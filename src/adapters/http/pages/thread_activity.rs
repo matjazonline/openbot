@@ -1,3 +1,4 @@
+//! A thread's run activity in the mailbox (p08 D4.6): a mark on its row and a strip under it.
 use super::*;
 
 /// A compact activity mark for a thread row.
@@ -6,7 +7,7 @@ pub fn thread_activity_mark(activity: Option<ThreadActivity>) -> String {
         None => String::new(),
         Some(activity) => format!(
             r##"<span class="shrink-0 leading-none {tint}{pulse}" title="{label}">{mark}</span>"##,
-            tint = if activity == ThreadActivity::Failed {
+            tint = if activity.needs_someone() {
                 "text-error"
             } else {
                 "opacity-60"
@@ -25,9 +26,20 @@ pub fn thread_activity_mark(activity: Option<ThreadActivity>) -> String {
 fn activity_icon(activity: ThreadActivity) -> Icon {
     match activity {
         ThreadActivity::Queued | ThreadActivity::Working => Icon::DotFill,
-        ThreadActivity::WaitingApproval => Icon::Hourglass,
-        ThreadActivity::WaitingReply => Icon::Mail,
-        ThreadActivity::Failed => Icon::Alert,
+        ThreadActivity::AwaitingReview | ThreadActivity::Waiting => Icon::Hourglass,
+        ThreadActivity::NeedsAttention | ThreadActivity::Failed => Icon::Alert,
+    }
+}
+
+/// The badge colour for an activity, shared by the strip and nothing else.
+fn activity_style(activity: ThreadActivity) -> &'static str {
+    match activity {
+        ThreadActivity::Queued => "badge-warning",
+        ThreadActivity::Working => "badge-info animate-pulse",
+        ThreadActivity::AwaitingReview => "badge-accent",
+        ThreadActivity::NeedsAttention => "badge-error badge-outline",
+        ThreadActivity::Waiting => "badge-info badge-outline",
+        ThreadActivity::Failed => "badge-error",
     }
 }
 
@@ -45,87 +57,49 @@ pub fn thread_activity_event(thread_id: Uuid) -> String {
     format!("activity-{thread_id}")
 }
 
-/// The full-width activity strip shown below an open thread.
-pub fn thread_activity_strip(activity: Option<ThreadActivity>) -> String {
-    thread_collaboration_strip(activity, None)
-}
-
-/// The mailbox-sized collaboration snapshot. The task workspace owns the nested detail; this
-/// strip answers the five questions needed while reading the conversation.
-pub fn thread_collaboration_strip(
-    activity: Option<ThreadActivity>,
-    summary: Option<&CollaborationSummary>,
+/// Every unfinished or failed run remains independently identifiable. The live stream replaces
+/// only this strip, leaving its stream owner and the message/composer state mounted.
+pub fn thread_activity_strip(
+    runs: &crate::application::thread_activity::ThreadRuns,
+    company_id: Uuid,
+    access: RunLinkAccess<'_>,
 ) -> String {
-    let Some(activity) = activity else {
+    if runs.items.is_empty() {
         return String::new();
-    };
-
-    let spinner = if activity == ThreadActivity::Working {
-        r##"<span class="loading loading-dots loading-sm"></span>"##
+    }
+    let entries: String = runs.items.iter().map(|run| {
+        let spinner = if run.activity.is_running() {
+            r#"<span class="loading loading-dots loading-sm" aria-hidden="true"></span>"#
+        } else { "" };
+        format!(r#"<li class="flex flex-wrap items-center gap-2" data-run-id="{id}">{spinner}{chip}<span>{title}</span><span class="badge badge-sm {style}">{label}</span></li>"#,
+            id=run.run_id, chip=run_chip(company_id, run.run_id, access),
+            title=escape_html_text(&run.title), style=activity_style(run.activity), label=escape_html_text(run.activity.label()))
+    }).collect();
+    let more = if runs.has_more {
+        "<li>Showing the newest 50 active or failed runs. Older runs are not shown.</li>"
     } else {
         ""
     };
-
-    let collaboration = summary.map(|summary| {
-        let progress = summary.progress.map(|progress| {
-            format!(" · {}/{} replies", progress.responded, progress.total)
-        }).unwrap_or_default();
-        let due = summary.expires_at.map(|at| {
-            let overdue = if at <= summary.as_of { " overdue" } else { "" };
-            format!(" · due {}{overdue}", format_time(at))
-        }).unwrap_or_default();
-        let next = summary
-            .next_action
-            .as_ref()
-            .map(|action| match action.actor {
-                NextActionActor::CurrentOwner => "owner",
-                NextActionActor::InternalTarget => "internal specialist",
-                NextActionActor::ExternalTarget => "external recipient",
-                NextActionActor::TaskQueue => "task queue",
-                NextActionActor::DeliveryQueue => "delivery queue",
-                NextActionActor::CompanyManager => "manager",
-            })
-            .map(|actor| format!(" · next: {actor}"))
-            .unwrap_or_default();
-        let unavailable = if summary.owner.available {
-            ""
-        } else {
-            " (unavailable)"
-        };
-        format!(
-            r##"<span class="truncate">Owner: <strong>{}</strong>{unavailable}{progress}{due}{next}</span>"##,
-            escape_html_text(&summary.owner.label),
-        )
-    }).unwrap_or_default();
-
     format!(
-        r##"<div class="flex flex-wrap items-center gap-2 border-t border-base-300 px-6 py-2 text-xs opacity-70">{spinner}<span class="badge badge-sm shrink-0 {style}">{label}</span>{collaboration}</div>"##,
-        style = task_status_style(activity.task_status()),
-        label = escape_html_text(activity.label()),
+        r#"<ul aria-label="Thread runs" class="space-y-1 border-t border-base-300 px-6 py-2 text-xs">{entries}{more}</ul>"#
     )
 }
 
-/// Text badge used by schedule-run rows, including the completed/idle state.
-pub fn schedule_run_activity_badge(activity: Option<ThreadActivity>) -> String {
-    let Some(activity) = activity else {
-        return r#"<span class="badge badge-ghost badge-xs opacity-60">Done</span>"#.into();
-    };
-
-    let spinner = if activity == ThreadActivity::Working {
-        r#"<span class="loading loading-spinner loading-xs"></span>"#
-    } else {
-        ""
-    };
-    let label = match activity {
-        ThreadActivity::Working => "Running",
-        ThreadActivity::Queued => "Queued",
-        ThreadActivity::WaitingApproval => "Waiting for approval",
-        ThreadActivity::WaitingReply => "Waiting for reply",
-        ThreadActivity::Failed => "Failed",
-    };
-
-    format!(
-        r#"<span class="badge badge-xs flex items-center gap-1 {style}">{spinner}{label}</span>"#,
-        style = task_status_style(activity.task_status()),
-    )
-}
+/// The live DOM retains the same newest-N window as initial reads and attribution reconciliation.
+/// Trimming only message bubbles preserves the stream owner and unsent composer/correction state
+/// on retained messages. Keep a retained anchor stationary even with browser scroll anchoring.
+pub const THREAD_HISTORY_SCRIPT: &str = r#"
+document.addEventListener('htmx:sseMessage', function (event) {
+    var pane = event.target;
+    if (!pane || pane.id !== 'message-scroll') return;
+    var limit = Number(pane.dataset.historyLimit);
+    if (!Number.isInteger(limit) || limit < 1) return;
+    var bubbles = pane.querySelectorAll(':scope > .chat[data-message-id]');
+    var excess = bubbles.length - limit;
+    if (excess <= 0) return;
+    var anchor = bubbles[excess];
+    var before = anchor.getBoundingClientRect().top;
+    for (var index = 0; index < excess; index++) bubbles[index].remove();
+    pane.scrollTop += anchor.getBoundingClientRect().top - before;
+});
+"#;

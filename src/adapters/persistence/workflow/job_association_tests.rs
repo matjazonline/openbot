@@ -1,4 +1,4 @@
-//! Exact workflow scope and legacy isolation on the fully migrated schema.
+//! Exact workflow scope on the fully migrated schema, where a job is only ever a workflow job.
 use super::*;
 use std::time::Duration;
 
@@ -110,7 +110,8 @@ async fn workflow_job_association_nullable_scope_matrix_and_shared_attempts() {
         .unwrap();
     let error = sqlx::query("INSERT INTO background_tasks (id, company_id, correlation_id, task_type) VALUES (gen_random_uuid(), $1, gen_random_uuid(), 'inbound_email')")
         .bind(company).execute(&mut *db).await.unwrap_err();
-    constraint(error, "background_tasks_legacy_channel_required");
+    // Every job is a workflow job now (p08 D4.8), so one naming no execution is refused as one.
+    constraint(error, "background_tasks_workflow_execution_fk");
 }
 
 #[tokio::test]
@@ -310,90 +311,4 @@ async fn workflow_job_association_prior_parent_update_serializes_insert() {
             .await
             .unwrap();
     }
-}
-
-#[tokio::test]
-async fn workflow_job_association_nullable_jobs_survive_legacy_control_and_recovery() {
-    use crate::{
-        entities::task::{ResumeActor, StopActor},
-        task_queue::TaskPersistence,
-    };
-    let f = JobFixture::new().await;
-    assert_nullable_gate(&f).await;
-    let p = &f.binding.fixture.persistence;
-    let company = f.binding.target.company.as_uuid();
-    let mut jobs = Vec::new();
-    for scope in [
-        RunAssociation::default(),
-        RunAssociation {
-            channel: Some(f.channel),
-            thread: None,
-        },
-        RunAssociation {
-            channel: Some(f.channel),
-            thread: Some(f.thread),
-        },
-    ] {
-        let execution = scoped_execution(&f, scope).await;
-        let job = scoped_job(
-            &mut p.pool().acquire().await.unwrap(),
-            company,
-            execution,
-            scope,
-        )
-        .await
-        .unwrap();
-        jobs.push(job);
-    }
-    let deadline = chrono::Utc::now() + chrono::Duration::minutes(5);
-    assert!(
-        p.claim_pending_tasks(Uuid::new_v4(), deadline, 10)
-            .await
-            .unwrap()
-            .is_empty()
-    );
-    for job in &jobs {
-        assert!(!p.claim_task(*job, Uuid::new_v4(), deadline).await.unwrap());
-        assert!(p.get_task_by_id(*job).await.unwrap().is_none());
-        assert!(
-            p.stop_task(*job, StopActor::Operator(Uuid::new_v4()))
-                .await
-                .is_err()
-        );
-        assert!(
-            p.resume_task(*job, ResumeActor::Operator(Uuid::new_v4()))
-                .await
-                .is_err()
-        );
-        assert!(
-            p.list_task_attempts(company, *job)
-                .await
-                .unwrap()
-                .is_empty()
-        );
-    }
-    assert!(
-        p.list_company_tasks_page(company, None, None, false, 0, 20)
-            .await
-            .unwrap()
-            .is_empty()
-    );
-    sqlx::query("UPDATE background_tasks SET status = 'processing', worker_id = gen_random_uuid(), execution_generation = gen_random_uuid(), locked_at = CURRENT_TIMESTAMP - INTERVAL '2 minutes', lock_expires_at = CURRENT_TIMESTAMP - INTERVAL '1 minute' WHERE id = ANY($1)")
-        .bind(&jobs).execute(p.pool()).await.unwrap();
-    let before: Vec<serde_json::Value> = sqlx::query_scalar(
-        "SELECT to_jsonb(task) FROM background_tasks AS task WHERE id = ANY($1) ORDER BY id",
-    )
-    .bind(&jobs)
-    .fetch_all(p.pool())
-    .await
-    .unwrap();
-    p.reap_expired_task_leases().await.unwrap();
-    let after: Vec<serde_json::Value> = sqlx::query_scalar(
-        "SELECT to_jsonb(task) FROM background_tasks AS task WHERE id = ANY($1) ORDER BY id",
-    )
-    .bind(&jobs)
-    .fetch_all(p.pool())
-    .await
-    .unwrap();
-    assert_eq!(before, after);
 }

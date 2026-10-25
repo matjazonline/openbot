@@ -1,0 +1,75 @@
+[
+  {
+    "check": "offline-compilation",
+    "command": [
+      "cargo",
+      "check",
+      "--locked",
+      "--offline",
+      "--all-targets"
+    ],
+    "exit_code": 0,
+    "seconds": 46.98
+  },
+  {
+    "check": "clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "--offline",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 0,
+    "seconds": 56.74
+  },
+  {
+    "check": "compile-tests",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--all-targets",
+      "--no-run"
+    ],
+    "exit_code": 0,
+    "seconds": 47.17
+  },
+  {
+    "check": "database-suite",
+    "command": [
+      "scripts/test-network-isolation.sh",
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--all-targets"
+    ],
+    "exit_code": 0,
+    "seconds": 325.24
+  },
+  {
+    "check": "stack-budget",
+    "command": [
+      "scripts/test-network-isolation.sh",
+      "scripts/stack-budget.sh",
+      "--offline"
+    ],
+    "exit_code": 0,
+    "seconds": 323.26
+  },
+  {
+    "check": "lease-budget",
+    "command": [
+      "scripts/test-network-isolation.sh",
+      "scripts/lease-budget.sh",
+      "--offline"
+    ],
+    "exit_code": 0,
+    "seconds": 187.59
+  }
+]

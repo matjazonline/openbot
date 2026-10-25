@@ -50,7 +50,7 @@ impl WorkflowBindings for PostgresPersistence {
         binding: WorkflowBindingId,
         key: &IdempotencyKey,
         trigger: &TriggerRef,
-    ) -> AppResult<Option<Arc<ConfiguredBinding>>> {
+    ) -> AppResult<Option<AdmissionBinding>> {
         if trigger.company_id() != company {
             return Err(conflict());
         }
@@ -64,9 +64,17 @@ impl WorkflowBindings for PostgresPersistence {
             .await?;
         let saved = saved_run(&mut tx, company, binding, key, trigger, &source).await?;
         let selected = if let Some(run) = saved {
-            Some(read_saved_binding(&mut tx, company, binding, run).await?)
+            Some(AdmissionBinding {
+                binding: read_saved_binding(&mut tx, company, binding, run).await?,
+                saved: true,
+            })
         } else {
-            current_binding(&mut tx, company, binding).await?
+            current_binding(&mut tx, company, binding)
+                .await?
+                .map(|binding| AdmissionBinding {
+                    binding,
+                    saved: false,
+                })
         };
         tx.commit().await?;
         Ok(selected)
@@ -149,8 +157,12 @@ struct SavedBindingRow {
     bundle: Vec<u8>,
     params: Value,
     resources: Value,
+    actor_id: Uuid,
 }
 
+/// A committed run's own configuration snapshot. It never reads the binding head or its
+/// revisions, so replay survives their removal; the snapshot acts with the run's actor and
+/// admits nothing further.
 pub(super) async fn read_saved_binding(
     db: &mut PgConnection,
     company: CompanyId,
@@ -158,7 +170,7 @@ pub(super) async fn read_saved_binding(
     run: Uuid,
 ) -> AppResult<Arc<ConfiguredBinding>> {
     let row = sqlx::query_as::<_, SavedBindingRow>(
-        "SELECT workflow_id, version_id, binding_revision, bundle, params, resources \
+        "SELECT workflow_id, version_id, binding_revision, bundle, params, resources, actor_id \
          FROM workflow_runs WHERE company_id = $1 AND id = $2 AND binding_id = $3",
     )
     .bind(company.as_uuid())
@@ -188,6 +200,8 @@ pub(super) async fn read_saved_binding(
             revision,
             params: row.params,
             resources: serde_json::from_value(row.resources).map_err(|_| invalid())?,
+            run_as: WorkflowActor::authenticated(row.actor_id).map_err(|_| invalid())?,
+            message_trigger: None,
         },
         bundle,
     )

@@ -21,6 +21,7 @@ async fn select(
             trigger,
         )
         .await
+        .map(|selected| selected.map(|selected| selected.binding))
 }
 
 // This slice implements the read port only. Seed an already committed snapshot

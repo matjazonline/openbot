@@ -87,6 +87,13 @@ impl HttpOperation {
         {
             return Err(invalid());
         }
+        // A built-in's name would make its snapshot classify as the built-in (p08 D2.1).
+        if super::provisioning::is_reserved_tool_name(self.tool.contract.name.as_str()) {
+            return Err(AppError::BadRequest(
+                "Built-in tool names (message.*, list_company_agents, create_agent_channel) are reserved"
+                    .into(),
+            ));
+        }
         let span = SourceSpan {
             start: 0,
             end: 0,

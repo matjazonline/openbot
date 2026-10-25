@@ -174,6 +174,10 @@ pub(super) fn child_binding(
             revision: parent.revision(),
             params,
             resources,
+            // Provenance only, like the binding identity: a child admits no messages and runs
+            // with the parent run's actor.
+            run_as: parent.run_as(),
+            message_trigger: None,
         },
         bundle,
     )
@@ -205,6 +209,7 @@ struct ParentRun {
     channel_id: Option<Uuid>,
     thread_id: Option<Uuid>,
     correlation_id: Uuid,
+    delivery_policy: String,
 }
 
 /// The single runtime child writer (07-D1 §D1.2a): the child run, its entry job, its admission
@@ -217,7 +222,7 @@ pub(super) async fn create_on(
     start: &ChildStart<'_>,
 ) -> AppResult<ParkedWorkflow> {
     let parent = sqlx::query_as::<_, ParentRun>(
-        "SELECT actor_id, channel_id, thread_id, correlation_id FROM workflow_runs \
+        "SELECT actor_id, channel_id, thread_id, correlation_id, delivery_policy FROM workflow_runs \
          WHERE company_id=$1 AND id=$2",
     )
     .bind(scope.company.as_uuid())
@@ -271,6 +276,8 @@ pub(super) async fn create_on(
                 execution: scope.execution,
             }),
             rerun_of: None,
+            // A simulation's child is a simulation too: it cannot send what its parent may not.
+            delivery_policy: DeliveryPolicy::parse(&parent.delivery_policy)?,
         },
     )
     .await?;

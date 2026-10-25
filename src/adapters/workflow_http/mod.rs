@@ -47,6 +47,7 @@ impl crate::adapters::persistence::workflow::action_dispatch::SqlLocalAction for
         &self,
         _: &mut sqlx::Transaction<'_, sqlx::Postgres>,
         _: &FrozenAction,
+        _: &crate::application::workflow::actions::ApprovalSubject,
     ) -> AppResult<Value> {
         Err(failed())
     }

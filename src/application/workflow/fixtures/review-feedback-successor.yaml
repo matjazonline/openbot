@@ -7,6 +7,8 @@ input_schema:
   properties:
     message: {type: string}
     source_message: {type: string, maxLength: 128}
+    subject: {type: string, maxLength: 998}
+    sender: {type: string, maxLength: 320}
   required: [message, source_message]
   additionalProperties: false
 parameter_schema:

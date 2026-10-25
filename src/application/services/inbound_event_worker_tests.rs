@@ -147,6 +147,20 @@ fn claimed(company_id: uuid::Uuid, installation_id: Option<InstallationId>) -> C
     }
 }
 
+/// A commit refused because the channel's settings moved retries, and so routes again; a
+/// conflicting redelivery cannot heal and stops.
+#[test]
+fn a_superseded_commit_retries_and_a_conflict_does_not() {
+    assert_eq!(
+        classify_commit_error(&AppError::Superseded("settings changed".into())),
+        (InboundEventErrorClass::Superseded, false)
+    );
+    assert_eq!(
+        classify_commit_error(&AppError::Conflict("changed content".into())),
+        (InboundEventErrorClass::Routing, true)
+    );
+}
+
 #[test]
 fn claimed_batches_are_round_robin_by_company_and_installation() {
     let busy_company = uuid::Uuid::new_v4();

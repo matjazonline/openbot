@@ -14,23 +14,17 @@ use crate::entities::{correlation::CorrelationId, transport::uuid_id};
 uuid_id!(NotificationId);
 uuid_id!(NotificationEventId);
 
+/// What a notification points at. A delivery is the only source (p08 D4.3): workflow decisions
+/// notify by email, never with an in-app row.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum NotificationSourceKind {
-    Task,
-    Handoff,
-    ResponseReview,
-    Delegation,
     Delivery,
 }
 
 impl NotificationSourceKind {
     pub const fn as_str(self) -> &'static str {
         match self {
-            Self::Task => "task",
-            Self::Handoff => "handoff",
-            Self::ResponseReview => "response_review",
-            Self::Delegation => "delegation",
             Self::Delivery => "delivery",
         }
     }
@@ -41,10 +35,6 @@ impl FromStr for NotificationSourceKind {
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value {
-            "task" => Ok(Self::Task),
-            "handoff" => Ok(Self::Handoff),
-            "response_review" => Ok(Self::ResponseReview),
-            "delegation" => Ok(Self::Delegation),
             "delivery" => Ok(Self::Delivery),
             _ => Err(format!("invalid notification source kind '{value}'")),
         }
@@ -60,48 +50,26 @@ impl fmt::Display for NotificationSourceKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum NotificationActionKind {
-    Assignment,
-    ResponseReview,
-    DelegationTimeout,
-    TaskFailure,
     DeliveryFailure,
 }
 
 impl NotificationActionKind {
-    pub const ALL: [Self; 5] = [
-        Self::Assignment,
-        Self::ResponseReview,
-        Self::DelegationTimeout,
-        Self::TaskFailure,
-        Self::DeliveryFailure,
-    ];
+    pub const ALL: [Self; 1] = [Self::DeliveryFailure];
 
     pub const fn as_str(self) -> &'static str {
         match self {
-            Self::Assignment => "assignment",
-            Self::ResponseReview => "response_review",
-            Self::DelegationTimeout => "delegation_timeout",
-            Self::TaskFailure => "task_failure",
             Self::DeliveryFailure => "delivery_failure",
         }
     }
 
     pub const fn label(self) -> &'static str {
         match self {
-            Self::Assignment => "Work assigned to you",
-            Self::ResponseReview => "Response review assigned to you",
-            Self::DelegationTimeout => "Delegation decision needed",
-            Self::TaskFailure => "Task needs failure recovery",
             Self::DeliveryFailure => "Delivery needs failure recovery",
         }
     }
 
     pub const fn email_preference(self, preferences: NotificationPreferences) -> bool {
         match self {
-            Self::Assignment => preferences.assignment_email_enabled,
-            Self::ResponseReview => preferences.response_review_email_enabled,
-            Self::DelegationTimeout => preferences.delegation_timeout_email_enabled,
-            Self::TaskFailure => preferences.task_failure_email_enabled,
             Self::DeliveryFailure => preferences.delivery_failure_email_enabled,
         }
     }
@@ -112,10 +80,6 @@ impl FromStr for NotificationActionKind {
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value {
-            "assignment" => Ok(Self::Assignment),
-            "response_review" => Ok(Self::ResponseReview),
-            "delegation_timeout" => Ok(Self::DelegationTimeout),
-            "task_failure" => Ok(Self::TaskFailure),
             "delivery_failure" => Ok(Self::DeliveryFailure),
             _ => Err(format!("invalid notification action kind '{value}'")),
         }
@@ -159,23 +123,20 @@ impl FromStr for NotificationState {
     }
 }
 
+/// A person's email preferences (p08 D4.3): delivery failures assigned to them, and workflow
+/// decisions that need their review. In-app alerts are always on.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct NotificationPreferences {
-    pub assignment_email_enabled: bool,
-    pub response_review_email_enabled: bool,
-    pub delegation_timeout_email_enabled: bool,
-    pub task_failure_email_enabled: bool,
     pub delivery_failure_email_enabled: bool,
+    /// Honoured by the decision-notice composer, not by this notification model (P08-Q8).
+    pub decision_email_enabled: bool,
 }
 
 impl Default for NotificationPreferences {
     fn default() -> Self {
         Self {
-            assignment_email_enabled: true,
-            response_review_email_enabled: true,
-            delegation_timeout_email_enabled: true,
-            task_failure_email_enabled: true,
             delivery_failure_email_enabled: true,
+            decision_email_enabled: true,
         }
     }
 }
@@ -226,7 +187,7 @@ pub struct NotificationRecipient {
     pub channel_label: String,
     pub channel_id: Uuid,
     pub thread_id: Option<Uuid>,
-    pub task_id: Option<Uuid>,
+    pub run_id: Option<Uuid>,
     pub correlation_id: CorrelationId,
     pub email_enabled: bool,
 }
@@ -281,9 +242,9 @@ mod tests {
                 id: NotificationEventId::random(),
                 notification_id: NotificationId::random(),
                 company_id: Uuid::new_v4(),
-                source_kind: NotificationSourceKind::Task,
+                source_kind: NotificationSourceKind::Delivery,
                 source_id: Uuid::new_v4(),
-                action_kind: NotificationActionKind::Assignment,
+                action_kind: NotificationActionKind::DeliveryFailure,
                 source_generation: 1,
                 actor_principal_id: Some(principal),
                 occurred_at: Utc::now(),
@@ -296,7 +257,7 @@ mod tests {
                 channel_label: "Support".into(),
                 channel_id: Uuid::new_v4(),
                 thread_id: None,
-                task_id: None,
+                run_id: None,
                 correlation_id: CorrelationId::new(),
                 email_enabled: true,
             }),
@@ -309,18 +270,42 @@ mod tests {
     }
 
     #[test]
-    fn every_email_family_has_an_explicit_preference() {
+    fn a_delivery_failure_emails_only_when_its_preference_is_on() {
+        let enabled = NotificationPreferences::default();
         let disabled = NotificationPreferences {
-            assignment_email_enabled: false,
-            response_review_email_enabled: false,
-            delegation_timeout_email_enabled: false,
-            task_failure_email_enabled: false,
             delivery_failure_email_enabled: false,
+            ..enabled
         };
-        assert!(
-            NotificationActionKind::ALL
-                .into_iter()
-                .all(|kind| !kind.email_preference(disabled))
+        for kind in NotificationActionKind::ALL {
+            assert!(kind.email_preference(enabled), "{kind:?}");
+            assert!(!kind.email_preference(disabled), "{kind:?}");
+        }
+    }
+
+    /// The legacy runtime's sources and actions went with it (p08 D4.3).
+    #[test]
+    fn only_the_delivery_source_and_action_parse() {
+        assert_eq!("delivery".parse(), Ok(NotificationSourceKind::Delivery));
+        assert_eq!(
+            "delivery_failure".parse(),
+            Ok(NotificationActionKind::DeliveryFailure)
         );
+        for retired in ["task", "handoff", "response_review", "delegation"] {
+            assert!(
+                retired.parse::<NotificationSourceKind>().is_err(),
+                "{retired}"
+            );
+        }
+        for retired in [
+            "assignment",
+            "response_review",
+            "delegation_timeout",
+            "task_failure",
+        ] {
+            assert!(
+                retired.parse::<NotificationActionKind>().is_err(),
+                "{retired}"
+            );
+        }
     }
 }

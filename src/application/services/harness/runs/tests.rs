@@ -171,9 +171,6 @@ fn execution_allowances_and_replay_counts_survive_restart_and_cannot_reset() {
             crate::app_error::ExecutionFailure::Budget
         ))
     ));
-    let diagnostics = serde_json::to_string(&RunDiagnostics::from(&saved)).unwrap();
-    assert!(!diagnostics.contains("fixture prompt"));
-    assert!(!diagnostics.contains("arguments"));
 }
 
 #[test]
@@ -340,11 +337,7 @@ fn terminal_usage_state_cannot_legitimize_over_admitted_reservations() {
     let mut saved = run();
     saved.policy.total_input_tokens = 100;
     saved.reservations = vec![reservation(), reservation()];
-    for state in [
-        RunState::Active,
-        RunState::BudgetExceeded,
-        RunState::Superseded,
-    ] {
+    for state in [RunState::Active, RunState::BudgetExceeded] {
         saved.state = state;
         assert!(saved.validate().is_err());
     }

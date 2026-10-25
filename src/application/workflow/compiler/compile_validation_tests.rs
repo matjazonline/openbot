@@ -214,6 +214,7 @@ limits: {{max_steps: 20, max_context_bytes: 4096}}
         run: RunMetadata {
             run_id: RunId::new(Uuid::nil()),
             parent_run_id: None,
+            deadline: None,
         },
     };
     assert_eq!(

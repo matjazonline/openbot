@@ -186,6 +186,12 @@ where
                     thread,
                     channel,
                 } => plan_internal_reply(*source, *thread, *channel, content, routes),
+                RouteTarget::User { .. } | RouteTarget::ReplyEmail { .. }
+                    if routes.delivery_policy
+                        == crate::application::workflow::DeliveryPolicy::InAppOnly =>
+                {
+                    plan_in_app(kind, destination_id, target, content, routes)?
+                }
                 RouteTarget::User { .. } | RouteTarget::ReplyEmail { .. } => {
                     self.plan_email(
                         request,
@@ -225,7 +231,6 @@ where
                 company_id: request.scope.company.as_uuid(),
                 channel_id: email.sender.id,
                 message_id,
-                task_id: None,
                 correlation_id: routes.correlation_id,
                 purpose: email.purpose,
                 source_key: source_key.to_string(),
@@ -361,8 +366,8 @@ impl EmailPlan {
                     in_reply_to: in_reply_to.clone(),
                     references: references.clone(),
                 },
-                // The agent-answer precedent (`dispatch.rs`): the reply continues the trace the
-                // source arrived with; with none recorded it starts one, as direct mail does.
+                // A reply continues the trace the source arrived with; with none recorded it
+                // starts one, as direct mail does.
                 relay: EmailRelayTrace {
                     source_channel_id: sender.id,
                     hop_count: relay.as_ref().map_or(0, |relay| relay.hop_count),
@@ -422,6 +427,40 @@ fn plan_channel(
         recipient: None,
         check: RouteCheck::Channel { channel },
     }
+}
+
+/// An email target of an `in_app_only` run (channel simulation's test mode, p08 D1.7): the same
+/// thread and the same route checks as the email plan, the message published in-app, and no
+/// delivery. A member's send still opens its own thread, with the member as its participant.
+fn plan_in_app(
+    kind: DestinationKind,
+    destination_id: Uuid,
+    target: &RouteTarget,
+    content: &CanonicalContent,
+    routes: &MessageRoutes,
+) -> AppResult<PlannedDestination> {
+    let email = EmailPlan::of(target, content)?;
+    let message = MessageWrite::internal(
+        email.thread_id,
+        MessageAuthorWrite::Platform,
+        content.subject().to_string(),
+        content.body_text().to_string(),
+        MessageDirection::Outbound,
+        MessageRole::System,
+        routes.correlation_id,
+    )
+    .with_entry_kind(ThreadEntryKind::Conversation);
+    Ok(PlannedDestination {
+        kind,
+        destination_id,
+        new_thread: email.new_thread,
+        thread_id: email.thread_id,
+        message,
+        delivery: None,
+        principal_id: email.principal,
+        recipient: None,
+        check: email.check,
+    })
 }
 
 fn plan_internal_reply(

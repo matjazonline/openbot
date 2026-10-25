@@ -120,6 +120,9 @@ pub struct WorkflowToolPin {
 pub enum ToolKind<'a> {
     /// A trusted built-in `message.*` tool.
     Message,
+    /// A trusted built-in provisioning tool (p08 D2.1). Only a name-only snapshot carries a
+    /// provisioning name this way; an MCP tool of the same name stays a slot tool.
+    Provisioning,
     /// A tool reached through one of the workflow's resource slots (MCP or slot-bound HTTP).
     Slot(&'a ResourceName),
     /// A company HTTP operation registered by name.
@@ -137,6 +140,13 @@ impl ToolSnapshot {
             self.contract.name.as_str(),
         ) {
             return ToolKind::Message;
+        }
+        if self.contract.connection.is_none()
+            && crate::application::workflow::provisioning::is_builtin_provisioning_tool(
+                self.contract.name.as_str(),
+            )
+        {
+            return ToolKind::Provisioning;
         }
         match &self.contract.connection {
             Some(slot) => ToolKind::Slot(slot),

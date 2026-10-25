@@ -1,0 +1,516 @@
+--- a/scripts/tests/workflow-runs-browser.cjs
++++ b/scripts/tests/workflow-runs-browser.cjs
+@@ -317,7 +317,25 @@
+   await page.unroute('**/rerun?**');
+   const redrawn = await reconnect();
+   const shownAfter = await page.evaluate(() => document.getElementById('run-pane').innerText);
+-  check('after a lost answer and a reconnect the page shows the committed rerun and asks deliberately for another', redrawn && shownAfter.includes('Rerun as') && shownAfter.includes('Rerun again') && (await rerunCount(lostThenReconnect)) === 1, `${redrawn} ${shownAfter.slice(0, 200)}`);
++  check('after a lost answer and reconnect the page shows the committed rerun and an explicit separate-intent link', redrawn && shownAfter.includes('Rerun as') && shownAfter.includes('Prepare another rerun') && (await rerunCount(lostThenReconnect)) === 1, `${redrawn} ${shownAfter.slice(0, 200)}`);
++
++  await page.click('#run-pane button:has-text("Rerun")');
++  await settle();
++  check('a replay after reconnect still opens the original rerun', (await rerunCount(lostThenReconnect)) === 1);
++  await page.goto(`${BASE}/ui/workflow-runs?company_id=${C}&run_id=${lostThenReconnect}`);
++  await settle();
++  await page.click('#run-pane a:has-text("Prepare another rerun")');
++  await settle();
++  const secondKey = await keyOf();
++  await page.route('**/rerun?**', async route => { await route.fetch(); await route.abort('connectionreset'); });
++  await page.click('#run-pane button:has-text("Rerun")');
++  await page.waitForTimeout(1500);
++  await page.unroute('**/rerun?**');
++  const secondReconnect = await reconnect();
++  check('a lost second rerun and reconnect retain its key', secondReconnect && secondKey === await keyOf());
++  await page.click('#run-pane button:has-text("Rerun")');
++  await settle();
++  check('repeating the second rerun after reconnect creates no third run', (await rerunCount(lostThenReconnect)) === 2);
+ 
+   // F022: on a waiting run, the open unfinished step stays open across a resync.
+   const waitingNow = startedRuns[3].json?.run_id ? (await api('POST', `${P}/workflow-bindings/${hold}/runs`, { input: {}, command_key: crypto.randomUUID() })).json?.run_id : null;
+@@ -394,8 +412,8 @@
+   check('a binding filter shows only that binding and a way back', filtered[0].includes('only') && filtered[0].includes('all runs') && filtered[1] === (await api('GET', `${P}/workflow-runs?binding_id=${hold}&limit=200`)).json.items.length, `${filtered[1]}`);
+ 
+   check(`every request htmx aborted (${aborts.length}) was a superseded read (GET), never a write`, aborts.every((a) => a.startsWith('GET ') || a.startsWith('get ')), aborts.join(' | '));
+-  check('the three severed SSE sockets report native EventSource errors', disconnectErrors.length === 3);
+-  check('both intentionally lost answers report sendError', errors.filter(e => e === 'htmx:sendError').length === 2);
++  check('the four severed SSE sockets report native EventSource errors', disconnectErrors.length === 4);
++  check('all three intentionally lost answers report sendError', errors.filter(e => e === 'htmx:sendError').length === 3);
+   const unexpected = errors.filter((e) => !/^htmx:(sendAbort|afterRequest|sendError|sseError)$/.test(e));
+   check('no unexpected page errors', unexpected.length === 0, unexpected.join(' | '));
+   fs.writeFileSync(OUT + '/results.json', JSON.stringify(results, null, 2));
+--- a/scripts/tests/workflow-runs.mjs
++++ b/scripts/tests/workflow-runs.mjs
+@@ -10,9 +10,9 @@
+     .split('const WORKFLOW_RUNS_SCRIPT: &str = r#"')[1].split('"#;')[0];
+ const assets = { '/htmx.js': read('assets/htmx-2.0.4.min.js'), '/runs.js': script,
+     '/sse.js': read('assets/htmx-ext-sse-2.2.3.js') };
+-const body = state => `<div id="run-body"><span hidden hx-get="/body" hx-trigger="sse:resync"
++const body = (state, child = 'queued') => `<div id="run-body"><span hidden hx-get="/body" hx-trigger="sse:resync, sse:run-child"
+     hx-target="#run-body" hx-swap="outerHTML" hx-sync="#run-body:replace"></span>
+-    <p id="state">${state}</p><details id="run-step-finished" hx-preserve="true"><summary>Finished step</summary><p>Output</p></details>
++    <p id="state">${state}</p><p id="child-state">${child}</p><details id="run-step-finished" hx-preserve="true"><summary>Finished step</summary><p>Output</p></details>
+     <details id="run-reconcile" hx-preserve="true"><summary>Record what happened</summary><textarea name="note"></textarea></details>
+     <form hx-post="/cancel" hx-target="#run-pane" hx-swap="outerHTML"><button>Cancel</button></form></div>`;
+ const pane = state => `<section id="run-pane">${body(state)}</section>`;
+@@ -52,10 +52,10 @@
+     await page.goto(`http://127.0.0.1:${server.address().port}/`);
+     await expect.poll(() => pending.length).toBe(1);
+     return { page, pending, streams, connections: () => connections,
+-        async respond(state) {
++        async respond(state, child) {
+             await expect.poll(() => pending.length).toBeGreaterThan(0);
+             const response = pending.shift();
+-            response.end(body(state));
++            response.end(body(state, child));
+             await page.waitForTimeout(150);
+         },
+         async close() {
+@@ -100,3 +100,17 @@
+         await expect(h.page.locator('#run-reconcile')).toHaveAttribute('open', '');
+     } finally { await h.close(); }
+ });
++
++
++test('a waiting parent refreshes a child badge on the child wakeup without reconnecting', async () => {
++    const h = await harness();
++    try {
++        await h.respond('waiting for child');
++        await expect(h.page.locator('#child-state')).toHaveText('queued');
++        for (const response of h.streams) response.write('event: run-child\ndata: child\n\n');
++        await h.respond('waiting for child', 'waiting for a decision');
++        await expect(h.page.locator('#state')).toHaveText('waiting for child');
++        await expect(h.page.locator('#child-state')).toHaveText('waiting for a decision');
++        assert.equal(h.connections(), 1);
++    } finally { await h.close(); }
++});
+--- a/src/adapters/http/pages/workflow_runs/detail.rs
++++ b/src/adapters/http/pages/workflow_runs/detail.rs
+@@ -83,8 +83,8 @@
+ ///   lost answer);
+ /// - a control's answer draws a new epoch, so the next press after a refusal sends a new key
+ ///   (P08-D3: a refusal is recorded under its key);
+-/// - a committed command moves the revision, or for a rerun the newest rerun (`extra`), so a
+-///   page drawn after it asks for the next one deliberately.
++/// - reruns never change their key merely because history grew: a reconnect after a lost
++///   answer must recover that request even if this run already had other reruns.
+ pub fn control_key(
+     viewer: Uuid,
+     epoch: Uuid,
+@@ -159,7 +159,7 @@
+     let (company_id, id) = (view.company_id, summary.run.as_uuid());
+     format!(
+         r##"<div id="run-body" class="flex min-h-0 flex-1 flex-col">
+-            <span hidden hx-get="/ui/workflow-runs/{id}?company_id={company_id}&amp;part=body" hx-trigger="sse:run-{id}, sse:resync{tick}"
++            <span hidden hx-get="/ui/workflow-runs/{id}?company_id={company_id}&amp;part=body" hx-trigger="sse:run-{id}, sse:resync{tick}{child_wakes}"
+                 hx-target="#run-body" hx-swap="outerHTML" hx-sync="#run-body:replace" hx-include="#run-epoch"></span>
+             <div class="border-b border-base-300 px-4 py-4 sm:px-6">
+                 <div class="flex flex-wrap items-center gap-2"><h2 class="min-w-0 truncate text-xl font-bold">{title}</h2>{state}</div>
+@@ -183,6 +183,11 @@
+         } else {
+             ""
+         },
++        child_wakes = run
++            .children
++            .iter()
++            .map(|child| format!(", sse:run-{}", child.run.as_uuid()))
++            .collect::<String>(),
+         title = escape_html_text(&run.workflow_title),
+         state = run_state_badge(&summary.state, summary.waiting_reason.as_deref()),
+         short = short_id(id),
+@@ -364,24 +369,17 @@
+         );
+     }
+     if run_ended(&summary.state) {
+-        // The newest rerun is part of the intent: a page drawn after a rerun committed asks for
+-        // another one deliberately, while one drawn before it repeats the same request.
+-        let newest = run.reruns.first().map(|rerun| rerun.as_uuid());
+-        let extra = newest.map(|rerun| rerun.to_string()).unwrap_or_default();
+-        match newest {
+-            None => {
+-                buttons.push(form("rerun", &extra, "Rerun", "btn-outline", None));
+-                notes.push(
+-                    "Rerun starts a new run with this run's input, on the same binding.".to_owned(),
+-                );
+-            }
+-            Some(_) => {
+-                buttons.push(form("rerun", &extra, "Rerun again", "btn-outline", None));
+-                notes.push(
+-                    "This run was already rerun (listed above); Rerun again starts one more new run with its input."
+-                        .to_owned(),
+-                );
+-            }
++        buttons.push(form("rerun", "", "Rerun", "btn-outline", None));
++        notes.push("Rerun starts a new run with this run's input, on the same binding. Repeating this action after a lost answer opens the same rerun.".to_owned());
++        if !run.reruns.is_empty() {
++            buttons.push(format!(
++                r#"<a class="btn btn-ghost btn-sm" {}>Prepare another rerun</a>"#,
++                run_pane_attrs(company_id, id)
++            ));
++            notes.push(
++                "To start a separate rerun, choose Prepare another rerun first, then Rerun."
++                    .to_owned(),
++            );
+         }
+     }
+     if summary.state == "waiting" && summary.waiting_reason.as_deref() == Some("reconciliation") {
+--- a/src/adapters/http/routes/workflows/ui/runs/authorization_tests.rs
++++ b/src/adapters/http/routes/workflows/ui/runs/authorization_tests.rs
+@@ -0,0 +1,87 @@
++//! Reconciliation and execution reads with real inaccessible identities.
++use super::*;
++
++/// Valid action/execution identities remain inaccessible through foreign company paths and a
++/// private channel. The owner then uses the very same fields successfully as a positive control.
++#[tokio::test]
++async fn reconciliation_and_step_refuse_foreign_and_hidden_channel_identities() {
++    use crate::adapters::persistence::workflow::reconciliation_fixture::{
++        HttpForm, uncertain_http,
++    };
++    for kind in [HttpForm::Slot, HttpForm::PrivateChannelSlot] {
++        let action = uncertain_http(kind).await;
++        let engine: Engine = Arc::new(WorkflowEngine::for_tests(action.persistence.clone()));
++        let owner_ui = || ui_over(&action.persistence, &engine, action.owner);
++        let shown = text(
++            pane(
++                owner_ui(),
++                Path(action.run),
++                pane_query(action.company, None),
++            )
++            .await,
++        )
++        .await
++        .unwrap();
++        let fields = [
++            "execution_id",
++            "invocation_id",
++            "argument_digest",
++            "marker_id",
++            "target",
++            "expected_revision",
++            "command_key",
++        ]
++        .map(|name| (name, field_value(&shown, name)));
++        let mut submitted: Vec<(&str, &str)> = fields
++            .iter()
++            .map(|(name, value)| (*name, value.as_str()))
++            .collect();
++        submitted.push(("note", "No confirmation from vendor yet."));
++        let (stranger, other) = owner_and_company(&action.persistence, "Foreign annotation").await;
++        let mut denied = vec![(stranger, other), (stranger, action.company)];
++        if matches!(kind, HttpForm::PrivateChannelSlot) {
++            denied.push((
++                teammate(&action.persistence, action.company, "admin").await,
++                action.company,
++            ));
++        }
++        for (viewer, company_id) in denied {
++            let ui = || ui_over(&action.persistence, &engine, viewer);
++            let refused = reconcile(
++                ui(),
++                Path(action.run),
++                Query(CompanyQuery { company_id }),
++                form(&submitted),
++            )
++            .await;
++            assert!(
++                matches!(refused, Err(WorkflowError::App(AppError::NotFound(_)))),
++                "{refused:?}"
++            );
++            let refused = step(
++                ui(),
++                Path((action.run, action.execution)),
++                Query(CompanyQuery { company_id }),
++            )
++            .await;
++            assert!(matches!(refused, Err(AppError::NotFound(_))), "{refused:?}");
++        }
++        let count = || async {
++            sqlx::query_scalar::<_, i64>("SELECT count(*) FROM workflow_action_evidence WHERE company_id = $1 AND run_id = $2")
++                .bind(action.company).bind(action.run).fetch_one(action.persistence.pool()).await.unwrap()
++        };
++        assert_eq!(count().await, 0);
++        let accepted = reconcile(
++            owner_ui(),
++            Path(action.run),
++            Query(CompanyQuery {
++                company_id: action.company,
++            }),
++            form(&submitted),
++        )
++        .await
++        .unwrap();
++        assert!(accepted.0.contains("Recorded:"));
++        assert_eq!(count().await, 1);
++    }
++}
+--- a/src/adapters/http/routes/workflows/ui/runs/controls_tests.rs
++++ b/src/adapters/http/routes/workflows/ui/runs/controls_tests.rs
+@@ -288,8 +288,8 @@
+ }
+ 
+ /// The command keys a page draws (F023): a wake-up redraw in the same epoch repeats them, so a
+-/// press after a lost answer replays; a rerun that committed shows on the redrawn page, whose
+-/// key then asks for another one deliberately; another viewer or epoch draws other keys.
++/// press after a lost answer replays, even when earlier reruns exist. Only explicitly opening
++/// a fresh pane prepares another intent; history updates and reconnects cannot do so.
+ #[tokio::test]
+ async fn a_redraw_repeats_its_keys_until_the_command_shows_on_the_page() {
+     let Some(f) = Fixture::new().await else {
+@@ -362,11 +362,37 @@
+             .await
+             .unwrap();
+     assert_eq!(reruns.len(), 1);
+-    // A redraw after the rerun committed shows it, and asks for another one deliberately.
++    // A redraw after commit shows the rerun but must still replay that same intent.
+     let after = redraw(f.owner, epoch).await;
+     assert!(after.contains("Rerun as") && after.contains(&pages::short_id(reruns[0])));
+-    assert!(after.contains("Rerun again"), "{after}");
+-    assert_ne!(field_value(&after, "command_key"), key);
++    assert!(after.contains("Prepare another rerun"), "{after}");
++    assert_eq!(field_value(&after, "command_key"), key);
++    let next_epoch = Uuid::new_v4();
++    let next = redraw(f.owner, next_epoch).await;
++    let next_key = field_value(&next, "command_key");
++    assert_ne!(next_key, key);
++    for _ in 0..2 {
++        let current = redraw(f.owner, next_epoch).await;
++        assert_eq!(field_value(&current, "command_key"), next_key);
++        rerun(
++            f.ui(f.owner),
++            Path(original),
++            f.query(),
++            form(&[("command_key", &next_key)]),
++        )
++        .await
++        .unwrap();
++    }
++    let count: i64 =
++        sqlx::query_scalar("SELECT count(*) FROM workflow_runs WHERE rerun_of_run_id = $1")
++            .bind(original)
++            .fetch_one(f.persistence.pool())
++            .await
++            .unwrap();
++    assert_eq!(
++        count, 2,
++        "reconnect after a second rerun must not create a third"
++    );
+ }
+ 
+ /// An HTTP action the server accepted: the step lists its receipt, and the run's cancel says
+--- a/src/adapters/http/routes/workflows/ui/runs/runs_tests.rs
++++ b/src/adapters/http/routes/workflows/ui/runs/runs_tests.rs
+@@ -25,6 +25,8 @@
+ use tokio_util::sync::CancellationToken;
+ use tower::ServiceExt;
+ 
++#[path = "authorization_tests.rs"]
++mod authorization_tests;
+ #[path = "controls_tests.rs"]
+ mod controls_tests;
+ #[path = "events_tests.rs"]
+@@ -388,7 +390,9 @@
+     // Wake-ups reload the body alone; a finished run has no tick, and its finished steps keep
+     // their place across those reloads.
+     assert!(
+-        parent_pane.contains(&format!(r#"hx-trigger="sse:run-{run}, sse:resync""#)),
++        parent_pane.contains(&format!(
++            r#"hx-trigger="sse:run-{run}, sse:resync, sse:run-{child}""#
++        )),
+         "{parent_pane}"
+     );
+     assert!(parent_pane.contains(&format!(
+--- a/src/adapters/persistence/workflow/action_approval_http_tests.rs
++++ b/src/adapters/persistence/workflow/action_approval_http_tests.rs
+@@ -89,8 +89,15 @@
+         additional,
+     ))
+     .await;
+-    let target = Box::pin(bound(&fixture, &connection, version, entrance)).await;
+-    let claim = Box::pin(claimed(&fixture, target)).await;
++    let target = Box::pin(bound(
++        &fixture,
++        &connection,
++        version,
++        entrance,
++        RelatedAssociation::Company,
++    ))
++    .await;
++    let claim = Box::pin(claimed(&fixture, target, RelatedAssociation::Company)).await;
+     Setup {
+         fixture,
+         connection,
+--- a/src/adapters/persistence/workflow/agent_recovery_tests.rs
++++ b/src/adapters/persistence/workflow/agent_recovery_tests.rs
+@@ -558,7 +558,7 @@
+         })
+         .await
+         .unwrap();
+-    let claim = Box::pin(claimed(&fixture, target)).await;
++    let claim = Box::pin(claimed(&fixture, target, RelatedAssociation::Company)).await;
+     let mut llm = scripted_llm(vec![LlmTurn::text("\"supported\"")]).await;
+     // Only the selected agent has a provider endpoint; selecting `sales` would fail.
+     register_scripted_agent_base_url(agents[1], &llm.base_url);
+--- a/src/adapters/persistence/workflow/agent_runtime_tests.rs
++++ b/src/adapters/persistence/workflow/agent_runtime_tests.rs
+@@ -166,9 +166,10 @@
+         &connection,
+         publication.version,
+         Entrance::Tool,
++        RelatedAssociation::Company,
+     ))
+     .await;
+-    let claim = Box::pin(claimed(&fixture, target)).await;
++    let claim = Box::pin(claimed(&fixture, target, RelatedAssociation::Company)).await;
+     AgentSetup {
+         fixture,
+         connection,
+--- a/src/adapters/persistence/workflow/http_authority_tests.rs
++++ b/src/adapters/persistence/workflow/http_authority_tests.rs
+@@ -47,7 +47,14 @@
+         .await;
+     assert!(result.is_err());
+     // The unchanged original still binds: the rejection is the selected contract, not the name.
+-    Box::pin(bound(fixture, &setup.connection, version, Entrance::Http)).await;
++    Box::pin(bound(
++        fixture,
++        &setup.connection,
++        version,
++        Entrance::Http,
++        RelatedAssociation::Company,
++    ))
++    .await;
+ }
+ 
+ #[tokio::test]
+@@ -59,6 +66,7 @@
+         &setup.connection,
+         setup.version,
+         Entrance::Http,
++        RelatedAssociation::Company,
+     ))
+     .await;
+     // Keep another matching owner live so a global registration lookup alone would pass.
+--- a/src/adapters/persistence/workflow/http_test_support.rs
++++ b/src/adapters/persistence/workflow/http_test_support.rs
+@@ -54,17 +54,52 @@
+     Http,
+     Tool,
+ }
+-pub(super) async fn setup(origin: &str, entrance: Entrance) -> Setup {
++pub(super) fn setup(origin: &str, entrance: Entrance) -> impl Future<Output = Setup> + '_ {
++    setup_scoped(origin, entrance, HttpTestScope::Company)
++}
++
++pub(super) enum HttpTestScope {
++    Company,
++    PrivateChannel,
++}
++
++pub(super) async fn setup_scoped(origin: &str, entrance: Entrance, scope: HttpTestScope) -> Setup {
+     let mut fixture = Fixture::new().await;
+     fixture.persistence = PostgresPersistence::with_credential_cipher(
+         fixture.persistence.pool().clone(),
+         CredentialCipher::for_test(),
+     );
++    let association = match scope {
++        HttpTestScope::Company => RelatedAssociation::Company,
++        HttpTestScope::PrivateChannel => {
++            use crate::application::use_cases::channel::{ChannelPersistence, ChannelWrite};
++            let channel = ChannelPersistence::create(
++                &fixture.persistence,
++                fixture.target.company.as_uuid(),
++                ChannelWrite {
++                    name: "Private HTTP fixture".into(),
++                    slug: "private-http".into(),
++                    enabled: false,
++                    ..ChannelWrite::default()
++                },
++            )
++            .await
++            .unwrap();
++            sqlx::query("UPDATE channels SET access_mode = 'allowlist' WHERE id = $1")
++                .bind(channel.id)
++                .execute(fixture.persistence.pool())
++                .await
++                .unwrap();
++            RelatedAssociation::Channel(crate::application::workflow::RelatedChannelId::new(
++                channel.id,
++            ))
++        }
++    };
+     // Box the real persistence/lifecycle seams to keep fixture setup on stock stacks.
+     let connection = Box::pin(configured(&fixture, origin, entrance)).await;
+     let version = Box::pin(published(&fixture, &connection, entrance, None)).await;
+-    let target = Box::pin(bound(&fixture, &connection, version, entrance)).await;
+-    let claim = Box::pin(claimed(&fixture, target)).await;
++    let target = Box::pin(bound(&fixture, &connection, version, entrance, association)).await;
++    let claim = Box::pin(claimed(&fixture, target, association)).await;
+     Setup {
+         version,
+         fixture,
+@@ -201,6 +236,7 @@
+     connection: &HttpConnection,
+     version: VersionId,
+     entrance: Entrance,
++    association: RelatedAssociation,
+ ) -> BindingTarget {
+     let p = &fixture.persistence;
+     let company = fixture.target.company;
+@@ -216,7 +252,7 @@
+         .configure(ConfigureBinding {
+             target,
+             expected: None,
+-            association: RelatedAssociation::Company,
++            association,
+             version,
+             params: json!({}),
+             resources: if tool {
+@@ -241,7 +277,11 @@
+         .unwrap();
+     target
+ }
+-pub(super) async fn claimed(fixture: &Fixture, target: BindingTarget) -> ClaimedWorkflow {
++pub(super) async fn claimed(
++    fixture: &Fixture,
++    target: BindingTarget,
++    association: RelatedAssociation,
++) -> ClaimedWorkflow {
+     let p = &fixture.persistence;
+     let company = fixture.target.company;
+     let actor = fixture.target.actor;
+@@ -249,7 +289,7 @@
+         .admit(AdmitWorkflowRequest {
+             company_id: company,
+             actor,
+-            association: RelatedAssociation::Company,
++            association,
+             trigger: TriggerRef::new(
+                 company,
+                 TriggerId::new(Uuid::new_v4()),
+--- a/src/adapters/persistence/workflow/reconciliation_fixture.rs
++++ b/src/adapters/persistence/workflow/reconciliation_fixture.rs
+@@ -13,6 +13,7 @@
+ pub(crate) enum HttpForm {
+     Slot,
+     Tool,
++    PrivateChannelSlot,
+ }
+ 
+ /// The uncertain action, its identities, and the fixture's own database.
+@@ -32,10 +33,14 @@
+ pub(crate) async fn uncertain_http(form: HttpForm) -> UncertainHttp {
+     let (origin, server) = server("HTTP/1.1 500 Error\r\nContent-Length: 0\r\n\r\n").await;
+     let entrance = match form {
+-        HttpForm::Slot => Entrance::Http,
++        HttpForm::Slot | HttpForm::PrivateChannelSlot => Entrance::Http,
+         HttpForm::Tool => Entrance::Tool,
+     };
+-    let setup = Box::pin(setup(&origin, entrance)).await;
++    let scope = match form {
++        HttpForm::PrivateChannelSlot => HttpTestScope::PrivateChannel,
++        _ => HttpTestScope::Company,
++    };
++    let setup = Box::pin(setup_scoped(&origin, entrance, scope)).await;
+     let failure = runtime(&setup)
+         .run(&setup.kind, &setup.claim)
+         .await

@@ -157,14 +157,14 @@ an explicit `Err(e) => { warn!(...); <fallback> }` arm so the choice is visible 
 
 A 5,000-line module is a merge-conflict magnet and blows past what can be held in context at once.
 When a file crosses **~1,000 lines**, split it into a directory module (`thread/mod.rs` +
-`thread/ingest/` + `thread/dispatch.rs`) along the phase boundaries above.
+`thread/ingest/` + `thread/message_write.rs`) along the phase boundaries above.
 
 Inline `#[cfg(test)] mod tests` is the convention here — keep it. But when the test module itself
 crosses **~500 lines**, move it to a sibling file (`#[cfg(test)] #[path = "thread_tests.rs"] mod
 tests;`), and hoist hand-written mocks (`MockCompanyPersistence`, `MockThreadPersistence`, …) into
-one shared `test_support` module instead of re-declaring them per file. The 700 lines of mocks in
-`thread.rs` exist because the decision logic isn't pure — following the extraction rule above
-deletes most of the need for them.
+one shared `test_support` module instead of re-declaring them per file, as
+`use_cases/thread/test_support.rs` does. Most of a mock's size is decision logic that isn't pure —
+following the extraction rule above deletes most of the need for it.
 
 A test that wants a real database takes one from `adapters::persistence::test_support`, wherever in
 the tree it lives: `test_pool` for the shared test database, `own_database` for a migrated database

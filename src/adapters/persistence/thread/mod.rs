@@ -10,11 +10,8 @@ mod external;
 mod inbound;
 mod internal_note;
 mod message;
-mod reply_publication;
 mod views;
-
-#[cfg(test)]
-pub(super) use views::THREAD_TASK_LOOKUP_SQL;
+pub(in crate::adapters::persistence) use views::THREAD_RUN_LOOKUP_SQL;
 
 #[cfg(test)]
 #[path = "test_support.rs"]
@@ -36,10 +33,7 @@ mod inbound_tests;
 #[path = "view_tests.rs"]
 mod view_tests;
 
-pub(crate) use message::{InsertedMessage, associate_message_on, insert_message_on};
-#[cfg(test)]
-pub(crate) use reply_publication::file_in_sibling_threads_on;
-pub(crate) use reply_publication::{TaskReplyPublication, publish_task_reply_on};
+pub(crate) use message::{associate_message_on, insert_message_on};
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -52,7 +46,6 @@ use std::{
 };
 use uuid::Uuid;
 
-use crate::adapters::persistence::delivery::enqueue::insert_delivery_on;
 use crate::adapters::persistence::participant::resolve_or_create_external_identity_on;
 use crate::adapters::protocols::email::EmailIdentity;
 use crate::{
@@ -70,7 +63,7 @@ use crate::{
         transport::{PrincipalId, TransportKind},
         value_objects::{EmailAddress, MessageId, ThreadIndex},
     },
-    transport::{DeliveryCreation, NewDelivery, ThreadPrincipalIntent},
+    transport::ThreadPrincipalIntent,
     use_cases::{
         participant::IdentityObservation,
         thread::{MessageWrite, ThreadPersistence},
@@ -302,62 +295,6 @@ impl ThreadPersistence for PostgresPersistence {
             .await?;
 
         tx.commit().await.map_err(AppError::from)?;
-        load_thread(&self.pool, id)
-            .await?
-            .ok_or_else(|| AppError::Internal("Created thread was not found".into()))
-    }
-
-    async fn ensure_schedule_run_thread(
-        &self,
-        run_id: Uuid,
-        channel_id: Uuid,
-        subject: &str,
-        participant_emails: &[EmailAddress],
-    ) -> AppResult<Thread> {
-        let mut tx = self.pool.begin().await.map_err(AppError::from)?;
-        let run: Option<(Option<Uuid>,)> =
-            sqlx::query_as("SELECT thread_id FROM schedule_runs WHERE id = $1 FOR UPDATE")
-                .bind(run_id)
-                .fetch_optional(&mut *tx)
-                .await
-                .map_err(AppError::from)?;
-        let (existing,) =
-            run.ok_or_else(|| AppError::Internal("Durable schedule run was not found".into()))?;
-
-        if let Some(thread_id) = existing {
-            tx.commit().await.map_err(AppError::from)?;
-            return load_thread(&self.pool, thread_id).await?.ok_or_else(|| {
-                AppError::Internal("Durable schedule run references a missing thread".into())
-            });
-        }
-
-        let id = Uuid::new_v4();
-        let scope: Option<(Uuid, Uuid)> = sqlx::query_as(
-            r#"INSERT INTO threads (id, company_id, channel_id, subject)
-               SELECT $1, company_id, id, $3 FROM channels WHERE id = $2
-               RETURNING company_id, channel_id"#,
-        )
-        .bind(id)
-        .bind(channel_id)
-        .bind(subject)
-        .fetch_optional(&mut *tx)
-        .await
-        .map_err(AppError::from)?;
-        let Some((company_id, channel_id)) = scope else {
-            return Err(AppError::Internal("Channel not found".into()));
-        };
-        insert_thread_email_participants(&mut tx, company_id, channel_id, id, participant_emails)
-            .await?;
-        sqlx::query(
-            "UPDATE schedule_runs SET thread_id = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $1",
-        )
-        .bind(run_id)
-        .bind(id)
-        .execute(&mut *tx)
-        .await
-        .map_err(AppError::from)?;
-        tx.commit().await.map_err(AppError::from)?;
-
         load_thread(&self.pool, id)
             .await?
             .ok_or_else(|| AppError::Internal("Created thread was not found".into()))
@@ -607,33 +544,6 @@ impl ThreadPersistence for PostgresPersistence {
         load_message(&self.pool, inserted.association_id).await
     }
 
-    async fn create_message_with_deliveries(
-        &self,
-        write: &MessageWrite,
-        deliveries: &[NewDelivery],
-    ) -> AppResult<(Message, Vec<DeliveryCreation>)> {
-        let mut tx = self.pool.begin().await.map_err(AppError::from)?;
-        let inserted = insert_message_on(&mut tx, write).await?;
-        let mut created = Vec::with_capacity(deliveries.len());
-        for delivery in deliveries {
-            if delivery.message_id != inserted.canonical_id {
-                // A delivery naming a different message than the one just written would either
-                // fail its foreign key or, worse, attach to some other message entirely. Refused
-                // here because the caller minted both ids and can only have crossed them.
-                return Err(AppError::Internal(format!(
-                    "Delivery '{}' names message {} but this transaction stored {}",
-                    delivery.idempotency_key, delivery.message_id, inserted.canonical_id
-                )));
-            }
-            created.push(insert_delivery_on(&mut tx, delivery).await?);
-        }
-        tx.commit().await.map_err(AppError::from)?;
-        Ok((
-            load_message(&self.pool, inserted.association_id).await?,
-            created,
-        ))
-    }
-
     async fn find_outbound_reply_after(
         &self,
         thread_id: Uuid,
@@ -648,13 +558,6 @@ impl ThreadPersistence for PostgresPersistence {
                      (SELECT answered.created_at, answered.id
                         FROM thread_messages AS answered
                        WHERE answered.thread_id = $1 AND answered.message_id = $2)
-                 -- The agent asking a third party something is not the agent answering this
-                 -- turn. Recognised by the canonical relation the outreach recorded, so a
-                 -- transport with no message header of its own is excluded on the same terms.
-                 AND NOT EXISTS (
-                     SELECT 1 FROM task_outreach_targets AS target
-                     WHERE target.request_message_id = message.id
-                 )
                ORDER BY association.created_at DESC, association.id DESC
                LIMIT 1"#
         );

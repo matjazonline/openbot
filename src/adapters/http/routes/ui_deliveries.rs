@@ -35,19 +35,18 @@ use crate::{
         channel::Channel,
         company::Company,
         delivery::{DeliveryEntry, DeliveryFilter, DeliveryQuery as DeliveryPageQuery},
-        task::BackgroundTask,
         transport::DeliveryId,
         value_objects::EmailAddress,
     },
     infra::config::AppConfig,
     use_cases::{
         channel::ChannelUseCases, company::CompanyUseCases, delivery::DeliveryReader,
-        thread::ThreadUseCases, user::UserUseCases,
+        user::UserUseCases,
     },
 };
 
 use super::{
-    task::deserialize_empty_string_as_none,
+    deserialize_empty_string_as_none,
     ui::{load_account, load_managed_company, managed_company_membership, workspace_user},
 };
 
@@ -110,7 +109,6 @@ const NO_SELECTION: &str = "Select a delivery to see whether it ever left the bu
 struct Workspace {
     company_use_cases: Arc<CompanyUseCases>,
     channel_use_cases: Arc<ChannelUseCases>,
-    thread_use_cases: Arc<ThreadUseCases>,
     user_use_cases: Arc<UserUseCases>,
     deliveries: Arc<dyn DeliveryReader>,
     config: Arc<AppConfig>,
@@ -130,7 +128,6 @@ impl FromRequestParts<AppState> for Workspace {
         Ok(Self {
             company_use_cases: state.company_use_cases.clone(),
             channel_use_cases: state.channel_use_cases.clone(),
-            thread_use_cases: state.thread_use_cases.clone(),
             user_use_cases: state.user_use_cases.clone(),
             deliveries: state.deliveries.clone(),
             config: state.config.clone(),
@@ -152,7 +149,6 @@ impl Workspace {
     fn view<'a>(&'a self, company: &'a Company) -> DeliveriesView<'a> {
         DeliveriesView {
             channel_use_cases: &self.channel_use_cases,
-            thread_use_cases: &self.thread_use_cases,
             deliveries: self.deliveries.as_ref(),
             monitoring: self.monitoring.as_ref(),
             user_id: self.user_id,
@@ -258,7 +254,6 @@ async fn delivery_pane(
 /// Everything the workspace renders from, so each handler names its data once.
 struct DeliveriesView<'a> {
     channel_use_cases: &'a ChannelUseCases,
-    thread_use_cases: &'a Arc<ThreadUseCases>,
     deliveries: &'a dyn DeliveryReader,
     monitoring: &'a dyn MonitoringService,
     user_id: Uuid,
@@ -294,23 +289,6 @@ impl DeliveriesView<'_> {
         Ok(entry.filter(|entry| entry.company_id == self.company.id))
     }
 
-    /// The task that produced a delivery, scoped the same way the delivery is: a `task_id` that
-    /// does not belong to this company renders as "unavailable" rather than leaking another's work.
-    async fn task(&self, entry: &DeliveryEntry) -> AppResult<Option<BackgroundTask>> {
-        let Some(task_id) = entry.task_id else {
-            return Ok(None);
-        };
-
-        let task = self
-            .thread_use_cases
-            .get_task_persistence()
-            .await
-            .get_task_by_id(task_id)
-            .await?;
-
-        Ok(task.filter(|task| task.company_id == self.company.id))
-    }
-
     fn list<'a>(
         &'a self,
         entries: &'a [DeliveryEntry],
@@ -335,9 +313,6 @@ impl DeliveriesView<'_> {
     }
 
     async fn pane(&self, entry: &DeliveryEntry, channels: &[Channel]) -> AppResult<String> {
-        // The task is joined in here, at render time: the transport never writes back into it, and
-        // a delivery still sitting in the queue is often waiting on the task rather than a sender.
-        let task = self.task(entry).await?;
         let channel = channels
             .iter()
             .find(|channel| channel.id == entry.channel_id);
@@ -345,7 +320,6 @@ impl DeliveriesView<'_> {
         Ok(pages::delivery_detail_pane(&pages::DeliveryDetailPane {
             company_id: self.company.id,
             entry,
-            task: task.as_ref(),
             channel,
         }))
     }

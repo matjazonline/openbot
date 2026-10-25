@@ -1,23 +1,28 @@
-//! The channel assignment gate: one transaction-scoped advisory lock per `(company, channel)`.
+//! The channel gate: one transaction-scoped advisory lock per `(company, channel)`.
 //!
-//! Row locks settle races over rows that already exist. They cannot stop a concurrent transaction
-//! from inserting a task that a just-removed agent will own, or from handing an existing task to
-//! that agent, because until then there is no row to lock. So:
+//! Routing decides whether a channel takes a message -- the enabled switch, the access mode, the
+//! allowlist, the addresses -- from reads made before the inbound commit begins, and nothing in
+//! that decision writes the channel row, so no row lock can protect it. The gate and the channel's
+//! settings revision do:
 //!
-//! - an assignment change takes the gate **exclusively**, before it reads the assignments it is
-//!   replacing or locks the channel row;
-//! - every writer that admits work through an assignment -- creating a task, starting one by hand,
-//!   transferring one to an agent, resuming one, publishing one's output or asking outreach on its
-//!   behalf -- takes it **shared**,
-//!   before its first row lock, and reads eligibility in a statement that starts after it is held.
+//! - a settings edit takes the gate **exclusively**, before it locks the channel row, and moves
+//!   `channels.settings_revision` on with the settings
+//!   ([`crate::adapters::persistence::channel_edit`]);
+//! - routing reads the revision in the statement that reads the settings it decides on;
+//! - the inbound commit takes the gate **shared** for every channel it admits into, before its
+//!   first row lock, and then refuses the message as [`AppError::Superseded`] if any of those
+//!   channels has moved past the revision it was routed under.
 //!
-//! Under `READ COMMITTED` that last point is what makes the gate mean anything: a statement that
-//! waited for the lock inside itself would still read with the snapshot it started with.
+//! So a message is stored under the settings it was routed against, with any edit waiting for the
+//! commit, or not at all -- its transport retries it and routing sees the new settings. Never
+//! under a mix of the two.
 //!
-//! Never take the gate while holding a task, outreach, draft or delivery row lock: the assignment
-//! change holds the gate and then takes those, in that order, and the reverse is a deadlock. The
-//! keys are hashed, so two unrelated channels can collide; a collision only serializes them, it
-//! never skips a lock.
+//! Under `READ COMMITTED` the revision check being a statement of its own, started after the gate
+//! is held, is what makes the gate mean anything: a statement that waited for the lock inside
+//! itself would still read with the snapshot it started with.
+//!
+//! The keys are hashed, so two unrelated channels can collide; a collision only serializes them,
+//! it never skips a lock.
 
 use sqlx::PgConnection;
 use uuid::Uuid;
@@ -43,11 +48,11 @@ impl ChannelGateKey {
 /// How a transaction takes the gate, which is also why.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ChannelGateAccess {
-    /// Admitting work through the channel's current assignments. Any number may hold it at once.
+    /// Admitting a message through the channel's current settings. Any number may hold it at once.
     Admit,
-    /// Changing the assignments themselves. Waits for every admission in flight, and holds new
-    /// ones back until it commits.
-    ChangeAssignments,
+    /// Changing those settings. Waits for every admission in flight, and holds new ones back
+    /// until it commits.
+    ChangeSettings,
 }
 
 /// Take the gate for every key, in `(company_id, channel_id)` order.
@@ -64,10 +69,10 @@ pub(crate) async fn acquire_channel_gates_on(
     keys.dedup();
     let function = match access {
         ChannelGateAccess::Admit => "pg_advisory_xact_lock_shared",
-        ChannelGateAccess::ChangeAssignments => "pg_advisory_xact_lock",
+        ChannelGateAccess::ChangeSettings => "pg_advisory_xact_lock",
     };
     let statement = format!(
-        "SELECT {function}(hashtextextended('channel-assignment:' || $1::text || ':' || $2::text, 0))"
+        "SELECT {function}(hashtextextended('channel-gate:' || $1::text || ':' || $2::text, 0))"
     );
     for key in keys {
         sqlx::query(&statement)
@@ -87,21 +92,4 @@ pub(crate) async fn acquire_channel_gate_on(
     access: ChannelGateAccess,
 ) -> AppResult<()> {
     acquire_channel_gates_on(conn, [key], access).await
-}
-
-/// The gate a task's primary channel is guarded by, read without taking any lock.
-///
-/// Read first and revalidated after: the caller takes the gate with this key and only then locks
-/// the task row, so it must not trust anything else this read returned.
-pub(crate) async fn task_gate_key_on(
-    conn: &mut PgConnection,
-    task_id: Uuid,
-) -> AppResult<Option<ChannelGateKey>> {
-    let row: Option<(Uuid, Uuid)> =
-        sqlx::query_as("SELECT company_id, channel_id FROM background_tasks WHERE queue_kind = 'legacy' AND id = $1")
-            .bind(task_id)
-            .fetch_optional(&mut *conn)
-            .await
-            .map_err(AppError::from)?;
-    Ok(row.map(|(company_id, channel_id)| ChannelGateKey::new(company_id, channel_id)))
 }

@@ -151,7 +151,7 @@ pub fn agents_page(company: &Company, agents: &[Agent]) -> String {
                         {avatar_field}
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label for="agent_provider" class="block text-xs font-medium text-base-content/80 mb-1">Provider</label>
                             <input type="text" id="agent_provider" name="provider"
@@ -162,11 +162,6 @@ pub fn agents_page(company: &Company, agents: &[Agent]) -> String {
                             <input type="text" id="agent_model" name="model"
                                 placeholder="gpt-4o, claude-3-5-sonnet" class="w-full bg-base-100 border border-base-300 rounded-lg px-3 py-2 text-sm text-base-content placeholder-base-content/60 focus:outline-none focus:border-primary transition">
                         </div>
-                        <div>
-                            <label for="agent_run_timeout_secs" class="block text-xs font-medium text-base-content/80 mb-1">Run Timeout</label>
-                            <input type="number" id="agent_run_timeout_secs" name="run_timeout_secs" min="1" max="3600"
-                                placeholder="Default" class="w-full bg-base-100 border border-base-300 rounded-lg px-3 py-2 text-sm text-base-content placeholder-base-content/60 focus:outline-none focus:border-primary transition">
-                        </div>
                     </div>
 
                     <div>
@@ -174,13 +169,6 @@ pub fn agents_page(company: &Company, agents: &[Agent]) -> String {
                         <textarea id="agent_system_prompt" name="system_prompt" rows="2"
                             placeholder="You are a helpful customer support agent..."
                             class="w-full bg-base-100 border border-base-300 rounded-lg px-3 py-2 text-sm text-base-content placeholder-base-content/60 focus:outline-none focus:border-primary transition"></textarea>
-                    </div>
-
-                    <div>
-                        <label for="agent_config_json" class="block text-xs font-medium text-base-content/80 mb-1">Config JSON (Optional)</label>
-                        <textarea id="agent_config_json" name="config_json" rows="2"
-                            placeholder='{{ "system_prompt": "You are a support agent." }}'
-                            class="w-full bg-base-100 border border-base-300 rounded-lg px-3 py-2 text-sm text-base-content font-mono placeholder-base-content/60 focus:outline-none focus:border-primary transition"></textarea>
                     </div>
 
                     <div class="flex justify-end pt-2">
@@ -233,17 +221,7 @@ pub fn agent_row_fragment(company: &Company, agent: &Agent) -> String {
     let slug = &agent.slug;
     let provider = agent.provider.as_deref().unwrap_or("-");
     let model = agent.model.as_deref().unwrap_or("-");
-    let run_timeout = agent
-        .run_timeout_secs
-        .map(|seconds| format!("{seconds}s"))
-        .unwrap_or_else(|| "Default".to_string());
     let system_prompt_display = agent.system_prompt.as_deref().unwrap_or("-");
-
-    let config_display = agent
-        .config_json
-        .as_ref()
-        .map(|c| serde_json::to_string(c).unwrap_or_default())
-        .unwrap_or_else(|| "-".to_string());
 
     format!(
         r##"
@@ -257,9 +235,7 @@ pub fn agent_row_fragment(company: &Company, agent: &Agent) -> String {
                 <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-base-content/70 font-mono">
                     <div><span class="text-base-content/70">Provider:</span> <span class="text-base-content">{provider}</span></div>
                     <div><span class="text-base-content/70">Model:</span> <span class="text-base-content">{model}</span></div>
-                    <div><span class="text-base-content/70">Run timeout:</span> <span class="text-base-content">{run_timeout}</span></div>
                     <div class="max-w-xs truncate"><span class="text-base-content/70">System Prompt:</span> <span class="text-base-content/80">{system_prompt_display}</span></div>
-                    <div class="max-w-xs truncate"><span class="text-base-content/70">Config:</span> <span class="text-base-content/80">{config_display}</span></div>
                 </div>
             </div>
             <div class="flex items-center gap-2">
@@ -281,9 +257,7 @@ pub fn agent_row_fragment(company: &Company, agent: &Agent) -> String {
         slug = escape_html_text(slug),
         provider = escape_html_text(provider),
         model = escape_html_text(model),
-        run_timeout = run_timeout,
         system_prompt_display = escape_html_text(system_prompt_display),
-        config_display = escape_html_text(&config_display)
     )
 }
 
@@ -294,16 +268,7 @@ pub fn agent_edit_fragment(company: &Company, agent: &Agent) -> String {
     let slug = &agent.slug;
     let provider = agent.provider.as_deref().unwrap_or("");
     let model = agent.model.as_deref().unwrap_or("");
-    let run_timeout = agent
-        .run_timeout_secs
-        .map(|seconds| seconds.to_string())
-        .unwrap_or_default();
     let system_prompt = agent.system_prompt.as_deref().unwrap_or("");
-    let config_json_str = agent
-        .config_json
-        .as_ref()
-        .map(|c| serde_json::to_string_pretty(c).unwrap_or_default())
-        .unwrap_or_default();
     let prompt_gen_html = render_ai_prompt_generator(
         company_id,
         &format!("agent_system_prompt_{agent_id}"),
@@ -332,7 +297,7 @@ pub fn agent_edit_fragment(company: &Company, agent: &Agent) -> String {
                     {avatar_field}
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-xs font-medium text-base-content/80 mb-1">Provider</label>
                         <input type="text" name="provider" value="{provider}" placeholder="openai, anthropic" class="w-full bg-base-100 border border-base-300 rounded-lg px-3 py-2 text-sm text-base-content focus:outline-none focus:border-primary transition">
@@ -341,20 +306,11 @@ pub fn agent_edit_fragment(company: &Company, agent: &Agent) -> String {
                         <label class="block text-xs font-medium text-base-content/80 mb-1">Model</label>
                         <input type="text" name="model" value="{model}" placeholder="gpt-4o" class="w-full bg-base-100 border border-base-300 rounded-lg px-3 py-2 text-sm text-base-content focus:outline-none focus:border-primary transition">
                     </div>
-                    <div>
-                        <label class="block text-xs font-medium text-base-content/80 mb-1">Run Timeout</label>
-                        <input type="number" name="run_timeout_secs" min="1" max="3600" value="{run_timeout}" placeholder="Default" class="w-full bg-base-100 border border-base-300 rounded-lg px-3 py-2 text-sm text-base-content focus:outline-none focus:border-primary transition">
-                    </div>
                 </div>
 
                 <div>
                     {prompt_gen_html}
                     <textarea id="agent_system_prompt_{agent_id}" name="system_prompt" rows="2" class="w-full bg-base-100 border border-base-300 rounded-lg px-3 py-2 text-sm text-base-content focus:outline-none focus:border-primary transition">{system_prompt}</textarea>
-                </div>
-
-                <div>
-                    <label class="block text-xs font-medium text-base-content/80 mb-1">Config JSON</label>
-                    <textarea name="config_json" rows="3" class="w-full bg-base-100 border border-base-300 rounded-lg px-3 py-2 text-sm text-base-content font-mono focus:outline-none focus:border-primary transition">{config_json_str}</textarea>
                 </div>
 
                 <div class="flex justify-end gap-2 pt-2">
@@ -377,9 +333,7 @@ pub fn agent_edit_fragment(company: &Company, agent: &Agent) -> String {
             legacy_agent_avatar_field(&agent_id.to_string(), name, agent.avatar_url.as_ref()),
         provider = escape_html_attr(provider),
         model = escape_html_attr(model),
-        run_timeout = run_timeout,
         system_prompt = escape_html_text(system_prompt),
-        config_json_str = escape_html_text(&config_json_str),
         prompt_gen_html = prompt_gen_html
     )
 }

@@ -1,12 +1,10 @@
 use super::{
-    AdmissionResult, CancelCommand, CancelResult, ClaimRequest, ClaimedExecution, CompanyId,
-    IdempotencyKey, PreparedAdmission, RetryCommand, RetryResult, RunHead,
-    binding::ConfiguredBinding,
+    AdmissionBinding, AdmissionResult, CancelCommand, CancelResult, ClaimRequest, ClaimedExecution,
+    CompanyId, IdempotencyKey, PreparedAdmission, RetryCommand, RetryResult, RunHead,
 };
 use crate::application::app_error::AppResult;
 use crate::domain::workflow::{RunId, TriggerRef, WorkflowBindingId};
 use async_trait::async_trait;
-use std::sync::Arc;
 
 #[async_trait]
 /// Selects the original immutable configuration for a matching company/key/binding
@@ -26,7 +24,7 @@ pub trait WorkflowBindings: Send + Sync {
         binding_id: WorkflowBindingId,
         key: &IdempotencyKey,
         trigger: &TriggerRef,
-    ) -> AppResult<Option<Arc<ConfiguredBinding>>>;
+    ) -> AppResult<Option<AdmissionBinding>>;
 }
 
 #[async_trait]

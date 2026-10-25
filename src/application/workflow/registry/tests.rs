@@ -31,6 +31,7 @@ pub(super) fn context<'a>(
         run: crate::domain::workflow::RunMetadata {
             run_id: crate::domain::workflow::RunId::new(Uuid::nil()),
             parent_run_id: None,
+            deadline: None,
         },
     }
 }
@@ -55,20 +56,22 @@ fn workflow_registry_exact_catalogue_and_help_examples_compile() {
         )
         .unwrap();
         assert_eq!(help.type_name.as_str(), name);
-        // 06-D6, 07-D1: notes of the kinds that execute describe behaviour, not unavailability.
-        let runnable = [
-            "context.history",
-            "ai.classify",
-            "agent.run",
-            "decision.agent",
-            "workflow.call",
-            "flow.repeat",
-        ];
+        // 06-D6, 07-D1, p09: every kind executes except memory (out of this release), and the
+        // editor's catalogue reference shows these notes to authors.
+        assert!(!help.notes.contains("Execution unavailable"), "{name}");
         assert_eq!(
-            help.notes.contains("Execution unavailable"),
-            !runnable.contains(&name),
+            help.notes.contains("Not available in this release"),
+            name.starts_with("memory."),
             "{name}"
         );
+        if name.starts_with("message.") {
+            assert!(
+                help.notes.contains(&format!(
+                    "at most {MAX_MESSAGE_DESTINATIONS} scoped destinations"
+                )),
+                "{name}"
+            );
+        }
         assert!(help.input_schema.is_object());
         assert!(help.constraints["recovery"].is_string());
         assert!(

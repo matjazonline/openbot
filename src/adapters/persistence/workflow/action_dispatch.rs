@@ -35,10 +35,12 @@ pub trait SqlActionAuthority: Send + Sync {
 #[async_trait]
 pub trait SqlLocalAction: Send + Sync {
     /// Registered same-database effect only. All writes must use the supplied transaction.
+    /// `subject` names the invocation, for effects that derive their identities from it.
     async fn apply(
         &self,
         tx: &mut Transaction<'_, Postgres>,
         action: &FrozenAction,
+        subject: &ApprovalSubject,
     ) -> AppResult<Value>;
 }
 
@@ -233,7 +235,7 @@ impl<A: SqlActionAuthority, L: SqlLocalAction> ActionDispatch for PostgresAction
                 let marker = Uuid::new_v4();
                 Self::insert(&mut tx, request, marker, "local", policy).await?;
                 // Box the local adapter seam to keep debug/test stacks bounded.
-                let result = validate_action_result(&action, Box::pin(self.local.apply(&mut tx, &action)).await?)?;
+                let result = validate_action_result(&action, Box::pin(self.local.apply(&mut tx, &action, &request.subject)).await?)?;
                 sqlx::query("INSERT INTO workflow_action_receipts (company_id,run_id,execution_id,invocation_id,argument_digest,dispatch_id,effect_kind,result) VALUES ($1,$2,$3,$4,$5,$6,'local',$7)")
                     .bind(request.scope().company.as_uuid()).bind(request.scope().run.as_uuid())
                     .bind(request.scope().execution.as_uuid()).bind(request.subject.invocation.as_uuid())

@@ -1,0 +1,35 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM pending_account_changes\n               WHERE user_id = $1\n                 AND kind = $2\n                 AND confirmation_code_hash = $3\n                 AND expires_at > CURRENT_TIMESTAMP\n               RETURNING new_email, new_password_hash",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "new_email",
+        "type_info": {
+          "Custom": {
+            "name": "citext",
+            "kind": "Simple"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "new_password_hash",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      true,
+      true
+    ]
+  },
+  "hash": "3112423579b6e7eca14779f1279e2beb28eabcab19fa6cddf71e7dfe5b14c439"
+}

@@ -28,7 +28,6 @@ use crate::{
         value_objects::ChannelSlug,
     },
     use_cases::{
-        agent::{AgentPersistence, AgentWrite, OwnedAgentChannelPersistence},
         channel::{ChannelPersistence, ChannelWrite},
         company::{CompanyPersistence, CompanyWrite},
         integration::{
@@ -788,7 +787,6 @@ async fn a_channel_gets_exactly_one_canonical_email_binding() {
                 crate::use_cases::channel::ChannelUpdate {
                     company_id,
                     channel_id,
-                    actor_user_id: Uuid::new_v4(),
                     write: ChannelWrite {
                         name: "Support".into(),
                         slug: "support".into(),
@@ -839,7 +837,6 @@ async fn renaming_a_channel_address_moves_its_binding_and_records_the_move() {
         crate::use_cases::channel::ChannelUpdate {
             company_id: acme.id,
             channel_id: support.id,
-            actor_user_id: Uuid::new_v4(),
             write: ChannelWrite {
                 name: "Helpdesk".into(),
                 slug: "helpdesk".into(),
@@ -1098,105 +1095,6 @@ async fn renaming_a_company_leaves_its_email_bindings_alone_and_resolvable() {
         .map(|event| event.action)
         .collect();
     assert_eq!(actions, vec![BindingAuditAction::Linked]);
-}
-
-/// An agent's address *is* its owned channel's address, and `update_agent_and_owned_address` is
-/// the second writer of `channel_slugs.is_primary`. It moved the slug without moving the binding
-/// until this test existed, which left the channel unreachable by mail while looking healthy in
-/// every projection.
-#[tokio::test]
-async fn renaming_an_agent_moves_its_owned_channel_binding_too() {
-    let Some(pool) = test_pool().await else {
-        return;
-    };
-    let persistence = PostgresPersistence::new(pool.clone());
-    let acme = company(&persistence, "agentaddr").await;
-    let suffix = Uuid::new_v4().simple().to_string();
-    let (agent, owned) = OwnedAgentChannelPersistence::create_owned_agent_channel(
-        &persistence,
-        acme.id,
-        AgentWrite {
-            name: "Scout".into(),
-            slug: format!("scout-{suffix}"),
-            ..Default::default()
-        },
-        ChannelWrite {
-            name: "Scout".into(),
-            slug: format!("scout-{suffix}"),
-            enabled: false,
-            ..ChannelWrite::default()
-        },
-    )
-    .await
-    .unwrap();
-    let before = persistence
-        .active_bindings_for_channel(acme.id, owned.id)
-        .await
-        .unwrap()
-        .remove(0);
-
-    let renamed = format!("ranger-{suffix}");
-    AgentPersistence::update(
-        &persistence,
-        agent.id,
-        AgentWrite {
-            name: "Ranger".into(),
-            slug: renamed.clone(),
-            ..Default::default()
-        },
-    )
-    .await
-    .unwrap();
-    OwnedAgentChannelPersistence::update_agent_and_owned_address(
-        &persistence,
-        agent.id,
-        AgentWrite {
-            name: "Ranger".into(),
-            slug: renamed.clone(),
-            ..Default::default()
-        },
-    )
-    .await
-    .unwrap();
-
-    let after = persistence
-        .active_bindings_for_channel(acme.id, owned.id)
-        .await
-        .unwrap()
-        .remove(0);
-    assert_eq!(after.id, before.id, "the interface is the same one");
-    assert_eq!(
-        after.external_endpoint_key.as_str(),
-        EmailEndpointKey::canonical(&ChannelSlug::from(renamed.as_str()))
-            .unwrap()
-            .as_str()
-    );
-    assert_eq!(
-        persistence
-            .find_active_binding_by_endpoint(&endpoint_of(&after))
-            .await
-            .unwrap()
-            .map(|found| found.id),
-        Some(before.id),
-        "the new address resolves"
-    );
-    assert!(
-        persistence
-            .find_active_binding_by_endpoint(&endpoint_of(&before))
-            .await
-            .unwrap()
-            .is_none(),
-        "and the abandoned one does not"
-    );
-    assert_eq!(
-        persistence
-            .list_binding_audit_events(acme.id, after.id, 50)
-            .await
-            .unwrap()
-            .first()
-            .map(|event| event.action),
-        Some(BindingAuditAction::EndpointChanged)
-    );
 }
 
 /// The invariant behind both rename tests, stated once: no writer of a channel's primary slug may

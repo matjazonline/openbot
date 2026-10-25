@@ -16,21 +16,13 @@ use crate::{
     adapters::http::{app_state::AppState, auth::AuthenticatedUser, pages},
     app_error::{AppError, AppResult},
     entities::{
-        agent::{Agent, MAX_AGENT_SKILLS, MAX_AGENT_SUB_AGENTS},
-        channel::Channel,
-        harness::{HarnessConfig, HarnessKind},
-        memory::{MemoryPersistenceMode, MemoryRecallMode, default_memory_max_results},
+        agent::{Agent, MAX_AGENT_SKILLS},
         value_objects::AvatarUrl,
     },
-    use_cases::{
-        agent::{AgentUseCases, ProvisioningWarning},
-        company::CompanyUseCases,
-        skill::SkillUseCases,
-    },
+    use_cases::{agent::AgentUseCases, company::CompanyUseCases, skill::SkillUseCases},
 };
 
 use super::channel::slugify;
-use super::task::deserialize_empty_string_as_none;
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -77,62 +69,17 @@ pub struct AgentForm {
     pub slug: Option<String>,
     pub provider: Option<String>,
     pub model: Option<String>,
-    /// Left blank to inherit the deployment default. A blank number input posts `""`, which
-    /// plain `Option<u32>` rejects with a 422 before the handler ever runs, so it is parsed the
-    /// same way every other optional form number is.
-    #[serde(default, deserialize_with = "deserialize_empty_string_as_none")]
-    pub run_timeout_secs: Option<u32>,
     pub system_prompt: Option<String>,
     /// Short statement of what this agent is for, shown to sibling agents by the directory tool.
     pub description: Option<String>,
-    pub config_json: Option<String>,
-    pub response_format: Option<String>,
-    pub response_schema: Option<String>,
     #[serde(default)]
     pub skill_ids: Option<String>,
-    #[serde(default)]
-    pub sub_agent_ids: Option<String>,
     pub avatar_url: Option<String>,
-    #[serde(default)]
-    pub memory_enabled: bool,
-    pub memory_persistence_mode: Option<MemoryPersistenceMode>,
-    pub memory_recall_mode: Option<MemoryRecallMode>,
-    #[serde(default, deserialize_with = "deserialize_empty_string_as_none")]
-    pub memory_max_results: Option<u8>,
     /// `"simple"` means `system_prompt` holds instructions to expand, not the prompt itself.
     pub form_mode: Option<String>,
 }
 
 impl AgentForm {
-    pub(super) fn response_contract(
-        &self,
-    ) -> Result<crate::entities::response_contract::ContractUpdate, String> {
-        use crate::entities::response_contract::{
-            ContractUpdate, MAX_SCHEMA_BYTES, ResponseContract,
-        };
-        match self.response_format.as_deref() {
-            None => Ok(ContractUpdate::default()),
-            Some("text") => Ok(ContractUpdate(Some(None))),
-            Some("json_schema") => {
-                let input = self.response_schema.as_deref().unwrap_or_default();
-                if input.len() > MAX_SCHEMA_BYTES {
-                    return Err("response_schema: schema exceeds 64 KiB".into());
-                }
-                let schema: serde_json::Value = serde_json::from_str(input)
-                    .map_err(|e| format!("response_schema: enter valid JSON: {e}"))?;
-                let contract = ResponseContract::parse(
-                    &serde_json::json!({
-                        "version": 1, "format": "json_schema", "schema": schema
-                    })
-                    .to_string(),
-                )
-                .map_err(str::to_string)?;
-                Ok(ContractUpdate(Some(Some(contract))))
-            }
-            Some(_) => Err("response_format: choose ordinary text or JSON Schema".into()),
-        }
-    }
-
     /// The avatar this submission means, or why it cannot be stored.
     ///
     /// A form that has no avatar field at all clears nothing and stores nothing -- the same as one
@@ -153,22 +100,13 @@ impl AgentForm {
 
     pub(super) fn capabilities(&self) -> Result<SubmittedCapabilities, String> {
         let skill_ids = parse_uuid_csv(self.skill_ids.as_deref(), MAX_AGENT_SKILLS, "skills")?;
-        let sub_agent_ids = parse_uuid_csv(
-            self.sub_agent_ids.as_deref(),
-            MAX_AGENT_SUB_AGENTS,
-            "sub-agents",
-        )?;
-        Ok(SubmittedCapabilities {
-            skill_ids,
-            sub_agent_ids,
-        })
+        Ok(SubmittedCapabilities { skill_ids })
     }
 }
 
 #[derive(Debug, Clone)]
 pub(super) struct SubmittedCapabilities {
     pub skill_ids: Vec<Uuid>,
-    pub sub_agent_ids: Vec<Uuid>,
 }
 
 const MAX_CAPABILITY_CSV_BYTES: usize = 8 * 1024;
@@ -209,28 +147,6 @@ pub(super) fn parse_uuid_csv(
         .collect()
 }
 
-/// A submitted config field becomes canonical Rig settings; an absent one keeps what is stored.
-pub(super) fn parse_config_form(
-    input: Option<String>,
-) -> Result<Option<serde_json::Value>, String> {
-    let Some(input) = input else {
-        return Ok(None);
-    };
-    if input.len() > crate::entities::harness::MAX_AGENT_HARNESS_CONFIG_BYTES {
-        return Err("Agent config exceeds 64 KiB".into());
-    }
-    let value = match input.trim() {
-        "" => None,
-        trimmed => Some(
-            serde_json::from_str(trimmed)
-                .map_err(|error| format!("Invalid JSON config: {error}"))?,
-        ),
-    };
-    HarnessConfig::parse(HarnessKind::Rig, value.as_ref())?
-        .to_json()
-        .map(Some)
-}
-
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct AgentJsonPayload {
@@ -238,26 +154,12 @@ pub struct AgentJsonPayload {
     pub slug: String,
     pub provider: Option<String>,
     pub model: Option<String>,
-    pub run_timeout_secs: Option<u32>,
     pub system_prompt: Option<String>,
     /// Short statement of what this agent is for, shown to sibling agents by the directory tool.
     pub description: Option<String>,
     #[serde(default)]
-    pub response_contract: crate::entities::response_contract::ContractUpdate,
-    pub config_json: Option<serde_json::Value>,
-    #[serde(default)]
     pub skill_ids: Option<Vec<Uuid>>,
-    #[serde(default)]
-    pub sub_agent_ids: Option<Vec<Uuid>>,
     pub avatar_url: Option<String>,
-    #[serde(default)]
-    pub memory_enabled: bool,
-    #[serde(default)]
-    pub memory_persistence_mode: MemoryPersistenceMode,
-    #[serde(default)]
-    pub memory_recall_mode: MemoryRecallMode,
-    #[serde(default = "default_memory_max_results")]
-    pub memory_max_results: u8,
 }
 
 impl AgentJsonPayload {
@@ -267,8 +169,6 @@ impl AgentJsonPayload {
     ) {
         self.skill_ids
             .get_or_insert_with(|| stored.skills.iter().map(|skill| skill.id).collect());
-        self.sub_agent_ids
-            .get_or_insert_with(|| stored.sub_agent_scope.allowed_ids().to_vec());
     }
 
     /// The avatar this payload means, or why it cannot be stored.
@@ -281,12 +181,7 @@ impl AgentJsonPayload {
 pub struct AgentResponse {
     pub success: bool,
     pub agent: Agent,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub channel: Option<Channel>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub warnings: Vec<ProvisioningWarning>,
     pub skill_ids: Vec<Uuid>,
-    pub sub_agent_ids: Vec<Uuid>,
 }
 
 /// What an agent answers with when it should not take the company's LLM settings.
@@ -306,21 +201,20 @@ pub(super) struct AgentInstructionRequest<'a> {
     pub slug: &'a str,
     pub instructions: &'a str,
     pub overrides: ModelOverrides<'a>,
-    pub run_timeout_secs: Option<u32>,
     pub avatar_url: Option<&'a AvatarUrl>,
 }
 
 /// An agent built from plain-language instructions rather than a written system prompt.
 ///
-/// Used by the `/ui` Agents workspace's Simple tab so prompt expansion and atomic address
-/// provisioning share the same model-validation path as Advanced creation.
+/// Used by the `/ui` Agents workspace's Simple tab so prompt expansion shares the same
+/// model-validation path as Advanced creation.
 pub(super) async fn create_agent_from_instructions(
     agent_use_cases: &AgentUseCases,
     request: AgentInstructionRequest<'_>,
-) -> Result<crate::use_cases::agent::ProvisionedAgent, String> {
+) -> Result<Agent, String> {
     let write = agent_write_from_instructions(agent_use_cases, request).await?;
     agent_use_cases
-        .create_addressable_agent(request.user_id, request.company_id, write)
+        .create_agent(request.user_id, request.company_id, write)
         .await
         .map_err(|err| format!("Failed to create agent: {err}"))
 }
@@ -349,7 +243,6 @@ pub(super) async fn agent_write_from_instructions(
         slug: request.slug.to_string(),
         provider: request.overrides.provider.map(str::to_string),
         model: request.overrides.model.map(str::to_string),
-        run_timeout_secs: request.run_timeout_secs,
         system_prompt: Some(system_prompt),
         avatar_url: request.avatar_url.cloned(),
         ..AgentWrite::default()
@@ -391,16 +284,11 @@ async fn create_agent_handler(
         _ => return Html(pages::error_alert("Company not found.")),
     };
 
-    let response_contract = match form.response_contract() {
-        Ok(contract) => contract,
-        Err(error) => return Html(pages::error_alert(&error)),
-    };
-    let submitted = form.capabilities().and_then(|capabilities| {
-        parse_config_form(form.config_json.clone())
-            .and_then(|config_json| Ok((capabilities, config_json, form.avatar_url()?)))
-    });
+    let submitted = form
+        .capabilities()
+        .and_then(|capabilities| Ok((capabilities, form.avatar_url()?)));
 
-    let (capabilities, config_json, avatar_url) = match submitted {
+    let (capabilities, avatar_url) = match submitted {
         Ok(fields) => fields,
         Err(err) => {
             let error_html = pages::error_alert(&err);
@@ -417,49 +305,31 @@ async fn create_agent_handler(
     };
 
     match agent_use_cases
-        .create_addressable_agent(
+        .create_agent(
             user.id,
             company_id,
             AgentWrite {
                 // Workflow tool grants are edited in phase 09; keep the stored list.
                 workflow_tools: None,
-                response_contract,
                 name: form.name.clone(),
                 slug: form.slug(),
                 provider: form.provider.clone(),
                 model: form.model.clone(),
-                run_timeout_secs: form.run_timeout_secs,
                 system_prompt: form.system_prompt.clone(),
                 description: form.description.clone(),
                 skill_ids: capabilities.skill_ids,
-                sub_agent_ids: capabilities.sub_agent_ids,
-                config_json,
-                memory_enabled: form.memory_enabled,
-                memory_persistence_mode: form.memory_persistence_mode.unwrap_or_default(),
-                memory_recall_mode: form.memory_recall_mode.unwrap_or_default(),
-                memory_max_results: form
-                    .memory_max_results
-                    .unwrap_or_else(default_memory_max_results),
                 avatar_url,
                 created_by: None,
             },
         )
         .await
     {
-        Ok(provisioned) => {
+        Ok(_) => {
             let agents = agent_use_cases
                 .list_company_agents(user.id, company_id)
                 .await
                 .unwrap_or_default();
-            let warnings = provisioned
-                .warnings
-                .iter()
-                .map(|warning| pages::error_alert(&warning.message))
-                .collect::<String>();
-            Html(format!(
-                "{warnings}{}",
-                pages::agent_list_fragment(&company, &agents)
-            ))
+            Html(pages::agent_list_fragment(&company, &agents))
         }
         Err(err) => {
             let error_html = pages::error_alert(&format!("Failed to create agent: {err}"));
@@ -536,16 +406,11 @@ async fn update_agent_handler(
         _ => return Html(pages::error_alert("Company not found.")),
     };
 
-    let response_contract = match form.response_contract() {
-        Ok(contract) => contract,
-        Err(error) => return Html(pages::error_alert(&error)),
-    };
-    let submitted = form.capabilities().and_then(|capabilities| {
-        parse_config_form(form.config_json.clone())
-            .and_then(|config_json| Ok((capabilities, config_json, form.avatar_url()?)))
-    });
+    let submitted = form
+        .capabilities()
+        .and_then(|capabilities| Ok((capabilities, form.avatar_url()?)));
 
-    let (capabilities, config_json, avatar_url) = match submitted {
+    let (capabilities, avatar_url) = match submitted {
         Ok(fields) => fields,
         Err(err) => return Html(pages::error_alert(&err)),
     };
@@ -558,23 +423,13 @@ async fn update_agent_handler(
             AgentWrite {
                 // Workflow tool grants are edited in phase 09; keep the stored list.
                 workflow_tools: None,
-                response_contract,
                 name: form.name.clone(),
                 slug: form.slug(),
                 provider: form.provider.clone(),
                 model: form.model.clone(),
-                run_timeout_secs: form.run_timeout_secs,
                 system_prompt: form.system_prompt.clone(),
                 description: form.description.clone(),
                 skill_ids: capabilities.skill_ids,
-                sub_agent_ids: capabilities.sub_agent_ids,
-                config_json,
-                memory_enabled: form.memory_enabled,
-                memory_persistence_mode: form.memory_persistence_mode.unwrap_or_default(),
-                memory_recall_mode: form.memory_recall_mode.unwrap_or_default(),
-                memory_max_results: form
-                    .memory_max_results
-                    .unwrap_or_else(default_memory_max_results),
                 avatar_url,
                 created_by: None,
             },
@@ -618,10 +473,7 @@ async fn list_agents_json(
         response.push(AgentResponse {
             success: true,
             agent,
-            channel: None,
-            warnings: Vec::new(),
             skill_ids: capabilities.skills.iter().map(|skill| skill.id).collect(),
-            sub_agent_ids: capabilities.sub_agent_scope.allowed_ids().to_vec(),
         });
     }
     Ok((StatusCode::OK, Json(response)))
@@ -636,8 +488,8 @@ async fn create_agent_json(
 ) -> AppResult<impl IntoResponse> {
     let avatar_url = payload.avatar_url().map_err(AppError::BadRequest)?;
 
-    let provisioned = agent_use_cases
-        .create_addressable_agent(
+    let agent = agent_use_cases
+        .create_agent(
             user.id,
             company_id,
             AgentWrite {
@@ -647,17 +499,9 @@ async fn create_agent_json(
                 slug: payload.slug.clone(),
                 provider: payload.provider.clone(),
                 model: payload.model.clone(),
-                run_timeout_secs: payload.run_timeout_secs,
                 system_prompt: payload.system_prompt.clone(),
                 description: payload.description.clone(),
                 skill_ids: payload.skill_ids.clone().unwrap_or_default(),
-                sub_agent_ids: payload.sub_agent_ids.clone().unwrap_or_default(),
-                config_json: payload.config_json.clone(),
-                response_contract: payload.response_contract.clone(),
-                memory_enabled: payload.memory_enabled,
-                memory_persistence_mode: payload.memory_persistence_mode,
-                memory_recall_mode: payload.memory_recall_mode,
-                memory_max_results: payload.memory_max_results,
                 avatar_url,
                 created_by: None,
             },
@@ -668,11 +512,8 @@ async fn create_agent_json(
         StatusCode::CREATED,
         Json(AgentResponse {
             success: true,
-            agent: provisioned.agent,
-            channel: Some(provisioned.channel),
-            warnings: provisioned.warnings,
+            agent,
             skill_ids: payload.skill_ids.unwrap_or_default(),
-            sub_agent_ids: payload.sub_agent_ids.unwrap_or_default(),
         }),
     ))
 }
@@ -698,10 +539,7 @@ async fn get_agent_json(
         Json(AgentResponse {
             success: true,
             agent,
-            channel: None,
-            warnings: Vec::new(),
             skill_ids: capabilities.skills.iter().map(|skill| skill.id).collect(),
-            sub_agent_ids: capabilities.sub_agent_scope.allowed_ids().to_vec(),
         }),
     ))
 }
@@ -733,17 +571,9 @@ async fn update_agent_json(
                 slug: payload.slug.clone(),
                 provider: payload.provider.clone(),
                 model: payload.model.clone(),
-                run_timeout_secs: payload.run_timeout_secs,
                 system_prompt: payload.system_prompt.clone(),
                 description: payload.description.clone(),
                 skill_ids: payload.skill_ids.clone().unwrap_or_default(),
-                sub_agent_ids: payload.sub_agent_ids.clone().unwrap_or_default(),
-                config_json: payload.config_json.clone(),
-                response_contract: payload.response_contract.clone(),
-                memory_enabled: payload.memory_enabled,
-                memory_persistence_mode: payload.memory_persistence_mode,
-                memory_recall_mode: payload.memory_recall_mode,
-                memory_max_results: payload.memory_max_results,
                 avatar_url,
                 created_by: None,
             },
@@ -755,10 +585,7 @@ async fn update_agent_json(
         Json(AgentResponse {
             success: true,
             agent,
-            channel: None,
-            warnings: Vec::new(),
             skill_ids: payload.skill_ids.unwrap_or_default(),
-            sub_agent_ids: payload.sub_agent_ids.unwrap_or_default(),
         }),
     ))
 }
@@ -895,48 +722,8 @@ pub async fn generate_agent_prompt_json(
 mod tests {
     use crate::entities::company::Company;
     use chrono::Utc;
-    use serde_json::json;
 
     use super::*;
-
-    /// A blank number input posts `name=`, and plain `Option<u32>`/`Option<u8>` answer that with
-    /// a 422 before the handler runs -- which is what "leave blank to inherit" used to do.
-    #[tokio::test]
-    async fn blank_optional_numbers_mean_absent_rather_than_a_rejected_form() {
-        async fn parse(body: &'static str) -> Result<AgentForm, StatusCode> {
-            use axum::extract::{FromRequest, Request};
-
-            let request = Request::post("/ui/agents")
-                .header("content-type", "application/x-www-form-urlencoded")
-                .body(axum::body::Body::from(body))
-                .unwrap();
-
-            Form::<AgentForm>::from_request(request, &())
-                .await
-                .map(|Form(form)| form)
-                .map_err(|rejection| rejection.status())
-        }
-
-        let form = parse(
-            "name=Support&system_prompt=Help&run_timeout_secs=&memory_max_results=&form_mode=simple",
-        )
-        .await
-        .expect("a blank number field is an omitted one");
-        assert_eq!(form.run_timeout_secs, None);
-        assert_eq!(form.memory_max_results, None);
-
-        let filled = parse("name=Support&run_timeout_secs=90&memory_max_results=7")
-            .await
-            .expect("a filled number field still parses");
-        assert_eq!(filled.run_timeout_secs, Some(90));
-        assert_eq!(filled.memory_max_results, Some(7));
-
-        assert_eq!(
-            parse("name=Support&run_timeout_secs=soon").await.err(),
-            Some(StatusCode::UNPROCESSABLE_ENTITY),
-            "a non-numeric timeout is still a bad form, not a silent None"
-        );
-    }
 
     #[tokio::test]
     async fn clearing_every_capability_checkbox_submits_empty_lists() {
@@ -944,60 +731,31 @@ mod tests {
 
         let request = Request::post("/ui/agents")
             .header("content-type", "application/x-www-form-urlencoded")
-            .body(axum::body::Body::from(
-                "name=Support&skill_ids=&sub_agent_ids=",
-            ))
+            .body(axum::body::Body::from("name=Support&skill_ids="))
             .unwrap();
         let Form(form) = Form::<AgentForm>::from_request(request, &())
             .await
             .expect("an empty selection parses");
         let parsed = form.capabilities().expect("empty selections are valid");
         assert!(parsed.skill_ids.is_empty());
-        assert!(parsed.sub_agent_ids.is_empty());
     }
 
     #[test]
     fn json_payload_round_trips_every_capability_field() {
         let skill_id = Uuid::new_v4();
-        let sub_agent_id = Uuid::new_v4();
         let payload: AgentJsonPayload = serde_json::from_value(serde_json::json!({
             "name": "Support",
             "slug": "support",
             "provider": null,
             "model": null,
-            "run_timeout_secs": 90,
             "system_prompt": "Help",
             "description": "Answers support mail",
-            "config_json": {"version": 1, "disambiguation": {"enabled": true}},
             "avatar_url": null,
-            "skill_ids": [skill_id],
-            "sub_agent_ids": [sub_agent_id],
-            "memory_enabled": false
+            "skill_ids": [skill_id]
         }))
         .unwrap();
         let encoded = serde_json::to_value(&payload).unwrap();
         assert_eq!(encoded["skill_ids"][0], skill_id.to_string());
-        assert_eq!(encoded["sub_agent_ids"][0], sub_agent_id.to_string());
-    }
-
-    #[test]
-    fn unknown_or_security_owned_advanced_config_paths_are_rejected_with_the_path_named() {
-        let unknown = parse_config_form(Some(
-            r#"{"version":1,"max_turns":4,"surprise":true}"#.into(),
-        ))
-        .expect_err("an unknown field must fail closed");
-        assert!(unknown.contains("surprise"), "{unknown}");
-        let retired = parse_config_form(Some(
-            r#"{"version":1,"reasoning":{"mode":"react","max_iterations":4}}"#.into(),
-        ))
-        .expect_err("retired ai-agents settings must fail closed");
-        assert!(retired.contains("reasoning"), "{retired}");
-
-        let security_owned = parse_config_form(Some(
-            r#"{"version":1,"tool_security":{"allow":["command"]}}"#.into(),
-        ))
-        .expect_err("security-owned settings cannot enter harness config");
-        assert!(security_owned.contains("tool_security"), "{security_owned}");
     }
 
     #[test]
@@ -1009,26 +767,18 @@ mod tests {
             name: "Acme Corp".to_string(),
             slug: "acme".into(),
             avatar_url: None,
-            memory_provider: None,
             created_at: Utc::now(),
         };
 
         let agent = Agent {
-            response_contract: None,
-            memory_enabled: false,
-            memory_persistence_mode: crate::entities::memory::MemoryPersistenceMode::AudienceOnly,
-            memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
-            memory_max_results: 5,
             id: Uuid::new_v4(),
             company_id: Some(company.id),
             name: "Support Agent".to_string(),
             slug: "support-agent".to_string(),
             provider: Some("openai".to_string()),
             model: Some("gpt-4o".to_string()),
-            run_timeout_secs: None,
             system_prompt: Some("You are a helpful agent.".to_string()),
             description: None,
-            config_json: Some(json!({ "temperature": 0.5 })),
             avatar_url: None,
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
@@ -1051,29 +801,6 @@ mod tests {
         assert!(page_html.contains("id=\"agent-form-toggle\""));
         assert!(page_html.contains("id=\"agent-form-card\" class=\"hidden"));
         assert!(page_html.contains("aria-controls=\"agent-form-card\""));
-
-        let selection_html = pages::render_agents_selection(
-            company.id,
-            std::slice::from_ref(&agent),
-            Some(&[agent.id]),
-            "new",
-        );
-        assert!(selection_html.contains("agents-selection-new"));
-        assert!(!selection_html.contains("inline-agent-form-new"));
-        assert!(!selection_html.contains("/agents/inline"));
-        assert!(selection_html.contains("/ui/agents?company_id="));
-        assert!(selection_html.contains("Manage agents in the Agents workspace"));
-        assert!(selection_html.contains("checked"));
-
-        let selection_error_html = pages::render_agents_selection_full(
-            company.id,
-            &[agent],
-            None,
-            "wf-1",
-            Some("Slug is already taken"),
-        );
-        assert!(selection_error_html.contains("Slug is already taken"));
-        assert!(selection_error_html.contains("agents-selection-wf-1"));
     }
 
     #[test]
@@ -1104,8 +831,16 @@ mod tests {
 mod harness_payload_tests {
     use super::*;
     #[test]
-    fn retired_capability_fields_are_unknown_and_config_is_canonical_rig() {
-        for retired in ["harness_kind", "granted_tool_ids", "native_tool_policy"] {
+    fn retired_agent_fields_are_unknown() {
+        for retired in [
+            "harness_kind",
+            "granted_tool_ids",
+            "native_tool_policy",
+            "config_json",
+            "run_timeout_secs",
+            "response_contract",
+            "sub_agent_ids",
+        ] {
             let mut value = serde_json::json!({"name":"test","slug":"test"});
             value[retired] = serde_json::json!(null);
             assert!(
@@ -1114,15 +849,6 @@ mod harness_payload_tests {
             );
         }
         assert!(serde_json::from_value::<AgentJsonPayload>(serde_json::json!({"name":"test","slug":"test","mcp_connections":[{"endpoint_url":"https://example.com","token":"secret"}]})).is_err());
-        assert_eq!(
-            parse_config_form(Some(String::new())).unwrap(),
-            Some(serde_json::json!({"version":1}))
-        );
-        assert_eq!(parse_config_form(None).unwrap(), None);
-        assert_eq!(
-            parse_config_form(Some(r#"{"version":1,"max_turns":2}"#.into())).unwrap(),
-            Some(serde_json::json!({"version":1,"max_turns":2}))
-        );
     }
 }
 

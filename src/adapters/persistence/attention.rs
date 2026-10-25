@@ -1,17 +1,15 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
 use crate::{
     adapters::persistence::PostgresPersistence,
     app_error::{AppError, AppResult},
-    application::attention::{AttentionPersistence, validate_handoff},
+    application::attention::AttentionPersistence,
     entities::{
         attention::{
             AttentionCursor, AttentionItem, AttentionPage, AttentionQuery, AttentionResponsibility,
-            AttentionSourceCommand, AttentionSourceKind, AttentionView, HandoffResolution,
-            NewManualHandoff, OperationalSummary, ResolveHandoffCommand,
+            AttentionSourceKind, AttentionView, OperationalSummary,
         },
         correlation::CorrelationId,
         transport::PrincipalId,
@@ -23,9 +21,9 @@ struct AttentionRow {
     source_kind: String,
     source_id: Uuid,
     company_id: Uuid,
-    channel_id: Uuid,
+    channel_id: Option<Uuid>,
     thread_id: Option<Uuid>,
-    task_id: Option<Uuid>,
+    run_id: Option<Uuid>,
     correlation_id: Option<Uuid>,
     state: String,
     responsible_principal_id: Option<Uuid>,
@@ -53,7 +51,7 @@ impl TryFrom<AttentionRow> for AttentionItem {
             company_id: row.company_id,
             channel_id: row.channel_id,
             thread_id: row.thread_id,
-            task_id: row.task_id,
+            run_id: row.run_id,
             correlation_id: row.correlation_id.map(CorrelationId::from),
             state: row.state,
             responsibility: match (
@@ -84,277 +82,202 @@ impl TryFrom<AttentionRow> for AttentionItem {
     }
 }
 
+/// The work list (p08 D4.2). `$14` is whether the viewer is an owner or admin: company-associated
+/// sources (no channel) are visible only to them, as on the decision page.
 const ATTENTION_SQL: &str = r#"
 WITH params AS (
     SELECT COALESCE($5::timestamptz, CURRENT_TIMESTAMP) AS as_of
 ), raw AS (
-    -- Every branch filters on the responsibility its own columns imply, so `my_work` and
-    -- `unassigned` never build a teammate's rows, or pay the task branch's anti-join probes for
-    -- them, only for `ranked` to discard them. Each filter reads `$4 <> '<view>' OR <predicate>`,
-    -- which leaves `team_work` exactly as it was. `ranked` keeps the authoritative copy.
-    SELECT 'task'::text AS source_kind, task.id AS source_id, task.company_id,
-           task.channel_id, task.thread_id, task.id AS task_id, task.correlation_id,
-           task.status AS state,
-           CASE WHEN task.owner_principal_kind = 'person' THEN task.owner_principal_id END
-               AS responsible_principal_id,
-           CASE WHEN task.owner_principal_kind = 'person'
-                THEN 'principal' ELSE 'channel_team' END AS responsibility_kind,
-           CASE WHEN task.owner_principal_kind = 'person'
-                THEN COALESCE(owner.display_label, 'Channel team') ELSE 'Channel team' END
-               AS responsibility_label,
-           task.task_type AS title,
-           CASE task.status
-             WHEN 'completed' THEN 'View the completed task'
-             WHEN 'stopped' THEN 'View the stopped task'
-             WHEN 'pending_approval' THEN 'Review the pending approval'
-             WHEN 'dead_letter' THEN 'Decide how to recover the failed task'
-             WHEN 'failed' THEN 'Decide how to recover the failed task'
-             ELSE 'Complete or reassign the task'
+    -- Every branch applies visibility (a readable channel, or company-associated for a manager)
+    -- and keeps to the views its own columns imply, so `my_work` and `unassigned` never build a
+    -- teammate's rows only for `ranked` to discard them. Each view filter reads
+    -- `$4 <> '<view>' OR <predicate>`. Decisions are the one source that is narrower than
+    -- `ranked` on purpose: they are never unassigned work.
+
+    -- My work: the open decisions the viewer reviews, driven from `workflow_decisions_open` and
+    -- probed on the reviewer key, so the work stays bounded by open decisions however many the
+    -- viewer has reviewed before.
+    SELECT 'decision'::text AS source_kind, decision.id AS source_id, decision.company_id,
+           run.channel_id, run.thread_id, run.id AS run_id, run.correlation_id,
+           'open'::text AS state,
+           viewer.id AS responsible_principal_id, 'principal'::text AS responsibility_kind,
+           viewer.display_label AS responsibility_label,
+           CASE decision.subject_kind WHEN 'action_approval' THEN 'Protected-action approval · '
+             WHEN 'token_allowance' THEN 'Token allowance approval · ' ELSE 'Business decision · ' END || version.title AS title,
+           CASE decision.subject_kind
+             WHEN 'action_approval' THEN 'Approve or reject the action'
+             WHEN 'token_allowance' THEN 'Approve or reject the token allowance'
+             ELSE 'Review and decide'
            END AS next_action,
-           task.business_priority, task.business_due_at AS due_at,
-           task.wait_expires_at AS expires_at,
-           task.attention_version AS version,
-           task.created_at, task.updated_at
-    FROM background_tasks AS task
-    LEFT JOIN principals AS owner
-      ON owner.company_id = task.company_id AND owner.id = task.owner_principal_id
-    WHERE task.queue_kind = 'legacy' AND task.company_id = $1 AND task.channel_id = ANY($2)
-      AND ($4 <> 'my_work'
-           OR (task.owner_principal_kind = 'person' AND task.owner_principal_id = $3))
-      AND ($4 <> 'unassigned' OR task.owner_principal_kind IS DISTINCT FROM 'person')
-      AND (
-        -- `all_owned` lifts the status filter. The `my_work` conjunct above has already
-        -- confined the branch to the viewer's own tasks.
-        ($14 AND $4 = 'my_work')
-        OR (task.status IN ('pending', 'processing', 'pending_approval',
-                          'waiting_for_third_party_reply', 'failed', 'dead_letter')
-        AND (task.owner_principal_kind = 'person' OR task.owner_principal_id IS NULL
-           OR task.status IN ('pending_approval', 'failed', 'dead_letter'))
-        AND NOT EXISTS (
-          SELECT 1 FROM human_approvals AS approval
-          WHERE approval.company_id = task.company_id AND approval.task_id = task.id
-            AND approval.status = 'pending'
-        )
-        AND NOT EXISTS (
-          SELECT 1 FROM response_reviews AS review
-          WHERE review.company_id = task.company_id AND review.status = 'pending'
-            AND EXISTS (
-                SELECT 1 FROM response_drafts AS draft
-                WHERE draft.company_id = task.company_id AND draft.id = review.draft_id
-                  AND draft.version = review.draft_version AND draft.task_id = task.id
-                  AND draft.status = 'pending_review'
-            )
-        )
-        AND NOT EXISTS (
-          SELECT 1 FROM task_outreaches AS outreach
-          WHERE outreach.company_id = task.company_id AND outreach.task_id = task.id
-            AND outreach.status = 'timeout_pending_approval'
-        )
-        AND NOT EXISTS (
-          SELECT 1 FROM message_deliveries AS delivery
-          WHERE delivery.company_id = task.company_id AND delivery.task_id = task.id
-            AND delivery.status IN ('outcome_unknown', 'dead_letter')
-            AND delivery.last_error_class IS DISTINCT FROM 'superseded'
-        )
-        )
-      )
+           'normal'::text AS business_priority, wait.deadline AS due_at,
+           NULL::timestamptz AS expires_at, decision.revision AS version,
+           decision.created_at, decision.created_at AS updated_at
+    FROM principals AS viewer
+    JOIN workflow_decision_reviewers AS reviewer
+      ON reviewer.company_id = viewer.company_id AND reviewer.user_id = viewer.user_id
+     AND reviewer.principal_id = viewer.id
+    JOIN workflow_decisions AS decision
+      ON decision.company_id = reviewer.company_id AND decision.id = reviewer.decision_id
+    JOIN workflow_waits AS wait
+      ON wait.company_id = decision.company_id AND wait.id = decision.wait_id
+    JOIN workflow_runs AS run
+      ON run.company_id = decision.company_id AND run.id = decision.run_id
+    JOIN workflow_versions AS version
+      ON version.company_id = run.company_id AND version.id = run.version_id
+    WHERE $4 = 'my_work' AND viewer.company_id = $1 AND viewer.id = $3
+      AND viewer.kind = 'person'
+      AND decision.submitted_at IS NULL AND wait.state = 'waiting'
+      AND (run.channel_id = ANY($2) OR (run.channel_id IS NULL AND $14))
 
     UNION ALL
 
-    SELECT 'handoff', handoff.id, handoff.company_id, handoff.channel_id, handoff.thread_id,
-           NULL::uuid, handoff.correlation_id, handoff.status,
-           handoff.responsible_principal_id,
-           CASE WHEN handoff.responsible_principal_id IS NULL
-                THEN 'channel_team' ELSE 'principal' END,
-           COALESCE(responsible.display_label, 'Channel team'), handoff.title,
-           handoff.next_action, handoff.business_priority, handoff.business_due_at,
-           NULL::timestamptz, handoff.version, handoff.created_at, handoff.updated_at
-    FROM manual_handoffs AS handoff
-    LEFT JOIN principals AS responsible
-      ON responsible.company_id = handoff.company_id
-     AND responsible.id = handoff.responsible_principal_id
-    WHERE handoff.company_id = $1 AND handoff.channel_id = ANY($2)
-      AND handoff.status = 'open'
-      AND ($4 <> 'my_work' OR handoff.responsible_principal_id = $3)
-      AND ($4 <> 'unassigned' OR handoff.responsible_principal_id IS NULL)
-
-    UNION ALL
-
-    -- `thread_handoffs`, the inbound-triggered one-per-thread handoff, which is a different
-    -- feature from `manual_handoffs` above and shares no table, state machine or version with it.
-    -- Its title and next action are derived here rather than stored: the row holds no free text,
-    -- so there is nothing to bound, escape, or keep in step with a renamed thread.
-    SELECT 'thread_handoff', handoff.id, handoff.company_id, handoff.channel_id,
-           -- `task_id` is the drafting run's task when one exists. `correlation_id` stays NULL:
-           -- nothing reads it for this kind, and joining `background_tasks` for symmetry would
-           -- buy a probe per row for a column no surface renders.
-           handoff.thread_id, run.task_id, NULL::uuid, handoff.state,
-           handoff.responsible_principal_id,
-           CASE WHEN handoff.responsible_principal_id IS NULL
-                THEN 'channel_team' ELSE 'principal' END,
-           COALESCE(responsible.display_label, 'Channel team'), thread.subject,
-           CASE handoff.state
-             WHEN 'needs_instruction' THEN 'Tell the agent what to do, reply, or dismiss'
-             WHEN 'draft_ready' THEN 'Review the drafted reply and send it'
-             ELSE 'Waiting for the drafting run'
+    -- Team work: every open decision, one row each, whoever reviews it.
+    SELECT 'decision', decision.id, decision.company_id, run.channel_id, run.thread_id, run.id,
+           run.correlation_id, 'open', NULL::uuid, 'channel_team',
+           (SELECT CASE COUNT(*) WHEN 1 THEN '1 reviewer' ELSE COUNT(*) || ' reviewers' END
+            FROM workflow_decision_reviewers AS reviewer
+            WHERE reviewer.company_id = decision.company_id
+              AND reviewer.decision_id = decision.id),
+           CASE decision.subject_kind WHEN 'action_approval' THEN 'Protected-action approval · '
+             WHEN 'token_allowance' THEN 'Token allowance approval · ' ELSE 'Business decision · ' END || version.title AS title,
+           CASE decision.subject_kind
+             WHEN 'action_approval' THEN 'Approve or reject the action'
+             WHEN 'token_allowance' THEN 'Approve or reject the token allowance'
+             ELSE 'Review and decide'
            END,
-           -- `expires_at` is NULL because nothing expires a handoff: a value here would feed
-           -- `AttentionCursor::for_item`'s `due_rank` and invent an SLA nobody agreed to.
-           handoff.business_priority, handoff.business_due_at, NULL::timestamptz,
-           -- `created_at` is `generation_opened_at`, so the queue's age describes *this* wait
-           -- rather than the first time this thread was ever held.
-           handoff.version, handoff.generation_opened_at, handoff.updated_at
-    FROM thread_handoffs AS handoff
-    JOIN threads AS thread
-      ON (thread.company_id, thread.channel_id, thread.id)
-       = (handoff.company_id, handoff.channel_id, handoff.thread_id)
-    LEFT JOIN principals AS responsible
-      ON responsible.company_id = handoff.company_id
-     AND responsible.id = handoff.responsible_principal_id
-    -- At most one run per generation (`thread_handoff_runs_generation_key`), so this join cannot
-    -- multiply the row, and a generation opened after a run finished simply finds none.
-    LEFT JOIN thread_handoff_runs AS run
-      ON run.company_id = handoff.company_id AND run.generation = handoff.generation
-    WHERE handoff.company_id = $1 AND handoff.channel_id = ANY($2)
-      -- This predicate and `ThreadHandoffState::is_actionable` are two spellings of one rule:
-      -- `drafting` is visible progress rather than work, and the two terminal states are gone for
-      -- good. Changing one without the other is the bug.
-      AND handoff.state IN ('needs_instruction', 'draft_ready')
-      AND (run.task_id IS NULL OR EXISTS (
-          SELECT 1 FROM background_tasks AS task
-          WHERE task.company_id = run.company_id AND task.id = run.task_id
-            AND task.queue_kind = 'legacy'
-      ))
-      AND ($4 <> 'my_work' OR handoff.responsible_principal_id = $3)
-      AND ($4 <> 'unassigned' OR handoff.responsible_principal_id IS NULL)
+           'normal', wait.deadline, NULL::timestamptz, decision.revision,
+           decision.created_at, decision.created_at
+    FROM workflow_decisions AS decision
+    JOIN workflow_waits AS wait
+      ON wait.company_id = decision.company_id AND wait.id = decision.wait_id
+    JOIN workflow_runs AS run
+      ON run.company_id = decision.company_id AND run.id = decision.run_id
+    JOIN workflow_versions AS version
+      ON version.company_id = run.company_id AND version.id = run.version_id
+    WHERE $4 = 'team_work' AND decision.company_id = $1
+      AND decision.submitted_at IS NULL AND wait.state = 'waiting'
+      AND (run.channel_id = ANY($2) OR (run.channel_id IS NULL AND $14))
 
     UNION ALL
 
-    SELECT 'approval', approval.id, approval.company_id, approval.channel_id,
-           approval.thread_id, approval.task_id, task.correlation_id, approval.status,
-           approval.approver_principal_id,
-           CASE WHEN approval.approver_principal_id IS NULL
-                THEN 'external' ELSE 'principal' END,
-           CASE WHEN approval.approver_principal_id IS NULL
-                THEN 'External approver'
-                ELSE COALESCE(approver.display_label, 'Assigned approver') END,
-           approval.action_title, 'Approve or reject the requested action',
-           COALESCE(task.business_priority, 'normal'),
-           COALESCE(task.business_due_at, approval.expires_at), approval.expires_at,
-           1::bigint, approval.created_at, approval.updated_at
-    FROM human_approvals AS approval
-    LEFT JOIN background_tasks AS task
-      ON task.company_id = approval.company_id AND task.id = approval.task_id
-    LEFT JOIN principals AS approver
-      ON approver.company_id = approval.company_id
-     AND approver.id = approval.approver_principal_id
-    WHERE approval.company_id = $1 AND approval.channel_id = ANY($2)
-      AND approval.status = 'pending'
-      AND (approval.task_id IS NULL OR task.queue_kind = 'legacy')
-      AND ($4 <> 'my_work' OR approval.approver_principal_id = $3)
-      -- Skips the branch outright under `unassigned`. Sound only because the select list above
-      -- makes responsibility 'principal' or 'external', never 'channel_team', so `ranked` would
-      -- discard every row anyway. If this branch ever emits 'channel_team', this line goes.
-      AND $4 <> 'unassigned'
+    SELECT 'run_reconciliation', run.id, run.company_id, run.channel_id, run.thread_id, run.id,
+           run.correlation_id, run.state, NULL::uuid, 'channel_team',
+           CASE WHEN run.channel_id IS NULL THEN 'Owners and admins' ELSE 'Channel team' END,
+           version.title, 'Check whether the uncertain action took effect', 'normal',
+           run.deadline, NULL::timestamptz, run.revision, run.created_at, run.created_at
+    FROM workflow_runs AS run
+    JOIN workflow_versions AS version
+      ON version.company_id = run.company_id AND version.id = run.version_id
+    WHERE $4 <> 'my_work' AND run.company_id = $1
+      AND run.state = 'waiting' AND run.waiting_reason = 'reconciliation'
+      AND (run.channel_id = ANY($2) OR (run.channel_id IS NULL AND $14))
 
     UNION ALL
 
-    SELECT 'response_review', review.draft_id, review.company_id, draft.channel_id,
-           draft.thread_id, draft.task_id, task.correlation_id, review.status,
-           review.reviewer_principal_id, 'principal', reviewer.display_label,
-           draft.subject, 'Review the proposed external response',
-           COALESCE(task.business_priority, 'normal'), task.business_due_at,
-           review.expires_at, draft.version::bigint, review.created_at, review.updated_at
-    FROM response_reviews AS review
-    JOIN response_drafts AS draft
-      ON draft.company_id = review.company_id AND draft.id = review.draft_id
-     AND draft.version = review.draft_version AND draft.status = 'pending_review'
-    JOIN principals AS reviewer
-      ON reviewer.company_id = review.company_id AND reviewer.id = review.reviewer_principal_id
-    LEFT JOIN background_tasks AS task
-      ON task.company_id = draft.company_id AND task.id = draft.task_id
-    WHERE review.company_id = $1 AND draft.channel_id = ANY($2) AND review.status = 'pending'
-      AND (draft.task_id IS NULL OR task.queue_kind = 'legacy')
-      -- A draft a thread handoff's drafting run produced is queued as its handoff, not as a
-      -- review: one piece of work, one item. This is the same de-duplication the `task` branch
-      -- performs against pending reviews, pointed the other way, and it is `DraftTarget`'s
-      -- `HandoffDraft`-beats-`Review` precedence written in SQL. The /reviews page still lists
-      -- the draft -- only the attention feed de-duplicates.
-      AND NOT EXISTS (
-          SELECT 1 FROM thread_handoff_runs AS run
-          WHERE run.company_id = draft.company_id AND run.task_id = draft.task_id
-      )
-      AND ($4 <> 'my_work' OR review.reviewer_principal_id = $3)
-      -- Skipped under `unassigned` for the same reason as approvals: responsibility here is
-      -- always 'principal'. If this branch ever emits 'channel_team', this line goes.
-      AND $4 <> 'unassigned'
+    -- The run actor's work while they are a member; nobody's otherwise.
+    SELECT 'run_failure', run.id, run.company_id, run.channel_id, run.thread_id, run.id,
+           run.correlation_id, run.state, actor.id,
+           CASE WHEN actor.id IS NULL THEN 'channel_team' ELSE 'principal' END,
+           COALESCE(actor.display_label,
+                    CASE WHEN run.channel_id IS NULL THEN 'Owners and admins'
+                         ELSE 'Channel team' END),
+           version.title, 'Review the failed run (failed in the last 7 days)', 'normal',
+           NULL::timestamptz, NULL::timestamptz, run.revision, run.created_at, run.created_at
+    FROM workflow_runs AS run
+    CROSS JOIN params
+    JOIN workflow_versions AS version
+      ON version.company_id = run.company_id AND version.id = run.version_id
+    LEFT JOIN principals AS actor
+      ON actor.company_id = run.company_id AND actor.user_id = run.actor_id
+     AND actor.kind = 'person'
+     AND EXISTS (SELECT 1 FROM company_members AS member
+                 WHERE member.company_id = run.company_id AND member.user_id = run.actor_id)
+    WHERE run.company_id = $1 AND run.state = 'failed'
+      AND run.created_at >= params.as_of - interval '7 days'
+      AND NOT EXISTS (SELECT 1 FROM workflow_runs AS rerun
+                      WHERE rerun.company_id = run.company_id AND rerun.rerun_of_run_id = run.id)
+      AND (run.channel_id = ANY($2) OR (run.channel_id IS NULL AND $14))
+      AND ($4 <> 'my_work' OR actor.id = $3)
+      AND ($4 <> 'unassigned' OR actor.id IS NULL)
 
     UNION ALL
 
-    SELECT 'delegation_decision', outreach.id, task.company_id, task.channel_id,
-           task.thread_id, task.id, task.correlation_id, outreach.status,
-           CASE WHEN task.owner_principal_kind = 'person' THEN task.owner_principal_id END,
-           CASE WHEN task.owner_principal_kind = 'person'
-                THEN 'principal' ELSE 'channel_team' END,
-           CASE WHEN task.owner_principal_kind = 'person'
-                THEN COALESCE(owner.display_label, 'Channel team') ELSE 'Channel team' END,
-           outreach.subject, 'Review the delegation timeout', task.business_priority,
-           CASE WHEN task.business_due_at IS NULL THEN outreach.expires_at
-                ELSE LEAST(task.business_due_at, outreach.expires_at) END,
-           outreach.expires_at, outreach.version, outreach.created_at, outreach.updated_at
-    FROM task_outreaches AS outreach
-    JOIN background_tasks AS task
-      ON task.company_id = outreach.company_id AND task.id = outreach.task_id
-    LEFT JOIN principals AS owner
-      ON owner.company_id = task.company_id AND owner.id = task.owner_principal_id
-    WHERE task.queue_kind = 'legacy' AND task.company_id = $1 AND task.channel_id = ANY($2)
-      AND outreach.status = 'timeout_pending_approval'
-      AND ($4 <> 'my_work'
-           OR (task.owner_principal_kind = 'person' AND task.owner_principal_id = $3))
-      AND ($4 <> 'unassigned' OR task.owner_principal_kind IS DISTINCT FROM 'person')
+    -- One row per binding. Refusals create no run and no event, so this refreshes on the page's
+    -- periodic tick.
+    SELECT 'binding_refusal', binding.id, binding.company_id, binding.channel_id, NULL::uuid,
+           NULL::uuid, NULL::uuid, 'refused', NULL::uuid, 'channel_team',
+           CASE WHEN binding.channel_id IS NULL THEN 'Owners and admins' ELSE 'Channel team' END,
+           COALESCE(version.title, 'Workflow binding'),
+           refusal.refused || CASE WHEN refusal.refused = 1 THEN ' refusal' ELSE ' refusals' END
+               || ' in the last 7 days; latest: ' || refusal.latest_reason,
+           'normal', NULL::timestamptz, NULL::timestamptz, refusal.refused,
+           refusal.latest_at, refusal.latest_at
+    FROM (
+        SELECT recent.binding_id, COUNT(*) AS refused, MAX(recent.created_at) AS latest_at,
+               (ARRAY_AGG(recent.reason ORDER BY recent.created_at DESC))[1] AS latest_reason
+        FROM (
+            SELECT intent_binding.binding_id, intent_binding.created_at, intent_binding.reason
+            FROM workflow_message_intent_bindings AS intent_binding
+            CROSS JOIN params
+            WHERE $4 = 'team_work' AND intent_binding.company_id = $1
+              AND intent_binding.outcome <> 'admitted'
+              AND intent_binding.created_at >= params.as_of - interval '7 days'
+            UNION ALL
+            SELECT schedule_run.binding_id, schedule_run.created_at,
+                   LEFT(COALESCE(schedule_run.refusal, schedule_run.last_error,
+                                 'schedule materialization failed'), 200)
+            FROM schedule_runs AS schedule_run
+            CROSS JOIN params
+            WHERE $4 = 'team_work' AND schedule_run.company_id = $1
+              AND schedule_run.materialization_status = 'failed'
+              AND schedule_run.created_at >= params.as_of - interval '7 days'
+        ) AS recent
+        GROUP BY recent.binding_id
+    ) AS refusal
+    JOIN workflow_bindings AS binding
+      ON binding.company_id = $1 AND binding.id = refusal.binding_id
+    LEFT JOIN workflow_binding_revisions AS revision
+      ON revision.company_id = binding.company_id AND revision.binding_id = binding.id
+     AND revision.revision = binding.configuration_revision
+    LEFT JOIN workflow_versions AS version
+      ON version.company_id = revision.company_id AND version.id = revision.version_id
+    WHERE $4 = 'team_work'
+      AND (binding.channel_id = ANY($2) OR (binding.channel_id IS NULL AND $14))
 
     UNION ALL
 
+    -- A workflow delivery is its run actor's work while they are a member; any other company
+    -- delivery (a person's mailbox send) is the channel team's.
     SELECT 'delivery_failure', delivery.id, delivery.company_id, delivery.channel_id,
-           task.thread_id, delivery.task_id, delivery.correlation_id, delivery.status,
-           CASE WHEN task.owner_principal_kind = 'person' THEN task.owner_principal_id END,
-           CASE WHEN task.owner_principal_kind = 'person'
-                THEN 'principal' ELSE 'channel_team' END,
-           CASE WHEN task.owner_principal_kind = 'person'
-                THEN COALESCE(owner.display_label, 'Channel team') ELSE 'Channel team' END,
+           destination.thread_id, run.id, delivery.correlation_id, delivery.status, actor.id,
+           CASE WHEN actor.id IS NULL THEN 'channel_team' ELSE 'principal' END,
+           COALESCE(actor.display_label, 'Channel team'),
            message.subject,
            CASE delivery.status WHEN 'outcome_unknown' THEN 'Resolve the unknown delivery outcome'
                 ELSE 'Repair or dismiss the permanent delivery failure' END,
-           COALESCE(task.business_priority, 'normal'), task.business_due_at,
-           NULL::timestamptz, GREATEST(delivery.attempt_count, 1)::bigint,
-           delivery.created_at, delivery.updated_at
+           'normal', NULL::timestamptz, NULL::timestamptz,
+           GREATEST(delivery.attempt_count, 1)::bigint, delivery.created_at, delivery.updated_at
     FROM message_deliveries AS delivery
     JOIN messages AS message
       ON message.company_id = delivery.company_id AND message.id = delivery.message_id
-    LEFT JOIN background_tasks AS task
-      ON task.company_id = delivery.company_id AND task.id = delivery.task_id
-    LEFT JOIN principals AS owner
-      ON owner.company_id = task.company_id AND owner.id = task.owner_principal_id
+    LEFT JOIN workflow_message_destinations AS destination
+      ON destination.company_id = delivery.company_id AND destination.delivery_id = delivery.id
+    LEFT JOIN workflow_runs AS run
+      ON run.company_id = destination.company_id AND run.id = destination.run_id
+    LEFT JOIN principals AS actor
+      ON actor.company_id = run.company_id AND actor.user_id = run.actor_id
+     AND actor.kind = 'person'
+     AND EXISTS (SELECT 1 FROM company_members AS member
+                 WHERE member.company_id = run.company_id AND member.user_id = run.actor_id)
     WHERE delivery.company_id = $1 AND delivery.channel_id = ANY($2)
-      AND (delivery.task_id IS NULL OR task.queue_kind = 'legacy')
       AND delivery.status IN ('outcome_unknown', 'dead_letter')
       AND delivery.last_error_class IS DISTINCT FROM 'superseded'
-      AND ($4 <> 'my_work'
-           OR (task.owner_principal_kind = 'person' AND task.owner_principal_id = $3))
-      -- A delivery with no task joins NULL owner columns, which is channel-team work.
-      AND ($4 <> 'unassigned' OR task.owner_principal_kind IS DISTINCT FROM 'person')
-      AND NOT EXISTS (
-          SELECT 1 FROM task_outreach_targets AS target
-          JOIN task_outreaches AS outreach
-            ON outreach.company_id = target.company_id AND outreach.id = target.outreach_id
-          WHERE target.company_id = delivery.company_id AND target.delivery_id = delivery.id
-            AND outreach.status = 'timeout_pending_approval'
-      )
+      AND ($4 <> 'my_work' OR actor.id = $3)
+      AND ($4 <> 'unassigned' OR actor.id IS NULL)
 ), ranked AS (
-    -- The authoritative responsibility filter. Every `raw` branch carries its own copy, and
-    -- this one stays as the backstop: a branch filter may be removed without changing a row,
-    -- but must never be narrower than this, because `ranked` cannot restore a row a branch
-    -- never produced.
+    -- The authoritative responsibility filter. A branch filter may be removed without changing
+    -- a row, but must never be narrower than this one unless that is the product rule (the
+    -- decisions above), because `ranked` cannot restore a row a branch never produced.
     SELECT raw.*, params.as_of,
            CASE WHEN raw.due_at < params.as_of THEN 0
                 WHEN raw.due_at <= params.as_of + interval '24 hours' THEN 1 ELSE 2 END AS due_rank,
@@ -366,14 +289,9 @@ WITH params AS (
                                   AND raw.responsible_principal_id = $3)
            OR ($4 = 'unassigned' AND raw.responsibility_kind = 'channel_team'))
 ), after_cursor AS (
-    -- Every page sorts the whole filtered set, and that is inherent, not an oversight. `due_rank`
-    -- depends on `as_of`, so no index can supply this order, and an expression index on it is
-    -- impossible because the expression is not immutable. Do not add one. The branch filters
-    -- above shrink the input for `my_work` and `unassigned`; `team_work` sorts everything.
-    -- Two ways to bound it were considered and not taken: a `created_at` horizon in every
-    -- branch, which would hide old open items and so is a product decision rather than a
-    -- database one; and a rollup maintained by the `notify_attention_changed` triggers, whose
-    -- trade-offs are in plan/db_improve/kanban_denormalized_rollup_table_optimization.md.
+    -- Every page sorts the whole filtered set, and that is inherent: `due_rank` depends on
+    -- `as_of`, so no index can supply this order. The branch filters shrink the input for
+    -- `my_work` and `unassigned`; `team_work` sorts everything, bounded by the working set.
     SELECT * FROM ranked
     WHERE NOT $6 OR (due_rank, priority_rank, created_at, source_kind, source_id)
           > ($7, $8, $9, $10, $11)
@@ -387,13 +305,15 @@ ORDER BY due_rank, priority_rank, created_at, source_kind, source_id
 LIMIT $13
 "#;
 
-/// Bind a feed statement to the fourteen parameters `query` implies.
+/// Bind a feed statement to the fourteen parameters `query` implies, examining at most
+/// `working_set` eligible rows after the cursor.
 ///
 /// Takes the statement rather than naming `ATTENTION_SQL` so a test can hold a reference
 /// statement to exactly the parameters production binds.
 fn bind_attention<'q>(
     sql: &'q str,
     query: AttentionQuery<'q>,
+    working_set: usize,
 ) -> sqlx::query::QueryAs<'q, sqlx::Postgres, AttentionRow, sqlx::postgres::PgArguments> {
     let cursor = query.cursor;
     let view = match query.view {
@@ -415,201 +335,44 @@ fn bind_attention<'q>(
         .bind(cursor.map_or(sentinel_time, |cursor| cursor.created_at))
         .bind(cursor.map_or("", |cursor| cursor.source_kind.as_str()))
         .bind(cursor.map_or(sentinel_id, |cursor| cursor.source_id))
-        .bind((AttentionQuery::MAX_WORKING_SET + 1) as i64)
+        .bind((working_set + 1) as i64)
         .bind((query.clamped_limit() + 1) as i64)
-        .bind(query.all_owned)
+        .bind(query.manager)
 }
 
-fn item_href(item: &AttentionItem) -> String {
+/// Stable destinations; their routes independently authorize company and channel access.
+fn item_href(item: &AttentionItem) -> Option<String> {
     match item.source_kind {
-        AttentionSourceKind::ResponseReview => format!("/reviews/{}", item.source_id),
-        AttentionSourceKind::Approval => format!(
-            "/ui/approvals/{}?company_id={}",
-            item.source_id, item.company_id
-        ),
+        AttentionSourceKind::Decision => Some(format!("/ui/workflow-decisions/{}", item.source_id)),
         AttentionSourceKind::DeliveryFailure => {
-            format!("/ui/deliveries?company_id={}", item.company_id)
+            Some(format!("/ui/deliveries?company_id={}", item.company_id))
         }
-        AttentionSourceKind::Task | AttentionSourceKind::DelegationDecision => item
-            .correlation_id
-            .map(|correlation| {
+        AttentionSourceKind::RunReconciliation | AttentionSourceKind::RunFailure => {
+            item.run_id.map(|run| {
                 format!(
-                    "/ui/tasks?company_id={}&view=board&correlation_id={correlation}",
+                    "/ui/workflow-runs?company_id={}&run_id={run}",
                     item.company_id
                 )
             })
-            .unwrap_or_else(|| format!("/ui/tasks?company_id={}", item.company_id)),
-        AttentionSourceKind::Handoff => match item.thread_id {
-            Some(thread_id) => format!(
-                "/ui?company_id={}&channel_id={}&thread_id={thread_id}",
-                item.company_id, item.channel_id
-            ),
-            None => format!(
-                "/ui?company_id={}&channel_id={}",
-                item.company_id, item.channel_id
-            ),
-        },
-        // Unlike the manual handoff above, `thread_handoffs.thread_id` is `NOT NULL`, so there is
-        // no fallback to write. A `None` here would mean that constraint was removed, and a link
-        // to the wrong thread is worse than a panic a test will find.
-        AttentionSourceKind::ThreadHandoff => format!(
-            "/ui?company_id={}&channel_id={}&thread_id={}",
-            item.company_id,
-            item.channel_id,
-            item.thread_id
-                .expect("a thread handoff always names its thread"),
-        ),
+        }
+        AttentionSourceKind::BindingRefusal => Some(format!(
+            "/ui/workflow-bindings/{}?company_id={}",
+            item.source_id, item.company_id
+        )),
     }
 }
 
-/// SHA-256 of a command's semantic fields, so a replay with different parameters is a conflict
-/// rather than a silent overwrite.
-///
-/// Shared with `thread_handoff.rs`, which fingerprints its own command through the same helper so
-/// the two idempotency stores cannot drift into hashing different things.
-pub(crate) fn command_fingerprint<T: serde::Serialize>(value: &T) -> AppResult<String> {
-    let encoded = serde_json::to_vec(value).map_err(|error| {
-        AppError::Internal(format!("Could not encode attention command: {error}"))
-    })?;
-    Ok(format!("{:x}", Sha256::digest(encoded)))
-}
-
-pub(crate) async fn actor_is_manager(
-    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    company_id: Uuid,
-    actor: PrincipalId,
-) -> AppResult<bool> {
-    sqlx::query_scalar(
-        r#"SELECT EXISTS (
-               SELECT 1 FROM principals AS principal
-               JOIN companies AS company ON company.id = principal.company_id
-               LEFT JOIN company_members AS member
-                 ON member.company_id = principal.company_id AND member.user_id = principal.user_id
-               WHERE principal.company_id = $1 AND principal.id = $2 AND principal.kind = 'person'
-                 AND (company.user_id = principal.user_id OR member.role = 'admin')
-           )"#,
-    )
-    .bind(company_id)
-    .bind(actor.as_uuid())
-    .fetch_one(&mut **tx)
-    .await
-    .map_err(AppError::from)
-}
-
-pub(crate) async fn require_human_principal(
-    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    company_id: Uuid,
-    principal_id: PrincipalId,
-) -> AppResult<()> {
-    let exists: bool = sqlx::query_scalar(
-        "SELECT EXISTS (SELECT 1 FROM principals WHERE company_id = $1 AND id = $2 AND kind = 'person')",
-    )
-    .bind(company_id)
-    .bind(principal_id.as_uuid())
-    .fetch_one(&mut **tx)
-    .await
-    .map_err(AppError::from)?;
-    if !exists {
-        return Err(AppError::NotFound("Attention source not found.".into()));
-    }
-    Ok(())
-}
-
-pub(crate) async fn require_channel_principal(
-    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    company_id: Uuid,
-    channel_id: Uuid,
-    principal_id: PrincipalId,
-) -> AppResult<()> {
-    let may_view: bool = sqlx::query_scalar(
-        r#"SELECT EXISTS (
-               SELECT 1 FROM principals AS principal
-               JOIN channels AS channel
-                 ON channel.company_id = principal.company_id AND channel.id = $2
-               JOIN companies AS company ON company.id = principal.company_id
-               LEFT JOIN channel_principal_grants AS access_grant
-                 ON access_grant.company_id = channel.company_id
-                AND access_grant.channel_id = channel.id
-                AND access_grant.principal_id = principal.id
-                AND access_grant.capability = 'view'
-               WHERE principal.company_id = $1 AND principal.id = $3
-                 AND principal.kind = 'person'
-                 AND (company.user_id = principal.user_id
-                      OR channel.access_mode IN ('team', 'public')
-                      OR access_grant.principal_id IS NOT NULL)
-           )"#,
-    )
-    .bind(company_id)
-    .bind(channel_id)
-    .bind(principal_id.as_uuid())
-    .fetch_one(&mut **tx)
-    .await
-    .map_err(AppError::from)?;
-    if !may_view {
-        return Err(AppError::NotFound("Attention source not found.".into()));
-    }
-    Ok(())
-}
-
-#[derive(sqlx::FromRow)]
-struct ExistingEvent {
-    command_fingerprint: String,
-    to_version: i64,
-}
-
-pub(crate) async fn lock_attention_source(
-    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    company_id: Uuid,
-    source_kind: &str,
-    source_id: Uuid,
-) -> AppResult<()> {
-    let key = format!("{company_id}:{source_kind}:{source_id}");
-    sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))")
-        .bind(key)
-        .execute(&mut **tx)
-        .await
-        .map_err(AppError::from)?;
-    Ok(())
-}
-
-async fn existing_event(
-    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    company_id: Uuid,
-    source_kind: &str,
-    source_id: Uuid,
-    command_id: Uuid,
-    fingerprint: &str,
-) -> AppResult<Option<u64>> {
-    let existing = sqlx::query_as::<_, ExistingEvent>(
-        r#"SELECT command_fingerprint, to_version FROM attention_source_events
-           WHERE company_id = $1 AND source_kind = $2 AND source_id = $3 AND command_id = $4"#,
-    )
-    .bind(company_id)
-    .bind(source_kind)
-    .bind(source_id)
-    .bind(command_id)
-    .fetch_optional(&mut **tx)
-    .await
-    .map_err(AppError::from)?;
-    let Some(existing) = existing else {
-        return Ok(None);
-    };
-    if existing.command_fingerprint != fingerprint {
-        return Err(AppError::Conflict(
-            "Attention command id was already used with different parameters.".into(),
-        ));
-    }
-    Ok(Some(u64::try_from(existing.to_version).map_err(|_| {
-        AppError::Internal("Invalid audited attention version".into())
-    })?))
-}
-
-#[async_trait]
-impl AttentionPersistence for PostgresPersistence {
-    async fn list_attention(&self, query: AttentionQuery<'_>) -> AppResult<AttentionPage> {
+impl PostgresPersistence {
+    /// [`AttentionPersistence::list_attention`] with the working set bounded at `working_set`, so
+    /// a test reaches truncation with a few rows rather than a thousand.
+    async fn attention_page(
+        &self,
+        query: AttentionQuery<'_>,
+        working_set: usize,
+    ) -> AppResult<AttentionPage> {
         let limit = query.clamped_limit();
         let as_of = query.cursor.map(|cursor| cursor.as_of);
-        let rows = bind_attention(ATTENTION_SQL, query)
+        let rows = bind_attention(ATTENTION_SQL, query, working_set)
             .fetch_all(&self.pool)
             .await
             .map_err(AppError::from)?;
@@ -625,7 +388,16 @@ impl AttentionPersistence for PostgresPersistence {
             .map(TryInto::try_into)
             .collect::<AppResult<Vec<AttentionItem>>>()?;
         for item in &mut items {
-            item.href = Some(item_href(item));
+            item.href = match item.source_kind {
+                AttentionSourceKind::RunFailure
+                | AttentionSourceKind::RunReconciliation
+                | AttentionSourceKind::BindingRefusal
+                    if !query.manager =>
+                {
+                    None
+                }
+                _ => item_href(item),
+            };
         }
         let next_cursor = has_next
             .then(|| {
@@ -641,376 +413,16 @@ impl AttentionPersistence for PostgresPersistence {
             working_set_size: usize::try_from(bounded_count).map_err(|_| {
                 AppError::Internal("Attention working-set count cannot be negative".into())
             })?,
-            truncated: bounded_count > AttentionQuery::MAX_WORKING_SET as i64,
+            truncated: bounded_count > working_set as i64,
         })
     }
+}
 
-    async fn create_handoff(&self, handoff: NewManualHandoff) -> AppResult<u64> {
-        validate_handoff(&handoff)?;
-        let fingerprint = command_fingerprint(&handoff)?;
-        let mut tx = self.pool.begin().await.map_err(AppError::from)?;
-        lock_attention_source(&mut tx, handoff.company_id, "handoff", handoff.id).await?;
-        if let Some(version) = existing_event(
-            &mut tx,
-            handoff.company_id,
-            "handoff",
-            handoff.id,
-            handoff.command_id,
-            &fingerprint,
-        )
-        .await?
-        {
-            return Ok(version);
-        }
-        require_channel_principal(
-            &mut tx,
-            handoff.company_id,
-            handoff.channel_id,
-            handoff.actor_principal_id,
-        )
-        .await?;
-        if let Some(responsible) = handoff.responsible_principal_id {
-            require_channel_principal(&mut tx, handoff.company_id, handoff.channel_id, responsible)
-                .await?;
-        }
-        sqlx::query(
-            r#"INSERT INTO manual_handoffs (
-                   id, company_id, channel_id, thread_id, correlation_id, title, next_action,
-                   responsible_principal_id, business_priority, business_due_at,
-                   created_by_principal_id
-               ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)"#,
-        )
-        .bind(handoff.id)
-        .bind(handoff.company_id)
-        .bind(handoff.channel_id)
-        .bind(handoff.thread_id)
-        .bind(handoff.correlation_id.map(CorrelationId::as_uuid))
-        .bind(&handoff.title)
-        .bind(&handoff.next_action)
-        .bind(handoff.responsible_principal_id.map(PrincipalId::as_uuid))
-        .bind(handoff.priority.as_str())
-        .bind(handoff.due_at)
-        .bind(handoff.actor_principal_id.as_uuid())
-        .execute(&mut *tx)
-        .await
-        .map_err(AppError::from)?;
-        sqlx::query(
-            r#"INSERT INTO attention_source_events (
-                   company_id, source_kind, source_id, command_id, command_fingerprint, operation,
-                   actor_principal_id, from_version, to_version, new_priority, new_due_at,
-                   new_responsible_principal_id
-               ) VALUES ($1, 'handoff', $2, $3, $4, 'created', $5, 0, 1, $6, $7, $8)"#,
-        )
-        .bind(handoff.company_id)
-        .bind(handoff.id)
-        .bind(handoff.command_id)
-        .bind(fingerprint)
-        .bind(handoff.actor_principal_id.as_uuid())
-        .bind(handoff.priority.as_str())
-        .bind(handoff.due_at)
-        .bind(handoff.responsible_principal_id.map(PrincipalId::as_uuid))
-        .execute(&mut *tx)
-        .await
-        .map_err(AppError::from)?;
-        tx.commit().await.map_err(AppError::from)?;
-        Ok(1)
-    }
-
-    async fn change_source_attributes(&self, command: AttentionSourceCommand) -> AppResult<u64> {
-        // A thread handoff is fenced on its generation as well as its version and audits into its
-        // own table, so it is refused here rather than given a fifth branch: see
-        // `plan/manual_handoff/phase3.md` §3.5. Refusing it also keeps
-        // `attention_source_events_source_kind_check` free of a value nothing writes.
-        if command.source_kind == AttentionSourceKind::ThreadHandoff {
-            return Err(AppError::BadRequest(
-                "Thread handoff responsibility must be changed through its own command.".into(),
-            ));
-        }
-        if !matches!(
-            command.source_kind,
-            AttentionSourceKind::Task | AttentionSourceKind::Handoff
-        ) {
-            return Err(AppError::BadRequest(
-                "Priority and due dates must be changed through their task or handoff source."
-                    .into(),
-            ));
-        }
-        if command.source_kind == AttentionSourceKind::Task
-            && command.responsible_principal_id.is_some()
-        {
-            return Err(AppError::BadRequest(
-                "Task responsibility must be changed through task ownership.".into(),
-            ));
-        }
-        let source_kind = command.source_kind.as_str();
-        let fingerprint = command_fingerprint(&command)?;
-        let mut tx = self.pool.begin().await.map_err(AppError::from)?;
-        lock_attention_source(&mut tx, command.company_id, source_kind, command.source_id).await?;
-        if command.source_kind == AttentionSourceKind::Task {
-            super::legacy_task::require_legacy_task_on(
-                &mut tx,
-                command.company_id,
-                Some(command.source_id),
-            )
-            .await?;
-        }
-        if let Some(version) = existing_event(
-            &mut tx,
-            command.company_id,
-            source_kind,
-            command.source_id,
-            command.command_id,
-            &fingerprint,
-        )
-        .await?
-        {
-            return Ok(version);
-        }
-        require_human_principal(&mut tx, command.company_id, command.actor_principal_id).await?;
-        let manager =
-            actor_is_manager(&mut tx, command.company_id, command.actor_principal_id).await?;
-
-        let (old_priority, old_due, old_responsible, old_version, channel_id) = match command
-            .source_kind
-        {
-            AttentionSourceKind::Task => {
-                let row: Option<(String, Option<DateTime<Utc>>, Option<Uuid>, i64, Uuid)> =
-                        sqlx::query_as(
-                            r#"SELECT business_priority, business_due_at, owner_principal_id,
-                              attention_version, channel_id
-                       FROM background_tasks
-                       WHERE queue_kind = 'legacy' AND company_id = $1 AND id = $2 AND channel_id = ANY($3) FOR UPDATE"#,
-                        )
-                        .bind(command.company_id)
-                        .bind(command.source_id)
-                        .bind(&command.visible_channel_ids)
-                        .fetch_optional(&mut *tx)
-                        .await
-                        .map_err(AppError::from)?;
-                row.ok_or_else(|| AppError::NotFound("Attention source not found.".into()))?
-            }
-            AttentionSourceKind::Handoff => {
-                let row: Option<(String, Option<DateTime<Utc>>, Option<Uuid>, i64, Uuid)> =
-                    sqlx::query_as(
-                        r#"SELECT business_priority, business_due_at, responsible_principal_id,
-                              version, channel_id
-                       FROM manual_handoffs
-                       WHERE company_id = $1 AND id = $2 AND channel_id = ANY($3)
-                         AND status = 'open' FOR UPDATE"#,
-                    )
-                    .bind(command.company_id)
-                    .bind(command.source_id)
-                    .bind(&command.visible_channel_ids)
-                    .fetch_optional(&mut *tx)
-                    .await
-                    .map_err(AppError::from)?;
-                row.ok_or_else(|| AppError::NotFound("Attention source not found.".into()))?
-            }
-            AttentionSourceKind::ThreadHandoff
-            | AttentionSourceKind::Approval
-            | AttentionSourceKind::ResponseReview
-            | AttentionSourceKind::DelegationDecision
-            | AttentionSourceKind::DeliveryFailure => unreachable!(),
-        };
-        if let Some(responsible) = command.responsible_principal_id {
-            require_channel_principal(&mut tx, command.company_id, channel_id, responsible).await?;
-        }
-        let old_version_u64 = u64::try_from(old_version)
-            .map_err(|_| AppError::Internal("Invalid attention source version".into()))?;
-        if old_version_u64 != command.expected_version {
-            return Err(AppError::Conflict(format!(
-                "Attention source changed from version {} to {}; refresh and try again.",
-                command.expected_version, old_version_u64
-            )));
-        }
-        let actor_id = command.actor_principal_id.as_uuid();
-        if !manager && old_responsible != Some(actor_id) {
-            let self_claim = command.source_kind == AttentionSourceKind::Handoff
-                && old_responsible.is_none()
-                && command.responsible_principal_id == Some(command.actor_principal_id);
-            if !self_claim {
-                return Err(AppError::NotFound("Attention source not found.".into()));
-            }
-        }
-        let new_version = old_version
-            .checked_add(1)
-            .ok_or_else(|| AppError::Conflict("Attention version exhausted.".into()))?;
-        let new_responsible = if command.source_kind == AttentionSourceKind::Task {
-            old_responsible
-        } else {
-            command.responsible_principal_id.map(PrincipalId::as_uuid)
-        };
-        match command.source_kind {
-            AttentionSourceKind::Task => {
-                sqlx::query(
-                    r#"UPDATE background_tasks
-                       SET business_priority = $3, business_due_at = $4,
-                           attention_version = $5, updated_at = CURRENT_TIMESTAMP
-                       WHERE queue_kind = 'legacy' AND company_id = $1 AND id = $2 AND attention_version = $6"#,
-                )
-                .bind(command.company_id)
-                .bind(command.source_id)
-                .bind(command.priority.as_str())
-                .bind(command.due_at)
-                .bind(new_version)
-                .bind(old_version)
-                .execute(&mut *tx)
-                .await
-                .map_err(AppError::from)?;
-            }
-            AttentionSourceKind::Handoff => {
-                sqlx::query(
-                    r#"UPDATE manual_handoffs
-                       SET business_priority = $3, business_due_at = $4,
-                           responsible_principal_id = $5, version = $6,
-                           updated_at = CURRENT_TIMESTAMP
-                       WHERE company_id = $1 AND id = $2 AND version = $7"#,
-                )
-                .bind(command.company_id)
-                .bind(command.source_id)
-                .bind(command.priority.as_str())
-                .bind(command.due_at)
-                .bind(new_responsible)
-                .bind(new_version)
-                .bind(old_version)
-                .execute(&mut *tx)
-                .await
-                .map_err(AppError::from)?;
-            }
-            AttentionSourceKind::ThreadHandoff
-            | AttentionSourceKind::Approval
-            | AttentionSourceKind::ResponseReview
-            | AttentionSourceKind::DelegationDecision
-            | AttentionSourceKind::DeliveryFailure => unreachable!(),
-        }
-        let operation = if old_responsible != new_responsible {
-            "reassigned"
-        } else {
-            "attributes_changed"
-        };
-        sqlx::query(
-            r#"INSERT INTO attention_source_events (
-                   company_id, source_kind, source_id, command_id, command_fingerprint, operation,
-                   actor_principal_id, from_version, to_version, previous_priority, new_priority,
-                   previous_due_at, new_due_at, previous_responsible_principal_id,
-                   new_responsible_principal_id
-               ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)"#,
-        )
-        .bind(command.company_id)
-        .bind(source_kind)
-        .bind(command.source_id)
-        .bind(command.command_id)
-        .bind(fingerprint)
-        .bind(operation)
-        .bind(actor_id)
-        .bind(old_version)
-        .bind(new_version)
-        .bind(&old_priority)
-        .bind(command.priority.as_str())
-        .bind(old_due)
-        .bind(command.due_at)
-        .bind(old_responsible)
-        .bind(new_responsible)
-        .execute(&mut *tx)
-        .await
-        .map_err(AppError::from)?;
-        tx.commit().await.map_err(AppError::from)?;
-        u64::try_from(new_version)
-            .map_err(|_| AppError::Internal("Invalid attention source version".into()))
-    }
-
-    async fn resolve_handoff(&self, command: ResolveHandoffCommand) -> AppResult<u64> {
-        let fingerprint = command_fingerprint(&command)?;
-        let mut tx = self.pool.begin().await.map_err(AppError::from)?;
-        lock_attention_source(&mut tx, command.company_id, "handoff", command.handoff_id).await?;
-        if let Some(version) = existing_event(
-            &mut tx,
-            command.company_id,
-            "handoff",
-            command.handoff_id,
-            command.command_id,
-            &fingerprint,
-        )
-        .await?
-        {
-            return Ok(version);
-        }
-        require_human_principal(&mut tx, command.company_id, command.actor_principal_id).await?;
-        let row: Option<(String, Option<DateTime<Utc>>, Option<Uuid>, i64)> = sqlx::query_as(
-            r#"SELECT business_priority, business_due_at, responsible_principal_id, version
-               FROM manual_handoffs
-               WHERE company_id = $1 AND id = $2 AND channel_id = ANY($3)
-                 AND status = 'open' FOR UPDATE"#,
-        )
-        .bind(command.company_id)
-        .bind(command.handoff_id)
-        .bind(&command.visible_channel_ids)
-        .fetch_optional(&mut *tx)
-        .await
-        .map_err(AppError::from)?;
-        let (priority, due_at, responsible, old_version) =
-            row.ok_or_else(|| AppError::NotFound("Handoff not found.".into()))?;
-        let expected = i64::try_from(command.expected_version)
-            .map_err(|_| AppError::Conflict("Attention version exhausted.".into()))?;
-        if old_version != expected {
-            return Err(AppError::Conflict(format!(
-                "Handoff changed from version {} to {}; refresh and try again.",
-                command.expected_version, old_version
-            )));
-        }
-        let manager =
-            actor_is_manager(&mut tx, command.company_id, command.actor_principal_id).await?;
-        if !manager && responsible != Some(command.actor_principal_id.as_uuid()) {
-            return Err(AppError::NotFound("Handoff not found.".into()));
-        }
-        let new_version = old_version
-            .checked_add(1)
-            .ok_or_else(|| AppError::Conflict("Attention version exhausted.".into()))?;
-        let (status, operation) = match command.resolution {
-            HandoffResolution::Resolved => ("resolved", "resolved"),
-            HandoffResolution::Withdrawn => ("withdrawn", "withdrawn"),
-        };
-        sqlx::query(
-            r#"UPDATE manual_handoffs
-               SET status = $3, version = $4, resolved_by_principal_id = $5,
-                   resolved_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-               WHERE company_id = $1 AND id = $2 AND version = $6 AND status = 'open'"#,
-        )
-        .bind(command.company_id)
-        .bind(command.handoff_id)
-        .bind(status)
-        .bind(new_version)
-        .bind(command.actor_principal_id.as_uuid())
-        .bind(old_version)
-        .execute(&mut *tx)
-        .await
-        .map_err(AppError::from)?;
-        sqlx::query(
-            r#"INSERT INTO attention_source_events (
-                   company_id, source_kind, source_id, command_id, command_fingerprint, operation,
-                   actor_principal_id, from_version, to_version, previous_priority, new_priority,
-                   previous_due_at, new_due_at, previous_responsible_principal_id,
-                   new_responsible_principal_id
-               ) VALUES ($1, 'handoff', $2, $3, $4, $5, $6, $7, $8,
-                         $9, $9, $10, $10, $11, $11)"#,
-        )
-        .bind(command.company_id)
-        .bind(command.handoff_id)
-        .bind(command.command_id)
-        .bind(fingerprint)
-        .bind(operation)
-        .bind(command.actor_principal_id.as_uuid())
-        .bind(old_version)
-        .bind(new_version)
-        .bind(priority)
-        .bind(due_at)
-        .bind(responsible)
-        .execute(&mut *tx)
-        .await
-        .map_err(AppError::from)?;
-        tx.commit().await.map_err(AppError::from)?;
-        u64::try_from(new_version)
-            .map_err(|_| AppError::Internal("Invalid attention source version".into()))
+#[async_trait]
+impl AttentionPersistence for PostgresPersistence {
+    async fn list_attention(&self, query: AttentionQuery<'_>) -> AppResult<AttentionPage> {
+        self.attention_page(query, AttentionQuery::MAX_WORKING_SET)
+            .await
     }
 
     async fn operational_summary(
@@ -1021,191 +433,65 @@ impl AttentionPersistence for PostgresPersistence {
         #[derive(sqlx::FromRow)]
         struct SummaryRow {
             as_of: DateTime<Utc>,
-            unassigned_count: i64,
-            oldest_actionable_age_seconds: Option<f64>,
-            average_time_to_claim_seconds: Option<f64>,
-            average_delegation_wait_seconds: Option<f64>,
-            average_review_turnaround_seconds: Option<f64>,
-            timeout_cancel_reassign_rate: Option<f64>,
-            average_time_to_logical_external_response_seconds: Option<f64>,
+            open_decision_count: i64,
+            oldest_open_decision_age_seconds: Option<f64>,
+            runs_awaiting_reconciliation: i64,
+            failed_run_count: i64,
+            binding_refusal_count: i64,
             permanent_delivery_failure_count: i64,
         }
+        // The team-work branches of `ATTENTION_SQL` for a manager, counted. Keep the predicates
+        // in step with them; `the_summary_counts_what_team_work_lists` holds the two together.
         let row = sqlx::query_as::<_, SummaryRow>(
             r#"WITH clock AS (SELECT CURRENT_TIMESTAMP AS as_of),
-               current_actionable AS (
-                 SELECT task.created_at,
-                        CASE WHEN task.owner_principal_kind = 'person'
-                             THEN task.owner_principal_id END AS responsible_principal_id,
-                        CASE WHEN task.owner_principal_kind = 'person'
-                             THEN 'principal' ELSE 'channel_team' END AS responsibility_kind
-                 FROM background_tasks AS task
-                 WHERE task.queue_kind = 'legacy' AND task.company_id = $1 AND task.channel_id = ANY($2)
-                   AND task.status IN ('pending','processing','pending_approval',
-                                       'waiting_for_third_party_reply','failed','dead_letter')
-                   AND (task.owner_principal_kind = 'person'
-                        OR task.owner_principal_id IS NULL
-                        OR task.status IN ('pending_approval','failed','dead_letter'))
-                   AND NOT EXISTS (
-                       SELECT 1 FROM human_approvals AS approval
-                       WHERE approval.company_id = task.company_id
-                         AND approval.task_id = task.id AND approval.status = 'pending'
-                   )
-                   AND NOT EXISTS (
-                       SELECT 1 FROM response_reviews AS review
-                       JOIN response_drafts AS draft
-                         ON draft.company_id = review.company_id
-                        AND draft.id = review.draft_id
-                        AND draft.version = review.draft_version
-                       WHERE review.company_id = task.company_id
-                         AND review.status = 'pending'
-                         AND draft.task_id = task.id AND draft.status = 'pending_review'
-                   )
-                   AND NOT EXISTS (
-                       SELECT 1 FROM task_outreaches AS outreach
-                       WHERE outreach.task_id = task.id
-                         AND outreach.status = 'timeout_pending_approval'
-                   )
-                   AND NOT EXISTS (
-                       SELECT 1 FROM message_deliveries AS delivery
-                       WHERE delivery.company_id = task.company_id
-                         AND delivery.task_id = task.id
-                         AND delivery.status IN ('outcome_unknown','dead_letter')
-                         AND delivery.last_error_class IS DISTINCT FROM 'superseded'
-                   )
-                 UNION ALL
-                 SELECT handoff.created_at, handoff.responsible_principal_id,
-                        CASE WHEN handoff.responsible_principal_id IS NULL
-                             THEN 'channel_team' ELSE 'principal' END
-                 FROM manual_handoffs AS handoff
-                 WHERE handoff.company_id = $1 AND handoff.channel_id = ANY($2)
-                   AND handoff.status = 'open'
-                 UNION ALL
-                 SELECT approval.created_at, approval.approver_principal_id,
-                        CASE WHEN approval.approver_principal_id IS NULL
-                             THEN 'external' ELSE 'principal' END
-                 FROM human_approvals AS approval
-                 WHERE approval.company_id = $1 AND approval.channel_id = ANY($2)
-                   AND approval.status = 'pending'
-                   AND (approval.task_id IS NULL OR EXISTS (SELECT 1 FROM background_tasks AS task WHERE task.company_id = approval.company_id AND task.id = approval.task_id AND task.queue_kind = 'legacy'))
-                 UNION ALL
-                 SELECT review.created_at, review.reviewer_principal_id, 'principal'
-                 FROM response_reviews AS review
-                 JOIN response_drafts AS draft
-                   ON draft.company_id = review.company_id AND draft.id = review.draft_id
-                  AND draft.version = review.draft_version AND draft.status = 'pending_review'
-                 WHERE review.company_id = $1 AND draft.channel_id = ANY($2)
-                   AND review.status = 'pending'
-                   AND (draft.task_id IS NULL OR EXISTS (SELECT 1 FROM background_tasks AS task WHERE task.company_id = draft.company_id AND task.id = draft.task_id AND task.queue_kind = 'legacy'))
-                 UNION ALL
-                 SELECT outreach.created_at,
-                        CASE WHEN task.owner_principal_kind = 'person'
-                             THEN task.owner_principal_id END,
-                        CASE WHEN task.owner_principal_kind = 'person'
-                             THEN 'principal' ELSE 'channel_team' END
-                 FROM task_outreaches AS outreach
-                 JOIN background_tasks AS task ON task.id = outreach.task_id
-                 WHERE task.queue_kind = 'legacy' AND task.company_id = $1 AND task.channel_id = ANY($2)
-                   AND outreach.status = 'timeout_pending_approval'
-                 UNION ALL
-                 SELECT delivery.created_at,
-                        CASE WHEN task.owner_principal_kind = 'person'
-                             THEN task.owner_principal_id END,
-                        CASE WHEN task.owner_principal_kind = 'person'
-                             THEN 'principal' ELSE 'channel_team' END
-                 FROM message_deliveries AS delivery
-                 LEFT JOIN background_tasks AS task
-                   ON task.company_id = delivery.company_id AND task.id = delivery.task_id
-                 WHERE delivery.company_id = $1 AND delivery.channel_id = ANY($2)
-                   AND (delivery.task_id IS NULL OR task.queue_kind = 'legacy')
-                   AND delivery.status IN ('outcome_unknown','dead_letter')
-                   AND delivery.last_error_class IS DISTINCT FROM 'superseded'
-                   AND NOT EXISTS (
-                       SELECT 1 FROM task_outreach_targets AS target
-                       JOIN task_outreaches AS outreach ON outreach.id = target.outreach_id
-                       WHERE target.delivery_id = delivery.id
-                         AND outreach.status = 'timeout_pending_approval'
-                   )
-               ), first_claim AS (
-                 SELECT DISTINCT ON (event.task_id) event.task_id, event.occurred_at
-                 FROM task_ownership_events AS event
-                 WHERE event.company_id = $1 AND event.operation = 'claim'
-                 ORDER BY event.task_id, event.occurred_at, event.id
-               ), control_counts AS (
-                 SELECT (
-                     SELECT COUNT(DISTINCT affected.outreach_id)::float8 FROM (
-                         SELECT command.outreach_id
-                         FROM delegation_control_commands AS command
-                         JOIN background_tasks AS task ON task.id = command.task_id
-                         WHERE task.queue_kind = 'legacy' AND command.company_id = $1 AND task.channel_id = ANY($2)
-                           AND command.operation IN (
-                               'cancel_target','cancel_outreach','reassign_internal_target'
-                           )
-                         UNION
-                         SELECT event.related_outreach_id
-                         FROM task_status_events AS event
-                         JOIN background_tasks AS task ON task.id = event.task_id
-                         WHERE task.queue_kind = 'legacy' AND event.company_id = $1 AND task.channel_id = ANY($2)
-                           AND event.reason = 'outreach_timed_out'
-                           AND event.related_outreach_id IS NOT NULL
-                     ) AS affected
-                 ) AS adverse,
-                 (
-                     SELECT COUNT(*)::float8
-                     FROM task_outreaches AS outreach
-                     JOIN background_tasks AS task ON task.id = outreach.task_id
-                     WHERE task.queue_kind = 'legacy' AND outreach.company_id = $1 AND task.channel_id = ANY($2)
-                 ) AS total
+               open_decisions AS (
+                 SELECT decision.created_at
+                 FROM workflow_decisions AS decision
+                 JOIN workflow_waits AS wait
+                   ON wait.company_id = decision.company_id AND wait.id = decision.wait_id
+                 JOIN workflow_runs AS run
+                   ON run.company_id = decision.company_id AND run.id = decision.run_id
+                 WHERE decision.company_id = $1 AND decision.submitted_at IS NULL
+                   AND wait.state = 'waiting'
+                   AND (run.channel_id = ANY($2) OR run.channel_id IS NULL)
                )
                SELECT clock.as_of,
-                 (SELECT COUNT(*) FROM current_actionable
-                   WHERE responsibility_kind = 'channel_team')::bigint AS unassigned_count,
+                 (SELECT COUNT(*) FROM open_decisions) AS open_decision_count,
                  (SELECT EXTRACT(EPOCH FROM (clock.as_of - MIN(created_at)))::float8
-                    FROM current_actionable) AS oldest_actionable_age_seconds,
-                 (SELECT AVG(EXTRACT(EPOCH FROM (claim.occurred_at - task.created_at)))::float8
-                    FROM first_claim AS claim JOIN background_tasks AS task ON task.id = claim.task_id
-                    WHERE task.queue_kind = 'legacy' AND task.channel_id = ANY($2))
-                    AS average_time_to_claim_seconds,
-                 (SELECT AVG(EXTRACT(EPOCH FROM (
-                         CASE WHEN outreach.status IN ('waiting','timeout_pending_approval')
-                              THEN clock.as_of ELSE outreach.updated_at END - outreach.created_at
-                     )))::float8 FROM task_outreaches AS outreach
-                     JOIN background_tasks AS task ON task.id = outreach.task_id
-                     WHERE task.queue_kind = 'legacy' AND outreach.company_id = $1 AND task.channel_id = ANY($2))
-                    AS average_delegation_wait_seconds,
-                 (SELECT AVG(EXTRACT(EPOCH FROM (
-                         COALESCE((
-                             SELECT MIN(command.created_at)
-                             FROM response_review_commands AS command
-                             WHERE command.company_id = review.company_id
-                               AND command.draft_id = review.draft_id
-                               AND command.expected_draft_version = review.draft_version
-                               AND command.action IN ('approve', 'edit', 'reject')
-                         ), review.updated_at) - review.created_at
-                     )))::float8
-                    FROM response_reviews AS review
-                    JOIN response_drafts AS draft
-                      ON draft.company_id = review.company_id AND draft.id = review.draft_id
-                     AND draft.version = review.draft_version
-                    WHERE review.company_id = $1 AND draft.channel_id = ANY($2)
-                      AND review.status <> 'pending'
-                      AND (draft.task_id IS NULL OR EXISTS (SELECT 1 FROM background_tasks AS task WHERE task.company_id = draft.company_id AND task.id = draft.task_id AND task.queue_kind = 'legacy')))
-                    AS average_review_turnaround_seconds,
-                 (SELECT adverse / NULLIF(total, 0) FROM control_counts)
-                    AS timeout_cancel_reassign_rate,
-                 (SELECT AVG(EXTRACT(EPOCH FROM (event.transitioned_at - task.created_at)))::float8
-                    FROM task_status_events AS event
-                    JOIN background_tasks AS task ON task.id = event.task_id
-                    WHERE task.queue_kind = 'legacy' AND event.company_id = $1 AND task.channel_id = ANY($2)
-                      AND event.to_status = 'completed')
-                    AS average_time_to_logical_external_response_seconds,
+                    FROM open_decisions) AS oldest_open_decision_age_seconds,
+                 (SELECT COUNT(*) FROM workflow_runs AS run
+                    WHERE run.company_id = $1 AND run.state = 'waiting'
+                      AND run.waiting_reason = 'reconciliation'
+                      AND (run.channel_id = ANY($2) OR run.channel_id IS NULL))
+                    AS runs_awaiting_reconciliation,
+                 (SELECT COUNT(*) FROM workflow_runs AS run
+                    WHERE run.company_id = $1 AND run.state = 'failed'
+                      AND run.created_at >= clock.as_of - interval '7 days'
+                      AND NOT EXISTS (SELECT 1 FROM workflow_runs AS rerun
+                                      WHERE rerun.company_id = run.company_id
+                                        AND rerun.rerun_of_run_id = run.id)
+                      AND (run.channel_id = ANY($2) OR run.channel_id IS NULL))
+                    AS failed_run_count,
+                 (SELECT COUNT(*) FROM (
+                      SELECT intent_binding.binding_id
+                      FROM workflow_message_intent_bindings AS intent_binding
+                      WHERE intent_binding.company_id = $1
+                        AND intent_binding.outcome <> 'admitted'
+                        AND intent_binding.created_at >= clock.as_of - interval '7 days'
+                      UNION ALL
+                      SELECT schedule_run.binding_id FROM schedule_runs AS schedule_run
+                      WHERE schedule_run.company_id = $1
+                        AND schedule_run.materialization_status = 'failed'
+                        AND schedule_run.created_at >= clock.as_of - interval '7 days'
+                    ) AS recent
+                    JOIN workflow_bindings AS binding
+                      ON binding.company_id = $1 AND binding.id = recent.binding_id
+                    WHERE binding.channel_id = ANY($2) OR binding.channel_id IS NULL)
+                    AS binding_refusal_count,
                  (SELECT COUNT(*) FROM message_deliveries AS delivery
-                    WHERE delivery.company_id = $1 AND delivery.channel_id = ANY($2) AND delivery.status = 'dead_letter'
-                      AND delivery.last_error_class IS DISTINCT FROM 'superseded'
-                      AND (delivery.task_id IS NULL OR EXISTS (
-                          SELECT 1 FROM background_tasks AS task
-                          WHERE task.company_id = delivery.company_id AND task.id = delivery.task_id
-                            AND task.queue_kind = 'legacy'
-                      )))::bigint
+                    WHERE delivery.company_id = $1 AND delivery.channel_id = ANY($2)
+                      AND delivery.status = 'dead_letter'
+                      AND delivery.last_error_class IS DISTINCT FROM 'superseded')
                     AS permanent_delivery_failure_count
                FROM clock"#,
         )
@@ -1216,14 +502,11 @@ impl AttentionPersistence for PostgresPersistence {
         .map_err(AppError::from)?;
         Ok(OperationalSummary {
             as_of: row.as_of,
-            unassigned_count: row.unassigned_count,
-            oldest_actionable_age_seconds: row.oldest_actionable_age_seconds,
-            average_time_to_claim_seconds: row.average_time_to_claim_seconds,
-            average_delegation_wait_seconds: row.average_delegation_wait_seconds,
-            average_review_turnaround_seconds: row.average_review_turnaround_seconds,
-            timeout_cancel_reassign_rate: row.timeout_cancel_reassign_rate,
-            average_time_to_logical_external_response_seconds: row
-                .average_time_to_logical_external_response_seconds,
+            open_decision_count: row.open_decision_count,
+            oldest_open_decision_age_seconds: row.oldest_open_decision_age_seconds,
+            runs_awaiting_reconciliation: row.runs_awaiting_reconciliation,
+            failed_run_count: row.failed_run_count,
+            binding_refusal_count: row.binding_refusal_count,
             permanent_delivery_failure_count: row.permanent_delivery_failure_count,
         })
     }

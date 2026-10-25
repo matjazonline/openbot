@@ -139,27 +139,113 @@ pub fn onboarding_channel_draft_page(
     onboarding_shell("Create your first channel", user, Some(company), 2, &pane)
 }
 
+/// What became of one onboarding agent's assistant channel (p08 D4.7).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum OnboardingChannel {
+    /// The channel that answers for the agent, at this address.
+    Created {
+        channel_id: uuid::Uuid,
+        address: String,
+    },
+    /// The command refused; the agent page's assistant-channel card is the way on.
+    Refused(String),
+    /// The agent has no model, because the company has no default model connection.
+    NoModel,
+    /// No channel is stored for it: a reloaded completion page keeps no refusal.
+    Missing,
+}
+
+pub struct OnboardedAgent<'a> {
+    pub agent: &'a Agent,
+    pub channel: OnboardingChannel,
+}
+
 pub fn onboarding_complete_page(
     user: &MailboxUser<'_>,
     company: &Company,
-    channel: &Channel,
-    app_domain_name: &str,
+    agents: &[OnboardedAgent<'_>],
 ) -> String {
-    let email_address = format!("{}@{}.{}", channel.slug, company.slug, app_domain_name);
-    let pane = format!(
-        r##"<div><div class="mb-3 inline-flex size-12 items-center justify-center rounded-full bg-success/15 text-success">{check}</div><h1 class="card-title text-2xl">Your email agent is ready</h1><p class="mt-2 opacity-70">Send work to <strong>{channel_name}</strong> from your regular inbox.</p></div>
-        <div class="alert alert-success items-center"><div class="min-w-0 flex-1"><div class="text-xs font-semibold uppercase tracking-wider opacity-70">Send or forward email to</div><code id="onboarding-email-address" class="mt-1 block break-all text-lg">{email_address}</code></div><button type="button" class="btn btn-success btn-sm" data-action="copy-text" data-copy-from="onboarding-email-address" data-copied-label="Copied">Copy address</button></div>
-        <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+    let first_channel = agents
+        .iter()
+        .find_map(|onboarded| match &onboarded.channel {
+            OnboardingChannel::Created { channel_id, .. } => Some(*channel_id),
+            _ => None,
+        });
+    let rows = agents
+        .iter()
+        .enumerate()
+        .map(|(index, onboarded)| onboarded_agent_row(company, index, onboarded))
+        .collect::<String>();
+    let no_model = agents
+        .iter()
+        .any(|onboarded| onboarded.channel == OnboardingChannel::NoModel);
+    let no_model_html = if no_model {
+        r##"<div class="alert alert-info">Connect a model in company settings, then create an assistant channel from each agent's page.</div>"##
+    } else {
+        ""
+    };
+    let (title, lede, guide_html) = if first_channel.is_some() {
+        (
+            "Your email agents are ready",
+            "Send work to an agent's channel from your regular inbox.",
+            r##"<div class="grid grid-cols-1 gap-4 md:grid-cols-3">
             <section class="rounded-box border border-base-300 p-4"><span class="badge badge-primary badge-outline">1 · New request</span><h2 class="mt-3 font-semibold">Send a new email</h2><p class="mt-2 text-sm opacity-70">Put the goal in the subject and include context, constraints, deadline, and desired output.</p></section>
             <section class="rounded-box border border-base-300 p-4"><span class="badge badge-warning badge-outline">2 · Existing work</span><h2 class="mt-3 font-semibold">Forward a message</h2><p class="mt-2 text-sm opacity-70">Forward any email and add your instruction at the top.</p></section>
             <section class="rounded-box border border-base-300 p-4"><span class="badge badge-success badge-outline">3 · Iterate</span><h2 class="mt-3 font-semibold">Reply in the thread</h2><p class="mt-2 text-sm opacity-70">Reply to refine the result, answer questions, or request another pass.</p></section>
-        </div>
-        <div class="card-actions justify-end"><a href="/ui/channels?company_id={company_id}&channel_id={channel_id}" class="btn btn-ghost">Manage channel</a><a href="mailto:{email_address}" class="btn btn-primary">Compose first email</a><a href="/ui?company_id={company_id}&channel_id={channel_id}" class="btn btn-primary">Finish</a></div>"##,
+        </div>"##,
+        )
+    } else {
+        (
+            "Your agents are created",
+            "None of them has a channel yet, so nothing answers email.",
+            "",
+        )
+    };
+    let finish_href = match first_channel {
+        Some(channel_id) => format!("/ui?company_id={}&channel_id={channel_id}", company.id),
+        None => format!("/ui?company_id={}", company.id),
+    };
+    let pane = format!(
+        r##"<div><div class="mb-3 inline-flex size-12 items-center justify-center rounded-full bg-success/15 text-success">{check}</div><h1 class="card-title text-2xl">{title}</h1><p class="mt-2 opacity-70">{lede}</p></div>
+        {no_model_html}
+        <ul class="list rounded-box border border-base-300">{rows}</ul>
+        {guide_html}
+        <div class="card-actions justify-end"><a href="{finish_href}" class="btn btn-primary">Finish</a></div>"##,
         check = icon(Icon::Check, "size-6"),
-        channel_name = escape_html_text(&channel.name),
-        company_id = company.id,
-        channel_id = channel.id,
-        email_address = escape_html_text(&email_address)
     );
-    onboarding_shell("Your email agent is ready", user, Some(company), 3, &pane)
+    onboarding_shell(title, user, Some(company), 3, &pane)
+}
+
+/// One agent on the completion page: its channel's address, or why it has none and the agent
+/// page to create one from.
+fn onboarded_agent_row(company: &Company, index: usize, onboarded: &OnboardedAgent<'_>) -> String {
+    let agent = onboarded.agent;
+    let agent_href = format!("/ui/agents?company_id={}&agent_id={}", company.id, agent.id);
+    let create_link = format!(
+        r##"<a href="{agent_href}" class="btn btn-sm btn-ghost">Create an assistant channel</a>"##
+    );
+    let detail = match &onboarded.channel {
+        OnboardingChannel::Created {
+            channel_id,
+            address,
+        } => format!(
+            r##"<code id="onboarding-address-{index}" class="block break-all">{address}</code></div><button type="button" class="btn btn-sm" data-action="copy-text" data-copy-from="onboarding-address-{index}" data-copied-label="Copied">Copy address</button><a href="/ui/channels?company_id={company_id}&channel_id={channel_id}" class="btn btn-sm btn-ghost">Manage channel</a>"##,
+            address = escape_html_text(address),
+            company_id = company.id,
+        ),
+        OnboardingChannel::Refused(message) => format!(
+            r##"<p class="text-sm text-error">The channel could not be created: {message}</p></div>{create_link}"##,
+            message = escape_html_text(message),
+        ),
+        OnboardingChannel::NoModel => format!(
+            r##"<p class="text-sm opacity-70">No channel: there is no model connection to run it on.</p></div>{create_link}"##
+        ),
+        OnboardingChannel::Missing => {
+            format!(r##"<p class="text-sm opacity-70">No channel yet.</p></div>{create_link}"##)
+        }
+    };
+    format!(
+        r##"<li class="list-row items-center"><div class="min-w-0"><div class="font-semibold">{name}</div>{detail}</li>"##,
+        name = escape_html_text(&agent.name),
+    )
 }

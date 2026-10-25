@@ -26,10 +26,10 @@ use crate::{
     transport::{
         DeliveryAttribution, DeliveryCandidate, DeliveryDestination, DeliveryEnvelope,
         DeliveryIntent, DeliveryPlanRequest, DeliveryPlanner, DeliveryPurpose, DeliveryRecord,
-        ExternalDestinationClassification, FailureClass, FailureDetail, MAX_DELIVERY_ATTEMPTS,
-        PartIndex, PartKey, PolicyDeliveryPlanner, ProviderSendOutcome, RenderedPart,
-        StandaloneDeliveryEnvelope, TransportPayload, TransportRegistrationError,
-        TransportRegistry, TransportRenderer, TransportSender, delivery::ContentDigest,
+        FailureClass, FailureDetail, MAX_DELIVERY_ATTEMPTS, PartIndex, PartKey,
+        PolicyDeliveryPlanner, ProviderSendOutcome, RenderedPart, StandaloneDeliveryEnvelope,
+        TransportPayload, TransportRegistrationError, TransportRegistry, TransportRenderer,
+        TransportSender, delivery::ContentDigest,
     },
 };
 
@@ -308,7 +308,6 @@ fn record(transport: TransportKind) -> DeliveryRecord {
             destination_binding_id: ChannelBindingId::random(),
         }),
         external_destination: None,
-        task_id: None,
         correlation_id: CorrelationId::new(),
         transport,
         purpose: DeliveryPurpose::Reply,
@@ -348,10 +347,6 @@ struct EchoRenderer {
 impl TransportRenderer for EchoRenderer {
     fn transport(&self) -> TransportKind {
         self.transport
-    }
-
-    fn classify_external_destination(&self, _value: &str) -> ExternalDestinationClassification {
-        ExternalDestinationClassification::InvalidSyntax
     }
 
     fn render(&self, envelope: &DeliveryEnvelope) -> AppResult<Vec<RenderedPart>> {

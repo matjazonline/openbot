@@ -4,7 +4,7 @@ use uuid::Uuid;
 use crate::entities::{
     creation::CreationProvenance,
     participant::{ChannelPrincipalGrant, PrincipalAccessContext, PrincipalCapability},
-    transport::{PrincipalId, RecipientRole},
+    transport::PrincipalId,
     value_objects::{ChannelSlug, CompanySlug, EmailAddress},
 };
 use std::str::FromStr;
@@ -42,67 +42,37 @@ pub fn strip_quiet_prefix(body: &str) -> Option<&str> {
 pub struct Channel {
     pub id: Uuid,
     pub company_id: Uuid,
-    /// The agent whose personal address this channel is, or `None` for standalone channels.
-    #[serde(default)]
-    pub owner_agent_id: Option<Uuid>,
     pub name: String,
     /// What this channel is for, in one line, as its owner wrote it.
     ///
     /// Shown to a teammate whose mail bounced off an address that does not exist, so the list of
-    /// channels they *could* have written to explains itself. Defaulted on deserialize for the
-    /// same reason as `enabled`: durable `background_tasks` payloads written before this field
-    /// existed must still re-hydrate.
-    #[serde(default)]
+    /// channels they *could* have written to explains itself.
     pub description: Option<String>,
     pub slug: ChannelSlug,
     /// Extra local parts this channel also answers on, canonical [`Channel::slug`] excluded.
-    ///
-    /// Defaulted on deserialize for the same reason as `enabled`: durable `background_tasks`
-    /// payloads written before aliases existed must still re-hydrate.
-    #[serde(default)]
     pub alias_slugs: Vec<ChannelSlug>,
     /// Email-only form/delivery projection of allowlist grants. Authorization never consults this
     /// field; the stable grant rows below are the source of truth.
     pub participant_emails: Option<Vec<EmailAddress>>,
     pub access_mode: ChannelAccessMode,
     pub principal_grants: Vec<ChannelPrincipalGrant>,
-    pub agent_ids: Option<Vec<Uuid>>,
-    /// Whether the channel takes traffic at all. A disabled channel keeps its threads and tasks
-    /// but bounces inbound mail and cannot be an internal delivery target.
-    ///
-    /// Defaulted on deserialize because `Channel` is stored inside durable `background_tasks`
-    /// payloads: tasks queued before this field existed must still re-hydrate.
-    #[serde(default = "default_true")]
+    /// Whether the channel takes traffic at all. A disabled channel keeps its threads but bounces
+    /// inbound mail and cannot be an internal delivery target.
     pub enabled: bool,
     /// Whether a trusted sender may pull CC'd outsiders onto this channel's threads.
     ///
     /// Off means the channel is internal: a third party is neither added to
     /// `Thread::participant_emails` nor copied on the agent's reply. Because thread membership is
     /// itself an authorization grant, their later mail to the channel then bounces.
-    ///
-    /// Defaulted on deserialize for the same reason as `enabled`.
-    #[serde(default = "default_true")]
     pub add_3rd_party: bool,
-    /// Eligibility evaluated when a message enters this channel.
-    pub response_trigger: ChannelResponseTrigger,
-    #[serde(default)]
-    pub retrieve_company_memory: bool,
-    #[serde(default)]
-    pub retrieve_agent_memory: bool,
-    #[serde(default)]
-    pub retrieve_user_memory: bool,
-    #[serde(default)]
-    pub persist_company_memory: bool,
-    #[serde(default)]
-    pub persist_agent_memory: bool,
-    #[serde(default)]
-    pub persist_user_memory: bool,
+    /// Moved on by every settings edit.
+    ///
+    /// Routing reads it in the statement that reads the settings it decides on, and the inbound
+    /// commit refuses the message if the channel has moved past it, so a message is never stored
+    /// under settings an edit replaced while it was being routed.
+    pub settings_revision: i64,
     pub created_by: CreationProvenance,
     pub created_at: chrono::DateTime<chrono::Utc>,
-}
-
-fn default_true() -> bool {
-    true
 }
 
 /// Participant list entry that opens a channel to any sender.
@@ -135,55 +105,6 @@ impl FromStr for ChannelAccessMode {
             "allowlist" => Ok(Self::Allowlist),
             "public" => Ok(Self::Public),
             _ => Err(format!("invalid channel access mode '{value}'")),
-        }
-    }
-}
-
-/// When an accepted message should run this channel's agent.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum ChannelResponseTrigger {
-    #[default]
-    Always,
-    Mentioned,
-    #[serde(rename = "mentioned_or_reply")]
-    MentionedOrReplyToAgent,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct AnswerFacts {
-    pub role: RecipientRole,
-    pub mentioned: bool,
-    pub replies_to_agent: bool,
-}
-
-impl ChannelResponseTrigger {
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::Always => "always",
-            Self::Mentioned => "mentioned",
-            Self::MentionedOrReplyToAgent => "mentioned_or_reply",
-        }
-    }
-
-    pub fn answers(self, facts: AnswerFacts) -> bool {
-        match self {
-            Self::Always => facts.role == RecipientRole::To || facts.mentioned,
-            Self::Mentioned => facts.mentioned,
-            Self::MentionedOrReplyToAgent => facts.mentioned || facts.replies_to_agent,
-        }
-    }
-}
-
-impl FromStr for ChannelResponseTrigger {
-    type Err = String;
-
-    fn from_str(value: &str) -> Result<Self, Self::Err> {
-        match value {
-            "always" => Ok(Self::Always),
-            "mentioned" => Ok(Self::Mentioned),
-            "mentioned_or_reply" => Ok(Self::MentionedOrReplyToAgent),
-            _ => Err(format!("invalid channel response trigger '{value}'")),
         }
     }
 }
@@ -285,16 +206,6 @@ impl Channel {
         std::iter::once(&self.slug).chain(self.alias_slugs.iter())
     }
 
-    /// Whether this channel is the given agent's personal address.
-    ///
-    /// The single definition of the ownership test: an owned channel's slug follows its owner's
-    /// handle, its owner is pinned at position 0, and it can only be deleted through that agent —
-    /// so the pages and use cases that special-case any of those all ask this rather than
-    /// re-comparing `owner_agent_id` themselves.
-    pub fn is_owned_by(&self, agent_id: Uuid) -> bool {
-        self.owner_agent_id == Some(agent_id)
-    }
-
     /// The single definition of "does this addressed slug reach this channel".
     pub fn matches_slug(&self, slug: &str) -> bool {
         self.slugs().any(|own| own.eq_ignore_ascii_case(slug))
@@ -343,8 +254,6 @@ mod tests {
 
     fn channel_with_aliases(aliases: &[&str]) -> Channel {
         Channel {
-            response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
-            owner_agent_id: None,
             id: Uuid::new_v4(),
             company_id: Uuid::new_v4(),
             name: "Support".to_string(),
@@ -354,17 +263,11 @@ mod tests {
             participant_emails: None,
             access_mode: ChannelAccessMode::Team,
             principal_grants: Vec::new(),
-            agent_ids: None,
             enabled: true,
             add_3rd_party: true,
-            retrieve_company_memory: false,
-            retrieve_agent_memory: false,
-            retrieve_user_memory: false,
-            persist_company_memory: false,
-            persist_agent_memory: false,
-            persist_user_memory: false,
             created_by: CreationProvenance::system(),
             created_at: chrono::Utc::now(),
+            settings_revision: 0,
         }
     }
 
@@ -601,7 +504,3 @@ mod tests {
         );
     }
 }
-
-#[cfg(test)]
-#[path = "channel_response_trigger_tests.rs"]
-mod response_trigger_tests;

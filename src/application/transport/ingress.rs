@@ -17,7 +17,6 @@ use crate::{
         correlation::CorrelationId,
         email_message::EmailMessageMetadata,
         message::{AttachmentMetadata, CanonicalMessageId},
-        outreach::OutreachReplyMatch,
         participant::ThreadPrincipalRole,
         transport::{
             ChannelBindingId, ChannelSelector, ExternalEventKey, ExternalMessageKey,
@@ -395,8 +394,8 @@ impl InboundDraft {
 /// Every field is already validated: the identities are qualified, the content is bounded, the
 /// lists cannot exceed their limits, and the policy facts say which questions may be asked. There
 /// is deliberately no `Serialize` -- an envelope carries provider-derived content, and the one
-/// thing that must never happen to it is being written into a durable task payload. See
-/// [`crate::transport::InboundTaskPayloadV1`] for what a task carries instead.
+/// thing that must never happen to it is being written into a durable job payload. A workflow
+/// admission carries the stored message's identifiers instead.
 #[derive(Debug, Clone)]
 pub struct InboundEnvelope {
     /// Which binding this arrived on, and the provider's keys for the event, message and thread.
@@ -415,16 +414,6 @@ pub struct InboundEnvelope {
     /// when it did not. Never re-minted downstream.
     pub correlation_id: CorrelationId,
     pub extension: ProtocolExtension,
-}
-
-impl InboundEnvelope {
-    /// The identities addressed in one role, in the order the message carried them.
-    pub fn addressed_in(&self, role: RecipientRole) -> impl Iterator<Item = &QualifiedIdentity> {
-        self.addressed
-            .iter()
-            .filter(move |addressed| addressed.role == role)
-            .map(|addressed| &addressed.identity)
-    }
 }
 
 /// A reserved platform address that the platform answers itself instead of routing to a channel.
@@ -617,90 +606,52 @@ impl ThreadPrincipalIntent {
     }
 }
 
-/// One channel an agent-dispatch run drives.
-///
-/// Named by channel rather than by thread because the thread may not exist yet: a message that
-/// opens a conversation has its thread created by the same commit that creates this task, and the
-/// committer resolves the pair from the association it just wrote. A target with no association is
-/// therefore unrepresentable rather than merely unlikely.
+/// How an accepted message reached ingress, as the admission intent records it (p08 D1.3).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct InboundTaskTarget {
-    pub channel_id: Uuid,
-    pub role: RecipientRole,
+pub enum InboundOrigin {
+    /// Mail from outside the platform.
+    External,
+    /// One channel's mail relayed in-process to another.
+    Internal,
+    /// Posted by a signed-in member through the application.
+    Application,
 }
 
-/// One addressed pipeline's agent-dispatch task.
-///
-/// A `+` address chains its channels in one run; separate To/Cc addresses get separate tasks and
-/// replies. The first surviving channel owns the run. The canonical message id is assigned by the
-/// commit, so the committer builds the durable payload.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct InboundTaskRequest {
-    pub task_type: String,
-    /// In pipeline order. The first is the run's own channel and thread.
-    pub targets: Vec<InboundTaskTarget>,
-}
-
-/// An outreach reply whose target and waiting task must advance with the inbound message.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct InboundOutreachTransition {
-    pub channel_id: Uuid,
-    pub matched: OutreachReplyMatch,
-}
-
-/// One channel's copy of an eligible outside reply that must wait for the team.
-///
-/// Named by channel, not by thread, for the same reason [`InboundTaskTarget`] is: the thread may
-/// not exist until the commit writes it. The commit resolves the pair from the association it just
-/// wrote, so a hold with no association is unrepresentable.
-///
-/// Identifiers only. Nothing about the handoff reaches a durable task payload, so a worker can
-/// never snapshot a generation that a newer customer message has since replaced.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct InboundHold {
-    pub channel_id: Uuid,
-    /// The handoff row id to use when this thread has no handoff yet. A fresh UUID per commit;
-    /// an existing row keeps its own id and only takes the new generation.
-    pub handoff_id: Uuid,
-    /// The generation this hold opens. New on every held message, including a second hold on a
-    /// thread whose previous generation is still open.
-    pub generation: Uuid,
-}
-
-impl InboundTaskRequest {
-    pub fn primary(&self) -> Option<InboundTaskTarget> {
-        self.targets.first().copied()
-    }
-}
-
-/// Refuse a channel assigned to separate runs before any part of ingress is written.
-pub(crate) fn each_channel_in_one_task(
-    tasks: &[InboundTaskRequest],
-) -> crate::app_error::AppResult<()> {
-    let mut owners = std::collections::HashMap::new();
-    for (index, task) in tasks.iter().enumerate() {
-        for target in &task.targets {
-            if owners
-                .insert(target.channel_id, index)
-                .is_some_and(|owner| owner != index)
-            {
-                return Err(crate::app_error::AppError::BadRequest(
-                    "An inbound channel cannot belong to more than one task".into(),
-                ));
-            }
+impl InboundOrigin {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::External => "external",
+            Self::Internal => "internal",
+            Self::Application => "application",
         }
     }
-    Ok(())
+}
+
+/// One channel association's workflow-admission intent (p08 D1.3): the facts the intent worker
+/// decides reply correlation and binding eligibility from. Named by channel rather than by thread
+/// because the thread may not exist until the commit writes it; the committer resolves the pair
+/// from the association it just wrote, so an intent with no association is unrepresentable.
+///
+/// Facts only. Eligibility belongs to the bindings and is decided after the commit, never by
+/// channel execution settings.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct InboundAdmissionIntent {
+    pub channel_id: Uuid,
+    pub role: RecipientRole,
+    /// Whether the body names this channel (name, alias, address or handle).
+    pub mentioned: bool,
+    /// The message this one directly answers on this channel, when resolvable.
+    pub reply_to: Option<CanonicalMessageId>,
+    /// The channel's settings revision routing accepted this copy under. The commit refuses the
+    /// message as [`crate::app_error::AppError::Superseded`] if the channel has moved past it.
+    pub settings_revision: i64,
 }
 
 /// Everything one accepted inbound message must make durable, together or not at all.
 ///
 /// The whole point of one named struct is that these rows agree: a canonical message visible
 /// without its provider mapping is a message a redelivery will duplicate, and one visible without
-/// its task is a message no agent will ever answer -- *unless* a hold is what removed the task.
-/// `holds` is what makes that case legible: a held channel's copy is a perfectly ordinary customer
-/// message whose answer was deliberately deferred to the team, and the `thread_handoffs` row that
-/// says so becomes visible in the same transaction as the message itself.
+/// its admission intents is a message no workflow will ever consider (p08 D1.3).
 #[derive(Debug, Clone)]
 pub struct InboundCommitRequest {
     pub company_id: Uuid,
@@ -709,15 +660,13 @@ pub struct InboundCommitRequest {
     /// a durable inbox. `None` for direct ingress, which has nothing to fence.
     pub claimed_event: Option<ExecutionLease<InboundEventId>>,
     pub associations: BoundedVec<ThreadAssociation, MAX_THREAD_ASSOCIATIONS>,
-    /// One per addressed pipeline, in address order. A channel appears in at most one.
-    pub tasks: BoundedVec<InboundTaskRequest, MAX_THREAD_ASSOCIATIONS>,
-    /// The channels whose copy of this message waits for the team instead of running their agent.
-    ///
-    /// Bounded by [`MAX_THREAD_ASSOCIATIONS`] rather than by a limit of its own: at most one
-    /// handoff per thread and at most one thread per channel per message, so the holds one commit
-    /// can write can never outnumber the associations it writes.
-    pub holds: BoundedVec<InboundHold, MAX_THREAD_ASSOCIATIONS>,
-    pub outreach_transitions: BoundedVec<InboundOutreachTransition, MAX_THREAD_ASSOCIATIONS>,
+    /// One per association, in association order: every accepted copy is considered for reply
+    /// correlation, and admitted by bindings only when [`Self::admissible`] (p08 D1.3).
+    pub intents: BoundedVec<InboundAdmissionIntent, MAX_THREAD_ASSOCIATIONS>,
+    /// The sender's stated disposition answers: bindings may admit this message. A quiet message
+    /// is filed, and may still answer a workflow's correlated wait.
+    pub admissible: bool,
+    pub origin: InboundOrigin,
     /// The fan-out this message is immediately owed, already composed and frozen.
     ///
     /// Composed rather than planned: a delivery names the parts it will send, and freezing them
@@ -725,11 +674,10 @@ pub struct InboundCommitRequest {
     /// intents; the caller turns them into deliveries before it commits, so the queue rows and the
     /// message become visible together.
     pub deliveries: Vec<NewDelivery>,
-    /// Whether the answer this message earns should actually be sent.
+    /// Whether the runs this message admits may send email, or publish in-app only.
     ///
-    /// Part of the commit because it has to reach the worker, and the durable task payload is
-    /// written here: a run that had to guess would either mail a user's test or swallow a real
-    /// reply.
+    /// Part of the commit because the intents are written here: a run that had to guess would
+    /// either mail a user's test or swallow a real reply.
     pub reply_delivery: ReplyDelivery,
 }
 
@@ -756,14 +704,9 @@ pub struct InboundCommitOutcome {
     pub message_id: CanonicalMessageId,
     /// The threads the message is now associated with, in association order.
     pub thread_ids: Vec<Uuid>,
-    /// Task ids in the same order as the commit request.
-    pub task_ids: Vec<Uuid>,
-    /// The `thread_handoffs` rows this commit opened a generation on, in hold order.
-    ///
-    /// Empty for a duplicate and for every unheld message. Returned so the caller can name what
-    /// was opened without a second query -- a hold whose row id the caller had to guess would be a
-    /// hold it could not audit.
-    pub handoff_ids: Vec<Uuid>,
+    /// The admission intents of the message, in association order. A duplicate returns the
+    /// first delivery's: a redelivery writes none.
+    pub intent_ids: Vec<Uuid>,
     /// The deliveries this commit created. Empty for a duplicate, which must not fan out twice.
     pub delivery_ids: Vec<crate::entities::transport::DeliveryId>,
 }
@@ -771,25 +714,6 @@ pub struct InboundCommitOutcome {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn task_channels_may_be_disjoint_but_cannot_overlap_between_runs() {
-        let channel = Uuid::new_v4();
-        let other = Uuid::new_v4();
-        let task = |channels: &[Uuid]| InboundTaskRequest {
-            task_type: "agent_dispatch".into(),
-            targets: channels
-                .iter()
-                .map(|channel_id| InboundTaskTarget {
-                    channel_id: *channel_id,
-                    role: RecipientRole::To,
-                })
-                .collect(),
-        };
-        assert!(each_channel_in_one_task(&[]).is_ok());
-        assert!(each_channel_in_one_task(&[task(&[channel]), task(&[other])]).is_ok());
-        assert!(each_channel_in_one_task(&[task(&[other, channel]), task(&[channel])]).is_err());
-    }
 
     #[test]
     fn canonical_content_strips_invisible_and_prompt_injection_characters() {

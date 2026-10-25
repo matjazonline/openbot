@@ -40,6 +40,11 @@ fn configuration() -> BindingConfiguration {
         company_id: company(),
         params: json!({"count":1}),
         resources: BTreeMap::from([(ResourceName::parse("service").unwrap(), resource())]),
+        run_as: crate::application::workflow::WorkflowActor::authenticated(uuid::Uuid::from_u128(
+            0xA5,
+        ))
+        .unwrap(),
+        message_trigger: None,
     }
 }
 fn status() -> ResourceStatus {

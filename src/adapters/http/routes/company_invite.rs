@@ -531,7 +531,6 @@ mod tests {
             name: "Test Company".to_string(),
             slug: "test-company".into(),
             avatar_url: None,
-            memory_provider: None,
             created_at: Utc::now(),
         };
 

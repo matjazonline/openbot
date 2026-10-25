@@ -2,7 +2,10 @@
 //! Settlement and dispatch permission stay separate from this read boundary.
 mod delivery;
 mod facts;
+mod resources;
 mod settlement;
+
+pub use resources::CompanyReconciliationResources;
 
 use super::invalid;
 use super::*;
@@ -17,7 +20,9 @@ use chrono::{DateTime, Utc};
 use serde_json::Value;
 
 /// Lock the command actor's actual resource authority through the transaction.
-/// Recording past truth requires access; it does not require current I/O approval.
+/// Recording past truth requires access, not the current approval policy for I/O. The service's
+/// `validate_resource` does still require the resource to be authorized, Ready and to support the
+/// frozen contract (P08-D3 §D3.2a): an unready resource cannot be annotated until it is ready.
 #[async_trait]
 pub trait SqlReconciliationResources: Send + Sync {
     async fn lock_resource(

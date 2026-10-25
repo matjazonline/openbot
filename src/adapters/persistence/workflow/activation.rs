@@ -149,8 +149,8 @@ async fn resolve(
     let dependencies = input_dependencies(bundle, step)?;
     let outputs = outputs(db, request, ordinal, bundle, limits, &dependencies).await?;
     // One source of truth for lineage: the immutable run column, not the admission key.
-    let parent: Option<Uuid> = sqlx::query_scalar(
-        "SELECT parent_run_id FROM workflow_runs WHERE company_id = $1 AND id = $2",
+    let (parent, deadline): (Option<Uuid>, chrono::DateTime<chrono::Utc>) = sqlx::query_as(
+        "SELECT parent_run_id, deadline FROM workflow_runs WHERE company_id = $1 AND id = $2",
     )
     .bind(request.company.as_uuid())
     .bind(request.run.as_uuid())
@@ -163,17 +163,14 @@ async fn resolve(
         run: RunMetadata {
             run_id: request.run,
             parent_run_id: parent.map(RunId::new),
+            deadline: Some(deadline),
         },
     };
-    let inputs = prepare_inputs(bundle, step, &context)?;
-    let choice = bundle
-        .compiled()
-        .rule(step)
-        .map(|rule| rule.decide(&context, limits))
-        .transpose()
-        .map_err(|_| AppError::BadRequest("Invalid rule predicate".into()))?
-        .map(|choice| choice.as_str().to_owned());
-    Ok(FrozenActivation { inputs, choice })
+    let prepared = prepare_activation(bundle, step, &context)?;
+    Ok(FrozenActivation {
+        inputs: prepared.inputs,
+        choice: prepared.choice.map(|choice| choice.as_str().to_owned()),
+    })
 }
 
 /// The parent context a `flow.repeat` round is decided in (07-D1 §D1.1): the activation's
@@ -185,6 +182,7 @@ pub(super) struct RoundContext {
     outputs: BTreeMap<StepId, Value>,
     run: RunId,
     parent: Option<RunId>,
+    deadline: chrono::DateTime<chrono::Utc>,
 }
 impl RoundContext {
     pub(super) fn context(&self) -> Context<'_> {
@@ -195,6 +193,7 @@ impl RoundContext {
             run: RunMetadata {
                 run_id: self.run,
                 parent_run_id: self.parent,
+                deadline: Some(self.deadline),
             },
         }
     }
@@ -207,13 +206,15 @@ pub(super) async fn round_context(
     activation: &ActivatedExecution,
     provisional: Value,
 ) -> AppResult<RoundContext> {
-    let (input, parent): (Value, Option<Uuid>) = sqlx::query_as(
-        "SELECT input, parent_run_id FROM workflow_runs WHERE company_id = $1 AND id = $2",
-    )
-    .bind(request.company.as_uuid())
-    .bind(request.run.as_uuid())
-    .fetch_one(&mut *db)
-    .await?;
+    let (input, parent, deadline): (Value, Option<Uuid>, chrono::DateTime<chrono::Utc>) =
+        sqlx::query_as(
+            "SELECT input, parent_run_id, deadline FROM workflow_runs \
+             WHERE company_id = $1 AND id = $2",
+        )
+        .bind(request.company.as_uuid())
+        .bind(request.run.as_uuid())
+        .fetch_one(&mut *db)
+        .await?;
     let bundle = binding.bundle();
     let mut dependencies = input_dependencies(bundle, &activation.step)?;
     dependencies.remove(&activation.step);
@@ -227,6 +228,7 @@ pub(super) async fn round_context(
         outputs,
         run: request.run,
         parent: parent.map(RunId::new),
+        deadline,
     })
 }
 

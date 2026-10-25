@@ -17,6 +17,10 @@ mod agent_tests;
 mod authority_tests;
 #[path = "message_delivery_tests.rs"]
 mod delivery_tests;
+#[path = "message_ingress_tests.rs"]
+mod ingress_tests;
+#[path = "message_intent_tests.rs"]
+mod intent_tests;
 #[path = "message_race_tests.rs"]
 mod race_tests;
 #[path = "message_reconcile_tests.rs"]

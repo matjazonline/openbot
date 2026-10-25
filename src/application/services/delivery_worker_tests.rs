@@ -33,7 +33,6 @@ fn record(company_id: uuid::Uuid) -> DeliveryRecord {
             destination_binding_id: ChannelBindingId::random(),
         }),
         external_destination: None,
-        task_id: None,
         correlation_id: CorrelationId::new(),
         transport: TransportKind::Email,
         purpose: crate::entities::transport::DeliveryPurpose::Reply,
@@ -172,6 +171,31 @@ fn a_resumed_delivery_starts_at_its_first_unfinished_part() {
 
 /// A transport this deployment cannot speak is a configuration fact, and a delivery naming one is
 /// dead-lettered rather than retried: five backoffs will not install an adapter.
+/// p08 B4b: the stuck-delivery gauges moved here from the retired task census. Every sweep
+/// publishes all three, zeroes included, under the same `stuck_work` name and labels.
+#[tokio::test]
+async fn a_sweep_publishes_every_stuck_delivery_gauge() {
+    let monitor = Arc::new(crate::adapters::monitoring::in_memory_monitor::InMemoryMonitor::new());
+    let worker = DeliveryWorker::new(
+        Arc::new(ScriptedQueue::default()),
+        Arc::new(TransportRegistry::new()),
+    )
+    .with_monitoring(monitor.clone());
+
+    worker.reap().await;
+
+    let gauges = monitor.get_stats_json()["gauges"].clone();
+    assert_eq!(
+        gauges["stuck_work{kind=delivery_dead_lettered}"], 2.0,
+        "{gauges}"
+    );
+    assert_eq!(gauges["stuck_work{kind=delivery_overdue}"], 0.0, "{gauges}");
+    assert_eq!(
+        gauges["stuck_work{kind=delivery_unconfirmed}"], 0.0,
+        "{gauges}"
+    );
+}
+
 #[tokio::test]
 async fn a_delivery_for_an_unregistered_transport_is_dead_lettered() {
     let queue = Arc::new(ScriptedQueue::default());
@@ -291,6 +315,16 @@ struct ScriptedQueue {
 
 #[async_trait::async_trait]
 impl DeliveryQueue for ScriptedQueue {
+    async fn census_stuck_deliveries(
+        &self,
+        _overdue_after: Duration,
+    ) -> AppResult<crate::entities::stuck_work::StuckWorkCensus> {
+        Ok(crate::entities::stuck_work::StuckWorkCensus {
+            delivery_dead_lettered: 2,
+            ..Default::default()
+        })
+    }
+
     async fn claim_deliveries(
         &self,
         _owner: WorkerId,
@@ -372,13 +406,6 @@ struct NoopRenderer;
 impl TransportRenderer for NoopRenderer {
     fn transport(&self) -> TransportKind {
         TransportKind::Email
-    }
-
-    fn classify_external_destination(
-        &self,
-        _value: &str,
-    ) -> crate::transport::ExternalDestinationClassification {
-        crate::transport::ExternalDestinationClassification::InvalidSyntax
     }
 
     fn render(

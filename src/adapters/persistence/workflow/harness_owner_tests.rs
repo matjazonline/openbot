@@ -2,7 +2,7 @@
 use super::*;
 use crate::{
     entities::harness::HarnessKind,
-    services::harness::runs::{HarnessRunStore, RigExecutionPolicy, RunCheckpoint, RunIdentity},
+    services::harness::runs::{RigExecutionPolicy, RunCheckpoint, RunIdentity},
     use_cases::agent::{AgentPersistence, AgentWrite},
 };
 
@@ -87,10 +87,10 @@ async fn insert(db: &mut sqlx::PgConnection, row: &Value) -> Result<(), sqlx::Er
 }
 
 #[tokio::test]
-async fn workflow_harness_owner_exact_scope_and_legacy_isolation() {
+async fn workflow_harness_owner_exact_scope_and_workflow_owner_only() {
     let NativeFixture {
         fixture: f,
-        fence,
+        fence: _,
         row,
     } = native_row().await;
     for field in [
@@ -117,10 +117,9 @@ async fn workflow_harness_owner_exact_scope_and_legacy_isolation() {
         };
         assert!(rejected, "accepted wrong {field}");
     }
+    // A workflow is the only owner a checkpoint can have (p08 D4.8).
     for (field, value) in [
         ("owner_kind", json!("legacy")),
-        ("owner_principal_id", json!(Uuid::new_v4())),
-        ("ownership_version", json!(1)),
         ("workflow_attempt", json!(2)),
         ("workflow_prepared", Value::Null),
         ("final_output_consumed_at", json!(chrono::Utc::now())),
@@ -137,25 +136,7 @@ async fn workflow_harness_owner_exact_scope_and_legacy_isolation() {
     let mut tx = f.persistence().pool().begin().await.unwrap();
     insert(&mut tx, &row).await.unwrap();
     tx.commit().await.unwrap();
-    let id = serde_json::from_value(row["id"].clone()).unwrap();
-    assert!(
-        f.persistence()
-            .load_run(
-                fence.scope.company.as_uuid(),
-                fence.scope.job.0,
-                crate::services::harness::runs::RunId(id)
-            )
-            .await
-            .unwrap()
-            .is_none()
-    );
-    assert!(
-        f.persistence()
-            .diagnostics(fence.scope.company.as_uuid(), fence.scope.job.0)
-            .await
-            .unwrap()
-            .is_none()
-    );
+    let id: Uuid = serde_json::from_value(row["id"].clone()).unwrap();
     let saved: Value =
         sqlx::query_scalar("SELECT workflow_prepared FROM task_harness_runs WHERE id=$1")
             .bind(id)
@@ -268,53 +249,6 @@ async fn workflow_harness_owner_competing_open_has_one_execution_identity() {
         .await
         .unwrap();
     assert_eq!(count, 1);
-}
-
-#[tokio::test]
-async fn workflow_harness_owner_legacy_supersede_and_invocation_projection_are_isolated() {
-    let NativeFixture {
-        fixture: f,
-        fence,
-        row,
-    } = native_row().await;
-    let id: Uuid = serde_json::from_value(row["id"].clone()).unwrap();
-    let mut tx = f.persistence().pool().begin().await.unwrap();
-    insert(&mut tx, &row).await.unwrap();
-    tx.commit().await.unwrap();
-    let mut tx = f.persistence().pool().begin().await.unwrap();
-    crate::adapters::persistence::task::supersede_harness_runs_on(
-        &mut tx,
-        fence.scope.company.as_uuid(),
-        fence.scope.job.0,
-        0,
-    )
-    .await
-    .unwrap();
-    crate::adapters::persistence::task::supersede_harness_runs_for_tasks_on(
-        &mut tx,
-        fence.scope.company.as_uuid(),
-        &[(fence.scope.job.0, 0)],
-    )
-    .await
-    .unwrap();
-    tx.commit().await.unwrap();
-    let saved: Value = sqlx::query_scalar("SELECT checkpoint FROM task_harness_runs WHERE id=$1")
-        .bind(id)
-        .fetch_one(f.persistence().pool())
-        .await
-        .unwrap();
-    assert_eq!(saved, row["checkpoint"]);
-    let invocation = Uuid::new_v4();
-    let error = sqlx::query("INSERT INTO task_harness_invocations
-        (id,company_id,task_id,run_id,model_turn,call_ordinal,state,invocation)
-        VALUES ($1,$2,$3,$4,0,0,'prepared',$5)")
-        .bind(invocation).bind(fence.scope.company.as_uuid()).bind(fence.scope.job.0).bind(id)
-        .bind(json!({"call":{"invocation_id":invocation},"turn":0,"ordinal":0,"state":"prepared","result":null}))
-        .execute(f.persistence().pool()).await.unwrap_err();
-    assert_eq!(
-        error.as_database_error().unwrap().constraint(),
-        Some("legacy_auxiliary_task_queue_kind")
-    );
 }
 
 #[path = "harness_store_tests.rs"]

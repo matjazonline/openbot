@@ -79,6 +79,8 @@ pub struct InboundEventWorker {
     decoders: Arc<InboundEventDecoderRegistry>,
     monitoring: Option<Arc<dyn MonitoringService>>,
     wakeups: InboundEventWakeups,
+    /// Woken after a commit wrote workflow admission intents (p08 D1.4.8).
+    intent_wakeups: Option<Arc<tokio::sync::Notify>>,
     worker_id: WorkerId,
 }
 
@@ -95,12 +97,18 @@ impl InboundEventWorker {
             decoders,
             monitoring: None,
             wakeups,
+            intent_wakeups: None,
             worker_id: WorkerId::random(),
         }
     }
 
     pub fn with_monitoring(mut self, monitoring: Arc<dyn MonitoringService>) -> Self {
         self.monitoring = Some(monitoring);
+        self
+    }
+
+    pub fn with_intent_wakeups(mut self, wakeups: Arc<tokio::sync::Notify>) -> Self {
+        self.intent_wakeups = Some(wakeups);
         self
     }
 
@@ -288,7 +296,15 @@ impl InboundEventWorker {
                 }
                 request.claimed_event = Some(fence);
                 match self.committer.commit_inbound(request).await {
-                    Ok(_) => WorkResult::Committed,
+                    Ok(outcome) => {
+                        if !outcome.disposition.is_duplicate()
+                            && !outcome.intent_ids.is_empty()
+                            && let Some(wakeups) = &self.intent_wakeups
+                        {
+                            wakeups.notify_one();
+                        }
+                        WorkResult::Committed
+                    }
                     Err(error) => {
                         let (class, terminal) = classify_commit_error(&error);
                         if terminal {
@@ -648,6 +664,8 @@ fn classify_commit_error(error: &AppError) -> (InboundEventErrorClass, bool) {
         | AppError::NotFound(_)
         | AppError::Conflict(_) => (InboundEventErrorClass::Routing, true),
         AppError::Timeout(_) => (InboundEventErrorClass::Deadline, false),
+        // Decoding again routes it again, against the settings that replaced the old ones.
+        AppError::Superseded(_) => (InboundEventErrorClass::Superseded, false),
         AppError::Database(_)
         | AppError::DatabaseTimeout(_)
         | AppError::Internal(_)

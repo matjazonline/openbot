@@ -1,0 +1,761 @@
+--- a/src/adapters/http/pages/workflow_authoring/bindings.rs
++++ b/src/adapters/http/pages/workflow_authoring/bindings.rs
+@@ -412,10 +412,10 @@
+     };
+     match &form.params {
+         BindingParams::Json(raw) => format!(
+-            r#"<fieldset class="space-y-1"><legend class="text-sm font-semibold">Parameters</legend>{field}</fieldset>"#,
++            r#"<fieldset class="space-y-1"><legend class="text-sm font-semibold">Parameters</legend><input type="hidden" name="params_mode" value="json">{field}</fieldset>"#,
+             field = labelled(
+                 "Parameters (JSON object)",
+-                "The version's parameter schema has no fields this form can show; the binding command validates the object against it.",
++                "Typed as one JSON object: the version's parameter schema has no fields this form can show, or the stored parameters hold something the fields cannot carry exactly. The binding command validates the object against the schema.",
+                 &format!(
+                     r#"<textarea class="textarea w-full font-mono text-xs" rows="6" name="params_json">
+ {}</textarea>"#,
+@@ -441,6 +441,7 @@
+                 .collect();
+             format!(
+                 r#"<fieldset class="space-y-1"><legend class="text-sm font-semibold">Parameters</legend>
++                    <input type="hidden" name="params_mode" value="fields">
+                     <div class="grid gap-3 sm:grid-cols-2">{controls}</div>
+                     <datalist id="binding-people">{people}</datalist>
+                     <p class="text-xs opacity-60">A text parameter suggests the company's people by id; an empty optional field is left out.</p>
+--- a/src/adapters/http/pages/workflow_authoring/tools.rs
++++ b/src/adapters/http/pages/workflow_authoring/tools.rs
+@@ -8,8 +8,16 @@
+ use crate::application::workflow::reads::{BindingUse, ToolTarget, VersionSummary};
+ use crate::application::workflow::tools::WorkflowToolRegistration;
+ 
+-/// What revoking a name does, said where the author revokes it.
+-pub const REVOKE_WARNING: &str = "Revoking refuses every call to this tool from published versions that froze it, including runs already waiting on one. Registering the name again for the same workflow lets those versions call it again; for another workflow they stay refused until republished.";
++/// What revoking a name does to the published versions that froze it (P07-D2 rev 4 §D2.2,
++/// §D2.7), said where the author revokes it.
++pub const REVOKE_WARNING: &str = "Revoking stops every published version that froze this tool: their new runs are refused, their bindings can no longer be configured or activated, and their agents' next calls to it are refused. A call already in progress still returns its result. Registering the name again for the same workflow restores them; for another workflow they stay stopped until republished.";
++
++/// What pointing a name at another workflow does: for the versions that froze the old one it
++/// is a revocation (P07-D2 rev 4 §D2.2).
++pub const REPOINT_WARNING: &str = "It is registered for another workflow. Pointing it here stops every published version that froze that workflow: their new runs are refused, their bindings can no longer be configured or activated, and their agents' next calls to it are refused, until they are republished. A call already in progress still returns its result.";
++
++/// What re-pinning within the same workflow does: nothing to what is published.
++pub const REPIN_NOTE: &str = "It is registered for this workflow already. Re-pinning it changes only what later publications freeze; published versions keep running and calling the version they froze.";
+ 
+ fn target_label(targets: &[ToolTarget], registration: &WorkflowToolRegistration) -> String {
+     match targets
+@@ -131,9 +139,9 @@
+         None => (String::new(), "Register tool"),
+         Some(existing) => {
+             let consequence = if existing.same_workflow {
+-                "It is registered for this workflow already. Re-pinning it changes only what later publications freeze; published versions keep calling the version they froze."
++                REPIN_NOTE
+             } else {
+-                "It is registered for another workflow. Pointing it here refuses every call from published versions that froze the other workflow, until they are republished."
++                REPOINT_WARNING
+             };
+             (
+                 format!(
+@@ -327,14 +335,14 @@
+         })
+         .collect();
+     let list = if card.bindings.is_empty() && card.hidden == 0 {
+-        r#"<p class="text-xs opacity-70">No binding runs this agent. A workflow uses it only once a version that names it is published and bound.</p>"#.to_owned()
++        r#"<p class="text-xs opacity-70">No binding's version froze this agent. A workflow uses it only once a version that names it is published and bound.</p>"#.to_owned()
+     } else {
+         format!(r#"<ul class="divide-y divide-base-300">{rows}</ul>"#)
+     };
+     format!(
+         r#"<section id="agent-workflow-usage" class="mt-6 space-y-2 rounded-box border border-base-300 p-4">
+             <div><h3 class="font-semibold">Used by</h3>
+-            <p class="text-sm opacity-70">Bindings whose published version runs this agent, directly or through a child workflow.</p></div>
++            <p class="text-sm opacity-70">Bindings whose published version froze this agent, directly or through a child workflow.</p></div>
+             {list}{hidden}{cut}
+         </section>"#,
+         hidden = if card.hidden > 0 {
+--- a/src/adapters/http/routes/workflows/ui/authoring/bindings.rs
++++ b/src/adapters/http/routes/workflows/ui/authoring/bindings.rs
+@@ -7,7 +7,7 @@
+ };
+ use super::*;
+ use crate::application::workflow::authoring::{
+-    field_value, parameter_fields, parameters_from_fields, parameters_from_json,
++    field_value, fields_for, parameter_fields, parameters_from_fields, parameters_from_json,
+ };
+ use crate::application::workflow::reads::{BindingOptions, BindingUse, WorkflowUsage};
+ use crate::application::workflow::{RelatedAssociation, RelatedChannelId};
+@@ -25,6 +25,8 @@
+     Typed {
+         values: BTreeMap<String, String>,
+         json: String,
++        /// The form showed the whole object as JSON (`params_mode=json`).
++        json_mode: bool,
+     },
+ }
+ 
+@@ -95,6 +97,7 @@
+             params: ParamsInput::Typed {
+                 values,
+                 json: form.text("params_json"),
++                json_mode: form.get("params_mode") == Some("json"),
+             },
+             resources,
+             message_trigger: form.text("message_trigger"),
+@@ -127,12 +130,17 @@
+     }
+ }
+ 
+-/// The form's params and the params object they build, by the version's schema.
++/// The params object the form builds: from the fields it showed, or from the whole object as
++/// JSON when it showed that (the schema has no fields, or the stored params were not exactly
++/// what the fields can carry).
+ fn params_of(
+     definition: &WorkflowDefinition,
+     form: &FormFields,
+ ) -> Result<serde_json::Value, String> {
+-    match parameter_fields(definition.parameter_schema.as_ref()) {
++    let fields = (form.get("params_mode") != Some("json"))
++        .then(|| parameter_fields(definition.parameter_schema.as_ref()))
++        .flatten();
++    match fields {
+         Some(fields) => parameters_from_fields(&fields, |name| {
+             form.get(&format!("param:{name}")).map(str::to_owned)
+         }),
+@@ -232,9 +240,18 @@
+         let definition = self
+             .binding_definition(company.id, workflow, form.version)
+             .await?;
+-        let fields = definition
++        let schema = definition
+             .as_ref()
+-            .and_then(|definition| parameter_fields(definition.parameter_schema.as_ref()));
++            .and_then(|definition| definition.parameter_schema.as_ref());
++        // Fields only when they carry the stored params exactly (F021), or when the author was
++        // already typing into fields.
++        let fields = match &form.params {
++            ParamsInput::Stored(params) => fields_for(schema, params),
++            ParamsInput::Typed {
++                json_mode: true, ..
++            } => None,
++            ParamsInput::Typed { .. } => parameter_fields(schema),
++        };
+         let (values, json) = match (&form.params, &fields) {
+             (ParamsInput::Stored(params), Some(fields)) => (
+                 fields
+@@ -247,7 +264,7 @@
+                 BTreeMap::new(),
+                 serde_json::to_string_pretty(params).unwrap_or_default(),
+             ),
+-            (ParamsInput::Typed { values, json }, _) => (values.clone(), json.clone()),
++            (ParamsInput::Typed { values, json, .. }, _) => (values.clone(), json.clone()),
+         };
+         let params = match &fields {
+             Some(fields) => pages::BindingParams::Fields {
+@@ -348,6 +365,27 @@
+             banner,
+             form_html: &form_html,
+         }))
++    }
++
++    /// Whether a `Conflict` from the binding command means the binding itself moved: a create
++    /// whose keyed binding now exists, or an edit whose state revision is no longer the one the
++    /// form or row was shown at. Any other `Conflict` is one of the command's own refusals.
++    async fn binding_moved(
++        &self,
++        company: Uuid,
++        binding: Uuid,
++        expected: Option<u64>,
++    ) -> AppResult<bool> {
++        let current = self
++            .engine
++            .authoring_reads()
++            .binding_use(super::company(company), binding)
++            .await?;
++        Ok(match (current, expected) {
++            (Some(_), None) | (None, Some(_)) => true,
++            (Some(current), Some(expected)) => current.binding.state_revision != expected,
++            (None, None) => false,
++        })
+     }
+ 
+     /// A binding of this workflow the viewer may see.
+@@ -494,6 +532,19 @@
+                     .await?,
+             ))
+         }
++        Err(WorkflowError::App(AppError::Conflict(message)))
++            if !ui
++                .binding_moved(company, binding, expected_state_revision)
++                .await? =>
++        {
++            // One of the command's own refusals that answer `Conflict` too (a resource slot
++            // that is not ready, a version changed under the binding): nothing moved (F019).
++            let form = refused(form, format!("Not saved: {message}"));
++            Ok(Html(
++                ui.bindings_pane(company, workflow, None, Some(form))
++                    .await?,
++            ))
++        }
+         Err(WorkflowError::App(AppError::Conflict(_))) if editing.is_none() => {
+             // A double submit of the create (the key names the binding) or a reused key.
+             Ok(Html(
+@@ -562,11 +613,22 @@
+                 pages::short_id(binding),
+                 state.revision.get(),
+             )),
+-            Err(WorkflowError::App(AppError::Conflict(_))) => BindingsBanner::RowRefused {
++            Err(WorkflowError::App(AppError::Conflict(_)))
++                if ui.binding_moved(company, binding, Some(expected)).await? =>
++            {
++                BindingsBanner::RowRefused {
++                    binding,
++                    message: "This binding changed since the page was shown; here it is as it is \
++                              now. Nothing was changed."
++                        .into(),
++                }
++            }
++            Err(WorkflowError::App(AppError::Conflict(message))) => BindingsBanner::RowRefused {
+                 binding,
+-                message: "This binding changed since the page was shown; here it is as it is now. \
+-                      Nothing was changed."
+-                    .into(),
++                message: format!(
++                    "Not {}: {message}",
++                    if active { "activated" } else { "deactivated" }
++                ),
+             },
+             Err(error) => match binding_refusal(&error) {
+                 Some(message) => BindingsBanner::RowRefused {
+--- a/src/adapters/http/routes/workflows/ui/authoring/bindings_tests.rs
++++ b/src/adapters/http/routes/workflows/ui/authoring/bindings_tests.rs
+@@ -551,3 +551,216 @@
+     let paused = render(&[binding(false)]);
+     assert!(!paused.contains("<button"), "{paused}");
+ }
++
++/// The binding command answers `Conflict` for a resource slot that is not ready too; that is
++/// said as the refusal it is, with every choice kept, not as a duplicate or a concurrent edit
++/// (F019).
++#[tokio::test]
++async fn a_resource_that_is_not_ready_is_refused_as_such_on_create_configure_and_activate() {
++    let Some(f) = Fixture::new().await else {
++        return;
++    };
++    let workflow = Uuid::new_v4();
++    let version = f
++        .published(
++            workflow,
++            "Http",
++            &serde_json::to_string_pretty(&example("http.request", workflow)).unwrap(),
++        )
++        .await
++        .to_string();
++    // Two bearer connections; only one has its secret.
++    let (unready, ready) = (Uuid::new_v4(), Uuid::new_v4());
++    for id in [unready, ready] {
++        sqlx::query(
++            "INSERT INTO workflow_http_connections (company_id, id, origin, enabled, bearer) \
++             VALUES ($1, $2, $3, true, true)",
++        )
++        .bind(f.company)
++        .bind(id)
++        .bind(format!("https://h{}.example.test", id.simple()))
++        .execute(f.persistence.pool())
++        .await
++        .unwrap();
++    }
++    let credential = |connection: Uuid| {
++        sqlx::query(
++            "INSERT INTO workflow_http_credentials (company_id, connection_id, envelope) \
++             VALUES ($1, $2, 'enc:v2:fixture')",
++        )
++        .bind(f.company)
++        .bind(connection)
++        .execute(f.persistence.pool())
++    };
++    credential(ready).await.unwrap();
++    let pane = f.pane(f.owner, workflow, "bindings").await.unwrap();
++    let key = field_value(&pane, "form_key");
++    let (unready_id, ready_id) = (unready.to_string(), ready.to_string());
++    let html = f
++        .save_binding(
++            f.owner,
++            workflow,
++            &[
++                ("form_key", &key),
++                ("version_id", &version),
++                ("association", "company"),
++                ("resource:service", &unready_id),
++            ],
++        )
++        .await;
++    assert!(
++        html.contains("Not saved:") && html.contains("not ready"),
++        "{html}"
++    );
++    assert!(!html.contains("already created"), "{html}");
++    assert!(html.contains(&format!(r#"<option value="{unready}" selected>"#)));
++    assert!(f.usage(workflow).await.is_empty());
++    // The same form, with the ready connection, saves under the same key.
++    let html = f
++        .save_binding(
++            f.owner,
++            workflow,
++            &[
++                ("form_key", &key),
++                ("version_id", &version),
++                ("association", "company"),
++                ("resource:service", &ready_id),
++            ],
++        )
++        .await;
++    assert!(html.contains("Saved binding"), "{html}");
++    let binding = f.usage(workflow).await[0].binding.binding.as_uuid();
++    // Configure to the unready one: refused as such, the choice kept.
++    let html = f
++        .save_binding(
++            f.owner,
++            workflow,
++            &[
++                ("binding_id", &binding.to_string()),
++                ("expected_state_revision", "1"),
++                ("version_id", &version),
++                ("resource:service", &unready_id),
++            ],
++        )
++        .await;
++    assert!(
++        html.contains("Not saved:") && html.contains("not ready"),
++        "{html}"
++    );
++    assert!(!html.contains("Someone changed this binding"), "{html}");
++    assert!(html.contains(&format!(r#"<option value="{unready}" selected>"#)));
++    // The ready connection loses its secret: activation is refused for that reason.
++    sqlx::query(
++        "DELETE FROM workflow_http_credentials WHERE company_id = $1 AND connection_id = $2",
++    )
++    .bind(f.company)
++    .bind(ready)
++    .execute(f.persistence.pool())
++    .await
++    .unwrap();
++    let html = f
++        .activity(f.owner, workflow, binding, 1, true)
++        .await
++        .unwrap();
++    assert!(
++        html.contains("Not activated:") && html.contains("not ready"),
++        "{html}"
++    );
++    assert!(!html.contains("changed since the page was shown"), "{html}");
++    // A stale row is still said as one.
++    credential(ready).await.unwrap();
++    assert!(
++        f.activity(f.owner, workflow, binding, 1, true)
++            .await
++            .unwrap()
++            .contains("Activated binding")
++    );
++    let stale = f
++        .activity(f.owner, workflow, binding, 1, false)
++        .await
++        .unwrap();
++    assert!(
++        stale.contains("changed since the page was shown"),
++        "{stale}"
++    );
++}
++
++/// Stored params the fields cannot carry exactly open as one JSON object, and saving the form
++/// unchanged stores the same object (F021).
++#[tokio::test]
++async fn params_the_fields_cannot_carry_open_as_json_and_save_unchanged() {
++    let Some(f) = Fixture::new().await else {
++        return;
++    };
++    let workflow = Uuid::new_v4();
++    let mut source = example("data.map", workflow);
++    source["parameter_schema"] = json!({
++        "type": "object",
++        "properties": {"reviewer": {"type": "string"}, "ratio": {"type": "number"}}
++    });
++    let version = f
++        .published(
++            workflow,
++            "Open",
++            &serde_json::to_string_pretty(&source).unwrap(),
++        )
++        .await;
++    let binding = Uuid::new_v4();
++    let stored = json!({"reviewer": "", "ratio": 5, "other": {"kept": true}});
++    crate::adapters::http::routes::workflows::bindings::configure_binding(
++        &f.engine,
++        f.company,
++        WorkflowActor::authenticated(f.owner).unwrap(),
++        binding,
++        crate::adapters::http::routes::workflows::bindings::BindingRequest {
++            expected_state_revision: None,
++            association: crate::application::workflow::RelatedAssociation::Company,
++            version,
++            params: stored.clone(),
++            resources: BTreeMap::new(),
++            run_as: None,
++            message_trigger: None,
++        },
++    )
++    .await
++    .unwrap();
++    let opened = binding_form(
++        f.ui(f.owner),
++        Path(workflow),
++        Query(BindingFormQuery {
++            company_id: f.company,
++            binding_id: Some(binding),
++        }),
++        "/".parse().unwrap(),
++    )
++    .await
++    .unwrap()
++    .0;
++    assert!(
++        opened.contains(r#"name="params_mode" value="json""#),
++        "{opened}"
++    );
++    assert!(!opened.contains(r#"name="param:reviewer""#));
++    let typed = {
++        let start = opened.find(r#"name="params_json">"#).unwrap() + r#"name="params_json">"#.len();
++        let end = start + opened[start..].find("</textarea>").unwrap();
++        opened[start..end]
++            .trim_start_matches('\n')
++            .replace("&quot;", "\"")
++    };
++    let saved = f
++        .save_binding(
++            f.owner,
++            workflow,
++            &[
++                ("binding_id", &binding.to_string()),
++                ("expected_state_revision", "1"),
++                ("version_id", &version.to_string()),
++                ("params_mode", "json"),
++                ("params_json", &typed),
++            ],
++        )
++        .await;
++    assert!(saved.contains("Saved binding"), "{saved}");
++    assert_eq!(f.usage(workflow).await[0].binding.params, stored);
++}
+--- a/src/adapters/http/routes/workflows/ui/authoring/tools.rs
++++ b/src/adapters/http/routes/workflows/ui/authoring/tools.rs
+@@ -116,7 +116,7 @@
+     let (banner, error) = match outcome {
+         Ok(()) => (
+             Some(format!(
+-                "Revoked {}. Published versions that froze it can no longer call it.",
++                "Revoked {}. Published versions that froze it can no longer start runs or call it; a call already in progress still returns its result.",
+                 name.as_str()
+             )),
+             None,
+@@ -225,7 +225,7 @@
+                     registration.revision
+                 ),
+                 Some(_) => format!(
+-                    "Pointed {} at this workflow, version {} (revision {}). Versions that froze the other workflow can no longer call it.",
++                    "Pointed {} at this workflow, version {} (revision {}). Versions that froze the other workflow can no longer start runs or call it until they are republished.",
+                     name.as_str(),
+                     pages::short_id(version),
+                     registration.revision
+--- a/src/adapters/http/routes/workflows/ui/authoring/tools_tests.rs
++++ b/src/adapters/http/routes/workflows/ui/authoring/tools_tests.rs
+@@ -69,7 +69,7 @@
+         listed.contains("lookup") && listed.contains("Orders"),
+         "{listed}"
+     );
+-    assert!(listed.contains("Revoking refuses every call"));
++    assert!(listed.contains("Revoking stops every published version that froze this tool"));
+ 
+     // The name is taken: the form says what re-pinning does before anything is written.
+     let asked = f
+@@ -403,7 +403,10 @@
+             .0
+     };
+     let none = usage().await;
+-    assert!(none.contains("No binding runs this agent"), "{none}");
++    assert!(
++        none.contains("No binding's version froze this agent"),
++        "{none}"
++    );
+     let configure = async |binding: Uuid, expected: Option<u64>, version: Uuid| {
+         crate::adapters::http::routes::workflows::bindings::configure_binding(
+             &f.engine,
+@@ -433,5 +436,151 @@
+     // Configured off that version, the binding no longer runs the agent.
+     configure(binding, Some(1), plain_version).await;
+     let gone = usage().await;
+-    assert!(gone.contains("No binding runs this agent"), "{gone}");
++    assert!(
++        gone.contains("No binding's version froze this agent"),
++        "{gone}"
++    );
+ }
++
++/// What the revoke and re-point warnings say is what happens to a version that froze the tool
++/// (P07-D2 rev 4 §D2.2, §D2.7; F020): its binding can no longer be activated after a revoke,
++/// re-registering the name for the same workflow restores it, and pointing the name at another
++/// workflow stops it again.
++#[tokio::test]
++async fn revoking_or_re_pointing_a_frozen_tool_stops_its_versions_bindings_as_the_warning_says() {
++    let Some(f) = Fixture::new().await else {
++        return;
++    };
++    for fact in [
++        "their new runs are refused",
++        "their bindings can no longer be configured or activated",
++        "their agents' next calls to it are refused",
++        "A call already in progress still returns its result",
++        "Registering the name again for the same workflow restores them",
++    ] {
++        assert!(pages::REVOKE_WARNING.contains(fact), "{fact}");
++    }
++    for fact in [
++        "their new runs are refused",
++        "their bindings can no longer be configured or activated",
++        "A call already in progress still returns its result",
++    ] {
++        assert!(pages::REPOINT_WARNING.contains(fact), "{fact}");
++    }
++    assert!(!pages::REVOKE_WARNING.contains("already waiting"));
++    assert!(pages::REPIN_NOTE.contains("published versions keep running"));
++
++    let agent = f.agent("Assistant", "assistant").await;
++    let (tool, other) = (Uuid::new_v4(), Uuid::new_v4());
++    let tool_version = f
++        .published(tool, "Orders", &tool_source(tool))
++        .await
++        .to_string();
++    let other_version = f
++        .published(other, "Refunds", &tool_source(other))
++        .await
++        .to_string();
++    let registered = f
++        .register(
++            tool,
++            &[
++                ("name", "lookup"),
++                ("version_id", &tool_version),
++                ("params_json", "{}"),
++            ],
++        )
++        .await;
++    assert!(registered.contains("Registered lookup"), "{registered}");
++    f.grant(f.owner, agent, &[("expected", ""), ("tools", "lookup")])
++        .await
++        .unwrap();
++    // A version whose agent froze the tool, bound and active.
++    let workflow = Uuid::new_v4();
++    let version = f
++        .published(workflow, "Answer", &source_of("agent.run", workflow))
++        .await;
++    let binding = Uuid::new_v4();
++    let actor = WorkflowActor::authenticated(f.owner).unwrap();
++    use crate::adapters::http::routes::workflows::bindings as json_bindings;
++    json_bindings::configure_binding(
++        &f.engine,
++        f.company,
++        actor,
++        binding,
++        json_bindings::BindingRequest {
++            expected_state_revision: None,
++            association: crate::application::workflow::RelatedAssociation::Company,
++            version,
++            params: json!({}),
++            resources: BTreeMap::new(),
++            run_as: None,
++            message_trigger: None,
++        },
++    )
++    .await
++    .unwrap();
++    let state = |revision: u64, active: bool| {
++        json_bindings::set_binding_activity(&f.engine, f.company, actor, binding, revision, active)
++    };
++    assert!(state(1, true).await.unwrap().active);
++    let activate_in_page = |revision: u64| {
++        activate_binding(
++            f.ui(f.owner),
++            Path((workflow, binding)),
++            f.query(),
++            axum::Form(ActivityForm {
++                expected_state_revision: revision,
++            }),
++        )
++    };
++
++    let revoked = revoke_tool(
++        f.ui(f.owner),
++        f.query(),
++        form(&[("name", "lookup"), ("expected_revision", "1")]),
++    )
++    .await
++    .unwrap()
++    .0;
++    assert!(
++        revoked.contains("can no longer start runs or call it"),
++        "{revoked}"
++    );
++    state(2, false).await.unwrap();
++    let refused = activate_in_page(3).await.unwrap().0;
++    assert!(refused.contains("Not activated:"), "{refused}");
++    assert!(!state(3, true).await.is_ok_and(|state| state.active));
++
++    // The same name for the same workflow restores the version that froze it.
++    f.register(
++        tool,
++        &[
++            ("name", "lookup"),
++            ("version_id", &tool_version),
++            ("params_json", "{}"),
++        ],
++    )
++    .await;
++    let restored = activate_in_page(3).await.unwrap().0;
++    assert!(restored.contains("Activated binding"), "{restored}");
++
++    // Pointed at another workflow, it stops again.
++    let pointed = f
++        .register(
++            other,
++            &[
++                ("name", "lookup"),
++                ("version_id", &other_version),
++                ("params_json", "{}"),
++                ("expected_revision", "1"),
++            ],
++        )
++        .await;
++    assert!(
++        pointed.contains("Pointed lookup at this workflow"),
++        "{pointed}"
++    );
++    state(4, false).await.unwrap();
++    let refused = activate_in_page(5).await.unwrap().0;
++    assert!(refused.contains("Not activated:"), "{refused}");
++}
+--- a/src/application/workflow/authoring/mod.rs
++++ b/src/application/workflow/authoring/mod.rs
+@@ -14,8 +14,8 @@
+ pub use graph::{END_NODE, GraphEdge, GraphEdgeKind, GraphNode, WorkflowGraph, workflow_graph};
+ pub use needs::{McpNeed, PublicationNeeds, ToolNeed, publication_needs};
+ pub use params::{
+-    MAX_PARAMETER_FIELDS, ParameterField, ParameterInput, field_value, parameter_fields,
+-    parameters_from_fields, parameters_from_json,
++    MAX_PARAMETER_FIELDS, ParameterField, ParameterInput, field_value, fields_for,
++    parameter_fields, parameters_from_fields, parameters_from_json,
+ };
+ 
+ #[cfg(test)]
+--- a/src/application/workflow/authoring/params.rs
++++ b/src/application/workflow/authoring/params.rs
+@@ -106,17 +106,13 @@
+         };
+         let parsed = match &field.input {
+             ParameterInput::Text { .. } | ParameterInput::Choice(_) => Value::String(raw),
+-            ParameterInput::Integer => raw
+-                .trim()
+-                .parse::<i64>()
+-                .map(Value::from)
+-                .map_err(|_| format!("Parameter {} must be a whole number.", field.name))?,
+-            ParameterInput::Number => raw
+-                .trim()
+-                .parse::<f64>()
+-                .ok()
+-                .and_then(serde_json::Number::from_f64)
++            // Read as JSON numbers, so `5` stays an integer and a large one keeps its digits.
++            ParameterInput::Integer => json_number(&raw)
++                .filter(|number| number.is_i64() || number.is_u64())
+                 .map(Value::Number)
++                .ok_or_else(|| format!("Parameter {} must be a whole number.", field.name))?,
++            ParameterInput::Number => json_number(&raw)
++                .map(Value::Number)
+                 .ok_or_else(|| format!("Parameter {} must be a number.", field.name))?,
+             ParameterInput::Boolean => match raw.trim() {
+                 "true" => Value::Bool(true),
+@@ -131,6 +127,24 @@
+     Ok(Value::Object(params))
+ }
+ 
++fn json_number(raw: &str) -> Option<serde_json::Number> {
++    serde_json::from_str(raw.trim()).ok()
++}
++
++/// The fields for `params` only when they show it exactly: saving the form unchanged must
++/// store the same object. Stored keys outside `properties`, an empty string (an empty field
++/// means "leave it out") or anything else a field cannot carry falls back to the whole object
++/// as JSON, so the form never changes what it was given.
++pub fn fields_for(schema: Option<&Value>, params: &Value) -> Option<Vec<ParameterField>> {
++    let fields = parameter_fields(schema)?;
++    let values: std::collections::HashMap<&str, String> = fields
++        .iter()
++        .map(|field| (field.name.as_str(), field_value(field, params)))
++        .collect();
++    let rebuilt = parameters_from_fields(&fields, |name| values.get(name).cloned()).ok()?;
++    (rebuilt == *params).then_some(fields)
++}
++
+ /// The whole params object typed as JSON (a schema the form has no fields for); empty is `{}`.
+ pub fn parameters_from_json(raw: &str) -> Result<Value, String> {
+     if raw.trim().is_empty() {
+--- a/src/application/workflow/authoring/tests.rs
++++ b/src/application/workflow/authoring/tests.rs
+@@ -268,5 +268,53 @@
+     assert_eq!(
+         parameters_from_json("{"),
+         Err("Parameters must be valid JSON.".into())
++    );
++}
++
++#[test]
++fn stored_params_open_as_fields_only_when_saving_them_unchanged_stores_the_same_object() {
++    let schema = json!({
++        "type": "object",
++        "properties": {
++            "name": {"type": "string"},
++            "count": {"type": "integer"},
++            "ratio": {"type": "number"},
++            "loud": {"type": "boolean"},
++            "tone": {"enum": ["warm", "brief"]},
++            "extra": {"type": "object"}
++        }
++    });
++    let round_trip = |params: serde_json::Value| {
++        let fields = fields_for(Some(&schema), &params)?;
++        let values: std::collections::HashMap<String, String> = fields
++            .iter()
++            .map(|field| (field.name.clone(), field_value(field, &params)))
++            .collect();
++        let saved = parameters_from_fields(&fields, |name| values.get(name).cloned()).unwrap();
++        assert_eq!(saved, params);
++        Some(())
++    };
++    // Integers stay integers, however large; a whole-valued number keeps its written form.
++    assert!(round_trip(json!({"count": 5, "ratio": 5})).is_some());
++    assert!(round_trip(json!({"count": 9_007_199_254_740_993_i64, "ratio": 0.1})).is_some());
++    assert!(round_trip(json!({"ratio": 5.0, "loud": false, "tone": "brief"})).is_some());
++    assert!(round_trip(json!({"name": "x", "extra": {"a": [1, {"b": null}]}})).is_some());
++    assert!(round_trip(json!({})).is_some());
++    // What the fields cannot carry exactly opens as the whole object instead.
++    assert_eq!(
++        fields_for(Some(&schema), &json!({"name": "x", "other": 1})),
++        None
+     );
++    assert_eq!(fields_for(Some(&schema), &json!({"name": ""})), None);
++    assert_eq!(fields_for(Some(&schema), &json!({"name": "  "})), None);
++    assert_eq!(fields_for(Some(&schema), &json!({"count": "seven"})), None);
++    // A typed integer field refuses a fraction; a number field keeps what was typed.
++    let fields = parameter_fields(Some(&schema)).unwrap();
++    let typed = |name: &'static str, raw: &'static str| {
++        parameters_from_fields(&fields, |field| (field == name).then(|| raw.to_owned()))
++    };
++    assert_eq!(typed("count", "12"), Ok(json!({"count": 12})));
++    assert!(typed("count", "1.5").is_err());
++    assert_eq!(typed("ratio", "2"), Ok(json!({"ratio": 2})));
++    assert_eq!(typed("ratio", "2.50"), Ok(json!({"ratio": 2.5})));
+ }

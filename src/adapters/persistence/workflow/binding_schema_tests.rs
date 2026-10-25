@@ -97,7 +97,7 @@ async fn insert_revision(
     version: Uuid,
     actor: Uuid,
 ) -> Result<(), sqlx::Error> {
-    sqlx::query("INSERT INTO workflow_binding_revisions (company_id, binding_id, revision, version_id, params, resources, actor_id) VALUES ($1, $2, 1, $3, '{}'::jsonb, '{}'::jsonb, $4)")
+    sqlx::query("INSERT INTO workflow_binding_revisions (company_id, binding_id, revision, version_id, params, resources, actor_id, run_as_user_id) VALUES ($1, $2, 1, $3, '{}'::jsonb, '{}'::jsonb, $4, $4)")
         .bind(company).bind(binding).bind(version).bind(actor).execute(&mut **tx).await?;
     Ok(())
 }

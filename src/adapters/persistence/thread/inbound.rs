@@ -3,16 +3,19 @@
 //! Every row an accepted message produces is written here, in one transaction, in dependency
 //! order: the threads it lands in, the provider conversation mappings that reach them, the
 //! canonical payload, its participants and email extension, one association per thread, one
-//! binding-qualified message mapping per association, the agent-dispatch tasks keyed on the message
-//! and first channel, and the delivery fan-out. They become visible together or not at all.
+//! binding-qualified message mapping per association, one workflow-admission intent per
+//! association (p08 D1.3), and the delivery fan-out. They become visible together or not at all.
 //!
 //! That property is the point. The shape this replaces created the thread in one statement, the
 //! message in a second transaction and the task in a third, so a crash between them left a stored
 //! message that no redelivery would deduplicate and that no agent would ever answer -- and the
 //! database trigger published the message before either of the other two rows existed.
 //!
-//! Two concurrency rules do the rest of the work:
+//! Three concurrency rules do the rest of the work:
 //!
+//! * The channel gates come first, shared, and each channel's settings revision is re-read once
+//!   they are held. A commit routed against settings an edit has since replaced is refused as
+//!   superseded rather than stored under them.
 //! * Transaction-scoped advisory locks cover every message and thread key on every association
 //!   binding, in deterministic order. The mappings are re-read only after those locks are held.
 //! * A provider conversation mapping wins over a caller's stale create decision. A reply that
@@ -31,21 +34,17 @@ use crate::{
         PostgresPersistence,
         channel_gate::{ChannelGateAccess, ChannelGateKey, acquire_channel_gates_on},
         delivery::enqueue::insert_delivery_on,
-        task::{insert_task, record_outreach_reply_on},
-        thread_handoff::{OpenHandoffGeneration, open_handoff_generation_on},
     },
     app_error::{AppError, AppResult},
     entities::{
         email_message::EmailMessageMetadata,
         message::{CanonicalMessageId, MessageDirection, MessageParticipantKind, MessageRole},
         participant::{IdentityClaimMetadata, IdentityProvenance},
-        task::{NewTask, TaskSource},
         transport::{ChannelBindingId, DeliveryId, QualifiedIdentity},
     },
     transport::{
         CommitDisposition, InboundCommitOutcome, InboundCommitRequest, InboundEnvelope,
-        InboundMessageCommitter, InboundTaskPayload, InboundTaskPayloadV1, InboundTaskRequest,
-        ProtocolExtension, ThreadAssociation, ThreadTarget, each_channel_in_one_task,
+        InboundMessageCommitter, ProtocolExtension, ReplyDelivery, ThreadAssociation, ThreadTarget,
     },
     use_cases::{
         participant::IdentityObservation,
@@ -80,7 +79,7 @@ impl InboundMessageCommitter for PostgresPersistence {
 
 /// The commit body, on a caller-supplied transaction so a failure at any statement rolls the whole
 /// set back rather than part of it.
-async fn commit_on(
+pub(super) async fn commit_on(
     tx: &mut Transaction<'_, Postgres>,
     request: &InboundCommitRequest,
 ) -> AppResult<InboundCommitOutcome> {
@@ -89,19 +88,7 @@ async fn commit_on(
             "An inbound commit must name at least one thread association".into(),
         ));
     }
-    each_channel_in_one_task(&request.tasks)?;
-    // Each task created below takes its owner from its primary channel's assignments, so the
-    // admission gates come before every row lock this commit takes, all of them in one ordered call.
-    acquire_channel_gates_on(
-        tx,
-        request.tasks.iter().filter_map(|task| {
-            task.targets
-                .first()
-                .map(|primary| ChannelGateKey::new(request.company_id, primary.channel_id))
-        }),
-        ChannelGateAccess::Admit,
-    )
-    .await?;
+    hold_channel_settings(tx, request).await?;
     let binding_ids = verify_association_bindings(tx, request).await?;
     lock_provider_keys(tx, request, &binding_ids).await?;
 
@@ -121,13 +108,10 @@ async fn commit_on(
 
     associate_threads(tx, request, &threads, stored.id).await?;
     map_provider_message(tx, request, &threads, &stored).await?;
-    apply_outreach_transitions(tx, request, stored.id).await?;
-
-    let task_ids = create_tasks(tx, request, &threads, stored.id).await?;
-    // After the tasks and before the fan-out: the handoff's foreign keys need the stored message
-    // and the resolved threads, and keeping the statement order of the whole commit fixed is what
-    // stops two concurrent inbound commits on one thread taking their locks in opposite orders.
-    let handoff_ids = create_handoffs(tx, request, &threads, stored.id).await?;
+    // After the associations, whose rows the intents' foreign key names, and before the fan-out:
+    // keeping the statement order of the whole commit fixed is what stops two concurrent inbound
+    // commits on one thread taking their locks in opposite orders.
+    let intent_ids = create_intents(tx, request, &threads, stored.id).await?;
     let delivery_ids = create_deliveries(tx, request).await?;
     complete_claimed_event(tx, request).await?;
 
@@ -135,10 +119,66 @@ async fn commit_on(
         disposition: CommitDisposition::Created,
         message_id: stored.id,
         thread_ids: threads.iter().map(|thread| thread.thread_id).collect(),
-        task_ids,
-        handoff_ids,
+        intent_ids,
         delivery_ids,
     })
+}
+
+/// Take the gate of every channel this commit admits into, then check the settings it was routed
+/// under still stand. No settings edit can land on those channels for the rest of the commit.
+///
+/// The gates come before every row lock the commit takes, all of them in one ordered call, so
+/// channel settings writers and this commit lock in one order.
+pub(super) async fn hold_channel_settings(
+    tx: &mut Transaction<'_, Postgres>,
+    request: &InboundCommitRequest,
+) -> AppResult<()> {
+    acquire_channel_gates_on(
+        tx,
+        request
+            .intents
+            .iter()
+            .map(|intent| ChannelGateKey::new(request.company_id, intent.channel_id)),
+        ChannelGateAccess::Admit,
+    )
+    .await?;
+    verify_channel_settings(tx, request).await
+}
+
+/// Refuse the commit if any channel it admits into has moved past the settings revision routing
+/// accepted it under -- or no longer exists.
+///
+/// After the gates, in a statement of its own, so it reads with a snapshot taken once they are
+/// held: an edit that landed first is seen here, and one that comes later waits for this commit
+/// ([`crate::adapters::persistence::channel_gate`]).
+async fn verify_channel_settings(
+    tx: &mut Transaction<'_, Postgres>,
+    request: &InboundCommitRequest,
+) -> AppResult<()> {
+    let (channels, revisions): (Vec<Uuid>, Vec<i64>) = request
+        .intents
+        .iter()
+        .map(|intent| (intent.channel_id, intent.settings_revision))
+        .unzip();
+    let superseded: Option<Uuid> = sqlx::query_scalar(
+        "SELECT seen.channel_id FROM unnest($2::uuid[], $3::bigint[]) AS seen(channel_id, revision) \
+         WHERE NOT EXISTS (SELECT 1 FROM channels AS channel WHERE channel.company_id = $1 \
+           AND channel.id = seen.channel_id AND channel.settings_revision = seen.revision) \
+         ORDER BY seen.channel_id LIMIT 1",
+    )
+    .bind(request.company_id)
+    .bind(&channels)
+    .bind(&revisions)
+    .fetch_optional(&mut **tx)
+    .await
+    .map_err(AppError::from)?;
+    match superseded {
+        Some(channel_id) => Err(AppError::Superseded(format!(
+            "Channel {channel_id} changed its settings while this message was being routed, so \
+             nothing was stored; route it again"
+        ))),
+        None => Ok(()),
+    }
 }
 
 /// Return what the first delivery of this message already made durable.
@@ -148,7 +188,7 @@ async fn commit_on(
 /// provider or adapter fault behind a successful-looking commit.
 ///
 /// Nothing is written and nothing is enqueued -- which is the property the caller needs, because
-/// the alternative is a second agent run on the same turn.
+/// the alternative is a second workflow admission for the same turn.
 async fn recognise_redelivery(
     tx: &mut Transaction<'_, Postgres>,
     request: &InboundCommitRequest,
@@ -185,16 +225,13 @@ async fn recognise_redelivery(
         )?;
     }
 
-    let task_ids = tasks_for_message(tx, request.company_id, message_id, &thread_ids).await?;
+    let intent_ids = intents_for_message(tx, request.company_id, message_id, &thread_ids).await?;
     complete_claimed_event(tx, request).await?;
     Ok(InboundCommitOutcome {
         disposition: CommitDisposition::Duplicate,
         message_id,
         thread_ids,
-        task_ids,
-        // A redelivery opens no generation: the first delivery already opened whichever one this
-        // message earned, and a second would fence a draft written for the very same message.
-        handoff_ids: Vec::new(),
+        intent_ids,
         // A redelivery fans out nothing: the first delivery's intents are already durable.
         delivery_ids: Vec::new(),
     })
@@ -220,15 +257,15 @@ async fn threads_holding(
 }
 
 /// The runs this message already caused, ordered by their original thread associations.
-async fn tasks_for_message(
+async fn intents_for_message(
     tx: &mut Transaction<'_, Postgres>,
     company_id: Uuid,
     message_id: CanonicalMessageId,
     thread_ids: &[Uuid],
 ) -> AppResult<Vec<Uuid>> {
     sqlx::query_scalar(
-        r#"SELECT id FROM background_tasks
-           WHERE queue_kind = 'legacy' AND company_id = $1 AND source_message_uuid = $2
+        r#"SELECT id FROM workflow_message_intents
+           WHERE company_id = $1 AND message_id = $2
            ORDER BY array_position($3::uuid[], thread_id), id"#,
     )
     .bind(company_id)
@@ -650,188 +687,70 @@ async fn map_provider_message(
     Ok(())
 }
 
-/// Associate outreach responses and wake any satisfied waiting task inside this commit.
-async fn apply_outreach_transitions(
+/// One workflow-admission intent per association, in association order (p08 D1.3).
+///
+/// Identifiers and ingress facts only: the intent worker reads the stored message when it admits.
+/// The responder is the stored message's author principal, and the relay trace recorded here is
+/// the one a workflow reply continues (p08 D1.6).
+async fn create_intents(
     tx: &mut Transaction<'_, Postgres>,
     request: &InboundCommitRequest,
+    threads: &[ResolvedThread],
     message_id: CanonicalMessageId,
-) -> AppResult<()> {
-    for transition in &request.outreach_transitions {
-        let association_id: Option<Uuid> = sqlx::query_scalar(
-            r#"SELECT association.id
-               FROM thread_messages AS association
-               WHERE association.company_id = $1 AND association.channel_id = $2
-                 AND association.message_id = $3"#,
+) -> AppResult<Vec<Uuid>> {
+    let thread_of: HashMap<Uuid, Uuid> = threads
+        .iter()
+        .map(|thread| (thread.channel_id, thread.thread_id))
+        .collect();
+    let directives = &request.envelope.directives;
+    let trace: Vec<Uuid> = directives.trace_channels.iter().copied().collect();
+    let policy = match request.reply_delivery {
+        ReplyDelivery::Send => "deliver",
+        ReplyDelivery::InAppOnly => "in_app_only",
+    };
+    let mut ids = Vec::with_capacity(request.intents.len());
+    for intent in &request.intents {
+        let thread_id = thread_of.get(&intent.channel_id).copied().ok_or_else(|| {
+            AppError::Internal(format!(
+                "Admission intent channel {} has no association in this commit",
+                intent.channel_id
+            ))
+        })?;
+        let id: Uuid = sqlx::query_scalar(
+            r#"INSERT INTO workflow_message_intents
+                   (company_id, id, message_id, channel_id, thread_id, role, mentioned, admissible,
+                    origin, reply_to_message_id, responder_principal_id, hop_count, trace_channels,
+                    delivery_policy, correlation_id)
+               SELECT $1, $2, message.id, $3, $4, $5, $6, $7, $8, $9, message.author_principal_id,
+                    $10, $11, $12, $13
+               FROM messages AS message WHERE message.company_id = $1 AND message.id = $14
+               RETURNING id"#,
         )
         .bind(request.company_id)
-        .bind(transition.channel_id)
+        .bind(Uuid::new_v4())
+        .bind(intent.channel_id)
+        .bind(thread_id)
+        .bind(intent.role.as_str())
+        .bind(intent.mentioned)
+        .bind(request.admissible)
+        .bind(request.origin.as_str())
+        .bind(intent.reply_to.map(|parent| parent.as_uuid()))
+        .bind(
+            i32::try_from(directives.hop_count)
+                .map_err(|_| AppError::BadRequest("An inbound hop count is out of range".into()))?,
+        )
+        .bind(&trace)
+        .bind(policy)
+        .bind(request.envelope.correlation_id.as_uuid())
         .bind(message_id.as_uuid())
-        .fetch_optional(&mut **tx)
+        .fetch_one(&mut **tx)
         .await
         .map_err(AppError::from)?;
-        let association_id = association_id.ok_or_else(|| {
-            AppError::BadRequest(format!(
-                "Outreach transition channel {} has no message association",
-                transition.channel_id
-            ))
-        })?;
-        Box::pin(record_outreach_reply_on(
-            tx,
-            &transition.matched,
-            association_id,
-        ))
-        .await?;
+        ids.push(id);
     }
-    Ok(())
+    Ok(ids)
 }
 
-/// Create the agent-dispatch tasks, preserving the addressed pipeline order.
-///
-/// Keyed on the canonical message and first channel through `TaskSource::Message`, so
-/// redelivery resolves each pipeline to its original run.
-async fn create_tasks(
-    tx: &mut Transaction<'_, Postgres>,
-    request: &InboundCommitRequest,
-    threads: &[ResolvedThread],
-    message_id: CanonicalMessageId,
-) -> AppResult<Vec<Uuid>> {
-    let thread_of: HashMap<Uuid, Uuid> = threads
-        .iter()
-        .map(|thread| (thread.channel_id, thread.thread_id))
-        .collect();
-    // Resolve every target before inserting any task; the transaction owns all remaining writes.
-    let tasks = request
-        .tasks
-        .iter()
-        .map(|task| new_inbound_task(request, task, &thread_of, message_id))
-        .collect::<AppResult<Vec<_>>>()?;
-    let mut task_ids = Vec::with_capacity(tasks.len());
-    for task in tasks {
-        task_ids.push(insert_task(tx, task).await?.id);
-    }
-    Ok(task_ids)
-}
-
-fn new_inbound_task(
-    request: &InboundCommitRequest,
-    task: &InboundTaskRequest,
-    thread_of: &HashMap<Uuid, Uuid>,
-    message_id: CanonicalMessageId,
-) -> AppResult<NewTask> {
-    let targets = task_targets(task, thread_of)?;
-    let primary = *targets
-        .first()
-        .ok_or_else(|| AppError::Internal("An inbound task names no channel".into()))?;
-
-    let payload = InboundTaskPayload::v1(InboundTaskPayloadV1 {
-        company_id: request.company_id,
-        channel_id: primary.channel_id,
-        thread_id: primary.thread_id,
-        source_message_id: message_id,
-        correlation_id: request.envelope.correlation_id,
-        hop_count: request.envelope.directives.hop_count,
-        trace_channels: request.envelope.directives.trace_channels.clone(),
-        is_forwarded: request.envelope.directives.is_forwarded,
-        reply_delivery: request.reply_delivery,
-    })
-    .encode()?;
-
-    Ok(NewTask {
-        company_id: request.company_id,
-        channel_id: primary.channel_id,
-        thread_id: Some(primary.thread_id),
-        task_type: task.task_type.clone(),
-        payload,
-        source: TaskSource::Message(message_id),
-        // Relayed messages stay on the chain their sender was already on.
-        correlation_id: request.envelope.correlation_id,
-        targets,
-    })
-}
-
-/// Open one `thread_handoffs` generation per held channel, with no task for any of them.
-///
-/// A hold naming a channel with no association is a planner bug rather than a user error, and gets
-/// the same `Internal` treatment `task_targets` gives a target with no association: the whole
-/// commit rolls back instead of writing a handoff pointing at a conversation the message never
-/// joined.
-async fn create_handoffs(
-    tx: &mut Transaction<'_, Postgres>,
-    request: &InboundCommitRequest,
-    threads: &[ResolvedThread],
-    message_id: CanonicalMessageId,
-) -> AppResult<Vec<Uuid>> {
-    if request.holds.is_empty() {
-        return Ok(Vec::new());
-    }
-    let thread_of: HashMap<Uuid, Uuid> = threads
-        .iter()
-        .map(|thread| (thread.channel_id, thread.thread_id))
-        .collect();
-
-    let mut opened = Vec::with_capacity(request.holds.len());
-    for hold in &request.holds {
-        let thread_id = thread_of.get(&hold.channel_id).copied().ok_or_else(|| {
-            AppError::Internal(format!(
-                "Held channel {} has no association in this commit",
-                hold.channel_id
-            ))
-        })?;
-        opened.push(
-            open_handoff_generation_on(
-                tx,
-                OpenHandoffGeneration {
-                    company_id: request.company_id,
-                    channel_id: hold.channel_id,
-                    thread_id,
-                    handoff_id: hold.handoff_id,
-                    generation: hold.generation,
-                    source_message_id: message_id,
-                },
-            )
-            .await?,
-        );
-    }
-    Ok(opened)
-}
-
-/// Pair every task target with the thread this commit put the message in.
-///
-/// A target naming a channel with no association would be a task pointing at a conversation the
-/// message never joined, so it is refused here rather than written and discovered by the worker.
-fn task_targets(
-    task: &InboundTaskRequest,
-    thread_of: &HashMap<Uuid, Uuid>,
-) -> AppResult<Vec<crate::entities::task::TaskTarget>> {
-    task.targets
-        .iter()
-        .map(|target| {
-            let thread_id = thread_of.get(&target.channel_id).copied().ok_or_else(|| {
-                AppError::Internal(format!(
-                    "Task target channel {} has no association in this commit",
-                    target.channel_id
-                ))
-            })?;
-            Ok(crate::entities::task::TaskTarget {
-                channel_id: target.channel_id,
-                thread_id,
-                recipient_role: target.role,
-            })
-        })
-        .collect()
-}
-
-/// The immediate delivery fan-out this commit owes.
-///
-/// Empty for every path that exists today: email is the only interface a channel speaks, and
-/// delivering a message back to the interface it arrived on is an echo. It is written here anyway,
-/// in this transaction, because that is the property the whole commit exists for -- a mirror queued
-/// separately could be lost by a crash that kept the message, and a mirror written first could be
-/// sent for a message that was rolled back.
-///
-/// Two workers racing one provider redelivery both reach this, and the unique index on
-/// `(destination_binding_id, idempotency_key)` absorbs the loser -- but only one of them gets past
-/// the advisory lock and the redelivery check above, so in practice this writes once.
 async fn create_deliveries(
     tx: &mut Transaction<'_, Postgres>,
     request: &InboundCommitRequest,
@@ -892,11 +811,8 @@ fn message_write(
         ));
     }
 
-    // An outreach response is delegated evidence even when it came from an external address. It
-    // stays private, including late and duplicate replies, and can never become customer-visible
-    // merely because the sender lacked an internal relay header.
-    let is_delegation =
-        envelope.directives.source_channel_id.is_some() || !request.outreach_transitions.is_empty();
+    // A relayed message is delegated evidence: another channel talking, kept private.
+    let is_delegation = envelope.directives.source_channel_id.is_some();
     let is_note = envelope.directives.disposition == crate::transport::MessageDisposition::FileOnly;
     Ok(MessageWrite {
         structured: None,

@@ -478,7 +478,7 @@ async fn workflow_child_wait_resumes_after_restart() {
     let (f, scopes) = AdmissionFixture::chain(data_map(), 1).await;
     let (parent, child) = (scopes[0], scopes[1]);
     let options = f.persistence().pool().connect_options();
-    let pool = sqlx::postgres::PgPoolOptions::new()
+    let pool = crate::adapters::persistence::test_support::pool_options()
         .max_connections(2)
         .connect_with((*options).clone())
         .await
@@ -517,6 +517,7 @@ async fn workflow_call_runs_through_the_worker_and_fair_poll() {
         worker: WorkflowWorkerId(Uuid::new_v4()),
         lease: LeasePolicy::new(std::time::Duration::from_secs(30)).unwrap(),
         poll: PollPolicy::new(std::time::Duration::from_millis(50), 16).unwrap(),
+        active_jobs: None,
     };
     let cancel = tokio_util::sync::CancellationToken::new();
     let job = |scope| PollCandidate {
@@ -554,4 +555,27 @@ async fn workflow_call_runs_through_the_worker_and_fair_poll() {
             .candidates
             .is_empty()
     );
+}
+
+/// p08 D1.7: a child inherits its parent run's delivery policy, so a simulated run's whole tree
+/// stays in-app.
+#[tokio::test]
+async fn workflow_call_child_inherits_the_parents_delivery_policy() {
+    use crate::application::workflow::DeliveryPolicy;
+    for policy in [DeliveryPolicy::Deliver, DeliveryPolicy::InAppOnly] {
+        let f = AdmissionFixture::calling(data_map()).await;
+        let mut request = f.request("policy-root", f.manual());
+        request.delivery_policy = policy;
+        let command = f.prepare(request).await;
+        f.persistence().admit(&command).await.unwrap();
+        let root = child_support::entry(&f, command.proposed_run_id()).await;
+        let child = f.spawn(root).await;
+        let stored: String =
+            sqlx::query_scalar("SELECT delivery_policy FROM workflow_runs WHERE id = $1")
+                .bind(child.run.as_uuid())
+                .fetch_one(f.persistence().pool())
+                .await
+                .unwrap();
+        assert_eq!(stored, policy.as_str());
+    }
 }

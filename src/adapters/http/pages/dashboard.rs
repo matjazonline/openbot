@@ -106,7 +106,7 @@ pub struct DashboardPage<'a> {
 impl DashboardPage<'_> {
     /// Would a link into this company's `/ui` pages actually show the caller anything?
     ///
-    /// `/ui` and `/ui/tasks` resolve a company out of the caller's *own* list, so a link into a
+    /// `/ui` resolves a company out of the caller's *own* list, so a link into a
     /// company they do not belong to lands on "Create a company". An operator sees every company's
     /// rows in the rollup but is rarely a member of any of them, so this is the common case for
     /// them — and a link that goes nowhere is worse than plain text, which at least does not
@@ -172,8 +172,8 @@ pub fn dashboard_page(shell: &DashboardShell<'_>) -> String {
 
 /// The body of the page: every panel, and nothing that owns the SSE connection.
 pub fn dashboard_panels(page: &DashboardPage<'_>) -> String {
-    // Only a company-scoped page can link its figures into `/ui/tasks`, which resolves exactly one
-    // company — and only when that company is one the caller can open. Individual task rows below
+    // Only a company-scoped page can link its figures into `/ui`, which resolves exactly one
+    // company — and only when that company is one the caller can open. Individual job rows below
     // are judged the same way, each against its own company.
     let linked_company = page.scope.company_id().filter(|id| page.can_open(*id));
 
@@ -206,7 +206,7 @@ pub fn dashboard_panels(page: &DashboardPage<'_>) -> String {
         "##,
         chart_style = chart::STYLE,
         alerts = health_alerts(&page.snapshot.tasks, &page.snapshot.deliveries),
-        tasks = task_queue_panel(&page.snapshot.tasks, linked_company),
+        tasks = task_queue_panel(&page.snapshot.tasks),
         deliveries = delivery_panel(&page.snapshot.deliveries, linked_company),
         outstanding = outstanding_panel(page),
         window_label = page.window.label(),
@@ -232,11 +232,11 @@ fn health_alerts(tasks: &TaskQueueHealth, deliveries: &DeliveryHealth) -> String
     if tasks.stalled > 0 {
         alerts.push_str(&alert_row(
             &format!(
-                "{} task{} claimed under a lapsed lease",
+                "{} workflow job{} claimed under a lapsed lease",
                 tasks.stalled,
                 plural(tasks.stalled)
             ),
-            "Nothing is renewing the lease. Each will be re-claimed and its agent run again.",
+            "Nothing is renewing the lease. Each will be re-claimed under a new fence.",
         ));
     }
 
@@ -290,16 +290,16 @@ fn alert_row(headline: &str, detail: &str) -> String {
     )
 }
 
-/// The tasks behind the numbers, each one a link to the conversation it belongs to.
+/// The jobs behind the numbers, each one with a conversation a link to it.
 ///
 /// This is what makes the counts actionable: "three stalled" is a fact, and this is the way to the
 /// three. Trouble sorts to the top, so the row worth opening is the first one.
 fn outstanding_panel(page: &DashboardPage<'_>) -> String {
     if page.snapshot.outstanding.is_empty() {
         return panel(
-            "Outstanding tasks",
+            "Outstanding workflow jobs",
             r##"<div class="px-4 py-6 text-sm opacity-60">
-                Nothing outstanding — every task has finished.
+                Nothing outstanding — every job has finished.
             </div>"##,
         );
     }
@@ -313,17 +313,6 @@ fn outstanding_panel(page: &DashboardPage<'_>) -> String {
         .map(|task| outstanding_row(task, show_company, page.can_open(task.company_id)))
         .collect();
 
-    let footer = match page.scope.company_id().filter(|id| page.can_open(*id)) {
-        Some(company_id) => format!(
-            r##"<div class="border-t border-base-300 px-4 py-2 text-right">
-                <a class="link text-xs opacity-70" href="/ui/tasks?company_id={company_id}">
-                    Open the task monitor
-                </a>
-            </div>"##
-        ),
-        None => String::new(),
-    };
-
     // The cap is a cap, not a total: say so when it bites, or the panel quietly under-reports.
     let capped = if page.snapshot.outstanding.len() as i64 >= OUTSTANDING_LIMIT {
         format!(
@@ -334,43 +323,35 @@ fn outstanding_panel(page: &DashboardPage<'_>) -> String {
     };
 
     panel(
-        "Outstanding tasks",
-        &format!(r##"<div class="divide-y divide-base-300">{rows}</div>{capped}{footer}"##),
+        "Outstanding workflow jobs",
+        &format!(r##"<div class="divide-y divide-base-300">{rows}</div>{capped}"##),
     )
 }
 
-/// One outstanding task: what state it is in, whose it is, and — when there is one — the way to it.
+/// One outstanding job: what state it is in, where it is, and — when there is one — the way to it.
 ///
 /// `openable` is false for a company the caller does not belong to, which is the normal case in the
 /// operator rollup. The row still shows everything it knows; it just does not offer a link that
 /// would land on "Create a company".
 fn outstanding_row(task: &OutstandingTask, show_company: bool, openable: bool) -> String {
-    // Every reachable row goes somewhere. A task without a thread was queued outside a
-    // conversation, so there is no thread to open — it points at the task monitor entry instead of
-    // being a dead end.
-    let destination = openable.then(|| match task.thread_id {
-        Some(thread_id) => (
+    // A job in a conversation links to its thread. Any other has no page until the run page
+    // (p09), so it stays plain rather than pointing somewhere it is not.
+    let destination = match (openable, task.channel_id, task.thread_id) {
+        (true, Some(channel_id), Some(thread_id)) => Some((
             format!(
                 "/ui?company_id={company_id}&channel_id={channel_id}&thread_id={thread_id}",
                 company_id = task.company_id,
-                channel_id = task.channel_id,
             ),
             "Open thread",
-        ),
-        None => (
-            format!(
-                "/ui/tasks?company_id={company_id}&task_id={task_id}",
-                company_id = task.company_id,
-                task_id = task.id,
-            ),
-            "Open task",
-        ),
-    });
+        )),
+        _ => None,
+    };
 
+    let channel = task.channel_name.as_deref().unwrap_or("Company-wide");
     let where_ = if show_company {
-        format!("{} / {}", task.company_name, task.channel_name)
+        format!("{} / {channel}", task.company_name)
     } else {
-        task.channel_name.clone()
+        channel.to_owned()
     };
 
     // The error is why the row is here at all, so it earns a line — truncated, because a stack of
@@ -435,9 +416,10 @@ fn outstanding_row(task: &OutstandingTask, show_company: bool, openable: bool) -
             href = escape_html_text(&href),
             target = escape_html_text(target),
         ),
-        None => format!(
+        None if !openable => format!(
             r##"<div class="flex items-center gap-3 px-4 py-2" title="You are not a member of this company">{body}</div>"##
         ),
+        None => format!(r##"<div class="flex items-center gap-3 px-4 py-2">{body}</div>"##),
     }
 }
 
@@ -452,83 +434,40 @@ fn outstanding_state(task: &OutstandingTask) -> &'static str {
     match task.status {
         TaskStatus::Processing => "Running",
         TaskStatus::Pending => "Queued",
-        TaskStatus::PendingApproval => "Awaiting approval",
-        TaskStatus::WaitingForThirdPartyReply => "Awaiting reply",
-        TaskStatus::DeadLetter => "Dead-lettered",
-        TaskStatus::Completed | TaskStatus::Failed | TaskStatus::Stopped => "Finished",
+        TaskStatus::Completed | TaskStatus::Failed => "Finished",
     }
 }
 
 /// The glyphs the thread column already uses for these states, so the two views agree.
 fn outstanding_icon(task: &OutstandingTask) -> Icon {
     if task.stalled {
-        return Icon::Alert;
-    }
-    match task.status {
-        TaskStatus::DeadLetter => Icon::Alert,
-        TaskStatus::PendingApproval => Icon::Hourglass,
-        TaskStatus::WaitingForThirdPartyReply => Icon::Mail,
-        _ => Icon::DotFill,
+        Icon::Alert
+    } else {
+        Icon::DotFill
     }
 }
 
-/// Where a task-queue figure should link to, given the scope on screen.
-///
-/// `None` in the operator view: `/ui/tasks` resolves a single company, so a link from a
-/// cross-company rollup would silently land on whichever one it picked first. A figure that cannot
-/// go anywhere honest stays plain text.
-fn task_filter_link(company_id: Option<Uuid>, status: Option<TaskStatus>) -> Option<String> {
-    let company_id = company_id?;
-    Some(match status {
-        Some(status) => format!(
-            "/ui/tasks?company_id={company_id}&status={status}",
-            status = status.as_str()
-        ),
-        None => format!("/ui/tasks?company_id={company_id}"),
-    })
-}
-
-fn task_queue_panel(tasks: &TaskQueueHealth, company_id: Option<Uuid>) -> String {
-    let link = |status: Option<TaskStatus>| task_filter_link(company_id, status);
-    let parked = tasks.count_of(TaskStatus::PendingApproval)
-        + tasks.count_of(TaskStatus::WaitingForThirdPartyReply);
-    let dead = tasks.count_of(TaskStatus::DeadLetter);
-
+/// The workflow queue's jobs (p08 D4.5). The figures are plain: no page lists jobs by status.
+fn task_queue_panel(tasks: &TaskQueueHealth) -> String {
     stat_row(
-        "Background tasks",
+        "Workflow jobs",
         &format!(
-            "{due}{processing}{stalled}{parked}{dead}{total}",
-            due = stat(
-                Stat::new("Due now", &tasks.due_now.to_string(), "pending & ready")
-                    .linked(link(Some(TaskStatus::Pending)))
-            ),
-            processing = stat(
-                Stat::new(
-                    "Processing",
-                    &tasks.count_of(TaskStatus::Processing).to_string(),
-                    "claimed",
-                )
-                .linked(link(Some(TaskStatus::Processing)))
-            ),
-            // Stalled has no status of its own, so it links to the `processing` list it is a
-            // subset of rather than to a filter that would come back empty.
+            "{due}{processing}{stalled}{total}",
+            due = stat(Stat::new(
+                "Due now",
+                &tasks.due_now.to_string(),
+                "pending & ready"
+            )),
+            processing = stat(Stat::new(
+                "Processing",
+                &tasks.count_of(TaskStatus::Processing).to_string(),
+                "claimed",
+            )),
             stalled = stat(
                 Stat::new("Stalled", &tasks.stalled.to_string(), "lapsed lease")
                     .alarming(tasks.stalled > 0)
-                    .linked(link(Some(TaskStatus::Processing)))
             ),
-            // Two statuses in one figure, so it links to the unfiltered list rather than picking
-            // one of them to be the truth.
-            parked = stat(
-                Stat::new("Parked", &parked.to_string(), "awaiting a reply").linked(link(None))
-            ),
-            dead = stat(
-                Stat::new("Dead-lettered", &dead.to_string(), "out of retries")
-                    .alarming(dead > 0)
-                    .linked(link(Some(TaskStatus::DeadLetter)))
-            ),
-            total =
-                stat(Stat::new("Total", &tasks.total().to_string(), "all time").linked(link(None))),
+            total = stat(Stat::new("Total", &tasks.total().to_string(), "all time")),
         ),
     )
 }
@@ -1201,10 +1140,10 @@ mod tests {
 
         let alerts = health_alerts(&snapshot.tasks, &snapshot.deliveries);
         assert!(
-            alerts.contains("2 tasks claimed under a lapsed lease"),
+            alerts.contains("2 workflow jobs claimed under a lapsed lease"),
             "{alerts}"
         );
-        assert!(alerts.contains("run again"), "{alerts}");
+        assert!(alerts.contains("re-claimed under a new fence"), "{alerts}");
     }
 
     #[test]
@@ -1214,7 +1153,7 @@ mod tests {
 
         assert!(
             health_alerts(&snapshot.tasks, &snapshot.deliveries)
-                .contains("1 task claimed under a lapsed lease")
+                .contains("1 workflow job claimed under a lapsed lease")
         );
     }
 
@@ -1248,7 +1187,7 @@ mod tests {
                     count: 4,
                 },
                 TaskStatusCount {
-                    status: TaskStatus::DeadLetter,
+                    status: TaskStatus::Failed,
                     count: 2,
                 },
             ],
@@ -1257,7 +1196,7 @@ mod tests {
         };
 
         assert_eq!(tasks.count_of(TaskStatus::Processing), 4);
-        assert_eq!(tasks.count_of(TaskStatus::DeadLetter), 2);
+        assert_eq!(tasks.count_of(TaskStatus::Failed), 2);
         assert_eq!(tasks.count_of(TaskStatus::Completed), 0);
         assert_eq!(tasks.total(), 6);
     }
@@ -1270,7 +1209,6 @@ mod tests {
             name: "Acme".into(),
             slug: "acme".into(),
             avatar_url: None,
-            memory_provider: None,
             created_at: chrono::Utc::now(),
         }
     }
@@ -1375,8 +1313,8 @@ mod tests {
             id: Uuid::nil(),
             company_id: Uuid::nil(),
             company_name: "Acme".into(),
-            channel_name: "support".into(),
-            channel_id: Uuid::nil(),
+            channel_name: Some("support".into()),
+            channel_id: Some(Uuid::nil()),
             thread_id: Some(Uuid::nil()),
             task_type: "email_agent_dispatch".into(),
             status,
@@ -1506,7 +1444,7 @@ mod tests {
     #[test]
     fn an_outstanding_task_links_to_its_thread() {
         let mut snapshot = snapshot();
-        snapshot.outstanding = vec![outstanding(TaskStatus::PendingApproval, false)];
+        snapshot.outstanding = vec![outstanding(TaskStatus::Pending, false)];
 
         let html = rendered(DashboardScopeView::Global, &snapshot);
         // `&` is escaped as `&amp;` because it is inside an attribute value; browsers read it back
@@ -1519,20 +1457,34 @@ mod tests {
             ),
             "{html}"
         );
-        assert!(html.contains("Awaiting approval"), "{html}");
+        assert!(html.contains("Queued"), "{html}");
     }
 
-    /// A task queued outside a conversation has no thread to open, and must not become a dead end.
+    /// A job outside a conversation, or of a run without a channel, has no thread to open and no
+    /// page of its own until p09: it is plain, without a chevron promising somewhere to go.
     #[test]
-    fn a_task_with_no_thread_links_to_the_task_instead() {
-        let mut task = outstanding(TaskStatus::DeadLetter, false);
-        task.thread_id = None;
+    fn a_job_with_no_thread_is_not_a_link() {
+        let mut threadless = outstanding(TaskStatus::Processing, true);
+        threadless.thread_id = None;
+        let mut company_wide = outstanding(TaskStatus::Processing, true);
+        company_wide.channel_id = None;
+        company_wide.channel_name = None;
+        let companies = [company()];
         let mut snapshot = snapshot();
-        snapshot.outstanding = vec![task];
+        snapshot.outstanding = vec![threadless, company_wide];
 
-        let html = rendered(DashboardScopeView::Global, &snapshot);
-        assert!(html.contains("/ui/tasks?company_id="), "{html}");
+        let html = rendered_for(
+            DashboardScopeView::Company(&companies[0]),
+            &companies,
+            &snapshot,
+        );
+        assert!(!html.contains("/ui/tasks"), "{html}");
         assert!(!html.contains("/ui?company_id="), "no thread link: {html}");
+        assert!(html.contains("Company-wide"), "{html}");
+        assert!(
+            !html.contains(&icon(Icon::ChevronRight, "h-3 w-3")),
+            "no chevron without somewhere to go: {html}"
+        );
     }
 
     /// "Stalled" is `processing` with a lapsed lease, and that is the fact worth showing.
@@ -1550,12 +1502,11 @@ mod tests {
         );
     }
 
-    /// Parked tasks are waiting on someone by design; only real trouble is tinted.
+    /// A queued job is on its way; only a lapsed lease is trouble.
     #[test]
-    fn parked_tasks_are_not_treated_as_trouble() {
-        assert!(!outstanding(TaskStatus::PendingApproval, false).needs_attention());
-        assert!(!outstanding(TaskStatus::WaitingForThirdPartyReply, false).needs_attention());
-        assert!(outstanding(TaskStatus::DeadLetter, false).needs_attention());
+    fn a_queued_job_is_not_treated_as_trouble() {
+        assert!(!outstanding(TaskStatus::Pending, false).needs_attention());
+        assert!(outstanding(TaskStatus::Processing, true).needs_attention());
     }
 
     /// The operator rollup shows companies the caller does not belong to. `/ui` resolves a company
@@ -1563,15 +1514,12 @@ mod tests {
     #[test]
     fn a_row_in_a_company_the_caller_cannot_open_is_not_a_link() {
         let mut snapshot = snapshot();
-        snapshot.outstanding = vec![outstanding(TaskStatus::DeadLetter, false)];
+        snapshot.outstanding = vec![outstanding(TaskStatus::Processing, true)];
 
         // No companies: the caller is an operator watching someone else's traffic.
         let html = rendered_for(DashboardScopeView::Global, &[], &snapshot);
 
-        assert!(
-            html.contains("Dead-lettered"),
-            "the row still shows: {html}"
-        );
+        assert!(html.contains("Stalled"), "the row still shows: {html}");
         assert!(
             !html.contains("/ui?company_id="),
             "an unreachable row must not offer a thread link: {html}"
@@ -1592,9 +1540,10 @@ mod tests {
         assert!(html.contains("Nothing outstanding"), "{html}");
     }
 
-    /// `/ui/tasks` resolves one company, so a cross-company rollup must not pretend to link there.
+    /// No page lists workflow jobs by status, so the job figures are plain text; the delivery
+    /// figures still link to the company's deliveries.
     #[test]
-    fn stat_figures_link_only_when_a_company_is_in_scope() {
+    fn job_figures_are_plain_and_delivery_figures_link_for_a_company() {
         let companies = [company()];
         let snapshot = snapshot();
 
@@ -1603,13 +1552,12 @@ mod tests {
             &companies,
             &snapshot,
         );
-        assert!(scoped.contains("/ui/tasks?company_id="), "{scoped}");
+        assert!(scoped.contains("Workflow jobs"), "{scoped}");
+        assert!(!scoped.contains("/ui/tasks"), "{scoped}");
+        assert!(scoped.contains("/ui/deliveries?company_id="), "{scoped}");
 
         let global = rendered(DashboardScopeView::Global, &snapshot);
-        assert!(
-            !global.contains("/ui/tasks?company_id="),
-            "the operator view must not link a figure into an arbitrary company: {global}"
-        );
+        assert!(!global.contains("/ui/deliveries?company_id="), "{global}");
     }
 
     #[test]

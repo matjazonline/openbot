@@ -147,14 +147,6 @@ impl MessageWrite {
         }
     }
 
-    pub fn with_structured(
-        mut self,
-        structured: Option<crate::services::response_contract::StructuredResponse>,
-    ) -> Self {
-        self.structured = structured;
-        self
-    }
-
     pub fn with_participants(mut self, participants: Vec<MessageParticipantWrite>) -> Self {
         self.participants = participants;
         self

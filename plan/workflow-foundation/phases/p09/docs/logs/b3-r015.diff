@@ -1,0 +1,287 @@
+--- a/scripts/tests/workflow-decisions.mjs
++++ b/scripts/tests/workflow-decisions.mjs
+@@ -101,12 +101,15 @@
+         await expect(page.getByText('Decision submitted',{exact:true})).toBeVisible();
+         await expect(page.locator('#workflow-decision form')).toHaveCount(0);
+         assert.notEqual(colors[0],colors[1],'real text colors follow both themes');
+-        for (const [name,body] of [['old','Source message 209 <script>'],['retained','Source message 5 <script>']]) {
++        for (const [name,body] of [['old','Source message 209 <script>'],['retained','Source message 5 <script>'],['note','Source internal note']]) {
+             await page.goto(`http://127.0.0.1:${server.address().port}/source-${name}`);
+             await expect(page.locator('#source-message')).toBeFocused();
+             await expect(page.locator('#source-message')).toContainText(body);
+             await expect(page.locator('#source-message')).toBeInViewport();
+             await expect(page.locator('#message-scroll')).toHaveCount(0);
++            await expect(page.locator('#source-message [hx-target], #source-message button, #source-message form')).toHaveCount(0);
++            await page.getByRole('link',{name:'Open latest conversation'}).click();
++            await expect(page).toHaveURL(/\/ui\?company_id=/);
+         }
+         assert.deepEqual(errors,[]);
+     } finally {
+--- a/src/adapters/http/pages/mailbox.rs
++++ b/src/adapters/http/pages/mailbox.rs
+@@ -2372,10 +2372,48 @@
+ /// A reply is stored with the *channel's* address as its sender rather than the agent that wrote
+ /// it, so the address is what the agent side is drawn as.
+ pub fn message_bubble_chat(
++    message: &ThreadMessageView,
++    viewer_email: Option<&EmailAddress>,
++    scope: MessageScope,
++    run_access: RunLinkAccess<'_>,
++) -> String {
++    message_bubble(
++        message,
++        viewer_email,
++        scope,
++        run_access,
++        MessageActions::Mailbox,
++    )
++}
++
++/// Standalone reads retain ordinary links but have no dependency on mailbox dialogs or panes.
++pub fn message_bubble_readonly(
++    message: &ThreadMessageView,
++    viewer_email: Option<&EmailAddress>,
++    scope: MessageScope,
++    run_access: RunLinkAccess<'_>,
++) -> String {
++    message_bubble(
++        message,
++        viewer_email,
++        scope,
++        run_access,
++        MessageActions::ReadOnly,
++    )
++}
++
++#[derive(Clone, Copy, PartialEq, Eq)]
++enum MessageActions {
++    Mailbox,
++    ReadOnly,
++}
++
++fn message_bubble(
+     message: &ThreadMessageView,
+     viewer_email: Option<&EmailAddress>,
+     scope: MessageScope,
+     run_access: RunLinkAccess<'_>,
++    actions: MessageActions,
+ ) -> String {
+     let is_agent = message.is_agent();
+     // Written by an agent in *another* channel: an inbound message only carries the agent role
+@@ -2413,42 +2451,6 @@
+ 
+     let (writer, avatar_url): (&str, Option<&AvatarUrl>) = (message.author.display(), None);
+ 
+-    let note_controls = note_state.map_or_else(String::new, |note| {
+-        if !note.is_active() {
+-            return if note.tombstoned_at.is_some() {
+-                r#"<span class="badge badge-ghost badge-xs">removed</span>"#.into()
+-            } else {
+-                r#"<span class="badge badge-ghost badge-xs">superseded</span>"#.into()
+-            };
+-        }
+-        format!(
+-            r##"<details class="dropdown dropdown-end"><summary class="link link-hover text-xs">correct</summary>
+-                    <form class="dropdown-content z-20 mt-1 w-80 space-y-2 rounded-box border border-base-300 bg-base-100 p-3 shadow"
+-                        hx-post="/ui/internal-notes" hx-target="#detail-pane" hx-swap="outerHTML">
+-                        <input type="hidden" name="company_id" value="{company_id}">
+-                        <input type="hidden" name="channel_id" value="{channel_id}">
+-                        <input type="hidden" name="thread_id" value="{thread_id}">
+-                        <input type="hidden" name="command_id" value="{correct_command}">
+-                        <input type="hidden" name="supersedes_note_id" value="{note_id}">
+-                        <textarea name="text_body" required maxlength="65536" class="textarea w-full">{body}</textarea>
+-                        <button class="btn btn-info btn-sm" type="submit">Save correction</button>
+-                    </form></details>
+-                <form hx-post="/ui/internal-notes/{note_id}/tombstone" hx-target="#detail-pane" hx-swap="outerHTML">
+-                    <input type="hidden" name="company_id" value="{company_id}">
+-                    <input type="hidden" name="channel_id" value="{channel_id}">
+-                    <input type="hidden" name="thread_id" value="{thread_id}">
+-                    <input type="hidden" name="command_id" value="{remove_command}">
+-                    <button class="link link-error text-xs" type="submit">remove</button>
+-                </form>"##,
+-            note_id = note.id,
+-            company_id = scope.company_id,
+-            channel_id = scope.channel_id,
+-            thread_id = message.thread_id,
+-            correct_command = Uuid::new_v4(),
+-            remove_command = Uuid::new_v4(),
+-            body = escape_html_text(&message.body),
+-        )
+-    });
+     format!(
+         r##"
+                 <div class="chat {side}" data-message-id="{message_id}" data-role="{role}" data-audience="{audience}" data-entry-kind="{entry_kind}">
+@@ -2487,7 +2489,7 @@
+         } else {
+             ""
+         },
+-        note_controls = note_controls,
++        note_controls = message_note_controls(message, scope, actions),
+         channel_glyph = other_channel_glyph(from_other_channel, "From an agent in another channel"),
+         transport_badge =
+             transport_badge(message.author.transport, message.author.handle.as_deref()),
+@@ -2495,10 +2497,57 @@
+         writer = escape_html_text(writer),
+         created_at = super::format_date_time(message.created_at),
+         subject = escape_html_text(&message.subject),
+-        diagnostics = diagnostics_link(message, scope),
++        diagnostics = match actions {
++            MessageActions::Mailbox => diagnostics_link(message, scope),
++            MessageActions::ReadOnly => String::new(),
++        },
+         body = body,
+         attachments = attachment_chips(message, scope),
+     )
++}
++
++fn message_note_controls(
++    message: &ThreadMessageView,
++    scope: MessageScope,
++    actions: MessageActions,
++) -> String {
++    message.internal_note.as_ref().map_or_else(String::new, |note| {
++        if !note.is_active() {
++            return if note.tombstoned_at.is_some() {
++                r#"<span class="badge badge-ghost badge-xs">removed</span>"#.into()
++            } else {
++                r#"<span class="badge badge-ghost badge-xs">superseded</span>"#.into()
++            };
++        }
++        if actions == MessageActions::ReadOnly { return String::new(); }
++        format!(
++            r##"<details class="dropdown dropdown-end"><summary class="link link-hover text-xs">correct</summary>
++                    <form class="dropdown-content z-20 mt-1 w-80 space-y-2 rounded-box border border-base-300 bg-base-100 p-3 shadow"
++                        hx-post="/ui/internal-notes" hx-target="#detail-pane" hx-swap="outerHTML">
++                        <input type="hidden" name="company_id" value="{company_id}">
++                        <input type="hidden" name="channel_id" value="{channel_id}">
++                        <input type="hidden" name="thread_id" value="{thread_id}">
++                        <input type="hidden" name="command_id" value="{correct_command}">
++                        <input type="hidden" name="supersedes_note_id" value="{note_id}">
++                        <textarea name="text_body" required maxlength="65536" class="textarea w-full">{body}</textarea>
++                        <button class="btn btn-info btn-sm" type="submit">Save correction</button>
++                    </form></details>
++                <form hx-post="/ui/internal-notes/{note_id}/tombstone" hx-target="#detail-pane" hx-swap="outerHTML">
++                    <input type="hidden" name="company_id" value="{company_id}">
++                    <input type="hidden" name="channel_id" value="{channel_id}">
++                    <input type="hidden" name="thread_id" value="{thread_id}">
++                    <input type="hidden" name="command_id" value="{remove_command}">
++                    <button class="link link-error text-xs" type="submit">remove</button>
++                </form>"##,
++            note_id = note.id,
++            company_id = scope.company_id,
++            channel_id = scope.channel_id,
++            thread_id = message.thread_id,
++            correct_command = Uuid::new_v4(),
++            remove_command = Uuid::new_v4(),
++            body = escape_html_text(&message.body),
++        )
++    })
+ }
+ 
+ /// The way into the one pane that shows provider identifiers.
+--- a/src/adapters/http/pages/workflow_decision.rs
++++ b/src/adapters/http/pages/workflow_decision.rs
+@@ -224,7 +224,7 @@
+         <a class="link" href="/ui?company_id={company}&amp;channel_id={channel}&amp;thread_id={thread}">Open latest conversation</a>
+         </main>"#,
+             id = message.canonical_id.as_uuid(),
+-            bubble = message_bubble_chat(message, Some(viewer_email), scope, run_access),
++            bubble = message_bubble_readonly(message, Some(viewer_email), scope, run_access),
+             company = scope.company_id,
+             channel = scope.channel_id,
+             thread = message.thread_id
+--- a/src/adapters/http/routes/ui_message_tests.rs
++++ b/src/adapters/http/routes/ui_message_tests.rs
+@@ -23,9 +23,9 @@
+             .unwrap();
+     let ids:Vec<Uuid>=sqlx::query_scalar(
+         "INSERT INTO messages(id,company_id,author_principal_id,subject,clean_text_body,direction,role,correlation_id,content_hash,created_at,audience) \
+-        SELECT gen_random_uuid(),$1,$2,'Source','Source message '||ordinal||' <script>','inbound','human',gen_random_uuid(),decode(repeat('00',32),'hex'),now()-ordinal*interval '1 second','external_conversation' \
++        SELECT gen_random_uuid(),$1,$2,'Source','Source message '||ordinal||$3,'inbound','human',gen_random_uuid(),decode(repeat('00',32),'hex'),now()-ordinal*interval '1 second','external_conversation' \
+         FROM generate_series(0,209) AS fixture(ordinal) RETURNING id")
+-        .bind(h.company_id).bind(principal).fetch_all(h.persistence.pool()).await.unwrap();
++        .bind(h.company_id).bind(principal).bind(" <script>").fetch_all(h.persistence.pool()).await.unwrap();
+     sqlx::query("INSERT INTO thread_messages(id,company_id,channel_id,thread_id,message_id,created_at,entry_kind) SELECT gen_random_uuid(),company_id,$2,$3,id,created_at,'conversation' FROM messages WHERE company_id=$1 AND id=ANY($4)")
+         .bind(h.company_id).bind(h.channel_id).bind(thread).bind(&ids).execute(h.persistence.pool()).await.unwrap();
+     ids
+@@ -74,6 +74,7 @@
+         assert!(page.contains(&format!("Message {id}")));
+         assert!(!page.contains("id=\"message-scroll\""));
+         assert!(!page.contains("sse-connect="));
++        assert!(!page.contains("hx-target="));
+         assert!(!page.contains("Source message 0 &lt;script&gt;"));
+         if let Some(dir) = std::env::var_os("WORKFLOW_DECISION_BROWSER_FIXTURES") {
+             let dir = std::path::PathBuf::from(dir);
+@@ -81,6 +82,7 @@
+             std::fs::write(dir.join(format!("source-{name}.html")), page).unwrap();
+         }
+     }
++    note_has_no_mailbox_controls(&h, query.clone()).await;
+     refuses_other_scopes(&h, &other, query).await;
+ }
+ 
+@@ -126,3 +128,64 @@
+         Err(AppError::NotFound(_))
+     ));
+ }
++
++async fn note_has_no_mailbox_controls(h: &Harness, query: MessageQuery) {
++    use crate::entities::internal_note::{AddInternalNote, InternalNoteProvenance};
++    let actor = h
++        .threads
++        .principal_access_for_user(h.company_id, h.owner.user_id)
++        .await
++        .unwrap()
++        .unwrap();
++    let note = h
++        .threads
++        .add_internal_note(
++            AddInternalNote {
++                company_id: h.company_id,
++                channel_id: h.channel_id,
++                thread_id: query.thread_id,
++                text: "Source internal note".into(),
++                command_id: Uuid::new_v4(),
++                supersedes_note_id: None,
++                provenance: InternalNoteProvenance::HumanUi,
++            },
++            actor,
++        )
++        .await
++        .unwrap();
++    let ordinary = pages::message_bubble_chat(
++        &note,
++        None,
++        pages::MessageScope {
++            company_id: h.company_id,
++            channel_id: h.channel_id,
++        },
++        pages::RunLinkAccess::Label,
++    );
++    assert!(ordinary.contains("hx-target=\"#detail-pane\""));
++    assert!(ordinary.contains("message-diagnostics-body"));
++    let page = source(
++        h,
++        h.owner.clone(),
++        MessageQuery {
++            message_id: note.canonical_id.as_uuid(),
++            ..query
++        },
++    )
++    .await
++    .unwrap()
++    .0;
++    assert!(page.contains("Source internal note"));
++    assert!(!page.contains("hx-target="));
++    let bubble = page
++        .split("id=\"source-message\"")
++        .nth(1)
++        .unwrap()
++        .split("</article>")
++        .next()
++        .unwrap();
++    assert!(!bubble.contains("<form"));
++    if let Some(dir) = std::env::var_os("WORKFLOW_DECISION_BROWSER_FIXTURES") {
++        std::fs::write(std::path::PathBuf::from(dir).join("source-note.html"), page).unwrap();
++    }
++}

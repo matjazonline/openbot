@@ -51,8 +51,9 @@ bounded_string!(PartKey, MAX_PART_KEY_BYTES);
 bounded_string!(FailureDetail, MAX_FAILURE_DETAIL_BYTES);
 bounded_string!(ContentDigest, MAX_CONTENT_DIGEST_BYTES);
 // `ConversationAnchor` is the stable name of a conversation this deployment anchors itself, for
-// `EmailThreading::Anchored`. Derived from something durable -- a schedule's slot -- so every
-// attempt and every later run about the same thing derives the same anchor. It is not a
+// `EmailThreading::Anchored`. Derived from something durable (legacy scheduled dispatch used its
+// run slot; since p08 nothing produces one) so every attempt and every later run about the same
+// thing derives the same anchor. It is not a
 // `Message-ID` and must not be written into a header as one: what makes an anchor safe is that
 // the *renderer* decides how it appears on the wire.
 bounded_string!(ConversationAnchor, MAX_CONVERSATION_ANCHOR_BYTES);

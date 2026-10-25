@@ -56,18 +56,6 @@ impl ResponseContractValidator for JsonResponseValidator {
     }
 }
 
-/// Recheck the exact payload frozen by the transport adapter before publication eligibility.
-pub(crate) fn validate_publication(
-    message: &crate::use_cases::thread::MessageWrite,
-    delivery: &crate::transport::NewDelivery,
-) -> AppResult<()> {
-    if let Some(response) = &message.structured {
-        response.verify(&message.clean_text_body, &JsonResponseValidator)?;
-        validate_delivery(response, delivery)?;
-    }
-    Ok(())
-}
-
 pub(crate) fn validate_delivery(
     response: &crate::services::response_contract::StructuredResponse,
     delivery: &crate::transport::NewDelivery,

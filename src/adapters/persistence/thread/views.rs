@@ -107,7 +107,6 @@ struct ThreadMessageDb {
     audience: String,
     entry_kind: String,
     created_at: DateTime<Utc>,
-    correlation_id: Uuid,
     note_id: Option<Uuid>,
     note_author_principal_id: Option<Uuid>,
     note_provenance: Option<String>,
@@ -117,7 +116,7 @@ struct ThreadMessageDb {
 }
 
 impl ThreadMessageDb {
-    fn into_view(self, task_id: Option<Uuid>) -> AppResult<ThreadMessageView> {
+    fn into_view(self, run_ids: Vec<Uuid>) -> AppResult<ThreadMessageView> {
         let internal_note = match (
             self.note_id,
             self.note_author_principal_id,
@@ -145,7 +144,7 @@ impl ThreadMessageDb {
             id: self.id,
             canonical_id: CanonicalMessageId::new(self.canonical_id),
             thread_id: self.thread_id,
-            task_id,
+            run_ids,
             author: self.author.try_into()?,
             subject: self.subject,
             body: self.clean_text_body,
@@ -165,68 +164,75 @@ impl ThreadMessageDb {
 }
 
 #[derive(sqlx::FromRow, Debug)]
-struct ThreadTaskLookupDb {
+struct ThreadRunLookupDb {
     canonical_id: Uuid,
-    task_id: Option<Uuid>,
+    run_ids: Vec<Uuid>,
 }
 
-/// One best task per displayed message. The exact lookup uses the company/source-message unique
-/// key, and the fallback's scope and order support a first-match index probe using
-/// `background_tasks_thread_correlation_match_idx`. Keep its expression and tie-breakers aligned
-/// with the index. The ascending UUID preserves the old stable sort's winner for equal timestamps.
-pub(in crate::adapters::persistence) const THREAD_TASK_LOOKUP_SQL: &str = r#"
-    SELECT rendered.canonical_id, COALESCE(direct.id, fallback.id) AS task_id
-    FROM unnest($3::uuid[], $4::uuid[]) AS rendered (canonical_id, correlation_id)
-    LEFT JOIN LATERAL (
-        SELECT task.id
-        FROM background_tasks AS task
-        WHERE task.queue_kind = 'legacy' AND task.company_id = $1 AND task.thread_id = $2
-          AND task.source_message_uuid = rendered.canonical_id
-        LIMIT 1
-    ) AS direct ON TRUE
-    LEFT JOIN LATERAL (
-        SELECT task.id
-        FROM background_tasks AS task
-        WHERE task.queue_kind = 'legacy' AND direct.id IS NULL
-          AND task.company_id = $1 AND task.thread_id = $2
-          AND task.correlation_id = rendered.correlation_id
-        ORDER BY (task.task_type IN ('email_agent_dispatch', 'scheduled_agent_run')) DESC,
-                 task.created_at DESC, task.id ASC
-        LIMIT 1
-    ) AS fallback ON TRUE
+/// The workflow runs of each displayed message (p08 D4.6, F079): the run that wrote it, through
+/// `workflow_message_destinations_company_id_message_id_key`, then every run its admission
+/// started, through `workflow_message_intents_association_key` and the intent bindings' key, in
+/// binding id order. A message holds at most one destination and one intent per channel, and an
+/// intent at most one admission per binding.
+pub(in crate::adapters::persistence) const THREAD_RUN_LOOKUP_SQL: &str = r#"
+    SELECT rendered.canonical_id,
+           ARRAY(
+               SELECT found.run_id
+                 FROM (
+                     SELECT 0 AS source, NULL::uuid AS binding_id, destination.run_id
+                       FROM workflow_message_destinations AS destination
+                      WHERE destination.company_id = $1
+                        AND destination.message_id = rendered.canonical_id
+                        AND destination.thread_id = $2
+                     UNION ALL
+                     SELECT 1, admitted.binding_id, admitted.run_id
+                       FROM workflow_message_intents AS intent
+                       JOIN workflow_message_intent_bindings AS admitted
+                         ON (admitted.company_id, admitted.intent_id) = (intent.company_id, intent.id)
+                      WHERE intent.company_id = $1
+                        AND intent.message_id = rendered.canonical_id
+                        AND intent.thread_id = $2
+                        AND admitted.outcome = 'admitted'
+                 ) AS found
+                ORDER BY found.source, found.binding_id
+           ) AS run_ids
+      FROM unnest($3::uuid[]) AS rendered (canonical_id)
 "#;
 
-/// Match the already-bounded rendered page in one round trip, returning at most one task per row.
-/// The former global candidate limit could discard an old exact match or main run before matching.
-async fn fetch_thread_tasks(
+/// Match the already-bounded rendered page in one round trip.
+async fn fetch_thread_runs(
     pool: &PgPool,
     company_id: Uuid,
     thread_id: Uuid,
     rendered: &[ThreadMessageDb],
-) -> AppResult<HashMap<Uuid, Uuid>> {
+) -> AppResult<HashMap<Uuid, Vec<Uuid>>> {
     if rendered.len() > THREAD_HISTORY_LIMIT {
         return Err(AppError::Internal(
-            "Thread task lookup exceeds the message page limit".into(),
+            "Thread run lookup exceeds the message page limit".into(),
         ));
     }
     if rendered.is_empty() {
         return Ok(HashMap::new());
     }
-    // Projections of the same rows, in the same order: unnest must pair each message with its own
-    // correlation. Independently sorting or deduplicating these arrays would mix their identities.
     let canonical_ids: Vec<Uuid> = rendered.iter().map(|row| row.canonical_id).collect();
-    let correlation_ids: Vec<Uuid> = rendered.iter().map(|row| row.correlation_id).collect();
-    let tasks = sqlx::query_as::<_, ThreadTaskLookupDb>(THREAD_TASK_LOOKUP_SQL)
+    let runs = sqlx::query_as::<_, ThreadRunLookupDb>(THREAD_RUN_LOOKUP_SQL)
         .bind(company_id)
         .bind(thread_id)
         .bind(&canonical_ids)
-        .bind(&correlation_ids)
         .fetch_all(pool)
         .await
         .map_err(AppError::from)?;
-    Ok(tasks
+    Ok(runs
         .into_iter()
-        .filter_map(|row| row.task_id.map(|id| (row.canonical_id, id)))
+        .filter(|row| !row.run_ids.is_empty())
+        .map(|row| {
+            // A run that wrote a message is not also admitted by it, but the read does not rely on
+            // that: the writer keeps its first place and a repeat is dropped.
+            let mut run_ids = row.run_ids;
+            let mut seen = std::collections::HashSet::new();
+            run_ids.retain(|run_id| seen.insert(*run_id));
+            (row.canonical_id, run_ids)
+        })
         .collect())
 }
 
@@ -246,7 +252,6 @@ fn thread_message_select() -> String {
            message.audience,
            association.entry_kind,
            association.created_at,
-           message.correlation_id,
            note.id AS note_id,
            note.author_principal_id AS note_author_principal_id,
            note.provenance AS note_provenance,
@@ -295,11 +300,11 @@ pub(super) async fn list_thread_messages(
         return Ok(Vec::new());
     };
 
-    let tasks = fetch_thread_tasks(pool, company_id, thread_id, &rows).await?;
+    let mut runs = fetch_thread_runs(pool, company_id, thread_id, &rows).await?;
     rows.into_iter()
         .map(|row| {
-            let task_id = tasks.get(&row.canonical_id).copied();
-            row.into_view(task_id)
+            let run_ids = runs.remove(&row.canonical_id).unwrap_or_default();
+            row.into_view(run_ids)
         })
         .collect()
 }
@@ -340,11 +345,11 @@ pub(super) async fn list_thread_messages_after(
         return Ok(Vec::new());
     };
 
-    let tasks = fetch_thread_tasks(pool, company_id, thread_id, &rows).await?;
+    let mut runs = fetch_thread_runs(pool, company_id, thread_id, &rows).await?;
     rows.into_iter()
         .map(|row| {
-            let task_id = tasks.get(&row.canonical_id).copied();
-            row.into_view(task_id)
+            let run_ids = runs.remove(&row.canonical_id).unwrap_or_default();
+            row.into_view(run_ids)
         })
         .collect()
 }
@@ -369,10 +374,10 @@ pub(super) async fn get_thread_message(
         return Ok(None);
     };
 
-    let tasks =
-        fetch_thread_tasks(pool, row.company_id, thread_id, std::slice::from_ref(&row)).await?;
-    let task_id = tasks.get(&row.canonical_id).copied();
-    Ok(Some(row.into_view(task_id)?))
+    let mut runs =
+        fetch_thread_runs(pool, row.company_id, thread_id, std::slice::from_ref(&row)).await?;
+    let run_ids = runs.remove(&row.canonical_id).unwrap_or_default();
+    Ok(Some(row.into_view(run_ids)?))
 }
 
 #[derive(sqlx::FromRow, Debug)]

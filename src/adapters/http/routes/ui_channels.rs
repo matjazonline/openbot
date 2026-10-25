@@ -6,7 +6,6 @@
 //! and every field is parsed by the same helpers the classic Channels page uses, so the two UIs
 //! cannot drift on what a submitted channel means.
 
-use std::collections::HashSet;
 use std::sync::Arc;
 
 use axum::{
@@ -28,15 +27,10 @@ use crate::{
     },
     app_error::{AppError, AppResult},
     entities::{
-        agent::Agent,
-        channel::Channel,
-        company::Company,
-        schedule::{ChannelSchedule, ScheduleRunAsChoices},
-        value_objects::EmailAddress,
+        channel::Channel, company::Company, schedule::ChannelSchedule, value_objects::EmailAddress,
     },
     infra::config::AppConfig,
     use_cases::{
-        agent::AgentUseCases,
         channel::{ChannelUseCases, ChannelWrite},
         company::CompanyUseCases,
         schedule::ScheduleUseCases,
@@ -45,20 +39,13 @@ use crate::{
 };
 
 use super::{
-    channel::{
-        ChannelForm, parse_agent_ids_form, parse_emails_form, parse_list_form, parse_text_form,
-        resolve_channel_agents, simple_channel_agent_write, slugify,
-    },
+    channel::{ChannelForm, parse_emails_form, parse_list_form, parse_text_form, slugify},
     ui::{load_account, load_managed_company, managed_company_membership, workspace_user},
 };
 
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/ui/channels", get(channels_page).post(create_channel))
-        .route(
-            "/ui/channels/easy",
-            axum::routing::post(create_easy_channels),
-        )
         .route("/ui/channels/new", get(create_pane))
         .route("/ui/channels/close", get(close_pane))
         .route(
@@ -78,22 +65,17 @@ pub struct WorkspaceQuery {
 
 /// The company scope every fragment and every write carries, in the URL rather than the body so
 /// the form itself stays exactly [`ChannelForm`].
-/// A channel's schedules and the members its runs may be attributed to, which the pane's
-/// schedules card needs together.
+/// A channel's schedules and the workflow bindings they may name, which the pane's schedules
+/// card needs together.
 #[derive(Debug, Clone, Default)]
 struct ChannelAutomation {
     schedules: Vec<ChannelSchedule>,
-    run_as: ScheduleRunAsChoices,
+    bindings: Vec<crate::use_cases::schedule::ScheduleBindingChoice>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct CompanyQuery {
     pub company_id: Uuid,
-}
-
-#[derive(Debug, Deserialize)]
-struct EasyChannelForm {
-    library_agent_ids: Option<String>,
 }
 
 const NO_SELECTION: &str = "Select a channel to configure it, or create a new one.";
@@ -106,7 +88,6 @@ struct Workspace {
     company_use_cases: Arc<CompanyUseCases>,
     channel_use_cases: Arc<ChannelUseCases>,
     schedule_use_cases: Arc<ScheduleUseCases>,
-    agent_use_cases: Arc<AgentUseCases>,
     user_use_cases: Arc<UserUseCases>,
     config: Arc<AppConfig>,
     user_id: Uuid,
@@ -125,7 +106,6 @@ impl FromRequestParts<AppState> for Workspace {
             company_use_cases: state.company_use_cases.clone(),
             channel_use_cases: state.channel_use_cases.clone(),
             schedule_use_cases: state.schedule_use_cases.clone(),
-            agent_use_cases: state.agent_use_cases.clone(),
             user_use_cases: state.user_use_cases.clone(),
             config: state.config.clone(),
             user_id: user.id,
@@ -143,18 +123,12 @@ impl Workspace {
     }
 
     async fn view<'a>(&'a self, company: &'a Company) -> AppResult<ChannelSettingsView<'a>> {
-        let memory_ready = self
-            .channel_use_cases
-            .memory_ready(self.user_id, company.id)
-            .await?;
         Ok(ChannelSettingsView {
             channel_use_cases: &self.channel_use_cases,
             schedule_use_cases: &self.schedule_use_cases,
-            agent_use_cases: &self.agent_use_cases,
             config: &self.config,
             user_id: self.user_id,
             company,
-            memory_ready,
         })
     }
 }
@@ -183,7 +157,6 @@ async fn channels_page(
 
     let view = workspace.view(&company).await?;
     let channels = view.channels().await?;
-    let agents = view.agents().await?;
     // Landing on `/ui/channels` with no `channel_id` opens the first channel rather than an empty
     // pane, so the workspace is never a blank screen when there is something to show.
     let selected = query
@@ -198,10 +171,8 @@ async fn channels_page(
 
     let creating = matches!(query.new.as_deref(), Some("1") | Some("true"));
     let pane_html = match (creating, selected) {
-        (true, _) => view.create_pane(&agents, &pages::ChannelDraft::default(), None),
-        (false, Some(channel)) => {
-            view.edit_pane(channel, &agents, &selected_automation, None, None)
-        }
+        (true, _) => view.create_pane(&pages::ChannelDraft::default(), None),
+        (false, Some(channel)) => view.edit_pane(channel, &selected_automation, None, None),
         (false, None) => {
             pages::channel_settings_empty_pane(NO_SELECTION, pages::FragmentSwap::Inline)
         }
@@ -226,13 +197,10 @@ async fn create_pane(
 ) -> AppResult<Html<String>> {
     let company = workspace.scoped_company(query.company_id).await?;
     let view = workspace.view(&company).await?;
-    let agents = view.agents().await?;
 
-    Ok(Html(view.create_pane(
-        &agents,
-        &pages::ChannelDraft::default(),
-        None,
-    )))
+    Ok(Html(
+        view.create_pane(&pages::ChannelDraft::default(), None),
+    ))
 }
 
 /// GET /ui/channels/close - Dismiss whichever form the pane holds (Protected).
@@ -259,16 +227,9 @@ async fn edit_pane(
     let company = workspace.scoped_company(query.company_id).await?;
     let view = workspace.view(&company).await?;
     let channel = view.channel(channel_id).await?;
-    let agents = view.agents().await?;
     let automation = view.automation(channel.id).await?;
 
-    Ok(Html(view.edit_pane(
-        &channel,
-        &agents,
-        &automation,
-        None,
-        None,
-    )))
+    Ok(Html(view.edit_pane(&channel, &automation, None, None)))
 }
 
 /// POST /ui/channels - Create a channel from the pane's Simple or Advanced form (Protected).
@@ -280,138 +241,27 @@ async fn create_channel(
 ) -> AppResult<Response> {
     let company = workspace.scoped_company(query.company_id).await?;
     let view = workspace.view(&company).await?;
-    let agents = view.agents().await?;
     let submitted = SubmittedChannel::new(form);
 
     let rejected = |message: String| {
-        Ok(Html(view.create_pane(&agents, &submitted.draft(), Some(&message))).into_response())
+        Ok(Html(view.create_pane(&submitted.draft(), Some(&message))).into_response())
     };
 
-    let simple_agent = match simple_channel_agent_write(
-        &workspace.agent_use_cases,
-        &submitted.form,
-        &submitted.slug,
-        workspace.user_id,
-        company.id,
-    )
-    .await
-    {
-        Ok(agent) => agent,
-        Err(message) => return rejected(message),
-    };
-    let agent_ids = resolve_channel_agents(&submitted.form);
-    let write = match submitted.write(agent_ids) {
-        Ok(write) => write,
-        Err(message) => return rejected(message),
-    };
-    let created = match simple_agent {
-        Some(agent) => {
-            workspace
-                .channel_use_cases
-                .create_channel_with_agent(
-                    workspace.user_id,
-                    company.id,
-                    agent,
-                    write,
-                    submitted.form.confirm_spam_disabled(),
-                )
-                .await
-        }
-        None => {
-            workspace
-                .channel_use_cases
-                .create_channel(
-                    workspace.user_id,
-                    company.id,
-                    write,
-                    submitted.form.confirm_spam_disabled(),
-                )
-                .await
-        }
-    };
+    let write = submitted.write();
+    let created = workspace
+        .channel_use_cases
+        .create_channel(
+            workspace.user_id,
+            company.id,
+            write,
+            submitted.form.confirm_spam_disabled(),
+        )
+        .await;
 
     match created {
-        Ok(channel) => {
-            // Agents may have grown by one: "simple" mode creates the channel's agent for it.
-            let agents = view.agents().await?;
-            view.saved_response(&channel, &agents).await
-        }
+        Ok(channel) => view.saved_response(&channel).await,
         Err(err) => rejected(format!("Failed to create channel: {err}")),
     }
-}
-
-/// POST /ui/channels/easy - Provision one same-named channel per selected library agent.
-#[instrument(skip(workspace, form))]
-async fn create_easy_channels(
-    workspace: Workspace,
-    Query(query): Query<CompanyQuery>,
-    Form(form): Form<EasyChannelForm>,
-) -> AppResult<Response> {
-    let company = workspace.scoped_company(query.company_id).await?;
-    let view = workspace.view(&company).await?;
-    let agents = view.agents().await?;
-    let submitted_ids = parse_agent_ids_form(form.library_agent_ids).unwrap_or_default();
-    let mut seen = HashSet::new();
-    let selected_ids = submitted_ids
-        .into_iter()
-        .filter(|id| seen.insert(*id))
-        .collect::<Vec<_>>();
-    let draft = pages::ChannelDraft {
-        agent_ids: &selected_ids,
-        ..pages::ChannelDraft::default()
-    };
-    let rejected = |message: String| {
-        Ok(Html(view.create_pane_mode(&agents, &draft, true, Some(&message))).into_response())
-    };
-
-    if selected_ids.is_empty() {
-        return rejected("Select at least one library agent.".to_string());
-    }
-    let selected = selected_ids
-        .iter()
-        .map(|id| {
-            agents
-                .iter()
-                .find(|agent| agent.id == *id && agent.is_library())
-        })
-        .collect::<Option<Vec<_>>>();
-    let Some(selected) = selected else {
-        return rejected(
-            "One or more selected library agents are no longer available.".to_string(),
-        );
-    };
-
-    let mut created = Vec::new();
-    for agent in selected {
-        let write = ChannelWrite {
-            response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
-            name: agent.name.clone(),
-            slug: agent.slug.clone(),
-            agent_ids: Some(vec![agent.id]),
-            enabled: true,
-            add_3rd_party: true,
-            ..ChannelWrite::default()
-        };
-        match workspace
-            .channel_use_cases
-            .create_channel(workspace.user_id, company.id, write, false)
-            .await
-        {
-            Ok(channel) => created.push(channel),
-            Err(err) => {
-                for channel in created {
-                    let _ = workspace
-                        .channel_use_cases
-                        .delete_channel(workspace.user_id, company.id, channel.id)
-                        .await;
-                }
-                return rejected(format!("Failed to create channels: {err}"));
-            }
-        }
-    }
-
-    let channel = created.first().expect("at least one channel was selected");
-    view.saved_response(channel, &agents).await
 }
 
 /// PUT /ui/channels/{channel_id} - Save one channel's settings (Protected).
@@ -425,14 +275,12 @@ async fn update_channel(
     let company = workspace.scoped_company(query.company_id).await?;
     let view = workspace.view(&company).await?;
     let stored = view.channel(channel_id).await?;
-    let agents = view.agents().await?;
     let automation = view.automation(channel_id).await?;
     let submitted = SubmittedChannel::new(form);
 
     let rejected = |message: String| {
         Ok(Html(view.edit_pane(
             &stored,
-            &agents,
             &automation,
             Some(&submitted.draft()),
             Some(&message),
@@ -440,10 +288,7 @@ async fn update_channel(
         .into_response())
     };
 
-    let write = match submitted.write(Some(submitted.agent_ids.clone())) {
-        Ok(write) => write,
-        Err(message) => return rejected(message),
-    };
+    let write = submitted.write();
     let saved = workspace
         .channel_use_cases
         .update_channel(
@@ -456,14 +301,7 @@ async fn update_channel(
         .await;
 
     match saved {
-        Ok(outcome) => {
-            view.saved_response_with_notice(
-                &outcome.channel,
-                &agents,
-                outcome.removal.summary().as_deref(),
-            )
-            .await
-        }
+        Ok(channel) => view.saved_response(&channel).await,
         Err(err) => rejected(format!("Failed to save channel: {err}")),
     }
 }
@@ -488,11 +326,9 @@ async fn delete_channel(
 struct ChannelSettingsView<'a> {
     channel_use_cases: &'a ChannelUseCases,
     schedule_use_cases: &'a ScheduleUseCases,
-    agent_use_cases: &'a AgentUseCases,
     config: &'a AppConfig,
     user_id: Uuid,
     company: &'a Company,
-    memory_ready: bool,
 }
 
 impl ChannelSettingsView<'_> {
@@ -502,23 +338,17 @@ impl ChannelSettingsView<'_> {
             .await
     }
 
-    async fn agents(&self) -> AppResult<Vec<Agent>> {
-        self.agent_use_cases
-            .list_assignable_agents(self.user_id, self.company.id)
-            .await
-    }
-
     /// A channel's automation as its pane needs it, loaded in one step because the schedules card
-    /// renders both halves: the schedules themselves, and who their runs may be attributed to.
+    /// renders both halves: the schedules themselves, and the bindings they may name.
     async fn automation(&self, channel_id: Uuid) -> AppResult<ChannelAutomation> {
         Ok(ChannelAutomation {
             schedules: self
                 .schedule_use_cases
                 .list_channel_schedules(self.user_id, self.company.id, channel_id)
                 .await?,
-            run_as: self
+            bindings: self
                 .schedule_use_cases
-                .run_as_choices(self.user_id, self.company.id)
+                .binding_choices(self.user_id, self.company.id, Some(channel_id))
                 .await?,
         })
     }
@@ -543,71 +373,33 @@ impl ChannelSettingsView<'_> {
         }
     }
 
-    fn create_pane(
-        &self,
-        agents: &[Agent],
-        draft: &pages::ChannelDraft<'_>,
-        error: Option<&str>,
-    ) -> String {
-        self.create_pane_mode(agents, draft, false, error)
-    }
-
-    fn create_pane_mode(
-        &self,
-        agents: &[Agent],
-        draft: &pages::ChannelDraft<'_>,
-        easy: bool,
-        error: Option<&str>,
-    ) -> String {
-        pages::channel_create_pane_with_memory(
-            &pages::ChannelCreatePane {
-                company: self.company,
-                app_domain_name: &self.config.app_domain_name,
-                agents,
-                spam_scan_enabled: self.config.is_spam_scan_enabled(),
-                draft,
-                easy,
-                error,
-            },
-            self.memory_ready,
-        )
+    fn create_pane(&self, draft: &pages::ChannelDraft<'_>, error: Option<&str>) -> String {
+        pages::channel_create_pane(&pages::ChannelCreatePane {
+            company: self.company,
+            app_domain_name: &self.config.app_domain_name,
+            spam_scan_enabled: self.config.is_spam_scan_enabled(),
+            draft,
+            error,
+        })
     }
 
     fn edit_pane(
         &self,
         channel: &Channel,
-        agents: &[Agent],
         automation: &ChannelAutomation,
         draft: Option<&pages::ChannelDraft<'_>>,
         error: Option<&str>,
     ) -> String {
-        self.edit_pane_with_notice(channel, agents, automation, draft, error, None)
-    }
-
-    fn edit_pane_with_notice(
-        &self,
-        channel: &Channel,
-        agents: &[Agent],
-        automation: &ChannelAutomation,
-        draft: Option<&pages::ChannelDraft<'_>>,
-        error: Option<&str>,
-        notice: Option<&str>,
-    ) -> String {
-        pages::channel_edit_pane_with_memory(
-            &pages::ChannelEditPane {
-                company: self.company,
-                app_domain_name: &self.config.app_domain_name,
-                channel,
-                agents,
-                schedules: &automation.schedules,
-                run_as: &automation.run_as,
-                spam_scan_enabled: self.config.is_spam_scan_enabled(),
-                draft,
-                error,
-                notice,
-            },
-            self.memory_ready,
-        )
+        pages::channel_edit_pane(&pages::ChannelEditPane {
+            company: self.company,
+            app_domain_name: &self.config.app_domain_name,
+            channel,
+            schedules: &automation.schedules,
+            schedule_bindings: &automation.bindings,
+            spam_scan_enabled: self.config.is_spam_scan_enabled(),
+            draft,
+            error,
+        })
     }
 
     /// The empty pane plus a sidebar with nothing selected — what cancelling a form and deleting
@@ -625,19 +417,9 @@ impl ChannelSettingsView<'_> {
 
     /// What every successful write returns: the saved channel's pane, with the sidebar list
     /// refreshed beside it so a create, rename or slug change shows up immediately.
-    async fn saved_response(&self, channel: &Channel, agents: &[Agent]) -> AppResult<Response> {
-        self.saved_response_with_notice(channel, agents, None).await
-    }
-
-    /// [`Self::saved_response`], with a banner saying what the save changed beyond the form.
-    async fn saved_response_with_notice(
-        &self,
-        channel: &Channel,
-        agents: &[Agent],
-        notice: Option<&str>,
-    ) -> AppResult<Response> {
+    async fn saved_response(&self, channel: &Channel) -> AppResult<Response> {
         let automation = self.automation(channel.id).await?;
-        let pane = self.edit_pane_with_notice(channel, agents, &automation, None, None, notice);
+        let pane = self.edit_pane(channel, &automation, None, None);
         let channels = self.channels().await?;
         let list = pages::channel_settings_list(
             &self.list(&channels, Some(channel.id)),
@@ -660,20 +442,15 @@ impl ChannelSettingsView<'_> {
 
 /// A submitted channel form, kept whole so a rejected save can be re-rendered with what was typed.
 ///
-/// It also owns the two derivations every write needs — the slug the name falls back to, and the
-/// parsed agent list — so neither is re-derived at a call site.
-///
-/// Visible to the rest of `routes` because the Agents workspace's create form ends on a channel
-/// step: the channel half of that submit is this same form, and parsing it the same way is what
-/// keeps the two panes from drifting on what a submitted channel means.
-pub(super) struct SubmittedChannel {
-    pub form: ChannelForm,
+/// It also owns the one derivation every write needs -- the slug the name falls back to -- so it
+/// is not re-derived at a call site.
+struct SubmittedChannel {
+    form: ChannelForm,
     slug: String,
-    agent_ids: Vec<Uuid>,
 }
 
 impl SubmittedChannel {
-    pub(super) fn new(form: ChannelForm) -> Self {
+    fn new(form: ChannelForm) -> Self {
         let slug = form
             .slug
             .as_deref()
@@ -681,106 +458,33 @@ impl SubmittedChannel {
             .filter(|slug| !slug.is_empty())
             .map(String::from)
             .unwrap_or_else(|| slugify(&form.name));
-        let agent_ids = parse_agent_ids_form(form.agent_ids.clone()).unwrap_or_default();
 
-        Self {
-            form,
-            slug,
-            agent_ids,
-        }
+        Self { form, slug }
     }
 
-    pub(super) fn draft(&self) -> pages::ChannelDraft<'_> {
+    fn draft(&self) -> pages::ChannelDraft<'_> {
         pages::ChannelDraft {
             name: &self.form.name,
             description: self.form.description.as_deref().unwrap_or(""),
             slug: &self.slug,
             alias_slugs: self.form.alias_slugs.as_deref().unwrap_or(""),
-            system_prompt: self.form.system_prompt.as_deref().unwrap_or(""),
             participant_emails: self.form.participant_emails.as_deref().unwrap_or(""),
-            agent_ids: &self.agent_ids,
-            advanced: self.form.form_mode.as_deref() != Some("simple"),
             enabled: self.form.enabled(),
             add_3rd_party: self.form.add_3rd_party(),
-            response_trigger: self.form.response_trigger().unwrap_or_default(),
-            retrieve_company_memory: self.form.retrieve_company_memory.is_some(),
-            retrieve_agent_memory: self.form.retrieve_agent_memory.is_some(),
-            retrieve_user_memory: self.form.retrieve_user_memory.is_some(),
-            persist_company_memory: self.form.persist_company_memory.is_some(),
-            persist_agent_memory: self.form.persist_agent_memory.is_some(),
-            persist_user_memory: self.form.persist_user_memory.is_some(),
         }
     }
 
-    /// The agents this submission names, in the order the form sent them.
-    ///
-    /// Exposed for the same reason `form` is: the Agents workspace's Channel tab submits this same
-    /// form, and parsing the list in one place is what keeps the two panes from drifting.
-    pub(super) fn agent_ids(&self) -> Vec<Uuid> {
-        self.agent_ids.clone()
-    }
-
-    /// The write this submission asks for. Create may mint an agent while update reuses the list.
-    pub(super) fn write(&self, agent_ids: Option<Vec<Uuid>>) -> Result<ChannelWrite, String> {
-        let memory = self.form.memory_settings()?;
-        Ok(ChannelWrite {
+    /// The write this submission asks for.
+    fn write(&self) -> ChannelWrite {
+        ChannelWrite {
             name: self.form.name.clone(),
             description: parse_text_form(self.form.description.clone()),
             slug: self.slug.clone(),
             alias_slugs: parse_list_form(self.form.alias_slugs.clone()),
             participant_emails: parse_emails_form(self.form.participant_emails.clone()),
-            agent_ids,
             enabled: self.form.enabled(),
             add_3rd_party: self.form.add_3rd_party(),
-            response_trigger: self.form.response_trigger()?,
-            external_response_review_override: super::channel::parse_review_override(
-                self.form.external_response_review_override.as_deref(),
-            ),
-            preferred_reviewer_principal_id: self
-                .form
-                .preferred_reviewer_principal_id
-                .map(crate::entities::transport::PrincipalId::new),
-            retrieve_company_memory: memory.retrieve_company,
-            retrieve_agent_memory: memory.retrieve_agent,
-            retrieve_user_memory: memory.retrieve_user,
-            persist_company_memory: memory.persist_company,
-            persist_agent_memory: memory.persist_agent,
-            persist_user_memory: memory.persist_user,
             created_by: None,
-        })
+        }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use axum::{
-        body::Body,
-        extract::{Form, FromRequest},
-        http::{Request, header},
-    };
-
-    use super::*;
-
-    #[tokio::test]
-    async fn obsolete_channel_memory_tuning_is_ignored_by_the_form() {
-        let request = Request::builder()
-            .method("POST")
-            .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
-            .body(Body::from(
-                "name=Support&slug=support&memory_max_results=0&memory_recall_mode=fast",
-            ))
-            .unwrap();
-        let form = Form::<ChannelForm>::from_request(request, &())
-            .await
-            .unwrap()
-            .0;
-        let submitted = SubmittedChannel::new(form);
-
-        assert!(submitted.write(None).is_ok());
-        assert_eq!(submitted.draft().name, "Support");
-    }
-}
-
-#[cfg(test)]
-#[path = "channel_response_trigger_tests.rs"]
-mod response_trigger_tests;

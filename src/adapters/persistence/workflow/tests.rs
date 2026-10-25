@@ -17,12 +17,15 @@ mod binding_tests;
 mod child_publication_tests;
 #[path = "http_tests.rs"]
 mod http_tests;
+pub(crate) use http_tests::reconciliation_fixture;
 #[path = "mcp_tests.rs"]
 mod mcp_tests;
 #[path = "message_tests.rs"]
 mod message_tests;
 #[path = "run_schema_tests.rs"]
 mod run_schema_tests;
+#[path = "schedule_tests.rs"]
+mod schedule_tests;
 use crate::adapters::persistence::test_support::{OwnDatabase, own_database};
 use crate::adapters::workflow_source::WorkflowSourceDecoder;
 use crate::application::use_cases::{
@@ -402,8 +405,8 @@ async fn workflow_sql_corrupt_source_fails_and_cross_company_version_is_rejected
     .await
     .unwrap();
     let error = sqlx::query("INSERT INTO workflow_versions \
-        (company_id, workflow_id, id, draft_revision, command_key, actor_id, title, description, source, bundle, content_hash) \
-        SELECT $1, workflow_id, id, draft_revision, command_key, actor_id, title, description, source, bundle, content_hash \
+        (company_id, workflow_id, id, draft_revision, command_key, actor_id, title, description, source, bundle, content_hash, agent_ids) \
+        SELECT $1, workflow_id, id, draft_revision, command_key, actor_id, title, description, source, bundle, content_hash, agent_ids \
         FROM workflow_versions WHERE company_id = $2")
         .bind(other.id).bind(fixture.target.company.as_uuid()).execute(fixture.persistence.pool()).await.unwrap_err();
     assert!(
@@ -504,4 +507,59 @@ async fn workflow_sql_template_provenance_roundtrips_and_replay_reauthorizes() {
         .await
         .unwrap();
     assert!(service.publish(request).await.is_err());
+}
+
+/// The listener's channels for workflow runs (p08 D4.1), on a connection of the test's own
+/// database, so every notification it hears is the test's own.
+async fn run_listener(pool: &sqlx::PgPool) -> sqlx::postgres::PgListener {
+    let mut listener = sqlx::postgres::PgListener::connect_with(pool)
+        .await
+        .unwrap();
+    listener
+        .listen_all(["workflow_run_changed", "thread_activity"])
+        .await
+        .unwrap();
+    listener
+}
+
+/// The next notification as `(channel, payload)`, failing rather than hanging.
+async fn next_notification(
+    listener: &mut sqlx::postgres::PgListener,
+) -> (String, serde_json::Value) {
+    let notification = tokio::time::timeout(std::time::Duration::from_secs(10), listener.recv())
+        .await
+        .expect("a notification arrives")
+        .unwrap();
+    (
+        notification.channel().to_string(),
+        serde_json::from_str(notification.payload()).unwrap_or(serde_json::Value::Null),
+    )
+}
+
+/// Publish a marker on both channels and expect it next on each: whatever the statements before
+/// it did, they notified nothing. Notifications arrive in commit order.
+async fn assert_silent_until_marker(
+    pool: &sqlx::PgPool,
+    listener: &mut sqlx::postgres::PgListener,
+) {
+    sqlx::query("SELECT pg_notify('workflow_run_changed', '\"marker\"'), pg_notify('thread_activity', '\"marker\"')")
+        .execute(pool)
+        .await
+        .unwrap();
+    let mut heard = vec![
+        next_notification(listener).await,
+        next_notification(listener).await,
+    ];
+    heard.sort_by(|left, right| left.0.cmp(&right.0));
+    assert_eq!(
+        heard,
+        [
+            ("thread_activity".to_string(), serde_json::json!("marker")),
+            (
+                "workflow_run_changed".to_string(),
+                serde_json::json!("marker")
+            ),
+        ],
+        "nothing was notified before the marker"
+    );
 }

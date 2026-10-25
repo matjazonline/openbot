@@ -1,15 +1,12 @@
 //! One-shot classification against a company's own model credential.
 //!
-//! Deliberately narrower than [`AgentHarness`]: `src/application/AGENTS.md` says to split a broad
-//! trait rather than add optional methods with safe-looking defaults, and its one caller does not
-//! want an agent. The system-prompt generator wants prose -- no tools, no memory, no approvals, no
-//! trace, and nothing durable behind the call.
+//! Deliberately narrower than a model step: its one caller does not want an agent. The
+//! system-prompt generator wants prose -- no tools, no checkpoint, and nothing durable behind the
+//! call.
 //!
 //! The call is not metered: no `model_usage_calls` row is written for it, because that table
 //! attributes usage to a task and an agent and an operator generating a prompt has neither. The
 //! user accepted that gap on 2026-10-21 (06-R024, 06-F030).
-//!
-//! [`AgentHarness`]: super::ports::AgentHarness
 
 use async_trait::async_trait;
 

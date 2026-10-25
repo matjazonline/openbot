@@ -150,38 +150,19 @@ fn notification_preferences_section(pane: &ProfilePane<'_>) -> String {
     format!(
         r##"<section class="mb-6 rounded-box border border-base-300 p-5">
             <h2 class="text-lg font-semibold">Notifications</h2>
-            <p class="mb-4 text-sm opacity-70">In-app alerts always remain available. Choose which urgent responsibility changes are also emailed.</p>
+            <p class="mb-4 text-sm opacity-70">In-app alerts always remain available. Choose what is also emailed.</p>
             {banner}
             <form hx-put="/ui/profile/notifications" hx-target="#profile-pane" hx-swap="outerHTML">
-                {assignment}
-                {review}
-                {delegation}
-                {task_failure}
+                {decision}
                 {delivery_failure}
                 <button type="submit" class="btn btn-primary btn-sm mt-3">Save notifications</button>
             </form>
         </section>"##,
         banner = pane.outcome.banner(ProfileForm::Notifications),
-        assignment = notification_toggle(
-            "assignment_email_enabled",
-            "Assignments and transfers to me",
-            pane.notification_preferences.assignment_email_enabled
-        ),
-        review = notification_toggle(
-            "response_review_email_enabled",
-            "Response reviews assigned to me",
-            pane.notification_preferences.response_review_email_enabled
-        ),
-        delegation = notification_toggle(
-            "delegation_timeout_email_enabled",
-            "Delegation timeouts that need my decision",
-            pane.notification_preferences
-                .delegation_timeout_email_enabled
-        ),
-        task_failure = notification_toggle(
-            "task_failure_email_enabled",
-            "Permanent task failures assigned to me",
-            pane.notification_preferences.task_failure_email_enabled
+        decision = notification_toggle(
+            "decision_email_enabled",
+            "Email me when a workflow decision needs my review",
+            pane.notification_preferences.decision_email_enabled
         ),
         delivery_failure = notification_toggle(
             "delivery_failure_email_enabled",

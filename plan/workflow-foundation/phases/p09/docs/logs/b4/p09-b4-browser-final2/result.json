@@ -1,0 +1,19 @@
+{
+  "ok": true,
+  "company": "a164e66e-5404-4501-8849-7bf0aad8e33c",
+  "workflow": "f9ad870e-f490-8579-a754-2ecaa61bd8ff",
+  "colors": [
+    {
+      "theme": "dark",
+      "color": "oklch(0.97807 0.029 256.847)",
+      "radius": "8px",
+      "outline": "-1px"
+    },
+    {
+      "theme": "light",
+      "color": "oklch(0.21 0.006 285.885)",
+      "radius": "8px",
+      "outline": "-1px"
+    }
+  ]
+}

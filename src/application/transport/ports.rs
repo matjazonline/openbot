@@ -16,8 +16,8 @@ use crate::{
         correlation::CorrelationId,
         message::CanonicalMessageId,
         transport::{
-            ChannelBindingId, ChannelSelector, ExternalDestination, ExternalMessageKey,
-            ExternalThreadKey, TransportKind, UnsupportedTransport,
+            ChannelBindingId, ChannelSelector, ExternalMessageKey, ExternalThreadKey,
+            TransportKind, UnsupportedTransport,
         },
         value_objects::{EmailAddress, MessageId},
     },
@@ -109,14 +109,6 @@ impl DeliveryPlanner for PolicyDeliveryPlanner {
 pub trait TransportRenderer: Send + Sync {
     fn transport(&self) -> TransportKind;
 
-    /// Parse one explicitly external destination using this transport's own syntax.
-    ///
-    /// The application needs this before it can authorize an outreach target, but must not import
-    /// a protocol parser or its framework types to do it. Keeping the classification on the
-    /// transport boundary also lets another renderer define a Slack user/channel destination
-    /// without projecting it through an email address.
-    fn classify_external_destination(&self, value: &str) -> ExternalDestinationClassification;
-
     fn render(&self, envelope: &DeliveryEnvelope) -> AppResult<Vec<RenderedPart>>;
 
     /// Freeze a notification that has no canonical message or channel attribution.
@@ -144,19 +136,6 @@ pub trait TransportRenderer: Send + Sync {
     /// Not defaulted: a renderer that quietly answered `None` would turn that into a thread
     /// nobody can find, one delayed reply at a time.
     fn predicted_provider_key(&self, part: &RenderedPart) -> Option<ExternalMessageKey>;
-}
-
-/// What a transport learned while parsing a requested external destination.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ExternalDestinationClassification {
-    External(ExternalDestination),
-    /// A valid address owned by this deployment. The caller must use an internal channel selector
-    /// so the channel's authorization policy is applied.
-    InternalEndpoint,
-    /// The value is in the deployment's namespace but is not a valid internal endpoint.
-    InvalidInternalEndpoint,
-    /// Not valid destination syntax for this transport.
-    InvalidSyntax,
 }
 
 /// One external request, and what the provider said about it.

@@ -88,7 +88,10 @@ pub struct ThreadMessageView {
     /// `messages.id` -- the payload every thread association of this message shares.
     pub canonical_id: CanonicalMessageId,
     pub thread_id: Uuid,
-    pub task_id: Option<Uuid>,
+    /// The workflow runs this message belongs to (p08 D4.6): the run that wrote a reply, then
+    /// every run its inbound admission started, in binding id order. Empty for a message no run
+    /// touched.
+    pub run_ids: Vec<Uuid>,
     pub author: AuthorView,
     pub subject: String,
     pub body: String,

@@ -166,9 +166,10 @@ async fn agent_setup_source(
         &connection,
         publication.version,
         Entrance::Tool,
+        RelatedAssociation::Company,
     ))
     .await;
-    let claim = Box::pin(claimed(&fixture, target)).await;
+    let claim = Box::pin(claimed(&fixture, target, RelatedAssociation::Company)).await;
     AgentSetup {
         fixture,
         connection,

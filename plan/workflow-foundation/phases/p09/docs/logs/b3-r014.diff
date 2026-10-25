@@ -1,0 +1,414 @@
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -107,6 +107,7 @@
+           WORKFLOW_DECISION_BROWSER_FIXTURES: /tmp/workflow-decision-browser
+         run: |
+           cargo test --locked --offline --lib decision_browser_markup_and_closed_draft_recovery
++          cargo test --locked --offline --lib source_message_outside_window_is_exact_and_authorized
+           node --test scripts/tests/workflow-decisions.mjs
+       # .cargo/config.toml gives every test thread 16 MiB, which is what keeps the
+       # task-worker -> dispatch -> agent-runner chain off the guard page -- and which would also
+--- a/scripts/tests/workflow-decisions.mjs
++++ b/scripts/tests/workflow-decisions.mjs
+@@ -26,7 +26,9 @@
+             const body=new URLSearchParams(Buffer.concat(chunks).toString());
+             received.push({url,body});pending.push(response);return;
+         }
+-        response.setHeader('Content-Type','text/html');response.end(fixtures.waiting);
++        response.setHeader('Content-Type','text/html');
++        if (url.startsWith('/source-')) return response.end(readFileSync(`${directory}${url}.html`,'utf8'));
++        response.end(fixtures.waiting);
+     });
+     await new Promise(resolve => server.listen(0,'127.0.0.1',resolve));
+     const browser=await chromium.launch(process.env.CHROME_PATH ? {executablePath:process.env.CHROME_PATH}:{});
+@@ -62,8 +64,24 @@
+             await expect(page.getByText('Decision submitted',{exact:true})).toBeVisible();
+             await expect(page.locator('#workflow-decision form')).toHaveCount(0);
+             await expect(page.locator('#decision-shell')).toHaveCount(1);
++            await expect(page.locator('#decision-draft-recovery')).toHaveCount(0);
+             await expect(page.locator('#--htmx-preserve-pantry--')).toHaveCount(0);
+         }
++        // Another reviewer closes this decision while the comment is in flight. Recover
++        // even edits typed after the request began, without suggesting the comment submitted them.
++        await page.goto(`http://127.0.0.1:${server.address().port}/`);
++        await page.locator('[name="data:body"]').fill('Unsent body');
++        await page.getByRole('textbox',{name:'Comment',exact:true}).fill('Posting comment');
++        await page.getByRole('button',{name:'Add comment',exact:true}).click();
++        await expect.poll(()=>pending.length).toBe(1);
++        await page.locator('[name="data:body"]').fill('Later edit <script>');
++        await page.locator('[name=feedback]').fill('Latest feedback');
++        pending.shift().end(fixtures.closed.replace('Decision submitted','Comment posted'));
++        await expect(page.locator('#decision-draft-recovery')).toContainText('Later edit <script>');
++        await expect(page.locator('#decision-draft-recovery')).toContainText('Latest feedback');
++        await expect(page.locator('#decision-draft-recovery')).toContainText('Posting a comment did not submit this input.');
++        await expect(page.locator('#decision-draft-recovery script')).toHaveCount(0);
++        await expect(page.locator('#workflow-decision form')).toHaveCount(0);
+         // Programmatically overlap requests, as can happen before a disabled state is painted.
+         await page.goto(`http://127.0.0.1:${server.address().port}/`);
+         await page.locator('[name="data:body"]').fill('Queued draft');
+@@ -83,6 +101,13 @@
+         await expect(page.getByText('Decision submitted',{exact:true})).toBeVisible();
+         await expect(page.locator('#workflow-decision form')).toHaveCount(0);
+         assert.notEqual(colors[0],colors[1],'real text colors follow both themes');
++        for (const [name,body] of [['old','Source message 209 <script>'],['retained','Source message 5 <script>']]) {
++            await page.goto(`http://127.0.0.1:${server.address().port}/source-${name}`);
++            await expect(page.locator('#source-message')).toBeFocused();
++            await expect(page.locator('#source-message')).toContainText(body);
++            await expect(page.locator('#source-message')).toBeInViewport();
++            await expect(page.locator('#message-scroll')).toHaveCount(0);
++        }
+         assert.deepEqual(errors,[]);
+     } finally {
+         await browser.close();for(const response of pending) response.destroy();
+--- a/src/adapters/http/pages/workflow_decision.rs
++++ b/src/adapters/http/pages/workflow_decision.rs
+@@ -94,18 +94,21 @@
+     let company = view.context.company.as_uuid();
+     let conversation = match (view.context.channel, view.context.thread) {
+         (Some(channel), Some(thread)) => {
+-            let anchor = view
+-                .context
+-                .trigger_message
+-                .map(|id| format!("#message-runs-{id}"))
+-                .unwrap_or_default();
++            let (href, label) = match view.context.trigger_message {
++                Some(message) => (
++                    format!(
++                        "/ui/message?company_id={company}&channel_id={channel}&thread_id={thread}&message_id={message}"
++                    ),
++                    "Source message",
++                ),
++                None => (
++                    format!("/ui?company_id={company}&channel_id={channel}&thread_id={thread}"),
++                    "Conversation",
++                ),
++            };
+             format!(
+-                r#"<a class="link" href="/ui?company_id={company}&amp;channel_id={channel}&amp;thread_id={thread}{anchor}">{label}</a>"#,
+-                label = if view.context.trigger_message.is_some() {
+-                    "Source message"
+-                } else {
+-                    "Conversation"
+-                }
++                r#"<a class="link" href="{}">{label}</a>"#,
++                escape_html_attr(&href)
+             )
+         }
+         _ => String::new(),
+@@ -204,5 +207,30 @@
+     )
+ }
+ 
++/// A single exact context message; no live-window owner or newest-message scrolling applies.
++pub fn workflow_source_message_page(
++    message: &crate::entities::message_view::ThreadMessageView,
++    viewer_email: &crate::entities::value_objects::EmailAddress,
++    scope: MessageScope,
++    run_access: RunLinkAccess<'_>,
++) -> String {
++    base_layout(
++        "Source message",
++        &format!(
++            r#"<main class="mx-auto w-full max-w-3xl space-y-4">
++        <h1 class="text-xl font-bold">Source message</h1>
++        <p class="break-all text-xs">Message {id}</p>
++        <article id="source-message" tabindex="-1" autofocus>{bubble}</article>
++        <a class="link" href="/ui?company_id={company}&amp;channel_id={channel}&amp;thread_id={thread}">Open latest conversation</a>
++        </main>"#,
++            id = message.canonical_id.as_uuid(),
++            bubble = message_bubble_chat(message, Some(viewer_email), scope, run_access),
++            company = scope.company_id,
++            channel = scope.channel_id,
++            thread = message.thread_id
++        ),
++    )
++}
++
+ #[cfg(test)]
+ mod tests;
+--- a/src/adapters/http/pages/workflow_decision/tests.rs
++++ b/src/adapters/http/pages/workflow_decision/tests.rs
+@@ -41,6 +41,13 @@
+ #[test]
+ fn decision_data_forms_preserve_raw_errors_and_protected_requests_are_immutable() {
+     let mut view = view();
++    view.context.channel = Some(Uuid::new_v4());
++    view.context.thread = Some(Uuid::new_v4());
++    let message = Uuid::new_v4();
++    view.context.trigger_message = Some(message);
++    let linked = workflow_decision_section(&view, None, None);
++    assert!(linked.contains("href=\"/ui/message?"));
++    assert!(linked.contains(&format!("message_id={message}")));
+     let inputs = DecisionFormInputs::Submission(DecisionInputs {
+         values: [
+             ("data_mode".into(), "json".into()),
+--- a/src/adapters/http/pages/workflow_runs/mod.rs
++++ b/src/adapters/http/pages/workflow_runs/mod.rs
+@@ -18,6 +18,37 @@
+ /// guard the late response can steal disclosures from the new pane. Listen on the requesting
+ /// element itself because a detached element's events no longer bubble to document.
+ pub const WORKFLOW_RUNS_SCRIPT: &str = r#"
++// A comment may return after another reviewer closed the decision. Keep the latest local
++// draft in a read-only recovery panel; a comment never submitted these values.
++document.addEventListener('htmx:beforeSwap', function (event) {
++    var detail = event.detail;
++    if (detail.target.id !== 'workflow-decision' || !detail.requestConfig.path.split('?')[0].endsWith('/comments')) return;
++    var draft = detail.target.querySelector('form[id^="decision-inputs-"]');
++    if (!draft) return;
++    var incoming = document.createElement('template');
++    incoming.innerHTML = detail.serverResponse;
++    if (incoming.content.querySelector('form[id^="decision-inputs-"]')) return;
++    var section = incoming.content.querySelector('#workflow-decision');
++    if (!section) return;
++    var values = {};
++    new FormData(draft).forEach(function (value, key) {
++        if (key === 'feedback' || key === 'data' || key.startsWith('data:')) values[key] = value;
++    });
++    var recovery = document.createElement('section');
++    recovery.id = 'decision-draft-recovery';
++    recovery.className = 'space-y-2';
++    var title = document.createElement('h2');
++    title.className = 'font-semibold';
++    title.textContent = 'Your unfinished decision input';
++    var explanation = document.createElement('p');
++    explanation.textContent = 'Posting a comment did not submit this input.';
++    var content = document.createElement('pre');
++    content.className = 'whitespace-pre-wrap text-sm';
++    content.textContent = JSON.stringify(values, null, 2);
++    recovery.append(title, explanation, content);
++    section.append(recovery);
++    detail.serverResponse = incoming.innerHTML;
++});
+ function discardDetachedRunResponse(answer) {
+     if (!answer.detail.target.isConnected) answer.preventDefault();
+ }
+--- a/src/adapters/http/routes/ui.rs
++++ b/src/adapters/http/routes/ui.rs
+@@ -60,6 +60,9 @@
+     channel::{ThreadListQuery, ThreadListResponse, load_thread_page},
+     live_updates::{Wake, channel_wake_ups, thread_wake_ups},
+ };
++
++#[path = "ui_message.rs"]
++mod message;
+ 
+ pub fn router() -> Router<AppState> {
+     Router::new()
+@@ -67,6 +70,7 @@
+         .route("/ui/threads", get(thread_column_fragment))
+         .route("/ui/threads/list", get(thread_page_fragment))
+         .route("/ui/messages", get(message_pane_fragment))
++        .route("/ui/message", get(message::page))
+         .route("/ui/events", get(thread_message_stream))
+         .route("/ui/threads/events", get(thread_column_stream))
+         .route("/ui/compose", get(compose_form).post(create_thread))
+--- a/src/adapters/http/routes/ui_message.rs
++++ b/src/adapters/http/routes/ui_message.rs
+@@ -0,0 +1,47 @@
++//! Exact source-message destinations are independent of the bounded live conversation window.
++use super::*;
++
++#[derive(Debug, Clone, Deserialize)]
++pub(super) struct MessageQuery {
++    pub company_id: Uuid,
++    pub channel_id: Uuid,
++    pub thread_id: Uuid,
++    pub message_id: Uuid,
++}
++
++pub(super) async fn page(
++    State(companies): State<Arc<CompanyUseCases>>,
++    State(channels): State<Arc<ChannelUseCases>>,
++    State(threads): State<Arc<ThreadUseCases>>,
++    State(activity): State<Arc<dyn ThreadActivityReader>>,
++    viewer: Viewer,
++    Query(query): Query<MessageQuery>,
++) -> AppResult<Html<String>> {
++    let (_, channel) = load_viewable_channel(
++        &companies,
++        &channels,
++        &viewer,
++        query.company_id,
++        query.channel_id,
++    )
++    .await?;
++    let thread = load_channel_thread(&threads, channel.id, query.thread_id)
++        .await?
++        .ok_or_else(|| AppError::NotFound("Thread not found".into()))?;
++    let message = threads
++        .get_thread_message_view(thread.id, CanonicalMessageId::new(query.message_id))
++        .await?
++        .ok_or_else(|| AppError::NotFound("Message not found in this thread".into()))?;
++    let inspectable = activity
++        .inspectable_runs(query.company_id, viewer.user_id, &message.run_ids)
++        .await?;
++    Ok(Html(pages::workflow_source_message_page(
++        &message,
++        &viewer.email,
++        pages::MessageScope {
++            company_id: query.company_id,
++            channel_id: channel.id,
++        },
++        pages::RunLinkAccess::Authorized(&inspectable),
++    )))
++}
+--- a/src/adapters/http/routes/ui_message_tests.rs
++++ b/src/adapters/http/routes/ui_message_tests.rs
+@@ -0,0 +1,128 @@
++use super::super::message::{MessageQuery, page};
++use super::*;
++
++async fn source(h: &Harness, viewer: Viewer, query: MessageQuery) -> AppResult<Html<String>> {
++    page(
++        State(Arc::new(CompanyUseCases::new(h.persistence.clone()))),
++        State(h.channels.clone()),
++        State(h.threads.clone()),
++        State(h.reader()),
++        viewer,
++        Query(query),
++    )
++    .await
++}
++
++async fn seed(h: &Harness, thread: Uuid) -> Vec<Uuid> {
++    let principal: Uuid =
++        sqlx::query_scalar("SELECT id FROM principals WHERE company_id=$1 AND user_id=$2")
++            .bind(h.company_id)
++            .bind(h.owner.user_id)
++            .fetch_one(h.persistence.pool())
++            .await
++            .unwrap();
++    let ids:Vec<Uuid>=sqlx::query_scalar(
++        "INSERT INTO messages(id,company_id,author_principal_id,subject,clean_text_body,direction,role,correlation_id,content_hash,created_at,audience) \
++        SELECT gen_random_uuid(),$1,$2,'Source','Source message '||ordinal||' <script>','inbound','human',gen_random_uuid(),decode(repeat('00',32),'hex'),now()-ordinal*interval '1 second','external_conversation' \
++        FROM generate_series(0,209) AS fixture(ordinal) RETURNING id")
++        .bind(h.company_id).bind(principal).fetch_all(h.persistence.pool()).await.unwrap();
++    sqlx::query("INSERT INTO thread_messages(id,company_id,channel_id,thread_id,message_id,created_at,entry_kind) SELECT gen_random_uuid(),company_id,$2,$3,id,created_at,'conversation' FROM messages WHERE company_id=$1 AND id=ANY($4)")
++        .bind(h.company_id).bind(h.channel_id).bind(thread).bind(&ids).execute(h.persistence.pool()).await.unwrap();
++    ids
++}
++
++#[tokio::test]
++async fn source_message_outside_window_is_exact_and_authorized() {
++    let Some(h) = Harness::new().await else {
++        return;
++    };
++    let Some(other) = Harness::new().await else {
++        return;
++    };
++    let thread = h.thread("Context").await;
++    let ids = seed(&h, thread).await;
++    let history = h.threads.get_thread_history(thread).await.unwrap();
++    assert_eq!(history.len(), 200);
++    let old = ids[209];
++    assert!(
++        !history
++            .iter()
++            .any(|message| message.canonical_id.as_uuid() == old)
++    );
++    let query = MessageQuery {
++        company_id: h.company_id,
++        channel_id: h.channel_id,
++        thread_id: thread,
++        message_id: old,
++    };
++    for (name, id, body) in [
++        ("old", old, "Source message 209 &lt;script&gt;"),
++        ("retained", ids[5], "Source message 5 &lt;script&gt;"),
++    ] {
++        let page = source(
++            &h,
++            h.owner.clone(),
++            MessageQuery {
++                message_id: id,
++                ..query.clone()
++            },
++        )
++        .await
++        .unwrap()
++        .0;
++        assert!(page.contains(body), "{page}");
++        assert!(page.contains(&format!("Message {id}")));
++        assert!(!page.contains("id=\"message-scroll\""));
++        assert!(!page.contains("sse-connect="));
++        assert!(!page.contains("Source message 0 &lt;script&gt;"));
++        if let Some(dir) = std::env::var_os("WORKFLOW_DECISION_BROWSER_FIXTURES") {
++            let dir = std::path::PathBuf::from(dir);
++            std::fs::create_dir_all(&dir).unwrap();
++            std::fs::write(dir.join(format!("source-{name}.html")), page).unwrap();
++        }
++    }
++    refuses_other_scopes(&h, &other, query).await;
++}
++
++async fn refuses_other_scopes(h: &Harness, other: &Harness, query: MessageQuery) {
++    let unrelated = h.thread("Other thread").await;
++    for refused in [
++        MessageQuery {
++            company_id: other.company_id,
++            ..query.clone()
++        },
++        MessageQuery {
++            channel_id: other.channel_id,
++            ..query.clone()
++        },
++        MessageQuery {
++            thread_id: unrelated,
++            ..query.clone()
++        },
++        MessageQuery {
++            message_id: Uuid::new_v4(),
++            ..query.clone()
++        },
++    ] {
++        assert!(matches!(
++            source(h, h.owner.clone(), refused).await,
++            Err(AppError::NotFound(_))
++        ));
++    }
++    sqlx::query("UPDATE channels SET access_mode='allowlist' WHERE id=$1")
++        .bind(h.channel_id)
++        .execute(h.persistence.pool())
++        .await
++        .unwrap();
++    sqlx::query("INSERT INTO company_members(id,company_id,user_id,role) VALUES($1,$2,$3,'admin')")
++        .bind(Uuid::new_v4())
++        .bind(h.company_id)
++        .bind(other.owner.user_id)
++        .execute(h.persistence.pool())
++        .await
++        .unwrap();
++    assert!(matches!(
++        source(h, other.owner.clone(), query).await,
++        Err(AppError::NotFound(_))
++    ));
++}
+--- a/src/adapters/http/routes/ui_stream_tests.rs
++++ b/src/adapters/http/routes/ui_stream_tests.rs
+@@ -527,3 +527,6 @@
+ 
+ #[path = "ui_conversation_stream_tests.rs"]
+ mod conversation_stream_tests;
++
++#[path = "ui_message_tests.rs"]
++mod message_source_tests;
+--- a/src/application/use_cases/thread/mod.rs
++++ b/src/application/use_cases/thread/mod.rs
+@@ -971,6 +971,17 @@
+             .await
+     }
+ 
++    /// One exact message after the caller authorizes the containing thread.
++    pub async fn get_thread_message_view(
++        &self,
++        thread_id: Uuid,
++        message_id: CanonicalMessageId,
++    ) -> AppResult<Option<ThreadMessageView>> {
++        self.thread_persistence
++            .get_thread_message_view(thread_id, message_id)
++            .await
++    }
++
+     /// The messages a live reader is missing, oldest first.
+     ///
+     /// Driving the message stream off a cursor rather than off the notification payload means one

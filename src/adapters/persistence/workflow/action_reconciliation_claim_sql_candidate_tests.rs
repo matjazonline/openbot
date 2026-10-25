@@ -161,7 +161,8 @@ async fn hide_first(f: &AdmissionFixture, first: &ActionDispatchRequest) {
     let mut tx = f.persistence().pool().begin().await.unwrap();
     assert_eq!(
         sqlx::query(
-            "UPDATE background_tasks SET status='stopped' WHERE id=$1 AND status='pending'"
+            // Hidden by a status no claim query selects; unguarded straight from pending.
+            "UPDATE background_tasks SET status='completed' WHERE id=$1 AND status='pending'"
         )
         .bind(first.fence.scope.job.0)
         .execute(&mut *tx)
@@ -197,7 +198,7 @@ async fn attack(
     );
     assert_eq!(
         sqlx::query(
-            "UPDATE background_tasks SET status='pending' WHERE id=$1 AND status='stopped'"
+            "UPDATE background_tasks SET status='pending' WHERE id=$1 AND status='completed'"
         )
         .bind(first.fence.scope.job.0)
         .execute(&mut *tx)
@@ -303,7 +304,7 @@ async fn multiple_applicable_candidates(attempt: usize) -> bool {
         "candidate-2",
     ))
     .await;
-    assert_eq!(job_status(&f, first.fence.scope).await, "stopped");
+    assert_eq!(job_status(&f, first.fence.scope).await, "completed");
     single_transition(&f, second_scope, &second_command).await;
     attack(&f, &first, &second, &[first_command, second_command]).await;
     assert_eq!(catalog, capture_catalog(&f).await);

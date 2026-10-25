@@ -7,21 +7,19 @@ use uuid::Uuid;
 use crate::{
     app_error::{AppError, AppResult},
     entities::{
-        agent::Agent,
         channel::{
             Channel, PUBLIC_PARTICIPANT, RESERVED_SLUG_SUFFIXES, RESERVED_SUFFIX_SEPARATORS,
         },
         company::Company,
         creation::CreationProvenance,
         participant::{IdentityProvenance, PrincipalAccessContext},
-        transport::{ChannelSelector, QualifiedIdentity},
+        transport::QualifiedIdentity,
         user::Viewer,
         value_objects::{ChannelSlug, CompanySlug},
     },
     infra::config::AppConfig,
-    use_cases::agent::{AgentWrite, SpamScanning},
+    use_cases::agent::SpamScanning,
     use_cases::company::{CompanyPersistence, managed_company},
-    use_cases::memory::{ActiveMemoryBinding, MemoryBindingPersistence},
     use_cases::participant::{ParticipantPersistence, observe_access_context},
 };
 
@@ -39,41 +37,17 @@ pub struct ChannelWrite {
     /// Extra local parts the channel also answers on. Replaced wholesale by every write.
     pub alias_slugs: Vec<String>,
     pub participant_emails: Option<Vec<String>>,
-    /// The channel's agents in position order. On create, `None` assigns none. On update, `None`
-    /// keeps the current assignments and `Some(vec![])` removes them all -- an agent's removal
-    /// stops its work, so only an explicit list may cause one.
-    pub agent_ids: Option<Vec<Uuid>>,
     pub enabled: bool,
     /// Whether a trusted sender may pull CC'd outsiders onto this channel's threads.
     pub add_3rd_party: bool,
-    pub response_trigger: crate::entities::channel::ChannelResponseTrigger,
-    pub external_response_review_override:
-        Option<crate::entities::response_draft::ExternalResponseReview>,
-    pub preferred_reviewer_principal_id: Option<crate::entities::transport::PrincipalId>,
-    pub retrieve_company_memory: bool,
-    pub retrieve_agent_memory: bool,
-    pub retrieve_user_memory: bool,
-    pub persist_company_memory: bool,
-    pub persist_agent_memory: bool,
-    pub persist_user_memory: bool,
     pub created_by: Option<CreationProvenance>,
 }
 
 impl ChannelWrite {
     /// Trim and lower-case the fields that have canonical forms, and drop the blanks. Runs once,
-    /// in the use case, so every entry point stores the same shape.
+    /// in the use case, so every entry point stores the same shape. A channel needs no agent: its
+    /// automation is a workflow binding (P08-D4 §D4.7).
     pub(crate) fn normalize(&mut self) -> AppResult<()> {
-        self.normalize_with(ActiveAgent::InWrite)
-    }
-
-    /// [`normalize`](Self::normalize), told where the position-0 agent is coming from.
-    ///
-    /// The distinction exists because a caller creating the channel and its agent in one
-    /// transaction has no agent id to put in `agent_ids` yet -- the write is still valid, the
-    /// assignment just arrives with it. Saying that in an argument keeps the rule in one place;
-    /// the alternative -- flipping `enabled` off around the call -- silently skips every future
-    /// `enabled`-dependent check as well as this one.
-    pub(crate) fn normalize_with(&mut self, active_agent: ActiveAgent) -> AppResult<()> {
         self.name = self.name.trim().to_string();
         self.slug = self.slug.trim().to_lowercase().replace(' ', "-");
 
@@ -95,15 +69,6 @@ impl ChannelWrite {
                 *email = email.trim().to_lowercase();
                 !email.is_empty() && email.contains('@')
             });
-        }
-
-        if matches!(active_agent, ActiveAgent::InWrite)
-            && self.enabled
-            && self.agent_ids.as_ref().is_none_or(Vec::is_empty)
-        {
-            return Err(AppError::BadRequest(
-                "An enabled channel must have an active agent at position 0.".into(),
-            ));
         }
 
         Ok(())
@@ -141,12 +106,9 @@ impl ChannelWrite {
 }
 
 /// A channel open to `@public` must not be saved while the server has no spam scanning at all,
-/// unless the caller explicitly says it knows.
-///
-/// Free-standing because two use cases enforce it: the Channels workspace saving a channel, and
-/// the Agents workspace creating an agent whose personal channel was written on the create form's
-/// channel step. One copy means the two cannot come to refuse it in different words.
-pub(crate) fn check_spam_interlock(
+/// unless the caller explicitly says it knows. Create and update share this one copy, so the two
+/// cannot come to refuse it in different words.
+fn check_spam_interlock(
     write: &ChannelWrite,
     spam_scanning: SpamScanning,
     confirmed: bool,
@@ -159,21 +121,6 @@ pub(crate) fn check_spam_interlock(
     Ok(())
 }
 
-/// Where a channel write's position-0 agent comes from, for [`ChannelWrite::normalize_with`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum ActiveAgent {
-    /// `agent_ids` is the whole story: an enabled channel with none is rejected.
-    InWrite,
-    /// The caller creates the agent alongside the channel in one transaction, so an empty
-    /// `agent_ids` is not yet a missing agent. The database's deferred
-    /// `enabled_channel_active_agent_check` is what holds the invariant on this path.
-    SuppliedByCaller,
-    /// An update that leaves `agent_ids` out keeps the assignments the use case has just read and
-    /// found non-empty. A concurrent edit emptying them in between still meets the same deferred
-    /// constraint.
-    AlreadyAssigned,
-}
-
 /// A channel belonging to another company is reported exactly like a missing one, so an id probe
 /// cannot tell a foreign channel from a nonexistent one. See [`managed_company`].
 pub fn channel_not_found() -> AppError {
@@ -182,90 +129,18 @@ pub fn channel_not_found() -> AppError {
 
 /// One authorized channel edit, as persistence receives it.
 ///
-/// The tenant and the manager travel with the write rather than beside it: persistence re-checks
-/// the channel against `company_id` under its row lock, and records `actor_user_id` on every task
-/// the edit stops.
+/// The tenant travels with the write rather than beside it: persistence re-checks the channel
+/// against `company_id` under its row lock.
 #[derive(Debug, Clone)]
 pub struct ChannelUpdate {
     pub company_id: Uuid,
     pub channel_id: Uuid,
-    pub actor_user_id: Uuid,
     pub write: ChannelWrite,
-}
-
-/// What removing agents from a channel took back with them, committed with the edit itself.
-///
-/// Empty whenever the edit removed nobody -- reordering, adding an agent and changing any other
-/// field all leave every task and delivery exactly as they were.
-#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize)]
-pub struct AssignmentRemoval {
-    pub removed_agent_ids: Vec<Uuid>,
-    pub stopped_tasks: u64,
-    /// Queued deliveries known never to have been sent.
-    pub cancelled_deliveries: u64,
-    pub superseded_reviews: u64,
-    /// Deliveries a provider may already hold: in flight, or unconfirmed, when the edit committed.
-    /// They will send nothing further, but what was sent cannot be recalled.
-    pub potentially_sent_delivery_ids: Vec<Uuid>,
-}
-
-impl AssignmentRemoval {
-    /// One short line for the edit flow, or `None` when the edit removed nobody.
-    pub fn summary(&self) -> Option<String> {
-        if self.removed_agent_ids.is_empty() {
-            return None;
-        }
-        let mut summary = format!(
-            "Removed {}: stopped {}, cancelled {} and withdrew {}.",
-            count(self.removed_agent_ids.len() as u64, "agent", "agents"),
-            count(self.stopped_tasks, "task", "tasks"),
-            count(
-                self.cancelled_deliveries,
-                "queued delivery",
-                "queued deliveries"
-            ),
-            count(self.superseded_reviews, "pending review", "pending reviews"),
-        );
-        let in_flight = self.potentially_sent_delivery_ids.len() as u64;
-        if in_flight > 0 {
-            summary.push_str(&format!(
-                " {} already being sent and may have gone out.",
-                match in_flight {
-                    1 => "1 delivery was".to_string(),
-                    n => format!("{n} deliveries were"),
-                }
-            ));
-        }
-        Some(summary)
-    }
-}
-
-fn count(value: u64, singular: &str, plural: &str) -> String {
-    format!("{value} {}", if value == 1 { singular } else { plural })
-}
-
-/// A saved channel edit.
-#[derive(Debug, Clone)]
-pub struct ChannelUpdateOutcome {
-    pub channel: Channel,
-    pub removal: AssignmentRemoval,
 }
 
 #[async_trait]
 pub trait ChannelPersistence: Send + Sync {
     async fn create(&self, company_id: Uuid, write: ChannelWrite) -> AppResult<Channel>;
-
-    /// Atomically creates an executable agent, its channel, and the position-0 assignment.
-    async fn create_with_agent(
-        &self,
-        _company_id: Uuid,
-        _agent: AgentWrite,
-        _channel: ChannelWrite,
-    ) -> AppResult<(Agent, Channel)> {
-        Err(AppError::Internal(
-            "Atomic agent/channel creation is unavailable.".into(),
-        ))
-    }
 
     async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Channel>>;
 
@@ -277,9 +152,8 @@ pub trait ChannelPersistence: Send + Sync {
 
     async fn list_by_company_id(&self, company_id: Uuid) -> AppResult<Vec<Channel>>;
 
-    /// Save one channel edit. An agent the edit removes has its work in this channel stopped and
-    /// its unsent output withdrawn in the same transaction; any failure leaves all of it unchanged.
-    async fn update(&self, request: ChannelUpdate) -> AppResult<ChannelUpdateOutcome>;
+    /// Save one channel edit under the channel's gate; any failure leaves it unchanged.
+    async fn update(&self, request: ChannelUpdate) -> AppResult<Channel>;
 
     async fn delete(&self, id: Uuid) -> AppResult<()>;
 }
@@ -289,7 +163,6 @@ pub struct ChannelUseCases {
     company_persistence: Arc<dyn CompanyPersistence>,
     channel_persistence: Arc<dyn ChannelPersistence>,
     config: Arc<AppConfig>,
-    memory_persistence: Option<Arc<dyn MemoryBindingPersistence>>,
     participant_persistence: Arc<dyn ParticipantPersistence>,
 }
 
@@ -305,16 +178,7 @@ impl ChannelUseCases {
             channel_persistence,
             participant_persistence,
             config,
-            memory_persistence: None,
         }
-    }
-
-    pub fn with_memory_persistence(
-        mut self,
-        persistence: Arc<dyn MemoryBindingPersistence>,
-    ) -> Self {
-        self.memory_persistence = Some(persistence);
-        self
     }
 
     async fn verify_company_manager(&self, user_id: Uuid, company_id: Uuid) -> AppResult<()> {
@@ -344,31 +208,6 @@ impl ChannelUseCases {
         self.channel_persistence.create(company_id, write).await
     }
 
-    #[instrument(skip(self, agent))]
-    pub async fn create_channel_with_agent(
-        &self,
-        user_id: Uuid,
-        company_id: Uuid,
-        mut agent: AgentWrite,
-        mut channel: ChannelWrite,
-        confirm_spam_disabled: bool,
-    ) -> AppResult<Channel> {
-        self.verify_company_manager(user_id, company_id).await?;
-        let provenance = CreationProvenance::user(user_id);
-        agent.created_by = Some(provenance.clone());
-        channel.created_by = Some(provenance);
-        agent.normalize()?;
-
-        channel.normalize_with(ActiveAgent::SuppliedByCaller)?;
-        self.check_spam_interlock(&channel, confirm_spam_disabled)?;
-
-        let (_, channel) = self
-            .channel_persistence
-            .create_with_agent(company_id, agent, channel)
-            .await?;
-        Ok(channel)
-    }
-
     /// This deployment's spam scanning, as the shared [`check_spam_interlock`] states it.
     fn spam_scanning(&self) -> SpamScanning {
         if self.config.is_spam_scan_enabled() {
@@ -384,17 +223,6 @@ impl ChannelUseCases {
         confirm_spam_disabled: bool,
     ) -> AppResult<()> {
         check_spam_interlock(write, self.spam_scanning(), confirm_spam_disabled)
-    }
-
-    pub async fn memory_ready(&self, user_id: Uuid, company_id: Uuid) -> AppResult<bool> {
-        self.verify_company_manager(user_id, company_id).await?;
-        let Some(persistence) = self.memory_persistence.as_ref() else {
-            return Ok(false);
-        };
-        let binding = persistence.active_binding(company_id).await?;
-        let configured = self.config.configured_memory_providers();
-        Ok(matches!(binding, ActiveMemoryBinding::Ready(connection)
-            if configured.contains(connection.provider)))
     }
 
     #[instrument(skip(self))]
@@ -513,7 +341,7 @@ impl ChannelUseCases {
         channel_id: Uuid,
         mut write: ChannelWrite,
         confirm_spam_disabled: bool,
-    ) -> AppResult<ChannelUpdateOutcome> {
+    ) -> AppResult<Channel> {
         self.verify_company_manager(user_id, company_id).await?;
 
         let channel = self
@@ -526,31 +354,7 @@ impl ChannelUseCases {
             return Err(channel_not_found());
         }
 
-        if let Some(owner_agent_id) = channel.owner_agent_id {
-            write.slug = channel.slug.to_string();
-            // An omitted list stays omitted: the kept assignments already start with the owner.
-            write.agent_ids = write.agent_ids.take().map(|requested| {
-                std::iter::once(owner_agent_id)
-                    .chain(
-                        requested
-                            .into_iter()
-                            .filter(|agent_id| *agent_id != owner_agent_id),
-                    )
-                    .collect()
-            });
-        }
-
-        let active_agent = if write.agent_ids.is_none()
-            && channel
-                .agent_ids
-                .as_ref()
-                .is_some_and(|agent_ids| !agent_ids.is_empty())
-        {
-            ActiveAgent::AlreadyAssigned
-        } else {
-            ActiveAgent::InWrite
-        };
-        write.normalize_with(active_agent)?;
+        write.normalize()?;
         self.check_spam_interlock(&write, confirm_spam_disabled)?;
 
         info!(
@@ -562,7 +366,6 @@ impl ChannelUseCases {
             .update(ChannelUpdate {
                 company_id,
                 channel_id,
-                actor_user_id: user_id,
                 write,
             })
             .await
@@ -585,11 +388,6 @@ impl ChannelUseCases {
 
         if channel.company_id != company_id {
             return Err(channel_not_found());
-        }
-        if channel.owner_agent_id.is_some() {
-            return Err(AppError::Conflict(
-                "This is an agent-owned personal channel. Delete the owning agent instead.".into(),
-            ));
         }
 
         info!("Deleting channel {} for company {}", channel_id, company_id);
@@ -693,134 +491,6 @@ pub fn validate_slug(slug: &str, kind: SlugKind) -> AppResult<()> {
     Ok(())
 }
 
-/// Split `{local}@{company}.{app_domain}` into its company and its raw local part.
-///
-/// The local part comes back lowercased but otherwise **untouched** — no pipeline split, no
-/// context-suffix stripping — because callers disagree about what it means. Channel routing expands
-/// it; [`SystemAddress::parse`] must see it whole, before context-suffix handling could
-/// eat a name like `_msg`.
-/// Why a same-company channel cannot be called by another channel's agent.
-///
-/// Every variant is a rule the internal transport enforces anyway; naming them lets the caller
-/// explain the refusal instead of returning a bare `false`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum InternalTargetRejection {
-    CrossCompany,
-    SelfCall,
-    Disabled,
-    NoAgent,
-    OutsideSubAgentScope,
-}
-
-impl InternalTargetRejection {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Self::CrossCompany => "Cross-company channel calls are not allowed",
-            Self::SelfCall => "A channel cannot call itself",
-            Self::Disabled => "Target channel is disabled",
-            Self::NoAgent => "Target channel has no configured agent",
-            Self::OutsideSubAgentScope => "Target channel is outside this agent's sub-agent scope",
-        }
-    }
-}
-
-impl std::fmt::Display for InternalTargetRejection {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.as_str())
-    }
-}
-
-/// Whether `target` may receive an internal channel call from the caller's channel.
-///
-/// One decision, one place: the outreach tool's send path and the agent directory both consult
-/// this, so the directory can never advertise a channel the send path would refuse.
-///
-/// Address-shape rules (direct address, no `+` pipeline, no context-only suffix) are *not* checked
-/// here — those belong to the address parser, and a resolved [`Channel`] no longer carries them.
-pub fn check_internal_target(
-    target: &Channel,
-    caller_company_id: Uuid,
-    caller_channel_id: Uuid,
-    sub_agent_scope: &crate::entities::harness::SubAgentScope,
-) -> Result<(), InternalTargetRejection> {
-    if target.company_id != caller_company_id {
-        return Err(InternalTargetRejection::CrossCompany);
-    }
-    if target.id == caller_channel_id {
-        return Err(InternalTargetRejection::SelfCall);
-    }
-    if !target.enabled {
-        return Err(InternalTargetRejection::Disabled);
-    }
-    let Some(first_agent_id) = target
-        .agent_ids
-        .as_ref()
-        .and_then(|agent_ids| agent_ids.first())
-        .copied()
-    else {
-        return Err(InternalTargetRejection::NoAgent);
-    };
-    // Authorization follows dispatch ordering: position zero is the responder that will run. An
-    // allowed later agent cannot lend its authority to an excluded first responder.
-    if !sub_agent_scope.allows(first_agent_id) {
-        return Err(InternalTargetRejection::OutsideSubAgentScope);
-    }
-    Ok(())
-}
-
-/// What one outreach recipient turns out to be.
-#[derive(Debug, Clone)]
-pub enum InternalTargetOutcome {
-    /// A same-company channel the caller is allowed to call.
-    Callable(Box<Channel>),
-    /// An address under the application domain that cannot be called, and why.
-    Rejected(String),
-}
-
-/// Resolve a transport-neutral business-channel intent as callable or refused.
-///
-/// Shared by the outreach send path and the approval policy so that "is this a colleague or a
-/// stranger?" is answered the same way in both. Persistence errors propagate rather than
-/// degrading into `External` — misclassifying a channel as a stranger would mail the outside
-/// world under a policy meant for internal traffic.
-pub async fn resolve_internal_target(
-    selector: &ChannelSelector,
-    caller_company_id: Uuid,
-    caller_channel_id: Uuid,
-    sub_agent_scope: &crate::entities::harness::SubAgentScope,
-    channel_persistence: &dyn ChannelPersistence,
-) -> AppResult<InternalTargetOutcome> {
-    let channel = match selector {
-        ChannelSelector::CurrentCompany(channel_slug) => channel_persistence
-            .list_by_company_id(caller_company_id)
-            .await?
-            .into_iter()
-            .find(|channel| channel.matches_slug(channel_slug)),
-        ChannelSelector::Qualified { company, channel } => {
-            channel_persistence
-                .get_by_company_slug_and_channel_slug(company, channel)
-                .await?
-        }
-    };
-    let Some(channel) = channel else {
-        return Ok(InternalTargetOutcome::Rejected(format!(
-            "Selected platform channel does not exist: {selector}"
-        )));
-    };
-
-    match check_internal_target(
-        &channel,
-        caller_company_id,
-        caller_channel_id,
-        sub_agent_scope,
-    ) {
-        Ok(()) => Ok(InternalTargetOutcome::Callable(Box::new(channel))),
-        Err(rejection) => Ok(InternalTargetOutcome::Rejected(format!(
-            "{rejection}: {selector}"
-        ))),
-    }
-}
-
 pub fn levenshtein_distance(a: &str, b: &str) -> usize {
     let a_chars: Vec<char> = a.chars().collect();
     let b_chars: Vec<char> = b.chars().collect();
@@ -872,28 +542,11 @@ pub fn find_similar_channel_slugs(target: &str, available: &[Channel]) -> Vec<Ch
 mod tests {
     use super::*;
 
-    #[test]
-    fn a_removal_summary_says_what_stopped_and_what_may_have_gone_out() {
-        assert_eq!(AssignmentRemoval::default().summary(), None);
-        let removal = AssignmentRemoval {
-            removed_agent_ids: vec![Uuid::new_v4()],
-            stopped_tasks: 3,
-            cancelled_deliveries: 1,
-            superseded_reviews: 0,
-            potentially_sent_delivery_ids: vec![Uuid::new_v4()],
-        };
-        assert_eq!(
-            removal.summary().as_deref(),
-            Some(
-                "Removed 1 agent: stopped 3 tasks, cancelled 1 queued delivery and withdrew \
-                 0 pending reviews. 1 delivery was already being sent and may have gone out."
-            )
-        );
-    }
     use crate::adapters::protocols::email::EmailChannelSelectorParser;
     use crate::entities::channel::ChannelAccessMode;
     use crate::entities::company::{Company, CompanyAccess};
     use crate::entities::company_member::CompanyMembership;
+    use crate::entities::transport::ChannelSelector;
     use crate::entities::value_objects::EmailAddress;
     use crate::use_cases::company::CompanyWrite;
     use crate::use_cases::participant::test_support::{
@@ -1015,17 +668,6 @@ mod tests {
             unimplemented!()
         }
 
-        async fn list_company_team_emails(&self, _company_id: Uuid) -> AppResult<Vec<String>> {
-            Ok(vec![])
-        }
-
-        async fn list_company_team_accounts(
-            &self,
-            _company_id: Uuid,
-        ) -> AppResult<Vec<crate::entities::company::CompanyTeamAccount>> {
-            unimplemented!("this double is not exercised on the team-account path")
-        }
-
         /// Model connections are not part of what these tests drive; a call here is a wiring mistake
         /// rather than a state worth simulating.
         async fn list_model_connections(
@@ -1100,38 +742,17 @@ mod tests {
                 .collect())
         }
 
-        async fn update(&self, request: ChannelUpdate) -> AppResult<ChannelUpdateOutcome> {
+        async fn update(&self, request: ChannelUpdate) -> AppResult<Channel> {
             let mut list = self.channels.lock().unwrap();
             let existing = list
                 .iter_mut()
                 .find(|w| w.id == request.channel_id && w.company_id == request.company_id)
                 .ok_or_else(|| AppError::Internal("Not found".into()))?;
-
-            // The double owns no tasks, so a removal withdraws nothing -- but it still reports
-            // which agents left, which is the part of the contract a caller can observe here.
-            // An omitted list keeps the assignments, as the real adapter does.
-            let mut write = request.write;
-            write.agent_ids = write.agent_ids.or_else(|| existing.agent_ids.clone());
-            let kept = write.agent_ids.clone().unwrap_or_default();
-            let removed_agent_ids = existing
-                .agent_ids
-                .clone()
-                .unwrap_or_default()
-                .into_iter()
-                .filter(|agent_id| !kept.contains(agent_id))
-                .collect();
             *existing = Channel {
-                owner_agent_id: None,
                 created_at: existing.created_at,
-                ..channel_from_write(request.channel_id, existing.company_id, write)
+                ..channel_from_write(request.channel_id, existing.company_id, request.write)
             };
-            Ok(ChannelUpdateOutcome {
-                channel: existing.clone(),
-                removal: AssignmentRemoval {
-                    removed_agent_ids,
-                    ..AssignmentRemoval::default()
-                },
-            })
+            Ok(existing.clone())
         }
 
         async fn delete(&self, id: Uuid) -> AppResult<()> {
@@ -1149,8 +770,6 @@ mod tests {
         let (access_mode, principal_grants) =
             email_allowlist_policy(company_id, participant_emails.as_deref());
         Channel {
-            response_trigger: write.response_trigger,
-            owner_agent_id: None,
             id,
             company_id,
             name: write.name,
@@ -1160,17 +779,11 @@ mod tests {
             participant_emails,
             access_mode,
             principal_grants,
-            agent_ids: write.agent_ids,
             enabled: write.enabled,
             add_3rd_party: write.add_3rd_party,
-            retrieve_company_memory: false,
-            retrieve_agent_memory: false,
-            retrieve_user_memory: false,
-            persist_company_memory: false,
-            persist_agent_memory: false,
-            persist_user_memory: false,
             created_by: write.created_by.unwrap_or_else(CreationProvenance::system),
             created_at: Utc::now(),
+            settings_revision: 0,
         }
     }
 
@@ -1179,8 +792,6 @@ mod tests {
             jwt_secret: "secret".to_string(),
             sendgrid_inbound: None,
             resend_api: crate::infra::config::ResendApiConfig::default(),
-            hydradb: None,
-            hindsight: None,
             refresh_token_ttl: time::Duration::days(30),
             app_domain_name: "mailagents.com".to_string(),
             cors_allowed_origins: vec![],
@@ -1222,7 +833,6 @@ mod tests {
             name: "Acme Corp".to_string(),
             slug: "acme".into(),
             avatar_url: None,
-            memory_provider: None,
             created_at: Utc::now(),
         };
         let company_persistence = Arc::new(MockCompanyPersistence {
@@ -1328,7 +938,6 @@ mod tests {
                 name: "Acme Corp".into(),
                 slug: "acme".into(),
                 avatar_url: None,
-                memory_provider: None,
                 created_at: Utc::now(),
             }]),
             memberships: Mutex::new(vec![
@@ -1404,8 +1013,7 @@ mod tests {
                 false,
             )
             .await
-            .expect("an admin updates a channel")
-            .channel;
+            .expect("an admin updates a channel");
         assert_eq!(channel.name, "Managed Channel");
         use_cases
             .delete_channel(admin_id, company_id, channel.id)
@@ -1426,7 +1034,6 @@ mod tests {
                 name: "Acme Corp".to_string(),
                 slug: "acme".into(),
                 avatar_url: None,
-                memory_provider: None,
                 created_at: Utc::now(),
             }]),
             memberships: Mutex::new(Vec::new()),
@@ -1449,10 +1056,6 @@ mod tests {
             "agent2@example.com".to_string(),
         ];
 
-        let agent_id1 = Uuid::new_v4();
-        let agent_id2 = Uuid::new_v4();
-        let agent_ids = vec![agent_id1, agent_id2];
-
         let channel = use_cases
             .create_channel(
                 owner_id,
@@ -1461,7 +1064,6 @@ mod tests {
                     name: "Support Flow".into(),
                     slug: "support-flow".into(),
                     participant_emails: Some(emails.clone()),
-                    agent_ids: Some(agent_ids.clone()),
                     enabled: false,
                     ..ChannelWrite::default()
                 },
@@ -1481,7 +1083,6 @@ mod tests {
                     .collect::<Vec<_>>()
             )
         );
-        assert_eq!(channel.agent_ids, Some(agent_ids));
 
         // 2. Non-owner cannot create channel
         let non_owner_id = Uuid::new_v4();
@@ -1522,38 +1123,10 @@ mod tests {
                 false,
             )
             .await
-            .unwrap()
-            .channel;
+            .unwrap();
         assert_eq!(updated.name, "Updated Flow");
         assert_eq!(updated.slug, "updated-flow");
         assert_eq!(updated.participant_emails, None);
-        assert_eq!(
-            updated.agent_ids,
-            Some(vec![agent_id1, agent_id2]),
-            "an update that leaves the agent list out keeps it"
-        );
-        let emptied = use_cases
-            .update_channel(
-                owner_id,
-                company_id,
-                channel.id,
-                ChannelWrite {
-                    name: "Updated Flow".into(),
-                    slug: "updated-flow".into(),
-                    agent_ids: Some(Vec::new()),
-                    enabled: false,
-                    ..ChannelWrite::default()
-                },
-                false,
-            )
-            .await
-            .unwrap();
-        assert_eq!(emptied.channel.agent_ids, Some(Vec::new()));
-        assert_eq!(
-            emptied.removal.removed_agent_ids,
-            vec![agent_id1, agent_id2],
-            "only an explicit empty list removes them"
-        );
 
         // 5. Delete channel
         use_cases
@@ -1716,8 +1289,6 @@ mod tests {
         let company_id = uuid::Uuid::new_v4();
         let available = vec![
             Channel {
-                response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
-                owner_agent_id: None,
                 enabled: false,
                 add_3rd_party: true,
                 id: uuid::Uuid::new_v4(),
@@ -1729,19 +1300,11 @@ mod tests {
                 participant_emails: None,
                 access_mode: ChannelAccessMode::Team,
                 principal_grants: Vec::new(),
-                agent_ids: None,
-                retrieve_company_memory: false,
-                retrieve_agent_memory: false,
-                retrieve_user_memory: false,
-                persist_company_memory: false,
-                persist_agent_memory: false,
-                persist_user_memory: false,
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: chrono::Utc::now(),
+                settings_revision: 0,
             },
             Channel {
-                response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
-                owner_agent_id: None,
                 enabled: false,
                 add_3rd_party: true,
                 id: uuid::Uuid::new_v4(),
@@ -1753,15 +1316,9 @@ mod tests {
                 participant_emails: None,
                 access_mode: ChannelAccessMode::Team,
                 principal_grants: Vec::new(),
-                agent_ids: None,
-                retrieve_company_memory: false,
-                retrieve_agent_memory: false,
-                retrieve_user_memory: false,
-                persist_company_memory: false,
-                persist_agent_memory: false,
-                persist_user_memory: false,
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: chrono::Utc::now(),
+                settings_revision: 0,
             },
         ];
 
@@ -1785,7 +1342,6 @@ mod tests {
                 name: "Acme Corp".to_string(),
                 slug: "acme".into(),
                 avatar_url: None,
-                memory_provider: None,
                 created_at: Utc::now(),
             }]),
             memberships: Mutex::new(Vec::new()),
@@ -1891,7 +1447,6 @@ mod tests {
                 name: "Acme Corp".to_string(),
                 slug: "acme".into(),
                 avatar_url: None,
-                memory_provider: None,
                 created_at: Utc::now(),
             }]),
             memberships: Mutex::new(Vec::new()),

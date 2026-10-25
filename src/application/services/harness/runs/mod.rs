@@ -1,25 +1,19 @@
-//! Durable, runtime-neutral continuation protocol. Task leases authorize worker writes;
-//! approval and ownership transactions must use their own authority after parking.
-use async_trait::async_trait;
+//! Durable, runtime-neutral continuation protocol for a workflow agent step's model calls.
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use uuid::Uuid;
 
-use super::AgentExecutionOutput;
 use crate::{
     app_error::{AppError, AppResult},
     entities::{
         harness::HarnessKind,
-        task::TaskLeaseRef,
         value_objects::{ModelName, ModelProvider, ToolId},
     },
 };
 
-mod diagnostics;
 mod usage;
 pub use usage::RunUsage;
 mod state;
-pub use diagnostics::RunDiagnostics;
 pub use state::*;
 
 pub use crate::entities::harness_run::{
@@ -125,7 +119,6 @@ pub enum TokenUsageSource {
 pub enum InvocationState {
     Prepared,
     Ready,
-    Waiting,
     Completed,
     Failed,
     Indeterminate,
@@ -141,13 +134,6 @@ pub struct SavedInvocation {
     pub result: Option<Value>,
 }
 
-pub struct OpenRun<'a> {
-    pub lease: TaskLeaseRef,
-    pub identity: &'a RunIdentity,
-    pub initial_prompt: &'a str,
-    pub policy: RigExecutionPolicy,
-}
-
 #[derive(Debug)]
 pub enum WriteOutcome<T> {
     Applied(T),
@@ -156,81 +142,12 @@ pub enum WriteOutcome<T> {
     RevisionConflict,
 }
 
-pub struct RunWrite {
-    pub company_id: Uuid,
-    pub run_id: RunId,
-    pub lease: TaskLeaseRef,
-    pub expected_revision: CheckpointRevision,
-}
-
-/// All operations are mandatory; no success-shaped fallback can drop a checkpoint.
-#[async_trait]
-pub trait HarnessRunStore: Send + Sync {
-    async fn reserve_execution(
-        &self,
-        write: &RunWrite,
-        allowance_ms: u64,
-    ) -> AppResult<WriteOutcome<RunCheckpoint>>;
-    async fn bind_tool_catalogue(
-        &self,
-        write: &RunWrite,
-        fingerprint: String,
-    ) -> AppResult<WriteOutcome<RunCheckpoint>>;
-    async fn open_run(&self, request: OpenRun<'_>) -> AppResult<WriteOutcome<RunCheckpoint>>;
-    async fn diagnostics(
-        &self,
-        company_id: Uuid,
-        task_id: Uuid,
-    ) -> AppResult<Option<RunDiagnostics>>;
-    async fn load_run(
-        &self,
-        company_id: Uuid,
-        task_id: Uuid,
-        run_id: RunId,
-    ) -> AppResult<Option<RunCheckpoint>>;
-    async fn reserve_model(
-        &self,
-        write: &RunWrite,
-        reservation: ModelReservation,
-    ) -> AppResult<WriteOutcome<RunCheckpoint>>;
-    async fn commit_model_turn(
-        &self,
-        write: &RunWrite,
-        turn: SavedModelTurn,
-    ) -> AppResult<WriteOutcome<RunCheckpoint>>;
-    async fn prepare_invocation(
-        &self,
-        write: &RunWrite,
-        invocation_id: InvocationId,
-    ) -> AppResult<WriteOutcome<RunCheckpoint>>;
-    async fn record_result(
-        &self,
-        write: &RunWrite,
-        invocation_id: InvocationId,
-        result: Value,
-    ) -> AppResult<WriteOutcome<RunCheckpoint>>;
-    async fn fail_invalid_output(&self, write: &RunWrite)
-    -> AppResult<WriteOutcome<RunCheckpoint>>;
-    async fn save_final_output(
-        &self,
-        write: &RunWrite,
-        output: AgentExecutionOutput,
-    ) -> AppResult<WriteOutcome<RunCheckpoint>>;
-}
-
 fn invalid(message: &str) -> AppError {
     AppError::BadRequest(message.into())
 }
 
 #[cfg(test)]
 mod tests;
-
-#[derive(Clone)]
-pub struct RunExecution {
-    pub company_id: Uuid,
-    pub lease: TaskLeaseRef,
-    pub store: std::sync::Arc<dyn HarnessRunStore>,
-}
 
 /// Provider replay data uses our own versioned vocabulary, preserving the original item order.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

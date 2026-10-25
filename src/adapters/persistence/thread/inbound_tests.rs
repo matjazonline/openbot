@@ -6,12 +6,13 @@
 
 use super::test_support::*;
 use super::*;
+use crate::adapters::persistence::channel_edit::{
+    EditBudget, update_channel_on, update_channel_within,
+};
 use crate::entities::{
     correlation::CorrelationId,
     email_message::EmailMessageMetadata,
-    outreach::OutreachReplyMatch,
     participant::{IdentityClaimMetadata, IdentityProvenance, ThreadPrincipalRole},
-    task::NewTask,
     transport::{
         ChannelBindingId, ExternalEventKey, ExternalMessageKey, ExternalThreadKey,
         IdentityNamespace, IdentitySubject, InboundEventId, InboundSource, QualifiedIdentity,
@@ -19,23 +20,31 @@ use crate::entities::{
     },
     value_objects::MessageId,
 };
-use crate::task_queue::TaskPersistence;
 use crate::transport::{
     AddressedIdentity, AuthenticatedInboundEvent, BoundedVec, CanonicalContent,
-    ClaimedInboundEvent, CommitDisposition, ExternalCorrelationStore, InboundCommitOutcome,
-    InboundCommitRequest, InboundEnvelope, InboundEventInbox, InboundEventPayload,
-    InboundEventQueue, InboundHold, InboundMessageCommitter, InboundOutreachTransition,
-    InboundTaskRequest, InboundTaskTarget, IngressDirectives, IngressPolicyFacts, PipelineStep,
-    ProtocolExtension, RecipientRole, ReplyDelivery, SafeHeaderFacts, ThreadAssociation,
-    ThreadPrincipalIntent, ThreadTarget, WorkerId,
+    ClaimedInboundEvent, CommitDisposition, ExternalCorrelationStore, InboundAdmissionIntent,
+    InboundCommitOutcome, InboundCommitRequest, InboundEnvelope, InboundEventInbox,
+    InboundEventPayload, InboundEventQueue, InboundMessageCommitter, InboundOrigin,
+    IngressDirectives, IngressPolicyFacts, PipelineStep, ProtocolExtension, RecipientRole,
+    ReplyDelivery, SafeHeaderFacts, ThreadAssociation, ThreadPrincipalIntent, ThreadTarget,
+    WorkerId,
 };
+use crate::use_cases::channel::{ChannelPersistence, ChannelUpdate, ChannelWrite};
 use crate::use_cases::participant::{IdentityDirectory, IdentityObservation};
-
-/// The one task type inbound mail produces.
-const AGENT_DISPATCH: &str = "email_agent_dispatch";
 
 #[path = "inbound_multi_task_tests.rs"]
 mod multi_task_tests;
+
+/// An answering intent for one channel, with no mention or parent.
+fn intent(channel_id: Uuid, role: RecipientRole) -> InboundAdmissionIntent {
+    InboundAdmissionIntent {
+        channel_id,
+        role,
+        mentioned: false,
+        reply_to: None,
+        settings_revision: 0,
+    }
+}
 
 fn identity(address: &str) -> QualifiedIdentity {
     QualifiedIdentity::new(
@@ -119,19 +128,13 @@ async fn request(fixture: &Fixture, rfc: &str, body: &str) -> InboundCommitReque
             }],
         )
         .unwrap(),
-        tasks: BoundedVec::parse(
-            "inbound tasks",
-            vec![InboundTaskRequest {
-                task_type: AGENT_DISPATCH.to_string(),
-                targets: vec![InboundTaskTarget {
-                    channel_id: fixture.channel_id,
-                    role: RecipientRole::To,
-                }],
-            }],
+        intents: BoundedVec::parse(
+            "admission intents",
+            vec![intent(fixture.channel_id, RecipientRole::To)],
         )
         .unwrap(),
-        holds: BoundedVec::empty(),
-        outreach_transitions: BoundedVec::empty(),
+        admissible: true,
+        origin: InboundOrigin::External,
         deliveries: Vec::new(),
         reply_delivery: ReplyDelivery::Send,
     }
@@ -163,15 +166,9 @@ async fn request_on(
         }],
     )
     .unwrap();
-    request.tasks = BoundedVec::parse(
-        "inbound tasks",
-        vec![InboundTaskRequest {
-            task_type: AGENT_DISPATCH.to_string(),
-            targets: vec![InboundTaskTarget {
-                channel_id,
-                role: RecipientRole::To,
-            }],
-        }],
+    request.intents = BoundedVec::parse(
+        "admission intents",
+        vec![intent(channel_id, RecipientRole::To)],
     )
     .unwrap();
     request
@@ -275,69 +272,18 @@ async fn message_count(fixture: &Fixture) -> i64 {
     .await
 }
 
-async fn task_count(fixture: &Fixture) -> i64 {
+async fn intent_count(fixture: &Fixture) -> i64 {
     count(
         fixture,
-        "SELECT count(*) FROM background_tasks WHERE company_id = $1",
+        "SELECT count(*) FROM workflow_message_intents WHERE company_id = $1",
     )
     .await
 }
 
-async fn durable_counts(fixture: &Fixture) -> [i64; 11] {
-    [
-        count(
-            fixture,
-            "SELECT count(*) FROM principals WHERE company_id = $1",
-        )
-        .await,
-        count(
-            fixture,
-            "SELECT count(*) FROM participant_identities WHERE company_id = $1",
-        )
-        .await,
-        count(
-            fixture,
-            "SELECT count(*) FROM threads WHERE company_id = $1",
-        )
-        .await,
-        count(
-            fixture,
-            "SELECT count(*) FROM thread_principals WHERE company_id = $1",
-        )
-        .await,
-        message_count(fixture).await,
-        count(
-            fixture,
-            "SELECT count(*) FROM message_participants WHERE company_id = $1",
-        )
-        .await,
-        count(
-            fixture,
-            "SELECT count(*) FROM thread_messages WHERE company_id = $1",
-        )
-        .await,
-        count(
-            fixture,
-            "SELECT count(*) FROM external_threads WHERE company_id = $1",
-        )
-        .await,
-        count(
-            fixture,
-            "SELECT count(*) FROM external_messages WHERE company_id = $1",
-        )
-        .await,
-        task_count(fixture).await,
-        count(
-            fixture,
-            "SELECT count(*) FROM message_deliveries WHERE company_id = $1",
-        )
-        .await,
-    ]
-}
-
-/// The whole point of the commit: the message, its mapping and its task exist together.
+/// The whole point of the commit: the message, its mapping and its admission intent exist
+/// together (p08 D1.3).
 #[tokio::test]
-async fn an_accepted_message_lands_with_its_mapping_thread_and_task_at_once() {
+async fn an_accepted_message_lands_with_its_mapping_thread_and_intent_at_once() {
     let Some(fixture) = Fixture::new("inbound_commit").await else {
         return;
     };
@@ -351,10 +297,10 @@ async fn an_accepted_message_lands_with_its_mapping_thread_and_task_at_once() {
 
     assert_eq!(outcome.disposition, CommitDisposition::Created);
     assert_eq!(outcome.thread_ids.len(), 1);
-    assert_eq!(outcome.task_ids.len(), 1);
-    let task_id = outcome.task_ids[0];
+    assert_eq!(outcome.intent_ids.len(), 1);
+    let intent_id = outcome.intent_ids[0];
 
-    // No accepted message needs a post-commit mapping or task insert: every row is already there.
+    // No accepted message needs a post-commit mapping or intent insert: every row is already there.
     assert_eq!(message_count(&fixture).await, 1);
     assert_eq!(
         count(
@@ -372,19 +318,60 @@ async fn an_accepted_message_lands_with_its_mapping_thread_and_task_at_once() {
         .await,
         1
     );
-    assert_eq!(task_count(&fixture).await, 1);
+    assert_eq!(intent_count(&fixture).await, 1);
 
-    // The task carries identifiers only, and names the message it answers.
-    let (source, payload): (Option<Uuid>, serde_json::Value) =
-        sqlx::query_as("SELECT source_message_uuid, payload FROM background_tasks WHERE id = $1")
-            .bind(task_id)
-            .fetch_one(&fixture.pool)
-            .await
-            .unwrap();
-    assert_eq!(source, Some(outcome.message_id.as_uuid()));
-    assert_eq!(payload["version"], "1");
-    assert_eq!(payload["source_message_id"], outcome.message_id.to_string());
-    assert!(payload.get("parsed_email").is_none());
+    // The intent carries identifiers and ingress facts only: the message, its association, the
+    // stored author as responder, the relay trace, and no legacy task anywhere.
+    let row: (
+        Uuid,
+        Uuid,
+        Uuid,
+        String,
+        bool,
+        bool,
+        String,
+        i32,
+        String,
+        String,
+        bool,
+    ) = sqlx::query_as(
+        "SELECT intent.message_id, intent.channel_id, intent.thread_id, intent.role, \
+               intent.mentioned, intent.admissible, intent.origin, intent.hop_count, \
+               intent.delivery_policy, intent.state, \
+               intent.responder_principal_id = message.author_principal_id \
+             FROM workflow_message_intents AS intent JOIN messages AS message \
+               ON message.company_id = intent.company_id AND message.id = intent.message_id \
+             WHERE intent.company_id = $1 AND intent.id = $2",
+    )
+    .bind(fixture.company_id)
+    .bind(intent_id)
+    .fetch_one(&fixture.pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        row,
+        (
+            outcome.message_id.as_uuid(),
+            fixture.channel_id,
+            outcome.thread_ids[0],
+            "to".to_string(),
+            false,
+            true,
+            "external".to_string(),
+            0,
+            "deliver".to_string(),
+            "pending".to_string(),
+            true
+        )
+    );
+    assert_eq!(
+        count(
+            &fixture,
+            "SELECT count(*) FROM background_tasks WHERE company_id = $1"
+        )
+        .await,
+        0
+    );
 
     // And the message is reachable through the thread it landed in.
     let stored = fixture
@@ -421,9 +408,9 @@ async fn a_redelivery_returns_the_first_delivery_and_enqueues_nothing_further() 
     assert_eq!(first.disposition, CommitDisposition::Created);
     assert_eq!(second.disposition, CommitDisposition::Duplicate);
     assert_eq!(second.message_id, first.message_id);
-    assert_eq!(second.task_ids, first.task_ids);
+    assert_eq!(second.intent_ids, first.intent_ids);
     assert_eq!(message_count(&fixture).await, 1);
-    assert_eq!(task_count(&fixture).await, 1);
+    assert_eq!(intent_count(&fixture).await, 1);
     // Two commits, but the second joined the thread the first opened rather than a second one.
     assert_eq!(
         count(
@@ -481,7 +468,7 @@ async fn two_concurrent_deliveries_of_one_message_produce_one_of_everything() {
     };
     let rfc = format!("<concurrent-{}@example.com>", fixture.suffix);
 
-    let first = multi_task_tests::two_pipeline_request(&fixture, &rfc).await;
+    let first = multi_task_tests::two_channel_request(&fixture, &rfc).await;
     let second = first.clone();
     let one = PostgresPersistence::new(fixture.pool.clone());
     let two = PostgresPersistence::new(fixture.pool.clone());
@@ -489,7 +476,7 @@ async fn two_concurrent_deliveries_of_one_message_produce_one_of_everything() {
 
     let outcomes: Vec<InboundCommitOutcome> = vec![left.unwrap(), right.unwrap()];
     assert_eq!(outcomes[0].message_id, outcomes[1].message_id);
-    assert_eq!(outcomes[0].task_ids, outcomes[1].task_ids);
+    assert_eq!(outcomes[0].intent_ids, outcomes[1].intent_ids);
     assert_eq!(
         outcomes
             .iter()
@@ -499,8 +486,8 @@ async fn two_concurrent_deliveries_of_one_message_produce_one_of_everything() {
         "exactly one of the two deliveries stored the message"
     );
     assert_eq!(message_count(&fixture).await, 1);
-    assert_eq!(task_count(&fixture).await, 2);
-    assert_eq!(outcomes[0].task_ids.len(), 2);
+    assert_eq!(intent_count(&fixture).await, 2);
+    assert_eq!(outcomes[0].intent_ids.len(), 2);
     assert_eq!(
         count(
             &fixture,
@@ -509,6 +496,129 @@ async fn two_concurrent_deliveries_of_one_message_produce_one_of_everything() {
         .await,
         2
     );
+
+    fixture.cleanup().await;
+}
+
+/// A settings edit that switches the fixture's channel off and leaves its address alone.
+async fn disable(fixture: &Fixture) -> ChannelUpdate {
+    let channel = ChannelPersistence::get_by_id(&fixture.persistence, fixture.channel_id)
+        .await
+        .unwrap()
+        .unwrap();
+    ChannelUpdate {
+        company_id: fixture.company_id,
+        channel_id: fixture.channel_id,
+        write: ChannelWrite {
+            name: channel.name,
+            slug: channel.slug.into_string(),
+            enabled: false,
+            ..ChannelWrite::default()
+        },
+    }
+}
+
+/// Switch the fixture channel on behind the edit path's back, so the revision stays where routing
+/// read it.
+async fn switch_on(fixture: &Fixture) {
+    sqlx::query("UPDATE channels SET enabled = true WHERE id = $1")
+        .bind(fixture.channel_id)
+        .execute(&fixture.pool)
+        .await
+        .unwrap();
+}
+
+/// The fixture channel's `(enabled, settings_revision)`.
+async fn channel_settings(fixture: &Fixture) -> (bool, i64) {
+    sqlx::query_as("SELECT enabled, settings_revision FROM channels WHERE id = $1")
+        .bind(fixture.channel_id)
+        .fetch_one(&fixture.pool)
+        .await
+        .unwrap()
+}
+
+/// The competing claimant, edit first: a commit that reaches the gate while a settings edit holds
+/// it waits for the edit, then refuses -- it was routed against settings that no longer exist --
+/// and stores nothing, so its transport's retry routes it against the new ones (p08 D4.8).
+#[tokio::test]
+async fn a_commit_queued_behind_a_settings_edit_is_refused_with_nothing_stored() {
+    let Some(fixture) = Fixture::new("inbound_gate_edit_first").await else {
+        return;
+    };
+    switch_on(&fixture).await;
+    let rfc = format!("<gate-edit-first-{}@example.com>", fixture.suffix);
+    let routed = request(&fixture, &rfc, "Still open?").await;
+    let mut edit = fixture.pool.begin().await.unwrap();
+    update_channel_on(&mut edit, &disable(&fixture).await, EditBudget::DEFAULT)
+        .await
+        .unwrap();
+
+    let commit = tokio::spawn({
+        let persistence = PostgresPersistence::new(fixture.pool.clone());
+        async move { persistence.commit_inbound(routed).await }
+    });
+    tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+    assert!(!commit.is_finished(), "the commit must wait for the edit");
+
+    edit.commit().await.unwrap();
+    let refused = commit.await.unwrap();
+    assert!(
+        matches!(&refused, Err(AppError::Superseded(_))),
+        "{refused:?}"
+    );
+    assert_eq!(message_count(&fixture).await, 0);
+    assert_eq!(intent_count(&fixture).await, 0);
+    assert_eq!(channel_settings(&fixture).await, (false, 1));
+
+    fixture.cleanup().await;
+}
+
+/// The competing claimant, commit first: an edit that reaches the gate while an inbound commit
+/// holds it waits for that commit, so the message lands under the settings it was routed against
+/// and the edit applies after it -- never in between (p08 D4.8).
+///
+/// The commit is paused right after its settings check, before it has written or locked a row:
+/// the window where only the gate keeps the edit out. Later, its foreign keys would hold the
+/// channel row too.
+#[tokio::test]
+async fn a_settings_edit_queued_behind_a_commit_applies_after_it() {
+    let Some(fixture) = Fixture::new("inbound_gate_commit_first").await else {
+        return;
+    };
+    switch_on(&fixture).await;
+    let rfc = format!("<gate-commit-first-{}@example.com>", fixture.suffix);
+    let routed = request(&fixture, &rfc, "Anyone there?").await;
+    let mut admission = fixture.pool.begin().await.unwrap();
+    super::inbound::hold_channel_settings(&mut admission, &routed)
+        .await
+        .unwrap();
+
+    let edit = tokio::spawn({
+        let pool = fixture.pool.clone();
+        let update = disable(&fixture).await;
+        // Patient enough to outlast the commit on a loaded run: the wait is the point here, and
+        // the edit's own refusal on a lock timeout is covered in `channel_edit_tests`.
+        let patient = EditBudget {
+            lock_timeout: std::time::Duration::from_secs(30),
+            ..EditBudget::DEFAULT
+        };
+        async move { update_channel_within(&pool, update, patient).await }
+    });
+    tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+    assert!(!edit.is_finished(), "the edit must wait for the commit");
+    assert_eq!(channel_settings(&fixture).await, (true, 0));
+
+    // The rest of the commit, under the gate it already holds.
+    super::inbound::commit_on(&mut admission, &routed)
+        .await
+        .unwrap();
+    admission.commit().await.unwrap();
+    edit.await
+        .unwrap()
+        .expect("the edit applies once the commit is done");
+    assert_eq!(message_count(&fixture).await, 1);
+    assert_eq!(intent_count(&fixture).await, 1);
+    assert_eq!(channel_settings(&fixture).await, (false, 1));
 
     fixture.cleanup().await;
 }
@@ -552,7 +662,7 @@ async fn concurrent_different_messages_sharing_a_new_thread_key_open_one_thread(
     assert_eq!(left.thread_ids, right.thread_ids);
     assert_ne!(left.message_id, right.message_id);
     assert_eq!(message_count(&fixture).await, 2);
-    assert_eq!(task_count(&fixture).await, 2);
+    assert_eq!(intent_count(&fixture).await, 2);
     assert_eq!(
         count(
             &fixture,
@@ -707,7 +817,7 @@ async fn inconsistent_multi_binding_message_mappings_are_a_typed_collision() {
         .expect_err("two canonical mappings cannot be one redelivery");
     assert!(error.to_string().contains("different content"), "{error}");
     assert_eq!(message_count(&fixture).await, 2);
-    assert_eq!(task_count(&fixture).await, 2);
+    assert_eq!(intent_count(&fixture).await, 2);
 
     fixture.cleanup().await;
 }
@@ -896,32 +1006,24 @@ async fn authored_identity_cannot_belong_to_a_different_author_principal() {
 /// A commit that cannot finish leaves nothing behind -- including the thread it had already
 /// created, which is the row the pre-canonical path committed separately and stranded.
 #[tokio::test]
-async fn a_commit_that_fails_at_the_task_leaves_no_thread_message_or_mapping() {
+async fn a_commit_that_fails_at_the_intent_leaves_no_thread_message_or_mapping() {
     let Some(fixture) = Fixture::new("inbound_rollback").await else {
         return;
     };
     let rfc = format!("<rollback-{}@example.com>", fixture.suffix);
 
     let mut request = request(&fixture, &rfc, "Anyone there?").await;
-    // A task naming a channel this commit has no association for: refused at the last statement
-    // group, after the thread, the message and both mappings have been written.
-    request.tasks = BoundedVec::parse(
-        "inbound tasks",
-        vec![InboundTaskRequest {
-            task_type: AGENT_DISPATCH.to_string(),
-            targets: vec![InboundTaskTarget {
-                channel_id: Uuid::new_v4(),
-                role: RecipientRole::To,
-            }],
-        }],
-    )
-    .unwrap();
+    // An intent naming a channel this commit has no association for: refused after the thread,
+    // the message and both mappings have been written.
+    let mut intents = request.intents.into_inner();
+    intents.push(intent(Uuid::new_v4(), RecipientRole::To));
+    request.intents = BoundedVec::parse("admission intents", intents).unwrap();
 
     let refused = fixture.persistence.commit_inbound(request).await;
-    assert!(refused.is_err(), "a task with no association is refused");
+    assert!(refused.is_err(), "an intent with no association is refused");
 
     assert_eq!(message_count(&fixture).await, 0);
-    assert_eq!(task_count(&fixture).await, 0);
+    assert_eq!(intent_count(&fixture).await, 0);
     assert_eq!(
         count(
             &fixture,
@@ -947,186 +1049,6 @@ async fn a_commit_that_fails_at_the_task_leaves_no_thread_message_or_mapping() {
         .await,
         1
     );
-
-    fixture.cleanup().await;
-}
-
-/// Outreach association is not follow-up work: if it cannot be recorded, every message-side row
-/// written before it rolls back, and the unchanged request succeeds once the bad transition is
-/// removed.
-#[tokio::test]
-async fn an_outreach_transition_failure_rolls_back_every_inbound_row_and_retry_succeeds() {
-    let Some(fixture) = Fixture::new("inbound_outreach_rollback").await else {
-        return;
-    };
-    let key = format!("<outreach-rollback-{}@example.com>", fixture.suffix);
-    let before = durable_counts(&fixture).await;
-    let mut request = request(&fixture, &key, "Reply").await;
-    request.outreach_transitions = BoundedVec::parse(
-        "outreach transitions",
-        vec![InboundOutreachTransition {
-            channel_id: fixture.channel_id,
-            matched: OutreachReplyMatch {
-                outreach_id: Uuid::new_v4(),
-                task_id: Uuid::new_v4(),
-                target_id: Uuid::new_v4(),
-                target_email: "vendor@example.com".into(),
-            },
-        }],
-    )
-    .unwrap();
-    let mut retry = request.clone();
-    retry.outreach_transitions = BoundedVec::empty();
-
-    assert!(fixture.persistence.commit_inbound(request).await.is_err());
-    assert_eq!(durable_counts(&fixture).await, before);
-
-    let outcome = fixture.persistence.commit_inbound(retry).await.unwrap();
-    assert_eq!(outcome.disposition, CommitDisposition::Created);
-    assert_eq!(message_count(&fixture).await, before[4] + 1);
-
-    fixture.cleanup().await;
-}
-
-/// A response association and the waiting-task transition become visible in the same commit as
-/// the inbound message. There is no post-commit window in which one exists without the other.
-#[tokio::test]
-async fn an_outreach_reply_association_and_task_wakeup_commit_with_the_message() {
-    let Some(fixture) = Fixture::new("inbound_outreach_atomic").await else {
-        return;
-    };
-    let task = fixture
-        .persistence
-        .enqueue_task(NewTask::starting_new_chain(
-            fixture.company_id,
-            fixture.channel_id,
-            Some(fixture.thread.id),
-            "outreach-test",
-            serde_json::json!({}),
-        ))
-        .await
-        .unwrap();
-    sqlx::query(
-        r#"UPDATE background_tasks
-           SET status = 'waiting_for_third_party_reply',
-               wait_expires_at = CURRENT_TIMESTAMP + interval '1 day'
-           WHERE id = $1"#,
-    )
-    .bind(task.id)
-    .execute(&fixture.pool)
-    .await
-    .unwrap();
-    let outreach_id = Uuid::new_v4();
-    sqlx::query(
-        r#"INSERT INTO task_outreaches (
-                id, company_id, task_id, status, required_threshold_percent, expires_at,
-                outreach_key, subject, body
-           ) VALUES ($1, $2, $3, 'waiting', 100, CURRENT_TIMESTAMP + interval '1 day',
-                     'atomic-reply', 'Question', 'Please reply')"#,
-    )
-    .bind(outreach_id)
-    .bind(fixture.company_id)
-    .bind(task.id)
-    .execute(&fixture.pool)
-    .await
-    .unwrap();
-    sqlx::query("UPDATE background_tasks SET awaited_outreach_id = $2 WHERE id = $1")
-        .bind(task.id)
-        .bind(outreach_id)
-        .execute(&fixture.pool)
-        .await
-        .unwrap();
-    sqlx::query(
-        r#"INSERT INTO task_outreach_targets (
-               outreach_id, company_id, email, target_kind,
-               external_transport, external_namespace, external_subject
-           ) VALUES ($1, $2, $3, 'external', 'email', 'email', $3)"#,
-    )
-    .bind(outreach_id)
-    .bind(fixture.company_id)
-    .bind("vendor@example.com")
-    .execute(&fixture.pool)
-    .await
-    .unwrap();
-    let target_id: Uuid =
-        sqlx::query_scalar("SELECT id FROM task_outreach_targets WHERE outreach_id = $1")
-            .bind(outreach_id)
-            .fetch_one(&fixture.pool)
-            .await
-            .unwrap();
-
-    let key = format!("<outreach-response-{}@example.com>", fixture.suffix);
-    let binding = fixture.email_binding_of(fixture.channel_id).await;
-    let mut request = request_on(
-        &fixture,
-        fixture.channel_id,
-        binding,
-        &key,
-        &key,
-        "The answer",
-    )
-    .await;
-    request.associations = BoundedVec::parse(
-        "thread associations",
-        vec![ThreadAssociation {
-            channel_id: fixture.channel_id,
-            binding_id: binding,
-            target: ThreadTarget::Existing(fixture.thread.id),
-            role: RecipientRole::To,
-            step: PipelineStep::only(),
-            principals: sender_principals(),
-        }],
-    )
-    .unwrap();
-    request.tasks = BoundedVec::empty();
-    request.outreach_transitions = BoundedVec::parse(
-        "outreach transitions",
-        vec![InboundOutreachTransition {
-            channel_id: fixture.channel_id,
-            matched: OutreachReplyMatch {
-                outreach_id,
-                task_id: task.id,
-                target_id,
-                target_email: "vendor@example.com".into(),
-            },
-        }],
-    )
-    .unwrap();
-
-    let outcome = fixture.persistence.commit_inbound(request).await.unwrap();
-    let association_id: Uuid = sqlx::query_scalar(
-        r#"SELECT id FROM thread_messages
-           WHERE company_id = $1 AND channel_id = $2 AND message_id = $3"#,
-    )
-    .bind(fixture.company_id)
-    .bind(fixture.channel_id)
-    .bind(outcome.message_id.as_uuid())
-    .fetch_one(&fixture.pool)
-    .await
-    .unwrap();
-    let (responded, response_id): (bool, Option<Uuid>) = sqlx::query_as(
-        r#"SELECT responded_at IS NOT NULL, response_association_id
-           FROM task_outreach_targets WHERE outreach_id = $1 AND email = $2"#,
-    )
-    .bind(outreach_id)
-    .bind("vendor@example.com")
-    .fetch_one(&fixture.pool)
-    .await
-    .unwrap();
-    assert!(responded);
-    assert_eq!(response_id, Some(association_id));
-    let (outreach_status, task_status): (String, String) = sqlx::query_as(
-        r#"SELECT outreach.status, task.status
-           FROM task_outreaches AS outreach
-           JOIN background_tasks AS task ON task.id = outreach.task_id
-           WHERE outreach.id = $1"#,
-    )
-    .bind(outreach_id)
-    .fetch_one(&fixture.pool)
-    .await
-    .unwrap();
-    assert_eq!(outreach_status, "threshold_met");
-    assert_eq!(task_status, "pending");
 
     fixture.cleanup().await;
 }
@@ -1159,7 +1081,7 @@ async fn a_commit_that_fails_at_the_threads_writes_nothing_either() {
     assert!(fixture.persistence.commit_inbound(request).await.is_err());
 
     assert_eq!(message_count(&fixture).await, 0);
-    assert_eq!(task_count(&fixture).await, 0);
+    assert_eq!(intent_count(&fixture).await, 0);
     assert_eq!(
         count(
             &fixture,
@@ -1371,7 +1293,7 @@ async fn a_crash_at_any_inbox_phase_recovers_without_a_duplicate_canonical_messa
     assert!(fixture.persistence.commit_inbound(request).await.is_ok());
     assert_eq!(event_status(&fixture, stored).await, "completed");
     assert_eq!(message_count(&fixture).await, 1);
-    assert_eq!(task_count(&fixture).await, 1);
+    assert_eq!(intent_count(&fixture).await, 1);
 
     // A crash after the commit cannot be recovered *into* a second message. The completed row is
     // outside every claimable and reapable predicate, and a provider redelivery of the same key
@@ -1425,532 +1347,6 @@ async fn lease_loss_at_final_commit_rolls_back_every_canonical_effect() {
     // The row keeps the lapsed lease rather than settling itself: the reaper owns that decision,
     // and it is the only place an attempt is charged for a lease nobody renewed.
     assert_eq!(event_status(&fixture, stored).await, "processing");
-
-    fixture.cleanup().await;
-}
-
-// ---------------------------------------------------------------------------------------------
-// The hold gate: an eligible outside reply is filed as the customer message it is, and opens a
-// `thread_handoffs` generation, with no `background_tasks` row for that channel.
-//
-// Every assertion below is scoped to the fixture's own company. The suite shares one database and
-// runs in parallel, so a whole-table count would be a coin toss.
-// ---------------------------------------------------------------------------------------------
-
-/// A commit that holds the fixture's channel instead of running its agent.
-async fn held_request(fixture: &Fixture, rfc: &str, body: &str) -> InboundCommitRequest {
-    let mut request = request(fixture, rfc, body).await;
-    hold_the_only_channel(&mut request, fixture.channel_id);
-    request
-}
-
-/// Drop the task and state the hold, exactly as `CommitPlan::build` would for a held channel.
-fn hold_the_only_channel(request: &mut InboundCommitRequest, channel_id: Uuid) {
-    request.tasks = BoundedVec::empty();
-    request.holds = BoundedVec::parse(
-        "thread handoffs",
-        vec![InboundHold {
-            channel_id,
-            handoff_id: Uuid::new_v4(),
-            generation: Uuid::new_v4(),
-        }],
-    )
-    .unwrap();
-}
-
-/// The one handoff of the fixture's company, by the key that makes it unique.
-async fn handoff_row(
-    fixture: &Fixture,
-) -> (Uuid, Uuid, String, i64, Option<Uuid>, String, bool, Uuid) {
-    sqlx::query_as(
-        r#"SELECT id, generation, state, version, responsible_principal_id, business_priority,
-                  (closed_at IS NOT NULL), source_message_id
-           FROM thread_handoffs WHERE company_id = $1"#,
-    )
-    .bind(fixture.company_id)
-    .fetch_one(&fixture.pool)
-    .await
-    .unwrap()
-}
-
-async fn handoff_count(fixture: &Fixture) -> i64 {
-    count(
-        fixture,
-        "SELECT count(*) FROM thread_handoffs WHERE company_id = $1",
-    )
-    .await
-}
-
-/// Every event of this company's handoffs, oldest first, as the fields the opening write sets.
-async fn handoff_events(
-    fixture: &Fixture,
-) -> Vec<(String, String, Option<Uuid>, i64, i64, Uuid, Uuid)> {
-    sqlx::query_as(
-        r#"SELECT operation, actor_kind, actor_principal_id, from_version, to_version,
-                  command_id, generation
-           FROM thread_handoff_events WHERE company_id = $1
-           ORDER BY to_version, occurred_at"#,
-    )
-    .bind(fixture.company_id)
-    .fetch_all(&fixture.pool)
-    .await
-    .unwrap()
-}
-
-/// Case 8 and 9: the first generation, and no run for it.
-#[tokio::test]
-async fn a_held_reply_opens_one_generation_and_creates_no_task() {
-    let Some(fixture) = Fixture::new("inbound_hold_first").await else {
-        return;
-    };
-    let rfc = format!("<hold-first-{}@example.com>", fixture.suffix);
-    let request = held_request(&fixture, &rfc, "Any news on the invoice?").await;
-
-    let outcome = fixture.persistence.commit_inbound(request).await.unwrap();
-
-    assert_eq!(outcome.disposition, CommitDisposition::Created);
-    assert!(outcome.task_ids.is_empty(), "a held reply runs no agent");
-    assert_eq!(outcome.handoff_ids.len(), 1);
-    assert_eq!(task_count(&fixture).await, 0);
-    assert_eq!(message_count(&fixture).await, 1);
-    // Everything else about a held message is exactly what an unheld one produces: its thread
-    // association, and the provider mapping a redelivery is recognised by.
-    assert_eq!(
-        count(
-            &fixture,
-            "SELECT count(*) FROM thread_messages WHERE company_id = $1"
-        )
-        .await,
-        1
-    );
-    assert_eq!(
-        count(
-            &fixture,
-            "SELECT count(*) FROM external_messages WHERE company_id = $1"
-        )
-        .await,
-        1
-    );
-
-    let (id, _, state, version, responsible, priority, closed, source) =
-        handoff_row(&fixture).await;
-    assert_eq!(id, outcome.handoff_ids[0]);
-    assert_eq!(state, "needs_instruction");
-    assert_eq!(version, 1);
-    assert_eq!(responsible, None, "a fresh handoff is the channel team's");
-    assert_eq!(priority, "normal");
-    assert!(!closed);
-    assert_eq!(source, outcome.message_id.as_uuid());
-
-    let events = handoff_events(&fixture).await;
-    assert_eq!(events.len(), 1);
-    let (operation, actor_kind, actor, from_version, to_version, command_id, _) = &events[0];
-    assert_eq!(operation, "opened");
-    assert_eq!(actor_kind, "system");
-    assert_eq!(*actor, None, "an arriving message is not a person acting");
-    assert_eq!((*from_version, *to_version), (0, 1));
-    assert_eq!(
-        *command_id,
-        outcome.message_id.as_uuid(),
-        "the canonical message id is what makes the opening write idempotent"
-    );
-
-    // The held copy is an ordinary customer message: same audience, same entry kind.
-    let (audience, entry_kind): (String, String) = sqlx::query_as(
-        r#"SELECT message.audience, association.entry_kind
-           FROM messages AS message
-           JOIN thread_messages AS association ON association.message_id = message.id
-           WHERE message.company_id = $1"#,
-    )
-    .bind(fixture.company_id)
-    .fetch_one(&fixture.pool)
-    .await
-    .unwrap();
-    assert_eq!(audience, "external_conversation");
-    assert_eq!(entry_kind, "conversation");
-
-    fixture.cleanup().await;
-}
-
-/// Case 10: a second reply replaces the generation rather than opening a second handoff.
-#[tokio::test]
-async fn a_second_held_reply_replaces_the_generation_in_place() {
-    let Some(fixture) = Fixture::new("inbound_hold_second").await else {
-        return;
-    };
-    let first_rfc = format!("<hold-a-{}@example.com>", fixture.suffix);
-    let first = fixture
-        .persistence
-        .commit_inbound(held_request(&fixture, &first_rfc, "First").await)
-        .await
-        .unwrap();
-    let (_, first_generation, _, _, _, _, _, _) = handoff_row(&fixture).await;
-
-    let second_rfc = format!("<hold-b-{}@example.com>", fixture.suffix);
-    let mut second = held_request(&fixture, &second_rfc, "Second").await;
-    second.envelope.source.thread_key = ExternalThreadKey::parse(&first_rfc).unwrap();
-    let second = fixture.persistence.commit_inbound(second).await.unwrap();
-
-    assert_eq!(handoff_count(&fixture).await, 1, "one handoff per thread");
-    assert_eq!(
-        second.handoff_ids, first.handoff_ids,
-        "the same row moved on"
-    );
-    let (_, generation, state, version, _, _, closed, source) = handoff_row(&fixture).await;
-    assert_ne!(generation, first_generation);
-    assert_eq!(state, "needs_instruction");
-    assert_eq!(version, 2);
-    assert!(!closed);
-    assert_eq!(source, second.message_id.as_uuid());
-
-    let events = handoff_events(&fixture).await;
-    assert_eq!(events.len(), 2);
-    assert_eq!(events[1].0, "regenerated");
-    assert_eq!((events[1].3, events[1].4), (1, 2));
-    assert_eq!(events[1].6, generation);
-
-    fixture.cleanup().await;
-}
-
-/// Case 11: responsibility and attributes are about who is looking after this conversation. A new
-/// customer message is not a reason to un-assign it.
-#[tokio::test]
-async fn a_replacement_keeps_the_responsibility_and_the_attributes() {
-    let Some(fixture) = Fixture::new("inbound_hold_keep").await else {
-        return;
-    };
-    let first_rfc = format!("<hold-keep-a-{}@example.com>", fixture.suffix);
-    fixture
-        .persistence
-        .commit_inbound(held_request(&fixture, &first_rfc, "First").await)
-        .await
-        .unwrap();
-
-    let claimant = fixture
-        .persistence
-        .resolve_or_create_external_identity(
-            fixture.company_id,
-            IdentityObservation {
-                identity: identity("bo@acme.example"),
-                display_label: None,
-                claim_metadata: IdentityClaimMetadata::observation(),
-                provenance: IdentityProvenance::TransportIngress,
-            },
-        )
-        .await
-        .unwrap()
-        .principal
-        .id;
-    let due = chrono::Utc::now() + chrono::Duration::hours(4);
-    sqlx::query(
-        r#"UPDATE thread_handoffs
-           SET responsible_principal_id = $2, business_priority = 'high', business_due_at = $3
-           WHERE company_id = $1"#,
-    )
-    .bind(fixture.company_id)
-    .bind(claimant.as_uuid())
-    .bind(due)
-    .execute(&fixture.pool)
-    .await
-    .unwrap();
-    let (_, first_generation, _, claimed_version, _, _, _, _) = handoff_row(&fixture).await;
-
-    let second_rfc = format!("<hold-keep-b-{}@example.com>", fixture.suffix);
-    let mut second = held_request(&fixture, &second_rfc, "Second").await;
-    second.envelope.source.thread_key = ExternalThreadKey::parse(&first_rfc).unwrap();
-    fixture.persistence.commit_inbound(second).await.unwrap();
-
-    let (_, generation, state, version, responsible, priority, _, _) = handoff_row(&fixture).await;
-    assert_ne!(generation, first_generation, "the generation moved");
-    assert_eq!(state, "needs_instruction");
-    assert_eq!(version, claimed_version + 1);
-    assert_eq!(
-        responsible,
-        Some(claimant.as_uuid()),
-        "a thread Bo claimed stays Bo's"
-    );
-    assert_eq!(priority, "high");
-    let kept_due: Option<chrono::DateTime<chrono::Utc>> =
-        sqlx::query_scalar("SELECT business_due_at FROM thread_handoffs WHERE company_id = $1")
-            .bind(fixture.company_id)
-            .fetch_one(&fixture.pool)
-            .await
-            .unwrap();
-    assert!(kept_due.is_some());
-
-    fixture.cleanup().await;
-}
-
-/// Case 12: the state returns to `needs_instruction` from anywhere, and `closed_at` is cleared —
-/// which the closure check would otherwise refuse outright.
-#[tokio::test]
-async fn a_replacement_reopens_a_drafting_or_resolved_handoff() {
-    let Some(fixture) = Fixture::new("inbound_hold_reopen").await else {
-        return;
-    };
-    let root = format!("<hold-reopen-{}@example.com>", fixture.suffix);
-    fixture
-        .persistence
-        .commit_inbound(held_request(&fixture, &root, "First").await)
-        .await
-        .unwrap();
-
-    for (index, (state, closed)) in [("drafting", false), ("resolved", true)].iter().enumerate() {
-        sqlx::query("UPDATE thread_handoffs SET state = $2, closed_at = $3 WHERE company_id = $1")
-            .bind(fixture.company_id)
-            .bind(state)
-            .bind(closed.then(chrono::Utc::now))
-            .execute(&fixture.pool)
-            .await
-            .expect("the fixture may put the row in any legal state");
-
-        let rfc = format!("<hold-reopen-{index}-{}@example.com>", fixture.suffix);
-        let mut next = held_request(&fixture, &rfc, "Another reply").await;
-        next.envelope.source.thread_key = ExternalThreadKey::parse(&root).unwrap();
-        fixture.persistence.commit_inbound(next).await.unwrap();
-
-        let (_, _, reopened, _, _, _, still_closed, _) = handoff_row(&fixture).await;
-        assert_eq!(reopened, "needs_instruction", "replaced a {state} handoff");
-        assert!(
-            !still_closed,
-            "the closure check refuses an open row with a closed_at"
-        );
-    }
-
-    fixture.cleanup().await;
-}
-
-/// Case 13: the same inbound message delivered twice is one message, one handoff, one generation,
-/// one event and no task. `recognise_redelivery` returns before any of this is reached.
-#[tokio::test]
-async fn a_redelivered_held_message_opens_no_second_generation() {
-    let Some(fixture) = Fixture::new("inbound_hold_redelivery").await else {
-        return;
-    };
-    let rfc = format!("<hold-dup-{}@example.com>", fixture.suffix);
-    let first = fixture
-        .persistence
-        .commit_inbound(held_request(&fixture, &rfc, "Same message").await)
-        .await
-        .unwrap();
-    let (_, generation, _, _, _, _, _, _) = handoff_row(&fixture).await;
-
-    let again = fixture
-        .persistence
-        .commit_inbound(held_request(&fixture, &rfc, "Same message").await)
-        .await
-        .unwrap();
-
-    assert_eq!(again.disposition, CommitDisposition::Duplicate);
-    assert_eq!(again.message_id, first.message_id);
-    assert!(again.handoff_ids.is_empty(), "a redelivery opens nothing");
-    assert!(again.task_ids.is_empty());
-    assert_eq!(message_count(&fixture).await, 1);
-    assert_eq!(handoff_count(&fixture).await, 1);
-    assert_eq!(task_count(&fixture).await, 0);
-    assert_eq!(handoff_events(&fixture).await.len(), 1);
-    let (_, still, _, version, _, _, _, _) = handoff_row(&fixture).await;
-    assert_eq!(still, generation);
-    assert_eq!(version, 1);
-
-    fixture.cleanup().await;
-}
-
-/// Case 14: one message, two channels, one task and one handoff.
-#[tokio::test]
-async fn a_message_to_a_held_and_an_automatic_channel_produces_one_of_each() {
-    let Some(fixture) = Fixture::new("inbound_hold_mixed").await else {
-        return;
-    };
-    let billing_id = fixture.extra_channel("billing").await;
-    let billing_binding = fixture.email_binding_of(billing_id).await;
-    let support_binding = fixture.email_binding_of(fixture.channel_id).await;
-    let rfc = format!("<hold-mixed-{}@example.com>", fixture.suffix);
-
-    let mut request = request(&fixture, &rfc, "Two teams, please").await;
-    request.associations = BoundedVec::parse(
-        "thread associations",
-        vec![
-            ThreadAssociation {
-                channel_id: fixture.channel_id,
-                binding_id: support_binding,
-                target: ThreadTarget::Create {
-                    subject: "Quick question".to_string(),
-                },
-                role: RecipientRole::To,
-                step: PipelineStep::only(),
-                principals: sender_principals(),
-            },
-            ThreadAssociation {
-                channel_id: billing_id,
-                binding_id: billing_binding,
-                target: ThreadTarget::Create {
-                    subject: "Quick question".to_string(),
-                },
-                role: RecipientRole::To,
-                step: PipelineStep::only(),
-                principals: sender_principals(),
-            },
-        ],
-    )
-    .unwrap();
-    // Support is held; billing answers.
-    request.tasks = BoundedVec::parse(
-        "inbound tasks",
-        vec![InboundTaskRequest {
-            task_type: AGENT_DISPATCH.to_string(),
-            targets: vec![InboundTaskTarget {
-                channel_id: billing_id,
-                role: RecipientRole::To,
-            }],
-        }],
-    )
-    .unwrap();
-    request.holds = BoundedVec::parse(
-        "thread handoffs",
-        vec![InboundHold {
-            channel_id: fixture.channel_id,
-            handoff_id: Uuid::new_v4(),
-            generation: Uuid::new_v4(),
-        }],
-    )
-    .unwrap();
-
-    let outcome = fixture.persistence.commit_inbound(request).await.unwrap();
-
-    assert_eq!(message_count(&fixture).await, 1, "one canonical message");
-    assert_eq!(
-        count(
-            &fixture,
-            "SELECT count(*) FROM thread_messages WHERE company_id = $1"
-        )
-        .await,
-        2
-    );
-    assert_eq!(task_count(&fixture).await, 1);
-    let task_channel: Uuid =
-        sqlx::query_scalar("SELECT channel_id FROM background_tasks WHERE company_id = $1")
-            .bind(fixture.company_id)
-            .fetch_one(&fixture.pool)
-            .await
-            .unwrap();
-    assert_eq!(task_channel, billing_id, "billing's task still runs");
-
-    assert_eq!(handoff_count(&fixture).await, 1);
-    let handoff_channel: Uuid =
-        sqlx::query_scalar("SELECT channel_id FROM thread_handoffs WHERE company_id = $1")
-            .bind(fixture.company_id)
-            .fetch_one(&fixture.pool)
-            .await
-            .unwrap();
-    assert_eq!(handoff_channel, fixture.channel_id);
-    assert_eq!(outcome.handoff_ids.len(), 1);
-
-    fixture.cleanup().await;
-}
-
-/// Case 15: two commits racing to hold one thread. Neither may raise a duplicate-key error out of
-/// an ingest -- the `ON CONFLICT (company_id, thread_id) DO UPDATE` is what turns the loser into a
-/// replacement rather than a failure. The row ends at version 2 with one of the two generations,
-/// and there are two events.
-#[tokio::test]
-async fn two_concurrent_commits_on_one_thread_serialise_on_the_unique_key() {
-    let Some(fixture) = Fixture::new("inbound_hold_race").await else {
-        return;
-    };
-    // Both generations open on this already-existing thread, so neither commit creates it and the
-    // race is exactly the one the `ON CONFLICT` has to survive.
-    let thread = fixture
-        .extra_thread(fixture.channel_id, "Invoice 4471")
-        .await;
-    let binding = fixture.email_binding_of(fixture.channel_id).await;
-
-    let mut requests = Vec::new();
-    for index in 0..2 {
-        let rfc = format!("<hold-race-{index}-{}@example.com>", fixture.suffix);
-        let mut request = held_request(&fixture, &rfc, "Racing reply").await;
-        request.envelope.source.thread_key = ExternalThreadKey::parse(&rfc).unwrap();
-        request.associations = BoundedVec::parse(
-            "thread associations",
-            vec![ThreadAssociation {
-                channel_id: fixture.channel_id,
-                binding_id: binding,
-                target: ThreadTarget::Existing(thread.id),
-                role: RecipientRole::To,
-                step: PipelineStep::only(),
-                principals: sender_principals(),
-            }],
-        )
-        .unwrap();
-        requests.push(request);
-    }
-    let second = requests.pop().unwrap();
-    let first = requests.pop().unwrap();
-    let first_generation = first.holds[0].generation;
-    let second_generation = second.holds[0].generation;
-
-    let left = fixture.persistence.clone();
-    let right = fixture.persistence.clone();
-    let (one, two) = tokio::join!(
-        tokio::spawn(async move { left.commit_inbound(first).await }),
-        tokio::spawn(async move { right.commit_inbound(second).await }),
-    );
-    one.unwrap()
-        .expect("neither commit may raise a duplicate key");
-    two.unwrap()
-        .expect("neither commit may raise a duplicate key");
-
-    assert_eq!(handoff_count(&fixture).await, 1);
-    let (_, generation, state, version, _, _, _, _) = handoff_row(&fixture).await;
-    assert_eq!(version, 2, "the loser saw the winner's version");
-    assert_eq!(state, "needs_instruction");
-    assert!(
-        generation == first_generation || generation == second_generation,
-        "the surviving generation is one of the two that raced"
-    );
-    let events = handoff_events(&fixture).await;
-    assert_eq!(events.len(), 2);
-    assert_eq!(events[0].0, "opened");
-    assert_eq!(events[1].0, "regenerated");
-    assert_eq!(task_count(&fixture).await, 0);
-
-    fixture.cleanup().await;
-}
-
-/// Case 19: a hold naming a channel with no association is a planner bug, and the whole commit
-/// rolls back — no message, no thread, no mapping. The task equivalent is proved just above.
-#[tokio::test]
-async fn a_hold_with_no_association_rolls_the_whole_commit_back() {
-    let Some(fixture) = Fixture::new("inbound_hold_rollback").await else {
-        return;
-    };
-    let rfc = format!("<hold-orphan-{}@example.com>", fixture.suffix);
-    let mut request = held_request(&fixture, &rfc, "Anyone there?").await;
-    hold_the_only_channel(&mut request, Uuid::new_v4());
-
-    let refused = fixture.persistence.commit_inbound(request).await;
-    assert!(refused.is_err(), "a hold with no association is refused");
-
-    assert_eq!(message_count(&fixture).await, 0);
-    assert_eq!(handoff_count(&fixture).await, 0);
-    assert_eq!(task_count(&fixture).await, 0);
-    assert_eq!(
-        count(
-            &fixture,
-            "SELECT count(*) FROM external_messages WHERE company_id = $1"
-        )
-        .await,
-        0
-    );
-    // The fixture's own thread survives; nothing this commit would have opened does.
-    assert_eq!(
-        count(
-            &fixture,
-            "SELECT count(*) FROM threads WHERE company_id = $1"
-        )
-        .await,
-        1
-    );
 
     fixture.cleanup().await;
 }

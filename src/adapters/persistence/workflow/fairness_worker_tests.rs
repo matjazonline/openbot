@@ -82,6 +82,7 @@ fn runner<'a>(
         worker: id,
         lease: lease(),
         poll: PollPolicy::new(Duration::from_millis(50), 128).unwrap(),
+        active_jobs: None,
     }
 }
 fn candidate(scope: ActivationRequest) -> PollCandidate {
@@ -261,6 +262,7 @@ async fn workflow_fairness_complementary_workers_reach_actual_supported_dispatch
                 worker: ids[index],
                 lease: lease(),
                 poll: PollPolicy::new(Duration::from_millis(50), 1).unwrap(),
+                active_jobs: None,
             };
             for candidate in f
                 .persistence()
@@ -315,6 +317,7 @@ async fn workflow_fairness_worker_stops_full_page_at_first_denied_demand() {
         worker: w,
         lease: lease(),
         poll: PollPolicy::new(Duration::from_millis(50), 128).unwrap(),
+        active_jobs: None,
     };
     let cancel = CancellationToken::new();
     let wakeup = tokio::sync::Notify::new();

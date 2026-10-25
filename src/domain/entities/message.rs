@@ -304,8 +304,7 @@ impl MessageAuthor {
 /// canonical row and three of these. [`Message::canonical_id`] is the payload the three share.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Message {
-    /// `thread_messages.id`. The identity the UI, the message cursor and
-    /// `task_outreach_targets.response_association_id` name.
+    /// `thread_messages.id`. The identity the UI and the message cursor name.
     pub id: Uuid,
     /// `messages.id`. The payload every thread association of this message shares.
     pub canonical_id: CanonicalMessageId,

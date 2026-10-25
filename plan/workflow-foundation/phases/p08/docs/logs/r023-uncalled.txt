@@ -1,0 +1,15 @@
+addressed_in src/application/transport/ingress.rs head_refs=1
+agent_run_timeout_from_env src/infra/config.rs head_refs=4
+assert_projection src/application/use_cases/thread/model_usage_tests.rs head_refs=3
+compose_delivery src/application/use_cases/thread/mod.rs head_refs=3
+email_write src/application/use_cases/thread/test_support.rs head_refs=27
+get_agent_history src/application/use_cases/thread/mod.rs head_refs=2
+insert_thread src/application/use_cases/thread/test_support.rs head_refs=3
+only_mail src/adapters/protocols/email/test_support.rs head_refs=2
+partial_response src/application/use_cases/thread/model_usage_tests.rs head_refs=1
+queued_deliveries src/application/use_cases/thread/test_support.rs head_refs=4
+recording_transport src/adapters/protocols/email/test_support.rs head_refs=2
+save_message_with_deliveries src/application/use_cases/thread/mod.rs head_refs=1
+stamp_duration src/application/services/harness/output.rs head_refs=1
+test_machine src/adapters/persistence/test_support.rs head_refs=11
+with_structured src/application/use_cases/thread/message_write.rs head_refs=1

@@ -1,0 +1,9 @@
+src/adapters/http/pages/workflow_authoring/bindings.rs
+src/adapters/http/pages/workflow_authoring/tools.rs
+src/adapters/http/routes/workflows/ui/authoring/bindings_tests.rs
+src/adapters/http/routes/workflows/ui/authoring/bindings.rs
+src/adapters/http/routes/workflows/ui/authoring/tools_tests.rs
+src/adapters/http/routes/workflows/ui/authoring/tools.rs
+src/application/workflow/authoring/mod.rs
+src/application/workflow/authoring/params.rs
+src/application/workflow/authoring/tests.rs

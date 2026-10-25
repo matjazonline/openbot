@@ -41,11 +41,20 @@ async fn workflow_http_binding_checks_exact_selected_connection_contract() {
                 ResourceName::parse("service").unwrap(),
                 RuntimeResourceId::new(other.id),
             )]),
+            run_as: None,
+            message_trigger: None,
         })
         .await;
     assert!(result.is_err());
     // The unchanged original still binds: the rejection is the selected contract, not the name.
-    Box::pin(bound(fixture, &setup.connection, version, Entrance::Http)).await;
+    Box::pin(bound(
+        fixture,
+        &setup.connection,
+        version,
+        Entrance::Http,
+        RelatedAssociation::Company,
+    ))
+    .await;
 }
 
 #[tokio::test]
@@ -57,6 +66,7 @@ async fn workflow_http_admission_rechecks_bound_operation_after_activation() {
         &setup.connection,
         setup.version,
         Entrance::Http,
+        RelatedAssociation::Company,
     ))
     .await;
     // Keep another matching owner live so a global registration lookup alone would pass.
@@ -89,6 +99,8 @@ async fn workflow_http_admission_rechecks_bound_operation_after_activation() {
             idempotency_key: IdempotencyKey::parse("revoked-http-admission").unwrap(),
             input: json!({}),
             rerun_of: None,
+            delivery_policy: crate::application::workflow::DeliveryPolicy::Deliver,
+            expected_binding_revision: None,
         })
         .await;
     assert!(result.is_err());

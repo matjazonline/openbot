@@ -5,26 +5,23 @@
 //! none of them does is write: nothing an inbound message produces becomes durable until
 //! [`super::commit::CommitPlan`] hands the whole set to the committer at once.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use tracing::warn;
-use uuid::Uuid;
 
 use crate::{
     app_error::{AppError, AppResult},
     entities::{
-        channel::{AnswerFacts, Channel, ChannelResponseTrigger},
+        channel::Channel,
         company::Company,
         email_message::EmailMessageMetadata,
-        message::MessageRole,
-        outreach::OutreachReplyMatch,
+        message::CanonicalMessageId,
         participant::{PrincipalAccessContext, ThreadPrincipalRole},
         thread::Thread,
-        thread_handoff::{HoldDecision, OutsideReplyFacts, holds_outside_reply},
         transport::{
             ChannelBindingId, ChannelSelector, DeliveryPurpose, QualifiedIdentity, TransportKind,
         },
-        value_objects::{ChannelSlug, EmailAddress, MessageId},
+        value_objects::{ChannelSlug, EmailAddress},
     },
     transport::{
         CanonicalContent, DeliveryContext, EmailDeliveryContext, EmailThreading, InboundDraft,
@@ -70,24 +67,10 @@ pub(crate) struct ChannelCandidate {
     pub access: crate::entities::channel::ParticipantAccess,
 }
 
-/// The channel-shaped half of the hold rule, as `prepare_channels` established it.
-///
-/// A named struct rather than four adjacent `bool` parameters: they are interchangeable at the
-/// call site and a transposed pair would silently hold the wrong messages.
-#[derive(Debug, Clone, Copy)]
-struct HoldFacts {
-    continues_existing_thread: bool,
-    sender_is_outside: bool,
-    channel_answers: bool,
-    closes_outreach: bool,
-}
-
 /// Everything phase 2 learned about where the message was addressed.
 pub(crate) struct ResolvedAddresses {
     pub company: Company,
     pub candidates: Vec<ChannelCandidate>,
-    /// Channels whose inbound message answers an outreach this platform is already awaiting.
-    pub outreach_by_channel: HashMap<Uuid, OutreachReplyMatch>,
 }
 
 /// Why a single candidate channel did or didn't make it into the match list.
@@ -95,7 +78,7 @@ pub(crate) struct ResolvedAddresses {
 /// An outcome enum rather than a bool plus out-parameters, so the loop that drives it is a `match`
 /// that pushes into the right accumulator.
 enum ChannelVerdict {
-    Accept(Box<Option<OutreachReplyMatch>>),
+    Accept,
     Unauthorized,
     Reject(IngestRejection),
 }
@@ -104,7 +87,6 @@ enum ChannelVerdict {
 enum ThreadAccess {
     Denied,
     Participant,
-    OutreachReply(Box<OutreachReplyMatch>),
 }
 
 /// One inbound sender, in both the terms the thread rules need.
@@ -154,7 +136,6 @@ impl ThreadUseCases {
         directory: &mut DirectoryCache<'_>,
     ) -> AppResult<Result<ResolvedAddresses, IngestRejection>> {
         let mut candidates: Vec<ChannelCandidate> = Vec::new();
-        let mut outreach_by_channel = HashMap::new();
         let mut seen_channels = HashSet::new();
         let mut unauthorized = 0usize;
         let mut undeliverable = UndeliverableSlugs::default();
@@ -211,10 +192,7 @@ impl ThreadUseCases {
                 {
                     ChannelVerdict::Reject(rejection) => return Ok(Err(rejection)),
                     ChannelVerdict::Unauthorized => unauthorized += 1,
-                    ChannelVerdict::Accept(outreach) => {
-                        if let Some(matched) = *outreach {
-                            outreach_by_channel.insert(channel.id, matched);
-                        }
+                    ChannelVerdict::Accept => {
                         let access = channel.participant_access(context);
                         candidates.push(ChannelCandidate {
                             company: company.clone(),
@@ -247,7 +225,6 @@ impl ThreadUseCases {
         Ok(Ok(ResolvedAddresses {
             company,
             candidates,
-            outreach_by_channel,
         }))
     }
 
@@ -305,21 +282,11 @@ impl ThreadUseCases {
         context: PrincipalAccessContext,
     ) -> AppResult<ChannelVerdict> {
         let sender = ThreadSender::new(&draft.author, context);
-        let mut outreach = None;
 
-        // A channel may appear twice in one trace only when this is the correlated response to an
-        // outreach it is already waiting on; anything else is a routing cycle.
+        // A channel never appears twice in one relay trace: that is a routing cycle.
         if origin.is_internal() && draft.directives.trace_channels.contains(&channel.id) {
-            match self
-                .outreach_reply_in_referenced_thread(channel, binding_id, draft, sender)
-                .await?
-            {
-                Some(matched) => outreach = Some(matched),
-                None => {
-                    warn!(channel_id = %channel.id, "Refusing an inter-channel routing cycle");
-                    return Ok(ChannelVerdict::Reject(IngestRejection::LoopCycle));
-                }
-            }
+            warn!(channel_id = %channel.id, "Refusing an inter-channel routing cycle");
+            return Ok(ChannelVerdict::Reject(IngestRejection::LoopCycle));
         }
 
         let access = channel.participant_access(context);
@@ -333,10 +300,6 @@ impl ThreadUseCases {
             {
                 ThreadAccess::Denied => {}
                 ThreadAccess::Participant => thread_authorized = true,
-                ThreadAccess::OutreachReply(matched) => {
-                    thread_authorized = true;
-                    outreach = Some(*matched);
-                }
             }
         }
 
@@ -350,11 +313,11 @@ impl ThreadUseCases {
             return Ok(ChannelVerdict::Reject(IngestRejection::SpamScore));
         }
 
-        Ok(ChannelVerdict::Accept(Box::new(outreach)))
+        Ok(ChannelVerdict::Accept)
     }
 
-    /// Whether an existing thread lets this sender in, either as a party to it or as the target of
-    /// an outreach awaiting their reply.
+    /// Whether an existing thread lets this sender in as a party to it: a member a workflow's
+    /// send addressed is one for the thread that send opened (p08 D1.5.4/D1.5.7).
     async fn thread_access_for(
         &self,
         channel: &Channel,
@@ -368,58 +331,11 @@ impl ThreadUseCases {
         else {
             return Ok(ThreadAccess::Denied);
         };
-        if sender.is_party_to(&thread) {
-            return Ok(ThreadAccess::Participant);
-        }
-        Ok(
-            match self
-                .correlated_outreach_reply(channel, thread.id, draft, sender)
-                .await?
-            {
-                Some(matched) => ThreadAccess::OutreachReply(Box::new(matched)),
-                None => ThreadAccess::Denied,
-            },
-        )
-    }
-
-    /// Does this message answer an outreach the channel is awaiting in the thread it references?
-    async fn outreach_reply_in_referenced_thread(
-        &self,
-        channel: &Channel,
-        binding_id: ChannelBindingId,
-        draft: &InboundDraft,
-        sender: ThreadSender<'_>,
-    ) -> AppResult<Option<OutreachReplyMatch>> {
-        let Some(thread) = self
-            .find_ancestor_thread(channel, binding_id, draft)
-            .await?
-        else {
-            return Ok(None);
-        };
-        self.correlated_outreach_reply(channel, thread.id, draft, sender)
-            .await
-    }
-
-    async fn correlated_outreach_reply(
-        &self,
-        channel: &Channel,
-        thread_id: Uuid,
-        draft: &InboundDraft,
-        sender: ThreadSender<'_>,
-    ) -> AppResult<Option<OutreachReplyMatch>> {
-        let references = reference_ids(draft);
-        if references.is_empty() {
-            return Ok(None);
-        }
-        self.task_persistence
-            .find_correlated_outreach_reply(
-                channel.company_id,
-                channel.id,
-                thread_id,
-                sender.address(),
-                &references,
-            )
-            .await
+        Ok(if sender.is_party_to(&thread) {
+            ThreadAccess::Participant
+        } else {
+            ThreadAccess::Denied
+        })
     }
 
     /// Phase 4: the conversation this message continues, if any.
@@ -541,102 +457,20 @@ impl ThreadUseCases {
 
         let mut channels = Vec::with_capacity(resolved.candidates.len());
         for (candidate, existing) in resolved.candidates.iter().zip(existing_threads) {
-            let outreach = resolved
-                .outreach_by_channel
-                .get(&candidate.channel.id)
-                .cloned();
-
-            let mut outreach = outreach;
-            let target = match existing {
-                Some(thread) => {
-                    match self
-                        .authorize_thread_injection(candidate, &thread, draft, sender, &outreach)
-                        .await?
-                    {
-                        Err(rejection) => return Ok(Err(rejection)),
-                        // A sender let in *because* they are answering an outreach closes it: the
-                        // reply is recorded and the agent is not re-run for it. Dropping the match
-                        // here is how the pre-canonical path left an outreach open forever.
-                        Ok(matched) => outreach = outreach.or(matched),
-                    }
-                    let recent = self
-                        .thread_persistence
-                        .count_recent_messages(thread.id, 3600)
-                        .await?;
-                    if exceeds_turn_limit(recent) {
-                        warn!(
-                            thread_id = %thread.id,
-                            recent,
-                            "Refusing a message that would exceed the thread turn limit"
-                        );
-                        return Ok(Err(IngestRejection::ThreadTurnLimit));
-                    }
-                    ThreadTarget::Existing(thread.id)
-                }
-                None => ThreadTarget::Create {
-                    subject: draft.content.subject().to_string(),
-                },
-            };
-
-            // A third party joins the thread only when the sender is trusted *and* the channel
-            // permits it: the flag can narrow who gets pulled in, never widen it.
-            let pull_third_parties = candidate.access.trusted && candidate.channel.add_3rd_party;
-            let participant_identities = thread_participants(
-                &[],
-                sender.handle,
-                &third_parties,
-                // Recording an outreach reply satisfies the outreach; it does not make its sender
-                // a party to the channel's conversation.
-                outreach.is_none(),
-                pull_third_parties,
-            );
-
-            let mut principals = Vec::with_capacity(participant_identities.len() + 1);
-            for identity in participant_identities {
-                if matches!(target, ThreadTarget::Create { .. }) && identity == draft.author {
-                    principals.push(crate::transport::ThreadPrincipalIntent::new(
-                        identity.clone(),
-                        ThreadPrincipalRole::Author,
-                    ));
-                }
-                principals.push(crate::transport::ThreadPrincipalIntent::new(
-                    identity,
-                    ThreadPrincipalRole::Participant,
-                ));
-            }
-
-            let answers = self
-                .candidate_answers(candidate, &target, draft, &body_text, directory)
-                .await?;
-
-            let hold = self
-                .hold_decision(
+            match self
+                .prepare_channel(
                     candidate,
-                    HoldFacts {
-                        // Read from the target rather than from "the subject looks like a reply":
-                        // the thread the message actually lands in is the only honest answer.
-                        continues_existing_thread: matches!(target, ThreadTarget::Existing(_)),
-                        // The stable actor's company membership, resolved once above. Not
-                        // `candidate.access.trusted`, which is a channel-ACL verdict and is true
-                        // for an explicitly listed outsider.
-                        sender_is_outside: !sender.context.membership.is_team(),
-                        channel_answers: answers,
-                        // The *folded* match, after `authorize_thread_injection` added the
-                        // correlated one. Reading the earlier lookup would hold a reply that a
-                        // correlated outreach had just authorised and strand its waiting task.
-                        closes_outreach: outreach.is_some(),
-                    },
+                    existing,
+                    draft,
+                    sender,
+                    &third_parties,
+                    &body_text,
                 )
-                .await?;
-
-            channels.push(PreparedChannel {
-                candidate: candidate.clone(),
-                target,
-                answers,
-                outreach,
-                principals: crate::transport::BoundedVec::parse("thread principals", principals)?,
-                hold,
-            });
+                .await?
+            {
+                Ok(channel) => channels.push(channel),
+                Err(rejection) => return Ok(Err(rejection)),
+            }
         }
 
         Ok(Ok(PreparedChannels {
@@ -645,134 +479,123 @@ impl ThreadUseCases {
         }))
     }
 
-    /// Whether this channel's copy of the message waits for the team.
-    ///
-    /// One extra read per candidate, and it is a read rather than a snapshot for the reason the
-    /// override column exists: a company that changes its default must move every inheriting
-    /// channel with it, live. A channel whose policy cannot be resolved is an error rather than an
-    /// assumed `Automatic` -- this value decides whether a customer's message is answered at all.
-    async fn hold_decision(
+    /// One authorized channel's thread, new principals and admission facts (p08 D1.3). Facts, not
+    /// decisions: whether anything runs belongs to the channel's bindings, after the commit.
+    async fn prepare_channel(
         &self,
         candidate: &ChannelCandidate,
-        facts: HoldFacts,
-    ) -> AppResult<HoldDecision> {
-        let handling = self
-            .thread_handoff_policy
-            .reply_handling_policy(candidate.company.id, candidate.channel.id)
-            .await?
-            .ok_or_else(|| {
-                AppError::Internal(format!(
-                    "Channel '{}' has no reply-handling policy to resolve",
-                    candidate.channel.slug
-                ))
-            })?
-            .effective();
-        if !handling.holds_outside_replies() {
-            return Ok(HoldDecision::Automatic);
+        existing: Option<Thread>,
+        draft: &InboundDraft,
+        sender: ThreadSender<'_>,
+        third_parties: &[QualifiedIdentity],
+        body_text: &str,
+    ) -> AppResult<Result<PreparedChannel, IngestRejection>> {
+        let target = match existing {
+            Some(thread) => {
+                if let Err(rejection) =
+                    self.authorize_thread_injection(candidate, &thread, draft, sender)
+                {
+                    return Ok(Err(rejection));
+                }
+                let recent = self
+                    .thread_persistence
+                    .count_recent_messages(thread.id, 3600)
+                    .await?;
+                if exceeds_turn_limit(recent) {
+                    warn!(
+                        thread_id = %thread.id,
+                        recent,
+                        "Refusing a message that would exceed the thread turn limit"
+                    );
+                    return Ok(Err(IngestRejection::ThreadTurnLimit));
+                }
+                ThreadTarget::Existing(thread.id)
+            }
+            None => ThreadTarget::Create {
+                subject: draft.content.subject().to_string(),
+            },
+        };
+
+        // A third party joins the thread only when the sender is trusted *and* the channel
+        // permits it: the flag can narrow who gets pulled in, never widen it.
+        let pull_third_parties = candidate.access.trusted && candidate.channel.add_3rd_party;
+        let participant_identities =
+            thread_participants(&[], sender.handle, third_parties, true, pull_third_parties);
+        let mut principals = Vec::with_capacity(participant_identities.len() + 1);
+        for identity in participant_identities {
+            if matches!(target, ThreadTarget::Create { .. }) && identity == draft.author {
+                principals.push(crate::transport::ThreadPrincipalIntent::new(
+                    identity.clone(),
+                    ThreadPrincipalRole::Author,
+                ));
+            }
+            principals.push(crate::transport::ThreadPrincipalIntent::new(
+                identity,
+                ThreadPrincipalRole::Participant,
+            ));
         }
-        // `asks_for_an_answer` is the one term this loop cannot see: the disposition is folded
-        // message-wide, from every address the mail named, in `CommitPlan::build`. So the rule is
-        // asked here with the five channel-shaped terms and that sixth one is applied there.
-        let eligible = holds_outside_reply(OutsideReplyFacts {
-            handling,
-            continues_existing_thread: facts.continues_existing_thread,
-            sender_is_outside: facts.sender_is_outside,
-            channel_answers: facts.channel_answers,
-            asks_for_an_answer: true,
-            closes_outreach: facts.closes_outreach,
-        });
-        Ok(if eligible {
-            HoldDecision::Hold
-        } else {
-            HoldDecision::NotEligible
-        })
+
+        let mentioned = self.channel_was_mentioned(candidate, body_text);
+        let reply_to = self.direct_parent(candidate, &target, draft).await?;
+        Ok(Ok(PreparedChannel {
+            candidate: candidate.clone(),
+            target,
+            mentioned,
+            reply_to,
+            principals: crate::transport::BoundedVec::parse("thread principals", principals)?,
+        }))
     }
 
-    /// Refuse a sender who is neither on the thread nor answering one of its outreaches, and tell
-    /// them so with a bounce rather than dropping the mail silently.
-    ///
-    /// Returns the outreach that let them in, when one did, so the caller can record the reply
-    /// against it: an authorization that is discarded leaves the outreach waiting forever.
-    async fn authorize_thread_injection(
+    /// Refuse a sender who is not a party to the thread, and tell them so with a bounce rather
+    /// than dropping the mail silently. Outreach replies no longer widen this (p08 D1.3); a
+    /// member a workflow addressed is a party to the thread its send opened (D1.5.4).
+    fn authorize_thread_injection(
         &self,
         candidate: &ChannelCandidate,
         thread: &Thread,
         draft: &InboundDraft,
         sender: ThreadSender<'_>,
-        outreach: &Option<OutreachReplyMatch>,
-    ) -> AppResult<Result<Option<OutreachReplyMatch>, IngestRejection>> {
-        if let Some(matched) = self
-            .correlated_outreach_reply(&candidate.channel, thread.id, draft, sender)
-            .await?
-        {
-            return Ok(Ok(Some(matched)));
-        }
+    ) -> Result<(), IngestRejection> {
         if sender.is_party_to(thread)
             || draft.directives.target_thread_id.is_some()
             || draft.directives.reply_to_message_id.is_some()
-            || outreach.is_some()
         {
-            return Ok(Ok(None));
+            return Ok(());
         }
 
         warn!(
             thread_id = %thread.id,
             "Refusing an unauthorized thread injection and bouncing it back"
         );
-        Ok(Err(IngestRejection::ThreadInjection(Box::new(
-            BounceInfo {
-                source_message_key: draft.message_key.clone(),
-                recipient_to: EmailAddress::from(sender.address()),
-                company_slug: Some(candidate.company.slug.clone()),
-                invalid_slugs: vec![ChannelSlug::from(format!(
-                    "Thread {} (Unauthorized Sender: {})",
-                    thread.id,
-                    sender.address()
-                ))],
-                disabled_slugs: vec![],
-                suggestions: vec![],
-                // This bounce fires *because* the sender has no standing on the thread, so it must not
-                // hand them the company's channel directory.
-                available_channels: vec![],
-                original_subject: draft.content.subject().to_string(),
-            },
-        ))))
+        Err(IngestRejection::ThreadInjection(Box::new(BounceInfo {
+            source_message_key: draft.message_key.clone(),
+            recipient_to: EmailAddress::from(sender.address()),
+            company_slug: Some(candidate.company.slug.clone()),
+            invalid_slugs: vec![ChannelSlug::from(format!(
+                "Thread {} (Unauthorized Sender: {})",
+                thread.id,
+                sender.address()
+            ))],
+            disabled_slugs: vec![],
+            suggestions: vec![],
+            // This bounce fires *because* the sender has no standing on the thread, so it must not
+            // hand them the company's channel directory.
+            available_channels: vec![],
+            original_subject: draft.content.subject().to_string(),
+        })))
     }
 
-    async fn candidate_answers(
+    /// The message this one directly answers in the channel's existing thread: the trusted
+    /// caller's explicit turn, else the provider-mapped `In-Reply-To`. Never References-only
+    /// ancestry, which cannot say which turn was answered (p08 D1.3).
+    async fn direct_parent(
         &self,
         candidate: &ChannelCandidate,
         target: &ThreadTarget,
         draft: &InboundDraft,
-        body: &str,
-        directory: &mut DirectoryCache<'_>,
-    ) -> AppResult<bool> {
-        let trigger = candidate.channel.response_trigger;
-        let mut facts = AnswerFacts {
-            role: candidate.role,
-            mentioned: false,
-            replies_to_agent: false,
-        };
-        if trigger.answers(facts) {
-            return Ok(true);
-        }
-        facts.mentioned = self
-            .channel_was_mentioned(candidate, body, directory)
-            .await?;
-        if trigger == ChannelResponseTrigger::MentionedOrReplyToAgent && !facts.mentioned {
-            facts.replies_to_agent = self.replies_to_agent(candidate, target, draft).await?;
-        }
-        Ok(trigger.answers(facts))
-    }
-
-    async fn replies_to_agent(
-        &self,
-        candidate: &ChannelCandidate,
-        target: &ThreadTarget,
-        draft: &InboundDraft,
-    ) -> AppResult<bool> {
+    ) -> AppResult<Option<CanonicalMessageId>> {
         let ThreadTarget::Existing(thread_id) = target else {
-            return Ok(false);
+            return Ok(None);
         };
         let parent = match draft.directives.reply_to_message_id {
             Some(id) => Some(id),
@@ -786,26 +609,21 @@ impl ThreadUseCases {
             },
         };
         let Some(parent) = parent else {
-            return Ok(false);
+            return Ok(None);
         };
         Ok(self
             .thread_persistence
             .get_thread_message(*thread_id, parent)
             .await?
-            .is_some_and(|message| message.role == MessageRole::Agent))
+            .map(|_| parent))
     }
 
-    /// Whether the body names the channel, an alias, its address, or one of its agents.
-    async fn channel_was_mentioned(
-        &self,
-        candidate: &ChannelCandidate,
-        body: &str,
-        directory: &mut DirectoryCache<'_>,
-    ) -> AppResult<bool> {
+    /// Whether the body names the channel, an alias, its address, or the handle it was reached at.
+    fn channel_was_mentioned(&self, candidate: &ChannelCandidate, body: &str) -> bool {
         let canonical_address = candidate
             .channel
             .inbound_address(&candidate.company.slug, &self.config.app_domain_name);
-        if body_mentions_email(body, candidate.handle.subject().as_str())
+        body_mentions_email(body, candidate.handle.subject().as_str())
             || body_mentions_email(body, &canonical_address)
             || body_mentions_slug(body, &candidate.matched_slug)
             || body_mentions_slug(body, &candidate.channel.slug)
@@ -814,18 +632,6 @@ impl ThreadUseCases {
                 .alias_slugs
                 .iter()
                 .any(|slug| body_mentions_slug(body, slug))
-        {
-            return Ok(true);
-        }
-
-        for agent_id in candidate.channel.agent_ids.iter().flatten() {
-            if let Some(agent) = directory.agent(*agent_id).await?
-                && body_mentions_slug(body, &agent.slug)
-            {
-                return Ok(true);
-            }
-        }
-        Ok(false)
     }
 
     /// The bounce an undeliverable address earns, with the directory the sender is allowed to see.
@@ -881,40 +687,14 @@ impl ThreadUseCases {
             if !channel.enabled || !channel.participant_access(context).authorized {
                 continue;
             }
-            let description = match channel.description.clone() {
-                Some(own) => Some(own),
-                None => {
-                    self.responding_agent_description(&channel, directory)
-                        .await?
-                }
-            };
             entries.push(ChannelDirectoryEntry {
                 address: channel.inbound_address(&company.slug, &self.config.app_domain_name),
                 name: channel.name.clone(),
-                description,
+                description: channel.description.clone(),
             });
         }
         entries.sort_by(|a, b| a.address.cmp(&b.address));
         Ok(entries)
-    }
-
-    /// What the channel's responding agent says it is for, when the channel itself says nothing.
-    async fn responding_agent_description(
-        &self,
-        channel: &Channel,
-        directory: &mut DirectoryCache<'_>,
-    ) -> AppResult<Option<String>> {
-        let Some(agent_id) = channel
-            .agent_ids
-            .as_ref()
-            .and_then(|ids| ids.first().copied())
-        else {
-            return Ok(None);
-        };
-        Ok(directory
-            .agent(agent_id)
-            .await?
-            .and_then(|agent| agent.description))
     }
 
     /// Reply to every reserved address the message named, reporting whether any answer went out.
@@ -1055,12 +835,4 @@ fn third_party_handles(
 
 fn email_metadata(draft: &InboundDraft) -> Option<&EmailMessageMetadata> {
     draft.extension.email_metadata()
-}
-
-/// The RFC ids naming *other* messages in this conversation, for the outreach correlation query
-/// that still speaks in them.
-fn reference_ids(draft: &InboundDraft) -> Vec<MessageId> {
-    email_metadata(draft)
-        .map(EmailMessageMetadata::reference_candidates)
-        .unwrap_or_default()
 }

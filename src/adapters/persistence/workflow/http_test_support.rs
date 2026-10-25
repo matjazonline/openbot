@@ -54,17 +54,52 @@ pub(super) enum Entrance {
     Http,
     Tool,
 }
-pub(super) async fn setup(origin: &str, entrance: Entrance) -> Setup {
+pub(super) fn setup(origin: &str, entrance: Entrance) -> impl Future<Output = Setup> + '_ {
+    setup_scoped(origin, entrance, HttpTestScope::Company)
+}
+
+pub(super) enum HttpTestScope {
+    Company,
+    PrivateChannel,
+}
+
+pub(super) async fn setup_scoped(origin: &str, entrance: Entrance, scope: HttpTestScope) -> Setup {
     let mut fixture = Fixture::new().await;
     fixture.persistence = PostgresPersistence::with_credential_cipher(
         fixture.persistence.pool().clone(),
         CredentialCipher::for_test(),
     );
+    let association = match scope {
+        HttpTestScope::Company => RelatedAssociation::Company,
+        HttpTestScope::PrivateChannel => {
+            use crate::application::use_cases::channel::{ChannelPersistence, ChannelWrite};
+            let channel = ChannelPersistence::create(
+                &fixture.persistence,
+                fixture.target.company.as_uuid(),
+                ChannelWrite {
+                    name: "Private HTTP fixture".into(),
+                    slug: "private-http".into(),
+                    enabled: false,
+                    ..ChannelWrite::default()
+                },
+            )
+            .await
+            .unwrap();
+            sqlx::query("UPDATE channels SET access_mode = 'allowlist' WHERE id = $1")
+                .bind(channel.id)
+                .execute(fixture.persistence.pool())
+                .await
+                .unwrap();
+            RelatedAssociation::Channel(crate::application::workflow::RelatedChannelId::new(
+                channel.id,
+            ))
+        }
+    };
     // Box the real persistence/lifecycle seams to keep fixture setup on stock stacks.
     let connection = Box::pin(configured(&fixture, origin, entrance)).await;
     let version = Box::pin(published(&fixture, &connection, entrance, None)).await;
-    let target = Box::pin(bound(&fixture, &connection, version, entrance)).await;
-    let claim = Box::pin(claimed(&fixture, target)).await;
+    let target = Box::pin(bound(&fixture, &connection, version, entrance, association)).await;
+    let claim = Box::pin(claimed(&fixture, target, association)).await;
     Setup {
         version,
         fixture,
@@ -201,6 +236,7 @@ pub(super) async fn bound(
     connection: &HttpConnection,
     version: VersionId,
     entrance: Entrance,
+    association: RelatedAssociation,
 ) -> BindingTarget {
     let p = &fixture.persistence;
     let company = fixture.target.company;
@@ -216,7 +252,7 @@ pub(super) async fn bound(
         .configure(ConfigureBinding {
             target,
             expected: None,
-            association: RelatedAssociation::Company,
+            association,
             version,
             params: json!({}),
             resources: if tool {
@@ -227,6 +263,8 @@ pub(super) async fn bound(
                     RuntimeResourceId::new(connection.id),
                 )])
             },
+            run_as: None,
+            message_trigger: None,
         })
         .await
         .unwrap();
@@ -239,7 +277,11 @@ pub(super) async fn bound(
         .unwrap();
     target
 }
-pub(super) async fn claimed(fixture: &Fixture, target: BindingTarget) -> ClaimedWorkflow {
+pub(super) async fn claimed(
+    fixture: &Fixture,
+    target: BindingTarget,
+    association: RelatedAssociation,
+) -> ClaimedWorkflow {
     let p = &fixture.persistence;
     let company = fixture.target.company;
     let actor = fixture.target.actor;
@@ -247,7 +289,7 @@ pub(super) async fn claimed(fixture: &Fixture, target: BindingTarget) -> Claimed
         .admit(AdmitWorkflowRequest {
             company_id: company,
             actor,
-            association: RelatedAssociation::Company,
+            association,
             trigger: TriggerRef::new(
                 company,
                 TriggerId::new(Uuid::new_v4()),
@@ -259,6 +301,8 @@ pub(super) async fn claimed(fixture: &Fixture, target: BindingTarget) -> Claimed
             idempotency_key: IdempotencyKey::parse("http-run").unwrap(),
             input: json!({}),
             rerun_of: None,
+            delivery_policy: crate::application::workflow::DeliveryPolicy::Deliver,
+            expected_binding_revision: None,
         })
         .await
         .unwrap();

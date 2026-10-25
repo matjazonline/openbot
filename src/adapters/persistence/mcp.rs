@@ -126,22 +126,6 @@ impl McpPersistence for PostgresPersistence {
         }
         rows.into_iter().map(TryInto::try_into).collect()
     }
-    async fn mcp_connections_by_ids(
-        &self,
-        company_id: Uuid,
-        connection_ids: &[Uuid],
-    ) -> AppResult<Vec<CompanyMcpConnection>> {
-        if connection_ids.len() > MAX_MCP_CONNECTIONS {
-            return Err(invalid("Too many MCP connections requested"));
-        }
-        if connection_ids.is_empty() {
-            return Ok(Vec::new());
-        }
-        let rows = sqlx::query_as::<_, ConnectionRow>(&format!(
-            "{CONNECTION_SELECT} WHERE connection.company_id = $1 AND connection.id = ANY($2) AND connection.deleted_at IS NULL ORDER BY connection.slug"
-        )).bind(company_id).bind(connection_ids).fetch_all(&self.pool).await?;
-        rows.into_iter().map(TryInto::try_into).collect()
-    }
     async fn create_mcp_connection(
         &self,
         company_id: Uuid,

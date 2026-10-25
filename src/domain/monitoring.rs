@@ -1,8 +1,6 @@
 use std::net::IpAddr;
 use uuid::Uuid;
 
-use crate::entities::task::TaskStopReason;
-
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AiExecutionMetrics {
     pub company_id: Option<Uuid>,
@@ -58,44 +56,15 @@ pub struct SmtpConnectionMetrics {
     pub rcpt_to: Option<String>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub enum TaskStatusMetric {
-    Completed,
-    Failed,
-    Retried,
-}
-
-impl std::fmt::Display for TaskStatusMetric {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            TaskStatusMetric::Completed => write!(f, "completed"),
-            TaskStatusMetric::Failed => write!(f, "failed"),
-            TaskStatusMetric::Retried => write!(f, "retried"),
-        }
-    }
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct TaskExecutionMetrics {
-    pub company_id: Option<Uuid>,
-    pub channel_id: Option<Uuid>,
-    pub task_type: String,
-    pub duration_ms: u64,
-    pub status: TaskStatusMetric,
-    pub stop_reason: TaskStopReason,
-    pub retry_count: u32,
-}
-
 #[async_trait::async_trait]
 pub trait MonitoringService: Send + Sync {
     fn record_ai_execution(&self, metrics: &AiExecutionMetrics);
     fn record_smtp_connection(&self, metrics: &SmtpConnectionMetrics);
-    fn record_task_execution(&self, metrics: &TaskExecutionMetrics);
     fn increment_counter(&self, name: &str, value: u64, labels: &[(&str, &str)]);
     /// Report the *current* value of something that goes up and down.
     ///
     /// Distinct from [`Self::increment_counter`] because a standing condition is not an
-    /// occurrence: four dead-lettered tasks are four dead-lettered tasks however many times the
+    /// occurrence: four dead-lettered deliveries are four however many times the
     /// sweep looks at them, and adding four to a counter every thirty seconds would describe a
     /// runaway failure that is not happening. A gauge also *clears*, which is what lets an alert
     /// on it stop firing once the work is dealt with.

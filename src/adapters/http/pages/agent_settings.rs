@@ -6,10 +6,7 @@
 //! list along out of band, so a rename or a delete shows up immediately.
 
 use super::*;
-use crate::entities::{
-    schedule::{ChannelSchedule, ScheduleRunAsChoices},
-    skill::Skill,
-};
+use crate::entities::skill::Skill;
 
 /// Client-side behaviour this workspace adds on top of [`MAILBOX_SCRIPT`].
 ///
@@ -39,12 +36,12 @@ pub const AGENT_SETTINGS_SCRIPT: &str = r##"        // The create pane holds one
 
         function updateAgentAddressPreview(input) {
             var preview = document.getElementById(input.dataset.addressPreview);
-            if (preview) preview.textContent = (input.value || 'agent-handle') + preview.dataset.addressSuffix;
+            if (preview) preview.textContent = '@' + (input.value || 'agent-handle');
         }
 
         function updateSimpleAgentAddressPreview(input) {
             var preview = document.getElementById('agent-address-preview');
-            if (preview) preview.textContent = (slugifyValue(input.value) || 'agent-handle') + preview.dataset.addressSuffix;
+            if (preview) preview.textContent = '@' + (slugifyValue(input.value) || 'agent-handle');
         }"##;
 
 /// The agent list in the sidebar — the only part of the workspace a write has to refresh.
@@ -52,7 +49,6 @@ pub struct AgentSettingsList<'a> {
     pub company: &'a Company,
     pub app_domain_name: &'a str,
     pub agents: &'a [Agent],
-    pub channels: &'a [Channel],
     pub selected_agent_id: Option<Uuid>,
 }
 
@@ -69,7 +65,7 @@ pub struct AgentSettingsPage<'a> {
 ///
 /// The Advanced create form and the edit form take exactly these fields, which is why they share
 /// one renderer; only the URL they submit to differs.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct AgentDraft<'a> {
     pub name: &'a str,
     pub slug: &'a str,
@@ -79,48 +75,10 @@ pub struct AgentDraft<'a> {
     pub description: &'a str,
     pub provider: &'a str,
     pub model: &'a str,
-    pub run_timeout_secs: Option<u32>,
-    pub memory_enabled: bool,
-    pub memory_persistence_mode: &'a str,
-    pub memory_recall_mode: &'a str,
-    pub memory_max_results: u8,
-    pub config_json: &'a str,
-    pub response_format: &'a str,
-    pub response_schema: String,
     pub skill_ids: Vec<Uuid>,
-    pub sub_agent_ids: Vec<Uuid>,
     pub avatar_url: &'a str,
     /// Whether the create pane should open on the Advanced tab.
     pub advanced: bool,
-}
-
-/// A blank agent as its own form will accept it, which is why this is hand-written rather than
-/// derived: `memory_max_results` renders into a `min="1"` number field, so a derived `0` makes the
-/// empty create form fail browser validation before it can be submitted — silently, because the
-/// field sits inside a collapsed `<details>` and cannot be focused to report itself.
-impl Default for AgentDraft<'_> {
-    fn default() -> Self {
-        Self {
-            name: "",
-            slug: "",
-            system_prompt: "",
-            description: "",
-            provider: "",
-            model: "",
-            run_timeout_secs: None,
-            memory_enabled: false,
-            memory_persistence_mode: MemoryPersistenceMode::default().as_str(),
-            memory_recall_mode: MemoryRecallMode::default().as_str(),
-            memory_max_results: default_memory_max_results(),
-            config_json: "",
-            response_format: "text",
-            response_schema: String::new(),
-            skill_ids: Vec::new(),
-            sub_agent_ids: Vec::new(),
-            avatar_url: "",
-            advanced: false,
-        }
-    }
 }
 
 /// The settings pane for an agent that already exists.
@@ -129,85 +87,15 @@ pub struct AgentEditPane<'a> {
     pub app_domain_name: &'a str,
     pub model_connections: &'a [CompanyModelConnection],
     pub agent: &'a Agent,
-    /// The channels currently running this agent — nothing stops one being deleted out from
-    /// under them, so the pane has to say who would notice.
-    pub used_by: &'a [&'a Channel],
     /// What the user last typed, when a save was rejected; `None` shows the stored agent.
     pub draft: Option<&'a AgentDraft<'a>>,
     pub error: Option<&'a str>,
     pub capability_options: AgentCapabilityOptions<'a>,
-    /// Which half of the agent the pane is showing.
-    pub body: AgentPaneBody<'a>,
 }
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct AgentCapabilityOptions<'a> {
     pub skills: &'a [Skill],
-    pub sub_agents: &'a [Agent],
-}
-
-/// Which half of an agent's settings a request asked for.
-///
-/// An agent's personal channel is part of the agent rather than a neighbour of it — the address
-/// follows the handle, the owner is pinned at position 0, and the channel dies with the agent — so
-/// it is a tab here rather than only a stop in the Channels workspace.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum AgentTab {
-    #[default]
-    Settings,
-    Channel,
-}
-
-impl AgentTab {
-    /// What `?tab=` names. Anything unrecognised is the settings the pane opens on.
-    pub fn from_query(value: Option<&str>) -> Self {
-        match value.map(str::trim) {
-            Some("channel") => Self::Channel,
-            _ => Self::Settings,
-        }
-    }
-
-    /// How this tab names itself in a URL.
-    pub fn as_query(self) -> &'static str {
-        match self {
-            Self::Settings => "settings",
-            Self::Channel => "channel",
-        }
-    }
-}
-
-/// What the agent pane holds below its tabs.
-///
-/// Holding the body rather than an [`AgentTab`] field beside it is what keeps "Channel is lit" and
-/// "the channel is showing" the same fact — the same reason [`CompanyPaneBody`] is shaped this way.
-pub enum AgentPaneBody<'a> {
-    Settings,
-    Channel(&'a AgentChannelTab<'a>),
-}
-
-impl AgentPaneBody<'_> {
-    fn tab(&self) -> AgentTab {
-        match self {
-            Self::Settings => AgentTab::Settings,
-            Self::Channel(_) => AgentTab::Channel,
-        }
-    }
-}
-
-/// The agent's own channel, as its tab needs it.
-///
-/// Everything here is what [`channel_fields`] and [`channel_schedules_card`] take: the Channel tab
-/// is the Channels workspace's own form, not a second one that could drift from it.
-pub struct AgentChannelTab<'a> {
-    pub channel: &'a Channel,
-    pub schedules: &'a [ChannelSchedule],
-    /// Who this channel's scheduled runs may be attributed to.
-    pub run_as: &'a ScheduleRunAsChoices,
-    pub spam_scan_enabled: bool,
-    pub memory_ready: bool,
-    /// What the user last typed, when a save was rejected; `None` shows the stored channel.
-    pub draft: Option<&'a ChannelDraft<'a>>,
-    pub error: Option<&'a str>,
 }
 
 /// Which of the create pane's forms opens.
@@ -242,7 +130,7 @@ pub fn agent_settings_page(page: &AgentSettingsPage<'_>) -> String {
         r##"
         <aside class="ui-pane-list flex w-64 shrink-0 flex-col border-r border-base-300 bg-base-200">
             {header}
-            {task_counts}
+            {run_counts}
             {list_html}
         </aside>
         {pane_html}
@@ -259,7 +147,7 @@ pub fn agent_settings_page(page: &AgentSettingsPage<'_>) -> String {
                 plus_glyph = icon(Icon::Plus, BUTTON_ICON),
             ),
         ),
-        task_counts = super::task_counts::task_counts_bar(company.id),
+        run_counts = super::run_counts::run_counts_bar(company.id),
         list_html = agent_settings_list(page.list, FragmentSwap::Inline),
         pane_html = page.pane_html,
     );
@@ -282,9 +170,7 @@ pub fn agent_settings_list(list: &AgentSettingsList<'_>, swap: FragmentSwap) -> 
         .map(|agent| {
             agent_settings_entry(
                 list.company,
-                list.app_domain_name,
                 agent,
-                list.channels,
                 list.selected_agent_id == Some(agent.id),
             )
         })
@@ -303,14 +189,8 @@ pub fn agent_settings_list(list: &AgentSettingsList<'_>, swap: FragmentSwap) -> 
     )
 }
 
-fn agent_settings_entry(
-    company: &Company,
-    app_domain_name: &str,
-    agent: &Agent,
-    channels: &[Channel],
-    selected: bool,
-) -> String {
-    let address = agent_display_address(agent, channels.iter(), company, app_domain_name);
+fn agent_settings_entry(company: &Company, agent: &Agent, selected: bool) -> String {
+    let address = format!("@{}", agent.slug);
     format!(
         r##"
                 <li>
@@ -323,7 +203,7 @@ fn agent_settings_entry(
                         {avatar}
                         <span class="flex min-w-0 flex-1 flex-col items-start gap-0.5">
                             <span class="flex w-full min-w-0 flex-wrap items-center gap-2">
-                                <span class="min-w-0 truncate">{name}</span>{task_counts}
+                                <span class="min-w-0 truncate">{name}</span>
                             </span>
                             <span class="w-full truncate font-mono text-[11px] opacity-60">{slug}</span>
                             <span class="w-full truncate font-mono text-[11px] opacity-60">{model}</span>
@@ -331,7 +211,6 @@ fn agent_settings_entry(
                     </a>
                 </li>
         "##,
-        task_counts = super::task_counts_slot(super::TaskCountKey::Agent(agent.id)),
         active = if selected { "menu-active" } else { "" },
         company_id = company.id,
         agent_id = agent.id,
@@ -339,35 +218,6 @@ fn agent_settings_entry(
         name = escape_html_text(&agent.name),
         slug = escape_html_text(&address),
         model = escape_html_text(&agent_model_summary(agent)),
-    )
-}
-
-fn agent_display_address<'a>(
-    agent: &Agent,
-    channels: impl Iterator<Item = &'a Channel>,
-    company: &Company,
-    app_domain_name: &str,
-) -> String {
-    let channels = channels.collect::<Vec<_>>();
-    let owned = owned_channel(agent.id, channels.iter().copied());
-    let channel = owned.or_else(|| {
-        let mut matches = channels.iter().copied().filter(|channel| {
-            channel
-                .agent_ids
-                .as_deref()
-                .and_then(|ids| ids.first())
-                .is_some_and(|id| *id == agent.id)
-        });
-        let only = matches.next();
-        (matches.next().is_none()).then_some(only).flatten()
-    });
-    channel.map_or_else(
-        || format!("@{}", agent.slug),
-        |channel| {
-            channel
-                .inbound_address(&company.slug, app_domain_name)
-                .to_string()
-        },
     )
 }
 
@@ -395,44 +245,26 @@ pub fn agent_settings_empty_pane(message: &str, swap: FragmentSwap) -> String {
 }
 
 pub fn agent_edit_pane(pane: &AgentEditPane<'_>) -> String {
-    let company_id = pane.company.id;
-    let agent_id = pane.agent.id;
-    let address = agent_display_address(
-        pane.agent,
-        pane.used_by.iter().copied(),
-        pane.company,
-        pane.app_domain_name,
-    );
-    let tabs = agent_tabs(
-        company_id,
-        agent_id,
-        pane.body.tab(),
-        owned_channel(agent_id, pane.used_by.iter().copied()).is_some(),
-    );
+    let address = format!("@{}", pane.agent.slug);
 
     format!(
         r##"
         <section id="agent-pane"{PANE_SKELETON} class="ui-pane-detail flex min-w-0 flex-1 flex-col bg-base-100">
-            <div class="border-b border-base-300 {header_padding}">
+            <div class="border-b border-base-300 px-4 py-4 sm:px-6">
                 <div class="flex flex-wrap items-start justify-between gap-3">
                     <div class="flex min-w-0 grow basis-48 items-center gap-3">
                         {avatar}
                         <div class="min-w-0">
                             <h2 class="truncate text-xl font-bold">{name}</h2>
                             <p class="truncate font-mono text-xs opacity-60">{address} · {model}</p>
-                            {task_counts}
                             <p class="truncate text-xs opacity-50">{creator}</p>
                         </div>
                     </div>
                 </div>
-                {strip}
             </div>
             {body}
         </section>
         "##,
-        task_counts = super::task_counts_slot(super::TaskCountKey::Agent(agent_id)),
-        header_padding = tabs.header_padding,
-        strip = tabs.strip,
         avatar = avatar_bubble(
             pane.agent.avatar_url.as_ref(),
             &pane.agent.name,
@@ -442,34 +274,21 @@ pub fn agent_edit_pane(pane: &AgentEditPane<'_>) -> String {
         address = escape_html_text(&address),
         model = escape_html_text(&agent_model_summary(pane.agent)),
         creator = escape_html_text(&pane.agent.created_by.label()),
-        body = match &pane.body {
-            AgentPaneBody::Settings => agent_settings_body(pane),
-            AgentPaneBody::Channel(tab) => agent_channel_body(pane, tab),
-        },
+        body = agent_settings_body(pane),
     )
 }
 
 /// The Settings tab: the agent's own form, and what deleting it would cost.
 fn agent_settings_body(pane: &AgentEditPane<'_>) -> String {
-    let config = stored_agent_config(pane.agent);
-    let stored = stored_draft(pane.agent, &config);
+    let stored = stored_draft(pane.agent);
     let draft = pane.draft.unwrap_or(&stored);
     let company_id = pane.company.id;
     let agent_id = pane.agent.id;
-    // The personal channel has a tab of its own, so "Run by" is left saying the thing it is
-    // actually for: the *other* channels that would notice this agent going away.
-    let shared = pane
-        .used_by
-        .iter()
-        .copied()
-        .filter(|channel| !channel.is_owned_by(agent_id))
-        .collect::<Vec<_>>();
 
     format!(
         r##"
             <div class="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
                 {error_html}
-                {used_by_html}
                 <form method="post" action="/ui/agents/{agent_id}?company_id={company_id}" hx-disabled-elt="find button[type='submit']" hx-put="/ui/agents/{agent_id}?company_id={company_id}" hx-target="#agent-pane" hx-swap="outerHTML"
                     hx-params="not avatar_file" class="space-y-4">
                     <input type="hidden" name="form_mode" value="advanced">
@@ -486,16 +305,18 @@ fn agent_settings_body(pane: &AgentEditPane<'_>) -> String {
                         <button type="button" class="btn btn-error btn-outline ml-auto"
                             hx-delete="/ui/agents/{agent_id}?company_id={company_id}"
                             hx-target="#agent-pane" hx-swap="outerHTML"
-                            hx-confirm="Delete agent '{name}'? {delete_warning}"
+                            hx-confirm="Delete agent '{name}'? This cannot be undone."
                             hx-push-url="/ui/agents?company_id={company_id}">Delete Agent</button>
                     </div>
                 </form>
+                {assistant_html}
+                {workflow_cards}
             </div>
         "##,
+        assistant_html = assistant_channel_card(company_id, pane.agent, None),
+        workflow_cards = super::workflow_agent_cards(company_id, agent_id),
         name = escape_html_attr(&pane.agent.name),
         error_html = form_error_banner(pane.error),
-        used_by_html = used_by_channels(company_id, &shared),
-        delete_warning = escape_html_attr(&delete_warning(agent_id, pane.used_by)),
         fields = agent_fields(&AgentFields {
             scope: AgentFormScope::Company(company_id),
             agent_id: Some(agent_id),
@@ -506,132 +327,67 @@ fn agent_settings_body(pane: &AgentEditPane<'_>) -> String {
     )
 }
 
-/// The Channel tab: the agent's personal channel, on the form the Channels workspace uses.
-///
-/// The owner, its position-0 assignment and the primary address are lifecycle state rather than
-/// settings, which is what [`ChannelOwner::Existing`] shows instead of offering — and it is why
-/// there is no delete here either: the channel goes when the agent does, and the database refuses
-/// it any other way.
-fn agent_channel_body(pane: &AgentEditPane<'_>, tab: &AgentChannelTab<'_>) -> String {
-    let participants = stored_participants(tab.channel);
-    let aliases = stored_alias_slugs(tab.channel);
-    let stored = stored_channel_draft(tab.channel, &participants, &aliases);
-    let draft = tab.draft.unwrap_or(&stored);
-    let company_id = pane.company.id;
-    let agent_id = pane.agent.id;
+/// What a "Create assistant channel" submission produced, for its card to say.
+pub enum AssistantChannelOutcome<'a> {
+    Created { channel: &'a str, address: &'a str },
+    Refused(&'a str),
+}
 
+/// "Create assistant channel" (p08 D2.4): a new team channel this agent answers, with every
+/// message run through the chosen reply mode's workflow. The command key is fresh with every
+/// render, so a double submit creates one channel.
+pub fn assistant_channel_card(
+    company_id: Uuid,
+    agent: &Agent,
+    outcome: Option<AssistantChannelOutcome<'_>>,
+) -> String {
+    let agent_id = agent.id;
+    let banner = match outcome {
+        None => String::new(),
+        Some(AssistantChannelOutcome::Created { channel, address }) => format!(
+            r#"<div role="status" class="alert alert-success text-sm">Created the team channel {channel} ({address}); it now answers through its workflow.</div>"#,
+            channel = escape_html_text(channel),
+            address = escape_html_text(address),
+        ),
+        Some(AssistantChannelOutcome::Refused(message)) => form_error_banner(Some(message)),
+    };
     format!(
         r##"
-            <div class="flex-1 space-y-6 overflow-y-auto px-4 py-4 sm:px-6">
-                {error_html}
-                <form hx-put="/ui/agents/{agent_id}/channel?company_id={company_id}"
-                    hx-target="#agent-pane" hx-swap="outerHTML" class="space-y-4">
-                    <input type="hidden" name="form_mode" value="advanced">
-                    {fields}
-                    <div class="flex items-center gap-3 border-t border-base-300 pt-4">
-                        <button type="submit" class="btn btn-primary">
-                            <span class="loading loading-spinner loading-sm hidden [.htmx-request_&]:inline-block"></span>
-                            <span class="[.htmx-request_&]:hidden">Save Changes</span>
-                            <span class="hidden [.htmx-request_&]:inline">Saving...</span>
-                        </button>
-                        <button type="button" class="btn btn-ghost"
-                            hx-get="/ui/agents/{agent_id}?company_id={company_id}&tab=channel"
-                            hx-target="#agent-pane" hx-swap="outerHTML" hx-sync="#agent-pane:replace">Cancel</button>
+                <section id="assistant-channel-card" class="mt-6 space-y-3 rounded-box border border-base-300 p-4">
+                    <div>
+                        <h3 class="font-semibold">Assistant channel</h3>
+                        <p class="text-sm opacity-70">Create a team channel (never public) that this agent answers. Autonomous replies send the agent's answer directly; reviewed replies wait for your approval first.</p>
                     </div>
-                </form>
-
-                {schedules_html}
-            </div>
+                    {banner}
+                    <form hx-post="/ui/agents/{agent_id}/assistant-channel?company_id={company_id}"
+                        hx-target="#assistant-channel-card" hx-swap="outerHTML"
+                        hx-disabled-elt="find button[type='submit']" class="grid gap-3 sm:grid-cols-2">
+                        <input type="hidden" name="command_key" value="{command_key}">
+                        <label class="form-control w-full">
+                            <div class="label"><span class="text-xs opacity-70">Channel name</span></div>
+                            <input class="input w-full" name="channel_name" required maxlength="120" value="{name}">
+                        </label>
+                        <label class="form-control w-full">
+                            <div class="label"><span class="text-xs opacity-70">Channel address</span></div>
+                            <input class="input w-full font-mono" name="channel_slug" required maxlength="64" placeholder="{slug}-assistant">
+                        </label>
+                        <label class="form-control w-full">
+                            <div class="label"><span class="text-xs opacity-70">Replies</span></div>
+                            <select class="select w-full" name="reply_mode">
+                                <option value="autonomous">Autonomous</option>
+                                <option value="reviewed">Reviewed by me</option>
+                            </select>
+                        </label>
+                        <div class="flex items-end">
+                            <button type="submit" class="btn btn-outline">Create assistant channel</button>
+                        </div>
+                    </form>
+                </section>
         "##,
-        error_html = form_error_banner(tab.error),
-        fields = channel_fields(&ChannelFields {
-            company: pane.company,
-            app_domain_name: pane.app_domain_name,
-            agents: &[],
-            id_prefix: &format!("agent-channel-{agent_id}"),
-            draft,
-            spam_scan_enabled: tab.spam_scan_enabled,
-            memory_ready: tab.memory_ready,
-            owner: ChannelOwner::Existing(pane.agent),
-        }),
-        schedules_html = channel_schedules_card(&ChannelSchedulesCard {
-            company_id,
-            channel_id: tab.channel.id,
-            schedules: tab.schedules,
-            run_as: tab.run_as,
-        }),
+        slug = escape_html_attr(&agent.slug),
+        name = escape_html_attr(&agent.name),
+        command_key = Uuid::new_v4(),
     )
-}
-
-/// The pane's tab strip, and the header padding that belongs with it.
-///
-/// The two travel together because they are one decision: with a strip the header's bottom edge is
-/// the tabs' own, without one it is the header's padding — the same reason [`EasyTab`] carries its
-/// button and its form as a pair rather than as two independently-absent strings.
-struct AgentTabs {
-    strip: String,
-    header_padding: &'static str,
-}
-
-/// The pane's two halves, as htmx-swapped links.
-///
-/// A tab is a whole pane, and a plain URL is what makes one shareable and what the back button
-/// already understands — the same reasoning as the Companies pane's tabs. `#agent-pane` is already
-/// a swap target though, so these fetch the fragment rather than the whole page, exactly as the
-/// sidebar's own entries do.
-///
-/// An agent with no personal channel gets no strip at all rather than a tab leading nowhere.
-fn agent_tabs(
-    company_id: Uuid,
-    agent_id: Uuid,
-    tab: AgentTab,
-    has_owned_channel: bool,
-) -> AgentTabs {
-    if !has_owned_channel {
-        return AgentTabs {
-            strip: String::new(),
-            header_padding: "px-4 py-4 sm:px-6",
-        };
-    }
-
-    let entry = |target: AgentTab, label: &str| {
-        format!(
-            r##"<a role="tab" class="tab {active}"
-                        hx-get="/ui/agents/{agent_id}?company_id={company_id}&tab={query}"
-                        hx-target="#agent-pane" hx-swap="outerHTML" hx-sync="#agent-pane:replace"
-                        hx-push-url="/ui/agents?company_id={company_id}&agent_id={agent_id}&tab={query}">{label}</a>"##,
-            active = if tab == target { "tab-active" } else { "" },
-            query = target.as_query(),
-        )
-    };
-
-    AgentTabs {
-        strip: format!(
-            r##"
-                <div role="tablist" class="tabs tabs-border -mb-px mt-3">
-                    {settings}
-                    {channel}
-                </div>
-            "##,
-            settings = entry(AgentTab::Settings, "Settings"),
-            channel = entry(AgentTab::Channel, "Channel"),
-        ),
-        header_padding: "px-4 pt-4 sm:px-6",
-    }
-}
-
-/// The channel this agent owns, out of the channels it is assigned to.
-///
-/// An agent owns at most one — `channels.owner_agent_id` is unique — and an owned channel always
-/// assigns its owner at position 0, so it is always in the assigned set and never needs a lookup
-/// of its own.
-fn owned_channel<'a>(
-    agent_id: Uuid,
-    channels: impl Iterator<Item = &'a Channel>,
-) -> Option<&'a Channel> {
-    channels
-        .into_iter()
-        .find(|channel| channel.is_owned_by(agent_id))
 }
 
 pub fn agent_create_pane(pane: &AgentCreatePane<'_>) -> String {
@@ -643,20 +399,16 @@ pub fn agent_create_pane(pane: &AgentCreatePane<'_>) -> String {
     } else {
         pane.draft.slug
     };
-    let preview_address = Channel::address_for(
-        &crate::entities::value_objects::ChannelSlug::from(preview_slug),
-        &pane.company.slug,
-        pane.app_domain_name,
-    );
-    let address_suffix = format!("@{}.{}", pane.company.slug, pane.app_domain_name);
+    // A handle, not a mail address: an agent has none of its own (p08 D4.7).
+    let preview_handle = format!("@{preview_slug}");
 
     format!(
         r##"
         <section id="agent-pane"{PANE_SKELETON} class="ui-pane-detail flex min-w-0 flex-1 flex-col bg-base-100">
             <div class="border-b border-base-300 px-4 py-4 sm:px-6">
                 <h2 class="text-xl font-bold">New agent in {company_name}</h2>
-                <p class="text-xs opacity-70">An agent is a system prompt plus the model that answers with it. Channels run their agents in order.</p>
-                <p class="mt-1 font-mono text-xs text-primary"><span id="agent-address-preview" data-address-suffix="{address_suffix}">{preview_address}</span></p>
+                <p class="text-xs opacity-70">An agent is a system prompt plus the model that answers with it. A workflow runs it as a model step.</p>
+                <p class="mt-1 font-mono text-xs text-primary"><span id="agent-address-preview">{preview_handle}</span></p>
             </div>
             <div class="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
                 {error_html}
@@ -672,7 +424,6 @@ pub fn agent_create_pane(pane: &AgentCreatePane<'_>) -> String {
                     method="post" action="/ui/agents?company_id={company_id}" hx-post="/ui/agents?company_id={company_id}" hx-target="#agent-pane" hx-swap="outerHTML"
                     hx-params="not avatar_file" hx-disabled-elt="find button[type='submit']">
                     <input type="hidden" name="form_mode" value="simple">
-                    {simple_runtime}
                     <label class="form-control w-full">
                         <div class="label"><span class="text-xs opacity-70">Agent Name</span></div>
                         <input type="text" name="name" required value="{name}" placeholder="Support Triage"
@@ -686,12 +437,6 @@ pub fn agent_create_pane(pane: &AgentCreatePane<'_>) -> String {
                             placeholder="Describe the agent's role, responsibilities, rules and tone. A full system prompt is generated when the agent is created."
                             class="textarea w-full font-mono text-xs">{system_prompt}</textarea>
                     </label>
-                    <label class="form-control w-full">
-                        <div class="label"><span class="text-xs opacity-70">Run timeout (seconds)</span></div>
-                        <input type="number" name="run_timeout_secs" min="1" max="3600"
-                            value="{simple_run_timeout}" placeholder="Use deployment default"
-                            class="input w-full">
-                    </label>
                     <button type="submit" class="btn btn-primary">
                         <span class="loading loading-spinner loading-sm hidden [.htmx-request_&]:inline-block"></span>
                         <span class="[.htmx-request_&]:hidden">Create Agent</span>
@@ -699,23 +444,21 @@ pub fn agent_create_pane(pane: &AgentCreatePane<'_>) -> String {
                     </button>
                 </form>
                 <form id="agent-tab-advanced" class="{advanced_hidden} space-y-4"
-                    method="post" action="/ui/agents/new/channel?company_id={company_id}" hx-post="/ui/agents/new/channel?company_id={company_id}" hx-target="#agent-pane" hx-swap="outerHTML"
+                    method="post" action="/ui/agents?company_id={company_id}" hx-post="/ui/agents?company_id={company_id}" hx-target="#agent-pane" hx-swap="outerHTML"
                     hx-params="not avatar_file" hx-disabled-elt="find button[type='submit']">
                     <input type="hidden" name="form_mode" value="advanced">
-                    {agent_step}
                     {fields}
                     <button type="submit" class="btn btn-primary">
                         <span class="loading loading-spinner loading-sm hidden [.htmx-request_&]:inline-block"></span>
-                        <span class="[.htmx-request_&]:hidden">Next: Channel</span>
-                        <span class="hidden [.htmx-request_&]:inline">Loading channel...</span>
+                        <span class="[.htmx-request_&]:hidden">Create Agent</span>
+                        <span class="hidden [.htmx-request_&]:inline">Creating...</span>
                     </button>
                 </form>
             </div>
         </section>
         "##,
         company_name = escape_html_text(&pane.company.name),
-        preview_address = escape_html_text(&preview_address),
-        address_suffix = escape_html_attr(&address_suffix),
+        preview_handle = escape_html_text(&preview_handle),
         company_id = pane.company.id,
         error_html = form_error_banner(pane.error),
         easy_tab_button = easy_html.tab_button,
@@ -724,16 +467,9 @@ pub fn agent_create_pane(pane: &AgentCreatePane<'_>) -> String {
         advanced_hidden = hidden(AgentCreateTab::Advanced),
         simple_active = active(AgentCreateTab::Simple),
         advanced_active = active(AgentCreateTab::Advanced),
-        agent_step = create_steps(AgentCreateStep::Agent),
         name = escape_html_text(pane.draft.name),
         avatar_field = agent_avatar_field("simple", pane.draft),
         system_prompt = escape_html_text(pane.draft.system_prompt),
-        simple_runtime = super::agent_runtime_settings::fields(pane.draft),
-        simple_run_timeout = pane
-            .draft
-            .run_timeout_secs
-            .map(|seconds| seconds.to_string())
-            .unwrap_or_default(),
         fields = agent_fields(&AgentFields {
             scope: AgentFormScope::Company(pane.company.id),
             agent_id: None,
@@ -742,159 +478,6 @@ pub fn agent_create_pane(pane: &AgentCreatePane<'_>) -> String {
             capability_options: pane.capability_options,
         }),
     )
-}
-
-/// The pane for the second half of an Advanced create: the personal channel the new agent will
-/// answer on.
-///
-/// Nothing has been written when this renders. The agent from the first step rides along in hidden
-/// fields (see [`carried_agent_fields`]) so one submit can create the pair in the transaction they
-/// have always been created in.
-pub struct AgentChannelStepPane<'a> {
-    pub company: &'a Company,
-    pub app_domain_name: &'a str,
-    /// The first step, as it was submitted and normalized.
-    pub agent: &'a AgentDraft<'a>,
-    pub draft: &'a ChannelDraft<'a>,
-    pub spam_scan_enabled: bool,
-    pub memory_ready: bool,
-    pub error: Option<&'a str>,
-}
-
-/// Which half of an Advanced create the pane is showing.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum AgentCreateStep {
-    Agent,
-    Channel,
-}
-
-/// The two-step progress line both halves carry, so the first one says there is a second.
-fn create_steps(current: AgentCreateStep) -> String {
-    let step = |lit: bool| if lit { " step-primary" } else { "" };
-    format!(
-        r##"<ul class="steps steps-horizontal w-full max-w-xs text-xs">
-                        <li class="step step-primary">Agent</li>
-                        <li class="step{channel}">Channel</li>
-                    </ul>"##,
-        channel = step(current == AgentCreateStep::Channel),
-    )
-}
-
-pub fn agent_channel_step_pane(pane: &AgentChannelStepPane<'_>) -> String {
-    let address = Channel::address_for(
-        &crate::entities::value_objects::ChannelSlug::from(pane.agent.slug),
-        &pane.company.slug,
-        pane.app_domain_name,
-    );
-
-    format!(
-        r##"
-        <section id="agent-pane"{PANE_SKELETON} class="ui-pane-detail flex min-w-0 flex-1 flex-col bg-base-100">
-            <div class="border-b border-base-300 px-4 py-4 sm:px-6">
-                <h2 class="text-xl font-bold">New agent in {company_name}</h2>
-                <p class="text-xs opacity-70">{agent_name} answers on its own channel. Set it up here; the agent and the channel are created together.</p>
-                <p class="mt-1 font-mono text-xs text-primary">{address}</p>
-            </div>
-            <div class="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
-                {error_html}
-                <form class="space-y-4"
-                    method="post" action="/ui/agents/new/create?company_id={company_id}" hx-post="/ui/agents/new/create?company_id={company_id}" hx-target="#agent-pane" hx-swap="outerHTML"
-                    hx-params="not avatar_file" hx-disabled-elt="find button[type='submit']">
-                    {steps}
-                    {carried}
-                    {fields}
-                    <div class="flex items-center gap-3 border-t border-base-300 pt-4">
-                        <button type="button" class="btn btn-ghost"
-                            hx-post="/ui/agents/new/agent?company_id={company_id}" hx-include="closest form"
-                            hx-target="#agent-pane" hx-swap="outerHTML" hx-sync="#agent-pane:replace"
-                            hx-disabled-elt="this">Back</button>
-                        <button type="submit" class="btn btn-primary">
-                            <span class="loading loading-spinner loading-sm hidden [.htmx-request_&]:inline-block"></span>
-                            <span class="[.htmx-request_&]:hidden">Create Agent</span>
-                            <span class="hidden [.htmx-request_&]:inline">Creating...</span>
-                        </button>
-                        <button type="button" class="btn btn-ghost ml-auto"
-                            hx-get="/ui/agents/new?company_id={company_id}"
-                            hx-target="#agent-pane" hx-swap="outerHTML" hx-sync="#agent-pane:replace">Cancel</button>
-                    </div>
-                </form>
-            </div>
-        </section>
-        "##,
-        company_name = escape_html_text(&pane.company.name),
-        agent_name = escape_html_text(pane.agent.name),
-        address = escape_html_text(&address),
-        company_id = pane.company.id,
-        error_html = form_error_banner(pane.error),
-        steps = create_steps(AgentCreateStep::Channel),
-        carried = carried_agent_fields(pane.agent),
-        fields = channel_fields(&ChannelFields {
-            company: pane.company,
-            app_domain_name: pane.app_domain_name,
-            agents: &[],
-            id_prefix: "new-agent-channel",
-            draft: pane.draft,
-            spam_scan_enabled: pane.spam_scan_enabled,
-            memory_ready: pane.memory_ready,
-            owner: ChannelOwner::Pending {
-                name: pane.agent.name,
-                slug: pane.agent.slug,
-            },
-        }),
-    )
-}
-
-/// The first step's agent, as the hidden fields the channel step submits it back in.
-///
-/// Prefixed because the channel form beside them owns the unprefixed `name`, `slug`,
-/// `description` and `system_prompt`; `CarriedAgent` in the route module is the other half of this
-/// naming and turns them back into the ordinary agent form.
-fn carried_agent_fields(draft: &AgentDraft<'_>) -> String {
-    let hidden = |name: &str, value: &str| {
-        format!(
-            r##"<input type="hidden" name="{name}" value="{value}">"##,
-            value = escape_html_attr(value),
-        )
-    };
-
-    [
-        hidden("agent_name", draft.name),
-        hidden("agent_slug", draft.slug),
-        hidden("agent_system_prompt", draft.system_prompt),
-        hidden("agent_description", draft.description),
-        hidden("agent_provider", draft.provider),
-        hidden("agent_model", draft.model),
-        hidden(
-            "agent_run_timeout_secs",
-            &draft
-                .run_timeout_secs
-                .map(|seconds| seconds.to_string())
-                .unwrap_or_default(),
-        ),
-        // An unticked checkbox submits no key at all, and that is exactly how the agent form
-        // reads a disabled memory policy -- so an off switch is an absent field here too.
-        if draft.memory_enabled {
-            hidden("agent_memory_enabled", "true")
-        } else {
-            String::new()
-        },
-        hidden(
-            "agent_memory_persistence_mode",
-            draft.memory_persistence_mode,
-        ),
-        hidden("agent_memory_recall_mode", draft.memory_recall_mode),
-        hidden(
-            "agent_memory_max_results",
-            &draft.memory_max_results.to_string(),
-        ),
-        hidden("agent_config_json", draft.config_json),
-        hidden("agent_response_format", draft.response_format),
-        hidden("agent_response_schema", &draft.response_schema),
-        hidden("agent_skill_ids", &csv_uuids(&draft.skill_ids)),
-        hidden("agent_sub_agent_ids", &csv_uuids(&draft.sub_agent_ids)),
-        hidden("agent_avatar_url", draft.avatar_url),
-    ]
-    .concat()
 }
 
 /// The Easy tab, as its two pieces: the button in the tab list and the form under it. Both are
@@ -989,16 +572,12 @@ fn id_prefix(agent_id: Option<Uuid>) -> String {
 fn agent_fields(fields: &AgentFields<'_>) -> String {
     let draft = fields.draft;
     let id_prefix = id_prefix(fields.agent_id);
-    let overrides_open = if draft.provider.is_empty()
-        && draft.model.is_empty()
-        && draft.config_json.is_empty()
-        && draft.skill_ids.is_empty()
-        && draft.sub_agent_ids.is_empty()
-    {
-        ""
-    } else {
-        " open"
-    };
+    let overrides_open =
+        if draft.provider.is_empty() && draft.model.is_empty() && draft.skill_ids.is_empty() {
+            ""
+        } else {
+            " open"
+        };
     let description_help = match fields.scope {
         AgentFormScope::Company(_) => "Shown to other agents in this company",
         AgentFormScope::Library => "Shown to agents in companies that select it",
@@ -1018,11 +597,6 @@ fn agent_fields(fields: &AgentFields<'_>) -> String {
     } else {
         company_model_selection(fields.model_connections, draft, &id_prefix)
     };
-    let run_timeout_value = draft
-        .run_timeout_secs
-        .map(|seconds| seconds.to_string())
-        .unwrap_or_default();
-
     format!(
         r##"
                     <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -1049,45 +623,11 @@ fn agent_fields(fields: &AgentFields<'_>) -> String {
                         {generator}
                         {prompt_textarea}
                     </div>
-                    {runtime_settings}
                     <details class="collapse-arrow collapse border border-base-300 bg-base-200"{overrides_open}>
                         <summary class="collapse-title text-sm font-medium">Capabilities &amp; advanced options</summary>
                         <div class="collapse-content space-y-4">
                             {capabilities}
                             {model_connection_fields}
-                            <label class="form-control w-full">
-                                <div class="label"><span class="text-xs opacity-70">Run timeout (seconds)</span></div>
-                                <input type="number" name="run_timeout_secs" min="1" max="3600"
-                                    value="{run_timeout_value}" placeholder="Use deployment default"
-                                    class="input w-full">
-                                <div class="label"><span class="text-xs opacity-60">Leave blank to inherit AGENT_RUN_TIMEOUT_SECS.</span></div>
-                            </label>
-                            <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-                                <label class="form-control md:col-span-3">
-                                    <span class="label cursor-pointer justify-start gap-3">
-                                        <input type="checkbox" name="memory_enabled" value="true" class="checkbox"{memory_enabled_checked}>
-                                        <span><span class="font-medium">Enable memory for this agent</span><span class="block text-xs opacity-60">Channel grants still control which company, agent, and user scopes it may read or write.</span></span>
-                                    </span>
-                                </label>
-                                <label class="form-control w-full">
-                                    <div class="label"><span class="text-xs opacity-70">Memory persistence</span></div>
-                                    <select name="memory_persistence_mode" class="select w-full">
-                                        <option value="audience_only"{memory_audience_selected}>Audience only</option>
-                                        <option value="scope_specific_facts"{memory_scope_selected}>Scope-specific facts</option>
-                                    </select>
-                                </label>
-                                <label class="form-control w-full">
-                                    <div class="label"><span class="text-xs opacity-70">Memory recall</span></div>
-                                    <select name="memory_recall_mode" class="select w-full">
-                                        <option value="fast"{memory_fast_selected}>Fast</option>
-                                        <option value="thinking"{memory_thinking_selected}>Thinking</option>
-                                    </select>
-                                </label>
-                                <label class="form-control w-full">
-                                    <div class="label"><span class="text-xs opacity-70">Maximum memory results</span></div>
-                                    <input name="memory_max_results" type="number" min="1" max="20" value="{memory_max_results}" class="input w-full">
-                                </label>
-                            </div>
                             <label class="form-control w-full">
                                 <div class="label">
                                     <span class="text-xs opacity-70">Description</span>
@@ -1109,30 +649,7 @@ fn agent_fields(fields: &AgentFields<'_>) -> String {
         slug = escape_html_text(draft.slug),
         description_help = description_help,
         description = escape_html_text(draft.description),
-        runtime_settings = super::agent_runtime_settings::fields(draft),
         avatar_field = agent_avatar_field(&id_prefix, draft),
-        memory_audience_selected = if draft.memory_persistence_mode == "audience_only" {
-            " selected"
-        } else {
-            ""
-        },
-        memory_scope_selected = if draft.memory_persistence_mode == "scope_specific_facts" {
-            " selected"
-        } else {
-            ""
-        },
-        memory_fast_selected = if draft.memory_recall_mode == "fast" {
-            " selected"
-        } else {
-            ""
-        },
-        memory_thinking_selected = if draft.memory_recall_mode == "thinking" {
-            " selected"
-        } else {
-            ""
-        },
-        memory_max_results = draft.memory_max_results,
-        memory_enabled_checked = if draft.memory_enabled { " checked" } else { "" },
     )
 }
 
@@ -1146,17 +663,11 @@ fn csv_uuids(ids: &[Uuid]) -> String {
 fn capability_picker(fields: &AgentFields<'_>) -> String {
     let draft = fields.draft;
     let skills = skill_picker(fields.capability_options.skills, draft, fields.scope);
-    let sub_agents = match fields.scope {
-        AgentFormScope::Library => String::new(),
-        AgentFormScope::Company(_) => {
-            sub_agent_picker(fields.capability_options.sub_agents, fields.agent_id, draft)
-        }
-    };
 
     format!(
         r##"<section class="space-y-5 rounded-box border border-base-300 bg-base-100 p-4" data-agent-capability-picker>
             <div><h3 class="font-semibold">Agent capabilities</h3><p class="text-xs opacity-60">Explicitly choose what this agent may use.</p></div>
-            {skills}{sub_agents}
+            {skills}
         </section>"##
     )
 }
@@ -1199,38 +710,6 @@ fn skill_picker(skills: &[Skill], draft: &AgentDraft<'_>, scope: AgentFormScope)
             ),
             AgentFormScope::Library => String::new(),
         },
-    )
-}
-
-fn sub_agent_picker(
-    agents: &[Agent],
-    current_agent_id: Option<Uuid>,
-    draft: &AgentDraft<'_>,
-) -> String {
-    let cards = agents
-        .iter()
-        .filter(|agent| Some(agent.id) != current_agent_id && !agent.is_library())
-        .map(|agent| {
-            format!(
-                r##"<label class="flex cursor-pointer items-start gap-3 rounded-box border border-base-300 p-3">
-                    <input type="checkbox" class="checkbox checkbox-primary mt-0.5" value="{id}"
-                        data-action="capability-multi-select"{checked}>
-                    <span><span class="font-medium">{name}</span><span class="block font-mono text-xs opacity-60">{slug}</span></span>
-                </label>"##,
-                id = agent.id,
-                checked = if draft.sub_agent_ids.contains(&agent.id) { " checked" } else { "" },
-                name = escape_html_text(&agent.name),
-                slug = escape_html_text(&agent.slug),
-            )
-        })
-        .collect::<String>();
-    format!(
-        r##"<section class="space-y-2" data-capability-multi-select>
-            <input type="hidden" name="sub_agent_ids" value="{value}">
-            <h4 class="text-sm font-semibold">Sub-agents</h4>
-            <p class="text-xs opacity-60">Leave empty to let this agent reach every agent in the company.</p>
-            <div class="grid grid-cols-1 gap-2 md:grid-cols-2">{cards}</div></section>"##,
-        value = escape_html_attr(&csv_uuids(&draft.sub_agent_ids)),
     )
 }
 
@@ -1393,86 +872,8 @@ pub fn agent_prompt_failed(message: &str) -> String {
     )
 }
 
-/// The channels that would lose this agent if it were deleted, each a link into its settings.
-fn used_by_channels(company_id: Uuid, channels: &[&Channel]) -> String {
-    if channels.is_empty() {
-        return String::new();
-    }
-
-    let chips: String = channels
-        .iter()
-        .map(|channel| {
-            format!(
-                r##"<a href="/ui/channels?company_id={company_id}&channel_id={channel_id}" class="badge badge-outline badge-sm">{name}</a>"##,
-                channel_id = channel.id,
-                name = escape_html_text(&channel.name),
-            )
-        })
-        .collect();
-
-    format!(
-        r##"
-                <div class="mb-4 flex flex-wrap items-center gap-2 text-xs opacity-70">
-                    <span>Run by</span>
-                    {chips}
-                </div>
-        "##
-    )
-}
-
-/// What deleting this agent would cost, as the confirmation dialog puts it.
-fn delete_warning(agent_id: Uuid, used_by: &[&Channel]) -> String {
-    let owned = used_by
-        .iter()
-        .filter(|channel| channel.is_owned_by(agent_id))
-        .count();
-    let blockers = used_by
-        .iter()
-        .filter(|channel| {
-            !channel.is_owned_by(agent_id)
-                && channel.enabled
-                && channel
-                    .agent_ids
-                    .as_deref()
-                    .and_then(|ids| ids.first())
-                    .is_some_and(|id| *id == agent_id)
-        })
-        .count();
-    let detached = used_by.len().saturating_sub(owned + blockers);
-    if used_by.is_empty() {
-        return "No channel is running it.".to_string();
-    }
-
-    let mut effects = Vec::new();
-    if owned > 0 {
-        effects.push(format!(
-            "{} owned personal channel{} and all of its data will be deleted",
-            owned,
-            if owned == 1 { "" } else { "s" }
-        ));
-    }
-    if blockers > 0 {
-        effects.push(format!(
-            "{} enabled position-0 channel{} must be reassigned first",
-            blockers,
-            if blockers == 1 { "" } else { "s" }
-        ));
-    }
-    if detached > 0 {
-        effects.push(format!(
-            "{} other channel assignment{} will be removed",
-            detached,
-            if detached == 1 { "" } else { "s" }
-        ));
-    }
-    format!("{}.", effects.join("; "))
-}
-
 /// A stored agent as the form sees it.
-///
-/// The one field the agent does not hold as text — its config JSON — is rendered by
-/// [`stored_agent_config`] and passed in, so the draft can stay a pure set of borrows.
-fn stored_draft<'a>(agent: &'a Agent, config_json: &'a str) -> AgentDraft<'a> {
+fn stored_draft(agent: &Agent) -> AgentDraft<'_> {
     AgentDraft {
         name: &agent.name,
         slug: &agent.slug,
@@ -1480,20 +881,7 @@ fn stored_draft<'a>(agent: &'a Agent, config_json: &'a str) -> AgentDraft<'a> {
         description: agent.description.as_deref().unwrap_or(""),
         provider: agent.provider.as_deref().unwrap_or(""),
         model: agent.model.as_deref().unwrap_or(""),
-        run_timeout_secs: agent.run_timeout_secs,
-        memory_enabled: agent.memory_enabled,
-        memory_persistence_mode: agent.memory_persistence_mode.as_str(),
-        memory_recall_mode: agent.memory_recall_mode.as_str(),
-        memory_max_results: agent.memory_max_results,
-        config_json,
-        response_format: if agent.response_contract.is_some() {
-            "json_schema"
-        } else {
-            "text"
-        },
-        response_schema: agent_response_schema(agent),
         skill_ids: Vec::new(),
-        sub_agent_ids: Vec::new(),
         avatar_url: agent
             .avatar_url
             .as_ref()
@@ -1501,25 +889,6 @@ fn stored_draft<'a>(agent: &'a Agent, config_json: &'a str) -> AgentDraft<'a> {
             .unwrap_or(""),
         advanced: true,
     }
-}
-
-/// The agent's config as the JSON text the form submits.
-pub fn stored_agent_config(agent: &Agent) -> String {
-    match &agent.config_json {
-        Some(config) => serde_json::to_string_pretty(config).unwrap_or_else(|_| config.to_string()),
-        None => String::new(),
-    }
-}
-
-/// Schema text is rendered and edited separately from runtime configuration.
-pub fn agent_response_schema(agent: &Agent) -> String {
-    agent
-        .response_contract
-        .as_ref()
-        .map(|contract| {
-            serde_json::to_string_pretty(contract.schema()).expect("JSON value serializes")
-        })
-        .unwrap_or_default()
 }
 
 #[cfg(test)]
@@ -1557,33 +926,16 @@ mod capability_tests {
     }
 
     #[test]
-    fn an_empty_sub_agent_allowlist_renders_the_unrestricted_note() {
-        let company_id = Uuid::new_v4();
-        let html = agent_fields(&AgentFields {
-            scope: AgentFormScope::Company(company_id),
-            agent_id: None,
-            draft: &AgentDraft::default(),
-            model_connections: &[],
-            capability_options: AgentCapabilityOptions::default(),
-        });
-        assert!(html.contains("Leave empty to let this agent reach every agent in the company."));
-    }
-
-    #[test]
-    fn a_library_agent_picker_offers_only_global_skills_and_no_sub_agents() {
+    fn a_library_agent_picker_offers_only_global_skills() {
         let global = skill(None, "Global");
         let company = skill(Some(Uuid::new_v4()), "Company");
         let options = [global, company];
         let html = library_agent_fields_with_capabilities(
             &AgentDraft::default(),
             None,
-            AgentCapabilityOptions {
-                skills: &options,
-                sub_agents: &[],
-            },
+            AgentCapabilityOptions { skills: &options },
         );
         assert!(html.contains("Global description"));
         assert!(!html.contains("Company description"));
-        assert!(!html.contains("name=\"sub_agent_ids\""));
     }
 }

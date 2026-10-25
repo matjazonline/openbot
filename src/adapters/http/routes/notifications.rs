@@ -203,7 +203,7 @@ async fn notification_events(
         loop {
             tokio::select! {
                 event = events.next() => match event {
-                    Some(Ok(event)) if event.notification_scope(user_id).is_some_and(
+                    Some(Ok(event)) if event.is_resync() || event.notification_scope(user_id).is_some_and(
                         |scope| scope.company_id == company_id
                     ) => yield Ok(reconcile_event(company_id)),
                     Some(Ok(_)) => {}

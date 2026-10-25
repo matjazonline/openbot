@@ -12,11 +12,15 @@ use uuid::Uuid;
 use crate::{
     adapters::http::{app_state::AppState, auth::AuthenticatedUser, pages},
     app_error::AppResult,
-    entities::value_objects::EmailAddress,
+    application::workflow::{
+        WorkflowActor,
+        provisioning::{AssistantChannelRequest, AssistantChannels, ReplyMode},
+    },
+    domain::workflow::CompanyId,
+    entities::{agent::Agent, value_objects::EmailAddress},
     infra::config::AppConfig,
     use_cases::{
-        agent::AgentUseCases,
-        channel::ChannelUseCases,
+        agent::{AgentUseCases, LibraryCopyModel, pinned_default_model},
         company::{CompanyModelConnectionWrite, CompanyUseCases, CompanyWrite},
         user::UserUseCases,
     },
@@ -35,10 +39,10 @@ pub fn router() -> Router<AppState> {
         .route("/ui/onboarding/company", post(create_company))
         .route(
             "/ui/onboarding/companies/{company_id}/channel",
-            get(channel_step).post(create_channel),
+            get(channel_step).post(create_agents),
         )
         .route(
-            "/ui/onboarding/companies/{company_id}/channels/{channel_id}/complete",
+            "/ui/onboarding/companies/{company_id}/complete",
             get(complete),
         )
 }
@@ -193,10 +197,14 @@ async fn channel_step(
     .into_response())
 }
 
+/// Step 2 (p08 D4.7): the chosen agents, agent-only and pinned to the company default model when
+/// there is one, then an assistant channel for each agent that has a model. The completion page
+/// is rendered here, so a refusal shows next to its agent.
 #[allow(clippy::too_many_arguments)]
-async fn create_channel(
+async fn create_agents(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(agent_use_cases): State<Arc<AgentUseCases>>,
+    State(assistant_channels): State<Arc<dyn AssistantChannels>>,
     State(user_use_cases): State<Arc<UserUseCases>>,
     State(config): State<Arc<AppConfig>>,
     user: AuthenticatedUser,
@@ -260,8 +268,11 @@ async fn create_channel(
         .into_response());
     }
 
-    let mut created_channels = Vec::new();
-    let mut created_agent_ids = Vec::new();
+    let connections = agent_use_cases
+        .list_company_model_connections(user.id, company_id)
+        .await?;
+    let default_model = pinned_default_model(&connections);
+    let mut created_agents = Vec::new();
 
     if !custom_name.is_empty() {
         let slug = slugify(custom_name);
@@ -273,17 +284,18 @@ async fn create_channel(
                 name: custom_name,
                 slug: &slug,
                 instructions: custom_instructions,
-                overrides: ModelOverrides::default(),
-                run_timeout_secs: None,
+                overrides: ModelOverrides {
+                    provider: default_model
+                        .as_ref()
+                        .map(|(provider, _)| provider.as_str()),
+                    model: default_model.as_ref().map(|(_, model)| model.as_str()),
+                },
                 avatar_url: None,
             },
         )
         .await
         {
-            Ok(provisioned) => {
-                created_agent_ids.push(provisioned.agent.id);
-                created_channels.push(provisioned.channel);
-            }
+            Ok(agent) => created_agents.push(agent),
             Err(err) => {
                 return Ok(Html(pages::onboarding_channel_draft_page(
                     &mailbox_user,
@@ -299,17 +311,19 @@ async fn create_channel(
 
     for library_agent in selected_library_agents {
         match agent_use_cases
-            .create_agent_from_library(user.id, company_id, library_agent.id)
+            .create_agent_from_library(
+                user.id,
+                company_id,
+                library_agent.id,
+                LibraryCopyModel::PinDefault,
+            )
             .await
         {
-            Ok(provisioned) => {
-                created_agent_ids.push(provisioned.agent.id);
-                created_channels.push(provisioned.channel);
-            }
+            Ok(provisioned) => created_agents.push(provisioned.agent),
             Err(err) => {
-                for agent_id in created_agent_ids {
+                for agent in created_agents {
                     let _ = agent_use_cases
-                        .delete_agent(user.id, company_id, agent_id)
+                        .delete_agent(user.id, company_id, agent.id)
                         .await;
                 }
                 return Ok(Html(pages::onboarding_channel_draft_page(
@@ -324,23 +338,102 @@ async fn create_channel(
         }
     }
 
-    let channel = created_channels
-        .first()
-        .expect("at least one channel was requested");
-    Ok(Redirect::to(&format!(
-        "/ui/onboarding/companies/{company_id}/channels/{}/complete",
-        channel.id
+    let caller = WorkflowActor::authenticated(user.id)?;
+    let mut onboarded = Vec::with_capacity(created_agents.len());
+    for agent in &created_agents {
+        let channel =
+            onboarding_channel(assistant_channels.as_ref(), company_id, caller, agent).await?;
+        onboarded.push(pages::OnboardedAgent { agent, channel });
+    }
+    Ok(Html(pages::onboarding_complete_page(
+        &mailbox_user,
+        &company,
+        &onboarded,
     ))
     .into_response())
 }
 
+/// One agent's assistant channel: slug = its handle, name = its name, autonomous replies, team
+/// access, under its onboarding key. An agent without a model is skipped, not refused.
+async fn onboarding_channel(
+    channels: &dyn AssistantChannels,
+    company_id: Uuid,
+    caller: WorkflowActor,
+    agent: &Agent,
+) -> AppResult<pages::OnboardingChannel> {
+    if agent.model.is_none() {
+        return Ok(pages::OnboardingChannel::NoModel);
+    }
+    let created = channels
+        .create_assistant_channel(
+            CompanyId::new(company_id),
+            caller,
+            AssistantChannelRequest {
+                agent_slug: agent.slug.clone(),
+                channel_slug: agent.slug.clone(),
+                channel_name: agent.name.clone(),
+                reply_mode: ReplyMode::Autonomous,
+                command_key: onboarding_key(agent),
+            },
+        )
+        .await?;
+    Ok(match created {
+        Ok(created) => created_channel(&created),
+        Err(refusal) => pages::OnboardingChannel::Refused(refusal.message()),
+    })
+}
+
+/// What the completion page shows for an agent on a reload: the channel its onboarding command
+/// stored, if any. A refusal is not stored, so an agent with a model and no channel is missing.
+async fn stored_onboarding_channel(
+    channels: &dyn AssistantChannels,
+    company_id: Uuid,
+    caller: WorkflowActor,
+    agent: &Agent,
+) -> AppResult<pages::OnboardingChannel> {
+    let stored = channels
+        .assistant_channel_result(CompanyId::new(company_id), caller, &onboarding_key(agent))
+        .await?;
+    Ok(match stored {
+        Some(created) => created_channel(&created),
+        None if agent.model.is_none() => pages::OnboardingChannel::NoModel,
+        None => pages::OnboardingChannel::Missing,
+    })
+}
+
+/// The assistant-channel command key of an onboarding agent: stable per agent, so a replay
+/// returns the stored channel and the completion page can read it back.
+fn onboarding_key(agent: &Agent) -> String {
+    format!("onboarding:{}", agent.id)
+}
+
+fn created_channel(created: &serde_json::Value) -> pages::OnboardingChannel {
+    let channel = &created["channel"];
+    match (
+        channel["id"]
+            .as_str()
+            .and_then(|id| Uuid::parse_str(id).ok()),
+        channel["address"].as_str(),
+    ) {
+        (Some(channel_id), Some(address)) => pages::OnboardingChannel::Created {
+            channel_id,
+            address: address.to_owned(),
+        },
+        _ => pages::OnboardingChannel::Missing,
+    }
+}
+
+/// The completion page again, from what was stored: each company agent and the channel its
+/// onboarding command created.
+#[allow(clippy::too_many_arguments)]
 async fn complete(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
-    State(channel_use_cases): State<Arc<ChannelUseCases>>,
+    State(agent_use_cases): State<Arc<AgentUseCases>>,
+    State(assistant_channels): State<Arc<dyn AssistantChannels>>,
     State(config): State<Arc<AppConfig>>,
     State(user_use_cases): State<Arc<UserUseCases>>,
     user: AuthenticatedUser,
-    Path((company_id, channel_id)): Path<(Uuid, Uuid)>,
+    Path(company_id): Path<Uuid>,
 ) -> AppResult<Response> {
     let account = load_account(&user_use_cases, user.id).await?;
     let email = EmailAddress::from(account.email.as_str());
@@ -349,18 +442,21 @@ async fn complete(
     let Some(company) = company.filter(|company| company.user_id == user.id) else {
         return Ok(Redirect::to("/ui").into_response());
     };
-    let channel = channel_use_cases
-        .get_company_channel(user.id, company_id, channel_id)
+    let agents = agent_use_cases
+        .list_company_agents(user.id, company_id)
         .await?;
-    let Some(channel) = channel else {
-        return Ok(Redirect::to("/ui").into_response());
-    };
-
+    let caller = WorkflowActor::authenticated(user.id)?;
+    let mut onboarded = Vec::with_capacity(agents.len());
+    for agent in &agents {
+        let channel =
+            stored_onboarding_channel(assistant_channels.as_ref(), company_id, caller, agent)
+                .await?;
+        onboarded.push(pages::OnboardedAgent { agent, channel });
+    }
     Ok(Html(pages::onboarding_complete_page(
         &mailbox_user,
         &company,
-        &channel,
-        &config.app_domain_name,
+        &onboarded,
     ))
     .into_response())
 }
@@ -382,28 +478,20 @@ mod tests {
             name: "Acme".to_string(),
             slug: "acme".into(),
             avatar_url: None,
-            memory_provider: None,
             created_at: Utc::now(),
         }
     }
 
     fn library_agent(name: &str, slug: &str) -> Agent {
         Agent {
-            response_contract: None,
-            memory_enabled: false,
-            memory_persistence_mode: crate::entities::memory::MemoryPersistenceMode::AudienceOnly,
-            memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
-            memory_max_results: 5,
             id: Uuid::new_v4(),
             company_id: None,
             name: name.to_string(),
             slug: slug.to_string(),
             provider: None,
             model: None,
-            run_timeout_secs: None,
             system_prompt: Some("Help with email.".to_string()),
             description: Some("A ready-made helper".to_string()),
-            config_json: None,
             avatar_url: None,
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
@@ -423,8 +511,6 @@ mod tests {
             company_membership: CompanyMembership::Owner,
         };
         let channel = Channel {
-            response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
-            owner_agent_id: None,
             enabled: true,
             add_3rd_party: true,
             id: Uuid::new_v4(),
@@ -436,15 +522,9 @@ mod tests {
             participant_emails: None,
             access_mode: crate::entities::channel::ChannelAccessMode::Team,
             principal_grants: Vec::new(),
-            agent_ids: None,
-            retrieve_company_memory: false,
-            retrieve_agent_memory: false,
-            retrieve_user_memory: false,
-            persist_company_memory: false,
-            persist_agent_memory: false,
-            persist_user_memory: false,
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
+            settings_revision: 0,
         };
 
         let company_page = pages::onboarding_company_page(&user, "example.com", None);
@@ -501,15 +581,262 @@ mod tests {
         );
         assert!(channel_page.contains("Creating email agents…"));
 
-        let complete_page =
-            pages::onboarding_complete_page(&user, &company, &channel, "example.com");
+        // p08 D4.7: each agent with its channel, or why it has none and where to make one.
+        let scheduler = library_agent.clone();
+        let triage = super::tests::library_agent("Triage", "triage");
+        let unpinned = super::tests::library_agent("Drafts", "drafts");
+        let complete_page = pages::onboarding_complete_page(
+            &user,
+            &company,
+            &[
+                pages::OnboardedAgent {
+                    agent: &scheduler,
+                    channel: pages::OnboardingChannel::Created {
+                        channel_id: channel.id,
+                        address: "scheduler@acme.example.com".into(),
+                    },
+                },
+                pages::OnboardedAgent {
+                    agent: &triage,
+                    channel: pages::OnboardingChannel::Refused(
+                        "The address is <already> used".into(),
+                    ),
+                },
+                pages::OnboardedAgent {
+                    agent: &unpinned,
+                    channel: pages::OnboardingChannel::NoModel,
+                },
+            ],
+        );
         assert!(complete_page.contains("Step 3 of 3"));
-        assert!(complete_page.contains("customer-support@acme.example.com"));
+        assert!(complete_page.contains("Your email agents are ready"));
+        assert!(complete_page.contains("scheduler@acme.example.com"));
         assert!(complete_page.contains("Forward a message"));
-        assert!(complete_page.contains("Reply in the thread"));
+        assert!(complete_page.contains("The address is &lt;already&gt; used"));
+        assert!(complete_page.contains(&format!(
+            "href=\"/ui/agents?company_id={}&agent_id={}\"",
+            company.id, triage.id
+        )));
+        assert!(complete_page.contains(
+            "Connect a model in company settings, then create an assistant channel from each agent's page."
+        ));
         assert!(complete_page.contains(&format!(
             "href=\"/ui?company_id={}&channel_id={}\" class=\"btn btn-primary\">Finish</a>",
             company.id, channel.id
         )));
+
+        let no_channels = pages::onboarding_complete_page(
+            &user,
+            &company,
+            &[pages::OnboardedAgent {
+                agent: &unpinned,
+                channel: pages::OnboardingChannel::NoModel,
+            }],
+        );
+        assert!(no_channels.contains("Your agents are created"));
+        assert!(!no_channels.contains("Forward a message"));
+        assert!(no_channels.contains(&format!(
+            "href=\"/ui?company_id={}\" class=\"btn btn-primary\">Finish</a>",
+            company.id
+        )));
+    }
+
+    /// p08 D4.7, F085.3: each agent with a model gets one team assistant channel under its
+    /// onboarding key, and replaying the step for the existing agents returns that channel and
+    /// adds none. An agent without a model is skipped, a taken address is the refusal, and a
+    /// reload reads back only what was stored -- for the company's managers.
+    #[tokio::test]
+    async fn the_channel_step_gives_each_modelled_agent_one_assistant_channel() {
+        use crate::adapters::persistence::workflow::provisioning::{
+            AssistantChannelService, ProvisioningDeployment,
+        };
+        use crate::adapters::persistence::{PostgresPersistence, test_support::test_pool};
+        use crate::adapters::workflow_source::WorkflowSourceDecoder;
+        use crate::application::workflow::templates::TemplateCatalogue;
+        use crate::use_cases::{
+            agent::{AgentPersistence, AgentWrite},
+            company::CompanyPersistence,
+            user::UserPersistence,
+        };
+
+        let Some(pool) = test_pool().await else {
+            return;
+        };
+        let persistence = PostgresPersistence::new(pool);
+        let suffix = Uuid::new_v4().simple().to_string();
+        let owner = persistence
+            .create_user(&suffix, &format!("{suffix}@example.test"), "hash")
+            .await
+            .unwrap()
+            .id;
+        let outsider_name = format!("{suffix}-out");
+        let outsider = persistence
+            .create_user(
+                &outsider_name,
+                &format!("{outsider_name}@example.test"),
+                "hash",
+            )
+            .await
+            .unwrap()
+            .id;
+        let company = CompanyPersistence::create(
+            &persistence,
+            owner,
+            CompanyWrite {
+                name: "Onboarded".into(),
+                slug: suffix.clone(),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap()
+        .id;
+        CompanyPersistence::replace_model_connections_for_user(
+            &persistence,
+            owner,
+            company,
+            vec![
+                CompanyModelConnectionWrite::new(
+                    "openai",
+                    Some("test-key".into()),
+                    vec!["gpt-4o-mini".into()],
+                    true,
+                )
+                .unwrap(),
+            ],
+        )
+        .await
+        .unwrap();
+        let agent = |slug: &str, pinned: bool| AgentWrite {
+            name: format!("Agent {slug}"),
+            slug: slug.into(),
+            provider: pinned.then(|| "openai".into()),
+            model: pinned.then(|| "gpt-4o-mini".into()),
+            ..Default::default()
+        };
+        let desk = AgentPersistence::create(&persistence, company, agent("desk", true))
+            .await
+            .unwrap();
+        let drafts = AgentPersistence::create(&persistence, company, agent("drafts", false))
+            .await
+            .unwrap();
+        let taken = AgentPersistence::create(&persistence, company, agent("taken", true))
+            .await
+            .unwrap();
+        let channels = AssistantChannelService::new(
+            persistence.clone(),
+            ProvisioningDeployment::new(
+                Arc::new(TemplateCatalogue::shipped(&WorkflowSourceDecoder).unwrap()),
+                &[],
+                "agents.test",
+            ),
+        );
+        let caller = WorkflowActor::authenticated(owner).unwrap();
+        let company_channels = || async {
+            sqlx::query_scalar::<_, i64>("SELECT count(*) FROM channels WHERE company_id = $1")
+                .bind(company)
+                .fetch_one(persistence.pool())
+                .await
+                .unwrap()
+        };
+
+        // Something else already answers on "taken".
+        channels
+            .create_assistant_channel(
+                CompanyId::new(company),
+                caller,
+                AssistantChannelRequest {
+                    agent_slug: "desk".into(),
+                    channel_slug: "taken".into(),
+                    channel_name: "Taken".into(),
+                    reply_mode: ReplyMode::Autonomous,
+                    command_key: "elsewhere".into(),
+                },
+            )
+            .await
+            .unwrap()
+            .unwrap();
+        let before = company_channels().await;
+
+        let first = onboarding_channel(&channels, company, caller, &desk)
+            .await
+            .unwrap();
+        let pages::OnboardingChannel::Created {
+            channel_id,
+            address,
+        } = first.clone()
+        else {
+            panic!("the desk agent gets its channel: {first:?}");
+        };
+        assert_eq!(address, format!("desk@{suffix}.agents.test"));
+        let (slug, name, access): (String, String, String) = sqlx::query_as(
+            "SELECT slug.slug::text, channel.name, channel.access_mode FROM channels AS channel \
+             JOIN channel_slugs AS slug ON slug.channel_id = channel.id AND slug.is_primary \
+             WHERE channel.id = $1 AND channel.company_id = $2",
+        )
+        .bind(channel_id)
+        .bind(company)
+        .fetch_one(persistence.pool())
+        .await
+        .unwrap();
+        assert_eq!(
+            (slug.as_str(), name.as_str(), access.as_str()),
+            ("desk", "Agent desk", "team")
+        );
+        assert_eq!(company_channels().await, before + 1);
+
+        // A replay of the step for the agents that already exist adds nothing.
+        let replayed = onboarding_channel(&channels, company, caller, &desk)
+            .await
+            .unwrap();
+        assert_eq!(replayed, first);
+        assert_eq!(company_channels().await, before + 1);
+
+        assert_eq!(
+            onboarding_channel(&channels, company, caller, &drafts)
+                .await
+                .unwrap(),
+            pages::OnboardingChannel::NoModel
+        );
+        let refused = onboarding_channel(&channels, company, caller, &taken)
+            .await
+            .unwrap();
+        assert!(
+            matches!(&refused, pages::OnboardingChannel::Refused(message) if message.contains("'taken'")),
+            "{refused:?}"
+        );
+        assert_eq!(company_channels().await, before + 1);
+
+        // A reload reads back what was stored; a refusal was not.
+        assert_eq!(
+            stored_onboarding_channel(&channels, company, caller, &desk)
+                .await
+                .unwrap(),
+            first
+        );
+        assert_eq!(
+            stored_onboarding_channel(&channels, company, caller, &taken)
+                .await
+                .unwrap(),
+            pages::OnboardingChannel::Missing
+        );
+        assert_eq!(
+            stored_onboarding_channel(&channels, company, caller, &drafts)
+                .await
+                .unwrap(),
+            pages::OnboardingChannel::NoModel
+        );
+        // Someone who does not manage the company reads nothing.
+        assert_eq!(
+            stored_onboarding_channel(
+                &channels,
+                company,
+                WorkflowActor::authenticated(outsider).unwrap(),
+                &desk
+            )
+            .await
+            .unwrap(),
+            pages::OnboardingChannel::Missing
+        );
     }
 }

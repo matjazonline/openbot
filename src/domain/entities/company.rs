@@ -3,35 +3,19 @@ use uuid::Uuid;
 
 use crate::entities::{
     company_member::CompanyMembership,
-    memory::MemoryProviderKind,
-    transport::PrincipalId,
-    value_objects::{AvatarUrl, CompanySlug, EmailAddress, ModelName, ModelProvider},
+    value_objects::{AvatarUrl, CompanySlug, ModelName, ModelProvider},
 };
 
-/// Defaults copied into each newly provisioned personal agent channel.
+/// Defaults copied into each new assistant channel.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct CompanyChannelDefaults {
     pub add_3rd_party: bool,
-    pub participant_emails: Option<Vec<EmailAddress>>,
-    pub retrieve_company_memory: bool,
-    pub retrieve_agent_memory: bool,
-    pub retrieve_user_memory: bool,
-    pub persist_company_memory: bool,
-    pub persist_agent_memory: bool,
-    pub persist_user_memory: bool,
 }
 
 impl Default for CompanyChannelDefaults {
     fn default() -> Self {
         Self {
             add_3rd_party: true,
-            participant_emails: None,
-            retrieve_company_memory: false,
-            retrieve_agent_memory: false,
-            retrieve_user_memory: false,
-            persist_company_memory: false,
-            persist_agent_memory: false,
-            persist_user_memory: false,
         }
     }
 }
@@ -53,8 +37,6 @@ pub struct Company {
     pub name: String,
     pub slug: CompanySlug,
     #[serde(default)]
-    pub memory_provider: Option<MemoryProviderKind>,
-    #[serde(default)]
     pub channel_defaults: CompanyChannelDefaults,
     /// The company's picture; `None` falls back to the letter bubble.
     pub avatar_url: Option<AvatarUrl>,
@@ -71,38 +53,6 @@ pub struct CompanyAccess {
     pub membership: CompanyMembership,
 }
 
-/// One account on a company's team -- the owner included -- with the address the company knows
-/// them by.
-///
-/// `CompanyMember` is a `company_members` row and so cannot describe the owner, who has no such
-/// row. Anything that has to offer "somebody on this team" as a choice, such as the member a
-/// schedule runs as, needs the owner in the same list as everybody else.
-#[derive(Debug, Clone, PartialEq, Serialize)]
-pub struct CompanyTeamAccount {
-    pub user_id: Uuid,
-    pub email: EmailAddress,
-    pub username: Option<String>,
-    pub membership: CompanyMembership,
-    /// The company-scoped actor this account is, when it has one.
-    ///
-    /// Read alongside the account rather than looked up per caller: anything that has to *scope*
-    /// something to this person -- their memories, their thread participation, a schedule that
-    /// runs as them -- names the principal, and re-deriving it from the address at each call site
-    /// is how an address came to be used as a key. `None` for an account that has never been
-    /// observed in this company at all.
-    pub principal_id: Option<PrincipalId>,
-}
-
-impl CompanyTeamAccount {
-    /// What to show a reader: the account's own name when it has one, and its address otherwise.
-    pub fn label(&self) -> &str {
-        match self.username.as_deref().map(str::trim) {
-            Some(username) if !username.is_empty() => username,
-            _ => self.email.as_str(),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -111,12 +61,5 @@ mod tests {
     fn channel_defaults_match_database_defaults() {
         let defaults = CompanyChannelDefaults::default();
         assert!(defaults.add_3rd_party);
-        assert!(defaults.participant_emails.is_none());
-        assert!(!defaults.retrieve_company_memory);
-        assert!(!defaults.retrieve_agent_memory);
-        assert!(!defaults.retrieve_user_memory);
-        assert!(!defaults.persist_company_memory);
-        assert!(!defaults.persist_agent_memory);
-        assert!(!defaults.persist_user_memory);
     }
 }

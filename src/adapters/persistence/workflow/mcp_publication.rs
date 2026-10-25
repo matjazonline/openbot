@@ -9,6 +9,7 @@ pub struct McpPublicationDirectory {
     pub persistence: PostgresPersistence,
     pub selections: Vec<McpPublicationSelection>,
 }
+#[derive(Clone)]
 pub struct McpPublicationSelection {
     pub connection: Uuid,
     pub slot: ResourceName,

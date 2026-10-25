@@ -1,4 +1,4 @@
-//! Reusable multi-select cards for provisioning one channel per library agent.
+//! Reusable multi-select cards for picking library agents.
 
 use super::*;
 
@@ -7,13 +7,13 @@ use super::*;
 /// per-page `script` hook that used to carry it was silently discarded by the shell.
 pub(crate) const AGENT_LIBRARY_SCRIPT: &str = r#"
 function csvValues(data,name){return (data.get(name)||'').split(',').map(function(value){return value.trim()}).filter(Boolean)}
-function libraryPayload(form){const data=new FormData(form);let config={version:1};try{config=data.get('config_json')?JSON.parse(data.get('config_json')):{version:1}}catch(e){alert('Config must be valid JSON');throw e}return {name:data.get('name'),slug:data.get('slug'),provider:data.get('provider')||null,model:data.get('model')||null,run_timeout_secs:data.get('run_timeout_secs')?Number(data.get('run_timeout_secs')):null,system_prompt:data.get('system_prompt')||null,description:data.get('description')||null,config_json:config,response_contract:data.get('response_format')==='json_schema'?{version:1,format:'json_schema',schema:JSON.parse(data.get('response_schema')||'')}:null,avatar_url:data.get('avatar_url')||null,skill_ids:csvValues(data,'skill_ids'),sub_agent_ids:[],memory_enabled:data.get('memory_enabled')==='true',memory_persistence_mode:data.get('memory_persistence_mode')||'audience_only',memory_recall_mode:data.get('memory_recall_mode')||'fast',memory_max_results:Number(data.get('memory_max_results')||5)}}
+function libraryPayload(form){const data=new FormData(form);return {name:data.get('name'),slug:data.get('slug'),provider:data.get('provider')||null,model:data.get('model')||null,system_prompt:data.get('system_prompt')||null,description:data.get('description')||null,avatar_url:data.get('avatar_url')||null,skill_ids:csvValues(data,'skill_ids')}}
 async function libraryRequest(url,method,body){const response=await fetch(url,{method,headers:{'content-type':'application/json'},body:body?JSON.stringify(body):undefined});if(!response.ok)throw new Error(await response.text());return response.status===204?null:response.json()}
 async function createLibraryAgent(event){event.preventDefault();await submitLibraryAgent(event.target,'/api/agent-library','POST')}
 async function saveLibraryAgent(event,id){event.preventDefault();await submitLibraryAgent(event.target,'/api/agent-library/'+id,'PUT')}
 async function submitLibraryAgent(form,url,method){
     if(form.getAttribute('aria-busy')==='true')return;
-    let payload;try{payload=libraryPayload(form)}catch(e){alert('Enter valid configuration and response schema JSON. '+e.message);return}
+    const payload=libraryPayload(form);
     const buttons=Array.from(form.querySelectorAll('button[type=submit],button:not([type])'));
     form.setAttribute('aria-busy','true');buttons.forEach(button=>{button.dataset.previousLabel=button.textContent;button.textContent='Saving…';button.disabled=true});
     try{await libraryRequest(url,method,payload);location.reload()}catch(e){alert(e.message)}finally{form.removeAttribute('aria-busy');buttons.forEach(button=>{button.disabled=false;button.textContent=button.dataset.previousLabel})}

@@ -256,7 +256,7 @@ impl AttemptStats {
     }
 }
 
-/// How many outstanding tasks the dashboard lists before deferring to `/ui/tasks`.
+/// How many outstanding workflow jobs the dashboard lists.
 ///
 /// Enough to cover a normal bad morning, short enough that the panel stays a summary rather than
 /// becoming a second task monitor with none of its filtering.
@@ -273,9 +273,10 @@ pub struct OutstandingTask {
     pub id: Uuid,
     pub company_id: Uuid,
     pub company_name: String,
-    pub channel_id: Uuid,
-    pub channel_name: String,
-    /// `None` for a task queued outside a conversation; those link to the task itself instead.
+    /// `None` for a job of a run without a channel.
+    pub channel_id: Option<Uuid>,
+    pub channel_name: Option<String>,
+    /// `None` for a job outside a conversation, which has no thread to open.
     pub thread_id: Option<Uuid>,
     pub task_type: String,
     pub status: TaskStatus,
@@ -291,11 +292,11 @@ pub struct OutstandingTask {
 impl OutstandingTask {
     /// Is somebody expected to do something about this?
     ///
-    /// A stalled or dead-lettered task is a problem. A parked one is waiting on a human or a third
-    /// party by design, and a running one is simply running. One rule, so the ordering, the icon
-    /// and the tint cannot disagree about what counts as trouble.
+    /// A stalled job is a problem: no worker holds its lease. A queued or running one is simply
+    /// on its way. One rule, so the ordering, the icon and the tint cannot disagree about what
+    /// counts as trouble.
     pub fn needs_attention(&self) -> bool {
-        self.stalled || self.status == TaskStatus::DeadLetter
+        self.stalled
     }
 }
 

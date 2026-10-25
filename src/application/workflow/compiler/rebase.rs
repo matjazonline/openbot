@@ -71,6 +71,67 @@ pub fn rebase_workflow_id(
     Ok(result)
 }
 
+/// Point one `agent.run` step's literal agent at `agent` (p08 D2.3): only the located scalar
+/// changes, written double-quoted so no slug can read as another YAML type, then the result is
+/// decoded and checked. Assistant provisioning uses it on a shipped reply-mode template.
+pub fn retarget_agent(
+    decoder: &impl SourceDecoder,
+    source: &str,
+    step: &str,
+    agent: &str,
+) -> Result<String, Diagnostic> {
+    let pointer = format!("/steps/{step}/with/agent/literal");
+    let decoded = decoder.decode(source)?;
+    let version = VersionId::new(uuid::Uuid::nil());
+    let parsed = parse_workflow(&decoded, version)?;
+    let invalid = |message: &str, span| Diagnostic::at("provision.agent", message, &pointer, span);
+    let span = *parsed.locations.get(&pointer).ok_or_else(|| {
+        invalid(
+            "The template has no literal agent here",
+            parsed.locations[""],
+        )
+    })?;
+    if agent.is_empty()
+        || !agent
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-' | b'.'))
+    {
+        return Err(invalid("The agent key is not a valid literal", span));
+    }
+    let scalar = source
+        .get(span.start..span.end)
+        .ok_or_else(|| invalid("Decoder returned an invalid scalar byte span", span))?;
+    if scalar.contains('\n') {
+        return Err(invalid(
+            "The template's agent literal must be a single-line scalar",
+            span,
+        ));
+    }
+    let mut result = String::with_capacity(source.len() + agent.len() + 2);
+    result.push_str(&source[..span.start]);
+    result.push('"');
+    result.push_str(agent);
+    result.push('"');
+    result.push_str(&source[span.end..]);
+    if result.len() > MAX_SOURCE_BYTES {
+        return Err(invalid("Retargeted source exceeds 256 KiB", span));
+    }
+    let checked = parse_workflow(&decoder.decode(&result)?, version)?;
+    let literal = checked
+        .definition
+        .steps
+        .get(
+            &crate::domain::workflow::StepId::parse(step)
+                .map_err(|_| invalid("The template step is not a valid step id", span))?,
+        )
+        .and_then(|definition| definition.inputs.get("agent"));
+    if !matches!(literal, Some(crate::domain::workflow::Binding::Literal(value)) if value == agent)
+    {
+        return Err(invalid("Retargeted agent does not match", span));
+    }
+    Ok(result)
+}
+
 fn error(code: &'static str, message: &str, span: SourceSpan) -> Diagnostic {
     Diagnostic::at(code, message, "/workflow_id", span)
 }

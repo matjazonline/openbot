@@ -445,35 +445,6 @@ pub(crate) const LEGACY_FORMS_SCRIPT: &str = r##"        function slugifyValue(v
             }
         }
 
-        function showChannelFormTab(mode) {
-            var simpleForm = document.getElementById('simple-channel-form');
-            var advancedForm = document.getElementById('advanced-channel-form');
-            var simpleBtn = document.getElementById('tab-simple-btn');
-            var advancedBtn = document.getElementById('tab-advanced-btn');
-            var active = 'px-3 py-1 rounded-md text-primary-content bg-primary font-semibold transition cursor-pointer';
-            var idle = 'px-3 py-1 rounded-md text-base-content/70 hover:text-base-content transition cursor-pointer';
-            var simple = mode === 'simple';
-            if (simpleForm) simpleForm.classList.toggle('hidden', !simple);
-            if (advancedForm) advancedForm.classList.toggle('hidden', simple);
-            if (simpleBtn) simpleBtn.className = simple ? active : idle;
-            if (advancedBtn) advancedBtn.className = simple ? idle : active;
-        }
-
-        // The agent-selection block lets the user pick either one radio or one library entry;
-        // choosing on either side clears the other and writes the hidden `agent_ids` field.
-        function selectAgentInSelection(control, clearRadios) {
-            var parent = control.closest('[data-agents-selection]');
-            if (!parent) return;
-            if (clearRadios) {
-                parent.querySelectorAll('input[type=radio]').forEach(function (radio) { radio.checked = false; });
-            } else {
-                var library = parent.querySelector('.library-agent-select');
-                if (library) library.value = '';
-            }
-            var target = parent.querySelector('input[name=agent_ids]');
-            if (target) target.value = control.value;
-        }
-
         function togglePromptGenerator(button) {
             var box = document.getElementById(button.dataset.box);
             if (!box) return;

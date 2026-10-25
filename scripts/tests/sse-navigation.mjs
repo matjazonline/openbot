@@ -17,12 +17,12 @@ function navigate(href, event = {}, attributes = {}) {
     vm.runInNewContext(script, {
         URL,
         document: {
-            baseURI: 'https://example.test/ui/tasks?view=board',
+            baseURI: 'https://example.test/ui/work',
             querySelector: () => null,
             querySelectorAll: () => owners,
         },
         window: {
-            location: { href: 'https://example.test/ui/tasks?view=board' },
+            location: { href: 'https://example.test/ui/work' },
             addEventListener: (name, handler) => { if (name === 'click') click = handler; },
             htmx: { trigger: (owner, name) => {
                 assert.equal(name, 'htmx:beforeCleanupElement');
@@ -34,25 +34,25 @@ function navigate(href, event = {}, attributes = {}) {
     return owners.every(owner => owner.closed);
 }
 
-test('ordinary task links release every stream before navigation', () => {
-    for (const href of ['/ui/tasks?view=list', '/ui/tasks?view=board', '/ui?thread_id=123']) {
+test('ordinary page links release every stream before navigation', () => {
+    for (const href of ['/ui/deliveries?status=dead', '/ui/work', '/ui?thread_id=123']) {
         assert.equal(navigate(href), true, href);
     }
 });
 test('HTMX/prevented clicks, modified clicks, downloads and new tabs keep streams', () => {
     for (const event of [{ defaultPrevented: true }, { button: 1 }, { ctrlKey: true },
         { metaKey: true }, { shiftKey: true }, { altKey: true }]) {
-        assert.equal(navigate('/ui/tasks?view=list', event), false);
+        assert.equal(navigate('/ui/deliveries?status=dead', event), false);
     }
     for (const attributes of [{ download: '' }, { target: '_blank' }]) {
-        assert.equal(navigate('/ui/tasks?view=list', {}, attributes), false);
+        assert.equal(navigate('/ui/deliveries?status=dead', {}, attributes), false);
     }
 });
 test('anchors and non-document protocols keep streams', () => {
     assert.equal(navigate('#details'), false);
     assert.equal(navigate('#'), false);
     assert.equal(navigate('mailto:hello@example.test'), false);
-    assert.equal(navigate('/ui/tasks?view=list#details'), true);
+    assert.equal(navigate('/ui/deliveries?status=dead#details'), true);
 });
 
 function submitForm({ prevented = false, attributes = {}, submitter = {}, baseTarget = null } = {}) {
@@ -79,7 +79,7 @@ function submitForm({ prevented = false, attributes = {}, submitter = {}, baseTa
     return owners.every(owner => owner.closed);
 }
 
-test('native owned-task filter submissions release all streams on every navigation', () => {
+test('native filter submissions release all streams on every navigation', () => {
     for (let i = 0; i < 20; i++) {
         assert.equal(submitForm({ attributes: { method: 'get', action: '/ui/work' } }), true);
     }

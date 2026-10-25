@@ -98,6 +98,11 @@ fn configured(
                 company_id,
                 params,
                 resources: BTreeMap::new(),
+                run_as: crate::application::workflow::WorkflowActor::authenticated(
+                    uuid::Uuid::from_u128(0xA5),
+                )
+                .unwrap(),
+                message_trigger: None,
             },
             bundle,
         )
@@ -122,6 +127,8 @@ fn request(
         idempotency_key: IdempotencyKey::parse(key).unwrap(),
         input,
         rerun_of: None,
+        delivery_policy: crate::application::workflow::DeliveryPolicy::Deliver,
+        expected_binding_revision: None,
     }
 }
 
@@ -231,13 +238,13 @@ impl WorkflowBindings for MemoryStore {
         binding_id: WorkflowBindingId,
         key: &IdempotencyKey,
         trigger: &TriggerRef,
-    ) -> AppResult<Option<Arc<binding::ConfiguredBinding>>> {
+    ) -> AppResult<Option<AdmissionBinding>> {
         let result = {
             let state = self.state.lock().unwrap();
             if state.fail_lookup {
                 return Err(AppError::Database("lookup failed".into()));
             }
-            state
+            let saved = state
                 .admissions
                 .get(&(company_id, key.clone()))
                 .filter(|saved| saved.binding.id() == binding_id)
@@ -248,14 +255,26 @@ impl WorkflowBindings for MemoryStore {
                             && same_source_event(saved.causality.trigger(), trigger)
                     })
                 })
-                .map(|saved| saved.binding.clone())
-                .or_else(|| state.returned_version.clone())
-                .or_else(|| {
-                    state
-                        .versions
-                        .get(&(company_id, VersionId::new(binding_id.as_uuid())))
-                        .cloned()
-                })
+                .map(|saved| saved.binding.clone());
+            match saved {
+                Some(binding) => Some(AdmissionBinding {
+                    binding,
+                    saved: true,
+                }),
+                None => state
+                    .returned_version
+                    .clone()
+                    .or_else(|| {
+                        state
+                            .versions
+                            .get(&(company_id, VersionId::new(binding_id.as_uuid())))
+                            .cloned()
+                    })
+                    .map(|binding| AdmissionBinding {
+                        binding,
+                        saved: false,
+                    }),
+            }
         };
         if let Some(barrier) = &self.admission_barrier {
             barrier.wait().await;

@@ -89,8 +89,15 @@ async fn protected_with_operation(
         additional,
     ))
     .await;
-    let target = Box::pin(bound(&fixture, &connection, version, entrance)).await;
-    let claim = Box::pin(claimed(&fixture, target)).await;
+    let target = Box::pin(bound(
+        &fixture,
+        &connection,
+        version,
+        entrance,
+        RelatedAssociation::Company,
+    ))
+    .await;
+    let claim = Box::pin(claimed(&fixture, target, RelatedAssociation::Company)).await;
     Setup {
         fixture,
         connection,

@@ -50,7 +50,7 @@ related_id!(RelatedThreadId);
 /// Related visibility is checked independently from company management access.
 /// Thread identity includes its declared channel; the stored association is
 /// reused for cancellation and participates in admission deduplication.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum RelatedAssociation {
     Company,
     Channel(RelatedChannelId),
@@ -69,6 +69,8 @@ pub enum WorkflowOperation {
     CopyTemplate,
     ManageDefinition,
     ManageBinding,
+    /// Reading a definition, binding, run or decision through the workflow routes.
+    Inspect,
 }
 
 /// Required lifecycle authorization for authenticated workflow lifecycle and authoring calls.

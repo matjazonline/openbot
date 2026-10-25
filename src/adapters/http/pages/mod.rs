@@ -10,41 +10,21 @@ use uuid::Uuid;
 
 use crate::entities::{
     agent::Agent,
-    approval::{ApprovalStatus, HumanApproval},
     channel::Channel,
-    collaboration::{
-        CollaborationNextAction, CollaborationSummary, CollaborationTargetSummary, NextActionActor,
-        NextActionKind, OutreachBusinessStatus, TargetBusinessStatus,
-    },
     company::{Company, CompanyModelConnection},
     company_invite::CompanyInvite,
     company_member::{CompanyAccessRole, CompanyMember, CompanyMembership},
-    correlation::CorrelationId,
     delivery::{DeliveryEntry, DeliveryFilter},
-    member_removal::MemberWorkAtStake,
-    memory::{
-        MEMORY_READINESS_TIMEOUT_ERROR, MemoryConnection, MemoryConnectionReadiness,
-        MemoryPersistenceMode, MemoryProviderKind, MemoryProvisioningPhase, MemoryRecallMode,
-        default_memory_max_results,
-    },
     message::{
         AttachmentMetadata, MessageAudience, MessageDirection, MessageRole, ThreadEntryKind,
     },
     message_view::{EmailReplyContext, MessageAuditView, ThreadMessageView},
-    runtime_metrics::MachineIdentity,
-    task::{
-        BackgroundTask, ChainStage, TaskAttemptRecord, TaskAttemptRecordStatus, TaskBoardFilter,
-        TaskChainBoard, TaskChainCard, TaskChainCounts, TaskChainDetail, TaskChainTaskDetail,
-        TaskFilter, TaskOwner, TaskOwnerCandidate, TaskOwnershipEvent, TaskStatus, ThreadActivity,
-        ThreadWorkSummary,
-    },
     thread::Thread,
-    thread_handoff::{ThreadHandoff, ThreadHandoffDraft, ThreadHandoffState},
-    transport::{DeliveryPartStatus, DeliveryPurpose, DeliveryStatus, PrincipalId, TransportKind},
+    thread_activity::ThreadActivity,
+    transport::{DeliveryPartStatus, DeliveryPurpose, DeliveryStatus, TransportKind},
     user::User,
     value_objects::{AvatarUrl, EmailAddress, ModelName},
 };
-use crate::services::memory_provider::ConfiguredMemoryProviders;
 use crate::use_cases::user::{AccountChangeKind, PendingChange};
 
 fn parse_platform_address(
@@ -56,10 +36,8 @@ fn parse_platform_address(
 }
 
 mod agent_library_multi_select;
-mod agent_runtime_settings;
 mod agent_settings;
 mod agents;
-mod approvals;
 mod attention;
 mod auth;
 mod avatar_picker;
@@ -73,10 +51,8 @@ mod company_skills;
 mod dashboard;
 mod dashboard_query_health;
 mod dashboard_runtime;
-mod delegation;
 mod deliveries;
 mod fragment;
-mod harness_diagnostics;
 mod icon;
 mod invite_settings;
 mod layout;
@@ -85,23 +61,19 @@ mod model_connection;
 mod notifications;
 mod onboarding;
 mod profile;
-mod response_reviews;
+mod run_counts;
 mod schedules;
 mod simulation;
 mod skeleton;
-mod task_board;
-mod task_counts;
-mod task_monitor;
-mod tasks;
 mod team_settings;
 mod thread_activity;
-mod thread_handoff_marks;
-mod thread_handoffs;
+mod workflow_authoring;
+mod workflow_decision;
+mod workflow_runs;
 
 pub use agent_library_multi_select::*;
 pub use agent_settings::*;
 pub use agents::*;
-pub use approvals::*;
 pub use attention::*;
 pub use auth::*;
 pub use avatar_picker::*;
@@ -112,7 +84,6 @@ pub use company_resend_api::*;
 pub use company_settings::*;
 pub use company_skills::*;
 pub use dashboard::*;
-pub(crate) use delegation::*;
 pub use deliveries::*;
 pub use fragment::*;
 pub use icon::*;
@@ -123,21 +94,18 @@ pub(crate) use model_connection::*;
 pub use notifications::*;
 pub use onboarding::*;
 pub use profile::*;
-pub use response_reviews::*;
+pub use run_counts::*;
 pub use schedules::*;
 pub use simulation::*;
 pub(crate) use skeleton::{
     LIST_SKELETON, PANE_SKELETON, PANELS_SKELETON, THREAD_COLUMN_SKELETON, THREAD_ROWS_SKELETON,
     panels_placeholder, skeleton_script,
 };
-pub use task_board::*;
-pub use task_counts::*;
-pub use task_monitor::*;
-pub use tasks::*;
 pub use team_settings::*;
 pub use thread_activity::*;
-pub use thread_handoff_marks::*;
-pub use thread_handoffs::*;
+pub use workflow_authoring::*;
+pub use workflow_decision::*;
+pub use workflow_runs::*;
 
 /// Every timestamp the app stores is UTC. These helpers preserve that instant in a semantic
 /// `datetime` attribute; the page shell replaces the UTC fallback text with the reader's local

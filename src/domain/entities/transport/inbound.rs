@@ -48,6 +48,8 @@ stored_enum! {
         Internal => "internal",
         UnsupportedTransport => "unsupported_transport",
         LeaseExpired => "lease_expired",
+        /// The channel settings the event was routed against changed before it committed.
+        Superseded => "superseded",
     }
 }
 
@@ -61,6 +63,7 @@ impl InboundEventErrorClass {
                 | Self::Deadline
                 | Self::Internal
                 | Self::LeaseExpired
+                | Self::Superseded
         )
     }
 }
@@ -95,6 +98,7 @@ mod tests {
     #[test]
     fn terminal_and_retryable_classifications_are_explicit() {
         assert!(InboundEventErrorClass::ProviderFault.is_retryable());
+        assert!(InboundEventErrorClass::Superseded.is_retryable());
         assert!(!InboundEventErrorClass::InvalidPayload.is_retryable());
         assert!(InboundEventStatus::DeadLetter.is_terminal());
         assert!(!InboundEventStatus::Retryable.is_terminal());

@@ -1,5 +1,9 @@
 # 09 — Authoring and operations UI
 
+> **No backward compatibility.** We don't need backward compatibility and will reset the database
+> when needed. Do not add data backfills, dual reads/writes, legacy decoders, compatibility shims,
+> or staged rollouts for existing data.
+
 ## Outcome and dependencies
 
 Depends on phases 1–8. Complete the user journey using the existing server-rendered UI/HTMX

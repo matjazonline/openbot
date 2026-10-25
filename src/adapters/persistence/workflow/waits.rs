@@ -47,6 +47,9 @@ impl WorkflowWaits for PostgresPersistence {
         .await
         .map_err(|_| lease::timed_out())?
     }
+    async fn deliver_reply(&self, delivery: IngressReply) -> AppResult<ReplyIngress> {
+        super::reply_waits::deliver(self, delivery).await
+    }
     async fn resume_wait(&self, scope: ActivationRequest) -> AppResult<WaitProgress> {
         tokio::time::timeout(Duration::from_secs(2), async {
             let mut tx = self.pool.begin().await?;

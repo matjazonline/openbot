@@ -1,8 +1,9 @@
-//! The read side of `/ui/dashboard`: aggregates over the tables the queues already write.
+//! The read side of `/ui/dashboard`: aggregates over the tables the queues already write. The job
+//! figures are the workflow queue's (`queue_kind = 'workflow'`) and the tokens are the model usage
+//! ledger's (p08 D4.5).
 //!
-//! Kept out of [`super::task`] deliberately — that module is the queue's own read/write path and is
-//! already long; this one is reporting, never writes, and its queries are shaped by what a panel
-//! needs rather than by what a worker does.
+//! Kept out of the workflow queue's own persistence deliberately: this module is reporting, never
+//! writes, and its queries are shaped by what a panel needs rather than by what a worker does.
 //!
 //! How often these run is not decided here. `services::dashboard_snapshot` shares one reading per
 //! view across every tab for a tick, and this adapter answers each question it is asked.
@@ -95,12 +96,12 @@ impl ScopedSql {
     }
 }
 
-/// Counts of `background_tasks` grouped by status, plus the two states no grouping shows.
+/// Counts of workflow jobs grouped by status, plus the two states no grouping shows.
 const TASK_QUEUE_SQL: &str = r#"
     SELECT status,
            COUNT(*)::bigint AS count
       FROM background_tasks
-     WHERE queue_kind = 'legacy'
+     WHERE queue_kind = 'workflow'
      {scope}
      GROUP BY status
      ORDER BY status"#;
@@ -119,7 +120,7 @@ const TASK_PRESSURE_SQL: &str = r#"
                WHERE status = 'pending' AND run_at <= CURRENT_TIMESTAMP
            )::bigint AS due_now
       FROM background_tasks
-     WHERE queue_kind = 'legacy'
+     WHERE queue_kind = 'workflow'
      {scope}"#;
 
 const DELIVERY_QUEUE_SQL: &str = r#"
@@ -185,7 +186,7 @@ const SLOTS_CTE: &str = r#"
 ///
 /// Bucketing is epoch-flooring rather than `date_trunc`, because `date_trunc` only offers whole
 /// units and the window is sliced in fives. `updated_at` is when the row reached its current
-/// status, which for a `completed` or `dead_letter` row is when it finished.
+/// status, which for a `completed` or `failed` row is when it finished.
 ///
 /// One row here is one *task*, not one attempt: a task that failed twice and then completed
 /// contributes a single `completed`. Attempt-level counts come from [`ATTEMPT_STATS_SQL`].
@@ -193,10 +194,10 @@ const THROUGHPUT_BODY: &str = r#",
     finished AS (
         SELECT to_timestamp(floor(extract(epoch FROM updated_at) / $1) * $1) AS bucket,
                COUNT(*) FILTER (WHERE status = 'completed')::bigint AS completed,
-               COUNT(*) FILTER (WHERE status IN ('failed', 'dead_letter'))::bigint AS failed
+               COUNT(*) FILTER (WHERE status = 'failed')::bigint AS failed
           FROM background_tasks
-         WHERE queue_kind = 'legacy'
-           AND status IN ('completed', 'failed', 'dead_letter')
+         WHERE queue_kind = 'workflow'
+           AND status IN ('completed', 'failed')
            AND updated_at >= CURRENT_TIMESTAMP - make_interval(mins => $2)
            {scope}
          GROUP BY bucket
@@ -231,7 +232,7 @@ const LATENCY_BODY: &str = r#",
                              * 1000)::double precision
                ) AS p95_ms
           FROM task_attempts AS attempt
-          JOIN background_tasks AS task ON task.id = attempt.task_id AND task.queue_kind = 'legacy'
+          JOIN background_tasks AS task ON task.id = attempt.task_id AND task.queue_kind = 'workflow'
          WHERE attempt.started_at >= CURRENT_TIMESTAMP - make_interval(mins => $2)
            {scope}
          GROUP BY bucket
@@ -263,9 +264,8 @@ const QUEUE_DEPTH_BODY: &str = r#",
     open_tasks AS (
         SELECT created_at, updated_at, status
           FROM background_tasks
-         WHERE queue_kind = 'legacy'
-           AND (status IN ('pending', 'processing', 'pending_approval',
-                           'waiting_for_third_party_reply')
+         WHERE queue_kind = 'workflow'
+           AND (status IN ('pending', 'processing')
                 OR updated_at >= CURRENT_TIMESTAMP - make_interval(mins => $2))
            {scope}
     )
@@ -274,13 +274,13 @@ const QUEUE_DEPTH_BODY: &str = r#",
       FROM slots
       LEFT JOIN open_tasks
              ON open_tasks.created_at <= slots.bucket
-            AND (open_tasks.status IN ('pending', 'processing', 'pending_approval',
-                                       'waiting_for_third_party_reply')
+            AND (open_tasks.status IN ('pending', 'processing')
                  OR open_tasks.updated_at > slots.bucket)
      GROUP BY slots.bucket
      ORDER BY slots.bucket"#;
 
-/// Duration percentiles and token spend over the window, from `task_attempts`.
+/// Duration percentiles over the window, from the workflow jobs' `task_attempts`. Token spend is
+/// [`TOKENS_SQL`]'s: a workflow attempt records none of its own.
 ///
 /// `task_attempts` carries no `company_id` of its own, so the scope comes through its task. The
 /// percentiles read `NULL` while nothing has finished — an attempt still running has a `NULL`
@@ -302,12 +302,18 @@ const ATTEMPT_STATS_SQL: &str = r#"
            percentile_disc(0.95) WITHIN GROUP (
                ORDER BY (extract(epoch FROM (attempt.finished_at - attempt.started_at))
                          * 1000)::double precision
-           ) AS p95_ms,
-           COALESCE(SUM(attempt.prompt_tokens), 0)::bigint AS prompt_tokens,
-           COALESCE(SUM(attempt.completion_tokens), 0)::bigint AS completion_tokens
+           ) AS p95_ms
       FROM task_attempts AS attempt
-      JOIN background_tasks AS task ON task.id = attempt.task_id AND task.queue_kind = 'legacy'
+      JOIN background_tasks AS task ON task.id = attempt.task_id AND task.queue_kind = 'workflow'
      WHERE attempt.started_at >= CURRENT_TIMESTAMP - make_interval(mins => $1)
+       {scope}"#;
+
+/// Settled model tokens over the window, from the usage ledger every model call writes.
+const TOKENS_SQL: &str = r#"
+    SELECT COALESCE(SUM(usage.input_tokens), 0)::bigint AS prompt_tokens,
+           COALESCE(SUM(usage.output_tokens), 0)::bigint AS completion_tokens
+      FROM model_usage_calls AS usage
+     WHERE usage.requested_at >= CURRENT_TIMESTAMP - make_interval(mins => $1)
        {scope}"#;
 
 /// Retry share per bucket, including empty buckets as `attempts = 0` so the chart keeps its time
@@ -318,7 +324,7 @@ const RETRY_RATE_BODY: &str = r#",
                COUNT(*)::bigint AS attempts,
                COUNT(*) FILTER (WHERE attempt.attempt_number > 1)::bigint AS retries
           FROM task_attempts AS attempt
-          JOIN background_tasks AS task ON task.id = attempt.task_id AND task.queue_kind = 'legacy'
+          JOIN background_tasks AS task ON task.id = attempt.task_id AND task.queue_kind = 'workflow'
          WHERE attempt.started_at >= CURRENT_TIMESTAMP - make_interval(mins => $2)
            {scope}
          GROUP BY bucket
@@ -330,15 +336,15 @@ const RETRY_RATE_BODY: &str = r#",
       LEFT JOIN measured ON measured.bucket = slots.bucket
      ORDER BY slots.bucket"#;
 
-/// The tasks a reader might want to open, newest trouble first.
+/// The workflow jobs a reader might want to open, newest trouble first. A job of a run without a
+/// channel has none to name.
 ///
-/// "Outstanding" is everything that is not finished: running, waiting on a worker, parked on a human
-/// or a third party, or dead-lettered. A `pending` task whose `run_at` is still ahead of it is on a
-/// retry backoff and is excluded — it is not waiting on anything, and listing it would bury the rows
-/// that are.
+/// "Outstanding" is everything that is not finished: running, or waiting on a worker. A `pending`
+/// task whose `run_at` is still ahead of it is on a retry backoff and is excluded — it is not waiting
+/// on anything, and listing it would bury the rows that are.
 ///
 /// The ordering puts trouble first, by the same rule as `OutstandingTask::needs_attention`: a lapsed
-/// lease or a dead letter, then the most recently changed. `updated_at` is when the row reached its
+/// lease, then the most recently changed. `updated_at` is when the row reached its
 /// current state, so it reads as "stuck since".
 const OUTSTANDING_SQL: &str = r#"
     SELECT task.id,
@@ -357,17 +363,15 @@ const OUTSTANDING_SQL: &str = r#"
                   OR task.lock_expires_at <= CURRENT_TIMESTAMP)) AS stalled
       FROM background_tasks AS task
       JOIN companies AS company ON company.id = task.company_id
-      JOIN channels AS channel ON channel.id = task.channel_id
-     WHERE task.queue_kind = 'legacy' AND (
-             task.status IN ('processing', 'pending_approval',
-                             'waiting_for_third_party_reply', 'dead_letter')
+      LEFT JOIN channels AS channel ON channel.id = task.channel_id
+     WHERE task.queue_kind = 'workflow' AND (
+             task.status = 'processing'
              OR (task.status = 'pending' AND task.run_at <= CURRENT_TIMESTAMP)
            )
        {scope}
-     ORDER BY (task.status = 'dead_letter'
-                OR (task.status = 'processing'
-                    AND (task.lock_expires_at IS NULL
-                         OR task.lock_expires_at <= CURRENT_TIMESTAMP))) DESC,
+     ORDER BY (task.status = 'processing'
+                AND (task.lock_expires_at IS NULL
+                     OR task.lock_expires_at <= CURRENT_TIMESTAMP)) DESC,
               task.updated_at DESC,
               task.id DESC
      LIMIT $1"#;
@@ -414,6 +418,8 @@ static RETRY_RATE: LazyLock<ScopedSql> = LazyLock::new(|| {
 });
 static ATTEMPT_STATS: LazyLock<ScopedSql> =
     LazyLock::new(|| ScopedSql::new(ATTEMPT_STATS_SQL, "AND task.company_id = $2"));
+static TOKENS: LazyLock<ScopedSql> =
+    LazyLock::new(|| ScopedSql::new(TOKENS_SQL, "AND usage.company_id = $2"));
 static OUTSTANDING: LazyLock<ScopedSql> =
     LazyLock::new(|| ScopedSql::new(OUTSTANDING_SQL, "AND task.company_id = $2"));
 
@@ -662,14 +668,22 @@ impl PostgresPersistence {
             Ok(value.map(|ms| ms.round() as i64))
         };
 
+        let tokens = TOKENS
+            .query_with(company, |query| query.bind(window.minutes() as i32))
+            .fetch_one(&self.pool)
+            .await
+            .map_err(AppError::from)?;
+
         Ok(AttemptStats {
             attempts: row.try_get("attempts").map_err(AppError::from)?,
             retries: row.try_get("retries").map_err(AppError::from)?,
             failed: row.try_get("failed").map_err(AppError::from)?,
             p50_ms: percentile("p50_ms")?,
             p95_ms: percentile("p95_ms")?,
-            prompt_tokens: row.try_get("prompt_tokens").map_err(AppError::from)?,
-            completion_tokens: row.try_get("completion_tokens").map_err(AppError::from)?,
+            prompt_tokens: tokens.try_get("prompt_tokens").map_err(AppError::from)?,
+            completion_tokens: tokens
+                .try_get("completion_tokens")
+                .map_err(AppError::from)?,
         })
     }
 }

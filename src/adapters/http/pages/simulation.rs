@@ -1,6 +1,10 @@
 //! The channel simulator: compose a message, run it, inspect the execution.
 
 use super::*;
+use crate::domain::workflow::{RunState, WaitingReason};
+use crate::entities::message_outcome::{
+    AdmittedRun, BindingOutcome, MessageBindingOutcome, RUN_EXECUTION_LIMIT,
+};
 
 #[derive(Debug, Clone)]
 pub struct EmailSimulationResult {
@@ -591,80 +595,182 @@ pub(crate) fn simulation_active_banner(
     )
 }
 
-/// What the thread history needs in order to describe a message that has no recorded task: the
-/// task list to search, and the channel configuration to attribute an agent reply to.
-pub(crate) struct MessageTaskContext<'a> {
-    tasks: &'a [BackgroundTask],
-    task_id: Option<Uuid>,
-    thread_id: Option<Uuid>,
-    company: Option<&'a Company>,
-    channel: Option<&'a Channel>,
-    provider: &'a str,
-    model: &'a str,
-    /// Prompt to report for agent messages with no task; `None` reuses the message body.
-    agent_prompt: Option<&'a str>,
+/// The workflow side of one message (p08 D4.6): for an inbound message every binding's outcome,
+/// for an agent's reply the run that wrote it.
+fn message_workflow_html(msg: &ThreadMessageView, outcomes: &[&MessageBindingOutcome]) -> String {
+    if msg.is_agent() {
+        return match msg.run_ids.first() {
+            Some(run_id) => format!(
+                r##"<div class="text-xs font-mono text-base-content/70">Written by run <span class="text-primary">{run}</span></div>"##,
+                run = short_id(*run_id),
+            ),
+            None => String::new(),
+        };
+    }
+    if outcomes.is_empty() {
+        return r##"<div class="text-xs text-base-content/70">No workflow binding has answered this message yet.</div>"##.to_string();
+    }
+    let cards: String = outcomes
+        .iter()
+        .map(|outcome| binding_outcome_card(outcome))
+        .collect();
+    format!(
+        r##"<div class="space-y-2">
+                            <h5 class="text-[11px] font-semibold uppercase text-base-content/70">Workflow outcomes</h5>
+                            {cards}
+                        </div>"##
+    )
 }
 
-/// The real task payload when one matches, otherwise a synthesized stand-in so the message still
-/// renders its execution parameters.
-pub(crate) fn message_task_payload(
-    msg: &ThreadMessageView,
-    is_agent: bool,
-    created_at_fmt: &str,
-    ctx: &MessageTaskContext<'_>,
-) -> serde_json::Value {
-    if let Some(task) = find_task_for_message(msg, ctx.tasks, ctx.task_id, ctx.thread_id) {
-        return task.payload.clone();
-    }
-    // Names the message by its canonical id in both branches. The stand-in is shown where a real
-    // task payload would be, so it has to be the same shape a real one now is -- a provider header
-    // here would put a value in the pane that no task ever wrote.
-    if is_agent {
-        serde_json::json!({
-            "task_type": "email_agent_dispatch",
-            "execution_parameters": {
-                "provider": ctx.provider,
-                "model": ctx.model,
-                "prompt": ctx.agent_prompt.unwrap_or(msg.body.as_str()),
-                "executed_at": created_at_fmt
-            },
-            "execution_result": {
-                "response": msg.body,
-                "reply_message_id": msg.canonical_id
-            },
-            "channel": ctx.channel,
-            "company": ctx.company
+fn binding_outcome_card(outcome: &MessageBindingOutcome) -> String {
+    let (badge, detail) = match &outcome.outcome {
+        BindingOutcome::Admitted(run) => (
+            format!(
+                r##"<span class="badge badge-sm {style}">{label}</span>"##,
+                style = run_state_style(run.state),
+                label = escape_html_text(&run_state_label(run.state)),
+            ),
+            admitted_run_detail(run),
+        ),
+        BindingOutcome::Refused { reason } => (
+            r##"<span class="badge badge-sm badge-ghost">Refused</span>"##.to_string(),
+            format!(
+                r##"<div class="text-xs font-mono">{reason}</div>"##,
+                reason = escape_html_text(reason)
+            ),
+        ),
+        BindingOutcome::Failed { reason } => (
+            r##"<span class="badge badge-sm badge-error">Admission failed</span>"##.to_string(),
+            format!(
+                r##"<div class="text-xs font-mono">{reason}</div>"##,
+                reason = escape_html_text(reason)
+            ),
+        ),
+    };
+    format!(
+        r##"<div class="rounded-lg border border-base-300 bg-base-200 p-3 space-y-2">
+                                <div class="flex flex-wrap items-center gap-2 text-xs">
+                                    {badge}
+                                    <span class="font-semibold">{title}</span>
+                                    <span class="ml-auto font-mono text-base-content/70">binding {binding}</span>
+                                </div>
+                                {detail}
+                            </div>"##,
+        title = escape_html_text(&outcome.workflow_title),
+        binding = short_id(outcome.binding_id),
+    )
+}
+
+fn admitted_run_detail(run: &AdmittedRun) -> String {
+    let steps: String = run
+        .executions
+        .iter()
+        .map(|execution| {
+            format!(
+                r##"<tr><td class="font-mono">{step} #{activation}</td><td class="font-mono">{route}</td><td>{started}</td><td>{completed}</td></tr>"##,
+                step = escape_html_text(&execution.step_id),
+                activation = execution.activation,
+                route = execution
+                    .route
+                    .as_deref()
+                    .map(escape_html_text)
+                    .unwrap_or_default(),
+                started = execution
+                    .activated_at
+                    .map(format_time)
+                    .unwrap_or_else(|| "pending".to_string()),
+                completed = execution.completed_at.map(format_time).unwrap_or_default(),
+            )
         })
+        .collect();
+    let steps = if steps.is_empty() {
+        r##"<div class="text-xs text-base-content/70">No step has been scheduled yet.</div>"##
+            .to_string()
     } else {
-        serde_json::json!({
-            "task_type": "email_agent_dispatch",
-            "source_message_id": msg.canonical_id,
-            "inbound_message": {
-                "id": msg.id,
-                "canonical_id": msg.canonical_id,
-                "author": msg.author.display(),
-                "subject": msg.subject,
-                "direction": "inbound",
-                "role": "human",
-                "clean_text_body": msg.body
-            },
-            "channel": ctx.channel,
-            "company": ctx.company
+        let latest = if run.executions.len() == RUN_EXECUTION_LIMIT {
+            format!(" (latest {RUN_EXECUTION_LIMIT})")
+        } else {
+            String::new()
+        };
+        format!(
+            r##"<div class="overflow-x-auto"><table class="table table-xs">
+                                    <caption class="text-left text-[11px] uppercase text-base-content/70">Executions{latest}</caption>
+                                    <thead><tr><th>Step</th><th>Route</th><th>Started</th><th>Completed</th></tr></thead>
+                                    <tbody>{steps}</tbody>
+                                </table></div>"##
+        )
+    };
+    let usage: String = run
+        .model_usage
+        .iter()
+        .map(|usage| {
+            format!(
+                r##"<li class="font-mono">{provider} / {model} · {calls} call{plural} · {input} in / {output} out tokens</li>"##,
+                provider = escape_html_text(&usage.provider),
+                model = escape_html_text(&usage.model),
+                calls = usage.calls,
+                plural = if usage.calls == 1 { "" } else { "s" },
+                input = usage.input_tokens,
+                output = usage.output_tokens,
+            )
         })
+        .collect();
+    let usage = if usage.is_empty() {
+        String::new()
+    } else {
+        format!(r##"<ul class="text-xs space-y-1">{usage}</ul>"##)
+    };
+    format!(
+        r##"<div class="text-xs font-mono text-base-content/70">Run <span class="text-primary">{run_id}</span></div>
+                                {steps}
+                                {usage}"##,
+        run_id = run.run_id,
+    )
+}
+
+fn run_state_label(state: RunState) -> String {
+    match state {
+        RunState::Queued => "Queued".to_string(),
+        RunState::Running => "Running".to_string(),
+        RunState::Waiting(reason) => format!(
+            "Waiting on {}",
+            match reason {
+                WaitingReason::Decision => "a decision",
+                WaitingReason::Event => "an event",
+                WaitingReason::Timer => "a timer",
+                WaitingReason::ChildRun => "a child run",
+                WaitingReason::Effect => "an effect",
+                WaitingReason::Reconciliation => "reconciliation",
+            }
+        ),
+        RunState::Succeeded => "Succeeded".to_string(),
+        RunState::Failed => "Failed".to_string(),
+        RunState::Cancelled => "Cancelled".to_string(),
+    }
+}
+
+fn run_state_style(state: RunState) -> &'static str {
+    match state {
+        RunState::Queued => "badge-warning",
+        RunState::Running => "badge-info animate-pulse",
+        RunState::Waiting(WaitingReason::Decision | WaitingReason::Reconciliation) => {
+            "badge-accent"
+        }
+        RunState::Waiting(_) => "badge-info badge-outline",
+        RunState::Succeeded => "badge-success",
+        RunState::Failed => "badge-error",
+        RunState::Cancelled => "badge-ghost",
     }
 }
 
 /// One message in the thread history: an indigo agent card or a slate inbound card.
-pub(crate) fn message_bubble(msg: &ThreadMessageView, ctx: &MessageTaskContext<'_>) -> String {
+pub(crate) fn message_bubble(
+    msg: &ThreadMessageView,
+    outcomes: &[&MessageBindingOutcome],
+) -> String {
     let is_agent = msg.is_agent();
     let created_at = super::format_date_time(msg.created_at);
-    let created_at_utc = msg.created_at.to_rfc3339();
-    let params_html = render_message_task_parameters_html(&message_task_payload(
-        msg,
-        is_agent,
-        &created_at_utc,
-        ctx,
-    ));
+    let params_html = message_workflow_html(msg, outcomes);
 
     if is_agent {
         let body = if msg.response_contract.is_some() {
@@ -744,14 +850,27 @@ pub(crate) fn thread_history_section(
     thread_id_str: &str,
     wrapper_extra_class: &str,
     empty_state: &str,
-    ctx: &MessageTaskContext<'_>,
+    outcomes: &[MessageBindingOutcome],
 ) -> String {
     if messages.is_empty() {
         return empty_state.to_string();
     }
+    let mut by_message: HashMap<Uuid, Vec<&MessageBindingOutcome>> = HashMap::new();
+    for outcome in outcomes {
+        by_message
+            .entry(outcome.message_id)
+            .or_default()
+            .push(outcome);
+    }
     let msgs_html: String = messages
         .iter()
-        .map(|msg| message_bubble(msg, ctx))
+        .map(|msg| {
+            let outcomes = by_message
+                .get(&msg.canonical_id.as_uuid())
+                .map(Vec::as_slice)
+                .unwrap_or_default();
+            message_bubble(msg, outcomes)
+        })
         .collect();
     let msg_count = messages.len();
     let label = if msg_count == 1 {
@@ -932,7 +1051,10 @@ pub struct SimulationThreadView<'a> {
     /// The headers a simulated reply threads onto, when mail carried this thread's newest turn.
     /// `None` -- a schedule prompt, a Slack turn -- starts a fresh mail conversation.
     pub reply_context: Option<&'a EmailReplyContext>,
-    pub tasks: &'a [BackgroundTask],
+    /// Every binding outcome of the thread's messages, as [`MessageOutcomeReader`] reads them.
+    ///
+    /// [`MessageOutcomeReader`]: crate::application::message_outcomes::MessageOutcomeReader
+    pub outcomes: &'a [MessageBindingOutcome],
     pub include_oob: bool,
 }
 
@@ -944,7 +1066,7 @@ pub fn channel_simulation_loaded_thread_fragment(view: &SimulationThreadView<'_>
         thread,
         messages,
         reply_context,
-        tasks,
+        outcomes,
         include_oob,
     } = *view;
     let thread_id_str = thread.id.to_string();
@@ -968,23 +1090,12 @@ pub fn channel_simulation_loaded_thread_fragment(view: &SimulationThreadView<'_>
     let overview_card =
         loaded_thread_overview_card(thread, &thread_id_str, &target_recipient, messages.len());
 
-    let llm = resolve_llm_info(Some(channel), Some(company));
-    let (provider_str, model_str) = (&llm.provider, &llm.model);
     let messages_section = thread_history_section(
         messages,
         &thread_id_str,
         " mb-6",
         r#"<div class="bg-base-100 border border-base-300 rounded-xl p-5 shadow-lg text-base-content/70 text-xs text-center mb-6">No messages recorded in this thread yet.</div>"#,
-        &MessageTaskContext {
-            tasks,
-            task_id: None,
-            thread_id: Some(thread.id),
-            company: Some(company),
-            channel: Some(channel),
-            provider: provider_str,
-            model: model_str,
-            agent_prompt: None,
-        },
+        outcomes,
     );
 
     let reply_form = simulate_reply_form(&ReplyFormFields {

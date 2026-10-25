@@ -118,7 +118,6 @@ fn oversized_output(
         diagnostics.inputs,
         diagnostics.supported_tools,
         response.body().into(),
-        crate::services::harness::AgentExecutionDisposition::Completed,
     );
     output.structured = Some(response);
     Ok((serde_json::to_vec(&output)

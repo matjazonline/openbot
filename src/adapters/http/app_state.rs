@@ -8,41 +8,37 @@ use crate::{
     application::{attention::AttentionPersistence, notification::NotificationPersistence},
     domain::monitoring::MonitoringService,
     entities::runtime_metrics::MachineIdentity,
-    infra::{
-        config::AppConfig,
-        events::{MailboxEvents, TaskWakeups},
-    },
+    infra::{config::AppConfig, events::MailboxEvents},
     services::{
         dashboard_snapshot::DashboardSnapshotService,
         database_query_health::DatabaseQueryHealthService,
         inbound_event_worker::{InboundEventWakeups, InboundEventWorker},
-        memory_worker::MemoryWorker,
         notification_worker::NotificationWorker,
-        runtime_metrics::{MemoryProviderActivity, RuntimeMetricPersistence},
+        runtime_metrics::RuntimeMetricPersistence,
     },
     transport::{DeliveryQueue, InboundEventInbox, TransportRegistry},
     use_cases::{
         agent::AgentUseCases,
-        approval::ApprovalUseCases,
         channel::ChannelUseCases,
         company::CompanyUseCases,
         company_invite::CompanyInviteUseCases,
         company_resend_api::{CompanyResendApiAccounts, CompanyResendApiUseCases},
         delivery::DeliveryReader,
-        memory::MemoryUseCases,
-        response_review::ResponseReviewUseCases,
         schedule::ScheduleUseCases,
         skill::SkillUseCases,
         thread::ThreadUseCases,
-        thread_handoff::ThreadHandoffUseCases,
         user::UserUseCases,
     },
 };
 
 #[derive(Clone)]
 pub struct AppState {
+    /// The production workflow engine: services for the workflow routes, loops for `serve`.
+    pub workflow: Arc<crate::infra::workflow::WorkflowEngine>,
     pub model_usage: Arc<dyn crate::services::model_usage::ModelUsageStore>,
-    pub task_counts: Arc<dyn crate::application::task_counts::TaskCountsReader>,
+    pub run_counts: Arc<dyn crate::application::run_counts::RunCountsReader>,
+    pub thread_activity: Arc<dyn crate::application::thread_activity::ThreadActivityReader>,
+    pub message_outcomes: Arc<dyn crate::application::message_outcomes::MessageOutcomeReader>,
     pub db: PgPool,
     pub config: Arc<AppConfig>,
     pub monitoring: Arc<dyn MonitoringService>,
@@ -60,19 +56,12 @@ pub struct AppState {
     pub agent_use_cases: Arc<AgentUseCases>,
     pub skill_use_cases: Arc<SkillUseCases>,
     pub thread_use_cases: Arc<ThreadUseCases>,
-    pub approval_use_cases: Arc<ApprovalUseCases>,
-    pub response_review_use_cases: Arc<ResponseReviewUseCases>,
-    /// Reply-handling policy reads and writes. Not `manual_handoffs`.
-    pub thread_handoff_use_cases: Arc<ThreadHandoffUseCases>,
-    pub memory_use_cases: Arc<MemoryUseCases>,
-    pub memory_worker: Arc<MemoryWorker>,
     /// Owns claims on authenticated provider events. Routes only store and wake it.
     pub inbound_event_worker: Arc<InboundEventWorker>,
     /// Producer-only view used by future fast-ack webhook routes.
     pub inbound_event_inbox: Arc<dyn InboundEventInbox>,
     /// A latency hint after durable storage; polling remains authoritative.
     pub inbound_event_wakeups: InboundEventWakeups,
-    pub task_wakeups: TaskWakeups,
     /// Read-only aggregates behind `/ui/dashboard`, one reading per view per tick for every tab.
     /// Handlers reach the aggregates only through this, so none can bypass the cache.
     pub dashboard_snapshots: Arc<DashboardSnapshotService>,
@@ -89,8 +78,6 @@ pub struct AppState {
     /// Deployment-wide runtime history; handlers must authorize operators before reading it.
     pub runtime_metrics: Arc<dyn RuntimeMetricPersistence>,
     pub runtime_identity: MachineIdentity,
-    /// Tally the memory provider writes into and the runtime sampler drains each ten seconds.
-    pub memory_provider_activity: MemoryProviderActivity,
     /// Issues and verifies sessions; the only thing that decides who a request is.
     pub sessions: Arc<SessionAuthority>,
     /// Where a picked file is stored; `None` when no bucket is configured, which is what the
@@ -101,10 +88,10 @@ pub struct AppState {
     /// Carried on the state because `main` builds the delivery worker from it, and because a
     /// deployment's registered transports are what the integrations page reports as available.
     pub transports: Arc<TransportRegistry>,
-    /// Reads the delivery queue for `/ui/deliveries` and the task board's delivery column.
+    /// Reads the delivery queue for `/ui/deliveries`.
     pub deliveries: Arc<dyn DeliveryReader>,
     /// Claims and fences the same queue. Not used by any handler -- `main` builds the delivery
-    /// worker from it, the way it builds the memory worker from `memory_worker`.
+    /// worker from it.
     pub delivery_queue: Arc<dyn DeliveryQueue>,
     /// Committed messages, for the mailbox's live message stream.
     pub events: MailboxEvents,
@@ -119,6 +106,19 @@ impl FromRef<AppState> for PgPool {
 impl FromRef<AppState> for Arc<AppConfig> {
     fn from_ref(app_state: &AppState) -> Self {
         app_state.config.clone()
+    }
+}
+
+impl FromRef<AppState> for Arc<crate::infra::workflow::WorkflowEngine> {
+    fn from_ref(app_state: &AppState) -> Self {
+        app_state.workflow.clone()
+    }
+}
+
+/// "Create assistant channel" (p08 D2.4), over the workflow engine's provisioning.
+impl FromRef<AppState> for Arc<dyn crate::application::workflow::provisioning::AssistantChannels> {
+    fn from_ref(app_state: &AppState) -> Self {
+        app_state.workflow.assistant_channels()
     }
 }
 
@@ -188,27 +188,15 @@ impl FromRef<AppState> for Arc<ThreadUseCases> {
     }
 }
 
-impl FromRef<AppState> for Arc<ApprovalUseCases> {
-    fn from_ref(app_state: &AppState) -> Self {
-        app_state.approval_use_cases.clone()
+impl FromRef<AppState> for Arc<dyn crate::application::thread_activity::ThreadActivityReader> {
+    fn from_ref(state: &AppState) -> Self {
+        state.thread_activity.clone()
     }
 }
 
-impl FromRef<AppState> for Arc<ResponseReviewUseCases> {
-    fn from_ref(app_state: &AppState) -> Self {
-        app_state.response_review_use_cases.clone()
-    }
-}
-
-impl FromRef<AppState> for Arc<ThreadHandoffUseCases> {
-    fn from_ref(app_state: &AppState) -> Self {
-        app_state.thread_handoff_use_cases.clone()
-    }
-}
-
-impl FromRef<AppState> for Arc<MemoryUseCases> {
-    fn from_ref(app_state: &AppState) -> Self {
-        app_state.memory_use_cases.clone()
+impl FromRef<AppState> for Arc<dyn crate::application::message_outcomes::MessageOutcomeReader> {
+    fn from_ref(state: &AppState) -> Self {
+        state.message_outcomes.clone()
     }
 }
 

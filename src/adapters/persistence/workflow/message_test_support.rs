@@ -185,6 +185,8 @@ pub(super) async fn bound(fixture: &Fixture, version: VersionId) -> BindingTarge
             version,
             params: json!({}),
             resources: BTreeMap::new(),
+            run_as: None,
+            message_trigger: None,
         })
         .await
         .unwrap();
@@ -219,6 +221,24 @@ pub(super) async fn admitted_as(
     association: RelatedAssociation,
     key: &str,
 ) -> ActivationRequest {
+    admitted_with(
+        fixture,
+        target,
+        association,
+        key,
+        crate::application::workflow::DeliveryPolicy::Deliver,
+    )
+    .await
+}
+
+/// `admitted_as` under `policy`: an `in_app_only` run is the simulation's test mode (p08 D1.7).
+pub(super) async fn admitted_with(
+    fixture: &Fixture,
+    target: BindingTarget,
+    association: RelatedAssociation,
+    key: &str,
+    policy: crate::application::workflow::DeliveryPolicy,
+) -> ActivationRequest {
     let p = &fixture.persistence;
     let company = fixture.target.company;
     let admission = WorkflowService::new(p.clone(), p.clone(), p.clone(), p.clone(), Preflight)
@@ -237,6 +257,8 @@ pub(super) async fn admitted_as(
             idempotency_key: IdempotencyKey::parse(key).unwrap(),
             input: json!({}),
             rerun_of: None,
+            delivery_policy: policy,
+            expected_binding_revision: None,
         })
         .await
         .unwrap();

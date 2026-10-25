@@ -1,5 +1,5 @@
-//! Human-operational work projected from authoritative tasks, handoffs, approvals, reviews and
-//! failures.
+//! Human-operational work projected from workflow decisions, runs, binding refusals and delivery
+//! failures (p08 D4.2).
 //!
 //! None of the states in this module is persisted as another workflow. Resolving an item always
 //! means changing its source; reading this projection is side-effect free.
@@ -63,27 +63,25 @@ impl fmt::Display for BusinessPriority {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AttentionSourceKind {
-    Task,
-    Handoff,
-    /// One thread's inbound-triggered handoff -- `thread_handoffs`, not `manual_handoffs`. The two
-    /// are different features that both call themselves a handoff; see
-    /// [`crate::entities::thread_handoff`].
-    ThreadHandoff,
-    Approval,
-    ResponseReview,
-    DelegationDecision,
+    /// One open workflow decision, for its reviewers and the company's managers.
+    Decision,
+    /// A run waiting on a check of whether an uncertain action took effect.
+    RunReconciliation,
+    /// A run that failed in the last 7 days and has not been rerun.
+    RunFailure,
+    /// One binding's refused or failed admissions and schedule materializations in the last
+    /// 7 days. They create no run and no event, so they refresh on the page's 30 s tick.
+    BindingRefusal,
     DeliveryFailure,
 }
 
 impl AttentionSourceKind {
     pub const fn as_str(self) -> &'static str {
         match self {
-            Self::Task => "task",
-            Self::Handoff => "handoff",
-            Self::ThreadHandoff => "thread_handoff",
-            Self::Approval => "approval",
-            Self::ResponseReview => "response_review",
-            Self::DelegationDecision => "delegation_decision",
+            Self::Decision => "decision",
+            Self::RunReconciliation => "run_reconciliation",
+            Self::RunFailure => "run_failure",
+            Self::BindingRefusal => "binding_refusal",
             Self::DeliveryFailure => "delivery_failure",
         }
     }
@@ -94,12 +92,10 @@ impl FromStr for AttentionSourceKind {
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value {
-            "task" => Ok(Self::Task),
-            "handoff" => Ok(Self::Handoff),
-            "thread_handoff" => Ok(Self::ThreadHandoff),
-            "approval" => Ok(Self::Approval),
-            "response_review" => Ok(Self::ResponseReview),
-            "delegation_decision" => Ok(Self::DelegationDecision),
+            "decision" => Ok(Self::Decision),
+            "run_reconciliation" => Ok(Self::RunReconciliation),
+            "run_failure" => Ok(Self::RunFailure),
+            "binding_refusal" => Ok(Self::BindingRefusal),
             "delivery_failure" => Ok(Self::DeliveryFailure),
             _ => Err(format!("invalid attention source kind '{value}'")),
         }
@@ -127,9 +123,10 @@ pub struct AttentionItem {
     pub source_kind: AttentionSourceKind,
     pub source_id: Uuid,
     pub company_id: Uuid,
-    pub channel_id: Uuid,
+    /// `None` for a company-associated run or binding, which only owners and admins see.
+    pub channel_id: Option<Uuid>,
     pub thread_id: Option<Uuid>,
-    pub task_id: Option<Uuid>,
+    pub run_id: Option<Uuid>,
     pub correlation_id: Option<CorrelationId>,
     /// Source-owned business status, not a copied lifecycle.
     pub state: String,
@@ -143,7 +140,8 @@ pub struct AttentionItem {
     pub version: u64,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
-    /// Filled only after the application has proved channel visibility.
+    /// Filled only after the application has proved channel visibility; `None` for a source with
+    /// no page yet (runs and bindings get theirs in p09).
     pub href: Option<String>,
 }
 
@@ -248,8 +246,10 @@ pub struct AttentionQuery<'a> {
     pub company_id: Uuid,
     pub principal_id: PrincipalId,
     pub visible_channel_ids: &'a [Uuid],
+    /// Whether the viewer is an owner or admin, who also sees company-associated items (no
+    /// channel), as on the decision page.
+    pub manager: bool,
     pub view: AttentionView,
-    pub all_owned: bool,
     pub cursor: Option<&'a AttentionCursor>,
     pub limit: usize,
 }
@@ -264,69 +264,17 @@ impl AttentionQuery<'_> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct NewManualHandoff {
-    pub id: Uuid,
-    pub company_id: Uuid,
-    pub channel_id: Uuid,
-    pub thread_id: Option<Uuid>,
-    pub correlation_id: Option<CorrelationId>,
-    pub title: String,
-    pub next_action: String,
-    pub responsible_principal_id: Option<PrincipalId>,
-    pub priority: BusinessPriority,
-    pub due_at: Option<DateTime<Utc>>,
-    pub command_id: Uuid,
-    pub actor_principal_id: PrincipalId,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct AttentionSourceCommand {
-    pub company_id: Uuid,
-    pub source_kind: AttentionSourceKind,
-    pub source_id: Uuid,
-    pub command_id: Uuid,
-    pub expected_version: u64,
-    pub actor_principal_id: PrincipalId,
-    /// Authorization context, not command semantics; omitted from the idempotency fingerprint.
-    #[serde(skip)]
-    pub visible_channel_ids: Vec<Uuid>,
-    pub priority: BusinessPriority,
-    pub due_at: Option<DateTime<Utc>>,
-    /// Only handoffs may change responsibility through this command.
-    pub responsible_principal_id: Option<PrincipalId>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum HandoffResolution {
-    Resolved,
-    Withdrawn,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ResolveHandoffCommand {
-    pub company_id: Uuid,
-    pub handoff_id: Uuid,
-    pub command_id: Uuid,
-    pub expected_version: u64,
-    pub actor_principal_id: PrincipalId,
-    /// Authorization context, not command semantics; omitted from the idempotency fingerprint.
-    #[serde(skip)]
-    pub visible_channel_ids: Vec<Uuid>,
-    pub resolution: HandoffResolution,
-}
-
+/// The work list's sources over the same windows, for owners and admins (p08 D4.2).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct OperationalSummary {
     pub as_of: DateTime<Utc>,
-    pub unassigned_count: i64,
-    pub oldest_actionable_age_seconds: Option<f64>,
-    pub average_time_to_claim_seconds: Option<f64>,
-    pub average_delegation_wait_seconds: Option<f64>,
-    pub average_review_turnaround_seconds: Option<f64>,
-    pub timeout_cancel_reassign_rate: Option<f64>,
-    pub average_time_to_logical_external_response_seconds: Option<f64>,
+    pub open_decision_count: i64,
+    pub oldest_open_decision_age_seconds: Option<f64>,
+    pub runs_awaiting_reconciliation: i64,
+    /// Failed in the last 7 days and not rerun.
+    pub failed_run_count: i64,
+    /// Refused or failed admissions and schedule materializations in the last 7 days.
+    pub binding_refusal_count: i64,
     pub permanent_delivery_failure_count: i64,
 }
 
@@ -336,11 +284,14 @@ mod tests {
 
     #[test]
     fn cursor_round_trips_every_sort_component() {
-        // Both handoff kinds, because `Display`/`FromStr` split on `~` and a source kind that
-        // carried one would silently truncate the cursor rather than fail to parse.
+        // Every kind, because `Display`/`FromStr` split on `~` and a source kind that carried one
+        // would silently truncate the cursor rather than fail to parse.
         for source_kind in [
-            AttentionSourceKind::ResponseReview,
-            AttentionSourceKind::ThreadHandoff,
+            AttentionSourceKind::Decision,
+            AttentionSourceKind::RunReconciliation,
+            AttentionSourceKind::RunFailure,
+            AttentionSourceKind::BindingRefusal,
+            AttentionSourceKind::DeliveryFailure,
         ] {
             let cursor = AttentionCursor {
                 as_of: DateTime::parse_from_rfc3339("2026-09-07T10:00:00.123456Z")
@@ -358,27 +309,22 @@ mod tests {
                 cursor.to_string().parse::<AttentionCursor>().unwrap(),
                 cursor
             );
+            assert_eq!(source_kind.as_str().parse(), Ok(source_kind));
         }
     }
 
-    /// The two handoff features share a word and nothing else, so neither name may parse as the
-    /// other and neither may be reached by a near miss.
+    /// The legacy kinds are gone (p08 D4.2), so a cursor minted before B4a is refused.
     #[test]
-    fn the_thread_handoff_kind_is_its_own_vocabulary() {
-        assert_eq!(
-            AttentionSourceKind::ThreadHandoff.as_str(),
-            "thread_handoff"
-        );
-        assert_eq!(
-            "thread_handoff".parse::<AttentionSourceKind>(),
-            Ok(AttentionSourceKind::ThreadHandoff)
-        );
-        assert_eq!(
-            "handoff".parse::<AttentionSourceKind>(),
-            Ok(AttentionSourceKind::Handoff),
-            "the manual handoff keeps the bare word it already owns"
-        );
-        for value in ["threadhandoff", "handoff ", "thread-handoff", ""] {
+    fn legacy_source_kinds_do_not_parse() {
+        for value in [
+            "task",
+            "handoff",
+            "thread_handoff",
+            "approval",
+            "response_review",
+            "delegation_decision",
+            "",
+        ] {
             assert_eq!(
                 value.parse::<AttentionSourceKind>(),
                 Err(format!("invalid attention source kind '{value}'")),
@@ -390,12 +336,12 @@ mod tests {
     fn cursor_rejects_unknown_ranks_and_trailing_data() {
         let id = Uuid::new_v4();
         assert!(
-            format!("1~3~0~1~task~{id}")
+            format!("1~3~0~1~decision~{id}")
                 .parse::<AttentionCursor>()
                 .is_err()
         );
         assert!(
-            format!("1~0~0~1~task~{id}~extra")
+            format!("1~0~0~1~decision~{id}~extra")
                 .parse::<AttentionCursor>()
                 .is_err()
         );

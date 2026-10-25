@@ -2,7 +2,7 @@ use std::{
     collections::VecDeque,
     fmt,
     sync::{
-        Arc, Mutex,
+        Arc,
         atomic::{AtomicUsize, Ordering},
     },
     time::Duration,
@@ -18,8 +18,7 @@ use crate::{
     entities::{
         dashboard::DashboardWindow,
         runtime_metrics::{
-            MachineId, MemoryProviderInterval, RuntimeMetricObservation, RuntimeMetricSample,
-            RuntimeMetricSnapshot,
+            MachineId, RuntimeMetricObservation, RuntimeMetricSample, RuntimeMetricSnapshot,
         },
     },
 };
@@ -30,15 +29,16 @@ pub const RETENTION_DAYS: i64 = 7;
 /// One hour of failed ten-second probes. An outage cannot grow process memory without bound.
 pub const FAILED_PROBE_CAPACITY: usize = 360;
 
-/// Shared by the task executor and sampler. The guard makes cancellation-safe accounting the
-/// default: every path out of an execution drops it and decrements the gauge.
+/// The workflow jobs this process is executing, shared by its worker slots and the sampler. The
+/// guard makes cancellation-safe accounting the default: every path out of a job drops it and
+/// decrements the gauge.
 #[derive(Clone, Default)]
-pub struct ActiveTaskExecutions(Arc<AtomicUsize>);
+pub struct ActiveWorkflowJobs(Arc<AtomicUsize>);
 
-impl ActiveTaskExecutions {
-    pub fn enter(&self) -> ActiveTaskExecutionGuard {
+impl ActiveWorkflowJobs {
+    pub fn enter(&self) -> ActiveWorkflowJobGuard {
         self.0.fetch_add(1, Ordering::Relaxed);
-        ActiveTaskExecutionGuard(self.clone())
+        ActiveWorkflowJobGuard(self.clone())
     }
 
     pub fn current(&self) -> usize {
@@ -46,46 +46,12 @@ impl ActiveTaskExecutions {
     }
 }
 
-pub struct ActiveTaskExecutionGuard(ActiveTaskExecutions);
+pub struct ActiveWorkflowJobGuard(ActiveWorkflowJobs);
 
-impl Drop for ActiveTaskExecutionGuard {
+impl Drop for ActiveWorkflowJobGuard {
     fn drop(&mut self) {
         let previous = self.0.0.fetch_sub(1, Ordering::Relaxed);
-        debug_assert!(previous > 0, "active task execution gauge underflowed");
-    }
-}
-
-/// Shared by every memory provider adapter and the sampler. Every completed call is recorded once, and the
-/// sampler drains the tally, so each sample reports exactly the calls made since the previous one.
-///
-/// A lock rather than a set of atomics: the three figures are one reading, and a drain that
-/// interleaved with a record could otherwise report more failures than calls.
-#[derive(Clone, Default)]
-pub struct MemoryProviderActivity(Arc<Mutex<MemoryProviderInterval>>);
-
-impl MemoryProviderActivity {
-    pub fn record(&self, duration: Duration, succeeded: bool) {
-        let mut interval = self.lock();
-        interval.calls = interval.calls.saturating_add(1);
-        if !succeeded {
-            interval.failures = interval.failures.saturating_add(1);
-        }
-        interval.total_duration_ms += duration.as_secs_f64() * 1000.0;
-    }
-
-    /// Take the interval and start the next one. Called once per sample; a sample that fails to
-    /// persist carries its calls into the buffered backlog rather than losing or double-counting
-    /// them.
-    pub fn drain(&self) -> MemoryProviderInterval {
-        std::mem::take(&mut *self.lock())
-    }
-
-    /// A poisoned tally is recoverable: counters have no invariant a panic could have broken
-    /// halfway, and losing memory metrics is never a reason to fail a memory call.
-    fn lock(&self) -> std::sync::MutexGuard<'_, MemoryProviderInterval> {
-        self.0
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
+        debug_assert!(previous > 0, "active workflow job gauge underflowed");
     }
 }
 
@@ -239,9 +205,8 @@ mod tests {
                 cpu_utilization_percent: None,
                 cpu_steal_percent: None,
                 cpu_throttle_percent: None,
-                active_task_executions: 0,
-                task_worker_concurrency_limit: 4,
-                hydradb: MemoryProviderInterval::default(),
+                active_workflow_jobs: 0,
+                workflow_worker_slots: 4,
             }
         }
     }
@@ -280,9 +245,8 @@ mod tests {
                 cpu_utilization_percent: observation.cpu_utilization_percent,
                 cpu_steal_percent: observation.cpu_steal_percent,
                 cpu_throttle_percent: observation.cpu_throttle_percent,
-                active_task_executions: observation.active_task_executions,
-                task_worker_concurrency_limit: observation.task_worker_concurrency_limit,
-                hydradb: observation.hydradb,
+                active_workflow_jobs: observation.active_workflow_jobs,
+                workflow_worker_slots: observation.workflow_worker_slots,
                 database_acquire_duration_ms: 1.0,
                 database_acquire_succeeded: false,
                 pool_size: 1,
@@ -333,24 +297,8 @@ mod tests {
     }
 
     #[test]
-    fn memory_provider_activity_tallies_calls_and_starts_a_new_interval_on_drain() {
-        let activity = MemoryProviderActivity::default();
-        activity.record(Duration::from_millis(20), true);
-        activity.record(Duration::from_millis(40), false);
-
-        let interval = activity.drain();
-        assert_eq!(interval.calls, 2);
-        assert_eq!(interval.failures, 1);
-        assert_eq!(interval.mean_duration_ms(), Some(30.0));
-
-        let idle = activity.drain();
-        assert_eq!(idle.calls, 0);
-        assert_eq!(idle.mean_duration_ms(), None);
-    }
-
-    #[test]
     fn active_execution_gauge_is_nested_and_cancellation_safe() {
-        let gauge = ActiveTaskExecutions::default();
+        let gauge = ActiveWorkflowJobs::default();
         assert_eq!(gauge.current(), 0);
         let first = gauge.enter();
         assert_eq!(gauge.current(), 1);

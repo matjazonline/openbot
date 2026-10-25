@@ -110,8 +110,11 @@ async fn workflow_admit_sql_message_alias_equivalence_and_independent_runs() {
             _: WorkflowBindingId,
             _: &IdempotencyKey,
             _: &TriggerRef,
-        ) -> AppResult<Option<Arc<binding::ConfiguredBinding>>> {
-            Ok(Some(self.0.clone()))
+        ) -> AppResult<Option<AdmissionBinding>> {
+            Ok(Some(AdmissionBinding {
+                binding: self.0.clone(),
+                saved: false,
+            }))
         }
     }
     WorkflowService::new(

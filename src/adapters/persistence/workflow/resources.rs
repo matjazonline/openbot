@@ -50,6 +50,10 @@ pub(super) async fn check_readiness(
                 authority::builtin_message_tool(tool)?;
                 continue;
             }
+            ToolKind::Provisioning => {
+                authority::builtin_provisioning_tool(tool)?;
+                continue;
+            }
             ToolKind::Http => {
                 http::registered_on(tx, company, tool).await?;
                 continue;

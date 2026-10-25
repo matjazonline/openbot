@@ -87,6 +87,15 @@ pub(super) fn builtin_message_tool(tool: &ToolSnapshot) -> AppResult<bool> {
     Ok(true)
 }
 
+/// Built-in provisioning has no registration either: a name-only snapshot under a provisioning
+/// name must be exactly the trusted built-in (p08 D2.1).
+pub(super) fn builtin_provisioning_tool(tool: &ToolSnapshot) -> AppResult<()> {
+    if !crate::application::workflow::provisioning::is_trusted_provisioning_snapshot(tool)? {
+        return Err(missing());
+    }
+    Ok(())
+}
+
 /// Tools must match a live HTTP registration or MCP approval for their slot kind. Agent and
 /// skill snapshots are frozen content verified once, at publish, against their durable
 /// owners (`agent_publication::verify_on`, 06-D5); later agent edits never block stored
@@ -113,6 +122,7 @@ pub(super) async fn supported_publication(
                 ToolKind::Message => {
                     builtin_message_tool(tool)?;
                 }
+                ToolKind::Provisioning => builtin_provisioning_tool(tool)?,
                 ToolKind::Http => {
                     http::registered_on(tx, current.company_id(), tool).await?;
                 }

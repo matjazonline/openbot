@@ -20,6 +20,8 @@ fn relinked(request: &AdmitWorkflowRequest, rerun_of: Option<RunId>) -> AdmitWor
         idempotency_key: request.idempotency_key.clone(),
         input: request.input.clone(),
         rerun_of,
+        delivery_policy: crate::application::workflow::DeliveryPolicy::Deliver,
+        expected_binding_revision: None,
     }
 }
 

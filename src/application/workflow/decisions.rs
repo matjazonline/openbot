@@ -147,9 +147,66 @@ pub struct DecisionSubmissionView {
     pub data: Value,
 }
 
+/// The subject whose immutable artifact a reviewer is settling.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DecisionSubject {
+    Business,
+    ProtectedAction,
+    TokenAllowance,
+}
+impl DecisionSubject {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Business => "Business decision",
+            Self::ProtectedAction => "Protected-action approval",
+            Self::TokenAllowance => "Token allowance approval",
+        }
+    }
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Business => "business",
+            Self::ProtectedAction => "action_approval",
+            Self::TokenAllowance => "token_allowance",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct DecisionContext {
+    pub company: CompanyId,
+    pub workflow_title: String,
+    pub version: crate::domain::workflow::VersionId,
+    pub channel: Option<Uuid>,
+    pub thread: Option<Uuid>,
+    pub trigger_message: Option<Uuid>,
+    pub inspect_run: bool,
+}
+
+/// Bounded links to exact artifacts in this run and sibling revision rounds.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DecisionHistoryEntry {
+    pub decision: DecisionId,
+    pub run: RunId,
+    pub step: StepId,
+    pub round: Option<i32>,
+    pub artifact_digest: String,
+    pub subject: DecisionSubject,
+    pub state: String,
+    pub choice: Option<String>,
+    pub feedback: Option<String>,
+    pub created_at: DateTime<Utc>,
+}
+
 /// What a member with run visibility may see. Comments are internal discussion.
 #[derive(Debug, Clone, PartialEq)]
 pub struct DecisionView {
+    pub subject: DecisionSubject,
+    pub context: DecisionContext,
+    pub data_schema: Option<Value>,
+    pub feedback_required: Vec<String>,
+    pub can_submit: bool,
+    pub history: Vec<DecisionHistoryEntry>,
+    pub history_truncated: bool,
     pub decision: DecisionId,
     pub run: RunId,
     pub execution: ExecutionId,
@@ -161,6 +218,9 @@ pub struct DecisionView {
     /// The wait state: `waiting` is open; any other value is settled.
     pub state: String,
     pub reviewers: Vec<Uuid>,
+    /// What a submission may choose: a business decision's declared routes in order; an
+    /// approval's `approve` or `reject`.
+    pub choices: Vec<String>,
     pub submission: Option<DecisionSubmissionView>,
     pub comments: Vec<DecisionCommentView>,
 }

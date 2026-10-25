@@ -1,30 +1,7 @@
-//! The runtimes an agent can actually be executed on.
+//! The runtime a workflow model step executes on.
 //!
-//! Each submodule implements [`AgentHarness`] for one of them: it takes the harness-neutral
-//! [`AgentCapabilitySpec`] the application handed it, compiles it into whatever its runtime
-//! accepts, runs the turn, and translates the runtime's callbacks back into the application's
-//! ports. Nothing above this directory names a runtime.
-//!
-//! The registry these register *into* lives in `src/application/services/harness/`, not here:
-//! `src/AGENTS.md` -- an abstraction must not live inside the outer adapter it is intended to
-//! abstract.
-//!
-//! [`AgentHarness`]: crate::services::harness::AgentHarness
-//! [`AgentCapabilitySpec`]: crate::entities::harness::AgentCapabilitySpec
+//! `rig` drives one checkpointed model loop per workflow execution
+//! ([`rig::WorkflowAgentRuntime`]) and the system-prompt generator's one-shot completion
+//! ([`rig::RigTextClassifier`]). The legacy task harness and its registry are gone (p08 B4b).
 
 pub mod rig;
-
-/// Construct exactly the deployment's supported runtimes. No tenant credentials or network probes
-/// are involved: provider authentication and model availability are checked by real requests.
-pub fn deployment_registry(
-    capabilities: std::sync::Arc<dyn crate::use_cases::skill::AgentCapabilityReader>,
-) -> anyhow::Result<crate::services::harness::HarnessRegistry> {
-    use crate::{entities::harness::HarnessKind, services::harness::HarnessRegistry};
-    use std::sync::Arc;
-    let providers = rig::providers::ProviderRegistry::standard()?;
-    let registry = HarnessRegistry::new().register(
-        HarnessKind::Rig,
-        Arc::new(rig::RigHarness::with_providers(providers, capabilities)?),
-    )?;
-    Ok(registry)
-}

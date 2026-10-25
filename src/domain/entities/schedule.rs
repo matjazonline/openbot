@@ -4,14 +4,6 @@ use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use uuid::Uuid;
 
-use crate::entities::{
-    company::CompanyTeamAccount,
-    message::CanonicalMessageId,
-    task::{TaskStatus, ThreadActivity},
-    transport::PrincipalId,
-    value_objects::EmailAddress,
-};
-
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ScheduleType {
@@ -107,69 +99,20 @@ impl<'de> Deserialize<'de> for ScheduleTimezone {
     }
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum ScheduleDeliveryMode {
-    /// Keep output inside the channel's mailbox thread only.
-    MailboxOnly,
-    /// Post to mailbox thread and email all configured channel participants.
-    EmailParticipants,
-    /// Post to mailbox thread and email a custom recipient list.
-    EmailCustom,
-}
-
-impl ScheduleDeliveryMode {
-    pub fn as_str(self) -> &'static str {
-        match self {
-            ScheduleDeliveryMode::MailboxOnly => "mailbox_only",
-            ScheduleDeliveryMode::EmailParticipants => "email_participants",
-            ScheduleDeliveryMode::EmailCustom => "email_custom",
-        }
-    }
-}
-
-impl FromStr for ScheduleDeliveryMode {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.trim().to_lowercase().as_str() {
-            "mailbox_only" | "mailboxonly" => Ok(ScheduleDeliveryMode::MailboxOnly),
-            "email_participants" | "emailparticipants" => {
-                Ok(ScheduleDeliveryMode::EmailParticipants)
-            }
-            "email_custom" | "emailcustom" => Ok(ScheduleDeliveryMode::EmailCustom),
-            other => Err(format!("Unknown schedule delivery mode: {other}")),
-        }
-    }
-}
-
-impl std::fmt::Display for ScheduleDeliveryMode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.as_str())
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ChannelSchedule {
     pub id: Uuid,
     pub company_id: Uuid,
     pub channel_id: Uuid,
+    /// The workflow binding each occurrence admits a run of. The run acts as that binding's
+    /// run-as member (p08 D1.1, D1.9).
+    pub binding_id: Uuid,
     pub name: String,
     pub schedule_type: ScheduleType,
     pub interval_seconds: Option<i64>,
-    pub subject_template: String,
-    pub prompt_template: String,
-    pub delivery_mode: ScheduleDeliveryMode,
-    #[serde(default)]
-    pub recipient_emails: Vec<EmailAddress>,
-    /// IANA zone the templates render in and the cadence counts its days by.
+    /// IANA zone the cadence counts its days by.
     #[serde(default = "default_timezone")]
     pub timezone: ScheduleTimezone,
-    /// The team member every run acts as, or `None` for a run attributed to nobody. Stored as the
-    /// account rather than the address so renaming a mailbox does not re-point the attribution;
-    /// [`ScheduleRunAs`] is what the address is resolved into at execution.
-    #[serde(default)]
-    pub run_as_user_id: Option<Uuid>,
     #[serde(default = "default_true")]
     pub enabled: bool,
     pub last_run_at: Option<DateTime<Utc>>,
@@ -190,16 +133,6 @@ fn default_timezone() -> ScheduleTimezone {
 }
 
 impl ChannelSchedule {
-    /// Expand `{{date}}`, `{{time}}`, `{{datetime}}` in the subject template.
-    pub fn render_subject(&self, now: DateTime<Utc>) -> String {
-        render_template(&self.subject_template, now, &self.timezone)
-    }
-
-    /// Expand `{{date}}`, `{{time}}`, `{{datetime}}` in the prompt template.
-    pub fn render_prompt(&self, now: DateTime<Utc>) -> String {
-        render_template(&self.prompt_template, now, &self.timezone)
-    }
-
     /// An instant as the schedule's own zone shows it, for display next to its cadence.
     pub fn in_zone(&self, at: DateTime<Utc>, format: &str) -> String {
         self.timezone.format(at, format)
@@ -245,210 +178,82 @@ impl ChannelSchedule {
     }
 }
 
-fn render_template(template: &str, now: DateTime<Utc>, zone: &ScheduleTimezone) -> String {
-    let date_str = zone.format(now, "%Y-%m-%d");
-    let time_str = zone.format(now, "%H:%M %Z");
-    let datetime_str = zone.format(now, "%Y-%m-%d %H:%M %Z");
-
-    template
-        .replace("{{date}}", &date_str)
-        .replace("{{ date }}", &date_str)
-        .replace("{{time}}", &time_str)
-        .replace("{{ time }}", &time_str)
-        .replace("{{datetime}}", &datetime_str)
-        .replace("{{ datetime }}", &datetime_str)
-}
-
 #[derive(Debug, Clone)]
 pub struct ScheduleWrite {
     pub name: String,
     pub schedule_type: ScheduleType,
     pub interval_seconds: Option<i64>,
     pub scheduled_at: Option<DateTime<Utc>>,
-    pub subject_template: String,
-    pub prompt_template: String,
-    pub delivery_mode: ScheduleDeliveryMode,
-    pub recipient_emails: Vec<EmailAddress>,
     pub timezone: ScheduleTimezone,
-    /// Whom the runs act as. Never taken from a form untouched: only
-    /// [`crate::use_cases::schedule::ScheduleUseCases`] decides whether the submitter may
-    /// attribute runs to this account.
-    pub run_as_user_id: Option<Uuid>,
+    /// Checked against the schedule's channel when written (p08 D1.9): its association must be
+    /// the company or this channel, its pinned input must accept the schedule trigger input, and
+    /// its run-as must see the channel.
+    pub binding_id: Uuid,
     pub enabled: bool,
 }
 
-/// The identity one scheduled run acts as, resolved from the schedule's `run_as_user_id` when the
-/// run is materialized.
-///
-/// All three travel together because none is derivable from the others in the worker: the
-/// principal scopes the run's memory, the address is where its answer is mailed, and the account
-/// id is what the run is traced by.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct ScheduleRunAs {
-    pub user_id: Uuid,
-    pub email: EmailAddress,
-    /// The company-scoped actor the run acts as. This, not the address, is what scopes the run's
-    /// user memory: an account reachable at two addresses is still one actor, and a recycled
-    /// address must not inherit the previous holder's memories.
-    pub principal_id: Option<PrincipalId>,
-}
-
-/// Who a schedule may be made to run as, and which of those this caller may choose.
-///
-/// One value rather than two lists, because every place that renders the picker also has to name
-/// a member the caller cannot pick: an admin sees that a schedule runs as the owner and may leave
-/// it that way, without being able to attribute a new run to anybody but themselves.
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct ScheduleRunAsChoices {
-    /// Everyone on the company's team, for naming whoever a stored schedule already runs as.
-    pub team: Vec<CompanyTeamAccount>,
-    /// The one account this caller may attribute runs to, or `None` when they may pick anyone.
-    pub restricted_to: Option<Uuid>,
-}
-
-impl ScheduleRunAsChoices {
-    /// Whether this caller may store `user_id` as a schedule's run-as member.
-    pub fn may_choose(&self, user_id: Uuid) -> bool {
-        self.account(user_id).is_some()
-            && self
-                .restricted_to
-                .is_none_or(|restricted| restricted == user_id)
-    }
-
-    /// The team member behind an id, whether or not this caller may choose them.
-    pub fn account(&self, user_id: Uuid) -> Option<&CompanyTeamAccount> {
-        self.team.iter().find(|account| account.user_id == user_id)
-    }
-
-    /// The members to offer in a picker.
-    pub fn choosable(&self) -> impl Iterator<Item = &CompanyTeamAccount> {
-        self.team
-            .iter()
-            .filter(|account| self.may_choose(account.user_id))
-    }
-
-    /// How a picker has to present what a schedule already stores, which is not the same question
-    /// as who may be chosen: a member the caller cannot pick is still one they must be able to
-    /// leave in place, and an id whose account has left the team is one they can only replace.
-    pub fn selection(&self, stored: Option<Uuid>) -> RunAsSelection<'_> {
-        let Some(user_id) = stored else {
-            return RunAsSelection::System;
-        };
-
-        match self.account(user_id) {
-            None => RunAsSelection::Departed,
-            Some(account) if self.may_choose(user_id) => RunAsSelection::Choosable(account),
-            Some(account) => RunAsSelection::Locked(account),
-        }
-    }
-}
-
-/// What a schedule's stored run-as member is to the caller looking at it.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum RunAsSelection<'a> {
-    /// No member named: the run acts as nobody.
-    System,
-    /// A member this caller may keep or change.
-    Choosable(&'a CompanyTeamAccount),
-    /// A member only the company owner may change, offered back unchanged.
-    Locked(&'a CompanyTeamAccount),
-    /// An account that has left the team, which any caller may replace but nobody may keep.
-    Departed,
-}
-
-/// What one `scheduled_agent_run` task carries. The worker deserialises this rather than reaching
-/// into the JSON by key, so a payload written by an older build fails the task loudly instead of
-/// running the agent with an empty prompt.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct ScheduledRunPayload {
-    /// Stable identity of the logical schedule slot. Older queued payloads predate durable runs.
-    #[serde(default)]
-    pub schedule_run_id: Option<Uuid>,
-    pub schedule_id: Uuid,
-    pub schedule_name: String,
-    pub channel_id: Uuid,
-    pub company_id: Uuid,
-    pub thread_id: Uuid,
-    pub subject: String,
-    pub prompt: String,
-    pub delivery_mode: ScheduleDeliveryMode,
-    #[serde(default)]
-    pub recipient_emails: Vec<EmailAddress>,
-    /// Whom this run acts as. Absent both for an unattributed run and in payloads queued before
-    /// attribution existed, which are the same thing to the worker.
-    #[serde(default)]
-    pub run_as: Option<ScheduleRunAs>,
-    /// This run's stable identity: the durable schedule-run slot where there is one, and a
-    /// materialization-time id otherwise.
-    ///
-    /// Transport-neutral on purpose. It used to be an RFC `Message-ID` the mail renderer needed,
-    /// which put a synthetic mail header inside the task protocol for a run no mail ever carried.
-    /// The renderer derives its headers from this instead, so a run delivered over another
-    /// transport needs nothing here to change.
-    pub run_key: Uuid,
-    /// The canonical prompt message this run answers.
-    ///
-    /// The worker's idempotency guard asks "did a previous attempt already answer this?", which is
-    /// a question about canonical messages in a thread, not about mail headers -- so the prompt is
-    /// named by its canonical id and a run over a transport with no headers at all works the same.
-    pub prompt_message_id: CanonicalMessageId,
-}
-
-/// A durable logical slot waiting to be materialized into a thread, prompt, and task.
+/// A captured occurrence a materializer holds under its lease generation. The snapshot is the
+/// schedule as it was when the occurrence was captured; the binding is the one captured with it.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ClaimedScheduleRun {
     pub id: Uuid,
     pub materialization_generation: Uuid,
     pub scheduled_for: DateTime<Utc>,
+    pub binding_id: Uuid,
     pub schedule: ChannelSchedule,
-    pub thread_id: Option<Uuid>,
-    pub task_id: Option<Uuid>,
 }
 
-impl ScheduledRunPayload {
-    /// Who this run's answer is emailed to, or `None` when it stays in the mailbox. The channel's
-    /// own participants are not resolved here — the worker holds the channel, this does not.
-    pub fn custom_recipients(&self) -> Option<&[EmailAddress]> {
-        match self.delivery_mode {
-            ScheduleDeliveryMode::EmailCustom => Some(&self.recipient_emails),
-            ScheduleDeliveryMode::MailboxOnly | ScheduleDeliveryMode::EmailParticipants => None,
+/// Where one occurrence is in becoming a workflow run.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum OccurrenceStatus {
+    Pending,
+    Materializing,
+    Materialized,
+    Failed,
+}
+
+impl FromStr for OccurrenceStatus {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "pending" => Ok(Self::Pending),
+            "materializing" => Ok(Self::Materializing),
+            "materialized" => Ok(Self::Materialized),
+            "failed" => Ok(Self::Failed),
+            other => Err(format!("Unknown schedule occurrence status: {other}")),
         }
     }
+}
 
-    pub fn wants_email(&self) -> bool {
-        !matches!(self.delivery_mode, ScheduleDeliveryMode::MailboxOnly)
-    }
-
-    /// The address this run's answer is mailed to, or `None` when the run acts as nobody.
-    pub fn run_as_email(&self) -> Option<&EmailAddress> {
-        self.run_as.as_ref().map(|run_as| &run_as.email)
-    }
-
-    /// The actor this run acts as, for anything scoped to a person rather than addressed to one.
-    pub fn run_as_principal(&self) -> Option<PrincipalId> {
-        self.run_as.as_ref().and_then(|run_as| run_as.principal_id)
+impl OccurrenceStatus {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Pending => "pending",
+            Self::Materializing => "materializing",
+            Self::Materialized => "materialized",
+            Self::Failed => "failed",
+        }
     }
 }
 
-/// One execution of a schedule, joining the created thread with its background task state.
+/// One occurrence of a schedule, with the workflow run it admitted once it has one.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ScheduleRun {
-    pub thread_id: Uuid,
-    pub task_id: Uuid,
-    pub channel_id: Uuid,
-    pub subject: String,
-    pub task_status: TaskStatus,
-    pub lock_expires_at: Option<DateTime<Utc>>,
-    pub latest_response: Option<String>,
-    pub message_count: i64,
+    pub id: Uuid,
+    pub scheduled_for: DateTime<Utc>,
+    /// Started by run-now rather than by the cadence.
+    pub manual: bool,
+    pub status: OccurrenceStatus,
+    pub run_id: Option<Uuid>,
+    /// The run's state (`workflow_runs.state`), when there is a run.
+    pub run_state: Option<String>,
+    /// Why admission refused the occurrence (`unavailable`, `input_rejected`, `key_conflict`).
+    pub refusal: Option<String>,
+    pub last_error: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
-}
-
-impl ScheduleRun {
-    pub fn activity(&self, now: DateTime<Utc>) -> Option<ThreadActivity> {
-        ThreadActivity::from_task(self.task_status, self.lock_expires_at, now)
-    }
 }
 
 #[cfg(test)]
@@ -456,57 +261,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn renders_template_variables() {
-        let schedule = ChannelSchedule {
-            id: Uuid::new_v4(),
-            company_id: Uuid::new_v4(),
-            channel_id: Uuid::new_v4(),
-            name: "Morning Report".to_string(),
-            schedule_type: ScheduleType::Interval,
-            interval_seconds: Some(86400),
-            subject_template: "[Daily Report] {{date}} Summary".to_string(),
-            prompt_template: "Generate summary for {{date}} at {{time}}".to_string(),
-            delivery_mode: ScheduleDeliveryMode::MailboxOnly,
-            recipient_emails: vec![],
-            timezone: ScheduleTimezone::utc(),
-            run_as_user_id: None,
-            enabled: true,
-            last_run_at: None,
-            next_run_at: None,
-            last_error: None,
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
-        };
-
-        let now = DateTime::parse_from_rfc3339("2026-08-25T09:30:00Z")
-            .unwrap()
-            .with_timezone(&Utc);
-
-        assert_eq!(
-            schedule.render_subject(now),
-            "[Daily Report] 2026-08-25 Summary"
-        );
-        assert_eq!(
-            schedule.render_prompt(now),
-            "Generate summary for 2026-08-25 at 09:30 UTC"
-        );
-    }
-
-    #[test]
     fn cadence_labels_are_human_readable() {
         let mut schedule = ChannelSchedule {
             id: Uuid::new_v4(),
             company_id: Uuid::new_v4(),
             channel_id: Uuid::new_v4(),
+            binding_id: Uuid::new_v4(),
             name: "Test".to_string(),
             schedule_type: ScheduleType::Interval,
             interval_seconds: Some(3600),
-            subject_template: "".to_string(),
-            prompt_template: "".to_string(),
-            delivery_mode: ScheduleDeliveryMode::MailboxOnly,
-            recipient_emails: vec![],
             timezone: ScheduleTimezone::utc(),
-            run_as_user_id: None,
             enabled: true,
             last_run_at: None,
             next_run_at: None,

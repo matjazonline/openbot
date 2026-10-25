@@ -1,4 +1,5 @@
 use super::*;
+use crate::services::harness::AgentExecutionOutput;
 
 pub const CHECKPOINT_SCHEMA_VERSION: u16 = 1;
 pub const MAX_CHECKPOINT_BYTES: usize = 2 * 1024 * 1024;
@@ -63,9 +64,7 @@ pub enum RunState {
     Active,
     InvalidOutput,
     BudgetExceeded,
-    Waiting,
     Completed,
-    Superseded,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -83,8 +82,6 @@ pub struct RunCheckpoint {
     pub turns: Vec<SavedModelTurn>,
     pub invocations: Vec<SavedInvocation>,
     pub final_output: Option<AgentExecutionOutput>,
-    pub wait: Option<ApprovalWait>,
-    pub outreach_wait: Option<OutreachWait>,
     pub executions: Vec<ExecutionReservation>,
     pub tool_catalogue_fingerprint: Option<String>,
     #[serde(default)]
@@ -131,8 +128,6 @@ impl RunCheckpoint {
             turns: vec![],
             invocations: vec![],
             final_output: None,
-            wait: None,
-            outreach_wait: None,
             executions: vec![],
             tool_catalogue_fingerprint: None,
         };
@@ -293,14 +288,9 @@ impl RunCheckpoint {
 
     fn validate_ledger(&self) -> AppResult<()> {
         let exceeded = self.hard_token_budget_exceeded();
-        if (exceeded && !matches!(self.state, RunState::BudgetExceeded | RunState::Superseded))
+        if (exceeded && self.state != RunState::BudgetExceeded)
             || (self.state == RunState::BudgetExceeded && !exceeded)
-            || (self.state == RunState::Waiting)
-                != (self.wait.is_some() || self.outreach_wait.is_some())
-            || (self.wait.is_some() && self.outreach_wait.is_some())
-            || (self.state == RunState::Completed && self.final_output.is_none())
-            || (self.final_output.is_some()
-                && !matches!(self.state, RunState::Completed | RunState::Superseded))
+            || (self.state == RunState::Completed) != self.final_output.is_some()
         {
             return Err(invalid("Inconsistent checkpoint state or budget ledger"));
         }
@@ -741,7 +731,6 @@ impl RunCheckpoint {
         self.require_active()?;
         if self.turns.is_empty()
             || self.pending_call().is_some()
-            || output.disposition != super::super::AgentExecutionDisposition::Completed
             || serde_json::to_vec(&output)
                 .map_err(|_| invalid("Invalid final output"))?
                 .len()
@@ -758,185 +747,6 @@ impl RunCheckpoint {
         self.final_output = Some(output);
         self.state = RunState::Completed;
         Ok(true)
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct ApprovalWait {
-    pub approval_id: Uuid,
-    pub cycle_id: Uuid,
-    pub invocation_id: InvocationId,
-}
-
-impl RunCheckpoint {
-    pub(crate) fn park_approval(&self, wait: ApprovalWait) -> AppResult<Self> {
-        if self.wait.as_ref() == Some(&wait) && self.state == RunState::Waiting {
-            return Ok(self.clone());
-        }
-        self.require_active()?;
-        if self
-            .pending_call()
-            .is_none_or(|call| call.invocation_id != wait.invocation_id)
-        {
-            return Err(invalid("Approval does not match the current invocation"));
-        }
-        let mut next = self.clone();
-        let invocation = next
-            .invocations
-            .iter_mut()
-            .find(|inv| {
-                inv.call.invocation_id == wait.invocation_id
-                    && matches!(
-                        inv.state,
-                        InvocationState::Prepared | InvocationState::Ready
-                    )
-            })
-            .ok_or_else(|| invalid("Approval invocation is not prepared"))?;
-        invocation.state = InvocationState::Waiting;
-        next.state = RunState::Waiting;
-        next.wait = Some(wait);
-        next.revision.0 = next
-            .revision
-            .0
-            .checked_add(1)
-            .ok_or_else(|| invalid("Checkpoint revision exhausted"))?;
-        next.validate()?;
-        Ok(next)
-    }
-
-    pub(crate) fn resolve_approval(&self, wait: &ApprovalWait, approved: bool) -> AppResult<Self> {
-        if self.wait.as_ref() != Some(wait) || self.state != RunState::Waiting {
-            return Err(invalid(
-                "Approval does not match the current continuation wait",
-            ));
-        }
-        let mut next = self.clone();
-        let invocation = next
-            .invocations
-            .iter_mut()
-            .find(|inv| {
-                inv.call.invocation_id == wait.invocation_id
-                    && inv.state == InvocationState::Waiting
-            })
-            .ok_or_else(|| invalid("Missing waiting invocation"))?;
-        // Saved runs from before 06C may still wait on a `request_approval` checkpoint.
-        let checkpoint = invocation.call.tool_id.as_str() == "request_approval";
-        invocation.state = if approved {
-            InvocationState::Ready
-        } else {
-            InvocationState::Failed
-        };
-        next.wait = None;
-        next.state = if approved {
-            RunState::Active
-        } else {
-            RunState::Superseded
-        };
-        if approved && checkpoint {
-            next.result(
-                wait.invocation_id,
-                serde_json::json!({"status":"approved", "approval_id":wait.approval_id}),
-            )?;
-        }
-        next.revision.0 = next
-            .revision
-            .0
-            .checked_add(1)
-            .ok_or_else(|| invalid("Checkpoint revision exhausted"))?;
-        next.validate()?;
-        Ok(next)
-    }
-}
-
-impl RunCheckpoint {
-    pub(crate) fn supersede(&self) -> AppResult<Self> {
-        let mut next = self.clone();
-        next.state = RunState::Superseded;
-        next.wait = None;
-        next.outreach_wait = None;
-        for invocation in &mut next.invocations {
-            if matches!(
-                invocation.state,
-                InvocationState::Prepared | InvocationState::Ready | InvocationState::Waiting
-            ) {
-                invocation.state = InvocationState::Failed;
-            }
-        }
-        next.revision.0 = next
-            .revision
-            .0
-            .checked_add(1)
-            .ok_or_else(|| invalid("Checkpoint revision exhausted"))?;
-        next.validate()?;
-        Ok(next)
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct OutreachWait {
-    pub outreach_id: Uuid,
-    pub invocation_id: InvocationId,
-}
-
-impl RunCheckpoint {
-    pub(crate) fn park_outreach(&self, wait: OutreachWait) -> AppResult<Self> {
-        self.require_active()?;
-        if self
-            .pending_call()
-            .is_none_or(|call| call.invocation_id != wait.invocation_id)
-        {
-            return Err(invalid("Outreach is not the current invocation"));
-        }
-        let mut next = self.clone();
-        let invocation = next
-            .invocations
-            .iter_mut()
-            .find(|inv| {
-                inv.call.invocation_id == wait.invocation_id
-                    && matches!(
-                        inv.state,
-                        InvocationState::Prepared | InvocationState::Ready
-                    )
-            })
-            .ok_or_else(|| invalid("Outreach invocation was not prepared"))?;
-        invocation.state = InvocationState::Waiting;
-        next.state = RunState::Waiting;
-        next.outreach_wait = Some(wait);
-        next.revision.0 = next
-            .revision
-            .0
-            .checked_add(1)
-            .ok_or_else(|| invalid("Checkpoint revision exhausted"))?;
-        next.validate()?;
-        Ok(next)
-    }
-
-    pub(crate) fn resolve_outreach(&self, wait: &OutreachWait, result: Value) -> AppResult<Self> {
-        if self.outreach_wait.as_ref() != Some(wait) || self.state != RunState::Waiting {
-            return Err(invalid("Outreach does not match the saved wait"));
-        }
-        let mut next = self.clone();
-        let invocation = next
-            .invocations
-            .iter_mut()
-            .find(|inv| {
-                inv.call.invocation_id == wait.invocation_id
-                    && inv.state == InvocationState::Waiting
-            })
-            .ok_or_else(|| invalid("Missing waiting outreach invocation"))?;
-        invocation.state = InvocationState::Ready;
-        next.state = RunState::Active;
-        next.outreach_wait = None;
-        next.result(wait.invocation_id, result)?;
-        next.revision.0 = next
-            .revision
-            .0
-            .checked_add(1)
-            .ok_or_else(|| invalid("Checkpoint revision exhausted"))?;
-        next.validate()?;
-        Ok(next)
     }
 }
 

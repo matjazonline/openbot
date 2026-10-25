@@ -6,6 +6,12 @@ use crate::application::workflow::{
 use crate::domain::workflow::{TemplateId, TemplateRevision, VersionId, WorkflowId};
 use std::collections::{BTreeMap, BTreeSet};
 
+/// The shipped reply-mode templates (p08 D2.5); each has one `agent.run` step, `draft`.
+pub const AUTONOMOUS_RESPONSE: &str = "autonomous-response";
+pub const REVIEWED_SUPPORT: &str = "reviewed-support";
+/// The `agent.run` step of every shipped reply-mode template.
+pub const REPLY_AGENT_STEP: &str = "draft";
+
 pub const MAX_TEMPLATES: usize = 64;
 pub const MAX_TITLE_BYTES: usize = 256;
 pub const MAX_DESCRIPTION_BYTES: usize = 4096;
@@ -105,8 +111,61 @@ impl TemplateCatalogue {
         }
         Ok(Self { entries })
     }
+    /// The templates this deployment ships (p08 D-5, D2.5): the two reply modes an assistant
+    /// channel is provisioned on. Validated once at composition; a template that does not
+    /// compile stops startup.
+    pub fn shipped(decoder: &impl SourceDecoder) -> Result<Self, TemplateError> {
+        const SOURCES: [&str; 2] = [
+            include_str!("../fixtures/autonomous-response.yaml"),
+            include_str!("../fixtures/reviewed-support.yaml"),
+        ];
+        let facts = CatalogueFacts::default();
+        // Each is a root with no children or workflow tools.
+        let mut dependencies = BTreeMap::new();
+        for source in SOURCES {
+            let workflow = crate::application::workflow::compiler::parse_workflow(
+                &decoder.decode(source)?,
+                VersionId::new(uuid::Uuid::nil()),
+            )?
+            .definition
+            .workflow_id;
+            dependencies.insert(workflow, BTreeSet::new());
+        }
+        let offer = |id: &str, title: &'static str, description: &'static str, source| {
+            Ok::<_, TemplateError>(TemplateOffer {
+                id: TemplateId::parse(id).map_err(|_| TemplateError::Limit("template id"))?,
+                revision: TemplateRevision::new(1).expect("first template revision"),
+                title,
+                description,
+                source,
+                facts: &facts,
+                dependencies: &dependencies,
+            })
+        };
+        Self::build(
+            &[
+                offer(
+                    AUTONOMOUS_RESPONSE,
+                    "Autonomous response",
+                    "The agent drafts an answer to each inbound message and sends it as the reply.",
+                    SOURCES[0],
+                )?,
+                offer(
+                    REVIEWED_SUPPORT,
+                    "Reviewed response",
+                    "The agent drafts an answer; a reviewer approves or edits it before it is sent, or rejects it, before the run's deadline.",
+                    SOURCES[1],
+                )?,
+            ],
+            decoder,
+        )
+    }
     pub fn entries(&self) -> &[WorkflowTemplate] {
         &self.entries
+    }
+    /// The shipped template with this id, at whatever revision the catalogue holds.
+    pub fn template(&self, id: &str) -> Option<&WorkflowTemplate> {
+        self.entries.iter().find(|entry| entry.id.as_str() == id)
     }
     pub(super) fn selected(
         &self,

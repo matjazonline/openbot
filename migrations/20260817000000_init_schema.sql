@@ -115,58 +115,6 @@ END $$;
 
 
 --
--- Name: attention_source_events_are_immutable(); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.attention_source_events_are_immutable() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-BEGIN
-    IF TG_OP = 'DELETE'
-       AND NOT EXISTS (SELECT 1 FROM companies WHERE id = OLD.company_id) THEN
-        RETURN OLD;
-    END IF;
-    RAISE EXCEPTION 'attention source events are immutable' USING ERRCODE = '55000';
-END;
-$$;
-
-
---
--- Name: bump_handoff_version_for_responsibility_cleanup(); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.bump_handoff_version_for_responsibility_cleanup() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-BEGIN
-    IF NEW.responsible_principal_id IS DISTINCT FROM OLD.responsible_principal_id
-       AND NEW.version = OLD.version THEN
-        NEW.version := OLD.version + 1;
-        NEW.updated_at := CURRENT_TIMESTAMP;
-    END IF;
-    RETURN NEW;
-END;
-$$;
-
-
---
--- Name: bump_task_attention_version_for_owner_change(); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.bump_task_attention_version_for_owner_change() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-BEGIN
-    IF (NEW.owner_principal_id, NEW.owner_principal_kind)
-       IS DISTINCT FROM (OLD.owner_principal_id, OLD.owner_principal_kind) THEN
-        NEW.attention_version := OLD.attention_version + 1;
-    END IF;
-    RETURN NEW;
-END;
-$$;
-
-
---
 -- Name: check_workflow_control_retry(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -459,9 +407,15 @@ CREATE FUNCTION public.check_workflow_wait_commit() RETURNS trigger
 BEGIN
     IF (NEW.notification_intent IS NOT NULL OR NEW.reason='decision') AND
        (TG_OP='INSERT' OR (OLD.state='waiting' AND NEW.state='completed')) THEN
+        -- An event recorded by the wait's deadline still completes it after the deadline
+        -- (p08 D1.5.6); the run's own deadline is never extended.
         IF EXISTS (SELECT 1 FROM workflow_runs AS run WHERE run.company_id=NEW.company_id
             AND run.id=NEW.run_id AND run.deadline<=clock_timestamp()) OR
-           (NEW.reason IN ('event','decision') AND NEW.deadline<=clock_timestamp()) THEN
+           (NEW.reason='decision' AND NEW.deadline<=clock_timestamp()) OR
+           (NEW.reason='event' AND NEW.deadline<=clock_timestamp() AND NOT EXISTS (
+               SELECT 1 FROM workflow_wait_events AS event WHERE event.company_id=NEW.company_id
+                 AND event.run_id=NEW.run_id AND event.id=NEW.consumed_event_id
+                 AND event.created_at<=NEW.deadline)) THEN
             RAISE EXCEPTION 'workflow wait deadline reached before commit' USING ERRCODE='23514';
         END IF;
     END IF;
@@ -487,28 +441,6 @@ BEGIN
         IS DISTINCT FROM (OLD.company_id, OLD.id, OLD.endpoint_url, OLD.transport) THEN
         RAISE EXCEPTION 'MCP connection endpoint is immutable';
     END IF;
-    RETURN NEW;
-END;
-$$;
-
-
---
--- Name: create_memory_lifecycle_for_legacy_connection(); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.create_memory_lifecycle_for_legacy_connection() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-BEGIN
-    INSERT INTO memory_remote_resource_lifecycles
-        (provider, remote_database_id, company_id, desired_state)
-    VALUES (NEW.provider, NEW.remote_database_id, NEW.company_id, 'present')
-    ON CONFLICT (provider, remote_database_id) DO UPDATE
-    SET company_id = EXCLUDED.company_id,
-        desired_state = 'present',
-        quiesce_until = CURRENT_TIMESTAMP,
-        last_error = NULL,
-        updated_at = CURRENT_TIMESTAMP;
     RETURN NEW;
 END;
 $$;
@@ -551,24 +483,6 @@ BEGIN
     END IF;
     RETURN NEW;
 END $$;
-
-
---
--- Name: delete_channel_target_tasks(); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.delete_channel_target_tasks() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-BEGIN
-    DELETE FROM background_tasks AS task
-    WHERE task.queue_kind = 'legacy' AND EXISTS (
-        SELECT 1 FROM task_channel_targets AS target
-        WHERE target.task_id = task.id AND target.channel_id = OLD.id
-    );
-    RETURN OLD;
-END;
-$$;
 
 
 --
@@ -620,211 +534,6 @@ $$;
 
 
 --
--- Name: enforce_channel_agent_scope(); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.enforce_channel_agent_scope() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1 FROM agents AS agent
-        WHERE agent.id = NEW.agent_id
-          AND (agent.company_id IS NULL OR agent.company_id = NEW.company_id)
-    ) THEN
-        RAISE EXCEPTION 'agent must belong to the channel company or the global library'
-            USING ERRCODE = '23514';
-    END IF;
-    RETURN NEW;
-END;
-$$;
-
-
---
--- Name: enforce_enabled_channel_has_active_agent(); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.enforce_enabled_channel_has_active_agent() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-DECLARE
-    checked_channel_id UUID;
-BEGIN
-    IF TG_TABLE_NAME = 'channels' THEN
-        checked_channel_id := COALESCE(NEW.id, OLD.id);
-    ELSE
-        checked_channel_id := COALESCE(NEW.channel_id, OLD.channel_id);
-    END IF;
-    IF EXISTS (
-        SELECT 1 FROM channels AS channel
-        WHERE channel.id = checked_channel_id AND channel.enabled
-    ) AND NOT EXISTS (
-        SELECT 1 FROM channel_agents AS assignment
-        WHERE assignment.channel_id = checked_channel_id AND assignment.position = 0
-    ) THEN
-        RAISE EXCEPTION 'enabled channel must have an active agent at position 0'
-            USING ERRCODE = '23514';
-    END IF;
-    RETURN NULL;
-END;
-$$;
-
-
---
--- Name: enforce_outreach_status_transition(); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.enforce_outreach_status_transition() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-BEGIN
-    IF OLD.status = NEW.status THEN
-        RETURN NEW;
-    END IF;
-    IF NOT (CASE OLD.status
-        WHEN 'waiting' THEN NEW.status IN (
-            'threshold_met', 'timeout_pending_approval', 'proceed_partial', 'cancelled'
-        )
-        WHEN 'timeout_pending_approval' THEN NEW.status IN (
-            'waiting', 'threshold_met', 'proceed_partial', 'cancelled'
-        )
-        WHEN 'threshold_met' THEN NEW.status IN ('completed', 'cancelled')
-        WHEN 'proceed_partial' THEN NEW.status IN ('completed', 'cancelled')
-        WHEN 'cancelled' THEN FALSE
-        WHEN 'completed' THEN FALSE
-        ELSE FALSE
-    END) THEN
-        RAISE EXCEPTION 'invalid outreach status transition: % -> %', OLD.status, NEW.status
-            USING ERRCODE = 'check_violation';
-    END IF;
-    RETURN NEW;
-END;
-$$;
-
-
---
--- Name: enforce_outreach_target_status_transition(); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.enforce_outreach_target_status_transition() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-BEGIN
-    IF OLD.status = NEW.status THEN
-        RETURN NEW;
-    END IF;
-    IF OLD.status <> 'active'
-       OR NEW.status NOT IN ('responded', 'cancelled', 'superseded', 'expired') THEN
-        RAISE EXCEPTION 'invalid outreach target status transition: % -> %', OLD.status, NEW.status
-            USING ERRCODE = 'check_violation';
-    END IF;
-    RETURN NEW;
-END;
-$$;
-
-
---
--- Name: enforce_owned_channel_position_zero(); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.enforce_owned_channel_position_zero() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-DECLARE
-    checked_channel_id UUID;
-BEGIN
-    IF TG_TABLE_NAME = 'channels' THEN
-        checked_channel_id := COALESCE(NEW.id, OLD.id);
-    ELSE
-        checked_channel_id := COALESCE(NEW.channel_id, OLD.channel_id);
-    END IF;
-
-    IF EXISTS (
-        SELECT 1
-        FROM channels AS channel
-        WHERE channel.id = checked_channel_id
-          AND channel.owner_agent_id IS NOT NULL
-          AND NOT EXISTS (
-              SELECT 1
-              FROM channel_agents AS assignment
-              WHERE assignment.channel_id = channel.id
-                AND assignment.agent_id = channel.owner_agent_id
-                AND assignment.position = 0
-          )
-    ) THEN
-        RAISE EXCEPTION 'owned channel must assign its owner agent at position 0'
-            USING ERRCODE = '23514';
-    END IF;
-    RETURN NULL;
-END;
-$$;
-
-
---
--- Name: enforce_response_draft_evidence_immutability(); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.enforce_response_draft_evidence_immutability() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-BEGIN
-    IF TG_OP = 'INSERT' THEN
-        IF EXISTS (
-            SELECT 1 FROM response_reviews
-            WHERE company_id = NEW.company_id AND draft_id = NEW.draft_id
-              AND draft_version = NEW.draft_version
-        ) THEN
-            RAISE EXCEPTION 'response draft evidence is already sealed' USING ERRCODE = '23514';
-        END IF;
-        RETURN NEW;
-    END IF;
-    IF TG_OP = 'DELETE' AND NOT EXISTS (
-        SELECT 1 FROM response_drafts
-        WHERE company_id = OLD.company_id AND id = OLD.draft_id AND version = OLD.draft_version
-    ) THEN
-        RETURN OLD;
-    END IF;
-    RAISE EXCEPTION 'response draft evidence is immutable' USING ERRCODE = '23514';
-END;
-$$;
-
-
---
--- Name: enforce_response_draft_update(); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.enforce_response_draft_update() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-BEGIN
-    IF (OLD.id, OLD.version, OLD.company_id, OLD.channel_id, OLD.thread_id,
-        OLD.author_principal_id, OLD.proposed_message_id,
-        OLD.subject, OLD.body, OLD.attachment_snapshot, OLD.recipient_snapshot,
-        OLD.transport_snapshot, OLD.publication_snapshot, OLD.created_by_principal_id,
-        OLD.created_at, OLD.source_handoff_generation) IS DISTINCT FROM
-       (NEW.id, NEW.version, NEW.company_id, NEW.channel_id, NEW.thread_id,
-        NEW.author_principal_id, NEW.proposed_message_id,
-        NEW.subject, NEW.body, NEW.attachment_snapshot, NEW.recipient_snapshot,
-        NEW.transport_snapshot, NEW.publication_snapshot, NEW.created_by_principal_id,
-        NEW.created_at, NEW.source_handoff_generation) THEN
-        RAISE EXCEPTION 'response draft versions are immutable' USING ERRCODE = '23514';
-    END IF;
-    IF OLD.task_id IS DISTINCT FROM NEW.task_id
-       AND NOT (OLD.task_id IS NOT NULL AND NEW.task_id IS NULL) THEN
-        RAISE EXCEPTION 'a response draft task source cannot be replaced' USING ERRCODE = '23514';
-    END IF;
-    IF OLD.status <> NEW.status AND NOT (
-        OLD.status = 'pending_review'
-        AND NEW.status IN ('rejected', 'expired', 'superseded', 'published')
-    ) THEN
-        RAISE EXCEPTION 'invalid response draft status transition' USING ERRCODE = '23514';
-    END IF;
-    RETURN NEW;
-END;
-$$;
-
-
---
 -- Name: enqueue_actionable_notification_event(uuid, text, uuid, text, uuid); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -834,26 +543,6 @@ CREATE FUNCTION public.enqueue_actionable_notification_event(event_company uuid,
 DECLARE
     next_generation BIGINT;
 BEGIN
-    -- Existing actionable notifications belong to the legacy task runtime. Preserve
-    -- missing-source withdrawal events, but never enqueue for a workflow-owned job.
-    IF EXISTS (
-        SELECT 1 FROM background_tasks AS task
-         WHERE task.company_id = event_company AND task.queue_kind = 'workflow'
-           AND ((event_source_kind = 'task' AND task.id = event_source_id)
-             OR (event_source_kind = 'delegation' AND EXISTS (
-                 SELECT 1 FROM task_outreaches AS outreach
-                  WHERE outreach.id = event_source_id AND outreach.task_id = task.id))
-             OR (event_source_kind = 'delivery' AND EXISTS (
-                 SELECT 1 FROM message_deliveries AS delivery
-                  WHERE delivery.company_id = event_company AND delivery.id = event_source_id
-                    AND delivery.task_id = task.id))
-             OR (event_source_kind = 'response_review' AND EXISTS (
-                 SELECT 1 FROM response_drafts AS draft
-                  WHERE draft.company_id = event_company AND draft.id = event_source_id
-                    AND draft.task_id = task.id)))
-    ) THEN
-        RETURN;
-    END IF;
     IF NOT EXISTS (
         SELECT 1 FROM companies AS company WHERE company.id = event_company
     ) THEN
@@ -917,39 +606,6 @@ BEGIN
     END IF;
     RETURN NEW;
 END $$;
-
-
---
--- Name: initialize_task_ownership(); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.initialize_task_ownership() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-DECLARE
-    resolved RECORD;
-BEGIN
-    IF NEW.owner_principal_id IS NULL THEN
-        SELECT principal.id, principal.display_label
-          INTO resolved
-          FROM channel_agents AS assignment
-          JOIN agents AS agent
-            ON agent.id = assignment.agent_id AND agent.company_id = NEW.company_id
-          JOIN principals AS principal
-            ON principal.company_id = NEW.company_id
-           AND principal.agent_id = agent.id
-           AND principal.kind = 'agent'
-         WHERE assignment.company_id = NEW.company_id
-           AND assignment.channel_id = NEW.channel_id
-           AND assignment.position = 0
-         LIMIT 1;
-        NEW.owner_principal_id := resolved.id;
-        NEW.owner_principal_kind := CASE WHEN resolved.id IS NULL THEN NULL ELSE 'agent' END;
-    END IF;
-    NEW.ownership_version := 1;
-    RETURN NEW;
-END;
-$$;
 
 
 --
@@ -1045,25 +701,6 @@ $$;
 
 
 --
--- Name: notification_from_attention_source(); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.notification_from_attention_source() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-BEGIN
-    IF NEW.source_kind = 'handoff'
-       AND NEW.operation IN ('created', 'reassigned', 'resolved', 'withdrawn') THEN
-        PERFORM enqueue_actionable_notification_event(
-            NEW.company_id, 'handoff', NEW.source_id, 'assignment', NEW.actor_principal_id
-        );
-    END IF;
-    RETURN NEW;
-END;
-$$;
-
-
---
 -- Name: notification_from_delivery(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -1099,163 +736,12 @@ $$;
 
 
 --
--- Name: notification_from_outreach(); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.notification_from_outreach() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-DECLARE
-    event_company UUID;
-BEGIN
-    IF TG_OP = 'DELETE' THEN
-        UPDATE notifications
-           SET state = 'withdrawn', state_changed_at = CURRENT_TIMESTAMP,
-               updated_at = CURRENT_TIMESTAMP
-         WHERE source_kind = 'delegation' AND source_id = OLD.id AND state = 'active';
-    ELSIF OLD.status IS DISTINCT FROM NEW.status THEN
-        SELECT company_id INTO event_company FROM background_tasks WHERE id = NEW.task_id AND queue_kind = 'legacy';
-        IF event_company IS NOT NULL AND (
-            OLD.status = 'timeout_pending_approval' OR NEW.status = 'timeout_pending_approval'
-        ) THEN
-            PERFORM enqueue_actionable_notification_event(
-                event_company, 'delegation', NEW.id, 'delegation_timeout', NULL
-            );
-        END IF;
-    END IF;
-    RETURN COALESCE(NEW, OLD);
-END;
-$$;
-
-
---
--- Name: notification_from_review(); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.notification_from_review() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-BEGIN
-    IF TG_OP = 'INSERT' THEN
-        PERFORM enqueue_actionable_notification_event(
-            NEW.company_id, 'response_review', NEW.draft_id, 'response_review',
-            NEW.notification_actor_principal_id
-        );
-    ELSIF OLD.status IS DISTINCT FROM NEW.status
-          OR OLD.reviewer_principal_id IS DISTINCT FROM NEW.reviewer_principal_id THEN
-        PERFORM enqueue_actionable_notification_event(
-            NEW.company_id, 'response_review', NEW.draft_id, 'response_review',
-            NEW.notification_actor_principal_id
-        );
-    END IF;
-    RETURN NEW;
-END;
-$$;
-
-
---
--- Name: notification_from_task_ownership(); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.notification_from_task_ownership() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-DECLARE
-    related_source UUID;
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1 FROM background_tasks AS task
-         WHERE task.company_id = NEW.company_id AND task.id = NEW.task_id
-           AND task.queue_kind = 'legacy'
-    ) THEN
-        RETURN NEW;
-    END IF;
-    IF NEW.new_owner_kind = 'human'
-       AND (NEW.previous_owner_principal_id, NEW.previous_owner_kind)
-           IS DISTINCT FROM (NEW.new_owner_principal_id, NEW.new_owner_kind) THEN
-        PERFORM enqueue_actionable_notification_event(
-            NEW.company_id, 'task', NEW.task_id, 'assignment', NEW.actor_principal_id
-        );
-    ELSIF NEW.previous_owner_kind = 'human' AND NEW.new_owner_kind <> 'human' THEN
-        PERFORM enqueue_actionable_notification_event(
-            NEW.company_id, 'task', NEW.task_id, 'assignment', NEW.actor_principal_id
-        );
-    END IF;
-
-    IF EXISTS (
-        SELECT 1 FROM background_tasks AS task
-         WHERE task.company_id = NEW.company_id AND task.id = NEW.task_id
-           AND task.status = 'dead_letter'
-    ) THEN
-        PERFORM enqueue_actionable_notification_event(
-            NEW.company_id, 'task', NEW.task_id, 'task_failure', NEW.actor_principal_id
-        );
-    END IF;
-
-    FOR related_source IN
-        SELECT outreach.id FROM task_outreaches AS outreach
-         WHERE outreach.task_id = NEW.task_id AND outreach.status = 'timeout_pending_approval'
-    LOOP
-        PERFORM enqueue_actionable_notification_event(
-            NEW.company_id, 'delegation', related_source, 'delegation_timeout',
-            NEW.actor_principal_id
-        );
-    END LOOP;
-
-    FOR related_source IN
-        SELECT delivery.id FROM message_deliveries AS delivery
-         WHERE delivery.company_id = NEW.company_id AND delivery.task_id = NEW.task_id
-           AND delivery.status IN ('dead_letter', 'outcome_unknown')
-    LOOP
-        PERFORM enqueue_actionable_notification_event(
-            NEW.company_id, 'delivery', related_source, 'delivery_failure',
-            NEW.actor_principal_id
-        );
-    END LOOP;
-    RETURN NEW;
-END;
-$$;
-
-
---
--- Name: notification_from_task_status(); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.notification_from_task_status() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-BEGIN
-    IF TG_OP = 'DELETE' THEN
-        UPDATE notifications
-           SET state = 'withdrawn', state_changed_at = CURRENT_TIMESTAMP,
-               updated_at = CURRENT_TIMESTAMP
-         WHERE company_id = OLD.company_id AND source_kind = 'task'
-           AND source_id = OLD.id AND state = 'active';
-    ELSIF OLD.status IS DISTINCT FROM NEW.status THEN
-        IF OLD.status = 'dead_letter' OR NEW.status = 'dead_letter' THEN
-            PERFORM enqueue_actionable_notification_event(
-                NEW.company_id, 'task', NEW.id, 'task_failure', NULL
-            );
-        END IF;
-        IF NEW.status IN ('completed', 'stopped', 'dead_letter')
-           OR OLD.status IN ('completed', 'stopped', 'dead_letter') THEN
-            PERFORM enqueue_actionable_notification_event(
-                NEW.company_id, 'task', NEW.id, 'assignment', NULL
-            );
-        END IF;
-    END IF;
-    RETURN COALESCE(NEW, OLD);
-END;
-$$;
-
-
---
 -- Name: valid_creation_provenance(jsonb); Type: FUNCTION; Schema: public; Owner: -
 --
 
 CREATE FUNCTION public.valid_creation_provenance(provenance jsonb) RETURNS boolean
     LANGUAGE sql IMMUTABLE
-    RETURN ((jsonb_typeof(provenance) = 'object'::text) AND ((provenance - ARRAY['actor_type'::text, 'actor_id'::text, 'actor_name'::text, 'source_channel_id'::text, 'source_task_id'::text]) = '{}'::jsonb) AND (jsonb_typeof((provenance -> 'actor_type'::text)) = 'string'::text) AND ((provenance ->> 'actor_type'::text) = ANY (ARRAY['user'::text, 'agent'::text, 'system'::text])) AND (jsonb_typeof((provenance -> 'actor_name'::text)) = 'string'::text) AND (btrim((provenance ->> 'actor_name'::text)) <> ''::text) AND CASE (provenance ->> 'actor_type'::text) WHEN 'system'::text THEN ((provenance ? 'actor_id'::text) AND ((provenance -> 'actor_id'::text) = 'null'::jsonb) AND COALESCE(((provenance -> 'source_channel_id'::text) = 'null'::jsonb), true) AND COALESCE(((provenance -> 'source_task_id'::text) = 'null'::jsonb), true)) WHEN 'user'::text THEN ((jsonb_typeof((provenance -> 'actor_id'::text)) = 'string'::text) AND ((provenance ->> 'actor_id'::text) ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text) AND COALESCE(((provenance -> 'source_channel_id'::text) = 'null'::jsonb), true) AND COALESCE(((provenance -> 'source_task_id'::text) = 'null'::jsonb), true)) WHEN 'agent'::text THEN ((jsonb_typeof((provenance -> 'actor_id'::text)) = 'string'::text) AND ((provenance ->> 'actor_id'::text) ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text) AND (jsonb_typeof((provenance -> 'source_channel_id'::text)) = 'string'::text) AND ((provenance ->> 'source_channel_id'::text) ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text) AND (jsonb_typeof((provenance -> 'source_task_id'::text)) = 'string'::text) AND ((provenance ->> 'source_task_id'::text) ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text)) ELSE false END);
+    RETURN ((jsonb_typeof(provenance) = 'object'::text) AND ((provenance - ARRAY['actor_type'::text, 'actor_id'::text, 'actor_name'::text]) = '{}'::jsonb) AND (jsonb_typeof((provenance -> 'actor_type'::text)) = 'string'::text) AND ((provenance ->> 'actor_type'::text) = ANY (ARRAY['user'::text, 'system'::text])) AND (jsonb_typeof((provenance -> 'actor_name'::text)) = 'string'::text) AND (btrim((provenance ->> 'actor_name'::text)) <> ''::text) AND CASE (provenance ->> 'actor_type'::text) WHEN 'system'::text THEN ((provenance ? 'actor_id'::text) AND ((provenance -> 'actor_id'::text) = 'null'::jsonb)) WHEN 'user'::text THEN ((jsonb_typeof((provenance -> 'actor_id'::text)) = 'string'::text) AND ((provenance ->> 'actor_id'::text) ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text)) ELSE false END);
 
 
 SET default_tablespace = '';
@@ -1290,33 +776,13 @@ CREATE TABLE public.channels (
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     enabled boolean DEFAULT true NOT NULL,
     add_3rd_party boolean DEFAULT true NOT NULL,
-    response_trigger text DEFAULT 'always'::text NOT NULL,
     created_by jsonb NOT NULL,
-    retrieve_company_memory boolean DEFAULT false NOT NULL,
-    retrieve_agent_memory boolean DEFAULT false NOT NULL,
-    retrieve_user_memory boolean DEFAULT false NOT NULL,
-    persist_company_memory boolean DEFAULT false NOT NULL,
-    persist_agent_memory boolean DEFAULT false NOT NULL,
-    persist_user_memory boolean DEFAULT false NOT NULL,
     description text,
-    owner_agent_id uuid,
-    external_response_review_override text,
-    preferred_reviewer_principal_id uuid,
-    external_reply_handling_override text,
+    settings_revision bigint DEFAULT 0 NOT NULL,
     CONSTRAINT channels_access_mode_check CHECK ((access_mode = ANY (ARRAY['team'::text, 'allowlist'::text, 'public'::text]))),
     CONSTRAINT channels_created_by_shape_check CHECK (public.valid_creation_provenance(created_by)),
-    CONSTRAINT channels_external_reply_handling_override_check CHECK (((external_reply_handling_override IS NULL) OR (external_reply_handling_override = ANY (ARRAY['automatic'::text, 'manual_handoff'::text])))),
-    CONSTRAINT channels_external_response_review_override_check CHECK (((external_response_review_override IS NULL) OR (external_response_review_override = ANY (ARRAY['autonomous'::text, 'review_all_external'::text])))),
-    CONSTRAINT channels_name_not_blank CHECK ((btrim(name) <> ''::text)),
-    CONSTRAINT channels_response_trigger_check CHECK ((response_trigger = ANY (ARRAY['always'::text, 'mentioned'::text, 'mentioned_or_reply'::text])))
+    CONSTRAINT channels_name_not_blank CHECK ((btrim(name) <> ''::text))
 );
-
-
---
--- Name: COLUMN channels.external_reply_handling_override; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON COLUMN public.channels.external_reply_handling_override IS 'NULL inherits the company policy live rather than meaning automatic: a company that switches its default moves every inheriting channel with it, so the effective value is resolved with COALESCE at read time and never copied into the channel row.';
 
 
 --
@@ -1434,29 +900,6 @@ $$;
 
 
 --
--- Name: notification_withdraw_deleted_source(); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.notification_withdraw_deleted_source() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-DECLARE
-    row_data JSONB := to_jsonb(OLD);
-    deleted_source_id UUID := COALESCE(
-        (row_data->>'id')::UUID, (row_data->>'draft_id')::UUID
-    );
-BEGIN
-    UPDATE notifications
-       SET state = 'withdrawn', state_changed_at = CURRENT_TIMESTAMP,
-           updated_at = CURRENT_TIMESTAMP
-     WHERE source_kind = TG_ARGV[0] AND source_id = deleted_source_id
-       AND state = 'active';
-    RETURN OLD;
-END;
-$$;
-
-
---
 -- Name: notify_actionable_notification_changed(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -1478,35 +921,6 @@ $$;
 
 
 --
--- Name: notify_agent_instruction(); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.notify_agent_instruction() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1 FROM background_tasks AS task
-         WHERE task.company_id = NEW.company_id AND task.id = NEW.task_id
-           AND task.queue_kind = 'legacy'
-    ) THEN
-        RETURN NULL;
-    END IF;
-    IF EXISTS (
-        SELECT 1 FROM background_tasks
-         WHERE id = NEW.task_id AND status = 'pending' AND owner_principal_kind = 'agent'
-    ) THEN
-        PERFORM pg_notify('task_ready', json_build_object('task_id', NEW.task_id)::text);
-    END IF;
-    PERFORM pg_notify('thread_activity', json_build_object(
-        'thread_id', NEW.thread_id, 'channel_id', NEW.channel_id, 'company_id', NEW.company_id
-    )::text);
-    RETURN NULL;
-END;
-$$;
-
-
---
 -- Name: notify_attention_changed(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -1515,43 +929,10 @@ CREATE FUNCTION public.notify_attention_changed() RETURNS trigger
     AS $$
 DECLARE
     row_data JSONB := CASE WHEN TG_OP = 'DELETE' THEN to_jsonb(OLD) ELSE to_jsonb(NEW) END;
-    source_id UUID;
+    source_id UUID := NULLIF(row_data->>'id', '')::UUID;
     company UUID := NULLIF(row_data->>'company_id', '')::UUID;
     channel UUID := NULLIF(row_data->>'channel_id', '')::UUID;
 BEGIN
-    -- Approvals/deliveries carry their task directly; reviews resolve through the draft.
-    IF TG_ARGV[0] IN ('approval', 'delivery') AND EXISTS (
-        SELECT 1 FROM background_tasks AS task
-         WHERE task.company_id = company
-           AND task.id = NULLIF(row_data->>'task_id', '')::UUID
-           AND task.queue_kind = 'workflow'
-    ) THEN
-        RETURN COALESCE(NEW, OLD);
-    END IF;
-    source_id := COALESCE(
-        NULLIF(row_data->>'id', '')::UUID,
-        NULLIF(row_data->>'draft_id', '')::UUID
-    );
-
-    IF TG_ARGV[0] = 'response_review' THEN
-        SELECT draft.company_id, draft.channel_id
-          INTO company, channel
-          FROM response_drafts AS draft
-         WHERE draft.id = NULLIF(row_data->>'draft_id', '')::UUID
-           AND draft.version = NULLIF(row_data->>'draft_version', '')::INTEGER
-           AND NOT EXISTS (
-               SELECT 1 FROM background_tasks AS task
-                WHERE task.company_id = draft.company_id AND task.id = draft.task_id
-                  AND task.queue_kind = 'workflow'
-           );
-    ELSIF TG_ARGV[0] = 'delegation' THEN
-        SELECT task.company_id, task.channel_id
-          INTO company, channel
-          FROM background_tasks AS task
-         WHERE task.id = NULLIF(row_data->>'task_id', '')::UUID
-           AND task.queue_kind = 'legacy';
-    END IF;
-
     IF company IS NOT NULL AND channel IS NOT NULL AND source_id IS NOT NULL THEN
         PERFORM pg_notify(
             'attention_changed',
@@ -1610,133 +991,6 @@ BEGIN
     PERFORM pg_notify('thread_messages', json_build_object(
         'thread_id', note_thread, 'channel_id', note_channel, 'company_id', note_company
     )::text);
-    RETURN NULL;
-END;
-$$;
-
-
---
--- Name: notify_task_chain_changed(); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.notify_task_chain_changed() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-DECLARE
-    notified_company_id UUID;
-    notified_correlation_id UUID;
-BEGIN
-    IF TG_TABLE_NAME IN ('task_status_events', 'message_deliveries') THEN
-        IF EXISTS (
-            SELECT 1 FROM background_tasks AS task
-             WHERE task.company_id = NEW.company_id AND task.id = NEW.task_id
-               AND task.queue_kind = 'workflow'
-        ) THEN
-            RETURN NULL;
-        END IF;
-    END IF;
-    -- `UPDATE OF status` fires whenever the column appears in a SET list, whether or not the value
-    -- moved. A write that leaves the status alone changes nothing the board draws, so it must not
-    -- wake every connected viewer of the company. This suppresses no real transition:
-    -- `pending -> sending -> delivered` is three material changes and still emits three
-    -- notifications,
-    -- which the stream coalesces on its own. The checks are per table because these are the only
-    -- notifying tables that have a `status` column at all.
-    IF TG_OP = 'UPDATE' THEN
-        IF TG_TABLE_NAME = 'message_deliveries' THEN
-            IF NEW.status IS NOT DISTINCT FROM OLD.status THEN
-                RETURN NULL;
-            END IF;
-        ELSIF TG_TABLE_NAME = 'human_approvals' THEN
-            IF NEW.status IS NOT DISTINCT FROM OLD.status THEN
-                RETURN NULL;
-            END IF;
-        ELSIF TG_TABLE_NAME = 'task_outreaches' THEN
-            IF NEW.status IS NOT DISTINCT FROM OLD.status THEN
-                RETURN NULL;
-            END IF;
-        END IF;
-    END IF;
-
-    IF TG_TABLE_NAME = 'task_status_events' THEN
-        notified_company_id := NEW.company_id;
-        notified_correlation_id := NEW.correlation_id;
-    ELSIF TG_TABLE_NAME = 'message_deliveries' THEN
-        notified_company_id := NEW.company_id;
-        notified_correlation_id := NEW.correlation_id;
-    ELSIF TG_TABLE_NAME = 'human_approvals' THEN
-        SELECT task.company_id, task.correlation_id
-          INTO notified_company_id, notified_correlation_id
-          FROM background_tasks AS task WHERE task.id = NEW.task_id AND task.queue_kind = 'legacy';
-    ELSIF TG_TABLE_NAME = 'task_outreaches' THEN
-        SELECT task.company_id, task.correlation_id
-          INTO notified_company_id, notified_correlation_id
-          FROM background_tasks AS task WHERE task.id = NEW.task_id AND task.queue_kind = 'legacy';
-    ELSE
-        SELECT task.company_id, task.correlation_id
-          INTO notified_company_id, notified_correlation_id
-          FROM task_outreaches AS outreach
-          JOIN background_tasks AS task ON task.id = outreach.task_id
-         WHERE outreach.id = NEW.outreach_id AND task.queue_kind = 'legacy';
-    END IF;
-
-    IF notified_company_id IS NOT NULL AND notified_correlation_id IS NOT NULL THEN
-        PERFORM pg_notify(
-            'task_chain_changed',
-            json_build_object(
-                'company_id', notified_company_id,
-                'correlation_id', notified_correlation_id
-            )::text
-        );
-    END IF;
-    RETURN NULL;
-END;
-$$;
-
-
---
--- Name: notify_task_ownership(); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.notify_task_ownership() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-DECLARE
-    affected_thread UUID;
-    affected_channel UUID;
-    affected_correlation UUID;
-    affected_status TEXT;
-    affected_owner_kind TEXT;
-BEGIN
-    SELECT thread_id, channel_id, correlation_id, status, owner_principal_kind
-      INTO affected_thread, affected_channel, affected_correlation, affected_status,
-           affected_owner_kind
-      FROM background_tasks WHERE id = NEW.task_id AND company_id = NEW.company_id AND queue_kind = 'legacy';
-    IF NOT FOUND THEN
-        RETURN NULL;
-    END IF;
-
-    IF affected_thread IS NOT NULL THEN
-        PERFORM pg_notify('thread_activity', json_build_object(
-            'thread_id', affected_thread,
-            'channel_id', affected_channel,
-            'company_id', NEW.company_id
-        )::text);
-    END IF;
-    IF affected_correlation IS NOT NULL THEN
-        PERFORM pg_notify('task_chain_changed', json_build_object(
-            'company_id', NEW.company_id,
-            'correlation_id', affected_correlation
-        )::text);
-    END IF;
-    PERFORM pg_notify('task_ownership_changed', json_build_object(
-        'task_id', NEW.task_id
-    )::text);
-    IF affected_status = 'pending' AND affected_owner_kind = 'agent' THEN
-        PERFORM pg_notify('task_ready', json_build_object(
-            'task_id', NEW.task_id
-        )::text);
-    END IF;
     RETURN NULL;
 END;
 $$;
@@ -2096,24 +1350,6 @@ END $$;
 
 
 --
--- Name: prevent_assigned_library_agent_delete(); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.prevent_assigned_library_agent_delete() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-BEGIN
-    IF OLD.company_id IS NULL
-       AND EXISTS (SELECT 1 FROM channel_agents WHERE agent_id = OLD.id) THEN
-        RAISE EXCEPTION 'library agent is assigned to one or more channels'
-            USING ERRCODE = '23503';
-    END IF;
-    RETURN OLD;
-END;
-$$;
-
-
---
 -- Name: prevent_assigned_library_skill_delete(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -2150,143 +1386,6 @@ $$;
 
 
 --
--- Name: prevent_owned_channel_delete(); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.prevent_owned_channel_delete() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-BEGIN
-    IF OLD.owner_agent_id IS NOT NULL
-       AND EXISTS (SELECT 1 FROM agents WHERE id = OLD.owner_agent_id) THEN
-        RAISE EXCEPTION 'owned channel must be deleted through its owner agent'
-            USING ERRCODE = '23503';
-    END IF;
-    RETURN OLD;
-END;
-$$;
-
-
---
--- Name: record_initial_task_ownership(); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.record_initial_task_ownership() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-DECLARE
-    label TEXT;
-BEGIN
-    SELECT display_label INTO label
-      FROM principals
-     WHERE company_id = NEW.company_id AND id = NEW.owner_principal_id;
-    INSERT INTO task_ownership_events (
-        task_id, company_id, sequence, from_version, to_version, command_id,
-        command_fingerprint, operation, actor_kind, previous_owner_kind,
-        new_owner_principal_id, new_owner_kind, new_owner_label, reason
-    ) VALUES (
-        NEW.id, NEW.company_id, 1, 0, 1, gen_random_uuid(), 'enqueue:' || NEW.id::text,
-        'initial_assignment', 'system', 'unassigned', NEW.owner_principal_id,
-        CASE NEW.owner_principal_kind WHEN 'person' THEN 'human'
-             WHEN 'agent' THEN 'agent' ELSE 'unassigned' END,
-        label, 'initial_assignment'
-    );
-    RETURN NULL;
-END;
-$$;
-
-
---
--- Name: record_task_status_event(); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.record_task_status_event() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-DECLARE
-    transition_reason TEXT;
-    transition_actor_kind TEXT;
-    transition_actor_id UUID;
-    approval_id UUID;
-    outreach_id UUID;
-BEGIN
-    IF TG_OP = 'UPDATE' AND NEW.status = OLD.status THEN
-        RETURN NULL;
-    END IF;
-
-    transition_reason := NEW.transition_reason;
-    transition_actor_kind := NEW.transition_actor_kind;
-    transition_actor_id := NEW.transition_actor_id;
-    approval_id := NEW.transition_approval_id;
-    outreach_id := NEW.transition_outreach_id;
-
-    IF transition_reason IS NULL THEN
-        transition_reason := CASE
-            WHEN TG_OP = 'INSERT' THEN 'enqueued'
-            WHEN OLD.status = 'pending' AND NEW.status = 'processing' THEN 'claimed'
-            WHEN OLD.status = 'processing' AND NEW.status = 'completed' THEN 'completed'
-            WHEN OLD.status = 'processing' AND NEW.status = 'pending' THEN 'retryable_failure'
-            WHEN OLD.status = 'processing' AND NEW.status = 'dead_letter' THEN 'terminal_failure'
-            WHEN OLD.status = 'processing' AND NEW.status = 'pending_approval' THEN 'approval_requested'
-            WHEN OLD.status = 'processing' AND NEW.status = 'waiting_for_third_party_reply'
-                THEN 'outreach_started'
-            WHEN OLD.status = 'pending_approval' AND NEW.status = 'pending' THEN 'approval_accepted'
-            WHEN OLD.status = 'waiting_for_third_party_reply' AND NEW.status = 'pending'
-                THEN 'outreach_reply_received'
-            WHEN OLD.status = 'waiting_for_third_party_reply' AND NEW.status = 'pending_approval'
-                THEN 'outreach_timed_out'
-            WHEN OLD.status = 'pending_approval'
-                 AND NEW.status = 'waiting_for_third_party_reply' THEN 'outreach_extended'
-            WHEN NEW.status = 'stopped' THEN 'operator_stopped'
-            WHEN OLD.status = 'stopped' AND NEW.status = 'pending' THEN 'operator_resumed'
-            -- Nothing above established a cause, so none is claimed. `retryable_failure` used to
-            -- stand here, which turned every unattributed transition into a fabricated worker
-            -- failure -- an operator resuming a dead-lettered task was filed as the worker failing
-            -- it again. A row that says "unclassified" is greppable; a row that says the wrong
-            -- thing is not.
-            ELSE 'unknown'
-        END;
-    END IF;
-
-    IF transition_actor_kind IS NULL THEN
-        transition_actor_kind := CASE
-            WHEN transition_reason IN ('claimed', 'completed', 'retryable_failure',
-                                       'terminal_failure', 'timed_out', 'shutdown', 'lease_lost')
-                THEN 'worker'
-            WHEN transition_reason IN ('approval_requested', 'approval_accepted') THEN 'approval'
-            WHEN transition_reason IN ('outreach_started', 'outreach_reply_received',
-                                       'outreach_timed_out', 'outreach_extended') THEN 'outreach'
-            WHEN transition_reason IN ('operator_stopped', 'operator_resumed',
-                                       'channel_agent_removed') THEN 'operator'
-            ELSE 'system'
-        END;
-    END IF;
-
-    IF transition_actor_id IS NULL AND transition_actor_kind = 'worker' THEN
-        transition_actor_id := COALESCE(NEW.worker_id, CASE WHEN TG_OP = 'UPDATE' THEN OLD.worker_id END);
-    END IF;
-
-    INSERT INTO task_status_events (
-        id, company_id, task_id, correlation_id, sequence, from_status, to_status,
-        reason, actor_kind, actor_id, related_approval_id, related_outreach_id,
-        retry_count, run_at, execution_generation, transitioned_at
-    ) VALUES (
-        gen_random_uuid(), NEW.company_id, NEW.id, NEW.correlation_id,
-        COALESCE((SELECT MAX(event.sequence) + 1
-                  FROM task_status_events AS event WHERE event.task_id = NEW.id), 1),
-        CASE WHEN TG_OP = 'UPDATE' THEN OLD.status ELSE NULL END,
-        NEW.status, transition_reason, transition_actor_kind, transition_actor_id,
-        approval_id, outreach_id, NEW.retry_count, NEW.run_at,
-        COALESCE(NEW.execution_generation,
-                 CASE WHEN TG_OP = 'UPDATE' THEN OLD.execution_generation END),
-        CURRENT_TIMESTAMP
-    );
-    RETURN NULL;
-END;
-$$;
-
-
---
 -- Name: reject_binding_audit_rewrite(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -2298,101 +1397,6 @@ BEGIN
         RAISE EXCEPTION 'binding_audit_events is append-only' USING ERRCODE = '23514';
     END IF;
     RETURN OLD;
-END;
-$$;
-
-
---
--- Name: release_tasks_for_removed_principal(); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.release_tasks_for_removed_principal() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-BEGIN
-    -- One statement per affected relation, not one per owned task. `owned` locks the row set and
-    -- carries the values the other two arms need from *before* the release: `task_attempts` is
-    -- fenced on the generation the task is about to lose, and the ownership event's `sequence` is
-    -- the version the task is about to leave behind, per task rather than a running count. Row
-    -- triggers still fire once per row -- that is PostgreSQL, not the statement shape -- but the
-    -- row set is planned, locked and computed once instead of once per task.
-    --
-    -- The `task_attempts` arm is never read by the final `INSERT`, and does not need to be: a
-    -- data-modifying `WITH` clause always runs to completion whether or not the primary query
-    -- selects from it.
-    WITH owned AS (
-        SELECT task.id, task.company_id, task.status, task.ownership_version,
-               task.execution_generation
-          FROM background_tasks AS task
-         WHERE task.company_id = OLD.company_id AND task.owner_principal_id = OLD.id
-           AND task.queue_kind = 'legacy'
-         FOR UPDATE
-    ),
-    released AS (
-        UPDATE background_tasks AS task
-           SET owner_principal_id = NULL,
-               owner_principal_kind = NULL,
-               ownership_version = owned.ownership_version + 1,
-               status = CASE WHEN owned.status = 'processing' THEN 'pending' ELSE owned.status END,
-               worker_id = NULL,
-               execution_generation = NULL,
-               locked_at = NULL,
-               lock_expires_at = NULL,
-               run_at = CASE
-                   WHEN owned.status = 'processing' THEN CURRENT_TIMESTAMP
-                   ELSE task.run_at
-               END,
-               transition_reason = CASE
-                   WHEN owned.status = 'processing' THEN 'ownership_transferred'
-                   ELSE task.transition_reason
-               END,
-               transition_actor_kind = CASE
-                   WHEN owned.status = 'processing' THEN 'system'
-                   ELSE task.transition_actor_kind
-               END,
-               transition_actor_id = CASE
-                   WHEN owned.status = 'processing' THEN NULL
-                   ELSE task.transition_actor_id
-               END,
-               updated_at = CURRENT_TIMESTAMP
-          FROM owned
-         WHERE task.company_id = owned.company_id AND task.id = owned.id
-        RETURNING task.id, task.company_id, owned.status AS released_status,
-                  owned.ownership_version AS released_version,
-                  owned.execution_generation AS released_generation
-    ),
-    fenced AS (
-        UPDATE task_attempts AS attempt
-           SET status = 'failed', stop_reason = 'ownership_transferred',
-               error = 'Task ownership was removed', finished_at = CURRENT_TIMESTAMP
-          FROM released
-         WHERE attempt.task_id = released.id
-           AND released.released_status = 'processing'
-           AND attempt.execution_generation = released.released_generation
-           AND attempt.status = 'processing'
-        RETURNING attempt.id
-    )
-    INSERT INTO task_ownership_events (
-        task_id, company_id, sequence, from_version, to_version, command_id,
-        command_fingerprint, operation, actor_kind, previous_owner_principal_id,
-        previous_owner_kind, previous_owner_label, new_owner_kind, reason
-    )
-    SELECT released.id, released.company_id, released.released_version + 1,
-           released.released_version, released.released_version + 1, gen_random_uuid(),
-           'owner-removed:' || OLD.id::text || ':' || released.released_version::text,
-           'owner_removed', 'system', OLD.id,
-           CASE OLD.kind WHEN 'person' THEN 'human' ELSE 'agent' END,
-           OLD.display_label, 'unassigned', 'owner_removed'
-      FROM released;
-
-    -- Two triggers share this body. An agent's principal is deleted outright, cascaded from the
-    -- agent row; a person's principal is demoted to 'external' by team removal, which is an
-    -- UPDATE whose row must be returned as NEW -- returning OLD there would quietly write the
-    -- pre-demotion row back, and returning NULL would skip the update this clears the way for.
-    IF TG_OP = 'DELETE' THEN
-        RETURN OLD;
-    END IF;
-    RETURN NEW;
 END;
 $$;
 
@@ -2415,26 +1419,16 @@ $$;
 
 
 --
--- Native checkpoints share serialization with legacy runs, never legacy queue authority.
+-- A native checkpoint keeps its owner and prepared inputs, and writes only under a live workflow fence.
 CREATE FUNCTION public.require_harness_owner() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
     IF TG_OP = 'UPDATE' AND
-        ROW(NEW.id,NEW.company_id,NEW.task_id,NEW.agent_id,NEW.owner_kind,
-            NEW.owner_principal_id,NEW.ownership_version,NEW.workflow_run_id,
+        ROW(NEW.id,NEW.company_id,NEW.task_id,NEW.agent_id,NEW.owner_kind,NEW.workflow_run_id,
             NEW.workflow_execution_id,NEW.workflow_prepared)
         IS DISTINCT FROM
-        ROW(OLD.id,OLD.company_id,OLD.task_id,OLD.agent_id,OLD.owner_kind,
-            OLD.owner_principal_id,OLD.ownership_version,OLD.workflow_run_id,
+        ROW(OLD.id,OLD.company_id,OLD.task_id,OLD.agent_id,OLD.owner_kind,OLD.workflow_run_id,
             OLD.workflow_execution_id,OLD.workflow_prepared) THEN
         RAISE EXCEPTION 'harness owner and prepared inputs are immutable' USING ERRCODE='23514';
-    END IF;
-    IF NEW.owner_kind = 'legacy' THEN
-        IF NOT EXISTS (SELECT 1 FROM public.background_tasks AS task
-            WHERE task.company_id=NEW.company_id AND task.id=NEW.task_id AND task.queue_kind='legacy') THEN
-            RAISE EXCEPTION 'legacy harness requires legacy task'
-                USING ERRCODE='23514', CONSTRAINT='legacy_auxiliary_task_queue_kind';
-        END IF;
-        RETURN NEW;
     END IF;
     IF NEW.owner_kind <> 'workflow' THEN
         RAISE EXCEPTION 'unknown harness owner' USING ERRCODE='23514';
@@ -2532,90 +1526,45 @@ END;
 $$;
 
 --
--- Name: require_legacy_auxiliary_task(); Type: FUNCTION; Schema: public; Owner: -
+-- Name: require_schedule_occurrence_scope(); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.require_legacy_auxiliary_task() RETURNS trigger
+CREATE FUNCTION public.require_schedule_occurrence_scope() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
-BEGIN
-    IF TG_OP = 'UPDATE' THEN
-        IF NEW.task_id IS NOT DISTINCT FROM OLD.task_id
-           AND NEW.company_id IS NOT DISTINCT FROM OLD.company_id THEN
-            RETURN NEW;
-        END IF;
-    END IF;
-    IF NOT EXISTS (
-        SELECT 1 FROM public.background_tasks AS task
-        WHERE task.id = NEW.task_id AND task.company_id = NEW.company_id
-          AND task.queue_kind = 'legacy'
-    ) THEN
-        RAISE EXCEPTION 'Legacy auxiliary association requires a visible scoped legacy task'
-            USING ERRCODE = '23514', CONSTRAINT = 'legacy_auxiliary_task_queue_kind';
-    END IF;
-    RETURN NEW;
-END;
-$$;
-
-
---
--- Name: require_legacy_handoff_event_task(); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.require_legacy_handoff_event_task() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-BEGIN
-    IF NEW.task_id IS NULL THEN
-        RETURN NEW;
-    END IF;
-    -- Unlike the live auxiliary owners, events have no FK to serialize deletion.
-    -- Lock the visible scoped parent through commit, then retain only its identity.
-    -- Queue identity is immutable; KEY SHARE also prevents a company-key change.
-    PERFORM 1 FROM public.background_tasks AS task
-    WHERE task.id = NEW.task_id AND task.company_id = NEW.company_id
-      AND task.queue_kind = 'legacy'
-    FOR KEY SHARE;
-    IF NOT FOUND THEN
-        RAISE EXCEPTION 'Handoff event requires a visible scoped legacy task'
-            USING ERRCODE = '23514', CONSTRAINT = 'legacy_handoff_event_task_provenance';
-    END IF;
-    RETURN NEW;
-END;
-$$;
-
-
---
--- Name: require_legacy_schedule_task(); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.require_legacy_schedule_task() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-DECLARE owner_company uuid; owner_channel uuid;
+DECLARE owner_company uuid; owner_channel uuid; owner_binding uuid;
 BEGIN
     IF TG_OP = 'INSERT' THEN
-        -- SHARE also conflicts with a non-key channel UPDATE: either we capture
-        -- before the move or observe its committed scope, never a mixed snapshot.
-        SELECT schedule.company_id, schedule.channel_id INTO owner_company, owner_channel
+        -- SHARE also conflicts with a non-key schedule UPDATE: either we capture
+        -- before a retarget or observe its committed scope, never a mixed snapshot.
+        SELECT schedule.company_id, schedule.channel_id, schedule.binding_id
+        INTO owner_company, owner_channel, owner_binding
         FROM public.channel_schedules AS schedule WHERE schedule.id = NEW.schedule_id
         FOR SHARE;
         IF owner_company IS NULL
            OR (NEW.company_id IS NOT NULL AND NEW.company_id <> owner_company)
-           OR (NEW.channel_id IS NOT NULL AND NEW.channel_id <> owner_channel) THEN
+           OR (NEW.channel_id IS NOT NULL AND NEW.channel_id <> owner_channel)
+           OR (NEW.binding_id IS NOT NULL AND NEW.binding_id <> owner_binding) THEN
             RAISE EXCEPTION 'Schedule occurrence requires its actual owner scope at capture'
-                USING ERRCODE = '23514', CONSTRAINT = 'legacy_schedule_owner_scope';
+                USING ERRCODE = '23514', CONSTRAINT = 'schedule_occurrence_owner_scope';
         END IF;
         NEW.company_id := owner_company;
         NEW.channel_id := owner_channel;
+        NEW.binding_id := owner_binding;
     ELSE
-        IF (NEW.company_id, NEW.channel_id, NEW.schedule_id, NEW.schedule_snapshot)
+        IF (NEW.company_id, NEW.channel_id, NEW.binding_id, NEW.schedule_id, NEW.schedule_snapshot,
+            NEW.scheduled_for, NEW.command_key)
             IS DISTINCT FROM
-           (OLD.company_id, OLD.channel_id, OLD.schedule_id, OLD.schedule_snapshot) THEN
+           (OLD.company_id, OLD.channel_id, OLD.binding_id, OLD.schedule_id, OLD.schedule_snapshot,
+            OLD.scheduled_for, OLD.command_key) THEN
             RAISE EXCEPTION 'Captured schedule occurrence identity is immutable'
                 USING ERRCODE = '23514', CONSTRAINT = 'schedule_occurrence_identity_immutable';
         END IF;
-        IF (NEW.thread_id, NEW.task_id) IS NOT DISTINCT FROM (OLD.thread_id, OLD.task_id) THEN
+        IF OLD.run_id IS NOT NULL AND NEW.run_id IS DISTINCT FROM OLD.run_id THEN
+            RAISE EXCEPTION 'A materialized schedule occurrence keeps its run'
+                USING ERRCODE = '23514', CONSTRAINT = 'schedule_occurrence_run_immutable';
+        END IF;
+        IF NEW.run_id IS NOT DISTINCT FROM OLD.run_id THEN
             RETURN NEW;
         END IF;
     END IF;
@@ -2623,91 +1572,22 @@ BEGIN
     -- is present it must agree with the relational occurrence, including raw SQL.
     IF (NEW.schedule_snapshot ? 'id' AND NEW.schedule_snapshot->>'id' IS DISTINCT FROM NEW.schedule_id::text)
        OR (NEW.schedule_snapshot ? 'company_id' AND NEW.schedule_snapshot->>'company_id' IS DISTINCT FROM NEW.company_id::text)
-       OR (NEW.schedule_snapshot ? 'channel_id' AND NEW.schedule_snapshot->>'channel_id' IS DISTINCT FROM NEW.channel_id::text) THEN
+       OR (NEW.schedule_snapshot ? 'channel_id' AND NEW.schedule_snapshot->>'channel_id' IS DISTINCT FROM NEW.channel_id::text)
+       OR (NEW.schedule_snapshot ? 'binding_id' AND NEW.schedule_snapshot->>'binding_id' IS DISTINCT FROM NEW.binding_id::text) THEN
         RAISE EXCEPTION 'Schedule snapshot identity must match captured occurrence scope'
             USING ERRCODE = '23514', CONSTRAINT = 'schedule_occurrence_snapshot_scope';
     END IF;
-    IF NEW.task_id IS NOT NULL AND NOT EXISTS (
-        SELECT 1 FROM public.background_tasks AS task
-        WHERE task.id = NEW.task_id AND task.queue_kind = 'legacy'
-          AND task.company_id = NEW.company_id AND task.channel_id = NEW.channel_id
-          AND task.thread_id = NEW.thread_id
+    -- The run must be the one admitted for this occurrence: its trigger is the occurrence and
+    -- its association the occurrence's channel (the binding is the composite foreign key).
+    IF NEW.run_id IS NOT NULL AND NOT EXISTS (
+        SELECT 1 FROM public.workflow_runs AS run
+        WHERE run.company_id = NEW.company_id AND run.id = NEW.run_id
+          AND run.trigger_id = NEW.id AND run.channel_id = NEW.channel_id AND run.thread_id IS NULL
     ) THEN
-        RAISE EXCEPTION 'Schedule result requires a visible legacy task in the occurrence scope'
-            USING ERRCODE = '23514', CONSTRAINT = 'legacy_schedule_task_scope';
+        RAISE EXCEPTION 'Schedule result requires the run admitted for this occurrence'
+            USING ERRCODE = '23514', CONSTRAINT = 'schedule_occurrence_run_scope';
     END IF;
     RETURN NEW;
-END;
-$$;
-
-
---
--- Name: require_legacy_source_task(); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.require_legacy_source_task() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-BEGIN
-    IF NEW.task_id IS NOT NULL AND NOT EXISTS (
-        SELECT 1 FROM public.background_tasks AS task
-        WHERE task.id = NEW.task_id AND task.queue_kind = 'legacy'
-    ) THEN
-        RAISE EXCEPTION 'Legacy notification source requires a visible legacy task'
-            USING ERRCODE = '23514', CONSTRAINT = 'legacy_source_task_queue_kind';
-    END IF;
-    -- Scoped FKs still reject foreign tasks and serialize concurrent deletion.
-    -- Existing task queue identity cannot change after this visibility check.
-    RETURN NEW;
-END;
-$$;
-
-
---
--- Name: retire_memory_lifecycle_for_legacy_connection(); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.retire_memory_lifecycle_for_legacy_connection() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-DECLARE
-    cleanup_available_at TIMESTAMPTZ;
-BEGIN
-    UPDATE memory_remote_resource_lifecycles
-    SET company_id = NULL,
-        desired_state = 'absent',
-        quiesce_until = GREATEST(
-            quiesce_until,
-            CURRENT_TIMESTAMP + INTERVAL '180 seconds'
-        ),
-        last_error = NULL,
-        updated_at = CURRENT_TIMESTAMP
-    WHERE provider = OLD.provider
-      AND remote_database_id = OLD.remote_database_id
-      AND (desired_state <> 'absent' OR company_id IS NOT NULL)
-    RETURNING quiesce_until INTO cleanup_available_at;
-
-    IF FOUND THEN
-        INSERT INTO memory_cleanup_jobs
-            (id, provider, remote_database_id, available_at)
-        VALUES (
-            md5(OLD.provider || ':' || OLD.remote_database_id)::uuid,
-            OLD.provider,
-            OLD.remote_database_id,
-            cleanup_available_at
-        )
-        ON CONFLICT (provider, remote_database_id) DO UPDATE
-        SET status = 'pending',
-            attempts = 0,
-            available_at = EXCLUDED.available_at,
-            lease_token = NULL,
-            lease_expires_at = NULL,
-            operation_generation = NULL,
-            last_error = NULL,
-            updated_at = CURRENT_TIMESTAMP
-        WHERE memory_cleanup_jobs.status <> 'leased';
-    END IF;
-    RETURN OLD;
 END;
 $$;
 
@@ -2730,67 +1610,6 @@ BEGIN
     END IF;
     RETURN NULL;
 END $$;
-
-
---
--- Name: synchronize_legacy_memory_provisioning_phase(); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.synchronize_legacy_memory_provisioning_phase() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-BEGIN
-    IF NEW.status = 'completed' AND NEW.phase NOT IN ('ready', 'failed') THEN
-        NEW.phase = 'ready';
-    ELSIF NEW.status = 'failed' AND NEW.phase <> 'failed' THEN
-        NEW.phase = 'failed';
-    ELSIF NEW.status = 'pending' AND OLD.status IN ('completed', 'failed')
-            AND NEW.phase IN ('ready', 'failed') THEN
-        NEW.phase = 'create_pending';
-        NEW.failure_attempts = 0;
-        NEW.readiness_deadline = NULL;
-        NEW.next_poll_at = NULL;
-    END IF;
-    RETURN NEW;
-END;
-$$;
-
-
---
--- Name: task_ownership_events_are_immutable(); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.task_ownership_events_are_immutable() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-BEGIN
-    -- Tenant/task deletion may remove the ledger with its aggregate root. Direct mutation while
-    -- the task exists is forbidden. A principal deletion never changes snapshot rows.
-    IF TG_OP = 'DELETE' AND NOT EXISTS (
-        SELECT 1 FROM background_tasks WHERE id = OLD.task_id AND company_id = OLD.company_id
-    ) THEN
-        RETURN OLD;
-    END IF;
-    RAISE EXCEPTION 'task ownership events are immutable' USING ERRCODE = '55000';
-END;
-$$;
-
-
---
--- Name: thread_handoff_events_are_immutable(); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.thread_handoff_events_are_immutable() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-BEGIN
-    IF TG_OP = 'DELETE'
-       AND NOT EXISTS (SELECT 1 FROM companies WHERE id = OLD.company_id) THEN
-        RETURN OLD;
-    END IF;
-    RAISE EXCEPTION 'thread handoff events are immutable' USING ERRCODE = '55000';
-END;
-$$;
 
 
 --
@@ -2826,7 +1645,7 @@ CREATE FUNCTION public.valid_delivery_failure_class(class text) RETURNS boolean
 
 CREATE FUNCTION public.valid_inbound_event_error_class(class text) RETURNS boolean
     LANGUAGE sql IMMUTABLE
-    RETURN (class = ANY (ARRAY['decode'::text, 'invalid_payload'::text, 'routing'::text, 'dependency'::text, 'rate_limited'::text, 'provider_fault'::text, 'deadline'::text, 'internal'::text, 'unsupported_transport'::text, 'lease_expired'::text]));
+    RETURN (class = ANY (ARRAY['decode'::text, 'invalid_payload'::text, 'routing'::text, 'dependency'::text, 'rate_limited'::text, 'provider_fault'::text, 'deadline'::text, 'internal'::text, 'unsupported_transport'::text, 'lease_expired'::text, 'superseded'::text]));
 
 
 --
@@ -4068,6 +2887,14 @@ BEGIN
         RAISE EXCEPTION 'workflow decision reviewer user snapshot mismatches principal' USING ERRCODE='23514';
     END IF;
     NEW.user_id := snapshot_user;
+    -- Every reviewer was provably notified, or provably opted out of decision email (P08-D4 F076).
+    IF NEW.notice_opted_out THEN
+        IF NOT EXISTS (SELECT 1 FROM user_notification_preferences AS preference
+                WHERE preference.user_id=snapshot_user AND NOT preference.decision_email_enabled) THEN
+            RAISE EXCEPTION 'workflow decision reviewer opt-out is not recorded' USING ERRCODE='23514';
+        END IF;
+        RETURN NEW;
+    END IF;
     IF NOT EXISTS (SELECT 1 FROM message_deliveries AS delivery WHERE delivery.id=NEW.notice_delivery_id
             AND delivery.purpose='notification' AND delivery.company_id IS NULL AND delivery.channel_id IS NULL
             AND delivery.message_id IS NULL AND delivery.source_binding_id IS NULL
@@ -4186,6 +3013,26 @@ BEGIN
     IF (SELECT count(*) FROM (SELECT 1 FROM workflow_action_dispatches
             WHERE company_id=NEW.company_id AND execution_id=NEW.execution_id LIMIT 128) AS bounded)>=128
     THEN RAISE EXCEPTION 'workflow message action limit' USING ERRCODE='54000'; END IF;
+    RETURN NEW;
+END $$;
+
+
+--
+-- Name: workflow_message_destination_in_app_guard(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.workflow_message_destination_in_app_guard() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    -- A member destination is emailed unless its run publishes in-app only (p08 D1.7).
+    IF NEW.kind='user' AND NEW.delivery_id IS NULL AND NOT EXISTS(
+        SELECT 1 FROM workflow_runs AS run
+        WHERE run.company_id=NEW.company_id AND run.id=NEW.run_id AND run.delivery_policy='in_app_only'
+    ) THEN
+        RAISE EXCEPTION 'workflow user destination requires a delivery unless its run is in-app only'
+            USING ERRCODE='23514';
+    END IF;
     RETURN NEW;
 END $$;
 
@@ -4432,20 +3279,6 @@ CREATE TABLE public.agent_skills (
 
 
 --
--- Name: agent_sub_agents; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.agent_sub_agents (
-    company_id uuid NOT NULL,
-    agent_id uuid NOT NULL,
-    sub_agent_id uuid NOT NULL,
-    "position" integer NOT NULL,
-    CONSTRAINT agent_sub_agents_not_self CHECK ((agent_id <> sub_agent_id)),
-    CONSTRAINT agent_sub_agents_position_check CHECK ((("position" >= 0) AND ("position" <= 63)))
-);
-
-
---
 -- Name: agents; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -4458,57 +3291,15 @@ CREATE TABLE public.agents (
     model text,
     system_prompt text,
     description text,
-    config_json jsonb,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     avatar_url text,
     created_by jsonb NOT NULL,
-    run_timeout_secs integer,
-    memory_recall_mode text DEFAULT 'fast'::text NOT NULL,
-    memory_max_results smallint DEFAULT 5 NOT NULL,
-    memory_persistence_mode text DEFAULT 'audience_only'::text NOT NULL,
-    memory_enabled boolean DEFAULT false NOT NULL,
     -- Ordered workflow tool names this agent grants (06-D5).
     workflow_tools text[] DEFAULT '{}'::text[] NOT NULL CONSTRAINT agents_workflow_tools_shape CHECK (public.valid_workflow_type_names(workflow_tools)),
-    response_contract jsonb,
     CONSTRAINT agents_avatar_url_scheme_check CHECK (((avatar_url IS NULL) OR (avatar_url ~ '^https?://'::text))),
-    CONSTRAINT agents_config_v1_shape_check CHECK (((config_json IS NULL) OR COALESCE(((jsonb_typeof(config_json) = 'object'::text) AND (jsonb_typeof((config_json -> 'version'::text)) = 'number'::text) AND ((config_json ->> 'version'::text) = '1'::text) AND (octet_length((config_json)::text) <= 65536)), false))),
     CONSTRAINT agents_created_by_shape_check CHECK (public.valid_creation_provenance(created_by)),
-    CONSTRAINT agents_memory_max_results_check CHECK (((memory_max_results >= 1) AND (memory_max_results <= 20))),
-    CONSTRAINT agents_memory_persistence_mode_check CHECK ((memory_persistence_mode = ANY (ARRAY['audience_only'::text, 'scope_specific_facts'::text]))),
-    CONSTRAINT agents_memory_recall_mode_check CHECK ((memory_recall_mode = ANY (ARRAY['fast'::text, 'thinking'::text]))),
     CONSTRAINT agents_name_not_blank CHECK ((btrim(name) <> ''::text)),
-    CONSTRAINT agents_response_contract CHECK (((response_contract IS NULL) OR COALESCE(((jsonb_typeof(response_contract) = 'object'::text) AND ((response_contract ->> 'version'::text) = '1'::text) AND ((response_contract ->> 'format'::text) = 'json_schema'::text) AND (response_contract ? 'schema'::text) AND ((response_contract - ARRAY['version'::text, 'format'::text, 'schema'::text]) = '{}'::jsonb) AND (octet_length((response_contract)::text) <= 131072)), false))),
-    CONSTRAINT agents_run_timeout_secs_check CHECK (((run_timeout_secs >= 1) AND (run_timeout_secs <= 3600))),
     CONSTRAINT agents_slug_format CHECK ((((slug)::text = lower((slug)::text)) AND ((slug)::text ~ '^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$'::text)))
-);
-
-
---
--- Name: attention_source_events; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.attention_source_events (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    company_id uuid NOT NULL,
-    source_kind text NOT NULL,
-    source_id uuid NOT NULL,
-    command_id uuid NOT NULL,
-    command_fingerprint text NOT NULL,
-    operation text NOT NULL,
-    actor_principal_id uuid NOT NULL,
-    from_version bigint NOT NULL,
-    to_version bigint NOT NULL,
-    previous_priority text,
-    new_priority text,
-    previous_due_at timestamp with time zone,
-    new_due_at timestamp with time zone,
-    previous_responsible_principal_id uuid,
-    new_responsible_principal_id uuid,
-    occurred_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    CONSTRAINT attention_source_events_operation_check CHECK ((operation = ANY (ARRAY['created'::text, 'attributes_changed'::text, 'reassigned'::text, 'resolved'::text, 'withdrawn'::text]))),
-    CONSTRAINT attention_source_events_priority_check CHECK ((((previous_priority IS NULL) OR (previous_priority = ANY (ARRAY['normal'::text, 'high'::text, 'urgent'::text]))) AND ((new_priority IS NULL) OR (new_priority = ANY (ARRAY['normal'::text, 'high'::text, 'urgent'::text]))))),
-    CONSTRAINT attention_source_events_source_kind_check CHECK ((source_kind = ANY (ARRAY['task'::text, 'handoff'::text]))),
-    CONSTRAINT attention_source_events_version_check CHECK (((from_version >= 0) AND (to_version = (from_version + 1))))
 );
 
 
@@ -4521,8 +3312,6 @@ CREATE TABLE public.background_tasks (
     company_id uuid NOT NULL,
     channel_id uuid,
     thread_id uuid,
-    source_message_uuid uuid,
-    source_schedule_run_id uuid,
     correlation_id uuid NOT NULL,
     task_type text NOT NULL,
     status text DEFAULT 'pending'::text NOT NULL,
@@ -4536,51 +3325,19 @@ CREATE TABLE public.background_tasks (
     execution_generation uuid,
     locked_at timestamp with time zone,
     lock_expires_at timestamp with time zone,
-    wait_expires_at timestamp with time zone,
     run_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    transition_reason text,
-    transition_actor_kind text,
-    transition_actor_id uuid,
-    transition_approval_id uuid,
-    transition_outreach_id uuid,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    owner_principal_id uuid,
-    owner_principal_kind text,
-    ownership_version bigint DEFAULT 1 NOT NULL,
-    business_priority text DEFAULT 'normal'::text NOT NULL,
-    business_due_at timestamp with time zone,
-    attention_version bigint DEFAULT 1 NOT NULL,
-    awaited_outreach_id uuid,
-    queue_kind text DEFAULT 'legacy'::text NOT NULL,
+    queue_kind text DEFAULT 'workflow'::text NOT NULL,
     workflow_execution_id uuid,
-    CONSTRAINT background_tasks_attention_version_check CHECK ((attention_version > 0)),
-    CONSTRAINT background_tasks_business_priority_check CHECK ((business_priority = ANY (ARRAY['normal'::text, 'high'::text, 'urgent'::text]))),
     CONSTRAINT background_tasks_lease_check CHECK ((((status = 'processing'::text) AND (worker_id IS NOT NULL) AND (execution_generation IS NOT NULL) AND (locked_at IS NOT NULL) AND (lock_expires_at IS NOT NULL) AND (lock_expires_at > locked_at)) OR ((status <> 'processing'::text) AND (worker_id IS NULL) AND (execution_generation IS NULL) AND (locked_at IS NULL) AND (lock_expires_at IS NULL)))),
-    CONSTRAINT background_tasks_legacy_channel_required CHECK (((queue_kind <> 'legacy'::text) OR (channel_id IS NOT NULL))),
     CONSTRAINT background_tasks_max_retries_check CHECK ((max_retries > 0)),
-    CONSTRAINT background_tasks_owner_shape_check CHECK ((((owner_principal_id IS NULL) AND (owner_principal_kind IS NULL)) OR ((owner_principal_id IS NOT NULL) AND (owner_principal_kind IS NOT NULL) AND (owner_principal_kind = ANY (ARRAY['person'::text, 'agent'::text]))))),
-    CONSTRAINT background_tasks_ownership_version_check CHECK ((ownership_version > 0)),
     CONSTRAINT background_tasks_payload_object_check CHECK ((jsonb_typeof(payload) = 'object'::text)),
-    CONSTRAINT background_tasks_queue_kind_check CHECK ((queue_kind = ANY (ARRAY['legacy'::text, 'workflow'::text]))),
+    CONSTRAINT background_tasks_queue_kind_check CHECK ((queue_kind = 'workflow'::text)),
     CONSTRAINT background_tasks_retry_count_check CHECK ((retry_count >= 0)),
-    CONSTRAINT background_tasks_continuation_count_check CHECK (continuation_count BETWEEN 0 AND 63 AND (queue_kind='workflow' OR continuation_count=0)),
-    CONSTRAINT background_tasks_single_source_check CHECK (((source_message_uuid IS NULL) OR (source_schedule_run_id IS NULL))),
-    CONSTRAINT background_tasks_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'processing'::text, 'pending_approval'::text, 'waiting_for_third_party_reply'::text, 'completed'::text, 'failed'::text, 'dead_letter'::text, 'stopped'::text]))),
-    CONSTRAINT background_tasks_transition_actor_kind_check CHECK (((transition_actor_kind IS NULL) OR (transition_actor_kind = ANY (ARRAY['system'::text, 'worker'::text, 'operator'::text, 'human'::text, 'agent'::text, 'approval'::text, 'outreach'::text])))),
-    CONSTRAINT background_tasks_transition_reason_check CHECK (((transition_reason IS NULL) OR (transition_reason = ANY (ARRAY['enqueued'::text, 'claimed'::text, 'completed'::text, 'retryable_failure'::text, 'terminal_failure'::text, 'timed_out'::text, 'shutdown'::text, 'lease_lost'::text, 'approval_requested'::text, 'approval_accepted'::text, 'approval_rejected'::text, 'outreach_started'::text, 'outreach_reply_received'::text, 'outreach_timed_out'::text, 'outreach_extended'::text, 'operator_stopped'::text, 'operator_resumed'::text, 'ownership_transferred'::text, 'agent_instruction'::text, 'delegation_target_cancelled'::text, 'delegation_cancelled'::text, 'delegation_reassigned'::text, 'delegation_partial'::text, 'channel_agent_removed'::text, 'unknown'::text])))),
-    CONSTRAINT background_tasks_transition_shape_check CHECK ((((transition_reason IS NULL) AND (transition_actor_kind IS NULL) AND (transition_actor_id IS NULL) AND (transition_approval_id IS NULL) AND (transition_outreach_id IS NULL)) OR ((transition_reason IS NOT NULL) AND
-CASE transition_actor_kind
-    WHEN 'system'::text THEN ((transition_actor_id IS NULL) AND (transition_approval_id IS NULL) AND (transition_outreach_id IS NULL))
-    WHEN 'worker'::text THEN ((transition_actor_id IS NOT NULL) AND (transition_approval_id IS NULL) AND (transition_outreach_id IS NULL))
-    WHEN 'operator'::text THEN ((transition_actor_id IS NOT NULL) AND (transition_approval_id IS NULL) AND (transition_outreach_id IS NULL))
-    WHEN 'human'::text THEN ((transition_actor_id IS NOT NULL) AND (transition_approval_id IS NULL) AND (transition_outreach_id IS NULL))
-    WHEN 'agent'::text THEN ((transition_actor_id IS NOT NULL) AND (transition_approval_id IS NULL) AND (transition_outreach_id IS NULL))
-    WHEN 'approval'::text THEN ((transition_actor_id IS NULL) AND (transition_approval_id IS NOT NULL) AND (transition_outreach_id IS NULL))
-    WHEN 'outreach'::text THEN ((transition_actor_id IS NULL) AND (transition_approval_id IS NULL) AND (transition_outreach_id IS NOT NULL))
-    ELSE false
-END))),
-    CONSTRAINT background_tasks_workflow_shape_check CHECK ((((queue_kind = 'legacy'::text) AND (workflow_execution_id IS NULL)) OR ((queue_kind = 'workflow'::text) AND (workflow_execution_id IS NOT NULL) AND (task_type = 'workflow_execution'::text) AND (payload = jsonb_build_object('version', 1, 'execution_id', (workflow_execution_id)::text)) AND (owner_principal_id IS NULL) AND (owner_principal_kind IS NULL) AND (source_message_uuid IS NULL) AND (source_schedule_run_id IS NULL) AND (awaited_outreach_id IS NULL) AND (wait_expires_at IS NULL) AND (transition_reason IS NULL) AND (transition_actor_kind IS NULL) AND (transition_actor_id IS NULL) AND (transition_approval_id IS NULL) AND (transition_outreach_id IS NULL))))
+    CONSTRAINT background_tasks_continuation_count_check CHECK (continuation_count BETWEEN 0 AND 63),
+    CONSTRAINT background_tasks_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'processing'::text, 'completed'::text, 'failed'::text]))),
+    CONSTRAINT background_tasks_workflow_shape_check CHECK (((workflow_execution_id IS NOT NULL) AND (task_type = 'workflow_execution'::text) AND (payload = jsonb_build_object('version', 1, 'execution_id', (workflow_execution_id)::text))))
 );
 
 
@@ -4608,19 +3365,6 @@ CREATE TABLE public.binding_audit_events (
     CONSTRAINT binding_audit_events_actor_check CHECK (public.valid_creation_provenance(actor)),
     CONSTRAINT binding_audit_events_metadata_check CHECK (((jsonb_typeof(metadata) = 'object'::text) AND ((metadata -> 'version'::text) = '1'::jsonb) AND (jsonb_typeof((metadata -> 'transport'::text)) = 'string'::text) AND (octet_length((metadata)::text) <= 4096))),
     CONSTRAINT binding_audit_events_reason_check CHECK (((reason IS NULL) OR public.valid_binding_change_reason(reason)))
-);
-
-
---
--- Name: channel_agents; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.channel_agents (
-    company_id uuid NOT NULL,
-    channel_id uuid NOT NULL,
-    agent_id uuid NOT NULL,
-    "position" integer NOT NULL,
-    CONSTRAINT channel_agents_position_check CHECK (("position" >= 0))
 );
 
 
@@ -4667,22 +3411,17 @@ CREATE TABLE public.channel_schedules (
     id uuid NOT NULL,
     company_id uuid NOT NULL,
     channel_id uuid NOT NULL,
+    binding_id uuid NOT NULL,
     name text NOT NULL,
     schedule_type text NOT NULL,
     interval_seconds bigint,
-    subject_template text NOT NULL,
-    prompt_template text NOT NULL,
-    delivery_mode text DEFAULT 'mailbox_only'::text NOT NULL,
-    recipient_emails public.citext[] DEFAULT '{}'::public.citext[] NOT NULL,
     timezone text DEFAULT 'UTC'::text NOT NULL,
-    run_as_user_id uuid,
     enabled boolean DEFAULT true NOT NULL,
     last_run_at timestamp with time zone,
     next_run_at timestamp with time zone,
     last_error text,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    CONSTRAINT channel_schedules_delivery_mode_check CHECK ((delivery_mode = ANY (ARRAY['mailbox_only'::text, 'email_participants'::text, 'email_custom'::text]))),
     CONSTRAINT channel_schedules_interval_check CHECK ((((schedule_type = 'interval'::text) AND (interval_seconds IS NOT NULL) AND (interval_seconds >= 60)) OR ((schedule_type = 'one_off'::text) AND (interval_seconds IS NULL)))),
     CONSTRAINT channel_schedules_name_not_blank CHECK ((btrim(name) <> ''::text)),
     CONSTRAINT channel_schedules_timezone_check CHECK (((now() AT TIME ZONE timezone) IS NOT NULL)),
@@ -4714,23 +3453,9 @@ CREATE TABLE public.companies (
     name text NOT NULL,
     slug public.citext NOT NULL,
     default_add_3rd_party boolean DEFAULT true NOT NULL,
-    default_participant_emails public.citext[],
-    default_retrieve_company_memory boolean DEFAULT false NOT NULL,
-    default_retrieve_agent_memory boolean DEFAULT false NOT NULL,
-    default_retrieve_user_memory boolean DEFAULT false NOT NULL,
-    default_persist_company_memory boolean DEFAULT false NOT NULL,
-    default_persist_agent_memory boolean DEFAULT false NOT NULL,
-    default_persist_user_memory boolean DEFAULT false NOT NULL,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     avatar_url text,
-    memory_provider text,
-    external_response_review text DEFAULT 'autonomous'::text NOT NULL,
-    external_reply_handling text DEFAULT 'automatic'::text NOT NULL,
     CONSTRAINT companies_avatar_url_scheme_check CHECK (((avatar_url IS NULL) OR (avatar_url ~ '^https?://'::text))),
-    CONSTRAINT companies_default_participants_bounded CHECK (((default_participant_emails IS NULL) OR ((cardinality(default_participant_emails) <= 64) AND (array_position(default_participant_emails, NULL::public.citext) IS NULL) AND (array_position(default_participant_emails, ''::public.citext) IS NULL)))),
-    CONSTRAINT companies_external_reply_handling_check CHECK ((external_reply_handling = ANY (ARRAY['automatic'::text, 'manual_handoff'::text]))),
-    CONSTRAINT companies_external_response_review_check CHECK ((external_response_review = ANY (ARRAY['autonomous'::text, 'review_all_external'::text]))),
-    CONSTRAINT companies_memory_provider_check CHECK (((memory_provider IS NULL) OR (memory_provider = ANY (ARRAY['hydradb'::text, 'hindsight'::text])))),
     CONSTRAINT companies_name_not_blank CHECK ((btrim(name) <> ''::text)),
     CONSTRAINT companies_slug_format CHECK ((((slug)::text = lower((slug)::text)) AND ((slug)::text ~ '^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$'::text)))
 );
@@ -4842,38 +3567,6 @@ CREATE TABLE public.company_resend_api_integrations (
 
 
 --
--- Name: delegation_control_commands; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.delegation_control_commands (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    company_id uuid NOT NULL,
-    task_id uuid NOT NULL,
-    outreach_id uuid NOT NULL,
-    target_id uuid,
-    command_id uuid NOT NULL,
-    command_fingerprint text NOT NULL,
-    operation text NOT NULL,
-    actor_principal_id uuid NOT NULL,
-    actor_kind text NOT NULL,
-    authority text NOT NULL,
-    reason text NOT NULL,
-    reason_detail text,
-    from_version bigint NOT NULL,
-    to_version bigint NOT NULL,
-    result jsonb NOT NULL,
-    occurred_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    CONSTRAINT delegation_control_commands_actor_kind_check CHECK ((actor_kind = ANY (ARRAY['person'::text, 'agent'::text, 'external'::text]))),
-    CONSTRAINT delegation_control_commands_authority_check CHECK ((authority = ANY (ARRAY['human_owner'::text, 'company_manager'::text, 'owning_agent'::text]))),
-    CONSTRAINT delegation_control_commands_operation_check CHECK ((operation = ANY (ARRAY['extend_outreach'::text, 'cancel_target'::text, 'cancel_outreach'::text, 'reassign_internal_target'::text, 'reassign_person_target'::text, 'proceed_with_partial'::text, 'stop_task'::text]))),
-    CONSTRAINT delegation_control_commands_reason_check CHECK ((reason = ANY (ARRAY['deadline_changed'::text, 'no_longer_needed'::text, 'target_unavailable'::text, 'incorrect_target'::text, 'partial_results_accepted'::text, 'task_stopped'::text, 'other'::text]))),
-    CONSTRAINT delegation_control_commands_reason_detail_check CHECK (((reason_detail IS NULL) OR (octet_length(reason_detail) <= 512))),
-    CONSTRAINT delegation_control_commands_result_version_check CHECK (((result ->> 'version'::text) = '1'::text)),
-    CONSTRAINT delegation_control_commands_version_check CHECK (((from_version > 0) AND (to_version = (from_version + 1))))
-);
-
-
---
 -- Name: email_message_metadata; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -4923,52 +3616,6 @@ CREATE TABLE public.external_threads (
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     CONSTRAINT external_threads_key_check CHECK (((btrim(external_thread_key) <> ''::text) AND (octet_length(external_thread_key) <= 998)))
-);
-
-
---
--- Name: human_approvals; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.human_approvals (
-    id uuid NOT NULL,
-    company_id uuid NOT NULL,
-    channel_id uuid NOT NULL,
-    thread_id uuid NOT NULL,
-    task_id uuid,
-    step_key text NOT NULL,
-    approver_email public.citext NOT NULL,
-    action_type text NOT NULL,
-    action_title text NOT NULL,
-    action_summary text NOT NULL,
-    payload jsonb DEFAULT '{}'::jsonb NOT NULL,
-    token uuid NOT NULL,
-    status text DEFAULT 'pending'::text NOT NULL,
-    expires_at timestamp with time zone NOT NULL,
-    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    approver_principal_id uuid,
-    expiry_retry_at timestamp with time zone,
-    CONSTRAINT human_approvals_expiry_check CHECK ((expires_at > created_at)),
-    CONSTRAINT human_approvals_payload_object_check CHECK ((jsonb_typeof(payload) = 'object'::text)),
-    CONSTRAINT human_approvals_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'approved'::text, 'rejected'::text, 'expired'::text])))
-);
-
-
---
--- Name: human_task_completions; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.human_task_completions (
-    task_id uuid NOT NULL,
-    company_id uuid NOT NULL,
-    command_id uuid NOT NULL,
-    command_fingerprint text NOT NULL,
-    owner_principal_id uuid NOT NULL,
-    ownership_version bigint NOT NULL,
-    message_id uuid NOT NULL,
-    completed_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    CONSTRAINT human_task_completions_ownership_version_check CHECK ((ownership_version > 0))
 );
 
 
@@ -5101,136 +3748,6 @@ CREATE TABLE public.internal_notes (
 
 
 --
--- Name: manual_handoffs; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.manual_handoffs (
-    id uuid NOT NULL,
-    company_id uuid NOT NULL,
-    channel_id uuid NOT NULL,
-    thread_id uuid,
-    correlation_id uuid,
-    title text NOT NULL,
-    next_action text NOT NULL,
-    status text DEFAULT 'open'::text NOT NULL,
-    responsible_principal_id uuid,
-    business_priority text DEFAULT 'normal'::text NOT NULL,
-    business_due_at timestamp with time zone,
-    version bigint DEFAULT 1 NOT NULL,
-    created_by_principal_id uuid,
-    resolved_by_principal_id uuid,
-    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    resolved_at timestamp with time zone,
-    CONSTRAINT manual_handoffs_next_action_check CHECK (((btrim(next_action) <> ''::text) AND (octet_length(next_action) <= 2048))),
-    CONSTRAINT manual_handoffs_priority_check CHECK ((business_priority = ANY (ARRAY['normal'::text, 'high'::text, 'urgent'::text]))),
-    CONSTRAINT manual_handoffs_resolution_check CHECK ((((status = 'open'::text) AND (resolved_at IS NULL) AND (resolved_by_principal_id IS NULL)) OR ((status <> 'open'::text) AND (resolved_at IS NOT NULL)))),
-    CONSTRAINT manual_handoffs_status_check CHECK ((status = ANY (ARRAY['open'::text, 'resolved'::text, 'withdrawn'::text]))),
-    CONSTRAINT manual_handoffs_title_check CHECK (((btrim(title) <> ''::text) AND (octet_length(title) <= 512))),
-    CONSTRAINT manual_handoffs_version_check CHECK ((version > 0))
-);
-
-
---
--- Name: memory_cleanup_jobs; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.memory_cleanup_jobs (
-    id uuid NOT NULL,
-    provider text NOT NULL,
-    remote_database_id text NOT NULL,
-    status text DEFAULT 'pending'::text NOT NULL,
-    attempts integer DEFAULT 0 NOT NULL,
-    available_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    lease_expires_at timestamp with time zone,
-    last_error text,
-    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    lease_token uuid,
-    operation_generation bigint,
-    CONSTRAINT memory_cleanup_jobs_generation_state_check CHECK ((((status = 'leased'::text) AND (operation_generation IS NOT NULL)) OR ((status <> 'leased'::text) AND (operation_generation IS NULL)))),
-    CONSTRAINT memory_cleanup_jobs_lease_state_check CHECK ((((status = 'leased'::text) AND (lease_token IS NOT NULL) AND (lease_expires_at IS NOT NULL)) OR ((status <> 'leased'::text) AND (lease_token IS NULL) AND (lease_expires_at IS NULL)))),
-    CONSTRAINT memory_cleanup_jobs_provider_check CHECK ((provider = ANY (ARRAY['hydradb'::text, 'hindsight'::text]))),
-    CONSTRAINT memory_cleanup_jobs_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'leased'::text, 'completed'::text, 'failed'::text])))
-);
-
-
---
--- Name: memory_provider_connections; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.memory_provider_connections (
-    company_id uuid NOT NULL,
-    provider text NOT NULL,
-    remote_database_id text NOT NULL,
-    readiness text DEFAULT 'pending'::text NOT NULL,
-    last_error text,
-    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    CONSTRAINT memory_provider_connections_provider_check CHECK ((provider = ANY (ARRAY['hydradb'::text, 'hindsight'::text]))),
-    CONSTRAINT memory_provider_connections_readiness_check CHECK ((readiness = ANY (ARRAY['pending'::text, 'provisioning'::text, 'ready'::text, 'failed'::text])))
-);
-
-
---
--- Name: memory_provisioning_jobs; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.memory_provisioning_jobs (
-    id uuid NOT NULL,
-    company_id uuid NOT NULL,
-    provider text NOT NULL,
-    remote_database_id text NOT NULL,
-    status text DEFAULT 'pending'::text NOT NULL,
-    attempts integer DEFAULT 0 NOT NULL,
-    available_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    lease_token uuid,
-    lease_expires_at timestamp with time zone,
-    last_error text,
-    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    operation_generation bigint,
-    phase text DEFAULT 'create_pending'::text NOT NULL,
-    failure_attempts integer DEFAULT 0 NOT NULL,
-    readiness_deadline timestamp with time zone,
-    next_poll_at timestamp with time zone,
-    CONSTRAINT memory_provisioning_jobs_attempts_check CHECK ((attempts >= 0)),
-    CONSTRAINT memory_provisioning_jobs_check CHECK ((((status = 'leased'::text) AND (lease_token IS NOT NULL) AND (lease_expires_at IS NOT NULL)) OR ((status <> 'leased'::text) AND (lease_token IS NULL) AND (lease_expires_at IS NULL)))),
-    CONSTRAINT memory_provisioning_jobs_failure_attempts_check CHECK ((failure_attempts >= 0)),
-    CONSTRAINT memory_provisioning_jobs_generation_state_check CHECK ((((status = 'leased'::text) AND (operation_generation IS NOT NULL)) OR ((status <> 'leased'::text) AND (operation_generation IS NULL)))),
-    CONSTRAINT memory_provisioning_jobs_phase_check CHECK ((phase = ANY (ARRAY['create_pending'::text, 'waiting_ready'::text, 'ready'::text, 'failed'::text]))),
-    CONSTRAINT memory_provisioning_jobs_phase_state_check CHECK ((((status = ANY (ARRAY['pending'::text, 'leased'::text])) AND (phase = ANY (ARRAY['create_pending'::text, 'waiting_ready'::text]))) OR ((status = 'completed'::text) AND (phase = 'ready'::text)) OR ((status = 'failed'::text) AND (phase = 'failed'::text)))),
-    CONSTRAINT memory_provisioning_jobs_provider_check CHECK ((provider = ANY (ARRAY['hydradb'::text, 'hindsight'::text]))),
-    CONSTRAINT memory_provisioning_jobs_readiness_window_check CHECK ((((phase = 'create_pending'::text) AND (readiness_deadline IS NULL) AND (next_poll_at IS NULL)) OR ((phase = 'waiting_ready'::text) AND (readiness_deadline IS NOT NULL) AND (next_poll_at IS NOT NULL)) OR (phase = ANY (ARRAY['ready'::text, 'failed'::text])))),
-    CONSTRAINT memory_provisioning_jobs_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'leased'::text, 'completed'::text, 'failed'::text])))
-);
-
-
---
--- Name: memory_remote_resource_lifecycles; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.memory_remote_resource_lifecycles (
-    provider text NOT NULL,
-    remote_database_id text NOT NULL,
-    company_id uuid,
-    desired_state text NOT NULL,
-    operation_generation bigint DEFAULT 0 NOT NULL,
-    operation_lease_token uuid,
-    operation_lease_expires_at timestamp with time zone,
-    quiesce_until timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    last_error text,
-    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    CONSTRAINT memory_remote_resource_lifecycles_check CHECK ((((operation_lease_token IS NULL) AND (operation_lease_expires_at IS NULL)) OR ((operation_lease_token IS NOT NULL) AND (operation_lease_expires_at IS NOT NULL)))),
-    CONSTRAINT memory_remote_resource_lifecycles_check1 CHECK (((desired_state = 'absent'::text) OR (company_id IS NOT NULL))),
-    CONSTRAINT memory_remote_resource_lifecycles_desired_state_check CHECK ((desired_state = ANY (ARRAY['present'::text, 'absent'::text]))),
-    CONSTRAINT memory_remote_resource_lifecycles_operation_generation_check CHECK ((operation_generation >= 0)),
-    CONSTRAINT memory_remote_resource_lifecycles_provider_check CHECK ((provider = ANY (ARRAY['hydradb'::text, 'hindsight'::text])))
-);
-
-
---
 -- Name: message_deliveries; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -5242,7 +3759,6 @@ CREATE TABLE public.message_deliveries (
     source_binding_id uuid,
     destination_binding_id uuid,
     external_destination text,
-    task_id uuid,
     depends_on_delivery_id uuid,
     correlation_id uuid NOT NULL,
     transport text NOT NULL,
@@ -5267,8 +3783,8 @@ CREATE TABLE public.message_deliveries (
     settled_evidence_id uuid,
     reopen_id uuid,
     CONSTRAINT message_deliveries_attempt_check CHECK (((attempt_count >= 0) AND (max_attempts > 0) AND (attempt_count <= max_attempts))),
-    CONSTRAINT message_deliveries_attribution_check CHECK ((((company_id IS NOT NULL) AND (channel_id IS NOT NULL) AND (message_id IS NOT NULL) AND (source_binding_id IS NOT NULL) AND (destination_binding_id IS NOT NULL)) OR ((company_id IS NULL) AND (channel_id IS NULL) AND (message_id IS NULL) AND (source_binding_id IS NULL) AND (destination_binding_id IS NULL) AND (task_id IS NULL) AND (depends_on_delivery_id IS NULL) AND (external_destination IS NOT NULL) AND (purpose = 'notification'::text)))),
-    CONSTRAINT message_deliveries_cancellation_check CHECK ((((cancellation_requested_at IS NULL) = (cancellation_reason IS NULL)) AND ((cancellation_reason IS NULL) OR (cancellation_reason = ANY (ARRAY['channel_agent_removed'::text, 'task_stopped'::text, 'workflow_cancelled'::text, 'workflow_expired'::text, 'workflow_revoked'::text, 'recipient_revoked'::text, 'evidence_conflict'::text]))) AND ((cancellation_requested_at IS NULL) OR (status <> ALL (ARRAY['pending'::text, 'retryable'::text]))))),
+    CONSTRAINT message_deliveries_attribution_check CHECK ((((company_id IS NOT NULL) AND (channel_id IS NOT NULL) AND (message_id IS NOT NULL) AND (source_binding_id IS NOT NULL) AND (destination_binding_id IS NOT NULL)) OR ((company_id IS NULL) AND (channel_id IS NULL) AND (message_id IS NULL) AND (source_binding_id IS NULL) AND (destination_binding_id IS NULL) AND (depends_on_delivery_id IS NULL) AND (external_destination IS NOT NULL) AND (purpose = 'notification'::text)))),
+    CONSTRAINT message_deliveries_cancellation_check CHECK ((((cancellation_requested_at IS NULL) = (cancellation_reason IS NULL)) AND ((cancellation_reason IS NULL) OR (cancellation_reason = ANY (ARRAY['workflow_cancelled'::text, 'workflow_expired'::text, 'workflow_revoked'::text, 'recipient_revoked'::text, 'evidence_conflict'::text]))) AND ((cancellation_requested_at IS NULL) OR (status <> ALL (ARRAY['pending'::text, 'retryable'::text]))))),
     CONSTRAINT message_deliveries_delivered_at_check CHECK (((status = 'delivered'::text) = (delivered_at IS NOT NULL))),
     CONSTRAINT message_deliveries_error_check CHECK ((((last_error_class IS NULL) OR public.valid_delivery_failure_class(last_error_class)) AND ((last_error_detail IS NULL) OR (octet_length(last_error_detail) <= 512)) AND ((last_error_detail IS NULL) OR (last_error_class IS NOT NULL)))),
     CONSTRAINT message_deliveries_external_destination_check CHECK (((external_destination IS NULL) OR ((btrim(external_destination) <> ''::text) AND (octet_length(external_destination) <= 998)))),
@@ -5385,13 +3901,13 @@ CREATE TABLE public.notification_events (
     last_error_detail text,
     occurred_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     projected_at timestamp with time zone,
-    CONSTRAINT notification_events_action_kind_check CHECK ((action_kind = ANY (ARRAY['assignment'::text, 'response_review'::text, 'delegation_timeout'::text, 'task_failure'::text, 'delivery_failure'::text]))),
+    CONSTRAINT notification_events_action_kind_check CHECK ((action_kind = 'delivery_failure'::text)),
     CONSTRAINT notification_events_attempt_check CHECK (((attempt_count >= 0) AND (max_attempts > 0) AND (attempt_count <= max_attempts))),
     CONSTRAINT notification_events_error_check CHECK (((last_error_class IS NULL) OR (last_error_class = ANY (ARRAY['database'::text, 'composition'::text, 'invalid_source'::text, 'lease_expired'::text, 'internal'::text])))),
     CONSTRAINT notification_events_lease_check CHECK ((((status = 'processing'::text) AND (execution_id IS NOT NULL) AND (owner_worker_id IS NOT NULL) AND (locked_at IS NOT NULL) AND (lock_expires_at IS NOT NULL) AND (lock_expires_at > locked_at)) OR ((status <> 'processing'::text) AND (execution_id IS NULL) AND (owner_worker_id IS NULL) AND (locked_at IS NULL) AND (lock_expires_at IS NULL)))),
     CONSTRAINT notification_events_projection_check CHECK (((status = 'projected'::text) = (projected_at IS NOT NULL))),
     CONSTRAINT notification_events_source_generation_check CHECK ((source_generation > 0)),
-    CONSTRAINT notification_events_source_kind_check CHECK ((source_kind = ANY (ARRAY['task'::text, 'handoff'::text, 'response_review'::text, 'delegation'::text, 'delivery'::text]))),
+    CONSTRAINT notification_events_source_kind_check CHECK ((source_kind = 'delivery'::text)),
     CONSTRAINT notification_events_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'processing'::text, 'projected'::text, 'dead_letter'::text])))
 );
 
@@ -5417,9 +3933,9 @@ CREATE TABLE public.notifications (
     email_delivery_id uuid,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    CONSTRAINT notifications_action_kind_check CHECK ((action_kind = ANY (ARRAY['assignment'::text, 'response_review'::text, 'delegation_timeout'::text, 'task_failure'::text, 'delivery_failure'::text]))),
+    CONSTRAINT notifications_action_kind_check CHECK ((action_kind = 'delivery_failure'::text)),
     CONSTRAINT notifications_source_generation_check CHECK ((source_generation > 0)),
-    CONSTRAINT notifications_source_kind_check CHECK ((source_kind = ANY (ARRAY['task'::text, 'handoff'::text, 'response_review'::text, 'delegation'::text, 'delivery'::text]))),
+    CONSTRAINT notifications_source_kind_check CHECK ((source_kind = 'delivery'::text)),
     CONSTRAINT notifications_state_check CHECK ((state = ANY (ARRAY['active'::text, 'resolved'::text, 'withdrawn'::text])))
 );
 
@@ -5486,135 +4002,6 @@ CREATE TABLE public.pending_user_registrations (
 
 
 --
--- Name: response_draft_evidence; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.response_draft_evidence (
-    company_id uuid NOT NULL,
-    draft_id uuid NOT NULL,
-    draft_version integer NOT NULL,
-    id uuid NOT NULL,
-    "position" integer NOT NULL,
-    source_reference jsonb NOT NULL,
-    source_version text NOT NULL,
-    content_digest text NOT NULL,
-    audience text NOT NULL,
-    support text NOT NULL,
-    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    CONSTRAINT response_draft_evidence_audience_check CHECK ((audience = ANY (ARRAY['external_conversation'::text, 'internal_only'::text, 'company_restricted'::text]))),
-    CONSTRAINT response_draft_evidence_digest_check CHECK (((btrim(content_digest) <> ''::text) AND (octet_length(content_digest) <= 128))),
-    CONSTRAINT response_draft_evidence_position_check CHECK ((("position" >= 0) AND ("position" < 128))),
-    CONSTRAINT response_draft_evidence_source_check CHECK (((jsonb_typeof(source_reference) = 'object'::text) AND (jsonb_typeof((source_reference -> 'kind'::text)) = 'string'::text) AND ((source_reference ->> 'kind'::text) = ANY (ARRAY['message'::text, 'note'::text, 'attachment'::text, 'delegated_result'::text, 'retained_tool_result'::text, 'external_url'::text])) AND (octet_length((source_reference)::text) <= 8192))),
-    CONSTRAINT response_draft_evidence_support_check CHECK ((support = ANY (ARRAY['direct_evidence'::text, 'inference'::text]))),
-    CONSTRAINT response_draft_evidence_version_check CHECK (((btrim(source_version) <> ''::text) AND (octet_length(source_version) <= 256)))
-);
-
-
---
--- Name: response_draft_publications; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.response_draft_publications (
-    company_id uuid NOT NULL,
-    draft_id uuid NOT NULL,
-    draft_version integer NOT NULL,
-    message_id uuid NOT NULL,
-    message_audience text DEFAULT 'external_conversation'::text NOT NULL,
-    delivery_id uuid NOT NULL,
-    published_by_principal_id uuid NOT NULL,
-    published_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    CONSTRAINT response_draft_publications_audience_check CHECK ((message_audience = 'external_conversation'::text))
-);
-
-
---
--- Name: response_drafts; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.response_drafts (
-    id uuid NOT NULL,
-    version integer NOT NULL,
-    company_id uuid NOT NULL,
-    channel_id uuid NOT NULL,
-    thread_id uuid NOT NULL,
-    task_id uuid,
-    source_handoff_generation uuid,
-    author_principal_id uuid NOT NULL,
-    reviewer_principal_id uuid NOT NULL,
-    proposed_message_id uuid NOT NULL,
-    subject text NOT NULL,
-    body text NOT NULL,
-    attachment_snapshot jsonb NOT NULL,
-    recipient_snapshot jsonb NOT NULL,
-    transport_snapshot jsonb NOT NULL,
-    publication_snapshot jsonb NOT NULL,
-    status text DEFAULT 'pending_review'::text NOT NULL,
-    created_by_principal_id uuid NOT NULL,
-    updated_by_principal_id uuid NOT NULL,
-    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    response_contract jsonb GENERATED ALWAYS AS ((((publication_snapshot -> 'message'::text) -> 'structured'::text) -> 'contract'::text)) STORED,
-    CONSTRAINT response_drafts_attachment_snapshot_check CHECK (((jsonb_typeof(attachment_snapshot) = 'object'::text) AND ((attachment_snapshot -> 'version'::text) = '"1"'::jsonb) AND (jsonb_typeof((attachment_snapshot -> 'items'::text)) = 'array'::text) AND (octet_length((attachment_snapshot)::text) <= 262144))),
-    CONSTRAINT response_drafts_body_check CHECK (((btrim(body) <> ''::text) AND (octet_length(body) <= 262144))),
-    CONSTRAINT response_drafts_publication_snapshot_check CHECK (((jsonb_typeof(publication_snapshot) = 'object'::text) AND ((publication_snapshot -> 'version'::text) = '"1"'::jsonb) AND (octet_length((publication_snapshot)::text) <= 16777216))),
-    CONSTRAINT response_drafts_recipient_snapshot_check CHECK (((jsonb_typeof(recipient_snapshot) = 'object'::text) AND ((recipient_snapshot -> 'version'::text) = '"1"'::jsonb) AND (jsonb_typeof((recipient_snapshot -> 'to'::text)) = 'array'::text) AND (jsonb_typeof((recipient_snapshot -> 'cc'::text)) = 'array'::text) AND (octet_length((recipient_snapshot)::text) <= 32768))),
-    CONSTRAINT response_drafts_status_check CHECK ((status = ANY (ARRAY['pending_review'::text, 'rejected'::text, 'expired'::text, 'superseded'::text, 'published'::text]))),
-    CONSTRAINT response_drafts_structured_body CHECK (((response_contract IS NULL) OR COALESCE((((((publication_snapshot -> 'message'::text) -> 'structured'::text) ->> 'body'::text) = ((publication_snapshot -> 'message'::text) ->> 'clean_text_body'::text)) AND ((response_contract ->> 'version'::text) = '1'::text) AND (length((((publication_snapshot -> 'message'::text) -> 'structured'::text) ->> 'fingerprint'::text)) = 64)), false))),
-    CONSTRAINT response_drafts_subject_check CHECK ((octet_length(subject) <= 2048)),
-    CONSTRAINT response_drafts_transport_snapshot_check CHECK (((jsonb_typeof(transport_snapshot) = 'object'::text) AND ((transport_snapshot -> 'version'::text) = '"1"'::jsonb) AND (octet_length((transport_snapshot)::text) <= 8192))),
-    CONSTRAINT response_drafts_version_check CHECK ((version > 0))
-);
-
-
---
--- Name: response_review_commands; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.response_review_commands (
-    company_id uuid NOT NULL,
-    command_id uuid NOT NULL,
-    draft_id uuid NOT NULL,
-    expected_draft_version integer NOT NULL,
-    action text NOT NULL,
-    command_fingerprint text NOT NULL,
-    resulting_draft_version integer NOT NULL,
-    published_message_id uuid,
-    published_delivery_id uuid,
-    published_delivery_created boolean,
-    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    CONSTRAINT response_review_commands_action_check CHECK ((action = ANY (ARRAY['approve'::text, 'edit'::text, 'reject'::text, 'reassign'::text]))),
-    CONSTRAINT response_review_commands_fingerprint_check CHECK (((btrim(command_fingerprint) <> ''::text) AND (octet_length(command_fingerprint) <= 128))),
-    CONSTRAINT response_review_commands_publication_result_check CHECK ((((published_delivery_id IS NULL) AND (published_delivery_created IS NULL)) OR ((published_delivery_id IS NOT NULL) AND (published_delivery_created IS NOT NULL)))),
-    CONSTRAINT response_review_commands_version_check CHECK (((expected_draft_version > 0) AND (resulting_draft_version > 0)))
-);
-
-
---
--- Name: response_reviews; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.response_reviews (
-    company_id uuid NOT NULL,
-    draft_id uuid NOT NULL,
-    draft_version integer NOT NULL,
-    reviewer_principal_id uuid NOT NULL,
-    status text DEFAULT 'pending'::text NOT NULL,
-    feedback text,
-    reviewer_rationale text,
-    decided_by_principal_id uuid,
-    expires_at timestamp with time zone NOT NULL,
-    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    notification_actor_principal_id uuid,
-    CONSTRAINT response_reviews_decision_shape_check CHECK ((((status = 'pending'::text) AND (decided_by_principal_id IS NULL) AND (feedback IS NULL) AND (reviewer_rationale IS NULL)) OR ((status = 'rejected'::text) AND (decided_by_principal_id IS NOT NULL) AND (feedback IS NOT NULL)) OR ((status = 'published'::text) AND (decided_by_principal_id IS NOT NULL)) OR (status = ANY (ARRAY['expired'::text, 'superseded'::text])))),
-    CONSTRAINT response_reviews_expiry_check CHECK ((expires_at > created_at)),
-    CONSTRAINT response_reviews_feedback_check CHECK (((feedback IS NULL) OR ((btrim(feedback) <> ''::text) AND (octet_length(feedback) <= 8192)))),
-    CONSTRAINT response_reviews_rationale_check CHECK (((reviewer_rationale IS NULL) OR ((btrim(reviewer_rationale) <> ''::text) AND (octet_length(reviewer_rationale) <= 2048)))),
-    CONSTRAINT response_reviews_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'rejected'::text, 'expired'::text, 'superseded'::text, 'published'::text])))
-);
-
-
---
 -- Name: runtime_metric_samples; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -5632,28 +4019,21 @@ CREATE TABLE public.runtime_metric_samples (
     pool_size integer NOT NULL,
     pool_idle integer NOT NULL,
     pool_active integer NOT NULL,
-    active_task_executions integer DEFAULT 0 NOT NULL,
-    task_worker_concurrency_limit integer DEFAULT 1 NOT NULL,
-    hydradb_calls integer DEFAULT 0 NOT NULL,
-    hydradb_failures integer DEFAULT 0 NOT NULL,
-    hydradb_duration_ms double precision DEFAULT 0 NOT NULL,
+    active_workflow_jobs integer DEFAULT 0 NOT NULL,
+    workflow_worker_slots integer DEFAULT 1 NOT NULL,
     CONSTRAINT runtime_metric_samples_acquire_duration_nonnegative CHECK ((database_acquire_duration_ms >= (0)::double precision)),
-    CONSTRAINT runtime_metric_samples_active_tasks_nonnegative CHECK ((active_task_executions >= 0)),
-    CONSTRAINT runtime_metric_samples_active_tasks_within_limit CHECK ((active_task_executions <= task_worker_concurrency_limit)),
+    CONSTRAINT runtime_metric_samples_active_jobs_nonnegative CHECK ((active_workflow_jobs >= 0)),
+    CONSTRAINT runtime_metric_samples_active_jobs_within_slots CHECK ((active_workflow_jobs <= workflow_worker_slots)),
     CONSTRAINT runtime_metric_samples_cpu_steal_nonnegative CHECK (((cpu_steal_percent IS NULL) OR (cpu_steal_percent >= (0)::double precision))),
     CONSTRAINT runtime_metric_samples_cpu_throttle_nonnegative CHECK (((cpu_throttle_percent IS NULL) OR (cpu_throttle_percent >= (0)::double precision))),
     CONSTRAINT runtime_metric_samples_cpu_utilization_nonnegative CHECK (((cpu_utilization_percent IS NULL) OR (cpu_utilization_percent >= (0)::double precision))),
-    CONSTRAINT runtime_metric_samples_hydradb_calls_nonnegative CHECK ((hydradb_calls >= 0)),
-    CONSTRAINT runtime_metric_samples_hydradb_duration_needs_calls CHECK (((hydradb_calls > 0) OR (hydradb_duration_ms = (0)::double precision))),
-    CONSTRAINT runtime_metric_samples_hydradb_duration_nonnegative CHECK ((hydradb_duration_ms >= (0)::double precision)),
-    CONSTRAINT runtime_metric_samples_hydradb_failures_within_calls CHECK (((hydradb_failures >= 0) AND (hydradb_failures <= hydradb_calls))),
     CONSTRAINT runtime_metric_samples_memory_limit_nonnegative CHECK (((memory_limit_bytes IS NULL) OR (memory_limit_bytes >= 0))),
     CONSTRAINT runtime_metric_samples_pool_active_nonnegative CHECK ((pool_active >= 0)),
     CONSTRAINT runtime_metric_samples_pool_idle_nonnegative CHECK ((pool_idle >= 0)),
     CONSTRAINT runtime_metric_samples_pool_parts_fit CHECK (((pool_idle + pool_active) = pool_size)),
     CONSTRAINT runtime_metric_samples_pool_size_nonnegative CHECK ((pool_size >= 0)),
     CONSTRAINT runtime_metric_samples_rss_nonnegative CHECK (((process_rss_bytes IS NULL) OR (process_rss_bytes >= 0))),
-    CONSTRAINT runtime_metric_samples_worker_limit_positive CHECK ((task_worker_concurrency_limit > 0))
+    CONSTRAINT runtime_metric_samples_worker_slots_positive CHECK ((workflow_worker_slots > 0))
 );
 
 
@@ -5666,8 +4046,10 @@ CREATE TABLE public.schedule_runs (
     schedule_id uuid NOT NULL,
     scheduled_for timestamp with time zone NOT NULL,
     schedule_snapshot jsonb NOT NULL,
-    thread_id uuid,
-    task_id uuid,
+    binding_id uuid NOT NULL,
+    run_id uuid,
+    command_key text,
+    refusal text,
     last_error text,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
@@ -5681,9 +4063,10 @@ CREATE TABLE public.schedule_runs (
     company_id uuid NOT NULL,
     channel_id uuid NOT NULL,
     CONSTRAINT schedule_runs_materialization_attempts_check CHECK (((materialization_attempts >= 0) AND (materialization_attempts <= 5))),
-    CONSTRAINT schedule_runs_materialization_state_check CHECK ((((materialization_status = 'pending'::text) AND (task_id IS NULL) AND (materialization_attempts < 5) AND (materialization_worker_id IS NULL) AND (materialization_generation IS NULL) AND (materialization_locked_at IS NULL) AND (materialization_lock_expires_at IS NULL)) OR ((materialization_status = 'materializing'::text) AND (task_id IS NULL) AND ((materialization_attempts >= 1) AND (materialization_attempts <= 5)) AND (materialization_worker_id IS NOT NULL) AND (materialization_generation IS NOT NULL) AND (materialization_locked_at IS NOT NULL) AND (materialization_lock_expires_at IS NOT NULL) AND (materialization_lock_expires_at > materialization_locked_at)) OR ((materialization_status = 'materialized'::text) AND (task_id IS NOT NULL) AND (materialization_worker_id IS NULL) AND (materialization_generation IS NULL) AND (materialization_locked_at IS NULL) AND (materialization_lock_expires_at IS NULL)) OR ((materialization_status = 'failed'::text) AND (task_id IS NULL) AND (materialization_attempts = 5) AND (materialization_worker_id IS NULL) AND (materialization_generation IS NULL) AND (materialization_locked_at IS NULL) AND (materialization_lock_expires_at IS NULL)))),
-    CONSTRAINT schedule_runs_snapshot_object_check CHECK ((jsonb_typeof(schedule_snapshot) = 'object'::text)),
-    CONSTRAINT schedule_runs_task_requires_thread_check CHECK (((task_id IS NULL) OR (thread_id IS NOT NULL)))
+    CONSTRAINT schedule_runs_command_key_check CHECK (((command_key IS NULL) OR ((length(command_key) >= 1) AND (length(command_key) <= 200)))),
+    CONSTRAINT schedule_runs_materialization_state_check CHECK ((((materialization_status = 'pending'::text) AND (run_id IS NULL) AND (refusal IS NULL) AND (materialization_attempts < 5) AND (materialization_worker_id IS NULL) AND (materialization_generation IS NULL) AND (materialization_locked_at IS NULL) AND (materialization_lock_expires_at IS NULL)) OR ((materialization_status = 'materializing'::text) AND (run_id IS NULL) AND (refusal IS NULL) AND ((materialization_attempts >= 1) AND (materialization_attempts <= 5)) AND (materialization_worker_id IS NOT NULL) AND (materialization_generation IS NOT NULL) AND (materialization_locked_at IS NOT NULL) AND (materialization_lock_expires_at IS NOT NULL) AND (materialization_lock_expires_at > materialization_locked_at)) OR ((materialization_status = 'materialized'::text) AND (run_id IS NOT NULL) AND (refusal IS NULL) AND (materialization_worker_id IS NULL) AND (materialization_generation IS NULL) AND (materialization_locked_at IS NULL) AND (materialization_lock_expires_at IS NULL)) OR ((materialization_status = 'failed'::text) AND (run_id IS NULL) AND ((materialization_attempts = 5) OR (refusal IS NOT NULL)) AND (materialization_worker_id IS NULL) AND (materialization_generation IS NULL) AND (materialization_locked_at IS NULL) AND (materialization_lock_expires_at IS NULL)))),
+    CONSTRAINT schedule_runs_refusal_check CHECK (((refusal IS NULL) OR (refusal = ANY (ARRAY['unavailable'::text, 'input_rejected'::text, 'key_conflict'::text])))),
+    CONSTRAINT schedule_runs_snapshot_object_check CHECK ((jsonb_typeof(schedule_snapshot) = 'object'::text))
 );
 
 
@@ -5714,77 +4097,6 @@ CREATE TABLE public.skills (
 
 
 --
--- Name: start_agent_task_commands; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.start_agent_task_commands (
-    company_id uuid NOT NULL,
-    command_id uuid NOT NULL,
-    command_fingerprint text NOT NULL,
-    task_id uuid NOT NULL,
-    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
-);
-
-
---
--- Name: task_agent_instruction_notes; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.task_agent_instruction_notes (
-    instruction_id uuid NOT NULL,
-    company_id uuid NOT NULL,
-    note_id uuid NOT NULL,
-    "position" integer NOT NULL,
-    CONSTRAINT task_agent_instruction_notes_position_check CHECK ((("position" >= 0) AND ("position" < 50)))
-);
-
-
---
--- Name: task_agent_instructions; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.task_agent_instructions (
-    id uuid NOT NULL,
-    company_id uuid NOT NULL,
-    channel_id uuid NOT NULL,
-    thread_id uuid NOT NULL,
-    task_id uuid NOT NULL,
-    command_id uuid NOT NULL,
-    command_fingerprint text NOT NULL,
-    requested_by_principal_id uuid NOT NULL,
-    requested_ownership_version bigint NOT NULL,
-    wake_outcome text NOT NULL,
-    consumed_execution_generation uuid,
-    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    consumed_at timestamp with time zone,
-    CONSTRAINT task_agent_instructions_consumption_check CHECK ((((consumed_execution_generation IS NULL) AND (consumed_at IS NULL)) OR ((consumed_execution_generation IS NOT NULL) AND (consumed_at IS NOT NULL)))),
-    CONSTRAINT task_agent_instructions_requested_ownership_version_check CHECK ((requested_ownership_version > 0)),
-    CONSTRAINT task_agent_instructions_wake_outcome_check CHECK ((wake_outcome = ANY (ARRAY['queued'::text, 'requeued'::text, 'parked'::text])))
-);
-
-
---
--- Name: task_approval_waits; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.task_approval_waits (
-    task_id uuid NOT NULL,
-    company_id uuid NOT NULL,
-    approval_id uuid NOT NULL,
-    cycle_id uuid NOT NULL,
-    owner_principal_id uuid,
-    ownership_version bigint NOT NULL,
-    state text NOT NULL,
-    run_id uuid,
-    invocation_id uuid,
-    checkpoint_revision bigint,
-    CONSTRAINT task_approval_waits_check CHECK ((((run_id IS NULL) AND (invocation_id IS NULL) AND (checkpoint_revision IS NULL)) OR ((run_id IS NOT NULL) AND (invocation_id IS NOT NULL) AND (checkpoint_revision >= 0)))),
-    CONSTRAINT task_approval_waits_ownership_version_check CHECK ((ownership_version >= 0)),
-    CONSTRAINT task_approval_waits_state_check CHECK ((state = ANY (ARRAY['waiting'::text, 'approved'::text, 'rejected'::text, 'expired'::text])))
-);
-
-
---
 -- Name: task_attempts; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -5793,11 +4105,7 @@ CREATE TABLE public.task_attempts (
     task_id uuid NOT NULL,
     attempt_number integer NOT NULL,
     status text NOT NULL,
-    error text,
     stop_reason text,
-    prompt_tokens integer,
-    completion_tokens integer,
-    result jsonb,
     started_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     finished_at timestamp with time zone,
     execution_generation uuid NOT NULL,
@@ -5810,48 +4118,8 @@ CREATE TABLE public.task_attempts (
     workflow_retirement text,
     CONSTRAINT task_attempts_machine_id_check CHECK ((length(TRIM(BOTH FROM machine_id)) > 0)),
     CONSTRAINT task_attempts_status_check CHECK ((status = ANY (ARRAY['processing'::text, 'completed'::text, 'failed'::text]))),
-    CONSTRAINT task_attempts_stop_reason_check CHECK ((stop_reason = ANY (ARRAY['completed'::text, 'retryable_failure'::text, 'terminal_failure'::text, 'timed_out'::text, 'shutdown'::text, 'lease_lost'::text, 'ownership_transferred'::text, 'agent_instruction'::text, 'delegation_cancelled'::text, 'operator_stopped'::text, 'approval_rejected'::text, 'channel_agent_removed'::text, 'effect_parked'::text, 'approval_parked'::text, 'child_parked'::text]))),
-    CONSTRAINT task_attempts_token_check CHECK ((((prompt_tokens IS NULL) OR (prompt_tokens >= 0)) AND ((completion_tokens IS NULL) OR (completion_tokens >= 0)))),
+    CONSTRAINT task_attempts_stop_reason_check CHECK ((stop_reason = ANY (ARRAY['completed'::text, 'timed_out'::text, 'lease_lost'::text, 'effect_parked'::text, 'approval_parked'::text, 'child_parked'::text]))),
     CONSTRAINT workflow_attempt_failure_shape CHECK ((((workflow_failure_class IS NULL) AND (workflow_failure_code IS NULL) AND (workflow_retry_safety IS NULL) AND (workflow_retirement IS NULL)) OR ((status = 'failed'::text) AND (finished_at IS NOT NULL) AND (workflow_failure_class IS NOT NULL) AND (workflow_failure_class = ANY (ARRAY['retryable'::text, 'terminal'::text])) AND (workflow_failure_code IS NOT NULL) AND ((octet_length(workflow_failure_code) >= 1) AND (octet_length(workflow_failure_code) <= 128)) AND (workflow_retry_safety IS NOT NULL) AND (workflow_retry_safety = ANY (ARRAY['safe'::text, 'unknown'::text])) AND (workflow_retirement IS NOT NULL) AND (workflow_retirement = ANY (ARRAY['live'::text, 'expired'::text, 'deadline'::text, 'cancel'::text])))))
-);
-
-
---
--- Name: task_channel_targets; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.task_channel_targets (
-    task_id uuid NOT NULL,
-    company_id uuid NOT NULL,
-    channel_id uuid NOT NULL,
-    thread_id uuid NOT NULL,
-    recipient_role text NOT NULL,
-    "position" integer NOT NULL,
-    CONSTRAINT task_channel_targets_position_check CHECK (("position" >= 0)),
-    CONSTRAINT task_channel_targets_role_check CHECK ((recipient_role = ANY (ARRAY['to'::text, 'cc'::text])))
-);
-
-
---
--- Name: task_harness_invocations; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.task_harness_invocations (
-    id uuid NOT NULL,
-    company_id uuid NOT NULL,
-    task_id uuid NOT NULL,
-    run_id uuid NOT NULL,
-    model_turn smallint NOT NULL,
-    call_ordinal smallint NOT NULL,
-    state text NOT NULL,
-    invocation jsonb NOT NULL,
-    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    CONSTRAINT task_harness_invocations_call_ordinal_check CHECK (((call_ordinal >= 0) AND (call_ordinal <= 63))),
-    CONSTRAINT task_harness_invocations_invocation_check CHECK (((jsonb_typeof(invocation) = 'object'::text) AND (octet_length((invocation)::text) <= 262144))),
-    CONSTRAINT task_harness_invocations_ledger_identity CHECK (COALESCE(((((invocation -> 'call'::text) ->> 'invocation_id'::text) = (id)::text) AND (((invocation ->> 'turn'::text))::integer = model_turn) AND (((invocation ->> 'ordinal'::text))::integer = call_ordinal) AND ((invocation ->> 'state'::text) = state) AND (invocation ? 'result'::text) AND ((state = 'completed'::text) = ((invocation -> 'result'::text) <> 'null'::jsonb))), false)),
-    CONSTRAINT task_harness_invocations_model_turn_check CHECK (((model_turn >= 0) AND (model_turn <= 15))),
-    CONSTRAINT task_harness_invocations_state_check CHECK ((state = ANY (ARRAY['prepared'::text, 'ready'::text, 'waiting'::text, 'completed'::text, 'failed'::text, 'indeterminate'::text])))
 );
 
 
@@ -5864,9 +4132,7 @@ CREATE TABLE public.task_harness_runs (
     company_id uuid NOT NULL,
     task_id uuid NOT NULL,
     agent_id uuid NOT NULL,
-    owner_kind text NOT NULL DEFAULT 'legacy',
-    owner_principal_id uuid,
-    ownership_version bigint,
+    owner_kind text NOT NULL DEFAULT 'workflow',
     workflow_run_id uuid,
     workflow_execution_id uuid,
     workflow_generation uuid,
@@ -5892,15 +4158,12 @@ CREATE TABLE public.task_harness_runs (
             AND num_nonnulls(model_request_id,model_generation,model_worker_id,model_attempt)=4
             AND model_attempt>0)),
     CONSTRAINT task_harness_runs_owner_shape CHECK (
-        (owner_kind = 'legacy' AND owner_principal_id IS NOT NULL AND ownership_version IS NOT NULL
-            AND num_nonnulls(workflow_run_id,workflow_execution_id,workflow_generation,
-                workflow_worker_id,workflow_attempt,workflow_prepared) = 0)
-        OR (owner_kind = 'workflow' AND owner_principal_id IS NULL AND ownership_version IS NULL
+        owner_kind = 'workflow'
             AND num_nonnulls(workflow_run_id,workflow_execution_id,workflow_generation,
                 workflow_worker_id,workflow_attempt,workflow_prepared) = 6
             AND workflow_attempt > 0 AND final_output_consumed_at IS NULL
             AND jsonb_typeof(workflow_prepared) = 'object'
-            AND octet_length(workflow_prepared::text) <= 2097152)),
+            AND octet_length(workflow_prepared::text) <= 2097152),
     CONSTRAINT task_harness_runs_check CHECK ((((checkpoint ->> 'schema_version'::text))::integer = schema_version)),
     CONSTRAINT task_harness_runs_check1 CHECK ((((checkpoint ->> 'revision'::text))::bigint = revision)),
     CONSTRAINT task_harness_runs_check2 CHECK (((checkpoint ->> 'state'::text) = state)),
@@ -5909,7 +4172,6 @@ CREATE TABLE public.task_harness_runs (
     CONSTRAINT task_harness_runs_checkpoint_check1 CHECK ((jsonb_array_length((checkpoint -> 'reservations'::text)) <= 16)),
     CONSTRAINT task_harness_runs_checkpoint_check2 CHECK ((jsonb_array_length((checkpoint -> 'invocations'::text)) <= 64)),
     CONSTRAINT task_harness_runs_invalid_output CHECK (((state <> 'invalid_output'::text) OR COALESCE((((checkpoint -> 'final_output'::text) = 'null'::jsonb) AND (((checkpoint -> 'identity'::text) -> 'response_contract'::text) <> 'null'::jsonb) AND (jsonb_array_length(jsonb_path_query_array(checkpoint, '$."reservations"[*]?(@."repair" != null)."repair"'::jsonpath)) = 2) AND ((((checkpoint -> 'turns'::text) -> '-1'::integer) ->> 'invalid_response'::text) = ANY (ARRAY['malformed_json'::text, 'schema_mismatch'::text, 'output_limit'::text, 'tool_call'::text]))), false))),
-    CONSTRAINT task_harness_runs_ownership_version_check CHECK ((ownership_version >= 0)),
     CONSTRAINT task_harness_runs_required_checkpoint_fields CHECK (COALESCE(((checkpoint ?& ARRAY['schema_version'::text, 'run_id'::text, 'identity'::text, 'revision'::text, 'state'::text, 'policy'::text, 'messages'::text, 'reservations'::text, 'turns'::text, 'invocations'::text, 'executions'::text]) AND (((checkpoint -> 'identity'::text) ->> 'harness'::text) = 'rig'::text) AND (jsonb_typeof((checkpoint -> 'messages'::text)) = 'array'::text) AND ((jsonb_array_length((checkpoint -> 'messages'::text)) >= 1) AND (jsonb_array_length((checkpoint -> 'messages'::text)) <= 81)) AND (jsonb_typeof((checkpoint -> 'turns'::text)) = 'array'::text) AND (jsonb_array_length((checkpoint -> 'turns'::text)) <= 16) AND (jsonb_typeof((checkpoint -> 'executions'::text)) = 'array'::text) AND (jsonb_array_length((checkpoint -> 'executions'::text)) <= 64)), false)),
     CONSTRAINT task_harness_runs_response_contract CHECK (COALESCE((((checkpoint -> 'identity'::text) ? 'response_contract'::text) AND (checkpoint ? 'contract_fingerprint'::text) AND
 CASE
@@ -5923,241 +4185,6 @@ END AND (jsonb_array_length(jsonb_path_query_array(checkpoint, '$."reservations"
     CONSTRAINT task_harness_runs_revision_check CHECK ((revision >= 0)),
     CONSTRAINT task_harness_runs_schema_version_check CHECK ((schema_version = 1)),
     CONSTRAINT task_harness_runs_state_check CHECK ((state = ANY (ARRAY['active'::text, 'waiting'::text, 'completed'::text, 'superseded'::text, 'invalid_output'::text, 'budget_exceeded'::text])))
-);
-
-
---
--- Name: task_outreach_replies; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.task_outreach_replies (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    company_id uuid NOT NULL,
-    outreach_id uuid NOT NULL,
-    target_id uuid NOT NULL,
-    response_association_id uuid NOT NULL,
-    disposition text NOT NULL,
-    received_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    CONSTRAINT task_outreach_replies_disposition_check CHECK ((disposition = ANY (ARRAY['counted'::text, 'late'::text, 'duplicate'::text])))
-);
-
-
---
--- Name: task_outreach_targets; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.task_outreach_targets (
-    outreach_id uuid NOT NULL,
-    email public.citext NOT NULL,
-    responded_at timestamp with time zone,
-    response_association_id uuid,
-    delivery_id uuid,
-    request_message_id uuid,
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    company_id uuid NOT NULL,
-    target_kind text DEFAULT 'external'::text NOT NULL,
-    internal_channel_id uuid,
-    external_transport text,
-    external_namespace text,
-    external_subject text,
-    status text DEFAULT 'active'::text NOT NULL,
-    replaces_target_id uuid,
-    CONSTRAINT task_outreach_targets_identity_check CHECK ((((target_kind = 'internal_channel'::text) AND (internal_channel_id IS NOT NULL) AND (external_transport IS NULL) AND (external_namespace IS NULL) AND (external_subject IS NULL)) OR ((target_kind = 'external'::text) AND (internal_channel_id IS NULL) AND (external_transport IS NOT NULL) AND (external_namespace IS NOT NULL) AND (external_subject IS NOT NULL) AND (btrim(external_namespace) <> ''::text) AND (btrim(external_subject) <> ''::text)))),
-    CONSTRAINT task_outreach_targets_kind_check CHECK ((target_kind = ANY (ARRAY['internal_channel'::text, 'external'::text]))),
-    CONSTRAINT task_outreach_targets_response_check CHECK (((response_association_id IS NULL) OR (responded_at IS NOT NULL))),
-    CONSTRAINT task_outreach_targets_response_state_check CHECK ((((status = 'responded'::text) AND (responded_at IS NOT NULL) AND (response_association_id IS NOT NULL)) OR ((status <> 'responded'::text) AND (responded_at IS NULL) AND (response_association_id IS NULL)))),
-    CONSTRAINT task_outreach_targets_status_check CHECK ((status = ANY (ARRAY['active'::text, 'responded'::text, 'cancelled'::text, 'superseded'::text, 'expired'::text]))),
-    CONSTRAINT task_outreach_targets_transport_check CHECK (((external_transport IS NULL) OR (external_transport = ANY (ARRAY['email'::text, 'slack'::text]))))
-);
-
-
---
--- Name: task_outreaches; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.task_outreaches (
-    id uuid NOT NULL,
-    task_id uuid NOT NULL,
-    status text NOT NULL,
-    required_threshold_percent numeric(5,2) NOT NULL,
-    expires_at timestamp with time zone NOT NULL,
-    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    outreach_key text NOT NULL,
-    subject text NOT NULL,
-    body text NOT NULL,
-    company_id uuid NOT NULL,
-    version bigint DEFAULT 1 NOT NULL,
-    created_by_principal_id uuid,
-    created_by_principal_kind text,
-    ownership_version bigint DEFAULT 1 NOT NULL,
-    harness_run_id uuid,
-    harness_invocation_id uuid,
-    checkpoint_revision bigint,
-    CONSTRAINT task_outreaches_body_check CHECK ((length(btrim(body)) > 0)),
-    CONSTRAINT task_outreaches_check CHECK ((((harness_run_id IS NULL) AND (harness_invocation_id IS NULL) AND (checkpoint_revision IS NULL)) OR ((harness_run_id IS NOT NULL) AND (harness_invocation_id IS NOT NULL) AND (checkpoint_revision >= 0)))),
-    CONSTRAINT task_outreaches_creator_shape_check CHECK ((((created_by_principal_id IS NULL) AND (created_by_principal_kind IS NULL)) OR ((created_by_principal_id IS NOT NULL) AND (created_by_principal_kind IS NOT NULL) AND (created_by_principal_kind = 'agent'::text)))),
-    CONSTRAINT task_outreaches_expiry_check CHECK ((expires_at > created_at)),
-    CONSTRAINT task_outreaches_ownership_version_check CHECK ((ownership_version >= 0)),
-    CONSTRAINT task_outreaches_status_check CHECK ((status = ANY (ARRAY['waiting'::text, 'threshold_met'::text, 'timeout_pending_approval'::text, 'proceed_partial'::text, 'cancelled'::text, 'completed'::text]))),
-    CONSTRAINT task_outreaches_subject_check CHECK ((length(btrim(subject)) > 0)),
-    CONSTRAINT task_outreaches_threshold_check CHECK (((required_threshold_percent > (0)::numeric) AND (required_threshold_percent <= (100)::numeric))),
-    CONSTRAINT task_outreaches_version_check CHECK ((version > 0))
-);
-
-
---
--- Name: task_ownership_events; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.task_ownership_events (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    task_id uuid NOT NULL,
-    company_id uuid NOT NULL,
-    sequence bigint NOT NULL,
-    from_version bigint NOT NULL,
-    to_version bigint NOT NULL,
-    command_id uuid NOT NULL,
-    command_fingerprint text NOT NULL,
-    operation text NOT NULL,
-    actor_principal_id uuid,
-    actor_kind text NOT NULL,
-    previous_owner_principal_id uuid,
-    previous_owner_kind text,
-    previous_owner_label text,
-    new_owner_principal_id uuid,
-    new_owner_kind text,
-    new_owner_label text,
-    reason text NOT NULL,
-    reason_detail text,
-    handoff_instruction text,
-    occurred_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    CONSTRAINT task_ownership_events_actor_kind_check CHECK ((actor_kind = ANY (ARRAY['system'::text, 'human'::text, 'agent'::text]))),
-    CONSTRAINT task_ownership_events_handoff_check CHECK (((handoff_instruction IS NULL) OR ((btrim(handoff_instruction) <> ''::text) AND (octet_length(handoff_instruction) <= 8192)))),
-    CONSTRAINT task_ownership_events_new_owner_check CHECK ((((new_owner_principal_id IS NULL) AND (new_owner_kind = 'unassigned'::text)) OR ((new_owner_principal_id IS NOT NULL) AND (new_owner_kind = ANY (ARRAY['human'::text, 'agent'::text]))))),
-    CONSTRAINT task_ownership_events_operation_check CHECK ((operation = ANY (ARRAY['initial_assignment'::text, 'claim'::text, 'assign'::text, 'transfer'::text, 'release'::text, 'owner_removed'::text]))),
-    CONSTRAINT task_ownership_events_previous_owner_check CHECK ((((previous_owner_principal_id IS NULL) AND (previous_owner_kind = 'unassigned'::text)) OR ((previous_owner_principal_id IS NOT NULL) AND (previous_owner_kind = ANY (ARRAY['human'::text, 'agent'::text]))))),
-    CONSTRAINT task_ownership_events_reason_check CHECK ((reason = ANY (ARRAY['initial_assignment'::text, 'self_claim'::text, 'manual_assignment'::text, 'delegated'::text, 'workload_rebalance'::text, 'owner_unavailable'::text, 'released'::text, 'owner_removed'::text]))),
-    CONSTRAINT task_ownership_events_reason_detail_check CHECK (((reason_detail IS NULL) OR (octet_length(reason_detail) <= 512))),
-    CONSTRAINT task_ownership_events_transfer_handoff_check CHECK ((((operation = 'transfer'::text) AND (handoff_instruction IS NOT NULL)) OR ((operation <> 'transfer'::text) AND (handoff_instruction IS NULL)))),
-    CONSTRAINT task_ownership_events_version_check CHECK (((from_version >= 0) AND (to_version = (from_version + 1)) AND (sequence = to_version)))
-);
-
-
---
--- Name: task_status_events; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.task_status_events (
-    id uuid NOT NULL,
-    company_id uuid NOT NULL,
-    task_id uuid NOT NULL,
-    correlation_id uuid NOT NULL,
-    sequence integer NOT NULL,
-    from_status text,
-    to_status text NOT NULL,
-    reason text NOT NULL,
-    actor_kind text NOT NULL,
-    actor_id uuid,
-    related_approval_id uuid,
-    related_outreach_id uuid,
-    retry_count integer NOT NULL,
-    run_at timestamp with time zone NOT NULL,
-    execution_generation uuid,
-    transitioned_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    CONSTRAINT task_status_events_actor_kind_check CHECK ((actor_kind = ANY (ARRAY['system'::text, 'worker'::text, 'operator'::text, 'human'::text, 'agent'::text, 'approval'::text, 'outreach'::text]))),
-    CONSTRAINT task_status_events_from_status_check CHECK (((from_status IS NULL) OR (from_status = ANY (ARRAY['pending'::text, 'processing'::text, 'pending_approval'::text, 'waiting_for_third_party_reply'::text, 'completed'::text, 'failed'::text, 'dead_letter'::text, 'stopped'::text])))),
-    CONSTRAINT task_status_events_reason_check CHECK ((reason = ANY (ARRAY['enqueued'::text, 'claimed'::text, 'completed'::text, 'retryable_failure'::text, 'terminal_failure'::text, 'timed_out'::text, 'shutdown'::text, 'lease_lost'::text, 'approval_requested'::text, 'approval_accepted'::text, 'approval_rejected'::text, 'outreach_started'::text, 'outreach_reply_received'::text, 'outreach_timed_out'::text, 'outreach_extended'::text, 'operator_stopped'::text, 'operator_resumed'::text, 'ownership_transferred'::text, 'agent_instruction'::text, 'delegation_target_cancelled'::text, 'delegation_cancelled'::text, 'delegation_reassigned'::text, 'delegation_partial'::text, 'channel_agent_removed'::text, 'unknown'::text]))),
-    CONSTRAINT task_status_events_related_source_check CHECK (((related_approval_id IS NULL) OR (related_outreach_id IS NULL))),
-    CONSTRAINT task_status_events_retry_count_check CHECK ((retry_count >= 0)),
-    CONSTRAINT task_status_events_sequence_check CHECK ((sequence > 0)),
-    CONSTRAINT task_status_events_to_status_check CHECK ((to_status = ANY (ARRAY['pending'::text, 'processing'::text, 'pending_approval'::text, 'waiting_for_third_party_reply'::text, 'completed'::text, 'failed'::text, 'dead_letter'::text, 'stopped'::text])))
-);
-
-
---
--- Name: thread_handoff_events; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.thread_handoff_events (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    company_id uuid NOT NULL,
-    handoff_id uuid NOT NULL,
-    generation uuid NOT NULL,
-    command_id uuid NOT NULL,
-    command_fingerprint text NOT NULL,
-    operation text NOT NULL,
-    actor_kind text NOT NULL,
-    actor_principal_id uuid,
-    from_state text,
-    to_state text NOT NULL,
-    from_version bigint NOT NULL,
-    to_version bigint NOT NULL,
-    previous_priority text,
-    new_priority text,
-    previous_due_at timestamp with time zone,
-    new_due_at timestamp with time zone,
-    previous_responsible_principal_id uuid,
-    new_responsible_principal_id uuid,
-    task_id uuid,
-    draft_id uuid,
-    draft_version integer,
-    failure_reason text,
-    occurred_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    CONSTRAINT thread_handoff_events_actor_check CHECK ((((actor_kind = 'system'::text) AND (actor_principal_id IS NULL)) OR ((actor_kind = ANY (ARRAY['human'::text, 'agent'::text])) AND (actor_principal_id IS NOT NULL)))),
-    CONSTRAINT thread_handoff_events_failure_reason_check CHECK (((failure_reason IS NULL) OR ((btrim(failure_reason) <> ''::text) AND (octet_length(failure_reason) <= 2048)))),
-    CONSTRAINT thread_handoff_events_operation_check CHECK ((operation = ANY (ARRAY['opened'::text, 'regenerated'::text, 'claimed'::text, 'released'::text, 'reassigned'::text, 'attributes_changed'::text, 'draft_requested'::text, 'draft_ready'::text, 'draft_failed'::text, 'resolved'::text, 'dismissed'::text]))),
-    CONSTRAINT thread_handoff_events_priority_check CHECK ((((previous_priority IS NULL) OR (previous_priority = ANY (ARRAY['normal'::text, 'high'::text, 'urgent'::text]))) AND ((new_priority IS NULL) OR (new_priority = ANY (ARRAY['normal'::text, 'high'::text, 'urgent'::text]))))),
-    CONSTRAINT thread_handoff_events_state_check CHECK ((((from_state IS NULL) OR (from_state = ANY (ARRAY['needs_instruction'::text, 'drafting'::text, 'draft_ready'::text, 'resolved'::text, 'dismissed'::text]))) AND (to_state = ANY (ARRAY['needs_instruction'::text, 'drafting'::text, 'draft_ready'::text, 'resolved'::text, 'dismissed'::text])))),
-    CONSTRAINT thread_handoff_events_version_check CHECK (((from_version >= 0) AND (to_version = (from_version + 1))))
-);
-
-
---
--- Name: thread_handoff_runs; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.thread_handoff_runs (
-    company_id uuid NOT NULL,
-    task_id uuid NOT NULL,
-    handoff_id uuid NOT NULL,
-    generation uuid NOT NULL,
-    requested_by_principal_id uuid NOT NULL,
-    command_id uuid NOT NULL,
-    draft_id uuid,
-    draft_version integer,
-    state text DEFAULT 'running'::text NOT NULL,
-    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    CONSTRAINT thread_handoff_runs_draft_check CHECK ((((draft_id IS NULL) AND (draft_version IS NULL)) OR ((draft_id IS NOT NULL) AND (draft_version > 0)))),
-    CONSTRAINT thread_handoff_runs_state_check CHECK ((state = ANY (ARRAY['running'::text, 'drafted'::text, 'failed'::text, 'superseded'::text])))
-);
-
-
---
--- Name: thread_handoffs; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.thread_handoffs (
-    id uuid NOT NULL,
-    company_id uuid NOT NULL,
-    channel_id uuid NOT NULL,
-    thread_id uuid NOT NULL,
-    generation uuid NOT NULL,
-    state text DEFAULT 'needs_instruction'::text NOT NULL,
-    source_message_id uuid NOT NULL,
-    responsible_principal_id uuid,
-    business_priority text DEFAULT 'normal'::text NOT NULL,
-    business_due_at timestamp with time zone,
-    version bigint DEFAULT 1 NOT NULL,
-    generation_opened_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    closed_at timestamp with time zone,
-    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    CONSTRAINT thread_handoffs_closure_check CHECK ((((state = ANY (ARRAY['resolved'::text, 'dismissed'::text])) AND (closed_at IS NOT NULL)) OR ((state <> ALL (ARRAY['resolved'::text, 'dismissed'::text])) AND (closed_at IS NULL)))),
-    CONSTRAINT thread_handoffs_priority_check CHECK ((business_priority = ANY (ARRAY['normal'::text, 'high'::text, 'urgent'::text]))),
-    CONSTRAINT thread_handoffs_state_check CHECK ((state = ANY (ARRAY['needs_instruction'::text, 'drafting'::text, 'draft_ready'::text, 'resolved'::text, 'dismissed'::text]))),
-    CONSTRAINT thread_handoffs_version_check CHECK ((version > 0))
 );
 
 
@@ -6226,12 +4253,10 @@ CREATE TABLE public.user_login_methods (
 
 CREATE TABLE public.user_notification_preferences (
     user_id uuid NOT NULL,
-    assignment_email_enabled boolean DEFAULT true NOT NULL,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    response_review_email_enabled boolean DEFAULT true CONSTRAINT user_notification_preferenc_response_review_email_enab_not_null NOT NULL,
-    delegation_timeout_email_enabled boolean DEFAULT true CONSTRAINT user_notification_preferenc_delegation_timeout_email_e_not_null NOT NULL,
-    task_failure_email_enabled boolean DEFAULT true CONSTRAINT user_notification_preferenc_task_failure_email_enabled_not_null NOT NULL,
-    delivery_failure_email_enabled boolean DEFAULT true CONSTRAINT user_notification_preferenc_delivery_failure_email_ena_not_null NOT NULL
+    delivery_failure_email_enabled boolean DEFAULT true CONSTRAINT user_notification_preferenc_delivery_failure_email_ena_not_null NOT NULL,
+    -- Email me when a workflow decision needs my review (P08-Q8).
+    decision_email_enabled boolean DEFAULT true NOT NULL
 );
 
 
@@ -6752,6 +4777,9 @@ CREATE TABLE public.workflow_binding_revisions (
     resources jsonb NOT NULL,
     actor_id uuid NOT NULL,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    run_as_user_id uuid NOT NULL,
+    message_trigger text,
+    CONSTRAINT workflow_binding_revisions_message_trigger_check CHECK (((message_trigger IS NULL) OR (message_trigger = ANY (ARRAY['direct'::text, 'any'::text, 'mentioned'::text, 'mentioned_or_reply'::text])))),
     CONSTRAINT workflow_binding_revisions_params_check CHECK ((octet_length((params)::text) <= 4194304)),
     CONSTRAINT workflow_binding_revisions_resources_check CHECK (((jsonb_typeof(resources) = 'object'::text) AND (octet_length((resources)::text) <= 262144))),
     CONSTRAINT workflow_binding_revisions_revision_check CHECK ((revision > 0))
@@ -6770,6 +4798,8 @@ CREATE TABLE public.workflow_bindings (
     active boolean DEFAULT false NOT NULL,
     channel_id uuid,
     thread_id uuid,
+    activated_at timestamp with time zone,
+    CONSTRAINT workflow_bindings_activation_shape CHECK ((active = (activated_at IS NOT NULL))),
     CONSTRAINT workflow_bindings_check CHECK (((thread_id IS NULL) OR (channel_id IS NOT NULL))),
     CONSTRAINT workflow_bindings_configuration_revision_check CHECK ((configuration_revision > 0)),
     CONSTRAINT workflow_bindings_state_revision_check CHECK ((state_revision > 0))
@@ -6876,7 +4906,10 @@ CREATE TABLE public.workflow_decision_reviewers (
     decision_id uuid NOT NULL,
     ordinal smallint NOT NULL,
     principal_id uuid NOT NULL,
-    notice_delivery_id uuid NOT NULL,
+    -- The member notice, or NULL when the reviewer had opted out of decision email (p08 P08-Q8).
+    notice_delivery_id uuid,
+    notice_opted_out boolean DEFAULT false NOT NULL,
+    CONSTRAINT workflow_decision_reviewers_notice_check CHECK (((notice_delivery_id IS NULL) = notice_opted_out)),
     CONSTRAINT workflow_decision_reviewers_ordinal_check CHECK (((ordinal >= 0) AND (ordinal <= 15)))
 );
 
@@ -7219,11 +5252,80 @@ CREATE TABLE public.workflow_message_destinations (
     principal_id uuid,
     recipient_address text,
     created_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
-    CONSTRAINT workflow_message_destinations_check CHECK ((((kind = 'channel'::text) AND (delivery_id IS NULL) AND (principal_id IS NULL) AND (recipient_address IS NULL)) OR ((kind = 'user'::text) AND (delivery_id IS NOT NULL) AND (principal_id IS NOT NULL) AND (recipient_address IS NOT NULL)) OR ((kind = 'reply'::text) AND (principal_id IS NULL) AND ((delivery_id IS NULL) = (recipient_address IS NULL))))),
+    in_app boolean GENERATED ALWAYS AS ((delivery_id IS NULL)) STORED,
+    CONSTRAINT workflow_message_destinations_check CHECK ((((kind = 'channel'::text) AND (delivery_id IS NULL) AND (principal_id IS NULL) AND (recipient_address IS NULL)) OR ((kind = 'user'::text) AND (principal_id IS NOT NULL) AND ((delivery_id IS NULL) = (recipient_address IS NULL))) OR ((kind = 'reply'::text) AND (principal_id IS NULL) AND ((delivery_id IS NULL) = (recipient_address IS NULL))))),
     CONSTRAINT workflow_message_destinations_kind_check CHECK ((kind = ANY (ARRAY['channel'::text, 'user'::text, 'reply'::text]))),
     CONSTRAINT workflow_message_destinations_ordinal_check CHECK (((ordinal >= 0) AND (ordinal <= 19))),
     CONSTRAINT workflow_message_destinations_recipient_address_check CHECK (((recipient_address IS NULL) OR ((btrim(recipient_address) <> ''::text) AND (octet_length(recipient_address) <= 998))))
 );
+
+
+--
+-- Name: workflow_message_intent_bindings; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.workflow_message_intent_bindings (
+    company_id uuid NOT NULL,
+    intent_id uuid NOT NULL,
+    binding_id uuid NOT NULL,
+    binding_revision bigint NOT NULL,
+    outcome text NOT NULL,
+    run_id uuid,
+    reason text,
+    created_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
+    CONSTRAINT workflow_message_intent_binding_outcome CHECK ((((outcome = 'admitted'::text) AND (run_id IS NOT NULL) AND (reason IS NULL)) OR ((outcome = ANY (ARRAY['refused'::text, 'failed'::text])) AND (run_id IS NULL) AND (reason IS NOT NULL)))),
+    CONSTRAINT workflow_message_intent_binding_reason CHECK (((reason IS NULL) OR ((octet_length(reason) >= 1) AND (octet_length(reason) <= 64)))),
+    CONSTRAINT workflow_message_intent_binding_revision CHECK ((binding_revision > 0))
+);
+
+
+--
+-- Name: workflow_message_intents; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.workflow_message_intents (
+    company_id uuid NOT NULL,
+    id uuid NOT NULL,
+    message_id uuid NOT NULL,
+    channel_id uuid NOT NULL,
+    thread_id uuid NOT NULL,
+    role text NOT NULL,
+    mentioned boolean NOT NULL,
+    admissible boolean NOT NULL,
+    origin text NOT NULL,
+    reply_to_message_id uuid,
+    reply_settled boolean DEFAULT false NOT NULL,
+    responder_principal_id uuid,
+    hop_count integer NOT NULL,
+    trace_channels uuid[] NOT NULL,
+    delivery_policy text NOT NULL,
+    correlation_id uuid NOT NULL,
+    state text DEFAULT 'pending'::text NOT NULL,
+    attempts smallint DEFAULT 0 NOT NULL,
+    available_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
+    worker_id uuid,
+    claim_generation uuid,
+    lease_expires_at timestamp with time zone,
+    outcome text,
+    matched_run_id uuid,
+    created_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
+    updated_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
+    CONSTRAINT workflow_message_intent_attempts CHECK (((attempts >= 0) AND (attempts <= 5))),
+    CONSTRAINT workflow_message_intent_delivery_policy CHECK ((delivery_policy = ANY (ARRAY['deliver'::text, 'in_app_only'::text]))),
+    CONSTRAINT workflow_message_intent_hops CHECK (((hop_count >= 0) AND (hop_count <= 64) AND (cardinality(trace_channels) <= 5))),
+    CONSTRAINT workflow_message_intent_origin CHECK ((origin = ANY (ARRAY['external'::text, 'internal'::text, 'application'::text]))),
+    CONSTRAINT workflow_message_intent_outcome CHECK ((((outcome IS NULL) OR (outcome = ANY (ARRAY['matched'::text, 'admitted'::text, 'none'::text]))) AND ((outcome = 'matched'::text) = (matched_run_id IS NOT NULL)))),
+    CONSTRAINT workflow_message_intent_role CHECK ((role = ANY (ARRAY['to'::text, 'cc'::text]))),
+    CONSTRAINT workflow_message_intent_reply_settled CHECK (((NOT reply_settled) OR ((reply_to_message_id IS NOT NULL) AND (outcome IS DISTINCT FROM 'matched'::text)))),
+    CONSTRAINT workflow_message_intent_state CHECK ((((state = 'pending'::text) AND (worker_id IS NULL) AND (claim_generation IS NULL) AND (lease_expires_at IS NULL) AND (outcome IS NULL) AND (attempts < 5)) OR ((state = 'claimed'::text) AND (worker_id IS NOT NULL) AND (claim_generation IS NOT NULL) AND (lease_expires_at IS NOT NULL) AND (outcome IS NULL) AND (attempts >= 1)) OR ((state = 'done'::text) AND (worker_id IS NULL) AND (claim_generation IS NULL) AND (lease_expires_at IS NULL) AND (outcome IS NOT NULL)) OR ((state = 'failed'::text) AND (worker_id IS NULL) AND (claim_generation IS NULL) AND (lease_expires_at IS NULL) AND (outcome IS NULL) AND (attempts = 5))))
+);
+
+
+--
+-- Name: TABLE workflow_message_intents; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.workflow_message_intents IS 'One accepted inbound message x channel association, committed with the message (p08 D1.3). Besides queueing workflow admission it is the only durable owner of the inbound relay trace (hop_count, trace_channels) that workflow replies continue, so rows must not be swept while their message exists.';
 
 
 --
@@ -7247,6 +5349,30 @@ CREATE TABLE public.workflow_poll_workers (
     after_company uuid,
     touched_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL
 );
+
+
+--
+-- Name: workflow_provisioning_commands; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.workflow_provisioning_commands (
+    company_id uuid NOT NULL,
+    command_key text NOT NULL,
+    request_digest text NOT NULL,
+    actor_id uuid NOT NULL,
+    result jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT workflow_provisioning_commands_command_key_check CHECK (((octet_length(command_key) >= 1) AND (octet_length(command_key) <= 128))),
+    CONSTRAINT workflow_provisioning_commands_request_digest_check CHECK ((request_digest ~ '^[0-9a-f]{64}$'::text)),
+    CONSTRAINT workflow_provisioning_commands_result_check CHECK (((jsonb_typeof(result) = 'object'::text) AND (octet_length((result)::text) <= 4096)))
+);
+
+
+--
+-- Name: TABLE workflow_provisioning_commands; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.workflow_provisioning_commands IS 'One "Create assistant channel" command per client key (p08 D2.4): the request digest decides replay or conflict, and the stored result is what a replay returns. The tool path needs none; its action receipt is the record.';
 
 
 --
@@ -7411,6 +5537,8 @@ CREATE TABLE public.workflow_runs (
     terminal_wakeup_sequence bigint,
     revision bigint DEFAULT 1 NOT NULL,
     rerun_of_run_id uuid,
+    delivery_policy text DEFAULT 'deliver'::text NOT NULL,
+    CONSTRAINT workflow_run_delivery_policy CHECK ((delivery_policy = ANY (ARRAY['deliver'::text, 'in_app_only'::text]))),
     CONSTRAINT workflow_rerun_shape CHECK (((rerun_of_run_id IS NULL) OR ((parent_run_id IS NULL) AND (rerun_of_run_id <> id)))),
     CONSTRAINT workflow_parent_shape CHECK ((((parent_run_id IS NULL) AND (parent_execution_id IS NULL)) OR ((parent_run_id IS NOT NULL) AND (parent_execution_id IS NOT NULL) AND (parent_run_id <> id)))),
     CONSTRAINT workflow_run_state CHECK ((state = ANY (ARRAY['queued'::text, 'running'::text, 'waiting'::text, 'succeeded'::text, 'failed'::text, 'cancelled'::text]))),
@@ -7447,6 +5575,8 @@ CREATE TABLE public.workflow_versions (
     bundle bytea NOT NULL,
     content_hash text NOT NULL,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    agent_ids uuid[] NOT NULL,
+    CONSTRAINT workflow_versions_agent_ids_check CHECK ((array_position(agent_ids, NULL::uuid) IS NULL)),
     CONSTRAINT workflow_versions_bundle_check CHECK (((octet_length(bundle) >= 1) AND (octet_length(bundle) <= 4194304))),
     CONSTRAINT workflow_versions_command_key_check CHECK (((octet_length(command_key) >= 1) AND (octet_length(command_key) <= 128))),
     CONSTRAINT workflow_versions_content_hash_check CHECK ((content_hash ~ '^[0-9a-f]{64}$'::text)),
@@ -7456,6 +5586,13 @@ CREATE TABLE public.workflow_versions (
     CONSTRAINT workflow_versions_template_origin_check CHECK (((template_origin IS NULL) OR ((jsonb_typeof(template_origin) = 'object'::text) AND (octet_length((template_origin)::text) <= 1024)))),
     CONSTRAINT workflow_versions_title_check CHECK (((octet_length(title) >= 1) AND (octet_length(title) <= 256)))
 );
+
+
+--
+-- Name: COLUMN workflow_versions.agent_ids; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.workflow_versions.agent_ids IS 'Display index only: the distinct agents frozen in this version''s bundle and its pinned children, written once with the row. No execution, admission or authorization path reads it.';
 
 
 --
@@ -7529,22 +5666,6 @@ ALTER TABLE ONLY public.agent_skills
 
 
 --
--- Name: agent_sub_agents agent_sub_agents_agent_position_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.agent_sub_agents
-    ADD CONSTRAINT agent_sub_agents_agent_position_key UNIQUE (agent_id, "position");
-
-
---
--- Name: agent_sub_agents agent_sub_agents_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.agent_sub_agents
-    ADD CONSTRAINT agent_sub_agents_pkey PRIMARY KEY (agent_id, sub_agent_id);
-
-
---
 -- Name: agents agents_company_id_id_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -7569,50 +5690,11 @@ ALTER TABLE ONLY public.agents
 
 
 --
--- Name: attention_source_events attention_source_events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.attention_source_events
-    ADD CONSTRAINT attention_source_events_pkey PRIMARY KEY (id);
-
-
---
--- Name: attention_source_events attention_source_events_source_command_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.attention_source_events
-    ADD CONSTRAINT attention_source_events_source_command_key UNIQUE (company_id, source_kind, source_id, command_id);
-
-
---
 -- Name: background_tasks background_tasks_company_id_id_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.background_tasks
     ADD CONSTRAINT background_tasks_company_id_id_key UNIQUE (company_id, id);
-
-
---
--- Name: background_tasks background_tasks_company_source_message_channel_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.background_tasks
-    ADD CONSTRAINT background_tasks_company_source_message_channel_key UNIQUE (company_id, source_message_uuid, channel_id);
-
-
---
--- Name: CONSTRAINT background_tasks_company_source_message_channel_key ON background_tasks; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON CONSTRAINT background_tasks_company_source_message_channel_key ON public.background_tasks IS 'One source message causes at most one task per channel, where the channel is the first of one addressed pipeline.';
-
-
---
--- Name: background_tasks background_tasks_company_source_schedule_run_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.background_tasks
-    ADD CONSTRAINT background_tasks_company_source_schedule_run_key UNIQUE (company_id, source_schedule_run_id);
 
 
 --
@@ -7624,35 +5706,11 @@ ALTER TABLE ONLY public.background_tasks
 
 
 --
--- Name: background_tasks background_tasks_schedule_scope_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.background_tasks
-    ADD CONSTRAINT background_tasks_schedule_scope_key UNIQUE (company_id, channel_id, thread_id, id);
-
-
---
 -- Name: binding_audit_events binding_audit_events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.binding_audit_events
     ADD CONSTRAINT binding_audit_events_pkey PRIMARY KEY (id);
-
-
---
--- Name: channel_agents channel_agents_channel_position_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.channel_agents
-    ADD CONSTRAINT channel_agents_channel_position_key UNIQUE (channel_id, "position");
-
-
---
--- Name: channel_agents channel_agents_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.channel_agents
-    ADD CONSTRAINT channel_agents_pkey PRIMARY KEY (channel_id, agent_id);
 
 
 --
@@ -7725,14 +5783,6 @@ ALTER TABLE ONLY public.channel_slugs
 
 ALTER TABLE ONLY public.channels
     ADD CONSTRAINT channels_company_id_id_key UNIQUE (company_id, id);
-
-
---
--- Name: channels channels_owner_agent_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.channels
-    ADD CONSTRAINT channels_owner_agent_key UNIQUE (owner_agent_id);
 
 
 --
@@ -7848,22 +5898,6 @@ ALTER TABLE ONLY public.company_resend_api_integrations
 
 
 --
--- Name: delegation_control_commands delegation_control_commands_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.delegation_control_commands
-    ADD CONSTRAINT delegation_control_commands_pkey PRIMARY KEY (id);
-
-
---
--- Name: delegation_control_commands delegation_control_commands_task_command_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.delegation_control_commands
-    ADD CONSTRAINT delegation_control_commands_task_command_key UNIQUE (task_id, command_id);
-
-
---
 -- Name: email_message_metadata email_message_metadata_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -7917,62 +5951,6 @@ ALTER TABLE ONLY public.external_threads
 
 ALTER TABLE ONLY public.external_threads
     ADD CONSTRAINT external_threads_pkey PRIMARY KEY (id);
-
-
---
--- Name: human_approvals human_approvals_company_id_id_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.human_approvals
-    ADD CONSTRAINT human_approvals_company_id_id_key UNIQUE (company_id, id);
-
-
---
--- Name: human_approvals human_approvals_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.human_approvals
-    ADD CONSTRAINT human_approvals_pkey PRIMARY KEY (id);
-
-
---
--- Name: human_approvals human_approvals_task_scope; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.human_approvals
-    ADD CONSTRAINT human_approvals_task_scope UNIQUE (company_id, task_id, id);
-
-
---
--- Name: human_approvals human_approvals_thread_step_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.human_approvals
-    ADD CONSTRAINT human_approvals_thread_step_key UNIQUE (company_id, channel_id, thread_id, step_key);
-
-
---
--- Name: human_approvals human_approvals_token_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.human_approvals
-    ADD CONSTRAINT human_approvals_token_key UNIQUE (token);
-
-
---
--- Name: human_task_completions human_task_completions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.human_task_completions
-    ADD CONSTRAINT human_task_completions_pkey PRIMARY KEY (task_id);
-
-
---
--- Name: human_task_completions human_task_completions_task_command_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.human_task_completions
-    ADD CONSTRAINT human_task_completions_task_command_key UNIQUE (task_id, command_id);
 
 
 --
@@ -8093,94 +6071,6 @@ ALTER TABLE ONLY public.internal_notes
 
 ALTER TABLE ONLY public.internal_notes
     ADD CONSTRAINT internal_notes_supersedes_key UNIQUE (supersedes_note_id);
-
-
---
--- Name: manual_handoffs manual_handoffs_company_id_id_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.manual_handoffs
-    ADD CONSTRAINT manual_handoffs_company_id_id_key UNIQUE (company_id, id);
-
-
---
--- Name: manual_handoffs manual_handoffs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.manual_handoffs
-    ADD CONSTRAINT manual_handoffs_pkey PRIMARY KEY (id);
-
-
---
--- Name: memory_cleanup_jobs memory_cleanup_jobs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.memory_cleanup_jobs
-    ADD CONSTRAINT memory_cleanup_jobs_pkey PRIMARY KEY (id);
-
-
---
--- Name: memory_cleanup_jobs memory_cleanup_jobs_provider_remote_database_id_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.memory_cleanup_jobs
-    ADD CONSTRAINT memory_cleanup_jobs_provider_remote_database_id_key UNIQUE (provider, remote_database_id);
-
-
---
--- Name: memory_provider_connections memory_provider_connections_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.memory_provider_connections
-    ADD CONSTRAINT memory_provider_connections_pkey PRIMARY KEY (company_id, provider);
-
-
---
--- Name: memory_provider_connections memory_provider_connections_provider_remote_database_id_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.memory_provider_connections
-    ADD CONSTRAINT memory_provider_connections_provider_remote_database_id_key UNIQUE (provider, remote_database_id);
-
-
---
--- Name: memory_provisioning_jobs memory_provisioning_jobs_company_id_provider_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.memory_provisioning_jobs
-    ADD CONSTRAINT memory_provisioning_jobs_company_id_provider_key UNIQUE (company_id, provider);
-
-
---
--- Name: memory_provisioning_jobs memory_provisioning_jobs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.memory_provisioning_jobs
-    ADD CONSTRAINT memory_provisioning_jobs_pkey PRIMARY KEY (id);
-
-
---
--- Name: memory_provisioning_jobs memory_provisioning_jobs_provider_remote_database_id_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.memory_provisioning_jobs
-    ADD CONSTRAINT memory_provisioning_jobs_provider_remote_database_id_key UNIQUE (provider, remote_database_id);
-
-
---
--- Name: memory_remote_resource_lifecycles memory_remote_resource_lifecycles_company_id_provider_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.memory_remote_resource_lifecycles
-    ADD CONSTRAINT memory_remote_resource_lifecycles_company_id_provider_key UNIQUE (company_id, provider);
-
-
---
--- Name: memory_remote_resource_lifecycles memory_remote_resource_lifecycles_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.memory_remote_resource_lifecycles
-    ADD CONSTRAINT memory_remote_resource_lifecycles_pkey PRIMARY KEY (provider, remote_database_id);
 
 
 --
@@ -8408,78 +6298,6 @@ ALTER TABLE ONLY public.principals
 
 
 --
--- Name: response_draft_evidence response_draft_evidence_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.response_draft_evidence
-    ADD CONSTRAINT response_draft_evidence_pkey PRIMARY KEY (draft_id, draft_version, id);
-
-
---
--- Name: response_draft_evidence response_draft_evidence_position_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.response_draft_evidence
-    ADD CONSTRAINT response_draft_evidence_position_key UNIQUE (draft_id, draft_version, "position");
-
-
---
--- Name: response_draft_publications response_draft_publications_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.response_draft_publications
-    ADD CONSTRAINT response_draft_publications_pkey PRIMARY KEY (draft_id);
-
-
---
--- Name: response_drafts response_drafts_company_id_id_version_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.response_drafts
-    ADD CONSTRAINT response_drafts_company_id_id_version_key UNIQUE (company_id, id, version);
-
-
---
--- Name: response_drafts response_drafts_company_message_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.response_drafts
-    ADD CONSTRAINT response_drafts_company_message_key UNIQUE (company_id, proposed_message_id);
-
-
---
--- Name: response_drafts response_drafts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.response_drafts
-    ADD CONSTRAINT response_drafts_pkey PRIMARY KEY (id, version);
-
-
---
--- Name: response_review_commands response_review_commands_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.response_review_commands
-    ADD CONSTRAINT response_review_commands_pkey PRIMARY KEY (company_id, command_id);
-
-
---
--- Name: response_reviews response_reviews_company_id_draft_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.response_reviews
-    ADD CONSTRAINT response_reviews_company_id_draft_key UNIQUE (company_id, draft_id, draft_version);
-
-
---
--- Name: response_reviews response_reviews_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.response_reviews
-    ADD CONSTRAINT response_reviews_pkey PRIMARY KEY (draft_id, draft_version);
-
-
---
 -- Name: runtime_metric_samples runtime_metric_samples_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -8503,11 +6321,11 @@ ALTER TABLE ONLY public.schedule_runs
 
 
 --
--- Name: schedule_runs schedule_runs_schedule_slot_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: schedule_runs schedule_runs_command_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.schedule_runs
-    ADD CONSTRAINT schedule_runs_schedule_slot_key UNIQUE (schedule_id, scheduled_for);
+    ADD CONSTRAINT schedule_runs_command_key UNIQUE (company_id, schedule_id, command_key);
 
 
 --
@@ -8535,54 +6353,6 @@ ALTER TABLE ONLY public.skills
 
 
 --
--- Name: start_agent_task_commands start_agent_task_commands_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.start_agent_task_commands
-    ADD CONSTRAINT start_agent_task_commands_pkey PRIMARY KEY (company_id, command_id);
-
-
---
--- Name: task_agent_instruction_notes task_agent_instruction_notes_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.task_agent_instruction_notes
-    ADD CONSTRAINT task_agent_instruction_notes_pkey PRIMARY KEY (instruction_id, note_id);
-
-
---
--- Name: task_agent_instruction_notes task_agent_instruction_notes_position_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.task_agent_instruction_notes
-    ADD CONSTRAINT task_agent_instruction_notes_position_key UNIQUE (instruction_id, "position");
-
-
---
--- Name: task_agent_instructions task_agent_instructions_company_command_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.task_agent_instructions
-    ADD CONSTRAINT task_agent_instructions_company_command_key UNIQUE (company_id, command_id);
-
-
---
--- Name: task_agent_instructions task_agent_instructions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.task_agent_instructions
-    ADD CONSTRAINT task_agent_instructions_pkey PRIMARY KEY (id);
-
-
---
--- Name: task_approval_waits task_approval_waits_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.task_approval_waits
-    ADD CONSTRAINT task_approval_waits_pkey PRIMARY KEY (task_id);
-
-
---
 -- Name: task_attempts task_attempts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -8599,46 +6369,6 @@ ALTER TABLE ONLY public.task_attempts
 
 
 --
--- Name: task_channel_targets task_channel_targets_channel_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.task_channel_targets
-    ADD CONSTRAINT task_channel_targets_channel_key UNIQUE (task_id, channel_id);
-
-
---
--- Name: task_channel_targets task_channel_targets_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.task_channel_targets
-    ADD CONSTRAINT task_channel_targets_pkey PRIMARY KEY (task_id, "position");
-
-
---
--- Name: task_harness_invocations task_harness_invocations_company_id_task_id_run_id_id_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.task_harness_invocations
-    ADD CONSTRAINT task_harness_invocations_company_id_task_id_run_id_id_key UNIQUE (company_id, task_id, run_id, id);
-
-
---
--- Name: task_harness_invocations task_harness_invocations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.task_harness_invocations
-    ADD CONSTRAINT task_harness_invocations_pkey PRIMARY KEY (id);
-
-
---
--- Name: task_harness_invocations task_harness_invocations_run_id_model_turn_call_ordinal_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.task_harness_invocations
-    ADD CONSTRAINT task_harness_invocations_run_id_model_turn_call_ordinal_key UNIQUE (run_id, model_turn, call_ordinal);
-
-
---
 -- Name: task_harness_runs task_harness_runs_company_id_task_id_id_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -8652,182 +6382,6 @@ ALTER TABLE ONLY public.task_harness_runs
 
 ALTER TABLE ONLY public.task_harness_runs
     ADD CONSTRAINT task_harness_runs_pkey PRIMARY KEY (id);
-
-
---
--- Name: task_outreach_replies task_outreach_replies_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.task_outreach_replies
-    ADD CONSTRAINT task_outreach_replies_pkey PRIMARY KEY (id);
-
-
---
--- Name: task_outreach_replies task_outreach_replies_response_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.task_outreach_replies
-    ADD CONSTRAINT task_outreach_replies_response_key UNIQUE (response_association_id);
-
-
---
--- Name: task_outreach_targets task_outreach_targets_company_id_id_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.task_outreach_targets
-    ADD CONSTRAINT task_outreach_targets_company_id_id_key UNIQUE (company_id, id);
-
-
---
--- Name: task_outreach_targets task_outreach_targets_company_outreach_id_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.task_outreach_targets
-    ADD CONSTRAINT task_outreach_targets_company_outreach_id_key UNIQUE (company_id, outreach_id, id);
-
-
---
--- Name: task_outreach_targets task_outreach_targets_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.task_outreach_targets
-    ADD CONSTRAINT task_outreach_targets_pkey PRIMARY KEY (outreach_id, email);
-
-
---
--- Name: task_outreaches task_outreaches_company_id_id_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.task_outreaches
-    ADD CONSTRAINT task_outreaches_company_id_id_key UNIQUE (company_id, id);
-
-
---
--- Name: task_outreaches task_outreaches_company_task_id_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.task_outreaches
-    ADD CONSTRAINT task_outreaches_company_task_id_key UNIQUE (company_id, task_id, id);
-
-
---
--- Name: task_outreaches task_outreaches_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.task_outreaches
-    ADD CONSTRAINT task_outreaches_pkey PRIMARY KEY (id);
-
-
---
--- Name: task_outreaches task_outreaches_task_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.task_outreaches
-    ADD CONSTRAINT task_outreaches_task_key UNIQUE (task_id, outreach_key);
-
-
---
--- Name: task_ownership_events task_ownership_events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.task_ownership_events
-    ADD CONSTRAINT task_ownership_events_pkey PRIMARY KEY (id);
-
-
---
--- Name: task_ownership_events task_ownership_events_task_command_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.task_ownership_events
-    ADD CONSTRAINT task_ownership_events_task_command_key UNIQUE (task_id, command_id);
-
-
---
--- Name: task_ownership_events task_ownership_events_task_sequence_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.task_ownership_events
-    ADD CONSTRAINT task_ownership_events_task_sequence_key UNIQUE (task_id, sequence);
-
-
---
--- Name: task_status_events task_status_events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.task_status_events
-    ADD CONSTRAINT task_status_events_pkey PRIMARY KEY (id);
-
-
---
--- Name: task_status_events task_status_events_task_sequence_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.task_status_events
-    ADD CONSTRAINT task_status_events_task_sequence_key UNIQUE (task_id, sequence);
-
-
---
--- Name: thread_handoff_events thread_handoff_events_command_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.thread_handoff_events
-    ADD CONSTRAINT thread_handoff_events_command_key UNIQUE (company_id, handoff_id, command_id);
-
-
---
--- Name: thread_handoff_events thread_handoff_events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.thread_handoff_events
-    ADD CONSTRAINT thread_handoff_events_pkey PRIMARY KEY (id);
-
-
---
--- Name: thread_handoff_runs thread_handoff_runs_generation_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.thread_handoff_runs
-    ADD CONSTRAINT thread_handoff_runs_generation_key UNIQUE (company_id, generation);
-
-
---
--- Name: thread_handoff_runs thread_handoff_runs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.thread_handoff_runs
-    ADD CONSTRAINT thread_handoff_runs_pkey PRIMARY KEY (company_id, task_id);
-
-
---
--- Name: thread_handoffs thread_handoffs_company_id_generation_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.thread_handoffs
-    ADD CONSTRAINT thread_handoffs_company_id_generation_key UNIQUE (company_id, generation);
-
-
---
--- Name: thread_handoffs thread_handoffs_company_id_id_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.thread_handoffs
-    ADD CONSTRAINT thread_handoffs_company_id_id_key UNIQUE (company_id, id);
-
-
---
--- Name: thread_handoffs thread_handoffs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.thread_handoffs
-    ADD CONSTRAINT thread_handoffs_pkey PRIMARY KEY (id);
-
-
---
--- Name: thread_handoffs thread_handoffs_thread_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.thread_handoffs
-    ADD CONSTRAINT thread_handoffs_thread_key UNIQUE (company_id, thread_id);
 
 
 --
@@ -9356,6 +6910,17 @@ ALTER TABLE ONLY public.workflow_decision_reviewers
 
 CREATE UNIQUE INDEX workflow_decision_execution ON public.workflow_decisions(company_id,run_id,execution_id) WHERE subject_kind='business';
 CREATE UNIQUE INDEX workflow_decision_action ON public.workflow_decisions(company_id,run_id,execution_id,action_invocation_id) WHERE subject_kind='action_approval';
+-- A decision id names one decision across companies: the notice link names only the decision,
+-- and the decision page finds its company by it (p08 DV-7).
+CREATE UNIQUE INDEX workflow_decision_id ON public.workflow_decisions(id);
+-- Every open decision in a company, for the work list (both views: My work probes each one on the
+-- reviewer key, which stays bounded by open decisions as a reviewer's history grows) and the
+-- operational summary (P08-D4 §D4.2; logs/b4a-index-explain.log).
+CREATE INDEX workflow_decisions_open ON public.workflow_decisions(company_id, run_id) WHERE submitted_at IS NULL;
+-- Bounded decision history, including closed artifacts in sibling revision rounds.
+CREATE INDEX workflow_decisions_history ON public.workflow_decisions(company_id, run_id, created_at DESC, id DESC);
+-- Failed schedule materializations in the work list's refusal window (P08-D4 §D4.2).
+CREATE INDEX schedule_runs_failed_recent ON public.schedule_runs(company_id, created_at DESC) WHERE materialization_status = 'failed';
 ALTER TABLE ONLY public.workflow_decisions ADD UNIQUE(company_id,run_id,execution_id,id);
 ALTER TABLE ONLY public.workflow_decisions ADD UNIQUE(company_id,wait_id);
 
@@ -9577,6 +7142,30 @@ ALTER TABLE ONLY public.workflow_message_destinations
 
 
 --
+-- Name: workflow_message_intent_bindings workflow_message_intent_bindings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_message_intent_bindings
+    ADD CONSTRAINT workflow_message_intent_bindings_pkey PRIMARY KEY (company_id, intent_id, binding_id);
+
+
+--
+-- Name: workflow_message_intents workflow_message_intents_association_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_message_intents
+    ADD CONSTRAINT workflow_message_intents_association_key UNIQUE (company_id, message_id, channel_id);
+
+
+--
+-- Name: workflow_message_intents workflow_message_intents_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_message_intents
+    ADD CONSTRAINT workflow_message_intents_pkey PRIMARY KEY (company_id, id);
+
+
+--
 -- Name: workflow_executions workflow_one_predecessor; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -9598,6 +7187,14 @@ ALTER TABLE ONLY public.workflow_poll_companies
 
 ALTER TABLE ONLY public.workflow_poll_workers
     ADD CONSTRAINT workflow_poll_workers_pkey PRIMARY KEY (worker_id);
+
+
+--
+-- Name: workflow_provisioning_commands workflow_provisioning_commands_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_provisioning_commands
+    ADD CONSTRAINT workflow_provisioning_commands_pkey PRIMARY KEY (company_id, command_key);
 
 
 --
@@ -9694,6 +7291,20 @@ ALTER TABLE ONLY public.workflow_runs
 
 ALTER TABLE ONLY public.workflow_runs
     ADD CONSTRAINT workflow_runs_pkey PRIMARY KEY (company_id, id);
+
+-- The run listings' keyset order, company-wide and by binding (p08 B3b-1).
+CREATE INDEX workflow_runs_newest ON public.workflow_runs(company_id, created_at DESC, id DESC);
+CREATE INDEX workflow_runs_binding_newest ON public.workflow_runs(company_id, binding_id, created_at DESC, id DESC);
+-- The retargeted surfaces (P08-D4): attention, run counts and thread activity.
+CREATE INDEX workflow_runs_attention ON public.workflow_runs(company_id, state, created_at DESC) WHERE state IN ('waiting', 'failed');
+CREATE INDEX workflow_runs_reruns ON public.workflow_runs(company_id, rerun_of_run_id) WHERE rerun_of_run_id IS NOT NULL;
+CREATE INDEX workflow_runs_open_by_channel ON public.workflow_runs(company_id, channel_id, state) WHERE state IN ('queued', 'running', 'waiting');
+CREATE INDEX workflow_runs_by_thread ON public.workflow_runs(company_id, thread_id, created_at DESC) WHERE thread_id IS NOT NULL;
+-- The run page's reads by run (p09 B2a, F029): its controls, the message that started it and its
+-- children. Receipts and reconciliations are reached through the run-led dispatch key instead.
+CREATE INDEX workflow_control_commands_by_run ON public.workflow_control_commands(company_id, run_id, created_at DESC, command_key DESC);
+CREATE INDEX workflow_message_intent_bindings_by_run ON public.workflow_message_intent_bindings(company_id, run_id) WHERE run_id IS NOT NULL;
+CREATE INDEX workflow_run_parents_by_parent ON public.workflow_run_parents(company_id, parent_run_id, parent_execution_id);
 
 
 --
@@ -9792,13 +7403,6 @@ CREATE INDEX agent_skills_skill_idx ON public.agent_skills USING btree (skill_id
 
 
 --
--- Name: agent_sub_agents_sub_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX agent_sub_agents_sub_idx ON public.agent_sub_agents USING btree (sub_agent_id, agent_id);
-
-
---
 -- Name: agents_company_created_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -9848,31 +7452,10 @@ CREATE INDEX background_tasks_correlation_idx ON public.background_tasks USING b
 
 
 --
--- Name: background_tasks_pending_ready_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX background_tasks_pending_ready_idx ON public.background_tasks USING btree (company_id, run_at, created_at, id) WHERE ((status = 'pending'::text) AND (owner_principal_kind = 'agent'::text));
-
-
---
 -- Name: background_tasks_processing_lease_idx; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX background_tasks_processing_lease_idx ON public.background_tasks USING btree (lock_expires_at, id) WHERE (status = 'processing'::text);
-
-
---
--- Name: background_tasks_schedule_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX background_tasks_schedule_idx ON public.background_tasks USING btree (((payload ->> 'schedule_id'::text))) WHERE (task_type = 'scheduled_agent_run'::text);
-
-
---
--- Name: background_tasks_thread_correlation_match_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX background_tasks_thread_correlation_match_idx ON public.background_tasks USING btree (company_id, thread_id, correlation_id, queue_kind, ((task_type = ANY (ARRAY['email_agent_dispatch'::text, 'scheduled_agent_run'::text]))) DESC, created_at DESC, id) INCLUDE (task_type) WHERE (thread_id IS NOT NULL);
 
 
 --
@@ -9883,38 +7466,10 @@ CREATE INDEX background_tasks_thread_idx ON public.background_tasks USING btree 
 
 
 --
--- Name: background_tasks_unsettled_channel_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX background_tasks_unsettled_channel_idx ON public.background_tasks USING btree (company_id, channel_id) WHERE (status = ANY (ARRAY['pending'::text, 'processing'::text, 'pending_approval'::text, 'waiting_for_third_party_reply'::text, 'stopped'::text, 'failed'::text, 'dead_letter'::text]));
-
-
---
--- Name: background_tasks_unsettled_owner_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX background_tasks_unsettled_owner_idx ON public.background_tasks USING btree (company_id, owner_principal_id) WHERE (status = ANY (ARRAY['pending'::text, 'processing'::text, 'pending_approval'::text, 'waiting_for_third_party_reply'::text, 'stopped'::text, 'failed'::text, 'dead_letter'::text]));
-
-
---
--- Name: background_tasks_waiting_due_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX background_tasks_waiting_due_idx ON public.background_tasks USING btree (wait_expires_at, id) WHERE ((status = 'waiting_for_third_party_reply'::text) AND (wait_expires_at IS NOT NULL));
-
-
---
 -- Name: binding_audit_events_binding_idx; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX binding_audit_events_binding_idx ON public.binding_audit_events USING btree (company_id, binding_id, created_at DESC, id DESC);
-
-
---
--- Name: channel_agents_agent_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX channel_agents_agent_idx ON public.channel_agents USING btree (agent_id, channel_id);
 
 
 --
@@ -9964,6 +7519,13 @@ CREATE INDEX channel_principal_grants_principal_idx ON public.channel_principal_
 --
 
 CREATE INDEX channel_schedules_channel_idx ON public.channel_schedules USING btree (channel_id, created_at DESC, id DESC);
+
+
+--
+-- Name: channel_schedules_binding_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX channel_schedules_binding_idx ON public.channel_schedules USING btree (company_id, binding_id);
 
 
 --
@@ -10044,13 +7606,6 @@ CREATE UNIQUE INDEX company_model_connections_one_default_idx ON public.company_
 
 
 --
--- Name: delegation_control_commands_outreach_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX delegation_control_commands_outreach_idx ON public.delegation_control_commands USING btree (outreach_id, occurred_at, id);
-
-
---
 -- Name: email_message_metadata_company_rfc_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -10093,27 +7648,6 @@ CREATE INDEX external_threads_thread_idx ON public.external_threads USING btree 
 
 
 --
--- Name: human_approvals_channel_created_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX human_approvals_channel_created_idx ON public.human_approvals USING btree (company_id, channel_id, created_at DESC, id DESC);
-
-
---
--- Name: human_approvals_pending_expiry_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX human_approvals_pending_expiry_idx ON public.human_approvals USING btree (expires_at, id) WHERE (status = 'pending'::text);
-
-
---
--- Name: human_approvals_task_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX human_approvals_task_idx ON public.human_approvals USING btree (task_id) WHERE (task_id IS NOT NULL);
-
-
---
 -- Name: inbound_events_claimable_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -10146,24 +7680,6 @@ CREATE INDEX inbound_events_processing_lease_idx ON public.inbound_events USING 
 --
 
 CREATE INDEX integration_installations_company_idx ON public.integration_installations USING btree (company_id, transport, installed_at DESC, id DESC);
-
-
---
--- Name: memory_cleanup_jobs_due_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX memory_cleanup_jobs_due_idx ON public.memory_cleanup_jobs USING btree (available_at, created_at, id) WHERE (status = 'pending'::text);
-
-
---
--- Name: memory_provisioning_jobs_due_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX memory_provisioning_jobs_due_idx ON public.memory_provisioning_jobs USING btree ((
-CASE phase
-    WHEN 'waiting_ready'::text THEN next_poll_at
-    ELSE available_at
-END), created_at, id) WHERE (status = 'pending'::text);
 
 
 --
@@ -10234,13 +7750,6 @@ CREATE INDEX message_deliveries_sending_lease_idx ON public.message_deliveries U
 --
 
 CREATE UNIQUE INDEX message_deliveries_standalone_key_key ON public.message_deliveries USING btree (transport, idempotency_key) WHERE (destination_binding_id IS NULL);
-
-
---
--- Name: message_deliveries_task_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX message_deliveries_task_idx ON public.message_deliveries USING btree (task_id) WHERE (task_id IS NOT NULL);
 
 
 --
@@ -10363,34 +7872,6 @@ CREATE UNIQUE INDEX principals_company_user_key ON public.principals USING btree
 
 
 --
--- Name: response_drafts_one_pending_version_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX response_drafts_one_pending_version_idx ON public.response_drafts USING btree (id) WHERE (status = 'pending_review'::text);
-
-
---
--- Name: response_drafts_reviewer_pending_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX response_drafts_reviewer_pending_idx ON public.response_drafts USING btree (company_id, reviewer_principal_id, created_at, id) WHERE (status = 'pending_review'::text);
-
-
---
--- Name: response_drafts_scope_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX response_drafts_scope_idx ON public.response_drafts USING btree (company_id, channel_id, thread_id, id, version DESC);
-
-
---
--- Name: response_reviews_pending_expiry_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX response_reviews_pending_expiry_idx ON public.response_reviews USING btree (expires_at, draft_id) WHERE (status = 'pending'::text);
-
-
---
 -- Name: schedule_runs_materialization_expired_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -10412,6 +7893,14 @@ CREATE INDEX schedule_runs_schedule_created_idx ON public.schedule_runs USING bt
 
 
 --
+-- Name: schedule_runs_schedule_slot_key; Type: INDEX; Schema: public; Owner: -
+--
+
+-- A cadence slot is captured once; run-now occurrences carry a command key and never collide.
+CREATE UNIQUE INDEX schedule_runs_schedule_slot_key ON public.schedule_runs USING btree (schedule_id, scheduled_for) WHERE (command_key IS NULL);
+
+
+--
 -- Name: skills_library_slug_key; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -10419,101 +7908,10 @@ CREATE UNIQUE INDEX skills_library_slug_key ON public.skills USING btree (slug) 
 
 
 --
--- Name: task_channel_targets_channel_task_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX task_channel_targets_channel_task_idx ON public.task_channel_targets USING btree (company_id, channel_id, task_id);
-
-
---
--- Name: task_channel_targets_thread_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX task_channel_targets_thread_idx ON public.task_channel_targets USING btree (company_id, channel_id, thread_id);
-
-
---
--- Name: task_harness_runs_scope; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX task_harness_runs_scope ON public.task_harness_runs USING btree (task_id, agent_id, ownership_version);
-
-
---
 -- Name: task_harness_runs_task; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX task_harness_runs_task ON public.task_harness_runs USING btree (company_id, task_id);
-
-
---
--- Name: task_outreach_replies_target_received_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX task_outreach_replies_target_received_idx ON public.task_outreach_replies USING btree (target_id, received_at, id);
-
-
---
--- Name: task_outreach_targets_delivery_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX task_outreach_targets_delivery_idx ON public.task_outreach_targets USING btree (delivery_id) WHERE (delivery_id IS NOT NULL);
-
-
---
--- Name: task_outreach_targets_email_waiting_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX task_outreach_targets_email_waiting_idx ON public.task_outreach_targets USING btree (email, outreach_id) WHERE (responded_at IS NULL);
-
-
---
--- Name: task_outreach_targets_request_message_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX task_outreach_targets_request_message_idx ON public.task_outreach_targets USING btree (request_message_id) WHERE (request_message_id IS NOT NULL);
-
-
---
--- Name: task_outreach_targets_response_association_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX task_outreach_targets_response_association_idx ON public.task_outreach_targets USING btree (response_association_id) WHERE (response_association_id IS NOT NULL);
-
-
---
--- Name: task_outreaches_due_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX task_outreaches_due_idx ON public.task_outreaches USING btree (expires_at, id) WHERE ((status = 'waiting'::text) AND (expires_at IS NOT NULL));
-
-
---
--- Name: task_outreaches_task_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX task_outreaches_task_idx ON public.task_outreaches USING btree (task_id);
-
-
---
--- Name: task_outreaches_task_status_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX task_outreaches_task_status_idx ON public.task_outreaches USING btree (task_id, status);
-
-
---
--- Name: task_status_events_company_correlation_timeline_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX task_status_events_company_correlation_timeline_idx ON public.task_status_events USING btree (company_id, correlation_id, transitioned_at, task_id, sequence, id);
-
-
---
--- Name: task_status_events_task_history_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX task_status_events_task_history_idx ON public.task_status_events USING btree (task_id, transitioned_at, sequence, id);
 
 
 --
@@ -10598,6 +7996,20 @@ CREATE INDEX workflow_message_destinations_run ON public.workflow_message_destin
 
 
 --
+-- Name: workflow_message_intents_claim; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX workflow_message_intents_claim ON public.workflow_message_intents USING btree (company_id, available_at, id) WHERE (state = ANY (ARRAY['pending'::text, 'claimed'::text]));
+
+
+--
+-- Name: workflow_message_intent_bindings_binding; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX workflow_message_intent_bindings_binding ON public.workflow_message_intent_bindings USING btree (company_id, binding_id, created_at DESC) WHERE (outcome <> 'admitted'::text);
+
+
+--
 -- Name: workflow_one_execution_job; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -10642,66 +8054,10 @@ CREATE TRIGGER agent_skills_scope_check BEFORE INSERT OR UPDATE ON public.agent_
 
 
 --
--- Name: attention_source_events attention_source_events_immutable; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER attention_source_events_immutable BEFORE DELETE OR UPDATE ON public.attention_source_events FOR EACH ROW EXECUTE FUNCTION public.attention_source_events_are_immutable();
-
-
---
--- Name: background_tasks background_tasks_bump_attention_version; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER background_tasks_bump_attention_version BEFORE UPDATE OF owner_principal_id, owner_principal_kind ON public.background_tasks FOR EACH ROW WHEN ((new.queue_kind = 'legacy'::text)) EXECUTE FUNCTION public.bump_task_attention_version_for_owner_change();
-
-
---
--- Name: background_tasks background_tasks_initialize_ownership; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER background_tasks_initialize_ownership BEFORE INSERT ON public.background_tasks FOR EACH ROW WHEN ((new.queue_kind = 'legacy'::text)) EXECUTE FUNCTION public.initialize_task_ownership();
-
-
---
--- Name: background_tasks background_tasks_notify_activity; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER background_tasks_notify_activity AFTER INSERT OR UPDATE OF status ON public.background_tasks FOR EACH ROW WHEN (((new.queue_kind = 'legacy'::text) AND (new.thread_id IS NOT NULL))) EXECUTE FUNCTION public.notify_thread_activity();
-
-
---
--- Name: background_tasks background_tasks_notify_attention; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER background_tasks_notify_attention AFTER INSERT OR UPDATE OF status, owner_principal_id, owner_principal_kind, business_priority, business_due_at, attention_version ON public.background_tasks FOR EACH ROW WHEN ((new.queue_kind = 'legacy'::text)) EXECUTE FUNCTION public.notify_attention_changed('task');
-
-
---
--- Name: background_tasks background_tasks_notify_attention_delete; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER background_tasks_notify_attention_delete AFTER DELETE ON public.background_tasks FOR EACH ROW WHEN ((old.queue_kind = 'legacy'::text)) EXECUTE FUNCTION public.notify_attention_changed('task');
-
-
---
 -- Name: background_tasks background_tasks_preserve_queue_identity; Type: TRIGGER; Schema: public; Owner: -
 --
 
 CREATE TRIGGER background_tasks_preserve_queue_identity BEFORE UPDATE OF queue_kind, workflow_execution_id ON public.background_tasks FOR EACH ROW EXECUTE FUNCTION public.preserve_background_task_queue_identity();
-
-
---
--- Name: background_tasks background_tasks_record_initial_ownership; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER background_tasks_record_initial_ownership AFTER INSERT ON public.background_tasks FOR EACH ROW WHEN ((new.queue_kind = 'legacy'::text)) EXECUTE FUNCTION public.record_initial_task_ownership();
-
-
---
--- Name: background_tasks background_tasks_record_status_event; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER background_tasks_record_status_event AFTER INSERT OR UPDATE OF status ON public.background_tasks FOR EACH ROW WHEN ((new.queue_kind = 'legacy'::text)) EXECUTE FUNCTION public.record_task_status_event();
 
 
 --
@@ -10719,27 +8075,6 @@ CREATE TRIGGER binding_audit_events_append_only BEFORE DELETE OR UPDATE ON publi
 
 
 --
--- Name: channel_agents channel_agents_scope_check; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER channel_agents_scope_check BEFORE INSERT OR UPDATE ON public.channel_agents FOR EACH ROW EXECUTE FUNCTION public.enforce_channel_agent_scope();
-
-
---
--- Name: channel_agents channel_assignment_active_agent_check; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE CONSTRAINT TRIGGER channel_assignment_active_agent_check AFTER INSERT OR DELETE OR UPDATE ON public.channel_agents DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.enforce_enabled_channel_has_active_agent();
-
-
---
--- Name: channels channels_delete_target_tasks; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER channels_delete_target_tasks BEFORE DELETE ON public.channels FOR EACH ROW EXECUTE FUNCTION public.delete_channel_target_tasks();
-
-
---
 -- Name: company_mcp_connections company_mcp_endpoint_immutable; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -10753,39 +8088,6 @@ CREATE TRIGGER company_mcp_endpoint_immutable BEFORE UPDATE ON public.company_mc
 CREATE TRIGGER delivery_actionable_notification AFTER DELETE OR UPDATE OF status ON public.message_deliveries FOR EACH ROW EXECUTE FUNCTION public.notification_from_delivery();
 
 
---
--- Name: channels enabled_channel_active_agent_check; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE CONSTRAINT TRIGGER enabled_channel_active_agent_check AFTER INSERT OR UPDATE OF enabled ON public.channels DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.enforce_enabled_channel_has_active_agent();
-
-
---
--- Name: attention_source_events handoff_actionable_notification; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER handoff_actionable_notification AFTER INSERT ON public.attention_source_events FOR EACH ROW EXECUTE FUNCTION public.notification_from_attention_source();
-
-
---
--- Name: manual_handoffs handoff_notification_delete; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER handoff_notification_delete AFTER DELETE ON public.manual_handoffs FOR EACH ROW EXECUTE FUNCTION public.notification_withdraw_deleted_source('handoff');
-
-
---
--- Name: human_approvals human_approvals_notify_attention; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER human_approvals_notify_attention AFTER INSERT OR DELETE OR UPDATE OF status, approver_principal_id, expires_at ON public.human_approvals FOR EACH ROW EXECUTE FUNCTION public.notify_attention_changed('approval');
-
-
---
--- Name: human_approvals human_approvals_notify_chain; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER human_approvals_notify_chain AFTER INSERT OR UPDATE OF status ON public.human_approvals FOR EACH ROW WHEN ((new.task_id IS NOT NULL)) EXECUTE FUNCTION public.notify_task_chain_changed();
 
 
 --
@@ -10824,13 +8126,6 @@ CREATE TRIGGER internal_notes_notify AFTER INSERT ON public.internal_notes FOR E
 
 
 --
--- Name: agents library_agent_delete_guard; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER library_agent_delete_guard BEFORE DELETE ON public.agents FOR EACH ROW EXECUTE FUNCTION public.prevent_assigned_library_agent_delete();
-
-
---
 -- Name: skills library_skill_delete_guard; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -10838,52 +8133,10 @@ CREATE TRIGGER library_skill_delete_guard BEFORE DELETE ON public.skills FOR EAC
 
 
 --
--- Name: manual_handoffs manual_handoffs_bump_cleanup_version; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER manual_handoffs_bump_cleanup_version BEFORE UPDATE OF responsible_principal_id ON public.manual_handoffs FOR EACH ROW EXECUTE FUNCTION public.bump_handoff_version_for_responsibility_cleanup();
-
-
---
--- Name: manual_handoffs manual_handoffs_notify_attention; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER manual_handoffs_notify_attention AFTER INSERT OR DELETE OR UPDATE OF status, responsible_principal_id, business_priority, business_due_at, version ON public.manual_handoffs FOR EACH ROW EXECUTE FUNCTION public.notify_attention_changed('handoff');
-
-
---
--- Name: memory_provider_connections memory_connection_lifecycle_compatibility_delete; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER memory_connection_lifecycle_compatibility_delete BEFORE DELETE ON public.memory_provider_connections FOR EACH ROW EXECUTE FUNCTION public.retire_memory_lifecycle_for_legacy_connection();
-
-
---
--- Name: memory_provider_connections memory_connection_lifecycle_compatibility_insert; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER memory_connection_lifecycle_compatibility_insert AFTER INSERT ON public.memory_provider_connections FOR EACH ROW EXECUTE FUNCTION public.create_memory_lifecycle_for_legacy_connection();
-
-
---
--- Name: memory_provisioning_jobs memory_provisioning_phase_compatibility_update; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER memory_provisioning_phase_compatibility_update BEFORE UPDATE ON public.memory_provisioning_jobs FOR EACH ROW EXECUTE FUNCTION public.synchronize_legacy_memory_provisioning_phase();
-
-
---
 -- Name: message_deliveries message_deliveries_notify_attention; Type: TRIGGER; Schema: public; Owner: -
 --
 
 CREATE TRIGGER message_deliveries_notify_attention AFTER INSERT OR DELETE OR UPDATE OF status ON public.message_deliveries FOR EACH ROW EXECUTE FUNCTION public.notify_attention_changed('delivery');
-
-
---
--- Name: message_deliveries message_deliveries_notify_chain; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER message_deliveries_notify_chain AFTER INSERT OR UPDATE OF status ON public.message_deliveries FOR EACH ROW EXECUTE FUNCTION public.notify_task_chain_changed();
 
 
 --
@@ -10929,91 +8182,7 @@ CREATE TRIGGER notification_principal_delete_recheck BEFORE DELETE ON public.pri
 
 
 --
--- Name: task_outreaches outreach_actionable_notification; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER outreach_actionable_notification AFTER DELETE OR UPDATE OF status ON public.task_outreaches FOR EACH ROW EXECUTE FUNCTION public.notification_from_outreach();
-
-
---
--- Name: channel_agents owned_channel_assignment_position_zero_check; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE CONSTRAINT TRIGGER owned_channel_assignment_position_zero_check AFTER INSERT OR DELETE OR UPDATE ON public.channel_agents DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.enforce_owned_channel_position_zero();
-
-
---
--- Name: channels owned_channel_delete_guard; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER owned_channel_delete_guard BEFORE DELETE ON public.channels FOR EACH ROW EXECUTE FUNCTION public.prevent_owned_channel_delete();
-
-
---
--- Name: channels owned_channel_position_zero_check; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE CONSTRAINT TRIGGER owned_channel_position_zero_check AFTER INSERT OR UPDATE OF owner_agent_id ON public.channels DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.enforce_owned_channel_position_zero();
-
-
---
--- Name: principals principals_release_owned_tasks; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER principals_release_owned_tasks BEFORE DELETE ON public.principals FOR EACH ROW WHEN ((old.kind = ANY (ARRAY['person'::text, 'agent'::text]))) EXECUTE FUNCTION public.release_tasks_for_removed_principal();
-
-
---
--- Name: principals principals_release_owned_tasks_on_demotion; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER principals_release_owned_tasks_on_demotion BEFORE UPDATE OF kind ON public.principals FOR EACH ROW WHEN (((old.kind = ANY (ARRAY['person'::text, 'agent'::text])) AND (new.kind = 'external'::text))) EXECUTE FUNCTION public.release_tasks_for_removed_principal();
-
-
---
--- Name: delegation_control_commands require_legacy_auxiliary_task; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER require_legacy_auxiliary_task BEFORE INSERT OR UPDATE ON public.delegation_control_commands FOR EACH ROW EXECUTE FUNCTION public.require_legacy_auxiliary_task();
-
-
---
--- Name: human_task_completions require_legacy_auxiliary_task; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER require_legacy_auxiliary_task BEFORE INSERT OR UPDATE ON public.human_task_completions FOR EACH ROW EXECUTE FUNCTION public.require_legacy_auxiliary_task();
-
-
---
--- Name: start_agent_task_commands require_legacy_auxiliary_task; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER require_legacy_auxiliary_task BEFORE INSERT OR UPDATE ON public.start_agent_task_commands FOR EACH ROW EXECUTE FUNCTION public.require_legacy_auxiliary_task();
-
-
---
--- Name: task_agent_instructions require_legacy_auxiliary_task; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER require_legacy_auxiliary_task BEFORE INSERT OR UPDATE ON public.task_agent_instructions FOR EACH ROW EXECUTE FUNCTION public.require_legacy_auxiliary_task();
-
-
---
--- Name: task_approval_waits require_legacy_auxiliary_task; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER require_legacy_auxiliary_task BEFORE INSERT OR UPDATE ON public.task_approval_waits FOR EACH ROW EXECUTE FUNCTION public.require_legacy_auxiliary_task();
-
-
---
--- Name: task_channel_targets require_legacy_auxiliary_task; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER require_legacy_auxiliary_task BEFORE INSERT OR UPDATE ON public.task_channel_targets FOR EACH ROW EXECUTE FUNCTION public.require_legacy_auxiliary_task();
-
-
---
--- Name: task_harness_runs require_legacy_auxiliary_task; Type: TRIGGER; Schema: public; Owner: -
+-- Name: task_harness_runs require_harness_owner; Type: TRIGGER; Schema: public; Owner: -
 --
 
 CREATE TRIGGER guard_harness_model_owner BEFORE INSERT OR UPDATE ON public.task_harness_runs
@@ -11021,106 +8190,13 @@ CREATE TRIGGER guard_harness_model_owner BEFORE INSERT OR UPDATE ON public.task_
 
 CREATE TRIGGER require_harness_owner BEFORE INSERT OR UPDATE ON public.task_harness_runs
     FOR EACH ROW EXECUTE FUNCTION public.require_harness_owner();
-CREATE TRIGGER require_legacy_auxiliary_task BEFORE INSERT OR UPDATE ON public.task_harness_invocations
-    FOR EACH ROW EXECUTE FUNCTION public.require_legacy_auxiliary_task();
 
 
 --
--- Name: task_outreaches require_legacy_auxiliary_task; Type: TRIGGER; Schema: public; Owner: -
+-- Name: schedule_runs require_schedule_occurrence_scope; Type: TRIGGER; Schema: public; Owner: -
 --
 
-CREATE TRIGGER require_legacy_auxiliary_task BEFORE INSERT OR UPDATE ON public.task_outreaches FOR EACH ROW EXECUTE FUNCTION public.require_legacy_auxiliary_task();
-
-
---
--- Name: task_ownership_events require_legacy_auxiliary_task; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER require_legacy_auxiliary_task BEFORE INSERT OR UPDATE ON public.task_ownership_events FOR EACH ROW EXECUTE FUNCTION public.require_legacy_auxiliary_task();
-
-
---
--- Name: task_status_events require_legacy_auxiliary_task; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER require_legacy_auxiliary_task BEFORE INSERT OR UPDATE ON public.task_status_events FOR EACH ROW EXECUTE FUNCTION public.require_legacy_auxiliary_task();
-
-
---
--- Name: thread_handoff_runs require_legacy_auxiliary_task; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER require_legacy_auxiliary_task BEFORE INSERT OR UPDATE ON public.thread_handoff_runs FOR EACH ROW EXECUTE FUNCTION public.require_legacy_auxiliary_task();
-
-
---
--- Name: thread_handoff_events require_legacy_handoff_event_task; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER require_legacy_handoff_event_task BEFORE INSERT ON public.thread_handoff_events FOR EACH ROW EXECUTE FUNCTION public.require_legacy_handoff_event_task();
-
-
---
--- Name: schedule_runs require_legacy_schedule_task; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER require_legacy_schedule_task BEFORE INSERT OR UPDATE ON public.schedule_runs FOR EACH ROW EXECUTE FUNCTION public.require_legacy_schedule_task();
-
-
---
--- Name: human_approvals require_legacy_source_task; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER require_legacy_source_task BEFORE INSERT OR UPDATE ON public.human_approvals FOR EACH ROW EXECUTE FUNCTION public.require_legacy_source_task();
-
-
---
--- Name: message_deliveries require_legacy_source_task; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER require_legacy_source_task BEFORE INSERT OR UPDATE ON public.message_deliveries FOR EACH ROW EXECUTE FUNCTION public.require_legacy_source_task();
-
-
---
--- Name: response_drafts require_legacy_source_task; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER require_legacy_source_task BEFORE INSERT OR UPDATE ON public.response_drafts FOR EACH ROW EXECUTE FUNCTION public.require_legacy_source_task();
-
-
---
--- Name: response_draft_evidence response_draft_evidence_immutable; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER response_draft_evidence_immutable BEFORE INSERT OR DELETE OR UPDATE ON public.response_draft_evidence FOR EACH ROW EXECUTE FUNCTION public.enforce_response_draft_evidence_immutability();
-
-
---
--- Name: response_drafts response_drafts_immutable_versions; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER response_drafts_immutable_versions BEFORE UPDATE ON public.response_drafts FOR EACH ROW EXECUTE FUNCTION public.enforce_response_draft_update();
-
-
---
--- Name: response_reviews response_review_actionable_notification; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER response_review_actionable_notification AFTER INSERT OR UPDATE OF status, reviewer_principal_id ON public.response_reviews FOR EACH ROW EXECUTE FUNCTION public.notification_from_review();
-
-
---
--- Name: response_reviews response_review_notification_delete; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER response_review_notification_delete AFTER DELETE ON public.response_reviews FOR EACH ROW EXECUTE FUNCTION public.notification_withdraw_deleted_source('response_review');
-
-
---
--- Name: response_reviews response_reviews_notify_attention; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER response_reviews_notify_attention AFTER INSERT OR DELETE OR UPDATE OF status, reviewer_principal_id, expires_at ON public.response_reviews FOR EACH ROW EXECUTE FUNCTION public.notify_attention_changed('response_review');
+CREATE TRIGGER require_schedule_occurrence_scope BEFORE INSERT OR UPDATE ON public.schedule_runs FOR EACH ROW EXECUTE FUNCTION public.require_schedule_occurrence_scope();
 
 
 --
@@ -11128,111 +8204,6 @@ CREATE TRIGGER response_reviews_notify_attention AFTER INSERT OR DELETE OR UPDAT
 --
 
 CREATE TRIGGER schedule_channel_immutable BEFORE UPDATE OF channel_id ON public.channel_schedules FOR EACH ROW EXECUTE FUNCTION public.require_immutable_schedule_channel();
-
-
---
--- Name: task_agent_instructions task_agent_instructions_notify; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER task_agent_instructions_notify AFTER INSERT ON public.task_agent_instructions FOR EACH ROW EXECUTE FUNCTION public.notify_agent_instruction();
-
-
---
--- Name: task_outreach_targets task_outreach_targets_notify_chain; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER task_outreach_targets_notify_chain AFTER UPDATE OF responded_at ON public.task_outreach_targets FOR EACH ROW WHEN ((old.responded_at IS DISTINCT FROM new.responded_at)) EXECUTE FUNCTION public.notify_task_chain_changed();
-
-
---
--- Name: task_outreach_targets task_outreach_targets_status_transition; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER task_outreach_targets_status_transition BEFORE UPDATE OF status ON public.task_outreach_targets FOR EACH ROW EXECUTE FUNCTION public.enforce_outreach_target_status_transition();
-
-
---
--- Name: task_outreaches task_outreaches_notify_attention; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER task_outreaches_notify_attention AFTER INSERT OR DELETE OR UPDATE OF status, expires_at, version ON public.task_outreaches FOR EACH ROW EXECUTE FUNCTION public.notify_attention_changed('delegation');
-
-
---
--- Name: task_outreaches task_outreaches_notify_chain; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER task_outreaches_notify_chain AFTER INSERT OR UPDATE OF status ON public.task_outreaches FOR EACH ROW EXECUTE FUNCTION public.notify_task_chain_changed();
-
-
---
--- Name: task_outreaches task_outreaches_status_transition; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER task_outreaches_status_transition BEFORE UPDATE OF status ON public.task_outreaches FOR EACH ROW EXECUTE FUNCTION public.enforce_outreach_status_transition();
-
-
---
--- Name: task_ownership_events task_ownership_actionable_notification; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER task_ownership_actionable_notification AFTER INSERT ON public.task_ownership_events FOR EACH ROW EXECUTE FUNCTION public.notification_from_task_ownership();
-
-
---
--- Name: task_ownership_events task_ownership_events_immutable; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER task_ownership_events_immutable BEFORE DELETE OR UPDATE ON public.task_ownership_events FOR EACH ROW EXECUTE FUNCTION public.task_ownership_events_are_immutable();
-
-
---
--- Name: task_ownership_events task_ownership_events_notify; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER task_ownership_events_notify AFTER INSERT ON public.task_ownership_events FOR EACH ROW EXECUTE FUNCTION public.notify_task_ownership();
-
-
---
--- Name: background_tasks task_status_actionable_notification; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER task_status_actionable_notification AFTER UPDATE OF status ON public.background_tasks FOR EACH ROW WHEN ((new.queue_kind = 'legacy'::text)) EXECUTE FUNCTION public.notification_from_task_status();
-
-
---
--- Name: background_tasks task_status_actionable_notification_delete; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER task_status_actionable_notification_delete AFTER DELETE ON public.background_tasks FOR EACH ROW WHEN ((old.queue_kind = 'legacy'::text)) EXECUTE FUNCTION public.notification_from_task_status();
-
-
---
--- Name: task_status_events task_status_events_notify_chain; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER task_status_events_notify_chain AFTER INSERT ON public.task_status_events FOR EACH ROW EXECUTE FUNCTION public.notify_task_chain_changed();
-
-
---
--- Name: thread_handoff_events thread_handoff_events_immutable; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER thread_handoff_events_immutable BEFORE DELETE OR UPDATE ON public.thread_handoff_events FOR EACH ROW EXECUTE FUNCTION public.thread_handoff_events_are_immutable();
-
-
---
--- Name: thread_handoffs thread_handoffs_bump_cleanup_version; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER thread_handoffs_bump_cleanup_version BEFORE UPDATE OF responsible_principal_id ON public.thread_handoffs FOR EACH ROW EXECUTE FUNCTION public.bump_handoff_version_for_responsibility_cleanup();
-
-
---
--- Name: thread_handoffs thread_handoffs_notify_attention; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER thread_handoffs_notify_attention AFTER INSERT OR DELETE OR UPDATE OF state, responsible_principal_id, business_priority, business_due_at, version, generation ON public.thread_handoffs FOR EACH ROW EXECUTE FUNCTION public.notify_attention_changed('thread_handoff');
 
 
 --
@@ -11733,6 +8704,13 @@ CREATE TRIGGER workflow_message_destination_immutable BEFORE DELETE OR UPDATE ON
 
 
 --
+-- Name: workflow_message_destinations workflow_message_destination_in_app; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER workflow_message_destination_in_app BEFORE INSERT ON public.workflow_message_destinations FOR EACH ROW EXECUTE FUNCTION public.workflow_message_destination_in_app_guard();
+
+
+--
 -- Name: workflow_waits workflow_message_effect_wait_guard; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -11861,6 +8839,32 @@ CREATE TRIGGER workflow_run_revision BEFORE UPDATE ON public.workflow_runs FOR E
 
 CREATE TRIGGER workflow_runs_preserve_association BEFORE UPDATE OF company_id, id, channel_id, thread_id ON public.workflow_runs FOR EACH ROW EXECUTE FUNCTION public.preserve_workflow_run_association();
 
+-- Live updates for the workflow views (P08-D4 §D4.1): run-level transitions only, never per-step
+-- revision bumps. INSERT and UPDATE are separate because an INSERT trigger's WHEN cannot see OLD.
+CREATE FUNCTION public.notify_workflow_run_changed() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    PERFORM pg_notify(
+        'workflow_run_changed',
+        json_build_object(
+            'company_id', NEW.company_id,
+            'channel_id', NEW.channel_id,
+            'thread_id', NEW.thread_id,
+            'run_id', NEW.id,
+            'state', NEW.state,
+            'waiting_reason', NEW.waiting_reason
+        )::text
+    );
+    RETURN NULL;
+END;
+$$;
+
+CREATE TRIGGER workflow_runs_notify_inserted AFTER INSERT ON public.workflow_runs FOR EACH ROW EXECUTE FUNCTION public.notify_workflow_run_changed();
+CREATE TRIGGER workflow_runs_notify_changed AFTER UPDATE ON public.workflow_runs FOR EACH ROW WHEN (((old.state IS DISTINCT FROM new.state) OR (old.waiting_reason IS DISTINCT FROM new.waiting_reason))) EXECUTE FUNCTION public.notify_workflow_run_changed();
+CREATE TRIGGER workflow_runs_notify_activity_inserted AFTER INSERT ON public.workflow_runs FOR EACH ROW WHEN ((new.thread_id IS NOT NULL)) EXECUTE FUNCTION public.notify_thread_activity();
+CREATE TRIGGER workflow_runs_notify_activity_changed AFTER UPDATE ON public.workflow_runs FOR EACH ROW WHEN (((new.thread_id IS NOT NULL) AND ((old.state IS DISTINCT FROM new.state) OR (old.waiting_reason IS DISTINCT FROM new.waiting_reason)))) EXECUTE FUNCTION public.notify_thread_activity();
+
 
 --
 -- Name: workflow_runs workflow_terminal_parent_wakeup; Type: TRIGGER; Schema: public; Owner: -
@@ -11960,51 +8964,11 @@ ALTER TABLE ONLY public.agent_skills
 
 
 --
--- Name: agent_sub_agents agent_sub_agents_agent_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.agent_sub_agents
-    ADD CONSTRAINT agent_sub_agents_agent_fk FOREIGN KEY (company_id, agent_id) REFERENCES public.agents(company_id, id) ON DELETE CASCADE;
-
-
---
--- Name: agent_sub_agents agent_sub_agents_company_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.agent_sub_agents
-    ADD CONSTRAINT agent_sub_agents_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
-
-
---
--- Name: agent_sub_agents agent_sub_agents_sub_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.agent_sub_agents
-    ADD CONSTRAINT agent_sub_agents_sub_fk FOREIGN KEY (company_id, sub_agent_id) REFERENCES public.agents(company_id, id) ON DELETE CASCADE;
-
-
---
 -- Name: agents agents_company_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.agents
     ADD CONSTRAINT agents_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
-
-
---
--- Name: attention_source_events attention_source_events_company_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.attention_source_events
-    ADD CONSTRAINT attention_source_events_company_fk FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
-
-
---
--- Name: background_tasks background_tasks_awaited_outreach_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.background_tasks
-    ADD CONSTRAINT background_tasks_awaited_outreach_fk FOREIGN KEY (company_id, id, awaited_outreach_id) REFERENCES public.task_outreaches(company_id, task_id, id) ON DELETE SET NULL (awaited_outreach_id) DEFERRABLE INITIALLY DEFERRED;
 
 
 --
@@ -12024,43 +8988,11 @@ ALTER TABLE ONLY public.background_tasks
 
 
 --
--- Name: background_tasks background_tasks_owner_principal_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.background_tasks
-    ADD CONSTRAINT background_tasks_owner_principal_fk FOREIGN KEY (company_id, owner_principal_id, owner_principal_kind) REFERENCES public.principals(company_id, id, kind) ON DELETE RESTRICT;
-
-
---
--- Name: background_tasks background_tasks_source_message_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.background_tasks
-    ADD CONSTRAINT background_tasks_source_message_fk FOREIGN KEY (company_id, source_message_uuid) REFERENCES public.messages(company_id, id) ON DELETE SET NULL (source_message_uuid);
-
-
---
 -- Name: background_tasks background_tasks_thread_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.background_tasks
     ADD CONSTRAINT background_tasks_thread_fk FOREIGN KEY (company_id, channel_id, thread_id) REFERENCES public.threads(company_id, channel_id, id) ON DELETE SET NULL (thread_id);
-
-
---
--- Name: background_tasks background_tasks_transition_approval_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.background_tasks
-    ADD CONSTRAINT background_tasks_transition_approval_fk FOREIGN KEY (transition_approval_id) REFERENCES public.human_approvals(id);
-
-
---
--- Name: background_tasks background_tasks_transition_outreach_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.background_tasks
-    ADD CONSTRAINT background_tasks_transition_outreach_fk FOREIGN KEY (transition_outreach_id) REFERENCES public.task_outreaches(id);
 
 
 --
@@ -12077,22 +9009,6 @@ ALTER TABLE ONLY public.background_tasks
 
 ALTER TABLE ONLY public.binding_audit_events
     ADD CONSTRAINT binding_audit_events_binding_fk FOREIGN KEY (company_id, binding_id) REFERENCES public.channel_bindings(company_id, id) ON DELETE CASCADE;
-
-
---
--- Name: channel_agents channel_agents_agent_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.channel_agents
-    ADD CONSTRAINT channel_agents_agent_fk FOREIGN KEY (agent_id) REFERENCES public.agents(id) ON DELETE CASCADE;
-
-
---
--- Name: channel_agents channel_agents_channel_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.channel_agents
-    ADD CONSTRAINT channel_agents_channel_fk FOREIGN KEY (company_id, channel_id) REFERENCES public.channels(company_id, id) ON DELETE CASCADE;
 
 
 --
@@ -12144,11 +9060,11 @@ ALTER TABLE ONLY public.channel_schedules
 
 
 --
--- Name: channel_schedules channel_schedules_run_as_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: channel_schedules channel_schedules_binding_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.channel_schedules
-    ADD CONSTRAINT channel_schedules_run_as_user_id_fkey FOREIGN KEY (run_as_user_id) REFERENCES public.users(id) ON DELETE SET NULL;
+    ADD CONSTRAINT channel_schedules_binding_fk FOREIGN KEY (company_id, binding_id) REFERENCES public.workflow_bindings(company_id, id) ON DELETE CASCADE;
 
 
 --
@@ -12165,22 +9081,6 @@ ALTER TABLE ONLY public.channel_slugs
 
 ALTER TABLE ONLY public.channels
     ADD CONSTRAINT channels_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
-
-
---
--- Name: channels channels_owner_agent_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.channels
-    ADD CONSTRAINT channels_owner_agent_fk FOREIGN KEY (company_id, owner_agent_id) REFERENCES public.agents(company_id, id) ON DELETE CASCADE;
-
-
---
--- Name: channels channels_preferred_reviewer_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.channels
-    ADD CONSTRAINT channels_preferred_reviewer_fk FOREIGN KEY (company_id, preferred_reviewer_principal_id) REFERENCES public.principals(company_id, id) ON DELETE SET NULL (preferred_reviewer_principal_id);
 
 
 --
@@ -12256,38 +9156,6 @@ ALTER TABLE ONLY public.company_resend_api_integrations
 
 
 --
--- Name: delegation_control_commands delegation_control_commands_actor_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.delegation_control_commands
-    ADD CONSTRAINT delegation_control_commands_actor_fk FOREIGN KEY (company_id, actor_principal_id, actor_kind) REFERENCES public.principals(company_id, id, kind) ON UPDATE CASCADE ON DELETE RESTRICT;
-
-
---
--- Name: delegation_control_commands delegation_control_commands_outreach_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.delegation_control_commands
-    ADD CONSTRAINT delegation_control_commands_outreach_fk FOREIGN KEY (company_id, outreach_id) REFERENCES public.task_outreaches(company_id, id) ON DELETE CASCADE;
-
-
---
--- Name: delegation_control_commands delegation_control_commands_target_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.delegation_control_commands
-    ADD CONSTRAINT delegation_control_commands_target_fk FOREIGN KEY (company_id, outreach_id, target_id) REFERENCES public.task_outreach_targets(company_id, outreach_id, id) ON DELETE RESTRICT;
-
-
---
--- Name: delegation_control_commands delegation_control_commands_task_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.delegation_control_commands
-    ADD CONSTRAINT delegation_control_commands_task_fk FOREIGN KEY (company_id, task_id) REFERENCES public.background_tasks(company_id, id) ON DELETE CASCADE;
-
-
---
 -- Name: email_message_metadata email_message_metadata_message_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -12333,54 +9201,6 @@ ALTER TABLE ONLY public.external_threads
 
 ALTER TABLE ONLY public.external_threads
     ADD CONSTRAINT external_threads_thread_fk FOREIGN KEY (company_id, thread_id) REFERENCES public.threads(company_id, id) ON DELETE CASCADE;
-
-
---
--- Name: human_approvals human_approvals_approver_principal_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.human_approvals
-    ADD CONSTRAINT human_approvals_approver_principal_fk FOREIGN KEY (company_id, approver_principal_id) REFERENCES public.principals(company_id, id) ON DELETE SET NULL (approver_principal_id) DEFERRABLE INITIALLY DEFERRED;
-
-
---
--- Name: human_approvals human_approvals_channel_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.human_approvals
-    ADD CONSTRAINT human_approvals_channel_fk FOREIGN KEY (company_id, channel_id) REFERENCES public.channels(company_id, id) ON DELETE CASCADE;
-
-
---
--- Name: human_approvals human_approvals_task_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.human_approvals
-    ADD CONSTRAINT human_approvals_task_fk FOREIGN KEY (company_id, task_id) REFERENCES public.background_tasks(company_id, id) ON DELETE CASCADE;
-
-
---
--- Name: human_approvals human_approvals_thread_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.human_approvals
-    ADD CONSTRAINT human_approvals_thread_fk FOREIGN KEY (company_id, channel_id, thread_id) REFERENCES public.threads(company_id, channel_id, id) ON DELETE CASCADE;
-
-
---
--- Name: human_task_completions human_task_completions_message_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.human_task_completions
-    ADD CONSTRAINT human_task_completions_message_fk FOREIGN KEY (company_id, message_id) REFERENCES public.messages(company_id, id) ON DELETE RESTRICT;
-
-
---
--- Name: human_task_completions human_task_completions_task_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.human_task_completions
-    ADD CONSTRAINT human_task_completions_task_fk FOREIGN KEY (company_id, task_id) REFERENCES public.background_tasks(company_id, id) ON DELETE CASCADE;
 
 
 --
@@ -12464,86 +9284,6 @@ ALTER TABLE ONLY public.internal_notes
 
 
 --
--- Name: manual_handoffs manual_handoffs_channel_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.manual_handoffs
-    ADD CONSTRAINT manual_handoffs_channel_fk FOREIGN KEY (company_id, channel_id) REFERENCES public.channels(company_id, id) ON DELETE CASCADE;
-
-
---
--- Name: manual_handoffs manual_handoffs_creator_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.manual_handoffs
-    ADD CONSTRAINT manual_handoffs_creator_fk FOREIGN KEY (company_id, created_by_principal_id) REFERENCES public.principals(company_id, id) ON DELETE SET NULL (created_by_principal_id);
-
-
---
--- Name: manual_handoffs manual_handoffs_resolver_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.manual_handoffs
-    ADD CONSTRAINT manual_handoffs_resolver_fk FOREIGN KEY (company_id, resolved_by_principal_id) REFERENCES public.principals(company_id, id) ON DELETE SET NULL (resolved_by_principal_id);
-
-
---
--- Name: manual_handoffs manual_handoffs_responsible_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.manual_handoffs
-    ADD CONSTRAINT manual_handoffs_responsible_fk FOREIGN KEY (company_id, responsible_principal_id) REFERENCES public.principals(company_id, id) ON DELETE SET NULL (responsible_principal_id);
-
-
---
--- Name: manual_handoffs manual_handoffs_thread_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.manual_handoffs
-    ADD CONSTRAINT manual_handoffs_thread_fk FOREIGN KEY (company_id, channel_id, thread_id) REFERENCES public.threads(company_id, channel_id, id) ON DELETE CASCADE;
-
-
---
--- Name: memory_cleanup_jobs memory_cleanup_jobs_lifecycle_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.memory_cleanup_jobs
-    ADD CONSTRAINT memory_cleanup_jobs_lifecycle_fkey FOREIGN KEY (provider, remote_database_id) REFERENCES public.memory_remote_resource_lifecycles(provider, remote_database_id);
-
-
---
--- Name: memory_provider_connections memory_provider_connections_company_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.memory_provider_connections
-    ADD CONSTRAINT memory_provider_connections_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
-
-
---
--- Name: memory_provisioning_jobs memory_provisioning_jobs_company_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.memory_provisioning_jobs
-    ADD CONSTRAINT memory_provisioning_jobs_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
-
-
---
--- Name: memory_provisioning_jobs memory_provisioning_jobs_lifecycle_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.memory_provisioning_jobs
-    ADD CONSTRAINT memory_provisioning_jobs_lifecycle_fkey FOREIGN KEY (provider, remote_database_id) REFERENCES public.memory_remote_resource_lifecycles(provider, remote_database_id);
-
-
---
--- Name: memory_remote_resource_lifecycles memory_remote_resource_lifecycles_company_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.memory_remote_resource_lifecycles
-    ADD CONSTRAINT memory_remote_resource_lifecycles_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE SET NULL;
-
-
---
 -- Name: message_deliveries message_deliveries_channel_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -12605,14 +9345,6 @@ ALTER TABLE ONLY public.message_deliveries
 
 ALTER TABLE ONLY public.message_deliveries
     ADD CONSTRAINT message_deliveries_source_binding_fk FOREIGN KEY (company_id, source_binding_id) REFERENCES public.channel_bindings(company_id, id) ON DELETE CASCADE;
-
-
---
--- Name: message_deliveries message_deliveries_task_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.message_deliveries
-    ADD CONSTRAINT message_deliveries_task_fk FOREIGN KEY (company_id, task_id) REFERENCES public.background_tasks(company_id, id) ON DELETE SET NULL (task_id);
 
 
 --
@@ -12792,150 +9524,6 @@ ALTER TABLE ONLY public.principals
 
 
 --
--- Name: response_draft_evidence response_draft_evidence_draft_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.response_draft_evidence
-    ADD CONSTRAINT response_draft_evidence_draft_fk FOREIGN KEY (company_id, draft_id, draft_version) REFERENCES public.response_drafts(company_id, id, version) ON DELETE CASCADE;
-
-
---
--- Name: response_draft_publications response_draft_publications_delivery_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.response_draft_publications
-    ADD CONSTRAINT response_draft_publications_delivery_fk FOREIGN KEY (company_id, delivery_id) REFERENCES public.message_deliveries(company_id, id) DEFERRABLE INITIALLY DEFERRED;
-
-
---
--- Name: response_draft_publications response_draft_publications_draft_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.response_draft_publications
-    ADD CONSTRAINT response_draft_publications_draft_fk FOREIGN KEY (company_id, draft_id, draft_version) REFERENCES public.response_drafts(company_id, id, version) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
-
-
---
--- Name: response_draft_publications response_draft_publications_message_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.response_draft_publications
-    ADD CONSTRAINT response_draft_publications_message_fk FOREIGN KEY (company_id, message_id, message_audience) REFERENCES public.messages(company_id, id, audience) DEFERRABLE INITIALLY DEFERRED;
-
-
---
--- Name: response_draft_publications response_draft_publications_publisher_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.response_draft_publications
-    ADD CONSTRAINT response_draft_publications_publisher_fk FOREIGN KEY (company_id, published_by_principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
-
-
---
--- Name: response_drafts response_drafts_author_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.response_drafts
-    ADD CONSTRAINT response_drafts_author_fk FOREIGN KEY (company_id, author_principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
-
-
---
--- Name: response_drafts response_drafts_channel_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.response_drafts
-    ADD CONSTRAINT response_drafts_channel_fk FOREIGN KEY (company_id, channel_id) REFERENCES public.channels(company_id, id) ON DELETE CASCADE;
-
-
---
--- Name: response_drafts response_drafts_created_by_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.response_drafts
-    ADD CONSTRAINT response_drafts_created_by_fk FOREIGN KEY (company_id, created_by_principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
-
-
---
--- Name: response_drafts response_drafts_reviewer_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.response_drafts
-    ADD CONSTRAINT response_drafts_reviewer_fk FOREIGN KEY (company_id, reviewer_principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
-
-
---
--- Name: response_drafts response_drafts_task_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.response_drafts
-    ADD CONSTRAINT response_drafts_task_fk FOREIGN KEY (company_id, task_id) REFERENCES public.background_tasks(company_id, id) ON DELETE SET NULL (task_id);
-
-
---
--- Name: response_drafts response_drafts_thread_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.response_drafts
-    ADD CONSTRAINT response_drafts_thread_fk FOREIGN KEY (company_id, channel_id, thread_id) REFERENCES public.threads(company_id, channel_id, id) ON DELETE CASCADE;
-
-
---
--- Name: response_drafts response_drafts_updated_by_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.response_drafts
-    ADD CONSTRAINT response_drafts_updated_by_fk FOREIGN KEY (company_id, updated_by_principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
-
-
---
--- Name: response_review_commands response_review_commands_delivery_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.response_review_commands
-    ADD CONSTRAINT response_review_commands_delivery_fk FOREIGN KEY (company_id, published_delivery_id) REFERENCES public.message_deliveries(company_id, id) DEFERRABLE INITIALLY DEFERRED;
-
-
---
--- Name: response_review_commands response_review_commands_draft_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.response_review_commands
-    ADD CONSTRAINT response_review_commands_draft_fk FOREIGN KEY (company_id, draft_id, expected_draft_version) REFERENCES public.response_drafts(company_id, id, version) ON DELETE CASCADE;
-
-
---
--- Name: response_reviews response_reviews_decider_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.response_reviews
-    ADD CONSTRAINT response_reviews_decider_fk FOREIGN KEY (company_id, decided_by_principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
-
-
---
--- Name: response_reviews response_reviews_draft_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.response_reviews
-    ADD CONSTRAINT response_reviews_draft_fk FOREIGN KEY (company_id, draft_id, draft_version) REFERENCES public.response_drafts(company_id, id, version) ON DELETE CASCADE;
-
-
---
--- Name: response_reviews response_reviews_notification_actor_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.response_reviews
-    ADD CONSTRAINT response_reviews_notification_actor_fk FOREIGN KEY (company_id, notification_actor_principal_id) REFERENCES public.principals(company_id, id) ON DELETE SET NULL (notification_actor_principal_id);
-
-
---
--- Name: response_reviews response_reviews_reviewer_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.response_reviews
-    ADD CONSTRAINT response_reviews_reviewer_fk FOREIGN KEY (company_id, reviewer_principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
-
-
---
 -- Name: schedule_runs schedule_runs_channel_scope_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -12960,35 +9548,19 @@ ALTER TABLE ONLY public.schedule_runs
 
 
 --
--- Name: schedule_runs schedule_runs_task_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: schedule_runs schedule_runs_binding_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.schedule_runs
-    ADD CONSTRAINT schedule_runs_task_id_fkey FOREIGN KEY (task_id) REFERENCES public.background_tasks(id) ON DELETE SET NULL;
+    ADD CONSTRAINT schedule_runs_binding_fk FOREIGN KEY (company_id, binding_id) REFERENCES public.workflow_bindings(company_id, id) ON DELETE CASCADE;
 
 
 --
--- Name: schedule_runs schedule_runs_task_scope_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.schedule_runs
-    ADD CONSTRAINT schedule_runs_task_scope_fk FOREIGN KEY (company_id, channel_id, thread_id, task_id) REFERENCES public.background_tasks(company_id, channel_id, thread_id, id) ON DELETE SET NULL (task_id);
-
-
---
--- Name: schedule_runs schedule_runs_thread_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: schedule_runs schedule_runs_run_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.schedule_runs
-    ADD CONSTRAINT schedule_runs_thread_id_fkey FOREIGN KEY (thread_id) REFERENCES public.threads(id) ON DELETE SET NULL;
-
-
---
--- Name: schedule_runs schedule_runs_thread_scope_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.schedule_runs
-    ADD CONSTRAINT schedule_runs_thread_scope_fk FOREIGN KEY (company_id, channel_id, thread_id) REFERENCES public.threads(company_id, channel_id, id) ON DELETE SET NULL (thread_id);
+    ADD CONSTRAINT schedule_runs_run_fk FOREIGN KEY (company_id, run_id, binding_id) REFERENCES public.workflow_runs(company_id, id, binding_id) ON DELETE CASCADE;
 
 
 --
@@ -13000,123 +9572,11 @@ ALTER TABLE ONLY public.skills
 
 
 --
--- Name: start_agent_task_commands start_agent_task_commands_task_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.start_agent_task_commands
-    ADD CONSTRAINT start_agent_task_commands_task_fk FOREIGN KEY (company_id, task_id) REFERENCES public.background_tasks(company_id, id) ON DELETE CASCADE;
-
-
---
--- Name: task_agent_instruction_notes task_agent_instruction_notes_instruction_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.task_agent_instruction_notes
-    ADD CONSTRAINT task_agent_instruction_notes_instruction_id_fkey FOREIGN KEY (instruction_id) REFERENCES public.task_agent_instructions(id) ON DELETE CASCADE;
-
-
---
--- Name: task_agent_instruction_notes task_agent_instruction_notes_note_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.task_agent_instruction_notes
-    ADD CONSTRAINT task_agent_instruction_notes_note_fk FOREIGN KEY (company_id, note_id) REFERENCES public.internal_notes(company_id, id) ON DELETE CASCADE;
-
-
---
--- Name: task_agent_instructions task_agent_instructions_actor_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.task_agent_instructions
-    ADD CONSTRAINT task_agent_instructions_actor_fk FOREIGN KEY (company_id, requested_by_principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
-
-
---
--- Name: task_agent_instructions task_agent_instructions_task_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.task_agent_instructions
-    ADD CONSTRAINT task_agent_instructions_task_fk FOREIGN KEY (company_id, task_id) REFERENCES public.background_tasks(company_id, id) ON DELETE CASCADE;
-
-
---
--- Name: task_agent_instructions task_agent_instructions_thread_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.task_agent_instructions
-    ADD CONSTRAINT task_agent_instructions_thread_fk FOREIGN KEY (company_id, channel_id, thread_id) REFERENCES public.threads(company_id, channel_id, id) ON DELETE CASCADE;
-
-
---
--- Name: task_approval_waits task_approval_waits_approval_task; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.task_approval_waits
-    ADD CONSTRAINT task_approval_waits_approval_task FOREIGN KEY (company_id, task_id, approval_id) REFERENCES public.human_approvals(company_id, task_id, id) ON DELETE CASCADE;
-
-
---
--- Name: task_approval_waits task_approval_waits_company_id_approval_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.task_approval_waits
-    ADD CONSTRAINT task_approval_waits_company_id_approval_id_fkey FOREIGN KEY (company_id, approval_id) REFERENCES public.human_approvals(company_id, id) ON DELETE CASCADE;
-
-
---
--- Name: task_approval_waits task_approval_waits_company_id_owner_principal_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.task_approval_waits
-    ADD CONSTRAINT task_approval_waits_company_id_owner_principal_id_fkey FOREIGN KEY (company_id, owner_principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
-
-
---
--- Name: task_approval_waits task_approval_waits_company_id_task_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.task_approval_waits
-    ADD CONSTRAINT task_approval_waits_company_id_task_id_fkey FOREIGN KEY (company_id, task_id) REFERENCES public.background_tasks(company_id, id) ON DELETE CASCADE;
-
-
---
--- Name: task_approval_waits task_approval_waits_company_id_task_id_run_id_invocation_i_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.task_approval_waits
-    ADD CONSTRAINT task_approval_waits_company_id_task_id_run_id_invocation_i_fkey FOREIGN KEY (company_id, task_id, run_id, invocation_id) REFERENCES public.task_harness_invocations(company_id, task_id, run_id, id);
-
-
---
 -- Name: task_attempts task_attempts_task_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.task_attempts
     ADD CONSTRAINT task_attempts_task_id_fkey FOREIGN KEY (task_id) REFERENCES public.background_tasks(id) ON DELETE CASCADE;
-
-
---
--- Name: task_channel_targets task_channel_targets_task_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.task_channel_targets
-    ADD CONSTRAINT task_channel_targets_task_fk FOREIGN KEY (company_id, task_id) REFERENCES public.background_tasks(company_id, id) ON DELETE CASCADE;
-
-
---
--- Name: task_channel_targets task_channel_targets_thread_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.task_channel_targets
-    ADD CONSTRAINT task_channel_targets_thread_fk FOREIGN KEY (company_id, channel_id, thread_id) REFERENCES public.threads(company_id, channel_id, id) ON DELETE CASCADE;
-
-
---
--- Name: task_harness_invocations task_harness_invocations_company_id_task_id_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.task_harness_invocations
-    ADD CONSTRAINT task_harness_invocations_company_id_task_id_run_id_fkey FOREIGN KEY (company_id, task_id, run_id) REFERENCES public.task_harness_runs(company_id, task_id, id) ON DELETE CASCADE;
 
 
 --
@@ -13128,203 +9588,11 @@ ALTER TABLE ONLY public.task_harness_runs
 
 
 --
--- Name: task_harness_runs task_harness_runs_company_id_owner_principal_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.task_harness_runs
-    ADD CONSTRAINT task_harness_runs_company_id_owner_principal_id_fkey FOREIGN KEY (company_id, owner_principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
-
-
---
 -- Name: task_harness_runs task_harness_runs_company_id_task_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.task_harness_runs
     ADD CONSTRAINT task_harness_runs_company_id_task_id_fkey FOREIGN KEY (company_id, task_id) REFERENCES public.background_tasks(company_id, id) ON DELETE CASCADE;
-
-
---
--- Name: task_outreach_replies task_outreach_replies_outreach_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.task_outreach_replies
-    ADD CONSTRAINT task_outreach_replies_outreach_fk FOREIGN KEY (company_id, outreach_id) REFERENCES public.task_outreaches(company_id, id) ON DELETE CASCADE;
-
-
---
--- Name: task_outreach_replies task_outreach_replies_response_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.task_outreach_replies
-    ADD CONSTRAINT task_outreach_replies_response_fk FOREIGN KEY (company_id, response_association_id) REFERENCES public.thread_messages(company_id, id) ON DELETE CASCADE;
-
-
---
--- Name: task_outreach_replies task_outreach_replies_target_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.task_outreach_replies
-    ADD CONSTRAINT task_outreach_replies_target_fk FOREIGN KEY (company_id, outreach_id, target_id) REFERENCES public.task_outreach_targets(company_id, outreach_id, id) ON DELETE CASCADE;
-
-
---
--- Name: task_outreach_targets task_outreach_targets_delivery_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.task_outreach_targets
-    ADD CONSTRAINT task_outreach_targets_delivery_fk FOREIGN KEY (company_id, delivery_id) REFERENCES public.message_deliveries(company_id, id) ON DELETE SET NULL (delivery_id);
-
-
---
--- Name: task_outreach_targets task_outreach_targets_internal_channel_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.task_outreach_targets
-    ADD CONSTRAINT task_outreach_targets_internal_channel_fk FOREIGN KEY (company_id, internal_channel_id) REFERENCES public.channels(company_id, id) ON DELETE CASCADE;
-
-
---
--- Name: task_outreach_targets task_outreach_targets_outreach_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.task_outreach_targets
-    ADD CONSTRAINT task_outreach_targets_outreach_fk FOREIGN KEY (company_id, outreach_id) REFERENCES public.task_outreaches(company_id, id) ON DELETE CASCADE;
-
-
---
--- Name: task_outreach_targets task_outreach_targets_replacement_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.task_outreach_targets
-    ADD CONSTRAINT task_outreach_targets_replacement_fk FOREIGN KEY (company_id, outreach_id, replaces_target_id) REFERENCES public.task_outreach_targets(company_id, outreach_id, id) ON DELETE RESTRICT;
-
-
---
--- Name: task_outreach_targets task_outreach_targets_request_message_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.task_outreach_targets
-    ADD CONSTRAINT task_outreach_targets_request_message_fk FOREIGN KEY (company_id, request_message_id) REFERENCES public.messages(company_id, id) ON DELETE SET NULL (request_message_id);
-
-
---
--- Name: task_outreach_targets task_outreach_targets_response_association_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.task_outreach_targets
-    ADD CONSTRAINT task_outreach_targets_response_association_fk FOREIGN KEY (company_id, response_association_id) REFERENCES public.thread_messages(company_id, id) ON DELETE SET NULL (response_association_id);
-
-
---
--- Name: task_outreaches task_outreaches_creator_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.task_outreaches
-    ADD CONSTRAINT task_outreaches_creator_fk FOREIGN KEY (company_id, created_by_principal_id, created_by_principal_kind) REFERENCES public.principals(company_id, id, kind) ON DELETE RESTRICT;
-
-
---
--- Name: task_outreaches task_outreaches_harness_invocation_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.task_outreaches
-    ADD CONSTRAINT task_outreaches_harness_invocation_fk FOREIGN KEY (company_id, task_id, harness_run_id, harness_invocation_id) REFERENCES public.task_harness_invocations(company_id, task_id, run_id, id) DEFERRABLE INITIALLY DEFERRED;
-
-
---
--- Name: task_outreaches task_outreaches_task_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.task_outreaches
-    ADD CONSTRAINT task_outreaches_task_fk FOREIGN KEY (company_id, task_id) REFERENCES public.background_tasks(company_id, id) ON DELETE CASCADE;
-
-
---
--- Name: task_ownership_events task_ownership_events_task_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.task_ownership_events
-    ADD CONSTRAINT task_ownership_events_task_fk FOREIGN KEY (company_id, task_id) REFERENCES public.background_tasks(company_id, id) ON DELETE CASCADE;
-
-
---
--- Name: task_status_events task_status_events_related_approval_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.task_status_events
-    ADD CONSTRAINT task_status_events_related_approval_id_fkey FOREIGN KEY (related_approval_id) REFERENCES public.human_approvals(id) ON DELETE SET NULL;
-
-
---
--- Name: task_status_events task_status_events_related_outreach_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.task_status_events
-    ADD CONSTRAINT task_status_events_related_outreach_id_fkey FOREIGN KEY (related_outreach_id) REFERENCES public.task_outreaches(id) ON DELETE SET NULL;
-
-
---
--- Name: task_status_events task_status_events_task_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.task_status_events
-    ADD CONSTRAINT task_status_events_task_fk FOREIGN KEY (company_id, task_id) REFERENCES public.background_tasks(company_id, id) ON DELETE CASCADE;
-
-
---
--- Name: thread_handoff_events thread_handoff_events_company_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.thread_handoff_events
-    ADD CONSTRAINT thread_handoff_events_company_fk FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
-
-
---
--- Name: thread_handoff_runs thread_handoff_runs_handoff_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.thread_handoff_runs
-    ADD CONSTRAINT thread_handoff_runs_handoff_fk FOREIGN KEY (company_id, handoff_id) REFERENCES public.thread_handoffs(company_id, id) ON DELETE CASCADE;
-
-
---
--- Name: thread_handoff_runs thread_handoff_runs_task_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.thread_handoff_runs
-    ADD CONSTRAINT thread_handoff_runs_task_fk FOREIGN KEY (company_id, task_id) REFERENCES public.background_tasks(company_id, id) ON DELETE CASCADE;
-
-
---
--- Name: thread_handoffs thread_handoffs_channel_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.thread_handoffs
-    ADD CONSTRAINT thread_handoffs_channel_fk FOREIGN KEY (company_id, channel_id) REFERENCES public.channels(company_id, id) ON DELETE CASCADE;
-
-
---
--- Name: thread_handoffs thread_handoffs_responsible_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.thread_handoffs
-    ADD CONSTRAINT thread_handoffs_responsible_fk FOREIGN KEY (company_id, responsible_principal_id) REFERENCES public.principals(company_id, id) ON DELETE SET NULL (responsible_principal_id);
-
-
---
--- Name: thread_handoffs thread_handoffs_source_message_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.thread_handoffs
-    ADD CONSTRAINT thread_handoffs_source_message_fk FOREIGN KEY (company_id, source_message_id) REFERENCES public.messages(company_id, id) ON DELETE CASCADE;
-
-
---
--- Name: thread_handoffs thread_handoffs_thread_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.thread_handoffs
-    ADD CONSTRAINT thread_handoffs_thread_fk FOREIGN KEY (company_id, channel_id, thread_id) REFERENCES public.threads(company_id, channel_id, id) ON DELETE CASCADE;
 
 
 --
@@ -14142,6 +10410,70 @@ ALTER TABLE ONLY public.workflow_message_destinations
 
 
 --
+-- Name: workflow_message_intent_bindings workflow_message_intent_binding_intent; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_message_intent_bindings
+    ADD CONSTRAINT workflow_message_intent_binding_intent FOREIGN KEY (company_id, intent_id) REFERENCES public.workflow_message_intents(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: workflow_message_intent_bindings workflow_message_intent_binding_binding; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_message_intent_bindings
+    ADD CONSTRAINT workflow_message_intent_binding_binding FOREIGN KEY (company_id, binding_id) REFERENCES public.workflow_bindings(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: workflow_message_intent_bindings workflow_message_intent_binding_run; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_message_intent_bindings
+    ADD CONSTRAINT workflow_message_intent_binding_run FOREIGN KEY (company_id, run_id) REFERENCES public.workflow_runs(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: workflow_message_intents workflow_message_intent_company; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_message_intents
+    ADD CONSTRAINT workflow_message_intent_company FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+
+
+--
+-- Name: workflow_message_intents workflow_message_intent_association; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_message_intents
+    ADD CONSTRAINT workflow_message_intent_association FOREIGN KEY (company_id, channel_id, thread_id, message_id) REFERENCES public.thread_messages(company_id, channel_id, thread_id, message_id) ON DELETE CASCADE;
+
+
+--
+-- Name: workflow_message_intents workflow_message_intent_reply_to; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_message_intents
+    ADD CONSTRAINT workflow_message_intent_reply_to FOREIGN KEY (company_id, reply_to_message_id) REFERENCES public.messages(company_id, id) ON DELETE SET NULL (reply_to_message_id);
+
+
+--
+-- Name: workflow_message_intents workflow_message_intent_responder; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_message_intents
+    ADD CONSTRAINT workflow_message_intent_responder FOREIGN KEY (company_id, responder_principal_id) REFERENCES public.principals(company_id, id) ON DELETE SET NULL (responder_principal_id);
+
+
+--
+-- Name: workflow_message_intents workflow_message_intent_matched_run; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_message_intents
+    ADD CONSTRAINT workflow_message_intent_matched_run FOREIGN KEY (company_id, matched_run_id) REFERENCES public.workflow_runs(company_id, id) ON DELETE CASCADE;
+
+
+--
 -- Name: workflow_message_destinations workflow_message_destination_principal; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -14211,6 +10543,14 @@ ALTER TABLE ONLY public.workflow_run_parents
 
 ALTER TABLE ONLY public.workflow_run_parents
     ADD CONSTRAINT workflow_parent_owner_fk FOREIGN KEY (company_id, child_run_id, parent_run_id, parent_execution_id) REFERENCES public.workflow_runs(company_id, id, parent_run_id, parent_execution_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
+
+
+--
+-- Name: workflow_provisioning_commands workflow_provisioning_commands_company_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_provisioning_commands
+    ADD CONSTRAINT workflow_provisioning_commands_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
 
 
 --
@@ -14446,7 +10786,8 @@ CREATE TABLE public.model_usage_calls (
     CHECK ((input_tokens IS NULL AND output_tokens IS NULL AND usage_source IS NULL AND settled_at IS NULL)
         OR (input_tokens IS NOT NULL AND output_tokens IS NOT NULL AND usage_source IS NOT NULL AND settled_at IS NOT NULL)),
     CHECK (settled_at IS NULL OR settled_at >= requested_at),
-    CHECK (num_nonnulls(workflow_id, version_id, run_id, execution_id, root_run_id) IN (0,5)),
+    -- Every model call belongs to a workflow run (p08 D4.8).
+    CHECK (num_nonnulls(workflow_id, version_id, run_id, execution_id, root_run_id) = 5),
     FOREIGN KEY(company_id, task_id) REFERENCES public.background_tasks(company_id,id) ON DELETE CASCADE,
     FOREIGN KEY(company_id, agent_id) REFERENCES public.agents(company_id,id) DEFERRABLE INITIALLY DEFERRED,
     FOREIGN KEY(company_id, run_id, workflow_id, version_id)
@@ -14459,6 +10800,8 @@ CREATE TABLE public.model_usage_calls (
         REFERENCES public.workflow_run_budgets(company_id,run_id,root_run_id) ON DELETE CASCADE
 );
 CREATE INDEX model_usage_company_time ON public.model_usage_calls(company_id,requested_at,request_id);
+-- A run's calls, for the simulation's per-run usage (p08 D4.6) and the run delete cascade.
+CREATE INDEX model_usage_calls_run ON public.model_usage_calls(company_id,run_id) WHERE run_id IS NOT NULL;
 CREATE FUNCTION public.guard_model_usage_update() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
     IF (to_jsonb(NEW) - ARRAY['input_tokens','output_tokens','usage_source','settled_at'])
@@ -14487,8 +10830,7 @@ CREATE FUNCTION public.guard_model_usage_task() RETURNS trigger LANGUAGE plpgsql
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM public.background_tasks AS task
         WHERE task.company_id=NEW.company_id AND task.id=NEW.task_id
-          AND ((NEW.run_id IS NULL AND task.queue_kind='legacy')
-            OR (NEW.run_id IS NOT NULL AND task.queue_kind='workflow' AND task.workflow_execution_id=NEW.execution_id))) THEN
+          AND NEW.run_id IS NOT NULL AND task.workflow_execution_id=NEW.execution_id) THEN
         RAISE EXCEPTION 'model usage requires exact task provenance' USING ERRCODE='23514';
     END IF;
     RETURN NEW;

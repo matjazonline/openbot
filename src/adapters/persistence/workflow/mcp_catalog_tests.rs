@@ -226,6 +226,8 @@ async fn workflow_mcp_binding_rejects_foreign_and_wrong_kind_resources() {
                     ResourceName::parse("service").unwrap(),
                     RuntimeResourceId::new(resource),
                 )]),
+                run_as: None,
+                message_trigger: None,
             })
             .await;
         assert!(configured.is_err());

@@ -1,5 +1,5 @@
 use super::{RunCheckpoint, TokenUsageSource};
-use crate::entities::task::TokenUsage;
+use crate::services::harness::TokenUsage;
 
 /// One contribution per reserved request. Unknown outcomes retain the reserved upper estimate;
 /// a committed response replaces that estimate, including after a process restart.

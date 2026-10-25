@@ -141,6 +141,10 @@ pub struct ConfigureBinding {
     pub version: VersionId,
     pub params: serde_json::Value,
     pub resources: std::collections::BTreeMap<ResourceName, RuntimeResourceId>,
+    /// `None` is the configuring actor on create and the stored run-as on reconfigure; only the
+    /// company owner may name somebody else (p08 D1.1).
+    pub run_as: Option<WorkflowActor>,
+    pub message_trigger: Option<crate::domain::workflow::MessageTrigger>,
 }
 
 #[derive(Debug, Clone, Copy)]

@@ -11,7 +11,7 @@ use crate::{
         transport::ExternalMessageKey,
         value_objects::{ChannelSlug, EmailAddress},
     },
-    transport::{InboundDraft, IngressPolicyFacts, MAX_INGRESS_HOPS, MessageDisposition},
+    transport::{InboundDraft, IngressPolicyFacts, MAX_INGRESS_HOPS},
     use_cases::thread::{BounceInfo, MAX_THREAD_MESSAGES_PER_HOUR},
 };
 
@@ -191,23 +191,6 @@ pub fn exceeds_spam_threshold(
 /// Whether this thread has taken more turns in the last hour than the ping-pong guard allows.
 pub const fn exceeds_turn_limit(recent_messages: usize) -> bool {
     recent_messages >= MAX_THREAD_MESSAGES_PER_HOUR
-}
-
-/// Whether the agent runs at all for this message, folding every source that can silence it.
-///
-/// One place, because "quiet" arrives four ways -- an address suffix, a body marker, a header, and
-/// an outreach reply that only needs recording -- and a check that missed one would run an agent
-/// the sender explicitly asked not to.
-pub fn fold_disposition(
-    stated: MessageDisposition,
-    any_channel_answers: bool,
-    all_matches_are_outreach_replies: bool,
-) -> MessageDisposition {
-    if stated.answers() && any_channel_answers && !all_matches_are_outreach_replies {
-        MessageDisposition::Answer
-    } else {
-        MessageDisposition::FileOnly
-    }
 }
 
 /// The participants a thread gains from this message.
@@ -500,24 +483,6 @@ mod tests {
             untrusted,
             0.0
         ));
-    }
-
-    #[test]
-    fn any_source_of_quiet_silences_the_run() {
-        assert_eq!(
-            fold_disposition(MessageDisposition::Answer, true, false),
-            MessageDisposition::Answer
-        );
-        for (stated, answers, outreach) in [
-            (MessageDisposition::FileOnly, true, false),
-            (MessageDisposition::Answer, false, false),
-            (MessageDisposition::Answer, true, true),
-        ] {
-            assert_eq!(
-                fold_disposition(stated, answers, outreach),
-                MessageDisposition::FileOnly
-            );
-        }
     }
 
     #[test]

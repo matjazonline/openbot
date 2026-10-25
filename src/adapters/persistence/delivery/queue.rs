@@ -428,6 +428,38 @@ impl DeliveryQueue for PostgresPersistence {
         Ok(DeliveryOutcome::Applied(DeliveryStatus::Pending))
     }
 
+    async fn census_stuck_deliveries(
+        &self,
+        overdue_after: Duration,
+    ) -> AppResult<crate::entities::stuck_work::StuckWorkCensus> {
+        // One sequential pass with FILTER over the whole table, as the census has always made:
+        // it runs once per reap, and no index serves all three statuses at once.
+        let (dead_lettered, overdue, unconfirmed): (i64, i64, i64) = sqlx::query_as(
+            r#"SELECT count(*) FILTER (WHERE status = 'dead_letter'),
+                      count(*) FILTER (
+                          WHERE status IN ('pending', 'retryable')
+                            AND available_at < CURRENT_TIMESTAMP - $1::interval
+                      ),
+                      -- Nothing retries these: an ambiguous provider outcome is exactly what must
+                      -- not be re-sent, so they stay until a reconciler or a human clears them.
+                      count(*) FILTER (WHERE status = 'outcome_unknown')
+               FROM message_deliveries"#,
+        )
+        .bind(
+            sqlx::postgres::types::PgInterval::try_from(overdue_after).map_err(|error| {
+                AppError::Internal(format!("Invalid delivery-overdue threshold: {error}"))
+            })?,
+        )
+        .fetch_one(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+        Ok(crate::entities::stuck_work::StuckWorkCensus {
+            delivery_dead_lettered: dead_lettered,
+            delivery_overdue: overdue,
+            delivery_unconfirmed: unconfirmed,
+        })
+    }
+
     async fn reap_expired_deliveries(&self) -> AppResult<DeliveryReaping> {
         let mut tx = self.pool.begin().await.map_err(AppError::from)?;
         let leases_expired = reap_expired_leases_on(&mut tx).await?;

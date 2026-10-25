@@ -37,9 +37,10 @@ pub enum UiSection {
     Dashboard,
     Channels,
     Agents,
+    /// Workflow authoring: library, editor, versions and bindings (p09).
+    Workflows,
     Schedules,
     Work,
-    Tasks,
     Deliveries,
     Companies,
     Invites,
@@ -187,8 +188,6 @@ pub struct MailboxPage<'a> {
     pub selected_thread_id: Option<Uuid>,
     /// What each listed thread is doing, for the row badges.
     pub activity: &'a HashMap<Uuid, ThreadActivity>,
-    /// The held customer reply each listed thread is waiting on. Threads with none are absent.
-    pub handoffs: &'a HashMap<Uuid, ThreadHandoffMark>,
     /// Pre-rendered right-hand pane: messages, the compose form, or a placeholder.
     pub detail_html: &'a str,
 }
@@ -203,10 +202,8 @@ pub struct ThreadColumn<'a> {
     pub threads: &'a [Thread],
     pub next_cursor: Option<&'a str>,
     pub selected_thread_id: Option<Uuid>,
-    /// What each thread is doing, for the row badges. Threads with nothing in flight are absent.
+    /// What each thread is doing, for the row badges. Threads with no run are absent.
     pub activity: &'a HashMap<Uuid, ThreadActivity>,
-    /// The held customer reply each thread is waiting on. Threads with none are absent.
-    pub handoffs: &'a HashMap<Uuid, ThreadHandoffMark>,
 }
 
 /// The detail pane showing one thread's messages.
@@ -215,28 +212,15 @@ pub struct MessagePane<'a> {
     pub channel: &'a Channel,
     pub thread: &'a Thread,
     pub messages: &'a [ThreadMessageView],
-    /// The face and name the agent side of this thread is drawn with -- see [`message_bubble_chat`].
-    pub agent: Option<&'a Agent>,
     /// The signed-in reader's address, used to put their own messages on the right.
     pub viewer_email: &'a EmailAddress,
-    /// What this thread is doing right now, for the strip above the composer.
-    pub activity: Option<ThreadActivity>,
-    pub work: Option<ThreadWorkSummary>,
-    pub viewer_principal_id: Option<PrincipalId>,
-    pub viewer_manages_tasks: bool,
-    /// Private ownership metadata, provided only for the owner or a manager.
-    pub private_handoff: Option<&'a str>,
-    pub ownership_error: Option<&'a str>,
-    pub owner_candidates: &'a [TaskOwnerCandidate],
-    pub collaboration: Option<&'a CollaborationSummary>,
-    /// The held customer reply this thread is waiting on, when it has one -- as the banner's own
-    /// view, already built.
-    ///
-    /// The view rather than the entity, and it restates this pane's own ids, because the live
-    /// stream builds the very same value and hands it to the very same renderer: a banner that
-    /// streams in must be indistinguishable from one that came with the page, exactly as
-    /// [`message_bubble_chat`] requires of a bubble.
-    pub handoff: Option<ThreadHandoffBannerView<'a>>,
+    /// Independently identifiable runs for the strip above the composer.
+    pub activity: &'a crate::application::thread_activity::ThreadRuns,
+    /// Why the last action on this pane (an internal note) was refused, when it was.
+    pub error: Option<&'a str>,
+    /// Who the reader is to the company. Only its owner is offered the simulator, which is the
+    /// owner's alone (p08 D4.6).
+    pub viewer_membership: CompanyMembership,
 }
 
 /// The detail pane showing the new-message form for a thread that is already open.
@@ -608,22 +592,8 @@ pub(crate) const MAILBOX_SCRIPT: &str = r##"        // The `theme-controller` ch
                 return;
             }
 
-            // A thread row's held-reply badge redraws in place. Unlike the activity badge it does
-            // not lift the quiet on a replied row: a held reply is durable and was already there
-            // before the reply, so it is not news the reader has yet to see.
-            if (swapped && swapped.classList && swapped.classList.contains('thread-handoff-mark')) {
-                return;
-            }
-
-            // The open thread's held-reply banner and its activity strip both make the pane taller,
-            // which would push the newest message out of view for someone sitting at the live edge.
-            if (swapped && swapped.id === 'thread-handoff') {
-                if (wasAtBottomBeforeStream) {
-                    scrollToNewestMessageStart();
-                }
-                return;
-            }
-
+            // The open thread's activity strip makes the pane taller, which would push the newest
+            // message out of view for someone sitting at the live edge.
             if (swapped && swapped.id === 'thread-activity') {
                 if (wasAtBottomBeforeStream) {
                     scrollToNewestMessageStart();
@@ -847,7 +817,7 @@ pub(super) fn ui_layout(title: &str, body: &str) -> String {
 
 pub(crate) fn application_javascript() -> String {
     format!(
-        "var CHIP_SELECTED_MARK = {selected:?};\nvar CHIP_ADD_MARK = {add:?};\nvar AGENT_REPLIED_MARK = {replied:?};\n{app}\n{legacy}\n{mailbox}\n{local}\n{skeletons}\n{schedules}\n{agents}\n{channels}\n{library}\n{delegation}\n{request_errors}\n{button_busy}\n{thread_handoffs}\n{task_counts}",
+        "var CHIP_SELECTED_MARK = {selected:?};\nvar CHIP_ADD_MARK = {add:?};\nvar AGENT_REPLIED_MARK = {replied:?};\n{app}\n{legacy}\n{mailbox}\n{local}\n{skeletons}\n{schedules}\n{agents}\n{channels}\n{library}\n{delegation}\n{request_errors}\n{button_busy}\n{run_counts}\n{workflow_editor}\n{workflow_runs}\n{thread_history}",
         selected = icon(Icon::Check, BUTTON_ICON),
         add = icon(Icon::Plus, BUTTON_ICON),
         replied = icon(Icon::Check, BUTTON_ICON),
@@ -863,8 +833,10 @@ pub(crate) fn application_javascript() -> String {
         delegation = EVENT_DELEGATION_SCRIPT,
         request_errors = REQUEST_ERROR_SCRIPT,
         button_busy = BUTTON_BUSY_SCRIPT,
-        thread_handoffs = super::thread_handoffs::THREAD_HANDOFF_SCRIPT,
-        task_counts = super::task_counts::TASK_COUNTS_SCRIPT,
+        run_counts = super::run_counts::RUN_COUNTS_SCRIPT,
+        workflow_editor = super::workflow_authoring::WORKFLOW_EDITOR_SCRIPT,
+        workflow_runs = super::workflow_runs::WORKFLOW_RUNS_SCRIPT,
+        thread_history = super::thread_activity::THREAD_HISTORY_SCRIPT,
     )
 }
 
@@ -920,7 +892,6 @@ document.addEventListener('click', function (event) {
         case 'pane-back': setMobilePane('list'); break;
         case 'show-agent-tab': showAgentTab(control.dataset.tab); break;
         case 'toggle-agent-prompt': toggleAgentPromptGenerator(control.dataset.prefix); break;
-        case 'show-channel-tab': showChannelTab(control.dataset.tab); break;
         case 'hide-element': {
             var hidden = document.getElementById(control.dataset.target);
             if (hidden) hidden.classList.add('hidden');
@@ -936,7 +907,6 @@ document.addEventListener('click', function (event) {
             break;
         }
         case 'toggle-form-card': toggleFormCard(control); break;
-        case 'show-channel-form-tab': showChannelFormTab(control.dataset.tab); break;
         case 'toggle-prompt-generator': togglePromptGenerator(control); break;
         case 'select-company': selectCompany(control.dataset.companyId); break;
         case 'open-dialog': {
@@ -949,9 +919,7 @@ document.addEventListener('click', function (event) {
             if (open) open.close();
             break;
         }
-        case 'pick-channel-library-agent': pickChannelLibraryAgent(control); break;
         case 'copy-text': copyTextFrom(control); break;
-        case 'thread-handoff': postThreadHandoff(control); break;
         case 'delete-library-agent': deleteLibraryAgent(control.dataset.agentId); break;
         // 'isolate' carries no behaviour. It exists so that `closest('[data-action]')` stops
         // here rather than resolving to a clickable ancestor -- the delegated stand-in for the
@@ -965,8 +933,6 @@ document.addEventListener('change', function (event) {
     switch (control.dataset.action) {
         case 'theme-toggle': applyTheme(control.checked ? 'light' : 'dark'); break;
         case 'toggle-schedule-type': toggleScheduleType(control); break;
-        case 'toggle-schedule-delivery': toggleScheduleDelivery(control); break;
-        case 'sync-channel-agents': syncChannelAgents(control); break;
         case 'submit-form': control.form.requestSubmit(); break;
         case 'simulation-mode': {
             var sender = control.form.elements.namedItem('from');
@@ -1003,8 +969,6 @@ document.addEventListener('change', function (event) {
             break;
         }
         case 'model-select': control.nextElementSibling.value = control.value; break;
-        case 'pick-agent-radio': selectAgentInSelection(control, false); break;
-        case 'pick-agent-library': selectAgentInSelection(control, true); break;
     }
 });
 document.addEventListener('input', function (event) {
@@ -1070,7 +1034,6 @@ pub fn mailbox_page(page: &MailboxPage<'_>) -> String {
             next_cursor: page.next_cursor,
             selected_thread_id: page.selected_thread_id,
             activity: page.activity,
-            handoffs: page.handoffs,
         }),
         None => empty_thread_column(),
     };
@@ -1570,13 +1533,18 @@ fn icon_rail(user: &MailboxUser<'_>, company: &Company, section: UiSection) -> S
         (UiSection::Channels, "/ui/channels", Icon::Hash, "Channels"),
         (UiSection::Agents, "/ui/agents", Icon::Hubot, "Agents"),
         (
+            UiSection::Workflows,
+            "/ui/workflows",
+            Icon::Workflow,
+            "Workflows",
+        ),
+        (
             UiSection::Schedules,
             "/ui/schedules",
             Icon::Stopwatch,
             "Schedules",
         ),
         (UiSection::Work, "/ui/work", Icon::Alert, "Work"),
-        (UiSection::Tasks, "/ui/tasks", Icon::Gear, "Tasks"),
         (
             UiSection::Deliveries,
             "/ui/deliveries",
@@ -1635,8 +1603,8 @@ fn rail_section_visible(user: &MailboxUser<'_>, section: UiSection) -> bool {
         UiSection::Mailbox | UiSection::Work => user.company_membership.is_team(),
         UiSection::Channels
         | UiSection::Agents
+        | UiSection::Workflows
         | UiSection::Schedules
-        | UiSection::Tasks
         | UiSection::Deliveries => user.company_membership.manages_company_operations(),
         UiSection::Dashboard => {
             user.company_membership.manages_company_operations() || user.is_operator
@@ -1871,9 +1839,10 @@ pub fn channel_actions(
 
 /// One `<option>` per channel for a `/ui` sidebar filter, with the current one marked.
 ///
-/// Shared by the Tasks and Deliveries workspaces: both filter the same company's channels the same
-/// way, and a channel must not read differently depending on which queue you are looking at. The
-/// "All channels" option is left to the caller, since only it knows what "all" is called there.
+/// Kept beside the other `/ui` sidebar helpers so a future queue filters channels the way the
+/// Deliveries workspace does: a channel must not read differently depending on which queue you are
+/// looking at. The "All channels" option is left to the caller, since only it knows what "all" is
+/// called there.
 pub(crate) fn channel_filter_options(channels: &[Channel], selected: Option<Uuid>) -> String {
     channels
         .iter()
@@ -2031,7 +2000,6 @@ fn thread_row(column: &ThreadColumn<'_>, thread: &Thread) -> String {
         column.selected_thread_id == Some(thread.id),
         ThreadRowMarks {
             activity: column.activity.get(&thread.id).copied(),
-            handoff: column.handoffs.get(&thread.id).copied(),
             from_other_channel: opened_by_another_channel(thread, column.app_domain_name),
             ..ThreadRowMarks::default()
         },
@@ -2096,10 +2064,8 @@ pub fn other_channel_glyph(from_other_channel: bool, title: &str) -> String {
 /// without the compiler noticing.
 #[derive(Clone, Copy, Default)]
 pub struct ThreadRowMarks {
-    /// What this thread is doing. Threads with nothing in flight leave it `None`.
+    /// What this thread's newest run is doing. Threads with no run leave it `None`.
     pub activity: Option<ThreadActivity>,
-    /// The held customer reply this thread is waiting on, if any.
-    pub handoff: Option<ThreadHandoffMark>,
     /// Who spoke last. Only rows arriving over the stream carry this -- see [`thread_row_fragment`].
     pub last_role: Option<MessageRole>,
     /// This thread was opened by an agent in another channel.
@@ -2140,7 +2106,6 @@ pub fn thread_row_fragment(
                         <span class="flex min-w-0 items-center gap-1.5">{channel_glyph}<span class="truncate font-semibold">{subject}</span></span>
                         <span class="flex shrink-0 items-center gap-1.5">
                             <span class="thread-mark text-sm leading-none text-success"></span>
-                            {handoff_slot}
                             {activity_slot}
                             <span class="text-xs opacity-60">{updated_at}</span>
                         </span>
@@ -2158,9 +2123,6 @@ pub fn thread_row_fragment(
             marks.from_other_channel,
             "Opened by an agent in another channel",
         ),
-        // Before the activity slot: reading left to right, "what the team must do" comes before
-        // "what the machine is doing", and then the timestamp.
-        handoff_slot = thread_handoff_slot(thread.id, marks.handoff),
         activity_slot = thread_activity_slot(thread.id, marks.activity),
         // Only rows arriving over the stream carry this: the reply mark means "while you were
         // watching", so a freshly rendered page has nothing to mark and needs no lookup.
@@ -2206,6 +2168,20 @@ pub fn empty_detail_pane(message: &str, swap: FragmentSwap) -> String {
     )
 }
 
+/// "Open in Simulator", for the company owner only: every simulation route refuses anybody else.
+fn simulator_link(pane: &MessagePane<'_>) -> String {
+    if pane.viewer_membership != CompanyMembership::Owner {
+        return String::new();
+    }
+    format!(
+        r##"<a href="/companies/{company_id}/channels/{channel_id}/simulate?thread_id={thread_id}"
+                        class="btn btn-outline btn-sm">Open in Simulator</a>"##,
+        company_id = pane.company_id,
+        channel_id = pane.channel.id,
+        thread_id = pane.thread.id,
+    )
+}
+
 pub fn message_pane(pane: &MessagePane<'_>) -> String {
     let participant_addresses = pane
         .thread
@@ -2227,12 +2203,12 @@ pub fn message_pane(pane: &MessagePane<'_>) -> String {
             .map(|message| {
                 message_bubble_chat(
                     message,
-                    pane.agent,
                     Some(pane.viewer_email),
                     MessageScope {
                         company_id: pane.company_id,
                         channel_id: pane.channel.id,
                     },
+                    RunLinkAccess::Authorized(&pane.activity.inspectable),
                 )
             })
             .collect()
@@ -2247,13 +2223,6 @@ pub fn message_pane(pane: &MessagePane<'_>) -> String {
         .map(|message| format!("&after={}", message.cursor()))
         .unwrap_or_default();
 
-    let note_actions = internal_note_actions(pane);
-    // Empty when the thread has no held reply, and present either way: the container is where the
-    // first streamed banner lands, the same arrangement `#no-messages` has above.
-    let handoff_banner = pane
-        .handoff
-        .as_ref()
-        .map_or_else(String::new, super::thread_handoff_banner);
     format!(
         r##"
         <section id="detail-pane"{PANE_SKELETON} data-thread-id="{thread_id}" class="ui-pane-detail flex min-w-0 flex-1 flex-col bg-base-100" hx-ext="sse"
@@ -2271,28 +2240,25 @@ pub fn message_pane(pane: &MessagePane<'_>) -> String {
                     <button type="button" class="btn btn-ghost btn-sm btn-square" title="Reload messages"
                         hx-get="/ui/messages?company_id={company_id}&channel_id={channel_id}&thread_id={thread_id}"
                         hx-target="#detail-pane" hx-swap="outerHTML" hx-sync="#detail-pane:replace">{reload}</button>
-                    <a href="/companies/{company_id}/channels/{channel_id}/simulate?thread_id={thread_id}"
-                        class="btn btn-outline btn-sm">Open in Simulator</a>
+                    {simulator}
                 </div>
             </div>
             {pane_error}
-            <div id="message-scroll" class="flex-1 space-y-1 overflow-y-auto px-4 py-4 sm:px-6"
+            <p class="px-4 text-xs opacity-60">Showing up to {history_limit} newest messages. Older messages leave this live view.</p>
+            <div id="message-scroll" data-history-limit="{history_limit}" class="flex-1 space-y-1 overflow-y-auto px-4 py-4 sm:px-6"
                 sse-swap="message" hx-swap="beforeend">
                 {messages_html}
             </div>
-            <div id="thread-handoff" sse-swap="handoff" hx-target="this" hx-swap="innerHTML">{handoff_banner}</div>
             <div id="thread-activity" sse-swap="activity" hx-target="this" hx-swap="innerHTML">{activity_strip}</div>
-            {owner_panel}
-            {delegation_panel}
-            {human_completion}
-            {note_actions}
             {note_composer}
             {composer}
             {diagnostics_dialog}
         </section>
         "##,
+        history_limit = crate::entities::message_view::THREAD_HISTORY_LIMIT,
         pencil = icon(Icon::Pencil, BUTTON_ICON),
         reload = icon(Icon::Sync, BUTTON_ICON),
+        simulator = simulator_link(pane),
         subject = escape_html_text(&pane.thread.subject),
         participants = participants,
         thread_id = pane.thread.id,
@@ -2300,257 +2266,18 @@ pub fn message_pane(pane: &MessagePane<'_>) -> String {
         channel_id = pane.channel.id,
         after = after,
         messages_html = messages_html,
-        handoff_banner = handoff_banner,
-        pane_error = pane
-            .ownership_error
-            .map_or_else(String::new, |message| format!(
-                r#"<div class="alert alert-error mx-4 mt-3 py-2 text-sm sm:mx-6">{}</div>"#,
-                escape_html_text(message)
-            )),
-        activity_strip = thread_collaboration_strip(pane.activity, pane.collaboration),
-        owner_panel = task_owner_panel(pane),
-        delegation_panel = delegation_panel(pane),
-        human_completion = human_completion_composer(pane),
-        note_actions = note_actions,
+        pane_error = pane.error.map_or_else(String::new, |message| format!(
+            r#"<div class="alert alert-error mx-4 mt-3 py-2 text-sm sm:mx-6">{}</div>"#,
+            escape_html_text(message)
+        )),
+        activity_strip = thread_activity_strip(
+            pane.activity,
+            pane.company_id,
+            RunLinkAccess::Authorized(&pane.activity.inspectable)
+        ),
         note_composer = internal_note_composer(pane),
         composer = thread_composer(pane),
         diagnostics_dialog = DIAGNOSTICS_DIALOG,
-    )
-}
-
-fn task_owner_panel(pane: &MessagePane<'_>) -> String {
-    let Some(work) = pane.work.as_ref() else {
-        return String::new();
-    };
-    let viewer = pane.viewer_principal_id;
-    let (label, action) = match work.ownership.owner {
-        TaskOwner::Agent(_) => {
-            let label = if let Some(owner) = work.owner_label.as_deref() {
-                if pane.activity == Some(ThreadActivity::Working) {
-                    format!("{owner} working")
-                } else {
-                    format!("Assigned to {owner}")
-                }
-            } else if pane.activity == Some(ThreadActivity::Working) {
-                "Agent working".to_string()
-            } else {
-                "Assigned to an agent".to_string()
-            };
-            let action = pane.viewer_manages_tasks.then(|| {
-                format!(
-                    "{}{}",
-                    ownership_action_form(pane, work, "release", "Release task", "btn-ghost"),
-                    ownership_transfer_form(pane, work)
-                )
-            });
-            (label, action.unwrap_or_default())
-        }
-        TaskOwner::Human(owner) if Some(owner) == viewer => (
-            "Assigned to you".to_string(),
-            format!(
-                "{}{}",
-                ownership_action_form(pane, work, "release", "Release task", "btn-ghost"),
-                ownership_transfer_form(pane, work)
-            ),
-        ),
-        TaskOwner::Human(_) => {
-            let action = pane.viewer_manages_tasks.then(|| {
-                format!(
-                    "{}{}",
-                    ownership_action_form(pane, work, "release", "Release task", "btn-ghost"),
-                    ownership_transfer_form(pane, work)
-                )
-            });
-            (
-                work.owner_label
-                    .as_deref()
-                    .map(|owner| format!("Assigned to {owner}"))
-                    .unwrap_or_else(|| "Assigned to a teammate".to_string()),
-                action.unwrap_or_default(),
-            )
-        }
-        TaskOwner::Unassigned => (
-            "Unassigned".to_string(),
-            ownership_action_form(pane, work, "claim", "Claim task", "btn-primary"),
-        ),
-    };
-    let error = pane.ownership_error.map_or_else(String::new, |message| {
-        format!(
-            r#"<div class="alert alert-error mb-2 py-2 text-sm">{}</div>"#,
-            escape_html_text(message)
-        )
-    });
-    let handoff = pane.private_handoff.map_or_else(String::new, |instruction| {
-        format!(
-            r#"<div class="mt-2 rounded-box bg-base-200 p-3 text-sm"><span class="font-semibold">Private handoff</span><p class="mt-1 whitespace-pre-wrap">{}</p></div>"#,
-            escape_html_text(instruction)
-        )
-    });
-    format!(
-        r#"<section class="border-t border-base-300 px-4 py-3 sm:px-6">{error}
-            <div class="flex items-center justify-between gap-3"><span class="badge badge-outline">{label}</span>{action}</div>
-            {handoff}</section>"#
-    )
-}
-
-/// Whether this reader may act on the thread's delegation, and so be shown the controls for it.
-///
-/// The owner of a task is entitled to recover their own delegated work whether or not they
-/// administer the company: that is what [`DelegationAuthority::HumanOwner`] exists for, and until
-/// this panel existed the only route submitting these commands admitted managers alone. A reader
-/// with no principal in the company is shown nothing — there would be no actor to submit as.
-///
-/// [`DelegationAuthority::HumanOwner`]: crate::entities::delegation::DelegationAuthority::HumanOwner
-fn may_control_delegation(pane: &MessagePane<'_>, work: &ThreadWorkSummary) -> bool {
-    if pane.viewer_principal_id.is_none() {
-        return false;
-    }
-    let owns_task = matches!(work.ownership.owner, TaskOwner::Human(owner)
-        if Some(owner) == pane.viewer_principal_id);
-    owns_task || pane.viewer_manages_tasks
-}
-
-/// The delegation controls as the mailbox offers them, posting to `/ui/task-delegation` so the
-/// route resolves the reader's authority instead of assuming a manager.
-///
-/// A reassignment is deliberately absent: choosing a replacement channel needs the company's
-/// channel list, which this pane does not load, and the Tasks workspace is where that lives.
-fn delegation_panel(pane: &MessagePane<'_>) -> String {
-    let Some(work) = pane.work.as_ref() else {
-        return String::new();
-    };
-    let Some(summary) = pane.collaboration else {
-        return String::new();
-    };
-    if !may_control_delegation(pane, work) {
-        return String::new();
-    }
-    let body = delegation_control_forms(
-        summary,
-        &DelegationSurface {
-            action_prefix: &format!("/ui/task-delegation/{}", work.task_id),
-            action_suffix: "",
-            target: "#detail-pane",
-            scope_fields: &format!(
-                r#"<input type="hidden" name="company_id" value="{company_id}"><input type="hidden" name="channel_id" value="{channel_id}"><input type="hidden" name="thread_id" value="{thread_id}">"#,
-                company_id = pane.company_id,
-                channel_id = pane.channel.id,
-                thread_id = pane.thread.id,
-            ),
-            reassign_channels: &[],
-        },
-    );
-    if body.is_empty() {
-        return String::new();
-    }
-    format!(r#"<div class="border-t border-base-300 px-4 py-3 sm:px-6">{body}</div>"#)
-}
-
-fn ownership_transfer_form(pane: &MessagePane<'_>, work: &ThreadWorkSummary) -> String {
-    if pane.owner_candidates.is_empty() {
-        return String::new();
-    }
-    let options: String = pane
-        .owner_candidates
-        .iter()
-        .filter(|candidate| candidate.owner != work.ownership.owner)
-        .filter_map(|candidate| {
-            let id = candidate.owner.principal_id()?;
-            Some(format!(
-                r#"<option value="{}:{}">{} · {}</option>"#,
-                candidate.owner.as_str(),
-                id.as_uuid(),
-                escape_html_text(&candidate.label),
-                candidate.owner.as_str(),
-            ))
-        })
-        .collect();
-    if options.is_empty() {
-        return String::new();
-    }
-    format!(
-        r##"<details class="dropdown dropdown-end"><summary class="btn btn-ghost btn-sm">Transfer</summary>
-            <form class="dropdown-content z-10 mt-2 w-80 space-y-2 rounded-box border border-base-300 bg-base-100 p-3 shadow"
-                hx-post="/ui/task-ownership/{task_id}/transfer" hx-target="#detail-pane" hx-swap="outerHTML">
-                <input type="hidden" name="company_id" value="{company_id}">
-                <input type="hidden" name="channel_id" value="{channel_id}">
-                <input type="hidden" name="thread_id" value="{thread_id}">
-                <input type="hidden" name="command_id" value="{command_id}">
-                <input type="hidden" name="expected_ownership_version" value="{version}">
-                <select class="select select-sm w-full" name="owner" required>
-                    <option value="">Choose an eligible owner</option>{options}</select>
-                <textarea class="textarea textarea-sm w-full" name="handoff_instruction" required maxlength="8192"
-                    placeholder="Private handoff instruction"></textarea>
-                <input class="input input-sm w-full" name="reason_detail" maxlength="512" placeholder="Optional reason">
-                <button class="btn btn-primary btn-sm" type="submit">Transfer and end ownership</button>
-            </form></details>"##,
-        task_id = work.task_id,
-        company_id = pane.company_id,
-        channel_id = pane.channel.id,
-        thread_id = pane.thread.id,
-        command_id = Uuid::new_v4(),
-        version = work.ownership.version,
-    )
-}
-
-fn ownership_action_form(
-    pane: &MessagePane<'_>,
-    work: &ThreadWorkSummary,
-    operation: &str,
-    label: &str,
-    button_class: &str,
-) -> String {
-    if pane.viewer_principal_id.is_none() {
-        return String::new();
-    }
-    format!(
-        r##"<form hx-post="/ui/task-ownership/{task_id}/{operation}" hx-target="#detail-pane" hx-swap="outerHTML">
-            <input type="hidden" name="company_id" value="{company_id}">
-            <input type="hidden" name="channel_id" value="{channel_id}">
-            <input type="hidden" name="thread_id" value="{thread_id}">
-            <input type="hidden" name="command_id" value="{command_id}">
-            <input type="hidden" name="expected_ownership_version" value="{version}">
-            <button class="btn {button_class} btn-sm" type="submit">{label}</button></form>"##,
-        task_id = work.task_id,
-        company_id = pane.company_id,
-        channel_id = pane.channel.id,
-        thread_id = pane.thread.id,
-        command_id = Uuid::new_v4(),
-        version = work.ownership.version,
-    )
-}
-
-fn human_completion_composer(pane: &MessagePane<'_>) -> String {
-    let Some(work) = pane.work.as_ref() else {
-        return String::new();
-    };
-    let TaskOwner::Human(owner) = work.ownership.owner else {
-        return String::new();
-    };
-    if Some(owner) != pane.viewer_principal_id || pane.activity != Some(ThreadActivity::Queued) {
-        return String::new();
-    }
-    format!(
-        r##"<form class="border-t border-warning/40 bg-warning/10 px-4 py-4 sm:px-6"
-                hx-post="/ui/task-complete" hx-target="#detail-pane" hx-swap="outerHTML">
-            <input type="hidden" name="company_id" value="{company_id}">
-            <input type="hidden" name="channel_id" value="{channel_id}">
-            <input type="hidden" name="thread_id" value="{thread_id}">
-            <input type="hidden" name="task_id" value="{task_id}">
-            <input type="hidden" name="command_id" value="{command_id}">
-            <input type="hidden" name="expected_ownership_version" value="{version}">
-            <div class="mb-2"><p class="font-semibold">Send final response as task owner</p>
-                <p class="text-xs opacity-70">This sends externally and completes the task. It is separate from the quiet context form below.</p></div>
-            <textarea name="text_body" class="textarea min-h-24 w-full" required
-                placeholder="Write the final response that will be sent…"></textarea>
-            <button type="submit" class="btn btn-warning btn-sm mt-2">Send and complete</button>
-        </form>"##,
-        company_id = pane.company_id,
-        channel_id = pane.channel.id,
-        thread_id = pane.thread.id,
-        task_id = work.task_id,
-        command_id = Uuid::new_v4(),
-        version = work.ownership.version,
     )
 }
 
@@ -2617,7 +2344,7 @@ fn internal_note_composer(pane: &MessagePane<'_>) -> String {
             <input type="hidden" name="thread_id" value="{thread_id}">
             <input type="hidden" name="command_id" value="{command_id}">
             <div class="mb-2"><p class="font-semibold text-info">Internal note</p>
-                <p class="text-xs opacity-70">Private context only. This does not run the agent, send anything, or change task ownership.</p></div>
+                <p class="text-xs opacity-70">Private context only. This does not start a run or send anything.</p></div>
             <div class="flex items-end gap-2">
                 <textarea name="text_body" rows="2" required maxlength="65536"
                     class="textarea min-h-16 flex-1 text-sm" placeholder="Add private context for teammates…"></textarea>
@@ -2635,67 +2362,58 @@ fn internal_note_composer(pane: &MessagePane<'_>) -> String {
     )
 }
 
-fn internal_note_actions(pane: &MessagePane<'_>) -> String {
-    let (action, task_id, version) = match pane.work.as_ref() {
-        Some(work) if matches!(work.ownership.owner, TaskOwner::Agent(_)) => {
-            ("ask", Some(work.task_id), Some(work.ownership.version))
-        }
-        None => ("start", None, None),
-        Some(_) => return String::new(),
-    };
-    let task_fields = task_id.map_or_else(String::new, |task_id| {
-        format!(
-            r#"<input type="hidden" name="task_id" value="{task_id}">
-               <input type="hidden" name="expected_ownership_version" value="{}">"#,
-            version.expect("an existing task has an ownership version")
-        )
-    });
-    let label = if action == "ask" {
-        "Ask owner to use selected notes"
-    } else {
-        "Start agent task with selected notes"
-    };
-    format!(
-        r##"<form id="ask-agent-form" class="border-t border-info/30 px-4 py-3 sm:px-6"
-                hx-post="/ui/internal-notes/{action}" hx-target="#detail-pane" hx-swap="outerHTML">
-            <input type="hidden" name="company_id" value="{company_id}">
-            <input type="hidden" name="channel_id" value="{channel_id}">
-            <input type="hidden" name="thread_id" value="{thread_id}">
-            <input type="hidden" name="command_id" value="{command_id}">
-            {task_fields}
-            <button type="submit" class="btn btn-outline btn-info btn-sm">
-                <span class="loading loading-spinner loading-xs hidden [.htmx-request_&]:inline-block"></span>
-                <span class="[.htmx-request_&]:hidden">{label}</span>
-                <span class="hidden [.htmx-request_&]:inline">Requesting…</span>
-            </button>
-            <span class="ml-2 text-xs opacity-60">Select active internal notes above first.</span>
-        </form>"##,
-        action = action,
-        company_id = pane.company_id,
-        channel_id = pane.channel.id,
-        thread_id = pane.thread.id,
-        command_id = Uuid::new_v4(),
-        task_fields = task_fields,
-        label = label,
-    )
-}
-
-/// One message as a daisyUI chat bubble: agent replies on the right, everyone else on the left.
+/// One message as a daisyUI chat row: the writer's face, then their name and the time, the bubble,
+/// and the subject underneath. Agent replies sit on the right, everyone else on the left.
 ///
 /// Public because the live message stream (`/ui/events`) renders bubbles one at a time as they
 /// arrive. Both paths share this one definition, so a bubble that streams in is indistinguishable
 /// from one that came with the page.
-/// One message as a daisyUI chat row: the writer's face, then their name and the time, the bubble,
-/// and the subject underneath.
 ///
-/// `agent` is the channel's agent when it runs exactly one, and is what the agent side is drawn as.
 /// A reply is stored with the *channel's* address as its sender rather than the agent that wrote
-/// it, so with a stack of agents there is no one face to show and the address stands in.
+/// it, so the address is what the agent side is drawn as.
 pub fn message_bubble_chat(
     message: &ThreadMessageView,
-    agent: Option<&Agent>,
     viewer_email: Option<&EmailAddress>,
     scope: MessageScope,
+    run_access: RunLinkAccess<'_>,
+) -> String {
+    message_bubble(
+        message,
+        viewer_email,
+        scope,
+        run_access,
+        MessageActions::Mailbox,
+    )
+}
+
+/// Standalone reads retain ordinary links but have no dependency on mailbox dialogs or panes.
+pub fn message_bubble_readonly(
+    message: &ThreadMessageView,
+    viewer_email: Option<&EmailAddress>,
+    scope: MessageScope,
+    run_access: RunLinkAccess<'_>,
+) -> String {
+    message_bubble(
+        message,
+        viewer_email,
+        scope,
+        run_access,
+        MessageActions::ReadOnly,
+    )
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum MessageActions {
+    Mailbox,
+    ReadOnly,
+}
+
+fn message_bubble(
+    message: &ThreadMessageView,
+    viewer_email: Option<&EmailAddress>,
+    scope: MessageScope,
+    run_access: RunLinkAccess<'_>,
+    actions: MessageActions,
 ) -> String {
     let is_agent = message.is_agent();
     // Written by an agent in *another* channel: an inbound message only carries the agent role
@@ -2731,14 +2449,69 @@ pub fn message_bubble_chat(
         )
     };
 
-    // The passed agent is *this* channel's. Attributing a sibling channel's message to it would
-    // put the wrong name and face on work a different agent did, so that one keeps its address.
-    let (writer, avatar_url) = match (is_agent && !from_other_channel, agent) {
-        (true, Some(agent)) => (agent.name.as_str(), agent.avatar_url.as_ref()),
-        _ => (message.author.display(), None),
-    };
+    let (writer, avatar_url): (&str, Option<&AvatarUrl>) = (message.author.display(), None);
 
-    let note_controls = note_state.map_or_else(String::new, |note| {
+    format!(
+        r##"
+                <div class="chat {side}" data-message-id="{message_id}" data-role="{role}" data-audience="{audience}" data-entry-kind="{entry_kind}">
+                    <div class="chat-image">{avatar}</div>
+                    <div class="chat-header gap-1 opacity-70">
+                        {channel_glyph}{writer}{transport_badge}
+                        <time class="text-xs opacity-60">{created_at}</time>
+                    </div>
+                    <div class="chat-bubble {bubble_class} max-w-2xl text-sm">{internal_label}{body}{attachments}</div>
+                    <div class="flex flex-wrap items-center gap-2">{note_controls}</div>
+                    <div class="chat-footer font-mono text-[11px] opacity-50">{boundary} · {subject}{diagnostics}</div>{run_attribution}
+                </div>
+        "##,
+        message_id = message.canonical_id.as_uuid(),
+        run_attribution = message_run_attribution(message, scope.company_id, run_access),
+        side = if is_viewer { "chat-end" } else { "chat-start" },
+        // Read by the column when a bubble streams in: only the agent's own reply answers the
+        // question its row's activity mark was asking.
+        role = if is_agent { "agent" } else { "human" },
+        audience = message.audience.as_str(),
+        entry_kind = message.entry_kind.as_str(),
+        boundary = format_args!(
+            "{} / {}",
+            message.audience.as_str(),
+            message.entry_kind.as_str()
+        ),
+        bubble_class = if is_internal_note {
+            "border border-info/40 bg-info/10 text-base-content"
+        } else if is_viewer {
+            "chat-bubble-primary"
+        } else {
+            ""
+        },
+        internal_label = if is_internal_note {
+            r#"<div class="mb-1 text-[10px] font-bold uppercase tracking-wider text-info">Internal only</div>"#
+        } else {
+            ""
+        },
+        note_controls = message_note_controls(message, scope, actions),
+        channel_glyph = other_channel_glyph(from_other_channel, "From an agent in another channel"),
+        transport_badge =
+            transport_badge(message.author.transport, message.author.handle.as_deref()),
+        avatar = avatar_bubble(avatar_url, writer, AvatarSize::Row),
+        writer = escape_html_text(writer),
+        created_at = super::format_date_time(message.created_at),
+        subject = escape_html_text(&message.subject),
+        diagnostics = match actions {
+            MessageActions::Mailbox => diagnostics_link(message, scope),
+            MessageActions::ReadOnly => String::new(),
+        },
+        body = body,
+        attachments = attachment_chips(message, scope),
+    )
+}
+
+fn message_note_controls(
+    message: &ThreadMessageView,
+    scope: MessageScope,
+    actions: MessageActions,
+) -> String {
+    message.internal_note.as_ref().map_or_else(String::new, |note| {
         if !note.is_active() {
             return if note.tombstoned_at.is_some() {
                 r#"<span class="badge badge-ghost badge-xs">removed</span>"#.into()
@@ -2746,12 +2519,9 @@ pub fn message_bubble_chat(
                 r#"<span class="badge badge-ghost badge-xs">superseded</span>"#.into()
             };
         }
+        if actions == MessageActions::ReadOnly { return String::new(); }
         format!(
-            r##"<label class="label cursor-pointer gap-1 p-0 text-xs">
-                    <input type="checkbox" form="ask-agent-form" name="note_ids" value="{note_id}"
-                        class="checkbox checkbox-info checkbox-xs"> use with agent
-                </label>
-                <details class="dropdown dropdown-end"><summary class="link link-hover text-xs">correct</summary>
+            r##"<details class="dropdown dropdown-end"><summary class="link link-hover text-xs">correct</summary>
                     <form class="dropdown-content z-20 mt-1 w-80 space-y-2 rounded-box border border-base-300 bg-base-100 p-3 shadow"
                         hx-post="/ui/internal-notes" hx-target="#detail-pane" hx-swap="outerHTML">
                         <input type="hidden" name="company_id" value="{company_id}">
@@ -2777,72 +2547,7 @@ pub fn message_bubble_chat(
             remove_command = Uuid::new_v4(),
             body = escape_html_text(&message.body),
         )
-    });
-    format!(
-        r##"
-                <div class="chat {side}" data-role="{role}" data-audience="{audience}" data-entry-kind="{entry_kind}">
-                    <div class="chat-image">{avatar}</div>
-                    <div class="chat-header gap-1 opacity-70">
-                        {channel_glyph}{writer}{transport_badge}
-                        <time class="text-xs opacity-60">{created_at}</time>
-                    </div>
-                    <div class="chat-bubble {bubble_class} max-w-2xl text-sm">{internal_label}{body}{attachments}</div>
-                    <div class="flex flex-wrap items-center gap-2">{note_controls}</div>
-                    <div class="chat-footer font-mono text-[11px] opacity-50">{boundary} · {subject}{diagnostics}{tasks}</div>
-                </div>
-        "##,
-        side = if is_viewer { "chat-end" } else { "chat-start" },
-        // Read by the column when a bubble streams in: only the agent's own reply answers the
-        // question its row's activity mark was asking.
-        role = if is_agent { "agent" } else { "human" },
-        audience = message.audience.as_str(),
-        entry_kind = message.entry_kind.as_str(),
-        boundary = format_args!(
-            "{} / {}",
-            message.audience.as_str(),
-            message.entry_kind.as_str()
-        ),
-        bubble_class = if is_internal_note {
-            "border border-info/40 bg-info/10 text-base-content"
-        } else if is_viewer {
-            "chat-bubble-primary"
-        } else {
-            ""
-        },
-        internal_label = if is_internal_note {
-            r#"<div class="mb-1 text-[10px] font-bold uppercase tracking-wider text-info">Internal only</div>"#
-        } else {
-            ""
-        },
-        note_controls = note_controls,
-        channel_glyph = other_channel_glyph(from_other_channel, "From an agent in another channel"),
-        transport_badge =
-            transport_badge(message.author.transport, message.author.handle.as_deref()),
-        avatar = avatar_bubble(avatar_url, writer, AvatarSize::Row),
-        writer = escape_html_text(writer),
-        created_at = super::format_date_time(message.created_at),
-        subject = escape_html_text(&message.subject),
-        diagnostics = diagnostics_link(message, scope),
-        tasks = tasks_link(message, scope),
-        body = body,
-        attachments = attachment_chips(message, scope),
-    )
-}
-
-/// A direct link into the company's Tasks workspace in list view, opening the task if one is matched.
-fn tasks_link(message: &ThreadMessageView, scope: MessageScope) -> String {
-    let task_param = match message.task_id {
-        Some(task_id) => format!("&amp;task_id={task_id}"),
-        None => String::new(),
-    };
-    format!(
-        r##" · <a class="link link-hover"
-                    title="Tasks list"
-                    data-action="navigate-workspace"
-                    href="/ui/tasks?company_id={company_id}&amp;view=list{task_param}">tasks</a>"##,
-        company_id = scope.company_id,
-        task_param = task_param,
-    )
+    })
 }
 
 /// The way into the one pane that shows provider identifiers.

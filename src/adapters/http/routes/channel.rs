@@ -1,4 +1,3 @@
-use crate::use_cases::agent::AgentWrite;
 use std::{convert::Infallible, sync::Arc};
 
 use axum::{
@@ -23,24 +22,22 @@ use crate::{
         parser::RawInboundPayload,
     },
     app_error::{AppError, AppResult},
+    application::message_outcomes::MessageOutcomeReader,
     entities::{
         channel::Channel, cursor::ThreadCursor, thread::Thread, value_objects::EmailAddress,
     },
     infra::{config::AppConfig, events::MailboxEvents},
     use_cases::{
-        agent::AgentUseCases,
         channel::{ChannelUseCases, ChannelWrite},
         company::CompanyUseCases,
         thread::{
             InboundIngestResult, IngressOrigin, ReplyDelivery, SimulationMode, ThreadUseCases,
         },
-        thread_handoff::ThreadHandoffUseCases,
         user::UserUseCases,
     },
 };
 
-use super::agent::{AgentInstructionRequest, ModelOverrides, agent_write_from_instructions};
-use super::live_updates::thread_wake_ups;
+use super::live_updates::simulation_wake_ups;
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -94,10 +91,6 @@ pub fn router() -> Router<AppState> {
             "/api/companies/{company_id}/channels/{id}/threads",
             get(list_channel_threads_json),
         )
-        .route(
-            "/api/companies/{company_id}/channels/{id}/reply-handling",
-            get(get_reply_handling_json).put(put_reply_handling_json),
-        )
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -106,28 +99,10 @@ pub struct ChannelForm {
     pub description: Option<String>,
     pub slug: Option<String>,
     pub alias_slugs: Option<String>,
-    pub system_prompt: Option<String>,
-    pub form_mode: Option<String>,
     pub participant_emails: Option<String>,
-    pub agent_ids: Option<String>,
     pub confirm_spam_disabled: Option<String>,
     pub enabled: Option<String>,
     pub add_3rd_party: Option<String>,
-    pub response_trigger: Option<String>,
-    pub external_response_review_override: Option<String>,
-    /// `"inherit"` and the empty string clear the override; an unrecognised value is refused.
-    ///
-    /// Absent means "not submitted", and is left alone rather than cleared: no channel form
-    /// renders this control today, so an absent field is the browser's silence about a setting the
-    /// dedicated policy page owns, not a request to reset it.
-    pub external_reply_handling_override: Option<String>,
-    pub preferred_reviewer_principal_id: Option<Uuid>,
-    pub retrieve_company_memory: Option<String>,
-    pub retrieve_agent_memory: Option<String>,
-    pub retrieve_user_memory: Option<String>,
-    pub persist_company_memory: Option<String>,
-    pub persist_agent_memory: Option<String>,
-    pub persist_user_memory: Option<String>,
 }
 
 impl ChannelForm {
@@ -145,86 +120,14 @@ impl ChannelForm {
         checkbox_ticked(self.add_3rd_party.as_deref())
     }
 
-    /// Forms replace settings; omission selects the product creation default.
-    pub fn response_trigger(
-        &self,
-    ) -> Result<crate::entities::channel::ChannelResponseTrigger, String> {
-        self.response_trigger
-            .as_deref()
-            .map(str::parse)
-            .transpose()
-            .map(Option::unwrap_or_default)
-    }
-
     pub fn confirm_spam_disabled(&self) -> bool {
         checkbox_ticked(self.confirm_spam_disabled.as_deref())
     }
-
-    pub fn memory_settings(&self) -> Result<SubmittedMemorySettings, String> {
-        Ok(SubmittedMemorySettings {
-            retrieve_company: checkbox_ticked(self.retrieve_company_memory.as_deref()),
-            retrieve_agent: checkbox_ticked(self.retrieve_agent_memory.as_deref()),
-            retrieve_user: checkbox_ticked(self.retrieve_user_memory.as_deref()),
-            persist_company: checkbox_ticked(self.persist_company_memory.as_deref()),
-            persist_agent: checkbox_ticked(self.persist_agent_memory.as_deref()),
-            persist_user: checkbox_ticked(self.persist_user_memory.as_deref()),
-        })
-    }
-}
-
-pub struct SubmittedMemorySettings {
-    pub retrieve_company: bool,
-    pub retrieve_agent: bool,
-    pub retrieve_user: bool,
-    pub persist_company: bool,
-    pub persist_agent: bool,
-    pub persist_user: bool,
 }
 
 /// The two shapes a browser sends for a ticked checkbox, in one place.
 pub(super) fn checkbox_ticked(value: Option<&str>) -> bool {
     matches!(value, Some("true") | Some("on"))
-}
-
-pub(super) fn parse_review_override(
-    value: Option<&str>,
-) -> Option<crate::entities::response_draft::ExternalResponseReview> {
-    match value {
-        Some("autonomous") => {
-            Some(crate::entities::response_draft::ExternalResponseReview::Autonomous)
-        }
-        Some("review_all_external") => {
-            Some(crate::entities::response_draft::ExternalResponseReview::ReviewAllExternal)
-        }
-        _ => None,
-    }
-}
-
-/// What a submitted channel form asks of the reply-handling policy.
-///
-/// The policy is saved by a **second** write, after the channel itself, because it must be
-/// clearable: `ChannelPersistence::update` writes its overrides through `COALESCE($n, column)`,
-/// which cannot express "back to inherit" (phase 1 §1.5). A failure between the two leaves the
-/// channel saved with its previous policy — acceptable, because the policy write is idempotent and
-/// re-submittable, and because the alternative is reproducing that bug on a new column.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum SubmittedReplyHandling {
-    /// The field was not submitted at all; leave the stored policy exactly as it is.
-    Unsubmitted,
-    /// Write this policy, where `None` returns the channel to inheriting the company default.
-    Write(Option<crate::entities::thread_handoff::ExternalReplyHandling>),
-}
-
-/// Read the channel form's reply-handling field, refusing a value the policy does not name.
-///
-/// Deliberately not [`parse_review_override`]'s shape, which maps an unrecognised string to `None`
-/// and so turns a typo into "inherit".
-pub(super) fn parse_reply_handling_form(value: Option<&str>) -> AppResult<SubmittedReplyHandling> {
-    match value {
-        None => Ok(SubmittedReplyHandling::Unsubmitted),
-        Some(value) => super::ui_thread_handoffs::parse_reply_handling_override(value)
-            .map(SubmittedReplyHandling::Write),
-    }
 }
 
 pub fn slugify(input: &str) -> String {
@@ -251,10 +154,7 @@ pub fn slugify(input: &str) -> String {
     result.trim_matches('-').to_string()
 }
 
-/// The agents a form submitted, in order.
-///
-/// `None` only when the form has no `agent_ids` field at all. A present but empty field is
-/// `Some(vec![])`: on an update that removes every agent, where `None` keeps them.
+/// The agent ids a form submitted, in order; `None` only when the field is absent.
 pub(super) fn parse_agent_ids_form(input: Option<String>) -> Option<Vec<Uuid>> {
     input.map(|s| {
         s.split(&[',', ' ', ';', '\n'][..])
@@ -272,52 +172,18 @@ pub struct ChannelJsonPayload {
     pub slug: Option<String>,
     /// A PUT replaces the alias set wholesale, like every other field here.
     pub alias_slugs: Option<Vec<String>>,
-    pub system_prompt: Option<String>,
     pub participant_emails: Option<Vec<String>>,
-    /// The one field a PUT patches: omitted or `null` keeps the channel's current agents, and `[]`
-    /// removes them all. Removing an agent stops its work in the channel, so it has to be asked for
-    /// rather than implied by a field the client left out. On create, omitted assigns none.
-    pub agent_ids: Option<Vec<Uuid>>,
     pub confirm_spam_disabled: Option<bool>,
     /// Omitted means enabled: like every other field here, a PUT replaces rather than patches.
     pub enabled: Option<bool>,
     /// Omitted means on, for the same reason as `enabled`.
     pub add_3rd_party: Option<bool>,
-    pub response_trigger: Option<crate::entities::channel::ChannelResponseTrigger>,
-    pub external_response_review_override:
-        Option<crate::entities::response_draft::ExternalResponseReview>,
-    /// Omitted or `null` returns the channel to inheriting the company default: like every other
-    /// field here, a PUT replaces rather than patches.
-    pub external_reply_handling_override:
-        Option<crate::entities::thread_handoff::ExternalReplyHandling>,
-    pub preferred_reviewer_principal_id: Option<Uuid>,
-    #[serde(default)]
-    pub retrieve_company_memory: bool,
-    #[serde(default)]
-    pub retrieve_agent_memory: bool,
-    #[serde(default)]
-    pub retrieve_user_memory: bool,
-    #[serde(default)]
-    pub persist_company_memory: bool,
-    #[serde(default)]
-    pub persist_agent_memory: bool,
-    #[serde(default)]
-    pub persist_user_memory: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ChannelResponse {
     pub success: bool,
     pub channel: Channel,
-}
-
-/// A saved edit, with what removing agents from the channel stopped. `assignment_removal` is
-/// empty-valued when the edit removed nobody.
-#[derive(Debug, Clone, Serialize)]
-pub struct ChannelUpdateResponse {
-    pub success: bool,
-    pub channel: Channel,
-    pub assignment_removal: crate::use_cases::channel::AssignmentRemoval,
 }
 
 const DEFAULT_THREAD_PAGE_SIZE: usize = 50;
@@ -413,11 +279,10 @@ pub struct ChannelsPageQuery {
 }
 
 /// GET /companies/{company_id}/channels - Full HTML page listing channels (Protected).
-#[instrument(skip(company_use_cases, channel_use_cases, agent_use_cases, config, user))]
+#[instrument(skip(company_use_cases, channel_use_cases, config, user))]
 async fn list_channels_page(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
-    State(agent_use_cases): State<Arc<AgentUseCases>>,
     State(config): State<Arc<AppConfig>>,
     user: AuthenticatedUser,
     Path(company_id): Path<Uuid>,
@@ -433,16 +298,10 @@ async fn list_channels_page(
         .await
         .unwrap_or_default();
 
-    let agents = agent_use_cases
-        .list_assignable_agents(user.id, company_id)
-        .await
-        .unwrap_or_default();
-
     Html(pages::channels_page(&pages::ChannelsPage {
         company: &company,
         app_domain_name: &config.app_domain_name,
         channels: &channels,
-        agents: &agents,
         spam_scan_enabled: config.is_spam_scan_enabled(),
         focus: pages::ChannelsPageFocus {
             create_form_open: matches!(query.new.as_deref(), Some("1") | Some("true")),
@@ -452,28 +311,10 @@ async fn list_channels_page(
 }
 
 /// POST /companies/{company_id}/channels - HTMX create channel (Protected).
-#[instrument(skip(
-    company_use_cases,
-    channel_use_cases,
-    agent_use_cases,
-    thread_handoff_use_cases,
-    config,
-    user,
-    form
-))]
-/// Everything needed to re-render the channel list after any outcome.
-///
-/// Every exit from the create/update handlers ends in the same fragment, optionally headed by an
-/// error alert, so the reload lives here instead of at each `return`.
-#[expect(
-    clippy::too_many_arguments,
-    reason = "Axum handlers receive request state and extractors as parameters"
-)]
+#[instrument(skip(company_use_cases, channel_use_cases, config, user, form))]
 async fn create_channel_handler(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
-    State(agent_use_cases): State<Arc<AgentUseCases>>,
-    State(thread_handoff_use_cases): State<Arc<ThreadHandoffUseCases>>,
     State(config): State<Arc<AppConfig>>,
     user: AuthenticatedUser,
     Path(company_id): Path<Uuid>,
@@ -485,7 +326,6 @@ async fn create_channel_handler(
     };
     let view = ChannelListView {
         channel_use_cases: &channel_use_cases,
-        agent_use_cases: &agent_use_cases,
         app_domain_name: &config.app_domain_name,
         user_id: user.id,
         company: &company,
@@ -499,84 +339,25 @@ async fn create_channel_handler(
         .map(String::from)
         .unwrap_or_else(|| slugify(&form.name));
 
-    let simple_agent =
-        match simple_channel_agent_write(&agent_use_cases, &form, &slug, user.id, company_id).await
-        {
-            Ok(agent) => agent,
-            Err(message) => return view.render(Some(message)).await,
-        };
-    let agent_ids = resolve_channel_agents(&form);
-
     let confirm_spam_disabled = form.confirm_spam_disabled();
     let enabled = form.enabled();
-    let response_trigger = match form.response_trigger() {
-        Ok(trigger) => trigger,
-        Err(error) => return view.render(Some(error)).await,
-    };
     let add_3rd_party = form.add_3rd_party();
-    let memory = match form.memory_settings() {
-        Ok(memory) => memory,
-        Err(error) => return view.render(Some(error)).await,
-    };
-    let reply_handling =
-        match parse_reply_handling_form(form.external_reply_handling_override.as_deref()) {
-            Ok(submitted) => submitted,
-            Err(error) => return view.render(Some(error.to_string())).await,
-        };
-
     let write = ChannelWrite {
         enabled,
         add_3rd_party,
-        response_trigger,
-        external_response_review_override: parse_review_override(
-            form.external_response_review_override.as_deref(),
-        ),
-        preferred_reviewer_principal_id: form
-            .preferred_reviewer_principal_id
-            .map(crate::entities::transport::PrincipalId::new),
         name: form.name,
         description: parse_text_form(form.description),
         slug,
         alias_slugs: parse_list_form(form.alias_slugs),
         participant_emails: parse_emails_form(form.participant_emails),
-        agent_ids,
-        retrieve_company_memory: memory.retrieve_company,
-        retrieve_agent_memory: memory.retrieve_agent,
-        retrieve_user_memory: memory.retrieve_user,
-        persist_company_memory: memory.persist_company,
-        persist_agent_memory: memory.persist_agent,
-        persist_user_memory: memory.persist_user,
         created_by: None,
     };
-    let created = match simple_agent {
-        Some(agent) => {
-            channel_use_cases
-                .create_channel_with_agent(user.id, company_id, agent, write, confirm_spam_disabled)
-                .await
-        }
-        None => {
-            channel_use_cases
-                .create_channel(user.id, company_id, write, confirm_spam_disabled)
-                .await
-        }
-    };
-    let created = match created {
-        Ok(channel) => channel,
-        Err(err) => {
-            return view
-                .render(Some(format!("Failed to create channel: {err}")))
-                .await;
-        }
-    };
-    if let SubmittedReplyHandling::Write(policy_override) = reply_handling
-        && let Err(err) = thread_handoff_use_cases
-            .set_channel_reply_handling_override(company_id, created.id, policy_override)
-            .await
+    if let Err(err) = channel_use_cases
+        .create_channel(user.id, company_id, write, confirm_spam_disabled)
+        .await
     {
         return view
-            .render(Some(format!(
-                "Channel saved, but reply handling failed: {err}"
-            )))
+            .render(Some(format!("Failed to create channel: {err}")))
             .await;
     }
     view.render(None).await
@@ -588,7 +369,6 @@ async fn create_channel_handler(
 /// error alert, so the reload lives here instead of at each `return`.
 struct ChannelListView<'a> {
     channel_use_cases: &'a ChannelUseCases,
-    agent_use_cases: &'a AgentUseCases,
     app_domain_name: &'a str,
     user_id: Uuid,
     company: &'a crate::entities::company::Company,
@@ -597,18 +377,12 @@ struct ChannelListView<'a> {
 impl ChannelListView<'_> {
     async fn render(&self, error: Option<String>) -> Html<String> {
         let company_id = self.company.id;
-        let agents = self
-            .agent_use_cases
-            .list_assignable_agents(self.user_id, company_id)
-            .await
-            .unwrap_or_default();
         let channels = self
             .channel_use_cases
             .list_company_channels(self.user_id, company_id)
             .await
             .unwrap_or_default();
-        let list =
-            pages::channel_list_fragment(self.company, self.app_domain_name, &channels, &agents);
+        let list = pages::channel_list_fragment(self.company, self.app_domain_name, &channels);
         Html(match error {
             Some(message) => format!("{}{}", pages::error_alert(&message), list),
             None => list,
@@ -616,55 +390,11 @@ impl ChannelListView<'_> {
     }
 }
 
-/// The agents this channel should run.
-///
-/// In "simple" mode the submitted instructions are expanded into a system prompt and saved as a
-/// brand new agent, which is then appended to any explicitly selected ones.
-pub(super) fn resolve_channel_agents(form: &ChannelForm) -> Option<Vec<Uuid>> {
-    parse_agent_ids_form(form.agent_ids.clone())
-}
-
-pub(super) async fn simple_channel_agent_write(
-    agent_use_cases: &AgentUseCases,
-    form: &ChannelForm,
-    slug: &str,
-    user_id: Uuid,
-    company_id: Uuid,
-) -> Result<Option<AgentWrite>, String> {
-    if form.form_mode.as_deref() != Some("simple") {
-        return Ok(None);
-    }
-    let Some(instructions) = form
-        .system_prompt
-        .as_deref()
-        .map(str::trim)
-        .filter(|instructions| !instructions.is_empty())
-    else {
-        return Ok(None);
-    };
-    agent_write_from_instructions(
-        agent_use_cases,
-        AgentInstructionRequest {
-            user_id,
-            company_id,
-            name: &form.name,
-            slug,
-            instructions,
-            overrides: ModelOverrides::default(),
-            run_timeout_secs: None,
-            avatar_url: None,
-        },
-    )
-    .await
-    .map(Some)
-}
-
 /// GET /companies/{company_id}/channels/{id}/edit - HTMX edit channel form fragment (Protected).
-#[instrument(skip(company_use_cases, channel_use_cases, agent_use_cases, config, user))]
+#[instrument(skip(company_use_cases, channel_use_cases, config, user))]
 async fn edit_channel_form(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
-    State(agent_use_cases): State<Arc<AgentUseCases>>,
     State(config): State<Arc<AppConfig>>,
     user: AuthenticatedUser,
     Path((company_id, channel_id)): Path<(Uuid, Uuid)>,
@@ -673,11 +403,6 @@ async fn edit_channel_form(
         Ok(Some(c)) => c,
         _ => return Html(pages::error_alert("Company not found.")),
     };
-
-    let agents = agent_use_cases
-        .list_assignable_agents(user.id, company_id)
-        .await
-        .unwrap_or_default();
 
     if let Ok(Some(wf)) = channel_use_cases
         .get_company_channel(user.id, company_id, channel_id)
@@ -687,7 +412,6 @@ async fn edit_channel_form(
             &company,
             &config.app_domain_name,
             &wf,
-            &agents,
             config.is_spam_scan_enabled(),
         ))
     } else {
@@ -696,11 +420,10 @@ async fn edit_channel_form(
 }
 
 /// GET /companies/{company_id}/channels/{id}/cancel - Cancel channel edit fragment (Protected).
-#[instrument(skip(company_use_cases, channel_use_cases, agent_use_cases, config, user))]
+#[instrument(skip(company_use_cases, channel_use_cases, config, user))]
 async fn cancel_channel_edit(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
-    State(agent_use_cases): State<Arc<AgentUseCases>>,
     State(config): State<Arc<AppConfig>>,
     user: AuthenticatedUser,
     Path((company_id, channel_id)): Path<(Uuid, Uuid)>,
@@ -709,11 +432,6 @@ async fn cancel_channel_edit(
         Ok(Some(c)) => c,
         _ => return Html(pages::error_alert("Company not found.")),
     };
-
-    let agents = agent_use_cases
-        .list_assignable_agents(user.id, company_id)
-        .await
-        .unwrap_or_default();
 
     if let Ok(Some(wf)) = channel_use_cases
         .get_company_channel(user.id, company_id, channel_id)
@@ -723,7 +441,6 @@ async fn cancel_channel_edit(
             &company,
             &config.app_domain_name,
             &wf,
-            &agents,
         ))
     } else {
         Html(String::new())
@@ -731,24 +448,10 @@ async fn cancel_channel_edit(
 }
 
 /// PUT /companies/{company_id}/channels/{id} - HTMX update channel (Protected).
-#[instrument(skip(
-    company_use_cases,
-    channel_use_cases,
-    agent_use_cases,
-    thread_handoff_use_cases,
-    config,
-    user,
-    form
-))]
-#[expect(
-    clippy::too_many_arguments,
-    reason = "Axum handlers receive request state and extractors as parameters"
-)]
+#[instrument(skip(company_use_cases, channel_use_cases, config, user, form))]
 async fn update_channel_handler(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
-    State(agent_use_cases): State<Arc<AgentUseCases>>,
-    State(thread_handoff_use_cases): State<Arc<ThreadHandoffUseCases>>,
     State(config): State<Arc<AppConfig>>,
     user: AuthenticatedUser,
     Path((company_id, channel_id)): Path<(Uuid, Uuid)>,
@@ -758,11 +461,6 @@ async fn update_channel_handler(
         Ok(Some(c)) => c,
         _ => return Html(pages::error_alert("Company not found.")),
     };
-
-    let agents = agent_use_cases
-        .list_assignable_agents(user.id, company_id)
-        .await
-        .unwrap_or_default();
 
     let slug = form
         .slug
@@ -774,22 +472,8 @@ async fn update_channel_handler(
 
     let confirm_spam_disabled = form.confirm_spam_disabled();
     let enabled = form.enabled();
-    let response_trigger = match form.response_trigger() {
-        Ok(trigger) => trigger,
-        Err(error) => return Html(pages::error_alert(&error)),
-    };
     let add_3rd_party = form.add_3rd_party();
-    let memory = match form.memory_settings() {
-        Ok(memory) => memory,
-        Err(error) => return Html(pages::error_alert(&error)),
-    };
     let emails = parse_emails_form(form.participant_emails);
-    let agent_ids = parse_agent_ids_form(form.agent_ids);
-    let reply_handling =
-        match parse_reply_handling_form(form.external_reply_handling_override.as_deref()) {
-            Ok(submitted) => submitted,
-            Err(error) => return Html(pages::error_alert(&error.to_string())),
-        };
 
     let write = ChannelWrite {
         name: form.name,
@@ -797,22 +481,8 @@ async fn update_channel_handler(
         slug,
         alias_slugs: parse_list_form(form.alias_slugs),
         participant_emails: emails,
-        agent_ids,
         enabled,
         add_3rd_party,
-        response_trigger,
-        external_response_review_override: parse_review_override(
-            form.external_response_review_override.as_deref(),
-        ),
-        preferred_reviewer_principal_id: form
-            .preferred_reviewer_principal_id
-            .map(crate::entities::transport::PrincipalId::new),
-        retrieve_company_memory: memory.retrieve_company,
-        retrieve_agent_memory: memory.retrieve_agent,
-        retrieve_user_memory: memory.retrieve_user,
-        persist_company_memory: memory.persist_company,
-        persist_agent_memory: memory.persist_agent,
-        persist_user_memory: memory.persist_user,
         created_by: None,
     };
 
@@ -826,27 +496,13 @@ async fn update_channel_handler(
         )
         .await
     {
-        Ok(outcome) => outcome,
+        Ok(channel) => channel,
         Err(err) => return Html(pages::error_alert(&format!("Update failed: {err}"))),
     };
-    let removal_notice = updated
-        .removal
-        .summary()
-        .map(|summary| pages::success_alert(&summary, None))
-        .unwrap_or_default();
-    let updated = updated.channel;
-    if let SubmittedReplyHandling::Write(policy_override) = reply_handling
-        && let Err(err) = thread_handoff_use_cases
-            .set_channel_reply_handling_override(company_id, channel_id, policy_override)
-            .await
-    {
-        return Html(pages::error_alert(&format!(
-            "Channel saved, but reply handling failed: {err}"
-        )));
-    }
-    Html(format!(
-        "{removal_notice}{}",
-        pages::channel_row_fragment(&company, &config.app_domain_name, &updated, &agents)
+    Html(pages::channel_row_fragment(
+        &company,
+        &config.app_domain_name,
+        &updated,
     ))
 }
 
@@ -890,6 +546,7 @@ pub struct OpenThreadParams {
     company_use_cases,
     channel_use_cases,
     thread_use_cases,
+    outcome_reader,
     config,
     user
 ))]
@@ -902,13 +559,14 @@ async fn simulate_channel_page(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
+    State(outcome_reader): State<Arc<dyn MessageOutcomeReader>>,
     State(config): State<Arc<AppConfig>>,
     user: AuthenticatedUser,
     Path((company_id, channel_id)): Path<(Uuid, Uuid)>,
     Query(query): Query<SimulateQuery>,
 ) -> impl IntoResponse {
     let company = match company_use_cases.get_company(company_id).await {
-        Ok(Some(c)) => c,
+        Ok(Some(company)) if company.user_id == user.id => company,
         _ => return Html(pages::error_alert("Company not found.")).into_response(),
     };
     let channel = match channel_use_cases
@@ -933,6 +591,7 @@ async fn simulate_channel_page(
         Some(thread_id) => Some(
             load_simulation_thread_fragment(
                 &thread_use_cases,
+                outcome_reader.as_ref(),
                 &company,
                 &channel,
                 &config.app_domain_name,
@@ -965,6 +624,7 @@ async fn simulate_channel_page(
 /// id could not be opened, so both paths still have something to show the user.
 async fn load_simulation_thread_fragment(
     thread_use_cases: &ThreadUseCases,
+    outcome_reader: &dyn MessageOutcomeReader,
     company: &crate::entities::company::Company,
     channel: &Channel,
     app_domain_name: &str,
@@ -1006,10 +666,22 @@ async fn load_simulation_thread_fragment(
         .get_thread_history(thread.id)
         .await
         .unwrap_or_default();
-    let tasks = thread_use_cases
-        .list_company_tasks(company_id, Some(channel_id), None, true)
+    let message_ids: Vec<Uuid> = messages
+        .iter()
+        .filter(|message| !message.is_agent())
+        .map(|message| message.canonical_id.as_uuid())
+        .collect();
+    let outcomes = match outcome_reader
+        .message_outcomes(company_id, thread.id, &message_ids)
         .await
-        .unwrap_or_default();
+    {
+        Ok(outcomes) => outcomes,
+        Err(err) => {
+            return Err(error_fragment(&format!(
+                "Failed to read workflow outcomes: {err}"
+            )));
+        }
+    };
 
     let reply_context = thread_use_cases
         .latest_email_reply_context(thread.id)
@@ -1022,7 +694,7 @@ async fn load_simulation_thread_fragment(
         thread: &thread,
         messages: &messages,
         reply_context: reply_context.as_ref(),
-        tasks: &tasks,
+        outcomes: &outcomes,
         include_oob,
     });
     Ok((thread, fragment))
@@ -1038,6 +710,7 @@ fn simulation_thread_url(company_id: Uuid, channel_id: Uuid, thread_id: Uuid) ->
     company_use_cases,
     channel_use_cases,
     thread_use_cases,
+    outcome_reader,
     user_use_cases,
     config,
     user,
@@ -1052,6 +725,7 @@ async fn simulate_channel_handler(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
+    State(outcome_reader): State<Arc<dyn MessageOutcomeReader>>,
     State(config): State<Arc<AppConfig>>,
     user: AuthenticatedUser,
     Path((company_id, channel_id)): Path<(Uuid, Uuid)>,
@@ -1197,6 +871,7 @@ async fn simulate_channel_handler(
 
             match load_simulation_thread_fragment(
                 &thread_use_cases,
+                outcome_reader.as_ref(),
                 &company,
                 &channel,
                 &config.app_domain_name,
@@ -1228,11 +903,23 @@ async fn simulate_channel_handler(
 /// is queued like every other message, so the page starts out showing only what was sent and fills
 /// in from here. Every commit or status change on the thread re-renders the view whole: this is a
 /// debugging page, and re-reading it in full is simpler and more honest than patching it in pieces.
-#[instrument(skip(company_use_cases, channel_use_cases, thread_use_cases, events, user))]
+#[instrument(skip(
+    company_use_cases,
+    channel_use_cases,
+    thread_use_cases,
+    outcome_reader,
+    events,
+    user
+))]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Axum handlers receive request state and extractors as parameters"
+)]
 async fn simulation_stream(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
+    State(outcome_reader): State<Arc<dyn MessageOutcomeReader>>,
     State(events): State<MailboxEvents>,
     user: AuthenticatedUser,
     Path((company_id, channel_id)): Path<(Uuid, Uuid)>,
@@ -1262,7 +949,7 @@ async fn simulation_stream(
         .filter(|thread| thread.channel_id == channel_id)
         .ok_or_else(|| AppError::NotFound("Thread not found".into()))?;
 
-    let mut wake_ups = Box::pin(thread_wake_ups(&events, "simulation", thread_id));
+    let mut wake_ups = Box::pin(simulation_wake_ups(&events, "simulation", thread_id));
     let app_domain_name = thread_use_cases.config().app_domain_name.clone();
 
     let stream = async_stream::stream! {
@@ -1273,6 +960,7 @@ async fn simulation_stream(
             // this run, not to every update after it.
             let rendered = load_simulation_thread_fragment(
                 &thread_use_cases,
+                outcome_reader.as_ref(),
                 &company,
                 &channel,
                 &app_domain_name,
@@ -1383,6 +1071,7 @@ struct OpenSimulatedThreadContext {
     company_use_cases: Arc<CompanyUseCases>,
     channel_use_cases: Arc<ChannelUseCases>,
     thread_use_cases: Arc<ThreadUseCases>,
+    outcome_reader: Arc<dyn MessageOutcomeReader>,
     config: Arc<AppConfig>,
     user: AuthenticatedUser,
     company_id: Uuid,
@@ -1398,7 +1087,7 @@ async fn open_simulated_thread_logic(
         .get_company(context.company_id)
         .await
     {
-        Ok(Some(c)) => c,
+        Ok(Some(company)) if company.user_id == context.user.id => company,
         _ => return Html(pages::error_alert("Company not found.")).into_response(),
     };
     let channel = match context
@@ -1412,6 +1101,7 @@ async fn open_simulated_thread_logic(
 
     match load_simulation_thread_fragment(
         &context.thread_use_cases,
+        context.outcome_reader.as_ref(),
         &company,
         &channel,
         &context.config.app_domain_name,
@@ -1437,11 +1127,23 @@ async fn open_simulated_thread_logic(
     }
 }
 
-#[instrument(skip(company_use_cases, channel_use_cases, thread_use_cases, config, user))]
+#[instrument(skip(
+    company_use_cases,
+    channel_use_cases,
+    thread_use_cases,
+    outcome_reader,
+    config,
+    user
+))]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Axum handlers receive request state and extractors as parameters"
+)]
 async fn open_simulated_thread_get(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
+    State(outcome_reader): State<Arc<dyn MessageOutcomeReader>>,
     State(config): State<Arc<AppConfig>>,
     user: AuthenticatedUser,
     Path((company_id, channel_id)): Path<(Uuid, Uuid)>,
@@ -1453,6 +1155,7 @@ async fn open_simulated_thread_get(
             company_use_cases,
             channel_use_cases,
             thread_use_cases,
+            outcome_reader,
             config,
             user,
             company_id,
@@ -1463,11 +1166,23 @@ async fn open_simulated_thread_get(
     .await
 }
 
-#[instrument(skip(company_use_cases, channel_use_cases, thread_use_cases, config, user))]
+#[instrument(skip(
+    company_use_cases,
+    channel_use_cases,
+    thread_use_cases,
+    outcome_reader,
+    config,
+    user
+))]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Axum handlers receive request state and extractors as parameters"
+)]
 async fn open_simulated_thread_post(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
+    State(outcome_reader): State<Arc<dyn MessageOutcomeReader>>,
     State(config): State<Arc<AppConfig>>,
     user: AuthenticatedUser,
     Path((company_id, channel_id)): Path<(Uuid, Uuid)>,
@@ -1479,6 +1194,7 @@ async fn open_simulated_thread_post(
             company_use_cases,
             channel_use_cases,
             thread_use_cases,
+            outcome_reader,
             config,
             user,
             company_id,
@@ -1583,7 +1299,6 @@ async fn list_channel_threads_json(
 /// JSON API: Create company channel (Protected).
 async fn create_channel_json(
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
-    State(thread_handoff_use_cases): State<Arc<ThreadHandoffUseCases>>,
     user: AuthenticatedUser,
     Path(company_id): Path<Uuid>,
     Json(payload): Json<ChannelJsonPayload>,
@@ -1597,56 +1312,19 @@ async fn create_channel_json(
         .map(String::from)
         .unwrap_or_else(|| slugify(&payload.name));
 
-    let reply_handling_override = payload.external_reply_handling_override;
-    let agent_ids = payload.agent_ids;
-    let agent = payload.system_prompt.as_deref().and_then(|prompt| {
-        let prompt = prompt.trim();
-        (!prompt.is_empty()).then(|| AgentWrite {
-            name: payload.name.clone(),
-            slug: slug.clone(),
-            system_prompt: Some(prompt.to_string()),
-            ..AgentWrite::default()
-        })
-    });
-
     let write = ChannelWrite {
         name: payload.name,
         description: parse_text_form(payload.description),
         slug,
         alias_slugs: payload.alias_slugs.unwrap_or_default(),
         participant_emails: payload.participant_emails,
-        agent_ids,
         enabled: payload.enabled.unwrap_or(true),
         add_3rd_party: payload.add_3rd_party.unwrap_or(true),
-        response_trigger: payload.response_trigger.unwrap_or_default(),
-        external_response_review_override: payload.external_response_review_override,
-        preferred_reviewer_principal_id: payload
-            .preferred_reviewer_principal_id
-            .map(crate::entities::transport::PrincipalId::new),
-        retrieve_company_memory: payload.retrieve_company_memory,
-        retrieve_agent_memory: payload.retrieve_agent_memory,
-        retrieve_user_memory: payload.retrieve_user_memory,
-        persist_company_memory: payload.persist_company_memory,
-        persist_agent_memory: payload.persist_agent_memory,
-        persist_user_memory: payload.persist_user_memory,
         created_by: None,
     };
 
-    let channel = match agent {
-        Some(agent) => {
-            channel_use_cases
-                .create_channel_with_agent(user.id, company_id, agent, write, confirm_spam_disabled)
-                .await?
-        }
-        None => {
-            channel_use_cases
-                .create_channel(user.id, company_id, write, confirm_spam_disabled)
-                .await?
-        }
-    };
-    // A second write, because the override must be clearable. See `SubmittedReplyHandling`.
-    thread_handoff_use_cases
-        .set_channel_reply_handling_override(company_id, channel.id, reply_handling_override)
+    let channel = channel_use_cases
+        .create_channel(user.id, company_id, write, confirm_spam_disabled)
         .await?;
 
     Ok((
@@ -1675,13 +1353,11 @@ async fn get_channel_json(
 /// JSON API: Update company channel (Protected).
 pub(super) async fn update_channel_json(
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
-    State(thread_handoff_use_cases): State<Arc<ThreadHandoffUseCases>>,
     user: AuthenticatedUser,
     Path((company_id, channel_id)): Path<(Uuid, Uuid)>,
     Json(payload): Json<ChannelJsonPayload>,
 ) -> AppResult<impl IntoResponse> {
     let confirm_spam_disabled = payload.confirm_spam_disabled.unwrap_or(false);
-    let reply_handling_override = payload.external_reply_handling_override;
     let slug = payload
         .slug
         .as_deref()
@@ -1696,24 +1372,12 @@ pub(super) async fn update_channel_json(
         slug,
         alias_slugs: payload.alias_slugs.unwrap_or_default(),
         participant_emails: payload.participant_emails,
-        agent_ids: payload.agent_ids,
         enabled: payload.enabled.unwrap_or(true),
         add_3rd_party: payload.add_3rd_party.unwrap_or(true),
-        response_trigger: payload.response_trigger.unwrap_or_default(),
-        external_response_review_override: payload.external_response_review_override,
-        preferred_reviewer_principal_id: payload
-            .preferred_reviewer_principal_id
-            .map(crate::entities::transport::PrincipalId::new),
-        retrieve_company_memory: payload.retrieve_company_memory,
-        retrieve_agent_memory: payload.retrieve_agent_memory,
-        retrieve_user_memory: payload.retrieve_user_memory,
-        persist_company_memory: payload.persist_company_memory,
-        persist_agent_memory: payload.persist_agent_memory,
-        persist_user_memory: payload.persist_user_memory,
         created_by: None,
     };
 
-    let outcome = channel_use_cases
+    let channel = channel_use_cases
         .update_channel(
             user.id,
             company_id,
@@ -1722,85 +1386,14 @@ pub(super) async fn update_channel_json(
             confirm_spam_disabled,
         )
         .await?;
-    // A second write, because the override must be clearable. See `SubmittedReplyHandling`.
-    thread_handoff_use_cases
-        .set_channel_reply_handling_override(company_id, channel_id, reply_handling_override)
-        .await?;
 
     Ok((
         StatusCode::OK,
-        Json(ChannelUpdateResponse {
+        Json(ChannelResponse {
             success: true,
-            channel: outcome.channel,
-            assignment_removal: outcome.removal,
+            channel,
         }),
     ))
-}
-
-/// One channel's reply-handling policy, as the API reads it back.
-///
-/// `ChannelResponse` serializes [`Channel`], which deliberately does not carry the override — it is
-/// snapshotted into durable task payloads, and a policy that must be resolved live has no business
-/// being frozen into a queue row. So the policy gets its own pair of routes.
-#[derive(Debug, Clone, Serialize)]
-pub struct ReplyHandlingResponse {
-    pub company_default: crate::entities::thread_handoff::ExternalReplyHandling,
-    pub channel_override: Option<crate::entities::thread_handoff::ExternalReplyHandling>,
-    pub effective: crate::entities::thread_handoff::ExternalReplyHandling,
-    pub inherited: bool,
-}
-
-impl From<crate::entities::thread_handoff::ExternalReplyHandlingPolicy> for ReplyHandlingResponse {
-    fn from(policy: crate::entities::thread_handoff::ExternalReplyHandlingPolicy) -> Self {
-        Self {
-            company_default: policy.company_default,
-            channel_override: policy.channel_override,
-            effective: policy.effective(),
-            inherited: policy.is_inherited(),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct ReplyHandlingPayload {
-    /// `null` returns the channel to inheriting the company default.
-    pub channel_override: Option<crate::entities::thread_handoff::ExternalReplyHandling>,
-}
-
-/// JSON API: Read one channel's reply-handling policy (Protected).
-pub(super) async fn get_reply_handling_json(
-    State(thread_handoff_use_cases): State<Arc<ThreadHandoffUseCases>>,
-    State(company_use_cases): State<Arc<CompanyUseCases>>,
-    user: AuthenticatedUser,
-    Path((company_id, channel_id)): Path<(Uuid, Uuid)>,
-) -> AppResult<impl IntoResponse> {
-    super::ui_thread_handoffs::authorize_policy_manager(&company_use_cases, user.id, company_id)
-        .await?;
-    let policy = thread_handoff_use_cases
-        .reply_handling_policy(company_id, channel_id)
-        .await?
-        .ok_or_else(crate::use_cases::channel::channel_not_found)?;
-    Ok((StatusCode::OK, Json(ReplyHandlingResponse::from(policy))))
-}
-
-/// JSON API: Set or clear one channel's reply-handling override (Protected).
-pub(super) async fn put_reply_handling_json(
-    State(thread_handoff_use_cases): State<Arc<ThreadHandoffUseCases>>,
-    State(company_use_cases): State<Arc<CompanyUseCases>>,
-    user: AuthenticatedUser,
-    Path((company_id, channel_id)): Path<(Uuid, Uuid)>,
-    Json(payload): Json<ReplyHandlingPayload>,
-) -> AppResult<impl IntoResponse> {
-    super::ui_thread_handoffs::authorize_policy_manager(&company_use_cases, user.id, company_id)
-        .await?;
-    thread_handoff_use_cases
-        .set_channel_reply_handling_override(company_id, channel_id, payload.channel_override)
-        .await?;
-    let policy = thread_handoff_use_cases
-        .reply_handling_policy(company_id, channel_id)
-        .await?
-        .ok_or_else(crate::use_cases::channel::channel_not_found)?;
-    Ok((StatusCode::OK, Json(ReplyHandlingResponse::from(policy))))
 }
 
 /// JSON API: Delete company channel (Protected).
@@ -1853,13 +1446,10 @@ mod tests {
             name: "Acme Corp".to_string(),
             slug: "acme".into(),
             avatar_url: None,
-            memory_provider: None,
             created_at: Utc::now(),
         };
 
         let channel = Channel {
-            response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
-            owner_agent_id: None,
             enabled: true,
             add_3rd_party: true,
             id: Uuid::new_v4(),
@@ -1871,15 +1461,9 @@ mod tests {
             participant_emails: Some(vec!["agent@test.com".into()]),
             access_mode: crate::entities::channel::ChannelAccessMode::Allowlist,
             principal_grants: Vec::new(),
-            agent_ids: None,
-            retrieve_company_memory: false,
-            retrieve_agent_memory: false,
-            retrieve_user_memory: false,
-            persist_company_memory: false,
-            persist_agent_memory: false,
-            persist_user_memory: false,
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
+            settings_revision: 0,
         };
 
         let channels = [channel.clone()];
@@ -1887,7 +1471,6 @@ mod tests {
             company: &company,
             app_domain_name: "example.com",
             channels: &channels,
-            agents: &[],
             spam_scan_enabled: true,
             focus: pages::ChannelsPageFocus::default(),
         };
@@ -1899,19 +1482,20 @@ mod tests {
         assert!(page_html.contains("id=\"channel-form-toggle\""));
         assert!(page_html.contains("id=\"channel-form-card\" class=\"hidden"));
         assert!(page_html.contains("aria-controls=\"channel-form-card\""));
-        assert!(page_html.contains("Agent Instructions"));
+        // p08 D4.7: the page creates plain channels; agents get theirs from the agent page.
+        assert!(!page_html.contains("Agent Instructions"));
+        assert!(!page_html.contains("form_mode"));
         assert!(!page_html.contains("target_id\": \"simple_system_prompt\""));
         assert!(!page_html.contains("id=\"simple_prompt_gen_box\""));
-        assert!(page_html.contains("Creating..."));
-        assert!(page_html.contains("animate-spin h-4 w-4"));
         assert!(page_html.contains("hx-disabled-elt=\"find button[type='submit']\""));
 
-        let row_html = pages::channel_row_fragment(&company, "example.com", &channel, &[]);
+        let row_html = pages::channel_row_fragment(&company, "example.com", &channel);
         assert!(row_html.contains("Auto Dispatcher"));
         assert!(row_html.contains("auto-dispatcher@acme.example.com"));
         assert!(row_html.contains("agent@test.com"));
         assert!(!row_html.contains("async"));
-        assert!(row_html.contains("Task Executions"));
+        // The task pages are gone (p08 P08-Q3), and so is the row's link to them.
+        assert!(!row_html.contains("Task Executions"));
         assert!(row_html.contains("New Thread"));
         assert!(row_html.contains(&format!(
             "/companies/{}/channels/{}/threads",
@@ -1958,7 +1542,7 @@ mod tests {
         );
         assert!(next_threads.contains("hx-swap-oob=\"outerHTML\""));
 
-        let edit_html = pages::channel_edit_fragment(&company, "example.com", &channel, &[], true);
+        let edit_html = pages::channel_edit_fragment(&company, "example.com", &channel, true);
         assert!(edit_html.contains("hx-put="));
         assert!(edit_html.contains("value=\"Auto Dispatcher\""));
         assert!(!edit_html.contains("Custom Channel Agent"));
@@ -2040,7 +1624,7 @@ mod tests {
             thread_index: None,
             created_at: Utc::now(),
         });
-        let test_agent_message = stored_email_view(EmailMessageDraft {
+        let mut test_agent_message = stored_email_view(EmailMessageDraft {
             id: Uuid::new_v4(),
             thread_id: test_message.thread_id,
             message_id: "<out1@test>".into(),
@@ -2094,6 +1678,51 @@ mod tests {
             updated_at: Utc::now(),
         };
 
+        // p08 D4.6: every binding's outcome under the inbound message, the writing run under the
+        // reply.
+        use crate::{
+            domain::workflow::{RunState, WaitingReason},
+            entities::message_outcome::{
+                AdmittedRun, BindingOutcome, MessageBindingOutcome, RunExecutionSummary,
+                RunModelUsage,
+            },
+        };
+        let run_id = Uuid::new_v4();
+        test_agent_message.run_ids = vec![run_id];
+        let outcomes = [
+            MessageBindingOutcome {
+                message_id: test_message.canonical_id.as_uuid(),
+                binding_id: Uuid::new_v4(),
+                workflow_title: "Triage".into(),
+                outcome: BindingOutcome::Admitted(AdmittedRun {
+                    run_id,
+                    state: RunState::Waiting(WaitingReason::Decision),
+                    executions: vec![RunExecutionSummary {
+                        step_id: "draft".into(),
+                        activation: 1,
+                        route: Some("ready".into()),
+                        created_at: Utc::now(),
+                        activated_at: Some(Utc::now()),
+                        completed_at: Some(Utc::now()),
+                    }],
+                    model_usage: vec![RunModelUsage {
+                        provider: "anthropic".into(),
+                        model: "claude-test".into(),
+                        calls: 2,
+                        input_tokens: 120,
+                        output_tokens: 30,
+                    }],
+                }),
+            },
+            MessageBindingOutcome {
+                message_id: test_message.canonical_id.as_uuid(),
+                binding_id: Uuid::new_v4(),
+                workflow_title: "<b>Escalation</b>".into(),
+                outcome: BindingOutcome::Refused {
+                    reason: "unavailable".into(),
+                },
+            },
+        ];
         let loaded_thread_html =
             pages::channel_simulation_loaded_thread_fragment(&pages::SimulationThreadView {
                 company: &company,
@@ -2102,12 +1731,26 @@ mod tests {
                 thread: &sample_thread,
                 messages: &[test_message, test_agent_message],
                 reply_context: None,
-                tasks: &[],
+                outcomes: &outcomes,
                 include_oob: true,
             });
         assert!(loaded_thread_html.contains("Thread Loaded & Active"));
         assert!(loaded_thread_html.contains("Existing Thread Subject"));
-        assert!(loaded_thread_html.contains("Task Execution Parameters"));
+        assert!(!loaded_thread_html.contains("Task Execution Parameters"));
+        assert!(loaded_thread_html.contains("Workflow outcomes"));
+        assert!(loaded_thread_html.contains("Waiting on a decision"));
+        assert!(loaded_thread_html.contains("draft #1"));
+        assert!(
+            loaded_thread_html
+                .contains("anthropic / claude-test · 2 calls · 120 in / 30 out tokens")
+        );
+        assert!(loaded_thread_html.contains("Refused"));
+        assert!(loaded_thread_html.contains("unavailable"));
+        assert!(loaded_thread_html.contains("&lt;b&gt;Escalation&lt;/b&gt;"));
+        assert!(loaded_thread_html.contains(&format!(
+            "Written by run <span class=\"text-primary\">{}</span>",
+            &run_id.to_string()[..8]
+        )));
         assert!(loaded_thread_html.contains("Simulate Reply Webhook Call"));
         assert!(loaded_thread_html.contains("Trigger Reply Webhook Simulation"));
         assert!(loaded_thread_html.contains("Simulating..."));
@@ -2142,89 +1785,27 @@ mod tests {
         use axum::extract::FromRequest;
         use axum::http::{Request, header};
 
-        let req_simple = Request::builder()
+        let req_named = Request::builder()
             .method("POST")
             .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
-            .body(Body::from(
-                "name=Inbound+Support&system_prompt=You+are+a+support+agent.&form_mode=simple",
-            ))
+            .body(Body::from("name=Inbound+Support"))
             .unwrap();
-        let form_simple = Form::<ChannelForm>::from_request(req_simple, &())
+        let form_named = Form::<ChannelForm>::from_request(req_named, &())
             .await
             .unwrap()
             .0;
-        assert_eq!(form_simple.name, "Inbound Support");
-        assert_eq!(form_simple.slug, None);
-        assert_eq!(
-            form_simple.system_prompt,
-            Some("You are a support agent.".to_string())
-        );
-        assert_eq!(form_simple.form_mode.as_deref(), Some("simple"));
-        assert_eq!(slugify(&form_simple.name), "inbound-support");
+        assert_eq!(form_named.name, "Inbound Support");
+        assert_eq!(form_named.slug, None);
+        assert_eq!(slugify(&form_named.name), "inbound-support");
 
-        let req_omitted = Request::builder()
-            .method("PUT")
-            .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
-            .body(Body::from("name=My+Channel&slug=my-channel"))
-            .unwrap();
-        let form_omitted = Form::<ChannelForm>::from_request(req_omitted, &())
-            .await
-            .unwrap()
-            .0;
+        assert_eq!(parse_agent_ids_form(None), None, "an absent field is none");
+        assert_eq!(parse_agent_ids_form(Some(String::new())), Some(Vec::new()));
+        let one = Uuid::parse_str("00000000-0000-0000-0000-000000000001").unwrap();
+        let two = Uuid::parse_str("00000000-0000-0000-0000-000000000002").unwrap();
+        assert_eq!(parse_agent_ids_form(Some(one.to_string())), Some(vec![one]));
         assert_eq!(
-            parse_agent_ids_form(form_omitted.agent_ids),
-            None,
-            "no field keeps the channel's agents"
-        );
-
-        let req_emptied = Request::builder()
-            .method("PUT")
-            .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
-            .body(Body::from("name=My+Channel&slug=my-channel&agent_ids="))
-            .unwrap();
-        let form_emptied = Form::<ChannelForm>::from_request(req_emptied, &())
-            .await
-            .unwrap()
-            .0;
-        assert_eq!(
-            parse_agent_ids_form(form_emptied.agent_ids),
-            Some(Vec::new()),
-            "an empty field removes them"
-        );
-
-        let req_single = Request::builder()
-            .method("PUT")
-            .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
-            .body(Body::from(
-                "name=My+Channel&slug=my-channel&agent_ids=00000000-0000-0000-0000-000000000001",
-            ))
-            .unwrap();
-        let form_single = Form::<ChannelForm>::from_request(req_single, &())
-            .await
-            .unwrap()
-            .0;
-        assert_eq!(
-            parse_agent_ids_form(form_single.agent_ids),
-            Some(vec![
-                Uuid::parse_str("00000000-0000-0000-0000-000000000001").unwrap()
-            ])
-        );
-
-        let req_multiple = Request::builder()
-            .method("PUT")
-            .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
-            .body(Body::from("name=My+Channel&slug=my-channel&agent_ids=00000000-0000-0000-0000-000000000001%2C00000000-0000-0000-0000-000000000002"))
-            .unwrap();
-        let form_multiple = Form::<ChannelForm>::from_request(req_multiple, &())
-            .await
-            .unwrap()
-            .0;
-        assert_eq!(
-            parse_agent_ids_form(form_multiple.agent_ids),
-            Some(vec![
-                Uuid::parse_str("00000000-0000-0000-0000-000000000001").unwrap(),
-                Uuid::parse_str("00000000-0000-0000-0000-000000000002").unwrap(),
-            ])
+            parse_agent_ids_form(Some(format!("{one},{two}"))),
+            Some(vec![one, two])
         );
     }
 }

@@ -1,6 +1,4 @@
-use crate::domain::monitoring::{
-    AiExecutionMetrics, MonitoringService, SmtpConnectionMetrics, TaskExecutionMetrics,
-};
+use crate::domain::monitoring::{AiExecutionMetrics, MonitoringService, SmtpConnectionMetrics};
 use tracing::info;
 
 pub struct TracingMonitor;
@@ -46,20 +44,6 @@ impl MonitoringService for TracingMonitor {
             mail_from = ?metrics.mail_from,
             rcpt_to = ?metrics.rcpt_to,
             "SMTP Connection Processed"
-        );
-    }
-
-    fn record_task_execution(&self, metrics: &TaskExecutionMetrics) {
-        info!(
-            target: "monitoring::task",
-            company_id = ?metrics.company_id,
-            channel_id = ?metrics.channel_id,
-            task_type = %metrics.task_type,
-            duration_ms = metrics.duration_ms,
-            status = %metrics.status,
-            stop_reason = %metrics.stop_reason,
-            retry_count = metrics.retry_count,
-            "Task Execution Processed"
         );
     }
 

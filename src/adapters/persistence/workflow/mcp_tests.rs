@@ -54,6 +54,7 @@ async fn workflow_mcp_json_and_sse_run_end_to_end_with_typed_refs() {
             worker: WorkflowWorkerId(Uuid::new_v4()),
             lease: lease(),
             poll: PollPolicy::new(Duration::from_millis(50), 16).unwrap(),
+            active_jobs: None,
         };
         let shutdown = CancellationToken::new();
         worker

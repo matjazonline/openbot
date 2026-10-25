@@ -1,0 +1,162 @@
+[
+  {
+    "name": "setup: one company for the fresh owner",
+    "ok": true,
+    "detail": "200 1"
+  },
+  {
+    "name": "setup: Hold for review published, bound and active",
+    "ok": true,
+    "detail": "200 200 {\"content_hash\":\"5b6b8715167c21882702bb81153fb395b9f3897ecb79e90d9910421f28c89bee\",\"version_id\":\"03c66f88-ba61-8d2c-8ea3-94e9b2f881d3\"} 200 {\"active\":false,\"association\":{\"kind\":\"company\"},\"binding_id\":\"7c731620-5932-48d8-a6a1-c62db1c5caba\",\"configuration_revision\":1,\"state_revision\":1} 200"
+  },
+  {
+    "name": "setup: Quick map published, bound and active",
+    "ok": true,
+    "detail": "200 200 {\"content_hash\":\"d27de257c7a1149440efc736ba31c4e508c2b350ee38a6e3ab1058f0a324d54d\",\"version_id\":\"e13659a5-c2e0-8b8d-890d-6a839fe532da\"} 200 {\"active\":false,\"association\":{\"kind\":\"company\"},\"binding_id\":\"6ac77f71-9cac-4181-802b-a705ef08e93c\",\"configuration_revision\":1,\"state_revision\":1} 200"
+  },
+  {
+    "name": "setup: five runs started",
+    "ok": true,
+    "detail": "201 {\"replayed\":false,\"run_id\":\"2641b6ed-4aa2-4e54-b102-55e482a6a7fb\"} | 201 {\"replayed\":false,\"run_id\":\"7c0717c4-5f74-4f31-9181-cb5c1fbb1a26\"} | 201 {\"replayed\":false,\"run_id\":\"6f38e3f1-2dad-4ad3-84f0-ae9028ac1438\"} | 201 {\"replayed\":false,\"run_id\":\"4e783f20-d7c7-4667-888a-695678dbd1af\"} | 201 {\"replayed\":false,\"run_id\":\"9ba7bc47-ad37-4902-8adc-723d9751d8fd\"}"
+  },
+  {
+    "name": "workspace lists the five runs",
+    "ok": true,
+    "detail": "5"
+  },
+  {
+    "name": "a new run appears through the stream, without a navigation",
+    "ok": true,
+    "detail": "6"
+  },
+  {
+    "name": "overlapping wake-ups settle on the current list (12 runs), one list, one pane, one stream owner",
+    "ok": true,
+    "detail": "12 1,1,1"
+  },
+  {
+    "name": "no run listed twice",
+    "ok": true,
+    "detail": "12"
+  },
+  {
+    "name": "opening a run pushes its URL",
+    "ok": true,
+    "detail": "http://localhost:3001/ui/workflow-runs?company_id=0a97009c-7b18-4537-9e27-e24cd510d927&run_id=4e783f20-d7c7-4667-888a-695678dbd1af"
+  },
+  {
+    "name": "the waiting run shows its state, controls and steps",
+    "ok": true,
+    "detail": "Hold for review\nwaiting (timer)\n\nRun 4e783f20 · revision 13 · started Oct 25, 2026, 01:46 AM GMT+2 · deadline Oct 26, 2026, 12:46 AM GMT+1\n\nWorkflow Hold for review, version 03c66f88 (draft revision 1), frozen when the run started.\nBinding 7c731620 · Company-wide · started by b2a7f2b1f\nControls\nCanc"
+  },
+  {
+    "name": "the run graph is drawn",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "hostile input is shown as text, never as markup",
+    "ok": true,
+    "detail": "true,false "
+  },
+  {
+    "name": "Enter on a step opens it and loads what it froze and produced",
+    "ok": true,
+    "detail": "start · activation 1 · finished → success\n\nCreated Oct 25, 2026, 01:46 AM GMT+2 · started Oct 25, 2026, 01:46 AM GMT+2 · finished Oct 25, 2026, 01:46 AM GMT+2 · route success → hold\n\nInputs (frozen when the step started)\n\n{\n  \"output_schema\": {\n    \"maxLength\": 128,\n    \"type\": \"string\"\n  },\n  \"valu"
+  },
+  {
+    "name": "a change elsewhere reloads the body; the open finished step stays open and loaded",
+    "ok": true,
+    "detail": "200 true start · activation 1 · finished → success\n\nCreated Oct 25, 2026, 01:46 AM GMT+2 · started Oct 25, 2026, 01:46 AM GMT+2 ·"
+  },
+  {
+    "name": "cancel asks first, naming what stays",
+    "ok": true,
+    "detail": "Cancel this run? Steps not yet started will not run. No effect of this run has been accepted yet."
+  },
+  {
+    "name": "cancel answers on the pane and the run is cancelled",
+    "ok": true,
+    "detail": "Cancelled (revision 15). Steps not yet started will not run; effects already accepted stay.\nHold for review\ncancelled\n\nRun 4e783f20 · revision 15 · started Oct 25, 2026, 01:46 AM GMT+2 · deadline Oct 26, 2026, 12:46 AM GMT+1\n\nWorkflow Hold for review, version 03c66f88 (draft revision 1), frozen when"
+  },
+  {
+    "name": "the answer outlasts the run's own wake-up",
+    "ok": true,
+    "detail": "Cancelled (revision 15). Steps not yet started will not run; effects already accepted stay.\nHold for review\ncancelled\n\nRun 4e783f20 · revision 15 · started Oct 25, 2026, 01:46 AM GMT+2 · deadline Oct "
+  },
+  {
+    "name": "the parked step of the cancelled run reads as stopped, in the list and on the graph",
+    "ok": true,
+    "detail": "[true,1]"
+  },
+  {
+    "name": "rerun moves the pane and the URL to the new run",
+    "ok": true,
+    "detail": "Started run 1b38fe58 as a rerun of 4e783f20: a new run with its own history.\nHold for review\nqueued\n\nRun 1b38fe58 · revision 3 · started Oct 25, 2026, 01:46 AM GMT+2 · deadline Oct 26, 2026, 12:46 AM  http://localhost:3001/ui/workflow-runs?company_id=0a97009c-7b18-4537-9e27-e24cd510d927&run_id=1b38fe58-c34a-4c51-b75b-ec478711a9f6"
+  },
+  {
+    "name": "the list labels the rerun after its wake-up",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "Back returns to the cancelled run",
+    "ok": true,
+    "detail": "http://localhost:3001/ui/workflow-runs?company_id=0a97009c-7b18-4537-9e27-e24cd510d927&run_id=4e783f20-d7c7-4667-888a-695678dbd1af"
+  },
+  {
+    "name": "a deep link opens that run",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "the state filter keeps only succeeded runs",
+    "ok": true,
+    "detail": "10"
+  },
+  {
+    "name": "a full first page offers Load more",
+    "ok": true,
+    "detail": "50"
+  },
+  {
+    "name": "Load more appends the rest without repeats",
+    "ok": true,
+    "detail": "58"
+  },
+  {
+    "name": "Tab reaches a run link with a visible focus indicator",
+    "ok": true,
+    "detail": "{\"outline\":\"solid 2px\",\"shadow\":\"none\",\"href\":\"/ui/workflow-runs/983b46af-c8e4-43c9-830b-05c4e490b3dc?company_id=0a97009c-7b18-4537-9e27-e24cd510d927\"}"
+  },
+  {
+    "name": "Enter on a run link opens its pane",
+    "ok": true,
+    "detail": "http://localhost:3001/ui/workflow-runs?company_id=0a97009c-7b18-4537-9e27-e24cd510d927&run_id=983b46af-c8e4-43c9-830b-05c4e490b3dc"
+  },
+  {
+    "name": "light: theme applied and no text under 3:1",
+    "ok": true,
+    "detail": "light [{\"ratio\":4.55,\"text\":\"Every run of this company's workflows, n\",\"cls\":\"mt-1 text-xs leading-relaxed opacity-60\"},{\"ratio\":5.12,\"text\":\"succeeded\",\"cls\":\"badge badge-sm badge-success\"},{\"ratio\":5.12,\"text\":\"succeeded\",\"cls\":\"badge badge-sm badge-success\"}]"
+  },
+  {
+    "name": "dark: theme applied and no text under 3:1",
+    "ok": true,
+    "detail": "dark [{\"ratio\":5.12,\"text\":\"succeeded\",\"cls\":\"badge badge-sm badge-success\"},{\"ratio\":5.12,\"text\":\"succeeded\",\"cls\":\"badge badge-sm badge-success\"},{\"ratio\":5.12,\"text\":\"succeeded\",\"cls\":\"badge badge-sm badge-success\"}]"
+  },
+  {
+    "name": "a binding filter shows only that binding and a way back",
+    "ok": true,
+    "detail": "3"
+  },
+  {
+    "name": "every request htmx aborted (10) was a superseded read (GET), never a write",
+    "ok": true,
+    "detail": "get /ui/workflow-runs/list?company_id=0a97009c-7b18-4537-9e27-e24cd510d927 | get /ui/workflow-runs/list?company_id=0a97009c-7b18-4537-9e27-e24cd510d927 | get /ui/workflow-runs/list?company_id=0a97009c-7b18-4537-9e27-e24cd510d927 | get /ui/workflow-runs/list?company_id=0a97009c-7b18-4537-9e27-e24cd510d927 | get /ui/workflow-runs/list?company_id=0a97009c-7b18-4537-9e27-e24cd510d927 | get /ui/workflo"
+  },
+  {
+    "name": "no unexpected page errors",
+    "ok": true,
+    "detail": ""
+  }
+]

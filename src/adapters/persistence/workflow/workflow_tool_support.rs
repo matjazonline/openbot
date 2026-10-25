@@ -266,6 +266,8 @@ impl ToolSetup {
                 idempotency_key: IdempotencyKey::parse(key).unwrap(),
                 input: json!({}),
                 rerun_of: None,
+                delivery_policy: crate::application::workflow::DeliveryPolicy::Deliver,
+                expected_binding_revision: None,
             })
             .await
     }

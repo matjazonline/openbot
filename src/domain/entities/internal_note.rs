@@ -1,19 +1,16 @@
-//! Private thread notes and the explicit commands that make an agent consume them.
+//! Private thread notes.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use uuid::Uuid;
 
-use crate::entities::{
-    message::CanonicalMessageId, thread_handoff::HandoffRunRequest, transport::PrincipalId,
-};
+use crate::entities::transport::PrincipalId;
 
 /// Notes are intentionally much smaller than transport messages. They are collaboration context,
 /// not an alternate upload path; attachments remain unsupported until their security lifecycle is
 /// defined end to end.
 pub const MAX_INTERNAL_NOTE_BYTES: usize = 65_536;
-pub const MAX_SELECTED_NOTES: usize = 50;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -84,77 +81,6 @@ pub struct TombstoneInternalNote {
     pub command_id: Uuid,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct AskOwnerToAct {
-    pub company_id: Uuid,
-    pub channel_id: Uuid,
-    pub thread_id: Uuid,
-    pub task_id: Uuid,
-    pub expected_ownership_version: u64,
-    pub note_ids: Vec<Uuid>,
-    pub command_id: Uuid,
-    /// Set when this wake-up is a handoff's **Generate draft**, so the same transaction that wakes
-    /// the agent also records the run and moves the handoff. `None` is an ordinary ask.
-    pub handoff: Option<HandoffRunRequest>,
-}
-
-impl AskOwnerToAct {
-    pub fn validate(&self) -> Result<(), String> {
-        if self.expected_ownership_version == 0 || self.expected_ownership_version > i64::MAX as u64
-        {
-            return Err("The expected ownership version is invalid.".into());
-        }
-        if let Some(handoff) = self.handoff {
-            handoff.validate()?;
-        }
-        if self.note_ids.is_empty() {
-            return Err("Select at least one active internal note.".into());
-        }
-        if self.note_ids.len() > MAX_SELECTED_NOTES {
-            return Err(format!("Select at most {MAX_SELECTED_NOTES} notes."));
-        }
-        let mut unique = self.note_ids.clone();
-        unique.sort_unstable();
-        unique.dedup();
-        if unique.len() != self.note_ids.len() {
-            return Err("The selected internal notes must be unique.".into());
-        }
-        Ok(())
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct StartAgentTask {
-    pub company_id: Uuid,
-    pub channel_id: Uuid,
-    pub thread_id: Uuid,
-    pub note_ids: Vec<Uuid>,
-    pub command_id: Uuid,
-    /// Set when this task is a handoff's **Generate draft**. See [`AskOwnerToAct::handoff`].
-    pub handoff: Option<HandoffRunRequest>,
-}
-
-impl StartAgentTask {
-    pub fn validate(&self) -> Result<(), String> {
-        if let Some(handoff) = self.handoff {
-            handoff.validate()?;
-        }
-        if self.note_ids.is_empty() {
-            return Err("Select at least one active internal note.".into());
-        }
-        if self.note_ids.len() > MAX_SELECTED_NOTES {
-            return Err(format!("Select at most {MAX_SELECTED_NOTES} notes."));
-        }
-        let mut unique = self.note_ids.clone();
-        unique.sort_unstable();
-        unique.dedup();
-        if unique.len() != self.note_ids.len() {
-            return Err("The selected internal notes must be unique.".into());
-        }
-        Ok(())
-    }
-}
-
 /// Lifecycle metadata for one note as a mailbox renders it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InternalNoteView {
@@ -170,24 +96,6 @@ impl InternalNoteView {
     pub const fn is_active(&self) -> bool {
         self.superseded_by_note_id.is_none() && self.tombstoned_at.is_none()
     }
-}
-
-/// A selected note as it crosses the prompt boundary. No transport fields are present.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct AgentInstructionNote {
-    pub note_id: Uuid,
-    pub message_id: CanonicalMessageId,
-    pub author_display: String,
-    pub created_at: DateTime<Utc>,
-    pub supersedes_note_id: Option<Uuid>,
-    pub body: String,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum AskOwnerOutcome {
-    Queued,
-    Requeued,
-    Parked,
 }
 
 #[cfg(test)]
@@ -215,41 +123,5 @@ mod tests {
                 .validate()
                 .is_err()
         );
-    }
-
-    #[test]
-    fn selected_notes_are_required_unique_and_bounded() {
-        let selected = Uuid::new_v4();
-        let mut ask = AskOwnerToAct {
-            company_id: Uuid::new_v4(),
-            channel_id: Uuid::new_v4(),
-            thread_id: Uuid::new_v4(),
-            task_id: Uuid::new_v4(),
-            expected_ownership_version: 1,
-            note_ids: Vec::new(),
-            command_id: Uuid::new_v4(),
-            handoff: None,
-        };
-        assert!(ask.validate().is_err());
-        ask.expected_ownership_version = 0;
-        ask.note_ids = vec![selected];
-        assert!(ask.validate().is_err());
-        ask.expected_ownership_version = 1;
-        ask.note_ids = vec![selected, selected];
-        assert!(ask.validate().is_err());
-        ask.note_ids = (0..=MAX_SELECTED_NOTES).map(|_| Uuid::new_v4()).collect();
-        assert!(ask.validate().is_err());
-        ask.note_ids.pop();
-        assert!(ask.validate().is_ok());
-
-        let start = StartAgentTask {
-            company_id: ask.company_id,
-            channel_id: ask.channel_id,
-            thread_id: ask.thread_id,
-            note_ids: ask.note_ids,
-            command_id: Uuid::new_v4(),
-            handoff: None,
-        };
-        assert!(start.validate().is_ok());
     }
 }

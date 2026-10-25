@@ -1,7 +1,7 @@
 use super::*;
 use crate::application::workflow::checkpoints::WorkflowCheckpointUpdate as Update;
+use crate::services::harness::AgentExecutionOutput;
 use crate::services::harness::runs::{InvocationId, SavedToolCall};
-use crate::services::harness::{AgentExecutionDisposition, AgentExecutionOutput};
 
 fn output() -> AgentExecutionOutput {
     AgentExecutionOutput {
@@ -9,7 +9,6 @@ fn output() -> AgentExecutionOutput {
         structured: None,
         metadata: None,
         token_usage: Default::default(),
-        disposition: AgentExecutionDisposition::Completed,
     }
 }
 

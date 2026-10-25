@@ -1,0 +1,489 @@
+<!DOCTYPE html><html lang="en" data-theme="dark" class="h-full"><head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sample browser Workflows - Mail Agents</title>
+    <link href="/assets/app.css?v=14be5953539bf556" rel="stylesheet" type="text/css">
+    <style>
+        .loading-spinner {
+            -webkit-mask-image: none;
+            mask-image: none;
+            background-color: transparent;
+            box-sizing: border-box;
+            border: 2px solid currentColor;
+            border-right-color: transparent;
+            border-radius: 50%;
+            animation: spinner-rotate 0.7s linear infinite;
+        }
+        @keyframes spinner-rotate { to { transform: rotate(360deg); } }
+
+        .loading-dots { animation: loading-fade 1.2s ease-in-out infinite; }
+        @keyframes loading-fade { 50% { opacity: 0.35; } }
+
+        /* An icon-only button has no room beside its glyph, so the spinner stands in for it
+           rather than crowding in next to it. */
+        [data-busy-icon-only] > :not([data-request-spinner]) { display: none !important; }
+
+        @media (prefers-reduced-motion: reduce) {
+            .loading-spinner { animation-duration: 2s; }
+            .loading-dots { animation-duration: 3s; }
+        }
+
+        .brand-logo-on-light { display: none; }
+        [data-theme="light"] .brand-logo-on-dark { display: none; }
+        [data-theme="light"] .brand-logo-on-light { display: block; }
+
+        [data-theme="dark"] {
+            --color-primary: oklch(50% 0.19 264.05);
+            --color-primary-content: oklch(96% 0.02 264.05);
+            --color-info: oklch(66% 0.13 232.661);
+        }
+
+        :root, [data-theme] { --radius-field: .5rem !important; }
+
+        .input:focus, .input:focus-within,
+        .select:focus, .select:focus-within, .select:open,
+        .textarea:focus, .textarea:focus-within,
+        .file-input:focus, .file-input:focus-within { outline-offset: -1px; }
+
+        .form-control > .label { white-space: normal; }
+
+        :root {
+            color-scheme: light dark;
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+                "Segoe UI", sans-serif;
+            font-synthesis: none;
+            text-rendering: optimizeLegibility;
+        }
+
+        body {
+            background-image:
+                radial-gradient(circle at 18% -10%, color-mix(in oklab, var(--color-primary) 9%, transparent), transparent 28rem),
+                linear-gradient(135deg, color-mix(in oklab, var(--color-base-200) 35%, transparent), transparent 42%);
+        }
+
+        ::selection {
+            background: color-mix(in oklab, var(--color-primary) 28%, transparent);
+        }
+
+        :where(a, button, input, select, textarea):focus-visible {
+            outline: 2px solid var(--color-primary);
+            outline-offset: 2px;
+        }
+
+        .app-topbar {
+            background: color-mix(in oklab, var(--color-base-100) 88%, transparent);
+            box-shadow: 0 1px 0 color-mix(in oklab, var(--color-base-content) 7%, transparent);
+            backdrop-filter: blur(18px) saturate(140%);
+        }
+
+        .app-rail {
+            scrollbar-width: none;
+            background: color-mix(in oklab, var(--color-base-200) 86%, var(--color-base-300));
+        }
+        .app-rail::-webkit-scrollbar { display: none; }
+        .app-rail .btn {
+            position: relative;
+            min-height: 2.75rem;
+            transition: background-color 160ms ease, color 160ms ease, transform 160ms ease;
+        }
+        .app-rail .btn:hover { transform: translateY(-1px); }
+        .app-rail .btn-primary::before {
+            position: absolute;
+            left: -.55rem;
+            width: 3px;
+            height: 1.5rem;
+            border-radius: 999px;
+            background: currentColor;
+            content: "";
+        }
+
+        aside.bg-base-200 {
+            background: color-mix(in oklab, var(--color-base-200) 90%, transparent);
+        }
+
+        .workspace-heading h2 {
+            letter-spacing: -.025em;
+        }
+
+        .menu :where(li > a, li > button) {
+            border-radius: .625rem;
+            transition: background-color 140ms ease, color 140ms ease, transform 140ms ease;
+        }
+        .menu :where(li > a, li > button):hover { transform: translateX(1px); }
+        .menu .menu-active {
+            box-shadow: inset 3px 0 0 var(--color-primary);
+            font-weight: 650;
+        }
+
+        .card, .modal-box, section.rounded-box {
+            border-color: color-mix(in oklab, var(--color-base-content) 10%, transparent);
+            box-shadow: 0 1px 2px color-mix(in oklab, #000 10%, transparent),
+                0 12px 32px color-mix(in oklab, #000 5%, transparent);
+        }
+
+        .btn { font-weight: 650; letter-spacing: -.01em; }
+        .badge { font-weight: 650; }
+        .table :where(th) {
+            font-size: .6875rem;
+            letter-spacing: .06em;
+            text-transform: uppercase;
+            opacity: .65;
+        }
+
+        * { scrollbar-color: color-mix(in oklab, var(--color-base-content) 18%, transparent) transparent; }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                scroll-behavior: auto !important;
+                transition-duration: .01ms !important;
+                animation-duration: .01ms !important;
+                animation-iteration-count: 1 !important;
+            }
+        }
+
+        .thread-row.thread-replied .thread-activity { display: none; }
+
+        .mailbox-compact-header, .mailbox-sidebar-close { display: none; }
+
+        @media (max-width: 79.999rem) {
+            #mailbox-sidebar {
+                display: none;
+                position: fixed;
+                z-index: 35;
+                top: 4rem;
+                bottom: 0;
+                left: 4rem;
+                box-shadow: 12px 0 32px color-mix(in oklab, #000 22%, transparent);
+            }
+            #mailbox-sidebar.mailbox-sidebar-open { display: flex; }
+            .mailbox-compact-header { display: flex; }
+            .mailbox-sidebar-close { display: inline-flex; }
+        }
+
+        @media (max-width: 47.999rem) {
+            #mailbox-sidebar {
+                left: 0;
+                width: min(20rem, 85vw);
+                z-index: 46;
+            }
+        }
+
+        /* `dvh` follows a mobile browser's collapsing toolbars; `vh` does not, and leaves the
+           composer under the address bar. The `vh` line is the fallback for browsers without it. */
+        .app-shell { height: 100vh; height: 100dvh; }
+
+        #rail-backdrop { display: none; }
+        .ui-mobile-only, .ui-mobile-back, .rail-label { display: none; }
+
+        @media (max-width: 47.999rem) {
+            .ui-desktop-only { display: none; }
+            .ui-mobile-only { display: inline-flex; }
+            body[data-pane="detail"] .ui-mobile-back { display: inline-flex; }
+
+            /* The rail slides in over the workspace, wide enough here to name its destinations --
+               a column of unlabelled glyphs is affordable beside content, not on top of it. */
+            .app-rail {
+                position: fixed;
+                top: 4rem;
+                bottom: 0;
+                left: 0;
+                z-index: 47;
+                width: 15rem;
+                align-items: stretch;
+                transform: translateX(-100%);
+                transition: transform 180ms ease;
+                box-shadow: 12px 0 32px color-mix(in oklab, #000 28%, transparent);
+            }
+            body[data-rail="open"] .app-rail { transform: none; }
+            .app-rail .btn {
+                width: 100%;
+                justify-content: flex-start;
+                gap: .75rem;
+                padding-inline: .75rem;
+            }
+            .app-rail .btn-primary::before { left: .125rem; }
+            .rail-label { display: inline; }
+
+            #rail-backdrop {
+                display: block;
+                position: fixed;
+                inset: 4rem 0 0 0;
+                z-index: 46;
+                background: color-mix(in oklab, #000 45%, transparent);
+                opacity: 0;
+                pointer-events: none;
+                transition: opacity 180ms ease;
+            }
+            body[data-rail="open"] #rail-backdrop { opacity: 1; pointer-events: auto; }
+
+            /* Stacking the workspace lets a column that is on its own take the full window, and
+               lets the two that are not sit above one another instead of shoulder to shoulder. */
+            .app-workspace { flex-direction: column; }
+
+            .ui-pane-list, .ui-pane-detail {
+                width: 100%;
+                min-width: 0;
+                min-height: 0;
+                flex: 1 1 auto;
+                border-right-width: 0;
+            }
+            body[data-pane="detail"] .ui-pane-list { display: none; }
+            body:not([data-pane="detail"]) .ui-pane-detail { display: none; }
+
+            .ui-split { flex-direction: column; }
+            .ui-pane-stacked {
+                width: 100%;
+                flex: 0 0 auto;
+                max-height: 45vh;
+                overflow-y: auto;
+                border-right-width: 0;
+                border-bottom: 1px solid var(--color-base-300);
+            }
+        }
+</style>
+    <script src="/assets/theme-init.js?v=ef0341756532658d"></script>
+    <script src="/assets/htmx-2.0.4.min.js" defer=""></script>
+    <script src="/assets/htmx-ext-sse-2.2.3.js" defer=""></script>
+<style>      .htmx-indicator{opacity:0}      .htmx-request .htmx-indicator{opacity:1; transition: opacity 200ms ease-in;}      .htmx-request.htmx-indicator{opacity:1; transition: opacity 200ms ease-in;}      </style></head>
+<body class="h-full overflow-hidden bg-base-100 text-base-content" data-pane="detail" data-rail="closed">
+
+    <div class="app-shell flex flex-col">
+        
+        <header class="app-topbar navbar z-40 h-16 min-h-16 shrink-0 gap-2 border-b border-base-300 px-3 sm:gap-4 sm:px-4 lg:px-5">
+            <div class="flex flex-1 basis-0 items-center gap-1">
+<button type="button" class="ui-mobile-only btn btn-ghost btn-square btn-sm" title="Show navigation" aria-label="Show navigation" aria-controls="app-rail" aria-expanded="false" data-action="toggle-rail"><svg class="inline-block shrink-0 h-4 w-4" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M1 2.75A.75.75 0 0 1 1.75 2h12.5a.75.75 0 0 1 0 1.5H1.75A.75.75 0 0 1 1 2.75Zm0 5A.75.75 0 0 1 1.75 7h12.5a.75.75 0 0 1 0 1.5H1.75A.75.75 0 0 1 1 7.75ZM1.75 12h12.5a.75.75 0 0 1 0 1.5H1.75a.75.75 0 0 1 0-1.5Z"></path></svg></button>
+                <button type="button" class="ui-mobile-back btn btn-ghost btn-square btn-sm" title="Back to the list" aria-label="Back to the list" data-action="pane-back"><svg class="inline-block shrink-0 h-4 w-4" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M7.78 12.53a.75.75 0 0 1-1.06 0L2.47 8.28a.75.75 0 0 1 0-1.06l4.25-4.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042L4.81 7h7.44a.75.75 0 0 1 0 1.5H4.81l2.97 2.97a.75.75 0 0 1 0 1.06Z"></path></svg></button>
+                <a href="/ui" class="ui-desktop-only flex items-center" title="BusyBots">
+
+                <img src="/assets/busybots-logo-dark-hor.png" alt="BusyBots" class="brand-logo brand-logo-on-light h-10 w-auto">
+                <img src="/assets/busybots-logo-light.png?v=b6b75fa297b67777" alt="BusyBots" class="brand-logo brand-logo-on-dark h-10 w-auto">
+
+                </a>
+            </div>
+            <div class="flex min-w-0 items-center justify-center">
+                <div id="topbar-company" class="flex min-w-0 items-center gap-2">
+                    <div class="avatar avatar-placeholder shrink-0">
+                    <div class="relative w-8 rounded-full bg-primary text-primary-content">
+                        <span class="text-xs font-bold">S</span>
+                        
+                    </div>
+                </div>
+                    <span class="truncate text-sm font-semibold">Sample browser</span>
+                </div>
+            </div>
+            <div class="flex flex-1 basis-0 items-center justify-end gap-1">
+
+                <label class="swap swap-rotate btn btn-ghost btn-circle" title="Switch between light and dark">
+                    <input id="theme-toggle" type="checkbox" class="theme-controller" value="light" aria-label="Switch between light and dark" data-action="theme-toggle" style="">
+                    <svg class="swap-off h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z"></path>
+                    </svg>
+                    <svg class="swap-on h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z"></path>
+                    </svg>
+                </label>
+
+                <div class="dropdown dropdown-end">
+                    <div tabindex="0" role="button" class="btn btn-ghost h-auto gap-3 px-2 py-1">
+                        <div id="account-chip" class="flex items-center gap-3">
+                            <div class="hidden text-right leading-tight sm:block">
+                                <div class="text-sm font-semibold">p09sampleb757e545</div>
+                                <div class="text-[11px] font-normal opacity-60">p09sampleb757e545@example.test</div>
+                            </div>
+                            <div class="avatar avatar-placeholder shrink-0">
+                    <div class="relative w-9 rounded-full bg-primary text-primary-content">
+                        <span class="text-sm font-bold">P</span>
+                        
+                    </div>
+                </div>
+                        </div>
+                    </div>
+                    <ul tabindex="0" class="menu menu-sm dropdown-content z-50 mt-3 w-64 rounded-box border border-base-300 bg-base-100 p-2 shadow-2xl">
+                        <li class="menu-title truncate">p09sampleb757e545@example.test</li>
+                        <li><a href="/ui/profile">Profile</a></li>
+                        <li><a href="/ui/notifications">Notifications</a></li>
+                        <li><a href="/ui/invites">My Invites</a></li>
+
+                        <li>
+                            <button type="button" class="w-full text-left" data-action="confirm-logout"><svg class="inline-block shrink-0 h-4 w-4" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M2 2.75C2 1.784 2.784 1 3.75 1h2.5a.75.75 0 0 1 0 1.5h-2.5a.25.25 0 0 0-.25.25v10.5c0 .138.112.25.25.25h2.5a.75.75 0 0 1 0 1.5h-2.5A1.75 1.75 0 0 1 2 13.25Zm10.44 4.5-1.97-1.97a.749.749 0 0 1 .326-1.275.749.749 0 0 1 .734.215l3.25 3.25a.75.75 0 0 1 0 1.06l-3.25 3.25a.749.749 0 0 1-1.275-.326.749.749 0 0 1 .215-.734l1.97-1.97H6.75a.75.75 0 0 1 0-1.5Z"></path></svg> Log out</button>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </header>
+        
+        <div class="app-workspace flex min-h-0 flex-1">
+            
+        <nav id="app-rail" class="app-rail flex w-16 shrink-0 flex-col items-center gap-1.5 overflow-y-auto border-r border-base-300 px-2 py-3" aria-label="Primary navigation">
+            <a href="/ui?company_id=270aa86a-f7ea-43f9-9177-59354804642e" class="btn btn-square btn-md btn-ghost" title="Mailbox" aria-label="Mailbox" data-action="navigate-workspace"><svg class="inline-block shrink-0 h-6 w-6" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M1.75 2h12.5c.966 0 1.75.784 1.75 1.75v8.5A1.75 1.75 0 0 1 14.25 14H1.75A1.75 1.75 0 0 1 0 12.25v-8.5C0 2.784.784 2 1.75 2ZM1.5 12.251c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25V5.809L8.38 9.397a.75.75 0 0 1-.76 0L1.5 5.809v6.442Zm13-8.181v-.32a.25.25 0 0 0-.25-.25H1.75a.25.25 0 0 0-.25.25v.32L8 7.88Z"></path></svg><span class="rail-label">Mailbox</span></a><a href="/ui/channels?company_id=270aa86a-f7ea-43f9-9177-59354804642e" class="btn btn-square btn-md btn-ghost" title="Channels" aria-label="Channels" data-action="navigate-workspace"><svg class="inline-block shrink-0 h-6 w-6" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M6.368 1.01a.75.75 0 0 1 .623.859L6.57 4.5h3.98l.46-2.868a.75.75 0 0 1 1.48.237L12.07 4.5h2.18a.75.75 0 0 1 0 1.5h-2.42l-.64 4h2.56a.75.75 0 0 1 0 1.5h-2.8l-.46 2.869a.75.75 0 0 1-1.48-.237l.42-2.632H5.45l-.46 2.869a.75.75 0 0 1-1.48-.237l.42-2.632H1.75a.75.75 0 0 1 0-1.5h2.42l.64-4H2.25a.75.75 0 0 1 0-1.5h2.8l.46-2.868a.75.75 0 0 1 .858-.622ZM9.67 10l.64-4H6.33l-.64 4Z"></path></svg><span class="rail-label">Channels</span></a><a href="/ui/agents?company_id=270aa86a-f7ea-43f9-9177-59354804642e" class="btn btn-square btn-md btn-ghost" title="Agents" aria-label="Agents" data-action="navigate-workspace"><svg class="inline-block shrink-0 h-6 w-6" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M0 8a8 8 0 0 1 16 0v5.25a.75.75 0 0 1-1.5 0V8a6.5 6.5 0 1 0-13 0v5.25a.75.75 0 0 1-1.5 0Zm3-1.25C3 5.784 3.784 5 4.75 5h6.5c.966 0 1.75.784 1.75 1.75v1.5A1.75 1.75 0 0 1 11.25 10h-6.5A1.75 1.75 0 0 1 3 8.25Zm1.47-.53a.75.75 0 0 0 0 1.06l1.5 1.5a.75.75 0 0 0 1.06 0L8 7.81l.97.97a.75.75 0 0 0 1.06 0l1.5-1.5a.749.749 0 0 0-.326-1.275.749.749 0 0 0-.734.215l-.97.97-.97-.97a.75.75 0 0 0-1.06 0l-.97.97-.97-.97a.75.75 0 0 0-1.06 0Zm1.03 6.03a.75.75 0 0 1 .75-.75h3.5a.75.75 0 0 1 0 1.5h-3.5a.75.75 0 0 1-.75-.75Z"></path></svg><span class="rail-label">Agents</span></a><a href="/ui/workflows?company_id=270aa86a-f7ea-43f9-9177-59354804642e" class="btn btn-square btn-md btn-primary" title="Workflows" aria-label="Workflows" data-action="navigate-workspace" aria-current="page"><svg class="inline-block shrink-0 h-6 w-6" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M0 1.75C0 .784.784 0 1.75 0h3.5C6.216 0 7 .784 7 1.75v3.5A1.75 1.75 0 0 1 5.25 7H4v4a1 1 0 0 0 1 1h4v-1.25C9 9.784 9.784 9 10.75 9h3.5c.966 0 1.75.784 1.75 1.75v3.5A1.75 1.75 0 0 1 14.25 16h-3.5A1.75 1.75 0 0 1 9 14.25v-.75H5A2.5 2.5 0 0 1 2.5 11V7h-.75A1.75 1.75 0 0 1 0 5.25Zm1.75-.25a.25.25 0 0 0-.25.25v3.5c0 .138.112.25.25.25h3.5a.25.25 0 0 0 .25-.25v-3.5a.25.25 0 0 0-.25-.25Zm9 9a.25.25 0 0 0-.25.25v3.5c0 .138.112.25.25.25h3.5a.25.25 0 0 0 .25-.25v-3.5a.25.25 0 0 0-.25-.25Z"></path></svg><span class="rail-label">Workflows</span></a><a href="/ui/schedules?company_id=270aa86a-f7ea-43f9-9177-59354804642e" class="btn btn-square btn-md btn-ghost" title="Schedules" aria-label="Schedules" data-action="navigate-workspace"><svg class="inline-block shrink-0 h-6 w-6" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M5.75.75A.75.75 0 0 1 6.5 0h3a.75.75 0 0 1 0 1.5h-.75v1l-.001.041a6.724 6.724 0 0 1 3.464 1.435l.007-.006.75-.75a.749.749 0 0 1 1.275.326.749.749 0 0 1-.215.734l-.75.75-.006.007a6.75 6.75 0 1 1-10.548 0L2.72 5.03l-.75-.75a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018l.75.75.007.006A6.72 6.72 0 0 1 7.25 2.541V1.5H6.5a.75.75 0 0 1-.75-.75ZM8 14.5a5.25 5.25 0 1 0-.001-10.501A5.25 5.25 0 0 0 8 14.5Zm.389-6.7 1.33-1.33a.75.75 0 1 1 1.061 1.06L9.45 8.861A1.503 1.503 0 0 1 8 10.75a1.499 1.499 0 1 1 .389-2.95Z"></path></svg><span class="rail-label">Schedules</span></a><a href="/ui/work?company_id=270aa86a-f7ea-43f9-9177-59354804642e" class="btn btn-square btn-md btn-ghost" title="Work" aria-label="Work" data-action="navigate-workspace"><svg class="inline-block shrink-0 h-6 w-6" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M6.457 1.047c.659-1.234 2.427-1.234 3.086 0l6.082 11.378A1.75 1.75 0 0 1 14.082 15H1.918a1.75 1.75 0 0 1-1.543-2.575Zm1.763.707a.25.25 0 0 0-.44 0L1.698 13.132a.25.25 0 0 0 .22.368h12.164a.25.25 0 0 0 .22-.368Zm.53 3.996v2.5a.75.75 0 0 1-1.5 0v-2.5a.75.75 0 0 1 1.5 0ZM9 11a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z"></path></svg><span class="rail-label">Work</span></a><a href="/ui/deliveries?company_id=270aa86a-f7ea-43f9-9177-59354804642e" class="btn btn-square btn-md btn-ghost" title="Deliveries" aria-label="Deliveries" data-action="navigate-workspace"><svg class="inline-block shrink-0 h-6 w-6" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M.989 8 .064 2.68a1.342 1.342 0 0 1 1.85-1.462l13.402 5.744a1.13 1.13 0 0 1 0 2.076L1.913 14.782a1.343 1.343 0 0 1-1.85-1.463L.99 8Zm.603-5.288L2.38 7.25h4.87a.75.75 0 0 1 0 1.5H2.38l-.788 4.538L13.929 8Z"></path></svg><span class="rail-label">Deliveries</span></a><a href="/ui/dashboard?company_id=270aa86a-f7ea-43f9-9177-59354804642e" class="btn btn-square btn-md btn-ghost" title="Dashboard" aria-label="Dashboard" data-action="navigate-workspace"><svg class="inline-block shrink-0 h-6 w-6" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M1.5 1.75V13.5h13.75a.75.75 0 0 1 0 1.5H.75a.75.75 0 0 1-.75-.75V1.75a.75.75 0 0 1 1.5 0Zm14.28 2.53-5.25 5.25a.75.75 0 0 1-1.06 0L7 7.06 4.28 9.78a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042l3.25-3.25a.75.75 0 0 1 1.06 0L10 7.94l4.72-4.72a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042Z"></path></svg><span class="rail-label">Dashboard</span></a><a href="/ui/companies?company_id=270aa86a-f7ea-43f9-9177-59354804642e" class="btn btn-square btn-md btn-ghost" title="Companies" aria-label="Companies" data-action="navigate-workspace"><svg class="inline-block shrink-0 h-6 w-6" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M1.75 16A1.75 1.75 0 0 1 0 14.25V1.75C0 .784.784 0 1.75 0h8.5C11.216 0 12 .784 12 1.75v12.5c0 .085-.006.168-.018.25h2.268a.25.25 0 0 0 .25-.25V8.285a.25.25 0 0 0-.111-.208l-1.055-.703a.749.749 0 1 1 .832-1.248l1.055.703c.487.325.779.871.779 1.456v5.965A1.75 1.75 0 0 1 14.25 16h-3.5a.766.766 0 0 1-.197-.026c-.099.017-.2.026-.303.026h-3a.75.75 0 0 1-.75-.75V14h-1v1.25a.75.75 0 0 1-.75.75Zm-.25-1.75c0 .138.112.25.25.25H4v-1.25a.75.75 0 0 1 .75-.75h2.5a.75.75 0 0 1 .75.75v1.25h2.25a.25.25 0 0 0 .25-.25V1.75a.25.25 0 0 0-.25-.25h-8.5a.25.25 0 0 0-.25.25ZM3.75 6h.5a.75.75 0 0 1 0 1.5h-.5a.75.75 0 0 1 0-1.5ZM3 3.75A.75.75 0 0 1 3.75 3h.5a.75.75 0 0 1 0 1.5h-.5A.75.75 0 0 1 3 3.75Zm4 3A.75.75 0 0 1 7.75 6h.5a.75.75 0 0 1 0 1.5h-.5A.75.75 0 0 1 7 6.75ZM7.75 3h.5a.75.75 0 0 1 0 1.5h-.5a.75.75 0 0 1 0-1.5ZM3 9.75A.75.75 0 0 1 3.75 9h.5a.75.75 0 0 1 0 1.5h-.5A.75.75 0 0 1 3 9.75ZM7.75 9h.5a.75.75 0 0 1 0 1.5h-.5a.75.75 0 0 1 0-1.5Z"></path></svg><span class="rail-label">Companies</span></a>
+            <a id="rail-company" href="/ui/companies?company_id=270aa86a-f7ea-43f9-9177-59354804642e" class="btn btn-square btn-md btn-ghost mt-auto" title="Sample browser" aria-label="Company: Sample browser" data-action="navigate-workspace"><div class="avatar avatar-placeholder shrink-0">
+                    <div class="relative w-9 rounded-full bg-primary text-primary-content">
+                        <span class="text-sm font-bold">S</span>
+                        
+                    </div>
+                </div><span class="rail-label">Sample browser</span></a>
+        </nav>
+        
+            
+        <aside class="ui-pane-list flex w-64 shrink-0 flex-col border-r border-base-300 bg-base-200">
+            
+            <div class="workspace-heading border-b border-base-300 px-4 py-5">
+                <div class="flex items-start gap-2">
+                    <h2 class="min-w-0 flex-1 text-base font-semibold leading-tight">Workflows</h2>
+                    <div class="flex shrink-0 gap-1"><a class="btn btn-ghost btn-xs" href="/ui/workflow-runs?company_id=270aa86a-f7ea-43f9-9177-59354804642e">Runs</a><button type="button" class="btn btn-ghost btn-xs" hx-get="/ui/workflows/tools?company_id=270aa86a-f7ea-43f9-9177-59354804642e" hx-target="#workflow-pane" hx-swap="outerHTML" hx-sync="#workflow-pane:replace">Tools</button>
+                <button type="button" class="btn btn-primary btn-xs" hx-get="/ui/workflows/new?company_id=270aa86a-f7ea-43f9-9177-59354804642e" hx-target="#workflow-pane" hx-swap="outerHTML" hx-sync="#workflow-pane:replace" hx-push-url="/ui/workflows?company_id=270aa86a-f7ea-43f9-9177-59354804642e&amp;new=1"><svg class="inline-block shrink-0 h-4 w-4" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M7.75 2a.75.75 0 0 1 .75.75V7h4.25a.75.75 0 0 1 0 1.5H8.5v4.25a.75.75 0 0 1-1.5 0V8.5H2.75a.75.75 0 0 1 0-1.5H7V2.75A.75.75 0 0 1 7.75 2Z"></path></svg> New</button></div>
+                </div>
+                <p class="mt-1 text-xs leading-relaxed opacity-60">Drafts, published versions and where they run.</p>
+            </div>
+        
+            <ul id="workflow-menu" class="menu w-full flex-1 flex-nowrap gap-1 overflow-y-auto px-2"><li><a class="flex flex-col items-start gap-0.5 menu-active" href="/ui/workflows?company_id=270aa86a-f7ea-43f9-9177-59354804642e&amp;workflow_id=e6e10544-53fa-8dea-95d9-5aa3e929e3d8" hx-get="/ui/workflows/e6e10544-53fa-8dea-95d9-5aa3e929e3d8?company_id=270aa86a-f7ea-43f9-9177-59354804642e" hx-target="#workflow-pane" hx-swap="outerHTML" hx-sync="#workflow-pane:replace" hx-push-url="/ui/workflows?company_id=270aa86a-f7ea-43f9-9177-59354804642e&amp;workflow_id=e6e10544-53fa-8dea-95d9-5aa3e929e3d8" data-action="select-sidebar-item">
+                    <span class="flex w-full min-w-0 items-center gap-2"><span class="min-w-0 truncate">Reviewed response</span></span>
+                    <span class="w-full truncate font-mono text-[11px] opacity-60">draft revision 2</span>
+                </a></li></ul>
+        </aside>
+        <section id="workflow-pane" class="ui-pane-detail flex min-w-0 flex-1 flex-col bg-base-100">
+            <div class="border-b border-base-300 px-4 pt-4 sm:px-6">
+                <div class="flex flex-wrap items-center gap-2">
+                    <h2 class="min-w-0 truncate text-xl font-bold">Reviewed response</h2>
+                </div>
+                <p class="mt-1 text-xs opacity-60">Draft revision 2 · 0 published versions · copied from template <span class="font-mono">reviewed-support</span></p>
+                <nav role="tablist" class="tabs tabs-border mt-3" aria-label="Workflow views"><a role="tab" class="tab tab-active" aria-selected="true" href="/ui/workflows?company_id=270aa86a-f7ea-43f9-9177-59354804642e&amp;workflow_id=e6e10544-53fa-8dea-95d9-5aa3e929e3d8&amp;tab=editor" hx-get="/ui/workflows/e6e10544-53fa-8dea-95d9-5aa3e929e3d8?company_id=270aa86a-f7ea-43f9-9177-59354804642e&amp;tab=editor" hx-target="#workflow-pane" hx-swap="outerHTML" hx-sync="#workflow-pane:replace" hx-push-url="/ui/workflows?company_id=270aa86a-f7ea-43f9-9177-59354804642e&amp;workflow_id=e6e10544-53fa-8dea-95d9-5aa3e929e3d8&amp;tab=editor">Editor</a><a role="tab" class="tab" aria-selected="false" href="/ui/workflows?company_id=270aa86a-f7ea-43f9-9177-59354804642e&amp;workflow_id=e6e10544-53fa-8dea-95d9-5aa3e929e3d8&amp;tab=sample" hx-get="/ui/workflows/e6e10544-53fa-8dea-95d9-5aa3e929e3d8?company_id=270aa86a-f7ea-43f9-9177-59354804642e&amp;tab=sample" hx-target="#workflow-pane" hx-swap="outerHTML" hx-sync="#workflow-pane:replace" hx-push-url="/ui/workflows?company_id=270aa86a-f7ea-43f9-9177-59354804642e&amp;workflow_id=e6e10544-53fa-8dea-95d9-5aa3e929e3d8&amp;tab=sample">Sample</a><a role="tab" class="tab" aria-selected="false" href="/ui/workflows?company_id=270aa86a-f7ea-43f9-9177-59354804642e&amp;workflow_id=e6e10544-53fa-8dea-95d9-5aa3e929e3d8&amp;tab=versions" hx-get="/ui/workflows/e6e10544-53fa-8dea-95d9-5aa3e929e3d8?company_id=270aa86a-f7ea-43f9-9177-59354804642e&amp;tab=versions" hx-target="#workflow-pane" hx-swap="outerHTML" hx-sync="#workflow-pane:replace" hx-push-url="/ui/workflows?company_id=270aa86a-f7ea-43f9-9177-59354804642e&amp;workflow_id=e6e10544-53fa-8dea-95d9-5aa3e929e3d8&amp;tab=versions">Versions and usage</a><a role="tab" class="tab" aria-selected="false" href="/ui/workflows?company_id=270aa86a-f7ea-43f9-9177-59354804642e&amp;workflow_id=e6e10544-53fa-8dea-95d9-5aa3e929e3d8&amp;tab=bindings" hx-get="/ui/workflows/e6e10544-53fa-8dea-95d9-5aa3e929e3d8?company_id=270aa86a-f7ea-43f9-9177-59354804642e&amp;tab=bindings" hx-target="#workflow-pane" hx-swap="outerHTML" hx-sync="#workflow-pane:replace" hx-push-url="/ui/workflows?company_id=270aa86a-f7ea-43f9-9177-59354804642e&amp;workflow_id=e6e10544-53fa-8dea-95d9-5aa3e929e3d8&amp;tab=bindings">Bindings</a></nav>
+            </div>
+            <div class="flex-1 overflow-y-auto px-4 py-4 sm:px-6"><div class="alert alert-error mb-4 text-sm">Saved revision 2, but it could not be validated: Unknown field</div>
+        <form id="workflow-editor" class="space-y-4" data-workflow-editor="" hx-post="/ui/workflows/e6e10544-53fa-8dea-95d9-5aa3e929e3d8/save?company_id=270aa86a-f7ea-43f9-9177-59354804642e" hx-target="#workflow-pane" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']">
+            <input type="hidden" name="expected_revision" value="2" style="">
+            <label class="fieldset">
+                <span class="fieldset-legend">Title</span>
+                <input class="input w-full" name="title" required="" maxlength="256" value="Reviewed response" style="">
+            </label>
+            <label class="fieldset">
+                <span class="fieldset-legend">Description</span>
+                <textarea class="textarea w-full" name="description" rows="2" maxlength="4096" style="">The agent drafts an answer; a reviewer approves or edits it before it is sent, or rejects it, before the run's deadline.</textarea>
+            </label>
+            <label class="fieldset">
+                <span class="fieldset-legend">Source (YAML)</span>
+                <textarea id="workflow-source" class="textarea w-full font-mono text-xs" name="source" rows="28" spellcheck="false" autocapitalize="off" autocomplete="off" wrap="off" aria-describedby="workflow-source-help" style="">format_version: 1
+workflow_id: e6e10544-53fa-8dea-95d9-5aa3e929e3d8
+input_schema:
+  type: object
+  properties:
+    message: {type: string}
+    source_message: {type: string, maxLength: 128}
+    subject: {type: string, maxLength: 998}
+    sender: {type: string, maxLength: 320}
+  required: [message, source_message]
+  additionalProperties: false
+parameter_schema:
+  type: object
+  properties:
+    reviewer: {type: string, maxLength: 128}
+  required: [reviewer]
+  additionalProperties: false
+output_schema: true
+resources: []
+entry: draft
+steps:
+  draft:
+    type: agent.run
+    with:
+      agent: {literal: assistant}
+      context: {object: {untrusted_message: {ref: /input/message}}}
+      output_schema:
+        literal:
+          type: object
+          properties: {body: {type: string, maxLength: 16384}}
+          required: [body]
+          additionalProperties: false
+    routes: {success: review}
+  review:
+    type: decision.human
+    with:
+      proposal: {ref: /steps/draft/output}
+      reviewers: {array: [{object: {kind: {literal: user}, id: {ref: /params/reviewer}}}]}
+      deadline: {ref: /run/deadline}
+      data_schema:
+        literal:
+          type: object
+          properties: {body: {type: string, maxLength: 16384}}
+          required: [body]
+          additionalProperties: false
+      feedback_required: {literal: [reject]}
+    routes: {choices: {approve: reply, reject: $end}}
+  reply:
+    type: message.reply
+    with:
+      source_message: {ref: /input/source_message}
+      content: {ref: /steps/review/output/data}
+    routes: {success: $end}
+limits: {max_steps: 10, max_context_bytes: 65536}
+
+# Browser authoring journey
+
+invalid_sample_field: true
+</textarea>
+                <span id="workflow-source-help" class="text-xs opacity-60">Saving keeps whatever you type, valid or not. Validation compiles the saved revision exactly as publishing would.</span>
+            </label>
+            
+            <div class="flex flex-wrap items-center gap-2 border-t border-base-300 pt-4">
+                <button type="submit" name="intent" value="validate" class="btn btn-primary">Save and validate</button>
+                <button type="submit" name="intent" value="save" class="btn btn-outline">Save draft</button>
+                <button type="button" class="btn btn-ghost" data-editor-reload="" hx-get="/ui/workflows/e6e10544-53fa-8dea-95d9-5aa3e929e3d8?company_id=270aa86a-f7ea-43f9-9177-59354804642e" hx-target="#workflow-pane" hx-swap="outerHTML" hx-sync="#workflow-pane:replace" hx-confirm="Discard unsaved changes and reload the saved draft?">Reload saved draft</button>
+                <span id="workflow-editor-status" class="text-sm" role="status" aria-live="polite"></span>
+            </div>
+        </form>
+        
+        <details id="workflow-reference" class="mt-6 rounded-box border border-base-300 p-3" hx-get="/ui/workflows/catalogue?company_id=270aa86a-f7ea-43f9-9177-59354804642e" hx-trigger="toggle once" hx-target="#workflow-reference-body" hx-swap="outerHTML">
+            <summary class="cursor-pointer font-semibold">Step catalogue and agents reference</summary>
+            <div id="workflow-reference-body" class="mt-3 text-sm" aria-busy="true">
+                <span class="loading loading-spinner loading-sm"></span> Loading the reference…
+            </div>
+        </details>
+        <form class="mt-6 border-t border-base-300 pt-4" hx-post="/ui/workflows/e6e10544-53fa-8dea-95d9-5aa3e929e3d8/archive?company_id=270aa86a-f7ea-43f9-9177-59354804642e" hx-target="#workflow-pane" hx-swap="outerHTML" hx-confirm="Archive this workflow? Its draft can no longer be saved or published; published versions keep serving their bindings." hx-disabled-elt="find button[type='submit']">
+            <input type="hidden" name="expected_revision" value="2" style="">
+            <button type="submit" class="btn btn-sm btn-error">
+                <span class="loading loading-spinner loading-xs hidden [.htmx-request_&amp;]:inline-block"></span>
+                <span class="[.htmx-request_&amp;]:hidden">Archive workflow</span>
+                <span class="hidden [.htmx-request_&amp;]:inline">Archiving…</span>
+            </button>
+        </form></div>
+        </section>
+        
+        </div>
+    </div>
+    <div id="rail-backdrop" data-action="close-rail" aria-hidden="true"></div>
+    
+        <div id="live-update-status" role="status" aria-live="polite" aria-atomic="true" class="alert alert-warning pointer-events-none fixed left-1/2 top-4 z-50 hidden w-auto max-w-[calc(100vw-2rem)] -translate-x-1/2 px-4 py-2 text-sm font-medium shadow-lg">
+            <span>Live updates paused. Reconnecting…</span>
+        </div>
+        
+    
+        <div id="request-error-toast" role="alert" aria-live="assertive" aria-atomic="true" class="toast toast-top toast-center z-50 hidden max-w-[calc(100vw-2rem)]">
+            <div class="alert alert-error shadow-lg">
+                <span id="request-error-message" class="text-sm font-medium break-words"></span>
+                <button type="button" class="btn btn-ghost btn-xs" data-action="dismiss-request-error" aria-label="Dismiss">×</button>
+            </div>
+        </div>
+        
+    
+        <dialog id="logout-modal" class="modal">
+            <div class="modal-box">
+                <h3 class="text-lg font-bold">Log out?</h3>
+                <p class="py-4 opacity-70">You will need to sign in again to reach your mailbox.</p>
+                <div class="modal-action">
+                    <form method="dialog">
+                        <button class="btn btn-ghost">Cancel</button>
+                    </form>
+                    <form method="post" action="/logout">
+                        <button type="submit" class="btn btn-error">Log out</button>
+                    </form>
+                </div>
+            </div>
+            <form method="dialog" class="modal-backdrop">
+                <button>close</button>
+            </form>
+        </dialog>
+        
+        
+    <script src="/assets/app.js?v=69536ee6edd03020"></script>
+
+</body></html>

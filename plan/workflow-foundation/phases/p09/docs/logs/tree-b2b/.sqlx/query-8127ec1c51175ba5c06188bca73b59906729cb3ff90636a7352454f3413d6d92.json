@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE principals\n               SET kind = 'external', user_id = NULL, updated_at = CURRENT_TIMESTAMP\n               WHERE company_id = $1 AND user_id = $2\n                 AND EXISTS (\n                     SELECT 1 FROM company_members AS member\n                     WHERE member.company_id = $1 AND member.user_id = $2\n                       AND member.role <> 'owner'\n                 )",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "8127ec1c51175ba5c06188bca73b59906729cb3ff90636a7352454f3413d6d92"
+}

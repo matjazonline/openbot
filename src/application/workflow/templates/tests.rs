@@ -207,3 +207,28 @@ async fn workflow_templates_company_declarations_remain_unpublished_source_only(
         }
     }
 }
+
+/// p08 D2.5: the deployment's shipped catalogue builds, with the two reply-mode templates whose
+/// `draft` step is the agent provisioning retargets.
+#[test]
+fn the_shipped_catalogue_holds_the_reply_mode_templates() {
+    let catalogue =
+        TemplateCatalogue::shipped(&crate::adapters::workflow_source::WorkflowSourceDecoder)
+            .unwrap();
+    for id in [AUTONOMOUS_RESPONSE, REVIEWED_SUPPORT] {
+        let template = catalogue.template(id).unwrap();
+        let retargeted = crate::application::workflow::compiler::retarget_agent(
+            &crate::adapters::workflow_source::WorkflowSourceDecoder,
+            template.source(),
+            REPLY_AGENT_STEP,
+            "front-desk",
+        )
+        .unwrap();
+        assert!(
+            retargeted.contains("agent: {literal: \"front-desk\"}"),
+            "{retargeted}"
+        );
+    }
+    assert_eq!(catalogue.entries().len(), 2);
+    assert!(catalogue.template("triage-routing").is_none());
+}

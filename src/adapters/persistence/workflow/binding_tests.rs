@@ -99,6 +99,8 @@ impl BindingFixture {
             version: self.version,
             params: self.params.clone(),
             resources: self.resources.clone(),
+            run_as: None,
+            message_trigger: None,
         }
     }
     pub(super) fn service(

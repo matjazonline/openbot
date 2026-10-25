@@ -4,7 +4,7 @@
 //! revocation cannot race a separate pre-check.
 use super::{
     diagnostics::InputCounts,
-    execution::{Admitted, Binding, Driven, Execution, Progress, applied, invalid},
+    execution::{Admitted, Driven, Execution, Progress, applied, invalid},
     providers::ResolvedModelRequest,
 };
 use crate::adapters::response_schema::JsonResponseValidator;
@@ -147,7 +147,7 @@ impl WorkflowBinding<'_> {
         {
             WorkflowModelSettlement::Saved(outcome) => Ok(Progress::Continue(applied(*outcome)?)),
             WorkflowModelSettlement::Parked { checkpoint, wait } => {
-                Ok(Progress::Suspend(*checkpoint, Some(wait)))
+                Ok(Progress::Suspend(*checkpoint, wait))
             }
             // Received truth is saved; it grants no further progression.
             WorkflowModelSettlement::Refused(_) => {
@@ -210,7 +210,7 @@ impl WorkflowBinding<'_> {
                 )
                 .await?,
             )),
-            AgentToolObservation::Parked(wait) => Ok(Progress::Suspend(prepared, Some(wait))),
+            AgentToolObservation::Parked(wait) => Ok(Progress::Suspend(prepared, wait)),
             AgentToolObservation::Uncertain => {
                 Err(AppError::Execution(ExecutionFailure::IndeterminateEffect))
             }
@@ -335,7 +335,7 @@ where
         let secret = launch.secret.expose_secret();
         let mut execution = Execution {
             inputs: InputCounts::prompt(&spec.initial_prompt),
-            binding: Binding::Workflow(Box::new(binding)),
+            binding: Box::new(binding),
             checkpoint,
             model,
             deadline,
@@ -380,12 +380,9 @@ where
                 Ok(value) => WorkflowHandlerOutcome::Completed(Ok(value)),
                 Err(error) => WorkflowHandlerOutcome::Completed(Err(failure(&error))),
             },
-            Ok(Driven::Suspended(Some(wait))) => {
+            Ok(Driven::Suspended(wait)) => {
                 WorkflowHandlerOutcome::Suspended(SuspendedWorkflow { wait })
             }
-            Ok(Driven::Suspended(None)) => WorkflowHandlerOutcome::Completed(Err(failure(
-                &invalid("Workflow suspension has no wait"),
-            ))),
             Err(error) => WorkflowHandlerOutcome::Completed(Err(failure(&error))),
         }
     }

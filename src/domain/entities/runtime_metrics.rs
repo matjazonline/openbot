@@ -3,7 +3,7 @@ use std::{fmt, sync::OnceLock};
 use chrono::{DateTime, Utc};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct TaskWorkerRecommendationPolicy {
+pub struct WorkflowSlotsRecommendationPolicy {
     pub window_hours: i32,
     pub minimum_coverage_minutes: i32,
     pub minimum_samples_per_level: i64,
@@ -14,8 +14,8 @@ pub struct TaskWorkerRecommendationPolicy {
     pub reserved_pool_connections: i32,
 }
 
-pub const TASK_WORKER_RECOMMENDATION_POLICY: TaskWorkerRecommendationPolicy =
-    TaskWorkerRecommendationPolicy {
+pub const WORKFLOW_SLOTS_RECOMMENDATION_POLICY: WorkflowSlotsRecommendationPolicy =
+    WorkflowSlotsRecommendationPolicy {
         window_hours: 24,
         // One ten-minute deploy or connectivity gap should not restart a full day of evidence.
         minimum_coverage_minutes: 23 * 60 + 50,
@@ -102,28 +102,6 @@ impl MachineIdentity {
     }
 }
 
-/// Memory provider calls that completed on this machine during one sampling interval.
-///
-/// The aggregate spans every configured provider. The `hydradb_` column names it persists into
-/// predate the second provider and are kept deliberately — see the schema comment.
-///
-/// Counted rather than probed: the interval reports the memory calls the application actually
-/// made, so an idle machine costs the provider nothing and the latency shown is the latency
-/// recall and ingestion really paid.
-#[derive(Debug, Clone, Copy, Default, PartialEq)]
-pub struct MemoryProviderInterval {
-    pub calls: i32,
-    pub failures: i32,
-    pub total_duration_ms: f64,
-}
-
-impl MemoryProviderInterval {
-    /// `None` for an interval with no calls — an idle interval has no latency to average.
-    pub fn mean_duration_ms(&self) -> Option<f64> {
-        (self.calls > 0).then(|| self.total_duration_ms / f64::from(self.calls))
-    }
-}
-
 /// Host/process values observed before the database acquisition probe begins.
 #[derive(Debug, Clone, PartialEq)]
 pub struct RuntimeMetricObservation {
@@ -134,9 +112,8 @@ pub struct RuntimeMetricObservation {
     pub cpu_utilization_percent: Option<f64>,
     pub cpu_steal_percent: Option<f64>,
     pub cpu_throttle_percent: Option<f64>,
-    pub active_task_executions: i32,
-    pub task_worker_concurrency_limit: i32,
-    pub hydradb: MemoryProviderInterval,
+    pub active_workflow_jobs: i32,
+    pub workflow_worker_slots: i32,
 }
 
 /// One durable ten-second reading from one serving machine.
@@ -149,14 +126,13 @@ pub struct RuntimeMetricSample {
     pub cpu_utilization_percent: Option<f64>,
     pub cpu_steal_percent: Option<f64>,
     pub cpu_throttle_percent: Option<f64>,
-    pub active_task_executions: i32,
-    pub task_worker_concurrency_limit: i32,
+    pub active_workflow_jobs: i32,
+    pub workflow_worker_slots: i32,
     pub database_acquire_duration_ms: f64,
     pub database_acquire_succeeded: bool,
     pub pool_size: i32,
     pub pool_idle: i32,
     pub pool_active: i32,
-    pub hydradb: MemoryProviderInterval,
 }
 
 /// Aggregates rendered as one point in the selected dashboard range.
@@ -168,17 +144,12 @@ pub struct RuntimeMetricBucket {
     pub cpu_throttle_percent: Option<f64>,
     pub database_acquire_p50_ms: Option<f64>,
     pub database_acquire_p95_ms: Option<f64>,
-    /// `None` where no sample landed in the bucket at all; `Some(0)` where the machine was up
-    /// and made no memory provider calls. The two are a gap and a quiet period, not the same thing.
-    pub hydradb_calls: Option<i64>,
-    pub hydradb_failures: Option<i64>,
-    pub hydradb_mean_ms: Option<f64>,
 }
 
-/// Highest concurrency level the serving machine has actually demonstrated within the resource
-/// criteria. This is advice for configuration, never an automatic runtime adjustment.
+/// The most concurrent workflow jobs the serving machine has actually run within the resource
+/// criteria: advice for `WORKFLOW_WORKER_SLOTS`, never an automatic runtime adjustment.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TaskWorkerConcurrencyRecommendation {
+pub struct WorkflowWorkerSlotsRecommendation {
     pub maximum: i32,
     pub supporting_samples: i64,
 }
@@ -188,5 +159,5 @@ pub struct RuntimeMetricSnapshot {
     pub current: Option<RuntimeMetricSample>,
     pub peak_rss_bytes: Option<i64>,
     pub buckets: Vec<RuntimeMetricBucket>,
-    pub suggested_task_worker_concurrency: Option<TaskWorkerConcurrencyRecommendation>,
+    pub suggested_workflow_worker_slots: Option<WorkflowWorkerSlotsRecommendation>,
 }

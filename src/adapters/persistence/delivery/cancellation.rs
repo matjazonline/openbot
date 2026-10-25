@@ -40,12 +40,6 @@ pub(crate) struct CancelledDeliveries {
 /// [`cancellation_detail_sql`] splices it into a statement.
 pub(crate) const fn cancellation_detail(reason: DeliveryCancellationReason) -> &'static str {
     match reason {
-        DeliveryCancellationReason::ChannelAgentRemoved => {
-            "The agent that produced this delivery was removed from its channel"
-        }
-        DeliveryCancellationReason::TaskStopped => {
-            "The task that produced this delivery was stopped"
-        }
         DeliveryCancellationReason::WorkflowCancelled => {
             "The workflow run that produced this delivery was cancelled"
         }
@@ -81,40 +75,6 @@ fn cancellation_detail_sql(reason_column: &str) -> String {
     format!("CASE {reason_column} {arms} END")
 }
 
-/// Record a cancellation on every live delivery these tasks produced, whatever channel it goes out
-/// through.
-///
-/// Locks the parents first, in id order -- the same parent-before-part order every fenced worker
-/// write takes -- so a worker racing this either commits its `begin_part` before the lock is taken
-/// (and the row is reported as potentially sent) or finds the intent once it is released.
-pub(crate) async fn cancel_task_deliveries_on(
-    tx: &mut Transaction<'_, Postgres>,
-    company_id: Uuid,
-    task_ids: &[Uuid],
-    reason: DeliveryCancellationReason,
-) -> AppResult<CancelledDeliveries> {
-    if task_ids.is_empty() {
-        return Ok(CancelledDeliveries::default());
-    }
-    let claimable = claimable_statuses_sql();
-    let in_flight =
-        sql_status_list([DeliveryStatus::Sending, DeliveryStatus::OutcomeUnknown].iter());
-    let locked: Vec<Uuid> = sqlx::query_scalar(&format!(
-        r#"SELECT id FROM message_deliveries
-            WHERE company_id = $1 AND task_id = ANY($2)
-              AND status IN ({claimable}, {in_flight})
-              AND cancellation_requested_at IS NULL
-            ORDER BY id
-              FOR UPDATE"#
-    ))
-    .bind(company_id)
-    .bind(task_ids)
-    .fetch_all(&mut **tx)
-    .await
-    .map_err(AppError::from)?;
-    cancel_locked_deliveries_on(tx, &locked, reason).await
-}
-
 /// Workflow-linked deliveries of a run (or of one invocation), cancelled with a workflow reason.
 ///
 /// Callers hold the run lock (run before parent, the order workflow `begin_part`, the receipt
@@ -144,6 +104,34 @@ pub(crate) async fn cancel_workflow_deliveries_on(
     .bind(company_id)
     .bind(run_id)
     .bind(invocation_id)
+    .fetch_all(&mut *db)
+    .await
+    .map_err(AppError::from)?;
+    cancel_locked_deliveries_on(db, &locked, reason).await
+}
+
+/// [`cancel_workflow_deliveries_on`]'s lock-then-settle, keyed by delivery id, for the worker-path
+/// tests that need a cancellation without a workflow run to own the deliveries.
+#[cfg(test)]
+pub(crate) async fn cancel_deliveries_on(
+    db: &mut PgConnection,
+    company_id: Uuid,
+    delivery_ids: &[Uuid],
+    reason: DeliveryCancellationReason,
+) -> AppResult<CancelledDeliveries> {
+    let claimable = claimable_statuses_sql();
+    let in_flight =
+        sql_status_list([DeliveryStatus::Sending, DeliveryStatus::OutcomeUnknown].iter());
+    let locked: Vec<Uuid> = sqlx::query_scalar(&format!(
+        r#"SELECT id FROM message_deliveries
+            WHERE company_id = $1 AND id = ANY($2)
+              AND status IN ({claimable}, {in_flight})
+              AND cancellation_requested_at IS NULL
+            ORDER BY id
+              FOR UPDATE"#
+    ))
+    .bind(company_id)
+    .bind(delivery_ids)
     .fetch_all(&mut *db)
     .await
     .map_err(AppError::from)?;
@@ -269,8 +257,8 @@ pub(crate) enum HeldDelivery {
 /// Lock the parent this execution holds and read its cancellation intent.
 ///
 /// Every fenced worker write starts here, which is what serializes it against
-/// [`cancel_task_deliveries_on`]: whichever takes the parent's row lock first decides the order,
-/// and the other sees its result.
+/// [`cancel_workflow_deliveries_on`]: whichever takes the parent's row lock first decides the
+/// order, and the other sees its result.
 pub(crate) async fn lock_held_delivery_on(
     tx: &mut Transaction<'_, Postgres>,
     fence: &ExecutionLease<DeliveryId>,

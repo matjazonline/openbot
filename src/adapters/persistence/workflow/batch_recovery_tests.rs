@@ -24,7 +24,7 @@ async fn workflow_batch_deferred_deadline_and_lost_ack_are_atomic() {
     tx.commit().await.unwrap();
     // Simulate losing the commit response and reconnecting through a fresh pool.
     let options = f.persistence().pool().connect_options();
-    let pool = sqlx::postgres::PgPoolOptions::new()
+    let pool = crate::adapters::persistence::test_support::pool_options()
         .max_connections(2)
         .connect_with((*options).clone())
         .await

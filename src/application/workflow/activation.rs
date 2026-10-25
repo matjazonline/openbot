@@ -130,6 +130,27 @@ pub fn prepare_inputs(
         .map_err(|diagnostic| AppError::BadRequest(diagnostic.message.into()))
 }
 
+/// Shared pure preparation for durable activation and isolated samples.
+pub struct PreparedActivation {
+    pub inputs: Value,
+    pub choice: Option<ChoiceName>,
+}
+
+pub fn prepare_activation(
+    bundle: &PublishedBundle,
+    step: &StepId,
+    context: &Context<'_>,
+) -> AppResult<PreparedActivation> {
+    let inputs = prepare_inputs(bundle, step, context)?;
+    let choice = bundle
+        .compiled()
+        .rule(step)
+        .map(|rule| rule.decide(context, bundle.compiled().graph().context_limits()))
+        .transpose()
+        .map_err(|_| AppError::BadRequest("Invalid rule predicate".into()))?;
+    Ok(PreparedActivation { inputs, choice })
+}
+
 #[async_trait]
 pub trait WorkflowActivation: Send + Sync {
     /// Atomically resolve/store once, or return the original snapshot. Lock run

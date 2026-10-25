@@ -25,6 +25,7 @@ mod admission_write;
 mod agent_preparation;
 pub mod agent_publication;
 mod association;
+mod authoring_reads;
 pub(crate) mod authority;
 mod batch;
 mod batch_commit;
@@ -48,11 +49,23 @@ mod lease;
 mod lease_claim;
 pub mod mcp;
 pub mod message;
+mod message_intents;
 mod persistence_bound;
+pub mod provisioning;
+mod reads;
+mod reply_waits;
 mod resources;
 mod rows;
+mod run_views;
+#[cfg(test)]
+pub(crate) mod schedule_test_support;
+mod schedules;
 #[cfg(test)]
 mod tests;
+/// The uncertain HTTP action the reconciliation route tests start from (P08-D3).
+#[cfg(test)]
+pub(crate) use tests::reconciliation_fixture;
+pub mod tool_publication;
 mod wait_commit;
 mod waits;
 mod wakeups;
@@ -102,5 +115,6 @@ mod maintenance;
 mod control_retry;
 mod controls;
 mod inspection;
+mod message_outcomes;
 
 mod token_budget;

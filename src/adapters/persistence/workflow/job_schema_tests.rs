@@ -2,15 +2,10 @@
 use super::*;
 use crate::application::use_cases::channel::{ChannelPersistence, ChannelWrite};
 
-#[path = "job_notification_fixtures.rs"]
-mod notification_fixtures;
-
 #[path = "job_association_tests.rs"]
 mod job_association_tests;
 #[path = "job_core_query_tests.rs"]
 mod job_core_query_tests;
-#[path = "job_routine_tests.rs"]
-mod job_routine_tests;
 
 struct JobFixture {
     binding: BindingFixture,
@@ -99,7 +94,7 @@ fn constraint(error: sqlx::Error, expected: &str) {
 }
 
 #[tokio::test]
-async fn workflow_job_schema_opens_only_with_legacy_channel_and_association_guards() {
+async fn workflow_job_schema_keeps_the_channel_nullable_for_company_associations() {
     let f = JobFixture::new().await;
     let mut db = f
         .binding
@@ -116,9 +111,6 @@ async fn workflow_job_schema_opens_only_with_legacy_channel_and_association_guar
         !required,
         "workflow company associations require nullable channels"
     );
-    let legacy_guard: bool = sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'background_tasks'::regclass AND conname = 'background_tasks_legacy_channel_required' AND convalidated)")
-        .fetch_one(&mut *db).await.unwrap();
-    assert!(legacy_guard);
 }
 
 #[tokio::test]
@@ -171,7 +163,7 @@ async fn workflow_job_schema_enforces_exact_ids_and_scoped_execution() {
 }
 
 #[tokio::test]
-async fn workflow_job_schema_rejects_foreign_execution_and_legacy_link() {
+async fn workflow_job_schema_rejects_foreign_execution_and_a_non_workflow_job() {
     let f = JobFixture::new().await;
     let p = &f.binding.fixture.persistence;
     let company = CompanyPersistence::create(
@@ -203,76 +195,16 @@ async fn workflow_job_schema_rejects_foreign_execution_and_legacy_link() {
     constraint(error, "background_tasks_workflow_execution_fk");
     tx.rollback().await.unwrap();
     let mut tx = f.hypothetical().await;
-    let error = sqlx::query("INSERT INTO background_tasks (id, company_id, channel_id, correlation_id, task_type, workflow_execution_id) VALUES ($1, $2, $3, $4, 'inbound_email', $5)")
-        .bind(Uuid::new_v4()).bind(f.binding.target.company.as_uuid()).bind(f.channel)
-        .bind(Uuid::new_v4()).bind(f.execution).execute(&mut *tx).await.unwrap_err();
+    // Scoped exactly like the execution, so only the job's own kind is wrong.
+    let error = sqlx::query("INSERT INTO background_tasks (id, company_id, channel_id, thread_id, correlation_id, task_type, workflow_execution_id, payload) VALUES ($1, $2, $3, $4, $5, 'inbound_email', $6, $7)")
+        .bind(Uuid::new_v4()).bind(f.binding.target.company.as_uuid()).bind(f.channel).bind(f.thread)
+        .bind(Uuid::new_v4()).bind(f.execution).bind(f.payload()).execute(&mut *tx).await.unwrap_err();
     constraint(error, "background_tasks_workflow_shape_check");
     tx.rollback().await.unwrap();
     let mut tx = f.hypothetical().await;
     let id = f.insert(&mut tx, f.payload()).await.unwrap();
-    let error = sqlx::query("UPDATE background_tasks SET queue_kind = 'legacy', workflow_execution_id = NULL WHERE id = $1")
+    let error = sqlx::query("UPDATE background_tasks SET queue_kind = 'other', workflow_execution_id = NULL WHERE id = $1")
         .bind(id).execute(&mut *tx).await.unwrap_err();
     assert!(error.to_string().contains("queue identity is immutable"));
-    tx.rollback().await.unwrap();
-}
-
-#[tokio::test]
-async fn workflow_job_schema_does_not_create_legacy_ownership_or_status_events() {
-    let f = JobFixture::new().await;
-    let mut tx = f.hypothetical().await;
-    let workflow = f.insert(&mut tx, f.payload()).await.unwrap();
-    let legacy = Uuid::new_v4();
-    sqlx::query("INSERT INTO background_tasks (id, company_id, channel_id, correlation_id, task_type) VALUES ($1, $2, $3, $4, 'inbound_email')")
-        .bind(legacy).bind(f.binding.target.company.as_uuid()).bind(f.channel).bind(Uuid::new_v4())
-        .execute(&mut *tx).await.unwrap();
-    sqlx::query("UPDATE background_tasks SET status = 'completed' WHERE id = ANY($1)")
-        .bind(vec![workflow, legacy])
-        .execute(&mut *tx)
-        .await
-        .unwrap();
-    for table in ["task_ownership_events", "task_status_events"] {
-        let rows: Vec<Uuid> = sqlx::query_scalar(&format!("SELECT task_id FROM {table}"))
-            .fetch_all(&mut *tx)
-            .await
-            .unwrap();
-        assert!(!rows.is_empty(), "legacy {table} still operates");
-        assert!(
-            rows.iter().all(|id| *id == legacy),
-            "workflow leaked into {table}"
-        );
-    }
-    let owner: Option<Uuid> =
-        sqlx::query_scalar("SELECT owner_principal_id FROM background_tasks WHERE id = $1")
-            .bind(workflow)
-            .fetch_one(&mut *tx)
-            .await
-            .unwrap();
-    assert!(owner.is_none());
-    let events: Vec<Uuid> =
-        sqlx::query_scalar("SELECT source_id FROM notification_events WHERE source_kind = 'task'")
-            .fetch_all(&mut *tx)
-            .await
-            .unwrap();
-    assert!(!events.is_empty());
-    assert!(
-        events.iter().all(|id| *id == legacy),
-        "workflow status emitted legacy notification events"
-    );
-    sqlx::query("INSERT INTO notifications (company_id, recipient_user_id, event_id, source_kind, source_id, action_kind, source_generation, channel_id) SELECT company_id, $1, id, source_kind, source_id, action_kind, source_generation, $2 FROM notification_events WHERE source_kind = 'task'")
-        .bind(f.binding.target.actor.user_id()).bind(f.channel).execute(&mut *tx).await.unwrap();
-    sqlx::query("DELETE FROM background_tasks WHERE id = ANY($1)")
-        .bind(vec![workflow, legacy])
-        .execute(&mut *tx)
-        .await
-        .unwrap();
-    let states: Vec<String> = sqlx::query_scalar("SELECT state FROM notifications")
-        .fetch_all(&mut *tx)
-        .await
-        .unwrap();
-    assert!(!states.is_empty());
-    assert!(
-        states.iter().all(|state| state == "withdrawn"),
-        "legacy DELETE must withdraw notifications"
-    );
     tx.rollback().await.unwrap();
 }

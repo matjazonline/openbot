@@ -12,14 +12,9 @@ use regex::Regex;
 use super::*;
 use crate::adapters::persistence::{
     delivery::enqueue::insert_delivery_on,
-    test_support::{DeliveryFixtureRequest, delivery_fixture, test_machine, test_pool},
-};
-use crate::entities::task::NewTask;
-use crate::entities::task::{
-    TaskAttemptOutcome, TaskAttemptRef, TaskAttemptStatus, TaskStopReason, TokenUsage,
+    test_support::{DeliveryFixtureRequest, delivery_fixture, test_pool},
 };
 use crate::services::dashboard_snapshot::DashboardSnapshotService;
-use crate::task_queue::TaskPersistence;
 use crate::use_cases::{
     channel::{ChannelPersistence, ChannelWrite},
     company::{CompanyPersistence, CompanyWrite},
@@ -38,10 +33,6 @@ struct CompanyFixture {
 }
 
 /// Owning the company scopes each test to rows nothing else touches.
-///
-/// The channel has no agent assigned. A task queued on it therefore has no owner, and
-/// `claim_pending_tasks` passes over it even while it is `pending` and due, so a neighbouring
-/// test's claim cannot move it.
 async fn company_fixture(persistence: &PostgresPersistence, label: &str) -> CompanyFixture {
     let suffix = Uuid::new_v4().simple().to_string();
     let username = format!("{label}_{suffix}");
@@ -82,31 +73,6 @@ async fn company_fixture(persistence: &PostgresPersistence, label: &str) -> Comp
         company: company.id,
         channel: channel.id,
     }
-}
-
-async fn queue_task(persistence: &PostgresPersistence, fixture: &CompanyFixture) -> Uuid {
-    persistence
-        .enqueue_task(NewTask::starting_new_chain(
-            fixture.company,
-            fixture.channel,
-            None,
-            "dashboard-probe",
-            serde_json::json!({}),
-        ))
-        .await
-        .expect("the fixture task is queued")
-        .id
-}
-
-/// A company and a task of this test's own, for the attempt-ledger tests below.
-///
-/// `task_attempts.task_id` is a foreign key, so those tests need a task that exists. They used
-/// to take whichever task happened to already be in the database and return early when there
-/// was none — which meant they reported success while asserting nothing the moment the table
-/// was empty, and the table is empty at the start of every run now.
-async fn task_fixture(persistence: &PostgresPersistence, label: &str) -> (Uuid, Uuid) {
-    let fixture = company_fixture(persistence, label).await;
-    (queue_task(persistence, &fixture).await, fixture.company)
 }
 
 /// A root delivery parked ten years out, and a due delivery that depends on it.
@@ -172,80 +138,20 @@ async fn queue_blocked_delivery(
 /// rather than `completed` for the same reason. Moving a task to `completed` enqueues an
 /// assignment notification, and a notification test's global claim could turn that into a
 /// delivery on this company.
+/// `units` blocked deliveries (two rows each) on a company of this test's own. The job aggregates
+/// read the workflow queue, whose fixtures live with the workflow tests (`job_projection_tests`).
 async fn seed_company(
     persistence: &PostgresPersistence,
     label: &str,
     units: i64,
-    attempts_minutes_ago: i32,
 ) -> CompanyFixture {
     let fixture = company_fixture(persistence, label).await;
     let thread = ThreadPersistence::create_thread(persistence, fixture.channel, "Dashboard", &[])
         .await
         .expect("the fixture thread is created");
-
-    let mut open = Vec::new();
-    let mut finished = Vec::new();
     for unit in 0..units {
-        let task = queue_task(persistence, &fixture).await;
-        let attempt = TaskAttemptRef {
-            task_id: task,
-            attempt_number: 1,
-            execution_generation: Uuid::new_v4(),
-            worker_id: Uuid::new_v4(),
-        };
-        persistence
-            .begin_task_attempt(attempt, &test_machine())
-            .await
-            .expect("the ledger row opens");
-        persistence
-            .finish_task_attempt(&TaskAttemptOutcome {
-                attempt,
-                status: TaskAttemptStatus::Completed,
-                stop_reason: TaskStopReason::Completed,
-                error: None,
-                tokens: None,
-            })
-            .await
-            .expect("the ledger row closes");
-        open.push(task);
-        finished.push(queue_task(persistence, &fixture).await);
         queue_blocked_delivery(persistence, &fixture, thread.id, unit).await;
     }
-
-    sqlx::query(
-        "UPDATE background_tasks
-            SET created_at = CURRENT_TIMESTAMP - interval '30 minutes'
-          WHERE id = ANY($1)",
-    )
-    .bind(&open)
-    .execute(&persistence.pool)
-    .await
-    .expect("the open tasks are backdated");
-    sqlx::query(
-        "UPDATE background_tasks
-            SET status = 'failed',
-                created_at = CURRENT_TIMESTAMP - interval '50 minutes',
-                updated_at = CURRENT_TIMESTAMP - interval '40 minutes'
-          WHERE id = ANY($1)",
-    )
-    .bind(&finished)
-    .execute(&persistence.pool)
-    .await
-    .expect("the finished tasks are backdated");
-    // One statement, so every attempt in this company starts at the same instant and falls in one
-    // latency bucket.
-    sqlx::query(
-        "UPDATE task_attempts
-            SET started_at = CURRENT_TIMESTAMP - make_interval(mins => $2),
-                finished_at = CURRENT_TIMESTAMP - make_interval(mins => $2) + interval '1 second'
-          WHERE task_id = ANY($1)",
-    )
-    .bind(&open)
-    .bind(attempts_minutes_ago)
-    .execute(&persistence.pool)
-    .await
-    .expect("the attempts are backdated");
-
     fixture
 }
 
@@ -257,22 +163,9 @@ struct Aggregate {
     expected: fn(i64) -> i64,
 }
 
-/// Every aggregate in the snapshot, each measured by the rows its own statement reads.
-///
-/// Latency counts buckets that have a percentile. Each company's attempts share one bucket, and
-/// the two companies' buckets are twenty minutes apart. A company form that let the other
-/// company in would therefore have two such buckets.
-const AGGREGATES: [Aggregate; 10] = [
-    Aggregate {
-        name: "task queue",
-        count: |snapshot| snapshot.tasks.count_of(TaskStatus::Pending),
-        expected: |units| units,
-    },
-    Aggregate {
-        name: "task pressure",
-        count: |snapshot| snapshot.tasks.due_now,
-        expected: |units| units,
-    },
+/// The delivery aggregates, each measured by the rows its own statement reads. The workflow job
+/// aggregates are held to their company in `job_projection_tests`.
+const AGGREGATES: [Aggregate; 2] = [
     Aggregate {
         name: "delivery queue",
         count: |snapshot| snapshot.deliveries.count_of(DeliveryStatus::Pending),
@@ -283,52 +176,10 @@ const AGGREGATES: [Aggregate; 10] = [
         count: |snapshot| snapshot.deliveries.due_now,
         expected: |units| units,
     },
-    Aggregate {
-        name: "throughput",
-        count: DashboardSnapshot::throughput_total,
-        expected: |units| units,
-    },
-    Aggregate {
-        name: "latency",
-        count: |snapshot| {
-            snapshot
-                .latency
-                .iter()
-                .filter(|bucket| bucket.p50_ms.is_some())
-                .count() as i64
-        },
-        expected: |_| 1,
-    },
-    Aggregate {
-        name: "queue depth",
-        count: |snapshot| snapshot.queue_depth.last().map_or(0, |bucket| bucket.open),
-        expected: |units| units,
-    },
-    Aggregate {
-        name: "attempt stats",
-        count: |snapshot| snapshot.attempts.attempts,
-        expected: |units| units,
-    },
-    Aggregate {
-        name: "retry rate",
-        count: |snapshot| {
-            snapshot
-                .retry_rate
-                .iter()
-                .map(|bucket| bucket.attempts)
-                .sum()
-        },
-        expected: |units| units,
-    },
-    Aggregate {
-        name: "outstanding",
-        count: |snapshot| snapshot.outstanding.len() as i64,
-        expected: |units| units,
-    },
 ];
 
 /// Every statement's two forms, for the checks that need no database.
-fn scoped_statements() -> [(&'static str, &'static ScopedSql); 10] {
+fn scoped_statements() -> [(&'static str, &'static ScopedSql); 11] {
     [
         ("TASK_QUEUE", &*TASK_QUEUE),
         ("TASK_PRESSURE", &*TASK_PRESSURE),
@@ -339,6 +190,7 @@ fn scoped_statements() -> [(&'static str, &'static ScopedSql); 10] {
         ("QUEUE_DEPTH", &*QUEUE_DEPTH),
         ("RETRY_RATE", &*RETRY_RATE),
         ("ATTEMPT_STATS", &*ATTEMPT_STATS),
+        ("TOKENS", &*TOKENS),
         ("OUTSTANDING", &*OUTSTANDING),
     ]
 }
@@ -392,8 +244,8 @@ async fn every_company_form_reads_only_its_own_company() {
     let Some(persistence) = test_persistence().await else {
         return;
     };
-    let a = seed_company(&persistence, "scope-a", 1, 20).await;
-    let b = seed_company(&persistence, "scope-b", 2, 40).await;
+    let a = seed_company(&persistence, "scope-a", 1).await;
+    let b = seed_company(&persistence, "scope-b", 2).await;
     let window = DashboardWindow::last_hour();
 
     let mut leaks = Vec::new();
@@ -410,15 +262,6 @@ async fn every_company_form_reads_only_its_own_company() {
                     aggregate.name
                 ));
             }
-        }
-        if let Some(stray) = snapshot
-            .outstanding
-            .iter()
-            .find(|task| task.company_id != fixture.company)
-        {
-            leaks.push(format!(
-                "outstanding: listed {stray:?} under another company"
-            ));
         }
     }
 
@@ -439,8 +282,8 @@ async fn every_global_form_reads_both_companies() {
     let Some(persistence) = test_persistence().await else {
         return;
     };
-    let a = seed_company(&persistence, "global-a", 1, 20).await;
-    let b = seed_company(&persistence, "global-b", 2, 40).await;
+    let a = seed_company(&persistence, "global-a", 1).await;
+    let b = seed_company(&persistence, "global-b", 2).await;
 
     let global = persistence
         .dashboard_snapshot(None, DashboardWindow::last_hour())
@@ -478,23 +321,27 @@ async fn the_snapshot_cache_never_serves_one_view_to_another() {
     let Some(persistence) = test_persistence().await else {
         return;
     };
-    let a = seed_company(&persistence, "cache-a", 1, 20).await;
-    let b = seed_company(&persistence, "cache-b", 2, 40).await;
+    let a = seed_company(&persistence, "cache-a", 1).await;
+    let b = seed_company(&persistence, "cache-b", 2).await;
     let service = DashboardSnapshotService::with_long_ttl(Arc::new(persistence.clone()));
     let window = DashboardWindow::last_hour();
-    let pending = |snapshot: &DashboardSnapshot| snapshot.tasks.count_of(TaskStatus::Pending);
+    let pending =
+        |snapshot: &DashboardSnapshot| snapshot.deliveries.count_of(DeliveryStatus::Pending);
     let read = |company, window| service.snapshot(company, window);
 
     let first_a = pending(&read(Some(a.company), window).await.unwrap());
     let first_b = pending(&read(Some(b.company), window).await.unwrap());
     let first_global = pending(&read(None, window).await.unwrap());
-    assert_eq!((first_a, first_b), (1, 2));
-    assert!(first_global >= 3, "the global rollup holds both companies");
+    assert_eq!((first_a, first_b), (2, 4));
+    assert!(first_global >= 6, "the global rollup holds both companies");
 
-    queue_task(&persistence, &a).await;
+    let thread = ThreadPersistence::create_thread(&persistence, a.channel, "Later", &[])
+        .await
+        .unwrap();
+    queue_blocked_delivery(&persistence, &a, thread.id, 9).await;
 
-    assert_eq!(pending(&read(Some(a.company), window).await.unwrap()), 1);
-    assert_eq!(pending(&read(Some(b.company), window).await.unwrap()), 2);
+    assert_eq!(pending(&read(Some(a.company), window).await.unwrap()), 2);
+    assert_eq!(pending(&read(Some(b.company), window).await.unwrap()), 4);
     assert_eq!(pending(&read(None, window).await.unwrap()), first_global);
     assert_eq!(
         pending(
@@ -503,7 +350,7 @@ async fn the_snapshot_cache_never_serves_one_view_to_another() {
                 .await
                 .unwrap()
         ),
-        2,
+        4,
         "the uncached path reads through"
     );
     assert_eq!(
@@ -512,7 +359,7 @@ async fn the_snapshot_cache_never_serves_one_view_to_another() {
                 .await
                 .unwrap()
         ),
-        2,
+        4,
         "the window is part of the key"
     );
 
@@ -559,214 +406,4 @@ async fn a_company_scoped_snapshot_runs_and_stays_inside_its_company() {
     // x-axis.
     assert_eq!(snapshot.throughput_total(), 0, "{:?}", snapshot.throughput);
     assert_eq!(snapshot.attempts, AttemptStats::default());
-}
-
-/// Reads the percentiles with a *finished* attempt in the window.
-///
-/// [`the_global_snapshot_runs`] cannot catch a wrong percentile column type on its own: with
-/// nothing finished the value is `NULL`, and a `NULL` is never decoded. `extract(epoch ...)`
-/// returns `numeric`, so without the cast in [`ATTEMPT_STATS_SQL`] this is where it shows.
-#[tokio::test]
-async fn finished_attempts_decode_their_latency_percentiles() {
-    let Some(persistence) = test_persistence().await else {
-        return;
-    };
-
-    let (task_id, company) = task_fixture(&persistence, "latency").await;
-
-    let attempt = TaskAttemptRef {
-        task_id,
-        attempt_number: 9_998,
-        execution_generation: Uuid::new_v4(),
-        worker_id: Uuid::new_v4(),
-    };
-    persistence
-        .begin_task_attempt(attempt, &test_machine())
-        .await
-        .expect("the ledger row opens");
-    persistence
-        .finish_task_attempt(&TaskAttemptOutcome {
-            attempt,
-            status: TaskAttemptStatus::Completed,
-            stop_reason: TaskStopReason::Completed,
-            error: None,
-            tokens: Some(TokenUsage::new(3, 5)),
-        })
-        .await
-        .expect("the ledger row closes");
-
-    // Scoped to this task's company so a neighbouring test cannot empty the window from under
-    // it — the assertion needs at least one finished attempt to be there.
-    let snapshot = persistence
-        .dashboard_snapshot(Some(company), DashboardWindow::last_hour())
-        .await
-        .expect("the percentile columns decode once something has finished");
-
-    assert!(
-        snapshot.attempts.p50_ms.is_some(),
-        "a finished attempt must produce a latency: {:?}",
-        snapshot.attempts
-    );
-
-    CompanyPersistence::delete(&persistence, company)
-        .await
-        .expect("the fixture company is removed");
-}
-
-#[tokio::test]
-async fn retry_rate_counts_only_attempt_numbers_above_one_and_stays_company_scoped() {
-    let Some(persistence) = test_persistence().await else {
-        return;
-    };
-    let (task_id, company) = task_fixture(&persistence, "retry-rate").await;
-
-    for attempt_number in [1, 2] {
-        persistence
-            .begin_task_attempt(
-                TaskAttemptRef {
-                    task_id,
-                    attempt_number,
-                    execution_generation: Uuid::new_v4(),
-                    worker_id: Uuid::new_v4(),
-                },
-                &test_machine(),
-            )
-            .await
-            .expect("the attempt starts");
-    }
-
-    for window in DashboardWindow::PRESETS {
-        let snapshot = persistence
-            .dashboard_snapshot(Some(company), window)
-            .await
-            .expect("the scoped attempt aggregates run");
-        assert_eq!(snapshot.attempts.attempts, 2);
-        assert_eq!(snapshot.attempts.retries, 1);
-        assert_eq!(snapshot.attempts.retry_rate_percent(), Some(50.0));
-        assert_eq!(snapshot.retry_rate.len() as i64, window.bucket_count());
-        assert!(snapshot.retry_rate.iter().any(|bucket| {
-            bucket.attempts == 2 && bucket.retries == 1 && bucket.rate_percent() == Some(50.0)
-        }));
-    }
-
-    let unrelated = persistence
-        .dashboard_snapshot(Some(Uuid::new_v4()), DashboardWindow::last_hour())
-        .await
-        .expect("an unrelated company scope runs");
-    assert_eq!(unrelated.attempts, AttemptStats::default());
-    assert!(
-        unrelated
-            .retry_rate
-            .iter()
-            .all(|bucket| bucket.attempts == 0)
-    );
-
-    CompanyPersistence::delete(&persistence, company)
-        .await
-        .expect("the fixture company is removed");
-}
-
-#[tokio::test]
-async fn an_attempt_is_ledgered_and_can_be_reopened_by_a_re_run() {
-    let Some(persistence) = test_persistence().await else {
-        return;
-    };
-
-    let (task_id, company) = task_fixture(&persistence, "ledger").await;
-
-    // A number far above any real retry count, so this test cannot collide with live rows.
-    let attempt = TaskAttemptRef {
-        task_id,
-        attempt_number: 9_999,
-        execution_generation: Uuid::new_v4(),
-        worker_id: Uuid::new_v4(),
-    };
-
-    persistence
-        .begin_task_attempt(attempt, &test_machine())
-        .await
-        .expect("the ledger row opens");
-
-    let outcome = TaskAttemptOutcome {
-        attempt,
-        status: TaskAttemptStatus::Completed,
-        stop_reason: TaskStopReason::Completed,
-        error: None,
-        tokens: Some(TokenUsage::new(11, 7)),
-    };
-    assert!(
-        persistence
-            .finish_task_attempt(&outcome)
-            .await
-            .expect("the ledger row closes"),
-        "closing a row that was just opened must report that it wrote"
-    );
-
-    // Closing twice must not write twice: the second call finds no open row, which is the same
-    // guard that stops a superseded run from overwriting the run that took its task over.
-    assert!(
-        !persistence
-            .finish_task_attempt(&outcome)
-            .await
-            .expect("the second close runs"),
-        "an already-closed attempt must not be closed again"
-    );
-
-    // A task re-claimed after its lease lapsed comes back with the same attempt number. The
-    // conflict must reopen the row rather than fail the insert.
-    let replacement = TaskAttemptRef {
-        execution_generation: Uuid::new_v4(),
-        worker_id: Uuid::new_v4(),
-        ..attempt
-    };
-    persistence
-        .begin_task_attempt(replacement, &test_machine())
-        .await
-        .expect("a re-run reopens the same attempt rather than colliding with it");
-
-    assert!(
-        !persistence
-            .finish_task_attempt(&outcome)
-            .await
-            .expect("the stale execution can report without writing"),
-        "the execution replaced during reclaim must not finish the new ledger row"
-    );
-    assert!(
-        persistence
-            .finish_task_attempt(&TaskAttemptOutcome {
-                attempt: replacement,
-                ..outcome.clone()
-            })
-            .await
-            .expect("the replacement execution closes"),
-        "the current execution generation must still be able to finish"
-    );
-
-    let reopened: (String, Option<i32>, Option<String>, Uuid) = sqlx::query_as(
-        "SELECT status, prompt_tokens, stop_reason, worker_id FROM task_attempts WHERE task_id = $1 AND attempt_number = $2",
-    )
-    .bind(task_id)
-    .bind(9_999_i32)
-    .fetch_one(persistence.pool())
-    .await
-    .expect("the reopened row is readable");
-
-    assert_eq!(
-        reopened.0,
-        TaskAttemptStatus::Completed.as_str(),
-        "the replacement run finished"
-    );
-    assert_eq!(reopened.1, Some(11));
-    assert_eq!(
-        reopened.2.as_deref(),
-        Some(TaskStopReason::Completed.as_str())
-    );
-    assert_eq!(
-        reopened.3, replacement.worker_id,
-        "reopening the row hands it to the run that reclaimed the task, not the one that vanished"
-    );
-
-    CompanyPersistence::delete(&persistence, company)
-        .await
-        .expect("the fixture company is removed");
 }

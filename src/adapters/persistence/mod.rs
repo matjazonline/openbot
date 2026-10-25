@@ -1,22 +1,16 @@
-#[cfg(test)]
-mod thread_lock_test_support;
-
 use sqlx::PgPool;
 use std::sync::Arc;
 
 use crate::app_error::AppError;
 
 pub mod agent;
-pub mod approval;
 pub mod attention;
 pub mod channel;
-pub(crate) mod channel_assignment;
+pub(crate) mod channel_edit;
 pub(crate) mod channel_gate;
 pub mod company;
 pub mod company_invite;
 pub mod company_resend_api;
-#[cfg(test)]
-mod constraint_tests;
 pub mod credential_rotation;
 pub mod credentials;
 pub mod dashboard;
@@ -24,20 +18,16 @@ pub mod database_query_health;
 pub mod delivery;
 pub mod inbound_event;
 pub mod integration;
-mod legacy_task;
-pub mod memory;
 pub(crate) mod model_usage;
 pub mod notification;
 pub mod participant;
-pub mod response_review;
+pub mod run_counts;
 pub mod runtime_metrics;
-pub mod schedule;
 pub mod skill;
-pub mod task;
 #[cfg(test)]
 pub mod test_support;
 pub mod thread;
-pub mod thread_handoff;
+pub mod thread_activity;
 pub mod user;
 pub mod workflow;
 
@@ -171,8 +161,8 @@ mod tests {
 
     /// Two indexes with the same definition are both maintained on every insert and every update
     /// that touches their columns, and the planner will only ever choose one of them. Grouping on
-    /// the definition with the index name stripped catches the *next* duplicate, not only the
-    /// `human_approvals` pair this was written for.
+    /// the definition with the index name stripped catches the *next* duplicate, not only the pair
+    /// this was written for.
     #[tokio::test]
     async fn no_two_indexes_share_a_definition() {
         let Some(pool) = test_pool().await else {
@@ -198,6 +188,53 @@ mod tests {
             duplicates.is_empty(),
             "these indexes are identical apart from their names, so every write maintains all of \
              them and the planner can only use one: {duplicates:?}"
+        );
+    }
+
+    /// p08 P08-Q1: long-term memory providers are gone, schema and all. The workflow memory steps
+    /// are a separate, still-unhandled language feature and own no storage.
+    #[tokio::test]
+    async fn the_memory_provider_schema_is_gone() {
+        let Some(pool) = test_pool().await else {
+            return;
+        };
+
+        let tables: Vec<String> = sqlx::query_scalar(
+            r#"SELECT table_name::text
+                 FROM information_schema.tables
+                WHERE table_schema = 'public' AND table_name LIKE 'memory%'
+                ORDER BY table_name"#,
+        )
+        .fetch_all(&pool)
+        .await
+        .expect("the table catalog is readable");
+        assert!(tables.is_empty(), "memory tables remain: {tables:?}");
+
+        let columns: Vec<String> = sqlx::query_scalar(
+            r#"SELECT table_name || '.' || column_name
+                 FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND (column_name LIKE '%memory%' OR column_name LIKE 'hydradb%')
+                  AND (table_name, column_name) <> ('runtime_metric_samples', 'memory_limit_bytes')
+                ORDER BY table_name, column_name"#,
+        )
+        .fetch_all(&pool)
+        .await
+        .expect("the column catalog is readable");
+        assert!(columns.is_empty(), "memory columns remain: {columns:?}");
+
+        let functions: Vec<String> = sqlx::query_scalar(
+            r#"SELECT proname::text
+                 FROM pg_proc
+                WHERE pronamespace = 'public'::regnamespace AND proname LIKE '%memory%'
+                ORDER BY proname"#,
+        )
+        .fetch_all(&pool)
+        .await
+        .expect("the function catalog is readable");
+        assert!(
+            functions.is_empty(),
+            "memory functions remain: {functions:?}"
         );
     }
 
@@ -231,7 +268,8 @@ mod tests {
                       ('thread_messages', 'email_message_id'),
                       ('threads', 'external_thread_key'),
                       ('background_tasks', 'source_email_message_id'),
-                      ('background_tasks', 'source_message_id')
+                      ('background_tasks', 'source_message_id'),
+                      ('background_tasks', 'source_message_uuid')
                   )
                 ORDER BY table_name, column_name"#,
         )
@@ -247,8 +285,7 @@ mod tests {
             r#"SELECT table_name, column_name, is_nullable, udt_name
                  FROM information_schema.columns
                 WHERE table_schema = 'public'
-                  AND ((table_name = 'thread_messages' AND column_name = 'message_id')
-                    OR (table_name = 'background_tasks' AND column_name = 'source_message_uuid'))
+                  AND table_name = 'thread_messages' AND column_name = 'message_id'
                 ORDER BY table_name, column_name"#,
         )
         .fetch_all(&pool)
@@ -256,21 +293,13 @@ mod tests {
         .expect("the canonical columns are inspectable");
         assert_eq!(
             canonical_columns,
-            vec![
-                (
-                    "background_tasks".into(),
-                    "source_message_uuid".into(),
-                    "YES".into(),
-                    "uuid".into(),
-                ),
-                (
-                    "thread_messages".into(),
-                    "message_id".into(),
-                    "NO".into(),
-                    "uuid".into(),
-                ),
-            ],
-            "canonical message UUID columns must have their final nullability",
+            vec![(
+                "thread_messages".into(),
+                "message_id".into(),
+                "NO".into(),
+                "uuid".into(),
+            ),],
+            "the canonical message UUID column must have its final nullability",
         );
 
         let required_constraints: Vec<String> = sqlx::query_scalar(
@@ -279,24 +308,14 @@ mod tests {
                 WHERE conname = ANY($1)
                 ORDER BY conname"#,
         )
-        .bind([
-            "background_tasks_company_source_message_channel_key",
-            "background_tasks_single_source_check",
-            "background_tasks_source_message_fk",
-            "thread_messages_message_fk",
-        ])
+        .bind(["thread_messages_message_fk"])
         .fetch_all(&pool)
         .await
         .expect("the canonical constraints are inspectable");
         assert_eq!(
             required_constraints,
-            vec![
-                "background_tasks_company_source_message_channel_key".to_owned(),
-                "background_tasks_single_source_check".to_owned(),
-                "background_tasks_source_message_fk".to_owned(),
-                "thread_messages_message_fk".to_owned(),
-            ],
-            "canonical message/task constraints must be installed",
+            vec!["thread_messages_message_fk".to_owned()],
+            "the canonical message constraint must be installed",
         );
     }
 
@@ -375,6 +394,8 @@ mod tests {
 
 #[cfg(test)]
 mod agent_config_tests;
+#[cfg(test)]
+mod legacy_runtime_schema_tests;
 
 pub mod mcp;
 #[cfg(test)]

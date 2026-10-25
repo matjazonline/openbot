@@ -10,20 +10,21 @@ binding; canonical channels, actors, messages, threads, and deliveries are not e
 > openbots (busybots) decouples **cognitive reasoning** from **deterministic workflow execution**. Business logic, state machines, human approval gates, and external integrations run on a durable, rock-solid workflow engine in Rust, while bounded AI agents are invoked only where natural language understanding or synthesis is required.
 
 ### Key Capabilities
-- ✅ **Deterministic Multi-Agent Pipelines:** Chain sequential agent workflows via channel syntax (`+`), deterministic role context, and mention triggers (`@slug`), supported by quiet context-only ingestion and automated cron schedules.
-- ✅ **Human-in-the-Loop (HITL) & Safe Delegation:** Automatic manual handoffs on external replies ("Needs Instruction"), interactive draft-and-approval gates (`Draft Ready` $\rightarrow$ dispatch), and response reviews.
+- ✅ **Workflow-Driven Channels:** Each addressed channel's workflow bindings admit their own runs by message trigger (`direct`, `any`, `mentioned`, `mentioned_or_reply`), `@slug` mentions count as addressing a channel, quiet messages are filed without starting anything, and channel schedules admit binding runs on a cadence.
+- ✅ **Human-in-the-Loop Decisions:** A `decision.human` step parks a run for its named reviewers, who settle it on the decision page (`/ui/workflow-decisions/{id}`), and actions can require approval before they dispatch.
 - ✅ **Enterprise Security & Anti-Loop Defenses:** 2-stage inbound spam filtering (Rust heuristics, Rspamd/SpamAssassin daemon scoring), fenced untrusted content in agent prompts, participant ACLs, cycle detection, and strict turn/hop rate limits.
-- ✅ **Governance & Continuity:** Multi-tier RBAC (Owner/Admin/Member), atomic work reassignment during employee offboarding (`MemberWorkAtStake`), and versioned AES-256-GCM BYOK credential management.
-- ✅ **Command Center & Observability:** Live HTMX/SSE mailbox (`/ui`), real-time Kanban tasks board (`/ui/tasks`), delivery audit tracking (`/ui/deliveries`), and operational dashboards.
-- 🔮 **Roadmap:** Pure deterministic step primitives (`transform`, `branch`, `http.request`, `agent.run`), versioned SOP code DAGs (TWI job breakdowns, verification checklists), zero-trust action registries (`Workflow-as-a-Tool`), turnkey workflow marketplace packages, native Slack/webhook ingress, and ephemeral microVM sandboxes.
+- ✅ **Governance:** Multi-tier RBAC (Owner/Admin/Member) and versioned AES-256-GCM BYOK credential management.
+- ✅ **Command Center & Observability:** Live HTMX/SSE mailbox (`/ui`), work list (`/ui/work`), schedules (`/ui/schedules`), delivery audit tracking (`/ui/deliveries`), and the operator dashboard (`/ui/dashboard`).
+- 🔮 **Roadmap:** Versioned SOP code DAGs (TWI job breakdowns, verification checklists), zero-trust action registries (`Workflow-as-a-Tool`), turnkey workflow marketplace packages, native Slack ingress, and ephemeral microVM sandboxes.
 
 *(For detailed product architecture and feature breakdowns, see [`marketing/features.md`](marketing/features.md).)*
 
-Agents run on **Rig**, the only agent runtime. Credentials come from company model connections.
-Rig supports attached skills (loaded through `read_resource`), durable resume, and optional
-validated JSON answers through a separate `response_contract` field. Tools, company HTTP MCP and
-approvals are workflow actions rather than agent-runtime tools. Rig executes in the server process
-and is not a sandbox.
+Agents run on **Rig**, the only agent runtime, and always as workflow model steps (`agent.run`,
+`ai.classify`, `decision.agent`). Credentials come from company model connections. An `agent.run`
+step appends the agent's attached skills to its prompt, declares its workflow tools, resumes from
+its checkpoint after a restart, and validates the final answer against the step's
+`output_schema`. Tools, company HTTP MCP and approvals are workflow actions rather than
+agent-runtime tools. Rig executes in the server process and is not a sandbox.
 
 See the [Rig configuration and operator guide](docs/rig.md) for tested examples, compatibility and
 limits, [custom tools](docs/custom_tools.md) for the current tool model, and the
@@ -31,8 +32,8 @@ limits, [custom tools](docs/custom_tools.md) for the current tool model, and the
 
 ## Architecture Glossary
 
-- **Channel:** The company-scoped business object that owns agents, policy, memory, threads, and
-  access rules. It is not an email mailbox or chat conversation.
+- **Channel:** The company-scoped business object that owns its threads, access rules and the
+  workflow bindings that automate it. It is not an email mailbox or chat conversation.
 - **Transport kind:** An interface family such as email or Slack.
 - **Channel binding:** One independently enabled, addressable transport interface on a channel.
 - **Principal:** A stable company-scoped actor: person, agent, external person, or system actor.
@@ -55,7 +56,7 @@ transport deliveries. The first complete adapter supports SMTP and SendGrid emai
 - **Inbound Mail Transfer Agent (MTA) / Webhook Gateway:** Listens for incoming traffic, terminating the SMTP connection and passing raw MIME payloads.
 - **Message Parser & Normalizer:** Dissects MIME parts, sanitizes HTML to markdown/text, strips historical email quotes, and maps RFC headers.
 - **State & Thread Manager:** Reconstructs canonical conversations from binding-qualified provider keys and manages principal access control lists per thread.
-- **Agent Orchestrator:** The intelligent routing layer (detailed in `AGENTS.md`).
+- **Workflow Engine:** Admits runs from message intents, schedules, manual starts and child calls, and executes them step by step in leased worker slots; model steps run on Rig.
 - **Delivery Worker:** Claims generic deliveries; the email adapter renders MIME, applies spoof-safe "From" formatting, manages thread headers, and dispatches through SMTP.
 
 ## 2. Email Standards & Protocol Handling
@@ -96,234 +97,72 @@ Email clients append the entire historical thread below newly typed text. Feedin
 - ✅ **Thread Resolution & ACLs:** Reconstructs conversational graphs by matching `In-Reply-To`, `References`, or Outlook's base64 `Thread-Index` header. Enforces company & workflow participant email ACLs.
 - ✅ **Role Assignment:** Distinguishes human users (`MessageRole::Human`) from automated agents (`MessageRole::Agent`) and system notifications (`MessageRole::System`).
 
-### 3.3 Loop Guard Engine & Inter-Workflow Communication
+### 3.3 Loop Guard Engine & Inter-Channel Communication
 - ✅ **RFC 3834 & Exchange Headers:** Outbound emails include `Auto-Submitted: auto-replied` and `X-Auto-Response-Suppress: All`.
-- ✅ **Inter-Workflow Routing:** Attaches `X-MailAgents-Workflow-ID`, `X-MailAgents-Hop-Count`, and `X-MailAgents-Trace`. Supports collaborative communication between workflows while enforcing a **5-hop limit** (`MAX_WORKFLOW_HOPS`) and **cycle detection**.
-- ✅ **Thread Turn Limit:** Enforces a maximum of 20 messages per thread within 1 hour (`MAX_THREAD_MESSAGES_PER_HOUR`) to halt ping-pong loops between automated systems.
+- ✅ **Inter-Channel Routing:** Relayed and workflow-reply mail carries `X-MailAgents-Channel-ID`, `X-MailAgents-Hop-Count`, `X-MailAgents-Correlation-ID` and `X-MailAgents-Trace`. A same-company relay is ingested in process, stops at **5 hops** (`MAX_INGRESS_HOPS`), and refuses a channel already in its trace (**cycle detection**). See [inter-channel communication](docs/inter_channel_agent_communication.md).
+- ✅ **Thread Turn Limit:** Enforces a maximum of 60 messages per thread within 1 hour (`MAX_THREAD_MESSAGES_PER_HOUR`) to halt ping-pong loops between automated systems.
 
-### 3.4 Background Task Queue & Worker
-- ✅ **Durable Task Store (`background_tasks`):** Ingests inbound emails synchronously and enqueues background processing tasks, allowing the webhook to return `HTTP 200 OK` in < 100ms.
-- ✅ **Task Worker Poller (`TaskWorker`):** Independent loops keep long agent runs from holding up anything else. The task loop continuously fills up to `TASK_WORKER_CONCURRENCY` execution slots (default 4), polling an empty queue every 500ms and refilling a slot immediately when a task finishes. Both inbound message dispatches (`email_agent_dispatch`) and recurring scheduled runs (`scheduled_agent_run`) execute through the unified `ThreadUseCases` dispatch path, sharing idempotency checking, multi-agent pipeline execution, approval and outreach gates, and delivery planning. A schedule loop fires due recurring runs every 2 seconds, and a maintenance loop reaps expired task leases and checks quorum timeouts every 30 seconds. A failed poll backs off for 5 seconds. A failed task is retried after 60 seconds and then 120 seconds; the third failed attempt transitions it to `dead_letter`.
-- ✅ **Delivery Worker (`DeliveryWorker`):** A queue of its own, because a delivery outlives the task that produced it and plenty of deliveries have no task behind them. It claims up to 20 deliveries every 500ms, orders the batch round-robin across companies so one tenant's burst cannot fill it, and for each delivery walks its frozen parts through the registered transport. Every write is fenced on the execution the claim minted. A sweep every 30 seconds charges an attempt to leases that expired and dead-letters deliveries whose predecessor can never land.
-- ✅ **Leased Execution:** Claims use `FOR UPDATE SKIP LOCKED` and a 15-minute lease. Background executions renew the lease every 5 minutes, and an expired lease can be reclaimed by another worker.
-- ✅ **Shutdown:** `Ctrl+C` or SIGTERM stops admission, cancels in-flight provider work, records leased durable tasks as retryable, and joins the task worker, SMTP listener, mailbox listener, memory worker, and runtime sampler within the bounded drain window.
+### 3.4 Admission & Background Workers
+- ✅ **One Inbound Commit:** An accepted message, its thread associations, provider mappings and one admission intent per channel (`workflow_message_intents`) are committed in one transaction, so the webhook or SMTP session can answer at once. The message intent worker then offers it to any run awaiting it as a reply, and admits one run for each binding whose trigger accepts it, as the binding's run-as member. `background_tasks` holds only the workflow execution jobs.
+- ✅ **Workflow Worker Slots:** Each process runs `WORKFLOW_WORKER_SLOTS` workers (default 2, range 1–16), each executing one workflow job at a time under a 30-second lease and polling for work every second or as soon as an admission wakes it. The operator dashboard's runtime panel shows the jobs in flight against the configured slots, and the most the machine has run within its resource limits over the last day.
+- ✅ **Schedules on Workflow Bindings:** A channel schedule names a workflow binding and a cadence (recurring interval or one-off, in its own time zone). The workflow engine's schedule materializer captures each due slot once, under a 60-second materialization lease, and admits one run of the binding per occurrence, acting as the binding's run-as member, with input `{"scheduled_for": …}`. "Run now" captures an occurrence per client command key and admits it through the same path. A refused occurrence is recorded with its reason on the schedule; a transient failure is retried with backoff, five attempts in all.
+- ✅ **Delivery Worker (`DeliveryWorker`):** A queue of its own, because a delivery outlives the run that produced it and plenty of deliveries have no run behind them. It claims up to 20 deliveries every 500ms, orders the batch round-robin across companies so one tenant's burst cannot fill it, and for each delivery walks its frozen parts through the registered transport. Every write is fenced on the execution the claim minted. A sweep every 30 seconds charges an attempt to leases that expired and dead-letters deliveries whose predecessor can never land.
+- ✅ **Leased Execution:** Workflow jobs lease for 30 seconds and heartbeat every 10 seconds; message intents and schedule occurrences lease for 60 seconds, deliveries for 120. An expired lease is recovered rather than left in flight: the job is retried or failed, and an uncertain action effect waits for reconciliation.
+- ✅ **Shutdown:** `Ctrl+C` or SIGTERM starts a bounded drain: HTTP connections close, and the workflow worker slots, message intent worker, schedule materializer, inbound event worker, notification projector, delivery worker, SMTP and mailbox listeners and runtime sampler are each signalled and joined within the drain grace. A worker that does not stop in time is aborted, and a job it held is recovered through its lease.
 
-#### Task Execution Flow
+#### Workflow Execution Flow
 
 ```mermaid
 flowchart TD
-    subgraph Ingress[Inbound ingestion]
-        SMTP[SMTP listener<br/>envelope and DMARC verdicts]
-        SG[SendGrid webhook<br/>raw MIME reverified here]
-        APP[Mailbox or simulation compose<br/>authenticated by the signed-in principal]
-        RELAY[Internal channel relay<br/>in-process, never leaves the building]
-        PROVIDER[Signed provider webhook]
-        INBOX[(inbound_events<br/>durable inbox, fast acknowledgement)]
-        IEW[Inbound event worker<br/>claims 8, 120s lease, 90s deadline<br/>4 at once, 2 per company, 1 per installation]
-        PRE[Preflight<br/>ingress guard, address resolution, principal ACLs,<br/>thread and turn policy — nothing written]
-        VERDICT{Preflight verdict}
-        REJECT[Rejected<br/>refused in-session or bounced<br/>no message, no thread, no task]
-        UPLOAD[Store attachments<br/>content addressed, before any row exists]
-        COMMIT[One transaction<br/>threads, canonical message, associations,<br/>outreach transitions, task, frozen deliveries]
-        OUTCOME{Commit outcome}
-        DUPLICATE[Redelivery<br/>returns the first ids and enqueues nothing]
-        FILED[Filed only<br/>context-only message or outreach reply<br/>no task]
-        QUEUED[Task enqueued<br/>email_agent_dispatch]
-
-        SMTP --> PRE
-        SG --> PRE
-        APP --> PRE
-        RELAY --> PRE
-        PROVIDER --> INBOX --> IEW --> PRE
-        PRE --> VERDICT
-        VERDICT -->|rejected| REJECT
-        VERDICT -->|accepted| UPLOAD --> COMMIT --> OUTCOME
-        OUTCOME -->|duplicate| DUPLICATE
-        OUTCOME -->|filed| FILED
-        OUTCOME -->|answered| QUEUED
-    end
-
-    subgraph TaskQueue[Durable task queue]
-        PENDING[(pending<br/>run_at gates availability)]
-        PROCESSING[(processing<br/>worker id and 15-minute lease)]
-        COMPLETED[(completed)]
-        DEAD[(dead_letter)]
-        APPROVAL[(pending_approval)]
-        WAITING[(waiting_for_third_party_reply)]
-        STOPPED[(stopped)]
-    end
-
-    QUEUED --> PENDING
-
-    subgraph Worker[TaskWorker — three independent loops]
-        TASK_TICK[Task loop every 500ms<br/>refills free execution slots, 4 by default]
-        CLAIM[Claim pending rows only<br/>round-robin across companies<br/>FOR UPDATE SKIP LOCKED]
-        SCHED_TICK[Schedule loop every 2s]
-        SCHED[Claim and advance due schedules<br/>60s materialization lease]
-        MAINT_TICK[Maintenance loop every 30s]
-        REAP[Reap expired task leases<br/>charges an attempt and backs off]
-        QUORUM[Decide due quorum waits]
-        CENSUS[Publish the stuck-work census]
-
-        TASK_TICK --> CLAIM
-        SCHED_TICK --> SCHED
-        MAINT_TICK --> REAP --> QUORUM --> CENSUS
-    end
-
-    PENDING -->|due| CLAIM
-    CLAIM --> PROCESSING
-    SCHED -->|scheduled_agent_run| PENDING
-    PROCESSING -->|lease expired| REAP
-    REAP -->|attempts left| PENDING
-    REAP -->|attempts exhausted| DEAD
-
-    subgraph Execute[Claimed task execution — one dispatch for both task types]
-        KIND{Task type}
-        LOAD[Decode the inbound payload and reload<br/>the channel's current configuration]
-        SLOAD[Load the schedule's company and channel<br/>and the agent at position 0]
-        IDEMPOTENT{An outbound reply after<br/>this prompt already saved?}
-        REUSE[Associate the saved reply<br/>with any thread still missing it]
-        SREUSE[Reuse the stored answer and queue<br/>its mail on its own — the send is what failed]
-        AGENTS[Run each matched channel agent<br/>in pipeline order, memory recalled per turn]
-        SAGENT[Run the channel's first agent on the<br/>schedule's prompt, memory recalled into it]
-        PLAN[Freeze the reply and its delivery parts<br/>keyed on the task, a schedule's mail<br/>anchored on its own run slot]
-        COMMIT_RUN[Fenced transaction<br/>reply message, thread associations,<br/>deliveries and audit payload]
-        MEM[Persist memories after the commit]
-        RESULT{Run outcome}
-
-        KIND -->|email_agent_dispatch| LOAD --> IDEMPOTENT
-        KIND -->|scheduled_agent_run| SLOAD --> IDEMPOTENT
-        IDEMPOTENT -->|yes, inbound| REUSE
-        IDEMPOTENT -->|yes, scheduled| SREUSE
-        IDEMPOTENT -->|no, inbound| AGENTS --> PLAN
-        IDEMPOTENT -->|no, scheduled| SAGENT --> PLAN
-        PLAN --> COMMIT_RUN --> MEM --> RESULT
-        REUSE --> RESULT
-        SREUSE --> RESULT
-    end
-
-    PROCESSING --> KIND
-    PROCESSING -. lease renewed every 5 minutes .-> PROCESSING
-    RESULT -->|replied, or nothing to answer| COMPLETED
-    RESULT -->|failed, timed out, interrupted, lease lost| RETRY{Attempts exhausted?}
-    RETRY -->|no — 30s doubled per attempt, so 60s then 120s| PENDING
-    RETRY -->|yes — third attempt, or a terminal failure| DEAD
-
-    subgraph Pauses["Manual control — approval and waiting have no agent producer since 06C; phase 08 rebuilds them as workflow steps"]
-        APPROVAL_ACTION{Approval link action}
-        REPLY[Authorized third-party reply recorded]
-        TIMEOUT[Quorum expired below its threshold]
-        STOP[Manual stop]
-        RESUME[Manual resume]
-
-        APPROVAL --> APPROVAL_ACTION
-        APPROVAL_ACTION -->|approve, default, or proceed partial| PENDING
-        APPROVAL_ACTION -->|extend| WAITING
-        APPROVAL_ACTION -->|reject| STOPPED
-        WAITING --> REPLY --> PENDING
-        WAITING --> TIMEOUT --> APPROVAL
-        STOP --> STOPPED
-        STOPPED --> RESUME --> PENDING
-    end
-
-    QUORUM -. finds due waits .-> TIMEOUT
-    PENDING -.-> STOP
-    PROCESSING -. a stop clears the lease and fences the in-flight run out .-> STOP
-    APPROVAL -.-> STOP
-    WAITING -.-> STOP
-
-    subgraph Delivery[Generic delivery queue]
-        OUT_PENDING[(pending<br/>held until its dependency lands)]
-        OUT_RETRYABLE[(retryable<br/>available_at backoff)]
-        OUT_SENDING[(sending<br/>2-minute lease)]
-        OUT_DELIVERED[(delivered)]
-        OUT_UNKNOWN[(outcome_unknown<br/>never auto-retried)]
-        OUT_DEAD[(dead_letter)]
-        DEL_TICK[Delivery loop every 500ms]
-        DEL_CLAIM[Claim up to 20<br/>at most 4 per company]
-        PART[Per frozen part: fence the start,<br/>call the provider, fence the result]
-        SENT{Provider outcome}
-        DEL_SWEEP[Sweep every 30s<br/>expired leases and orphaned dependencies]
-
-        DEL_TICK --> DEL_CLAIM
-        OUT_PENDING -->|dependency delivered| DEL_CLAIM
-        OUT_RETRYABLE -->|available_at reached| DEL_CLAIM
-        DEL_CLAIM --> OUT_SENDING --> PART --> SENT
-        SENT -->|every part delivered| OUT_DELIVERED
-        SENT -->|definitely refused| OUT_RETRYABLE
-        SENT -->|acceptance ambiguous| OUT_UNKNOWN
-        SENT -->|terminal, or the fifth attempt| OUT_DEAD
-        DEL_SWEEP -. expired before the request started .-> OUT_RETRYABLE
-        DEL_SWEEP -. expired after it started .-> OUT_UNKNOWN
-        DEL_SWEEP -. dependency gone terminal .-> OUT_DEAD
-    end
-
-    PRE -. system address answered .-> OUT_PENDING
-    REJECT -->|bounce| OUT_PENDING
-    COMMIT_RUN -->|the agent reply| OUT_PENDING
-    APPROVAL -. approval request mail .-> OUT_PENDING
-    SREUSE -. mail for an answer already stored .-> OUT_PENDING
-    PART -. addressed to another channel of this company .-> RELAY
-
-    subgraph Shutdown[Shutdown]
-        CTRL[Ctrl+C or SIGTERM]
-        BROADCAST[Broadcast stop<br/>20s drain grace, then abort]
-        DRAIN[Task, delivery, inbound-event, memory,<br/>SMTP, mailbox and sampler loops stop claiming]
-        GIVEBACK[In-flight tasks recorded retryable and<br/>unsent deliveries released, both claimable again]
-
-        CTRL --> BROADCAST --> DRAIN --> GIVEBACK
-    end
-
-    GIVEBACK -.-> PENDING
-    GIVEBACK -.-> OUT_PENDING
+    MAIL[Inbound mail<br/>SMTP or provider webhook] --> PRE[Preflight<br/>routing, ACLs, spam, loop guards, threads]
+    PRE -->|refused| BOUNCE[Bounce or SMTP 550]
+    PRE --> COMMIT[One commit under the channel gates<br/>threads, canonical message, mappings,<br/>one admission intent per channel]
+    COMMIT --> INTENTS[Message intent worker<br/>reply correlation, then each binding<br/>whose trigger admits the message]
+    SCHEDULES[Schedule materializer] --> RUN
+    MANUAL[Manual start<br/>POST workflow-bindings/id/runs] --> RUN
+    INTENTS --> RUN[Workflow run<br/>as the binding's run-as member]
+    RUN --> SLOTS[Workflow worker slots<br/>leased jobs, one step at a time]
+    SLOTS --> KIND{Step kind}
+    KIND -->|data.map, decision.rule| PURE[Pure batch]
+    KIND -->|agent.run, ai.classify, decision.agent| RIG[Rig model step]
+    KIND -->|http.request, mcp.call, tool.call,<br/>message.send, message.reply| ACTIONS[ActionService<br/>marker-first effects]
+    KIND -->|decision.human| DECISION[Run parks on a decision]
+    KIND -->|wait.event, wait.timer| WAIT[Run parks on a wait]
+    KIND -->|workflow.call, flow.repeat| CHILD[Run parks on its child runs]
+    KIND -->|context.history| HISTORY[Thread history read]
+    ACTIONS --> DELIVERIES[Delivery worker<br/>frozen parts to the transport]
 ```
 
-### 3.5 Company Tasks HTMX Dashboard & Workspace
-- ✅ **Tasks Workspace (`/ui/tasks`):** Unified tasks workspace accessible from the mailbox shell, navigation rail, and message bubbles (`view=list`). Features a keyset-paginated task list, correlation-chain Kanban board (`view=board`) with live SSE updates (`/ui/tasks/events`), task detail inspection (`/ui/tasks/{task_id}`), and correlation chain inspector (`/ui/tasks/chains/{correlation_id}`).
-- ✅ **Web Dashboard (`/companies/{id}/tasks`):** Interactive HTMX interface allowing company owners to monitor tasks, filter by workflow or status (`pending`, `processing`, `completed`, `failed`, `dead_letter`, `stopped`), and sort by time.
-- ✅ **Stop / Resume Controls:** Allows manual task cancellation (dispatches a stop notification email to thread participants) or task resumption across both interfaces.
+### 3.5 Work List & Run Controls
+- ✅ **Work List (`/ui/work`):** What needs a human, in My work, Unassigned and Team views: decisions awaiting review, runs waiting on reconciliation, failed runs, binding refusals and failed deliveries, updated live.
+- ✅ **Run Controls:** Runs are listed, inspected, cancelled and retried through `/api/companies/{company_id}/workflow-runs` (`/{run_id}`, `/{run_id}/cancel`, `/{run_id}/retry`); an uncertain action effect takes an operator note at `/{run_id}/reconciliations`.
 
 ### 3.6 Multi-Stage Spam & Content Security Engine
-- ✅ **Workflow & Participant Resolution:** Upon email arrival, the target `Company` and `Workflow` are resolved from the recipient address (`workflow-slug@company-slug.domain.com`).
+- ✅ **Channel & Participant Resolution:** Upon email arrival, the target `Company` and `Channel` are resolved from the recipient address (`channel-slug@company-slug.domain.com`, an alias, or a `+` list).
 - ✅ **Participant Access Control & Spam Check Bypass:** By default (`participant_emails` is `None`), channel access is restricted to Company Team members. If `participant_emails` includes `@public`, the channel is open to the public (external emails are accepted and scanned for spam). If `participant_emails` specifies a list of emails, access is restricted strictly to that list. Trusted participants (company team members or explicitly listed emails) bypass spam scan layers.
 - ✅ **Stage 1 (Local Heuristic Scanner - Option B):** Fast, zero-dependency Rust-native engine analyzing email headers, subject trigger patterns (ALL CAPS, urgency keywords, excess punctuation), link shorteners (`bit.ly`, `tinyurl`), and HTML hidden text tricks (runs for public workflows).
 - ✅ **Stage 2 (External `SpamScanner` - Option A):** Integrates with external spam analysis daemons via `SpamScannerService`. Supports both **Rspamd** (via HTTP API) and **SpamAssassin** (via `spamd` TCP protocol). Evaluates combined scores against `MAX_SPAM_SCORE` threshold and records metrics (`SmtpStatus::RejectedSpamScore`).
 
-### 3.7 Multi-Agent & Multi-Recipient Handling (`To`, `CC`, and `+` Pipeline Chaining)
+### 3.7 Multi-Channel & Multi-Recipient Handling (`To`, `CC`, and `+` Addresses)
 
-- ✅ **Multi-Workflow Ingestion:** Each separately addressed channel or `+` pipeline runs as its own task, in either `To` or `CC`. Channel addresses in `To` execute normally. Channel addresses in `CC` are persisted to their thread history without executing by default; a CC'd channel executes only when the newly written body mentions its email address or a plain `@slug` matching the channel, an alias, or its assigned agent. A channel named more than once keeps its first address, with `To` before `CC`. Explicit quiet/context-only triggers, including a `.quiet` address anywhere on the message, suppress all tasks for that message.
-- ✅ **Sequential Pipeline Chaining (`+` Syntax):** Sending to a `+`-chained recipient address (e.g., `support+billing+legal@acme.mailagents.com`) triggers sequential pipeline execution (`support` $\rightarrow$ `billing` $\rightarrow$ `legal`).
-- ✅ **Cumulative Upstream Context Sharing:** In a `+` pipeline, each subsequent step agent receives the user's prompt **plus** the accumulated outputs of all prior step agents (`[Upstream Pipeline Context from Prior Step Agents]`). For example, Step 3 (`legal`) receives the outputs from both Step 1 (`support`) and Step 2 (`billing`). This upstream pipeline context never crosses separately addressed pipelines.
-- ✅ **Strict Validation, Bounce Notifications & Fuzzy Suggestions:** If an address or pipeline step is misspelled (e.g., `suppport@...` or `support+biling@...`), strict validation halts execution and the server queues an automated bounce email (`[Undeliverable] ...`) to the sender through the durable generic delivery worker, containing fuzzy suggestions calculated via Levenshtein distance matching (e.g., *"Did you mean: `support@acme.mailagents.com`?"*).
-- ✅ **Channel Threads:** An independent thread is resolved or created for each matched workflow, maintaining channel-specific conversation history.
-- ✅ **Delivery Role Context (`RecipientRole`):** Each agent execution receives its recipient delivery context (`To` vs. `Cc`), injecting `[Delivery Context: Email received via TO/CC field]` into the prompt and exposing `{{ context.recipient_role }}`, `{{ context.is_to }}`, and `{{ context.is_cc }}` in system prompts.
-- ✅ **Separate Replies & Outbound Filtering:** Outputs are concatenated and labelled within one `+` pipeline, then sent from that pipeline's first channel. Separately addressed channels reply independently from their own addresses, under their own third-party and participant Cc policies. A single-channel reply has no step labels. Outbound replies automatically strip platform addresses from recipient headers (`To`/`Cc`) to prevent inter-agent reply loops. One task's failure, retry, or response review does not hold up another task's reply.
-- ✅ **Shared Reply Context:** Each published reply is also filed as a context (`delegation`) entry into every other thread the source message reached, including channels that only received it for reference. Each addressed channel's history can therefore show every answer on follow-ups. This filing sends no mail between channels, starts no work, and does not count as the receiving channel's own answer. Replies awaiting review are filed only after approval. Independently running tasks do not wait for sibling answers.
-- ✅ **Manual Handoff of Outside Replies (`external_reply_handling`):** A company has a reply-handling default, and a channel may override it or inherit it live. On `Manual handoff`, an **outside reply to an existing thread** that the channel would have answered is **filed and waits for the team** instead of running the agent: the message, its thread association and its provider mapping are committed exactly as always, and a `thread_handoffs` row in state `needs_instruction` is committed with them, in the same transaction, with **no `background_tasks` row for that channel**.
-  - A held message is an ordinary customer message on the thread — same audience (`external_conversation`), same entry kind (`conversation`), same participants. The only difference is that no agent task was created. The hold is a separate axis from the quiet/context-only disposition, not a form of it.
-  - New conversations, teammates' messages, quiet messages (`support.quiet@`, `[[quiet]]`) and replies that close an outreach the platform is awaiting are **never** held. Neither is a passively CC'd channel the body did not name, which was not going to answer anyway.
-  - One message may reach a held channel and an automatic one at once: that is one canonical message, one task (the automatic channel's) and one handoff (the held channel's thread).
-  - A second outside reply while a hold is open **replaces the generation** on the same row — at most one handoff per thread — and anything written for the previous generation can no longer be sent. Responsibility, priority and due time survive a replacement: a thread somebody claimed stays theirs.
-  - `Automatic` is the default for every existing and new company, so nothing changes for a deployment that does not opt in.
-  - **A held reply is visible without opening it, and stays visible.** Its thread row in the mailbox carries a durable **Needs instruction** badge — becoming **Drafting** while an agent writes an answer and **Draft ready** when one is waiting — and the open thread carries a banner naming who is responsible (the channel team until somebody claims it), how long it has waited, its priority and its due time, with the actions it offers. Both update live over the existing `attention_changed` wake-up. **Opening the thread, reading it, or reloading the page never clears it**: a handoff is shared mailbox state, not per-person unread state. Only claiming it, sending its reply, or dismissing it changes what the badge and the banner say.
+- ✅ **Per-Channel Admission:** Each separately addressed channel gets its own thread association and admission intent, in either `To` or `CC`, and a channel named more than once keeps its first address, with `To` before `CC`. Whether a channel's bindings start a run is each binding's message trigger: `direct` admits a `To` address or a mention, `mentioned` only a mention (the body naming the channel's address or `@slug`/alias), `mentioned_or_reply` also a direct reply to a workflow-published message, and `any` everything. A quiet/context-only trigger anywhere on the message (a `.quiet` address, a `[[quiet]]` body prefix) makes every intent inadmissible: the message is filed, though a run awaiting it as a reply still receives it.
+- ✅ **`+` Addresses:** `support+billing+legal@acme.mailagents.com` addresses each channel in the list; each channel's bindings admit independent runs. Nothing is executed in sequence or shared between them by the platform.
+- ✅ **Strict Validation, Bounce Notifications & Fuzzy Suggestions:** If an address or list entry is misspelled (e.g., `suppport@...` or `support+biling@...`), the whole message is refused. Webhook ingress queues an automated bounce (`[Undeliverable] ...`) through the durable delivery worker, with fuzzy suggestions from Levenshtein distance matching (e.g., *"Did you mean: `support@acme.mailagents.com`?"*); SMTP ingress answers with a 550 instead.
+- ✅ **Channel Threads:** An independent thread is resolved or created for each addressed channel, maintaining channel-specific conversation history.
+- ✅ **Replies:** A workflow `message.reply` answers only the source message's sender, from the source channel's own address, in that channel's thread, with no Cc. Separately addressed channels reply independently, and one run does not hold up another. A channel's `add_3rd_party` setting governs who joins its threads, not who is copied on a reply.
 
-For example, Ana sends to `support+sales@acme.mailagents.com`, copies `billing@acme.mailagents.com` and `bob@client.com`, and mentions `@billing` in the body. Support copies third parties; billing does not. The shared correlation id links two tasks:
-
-- Support then sales produce one reply from `support@…`, with labelled Support and Sales sections and Bob on Cc.
-- Billing produces its own unlabelled reply from `billing@…`, with no Cc in this example.
-
-Both replies answer Ana's original email. Each channel's thread also receives the other pipeline's published reply as context. Without the billing mention, only the support/sales task runs, while billing's thread still receives the original email and the published reply as context.
+For example, Ana sends to `support+sales@acme.mailagents.com`, copies `billing@acme.mailagents.com` and `bob@client.com`, and mentions `@billing` in the body. Support, sales and billing each get a thread association and an admission intent sharing the message's correlation id. Each channel's matching bindings admit their own runs; billing's `direct` binding admits because of the mention. Each reply goes to Ana alone, from its own channel. Without the mention, billing admits only through a binding with trigger `any`.
 
 #### Inbound Processing & Spam Check Decision Matrix
 
 | Channel Mode / `participant_emails` | Sender Email (`from`) | Action | Stage 1 & Stage 2 Spam Scanner |
 |---|---|---|---|
 | **Default** (`None` / empty) | Company Team Member | **Accept & Process** | **Bypassed** |
-| **Default** (`None` / empty) | Non-Team Member / External | **Block / Reject Email** (`"Sender unauthorized for workflow"`) | N/A |
+| **Default** (`None` / empty) | Non-Team Member / External | **Block / Reject Email** (`"Sender unauthorized for channel"`) | N/A |
 | **Public** (contains `@public`) | Company Team Member / Listed | **Accept & Process** | **Bypassed** |
 | **Public** (contains `@public`) | Untrusted External Sender | **Scan & Process** | **Executed** (Rejects if score $\ge 5.0$) |
 | **Explicit List** (e.g. `alice@example.com`) | **IN** `participant_emails` | **Accept & Process** | **Bypassed** |
-| **Explicit List** (e.g. `alice@example.com`) | **NOT in** `participant_emails` | **Block / Reject Email** (`"Sender unauthorized for workflow"`) | N/A |
+| **Explicit List** (e.g. `alice@example.com`) | **NOT in** `participant_emails` | **Block / Reject Email** (`"Sender unauthorized for channel"`) | N/A |
 
 ### Architectural Flow
 
@@ -332,15 +171,15 @@ Inbound Email (SMTP / Webhook)
        │
        ▼
 ┌────────────────────────────────────────────────────────┐
-│ 1. Resolve Company & Workflow                          │
-│ - Match recipient email to company_slug & workflow_slug│
+│ 1. Resolve Company & Channels                          │
+│ - Match recipient to company_slug & channel_slug(s)    │
 └──────────────────────────┬─────────────────────────────┘
                            │
              ┌─────────────┴─────────────┐
-             │ Is Workflow Restricted?   │
+             │ Is Channel Restricted?    │
              │ (participant_emails set?) │
              └─────────────┬─────────────┘
-                YES        │        NO (Public Workflow)
+                YES        │        NO (Public Channel)
                  │                  │
      ┌───────────┴───────────┐      │
      │ Is 'from' email in    │      │
@@ -368,7 +207,7 @@ Inbound Email (SMTP / Webhook)
                        │ (Bypass All Spam Checks)
                        ▼
 ┌────────────────────────────────────────────────────────┐
-│ Execute Agent Prompt & Process Thread                  │
+│ Commit message, threads & admission intents; admit runs│
 └────────────────────────────────────────────────────────┘
 ```
 
@@ -376,13 +215,13 @@ Inbound Email (SMTP / Webhook)
 - ✅ **Context-Only Ingestion:** Ingest emails directly into a channel thread's history without triggering agent execution or automated replies. Allows users and integrations to post background context, transcripts, or notes.
 - ✅ **Trigger Suffixes & Body Commands:** Supported via recipient address subaddressing/suffixes (`channel.quiet@...`, `channel.noagent@...`, `channel.message@...`, `channel.msg@...`, `channel.na@...`, `channel+quiet@...`) or email body prefix triggers (`[[quiet]]`, `[quiet]`, `[[noagent]]`, `[noagent]`, `[[message]]`, `[msg]`, `[na]`).
 - ✅ **Reserved Slug Validation:** Agent and Channel/Workflow slug creation and updates strictly validate against reserved mode keywords (`quiet`, `noagent`, `message`, `msg`, `na`) to prevent route ambiguity.
-- ✅ **Thread History Integration:** Messages ingested in context-only mode are saved to database thread history. Subsequent normal messages sent to the channel trigger the agent, which reads the full thread context including all quiet notes.
+- ✅ **Thread History Integration:** Messages ingested in context-only mode are saved to the thread history. Later admissible messages admit runs per binding trigger, and a workflow reads the thread history, quiet notes included and internal notes excluded, with a `context.history` step.
 
 ### 3.9 Mailbox UI (`/ui`)
-- ✅ **Three-Column Reader (daisyUI + HTMX):** `/ui` renders the company's channels as a mail-style sidebar, the selected channel's threads in the middle column (keyset pagination, "Load older threads"), and the selected thread's messages as chat bubbles on the right. Each column is swapped independently over HTMX and the selection is reflected in the URL (`/ui?company_id=…&channel_id=…&thread_id=…`), so a refresh or a shared link restores the same view. Each message bubble includes a direct link into the company's Tasks workspace in list view (`/ui/tasks?company_id=…&view=list`).
+- ✅ **Three-Column Reader (daisyUI + HTMX):** `/ui` renders the company's channels as a mail-style sidebar, the selected channel's threads in the middle column (keyset pagination, "Load older threads"), and the selected thread's messages as chat bubbles on the right. Each column is swapped independently over HTMX and the selection is reflected in the URL (`/ui?company_id=…&channel_id=…&thread_id=…`), so a refresh or a shared link restores the same view. Each message bubble links to its message diagnostics, and an owner also gets "Open in Simulator".
 - ✅ **Compose (New Thread):** Enabled only once a channel is selected. The composed message is fed through the normal inbound path addressed to `channel-slug@company-slug.domain` as the signed-in user, so participant rules, spam checks and agents apply unchanged. The "deliver agent reply by email" toggle selects `SimulationMode::Run` (real dispatch) over the default `RunTest` (in-app only); a rejected message re-renders the form with the channel's rejection reason.
-- ✅ **Reply in Thread:** In-thread replies from `/ui` and `/ui/schedules` explicitly target the current conversation thread via `X-MailAgents-Thread-Id` headers (honored exclusively for trusted application ingress), while looking back past turns with no email headers (such as agent turns or schedule prompts) to preserve the newest RFC `Message-ID` for email threading when delivered.
-- ✅ **Coexistence:** All existing pages (channels, agents, tasks, simulator) are untouched and reachable from the icon rail; the mailbox is an additional read/compose surface over the same use cases.
+- ✅ **Reply in Thread:** In-thread replies from `/ui` explicitly target the current conversation thread via `X-MailAgents-Thread-Id` headers (honored exclusively for trusted application ingress), while looking back past turns with no email headers (such as agent turns) to preserve the newest RFC `Message-ID` for email threading when delivered.
+- ✅ **Coexistence:** Channels, Agents, Schedules, Work, Deliveries, Dashboard and the simulator are reachable from the icon rail; the mailbox is an additional read/compose surface over the same use cases.
 
 ### 3.10 Credential Encryption & Rotation
 - ✅ **Versioned encryption:** Provider credentials use versioned AES-256-GCM keys. `CREDENTIAL_ENCRYPTION_KEYS` defines the keys available for reads, while `CREDENTIAL_ENCRYPTION_ACTIVE_VERSION` selects the key used for new writes. The active version currently comes from deployment configuration, not PostgreSQL.

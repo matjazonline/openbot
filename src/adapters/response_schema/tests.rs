@@ -1,6 +1,6 @@
 use super::*;
 use crate::{
-    entities::response_contract::{ContractUpdate, MAX_CONTRACT_BYTES},
+    entities::response_contract::MAX_CONTRACT_BYTES,
     services::response_contract::{InvalidResponse, StructuredResponse},
 };
 use serde_json::json;
@@ -11,8 +11,6 @@ fn contract(schema: Value) -> ResponseContract {
 
 #[test]
 fn documented_rig_configuration_and_response_contracts_pass_application_parsers() {
-    use crate::entities::harness::{HarnessConfig, HarnessKind};
-
     let guide = include_str!("../../../docs/rig.md");
     let mut examples = 0;
     for block in guide.split("```json\n").skip(1) {
@@ -24,9 +22,6 @@ fn documented_rig_configuration_and_response_contracts_pass_application_parsers(
                 example.clone(),
             )
             .expect("documented agent request");
-            let config =
-                HarnessConfig::parse(HarnessKind::Rig, example.get("config_json")).unwrap();
-            assert_eq!(config.rig().unwrap().effective_max_turns(16), 8);
         } else {
             let contract = ResponseContract::parse(&example["response_contract"].to_string())
                 .expect("documented response contract envelope");
@@ -52,26 +47,7 @@ fn documented_rig_configuration_and_response_contracts_pass_application_parsers(
 }
 
 #[test]
-fn contract_envelope_patch_and_fingerprint_are_stable() {
-    #[derive(serde::Deserialize)]
-    struct Patch {
-        #[serde(default)]
-        response_contract: ContractUpdate,
-    }
-    assert!(
-        serde_json::from_str::<Patch>("{}")
-            .unwrap()
-            .response_contract
-            .0
-            .is_none()
-    );
-    assert_eq!(
-        serde_json::from_str::<Patch>(r#"{"response_contract":null}"#)
-            .unwrap()
-            .response_contract
-            .0,
-        Some(None)
-    );
+fn contract_envelope_and_fingerprint_are_stable() {
     let valid = json!({"version":1,"format":"json_schema","schema":{"type":"object","properties":{"b":{"type":"string"},"a":{"type":"integer"}}}});
     let parsed: ResponseContract = serde_json::from_value(valid.clone()).unwrap();
     assert_eq!(serde_json::to_value(&parsed).unwrap(), valid);

@@ -15,6 +15,7 @@ mod recovery;
 mod rule;
 mod state;
 mod transition;
+mod trigger;
 
 pub use budget::{
     BudgetCharge, BudgetLimitError, BudgetResource, MAX_ROOT_REPETITIONS, RootBudgetLimits,
@@ -26,7 +27,8 @@ pub use causality::{
 };
 pub use context::{
     Binding, Comparison, Context, ContextError, ContextLimits, ContextReference, RunMetadata,
-    canonical_array_index, preflight_binding, resolve, resolve_inputs, validate_context_value,
+    canonical_array_index, preflight_binding, render_deadline, resolve, resolve_inputs,
+    validate_context_value,
 };
 pub use definition::{
     ExecutionLimits, ResourceRequirement, Routes, StepDefinition, WorkflowDefinition,
@@ -51,3 +53,4 @@ pub use recovery::{
 pub use rule::{OrderedRule, RuleCase, RuleError};
 pub use state::{RunState, RunStateError, WaitingReason};
 pub use transition::{RouteError, RouteSelection, TransitionTarget, select_route};
+pub use trigger::{MAX_MESSAGE_BINDINGS_PER_CHANNEL, MessageFacts, MessageTrigger};

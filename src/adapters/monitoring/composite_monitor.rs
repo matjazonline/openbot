@@ -1,6 +1,4 @@
-use crate::domain::monitoring::{
-    AiExecutionMetrics, MonitoringService, SmtpConnectionMetrics, TaskExecutionMetrics,
-};
+use crate::domain::monitoring::{AiExecutionMetrics, MonitoringService, SmtpConnectionMetrics};
 use std::sync::Arc;
 
 pub struct CompositeMonitor {
@@ -24,12 +22,6 @@ impl MonitoringService for CompositeMonitor {
     fn record_smtp_connection(&self, metrics: &SmtpConnectionMetrics) {
         for monitor in &self.monitors {
             monitor.record_smtp_connection(metrics);
-        }
-    }
-
-    fn record_task_execution(&self, metrics: &TaskExecutionMetrics) {
-        for monitor in &self.monitors {
-            monitor.record_task_execution(metrics);
         }
     }
 

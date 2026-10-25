@@ -104,7 +104,7 @@ async fn workflow_completion_competing_results_lost_ack_and_saved_replay() {
     // A new connection after lost commit acknowledgement observes the saved result
     // even though the successor has already finished the run.
     let options = f.persistence().pool().connect_options();
-    let pool = sqlx::postgres::PgPoolOptions::new()
+    let pool = crate::adapters::persistence::test_support::pool_options()
         .max_connections(1)
         .connect_with((*options).clone())
         .await

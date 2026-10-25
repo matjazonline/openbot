@@ -9,17 +9,27 @@ impl<A: WorkflowAuthorization, P: BindingLifecycle, V: WorkflowDefinitions, R: R
             .persistence
             .binding(request.target.company, request.target.binding)
             .await?;
-        let (configuration_revision, active) = match (&current, request.expected) {
-            (None, None) => (1, false),
+        let (configuration_revision, active, stored_run_as) = match (&current, request.expected) {
+            (None, None) => (1, false, None),
             (Some(state), Some(expected)) => {
                 check_state(state, request.target, expected)?;
                 if state.association != request.association {
                     return Err(conflict().into());
                 }
-                (next(state.configuration.revision().get())?, state.active)
+                (
+                    next(state.configuration.revision().get())?,
+                    state.active,
+                    Some(state.configuration.run_as()),
+                )
             }
             _ => return Err(conflict().into()),
         };
+        // Leaving a stored attribution alone is not a change; persistence enforces who may
+        // name somebody else and that the run-as is a current owner/admin (p08 D1.1).
+        let run_as = request
+            .run_as
+            .or(stored_run_as)
+            .unwrap_or(request.target.actor);
         let bundle = self
             .versions
             .selectable_version(request.target.company, request.version)
@@ -37,12 +47,16 @@ impl<A: WorkflowAuthorization, P: BindingLifecycle, V: WorkflowDefinitions, R: R
                 company_id: request.target.company,
                 params: request.params,
                 resources: request.resources,
+                run_as,
+                message_trigger: request.message_trigger,
             },
             bundle,
         )?);
-        // Configuration cannot retain foreign/revoked resources even while inactive.
+        configuration.check_message_trigger(request.association)?;
+        // Configuration cannot retain foreign/revoked resources even while inactive; automatic
+        // runs use them with the run-as authority.
         configuration
-            .check_readiness(request.target.actor, &self.resources)
+            .check_readiness(run_as, &self.resources)
             .await?;
         let state = BindingState {
             configuration,
@@ -83,7 +97,11 @@ impl<A: WorkflowAuthorization, P: BindingLifecycle, V: WorkflowDefinitions, R: R
         }
         state
             .configuration
-            .check_readiness(request.target.actor, &self.resources)
+            .check_message_trigger(state.association)?;
+        let run_as = state.configuration.run_as();
+        state
+            .configuration
+            .check_readiness(run_as, &self.resources)
             .await?;
         state.active = true;
         self.persist_activity(request, state).await

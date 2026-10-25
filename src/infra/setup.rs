@@ -1,7 +1,6 @@
 use crate::{
     adapters::{
         http::{app_state::AppState, session::SessionAuthority},
-        memory::{hindsight::HindsightProvider, hydradb::HydraDbProvider},
         monitoring::{CompositeMonitor, InMemoryMonitor, TracingMonitor},
         protocols::email::{EmailRenderer, EmailSender, MailTransport, SmtpConfirmationSender},
         resend_api::{
@@ -11,11 +10,11 @@ use crate::{
         storage::{FileStorage, gcs::GcsFileStorage},
     },
     domain::monitoring::MonitoringService,
-    entities::{memory::MemoryProviderKind, runtime_metrics::MachineIdentity},
+    entities::runtime_metrics::MachineIdentity,
     infra::{
         argon2_password_hasher,
-        config::{AppConfig, agent_run_timeout_from_env, smtp_allow_plaintext_local_from_env},
-        events::{MailboxEvents, TaskWakeups},
+        config::{AppConfig, smtp_allow_plaintext_local_from_env},
+        events::MailboxEvents,
         postgres_persistence,
     },
     services::{
@@ -23,11 +22,7 @@ use crate::{
         database_query_health::DatabaseQueryHealthService,
         harness::TextClassifier,
         inbound_event_worker::{InboundEventWakeups, InboundEventWorker},
-        memory_coordinator::MemoryCoordinator,
-        memory_provider::{ConfiguredMemoryProviders, MemoryProviderRegistry},
-        memory_worker::MemoryWorker,
         notification_worker::NotificationWorker,
-        runtime_metrics::MemoryProviderActivity,
     },
     transport::{
         DeliveryComposer, InboundEventDecoderRegistry, MonitoredInboundEventInbox,
@@ -35,18 +30,14 @@ use crate::{
     },
     use_cases::{
         agent::AgentUseCases,
-        approval::ApprovalUseCases,
         builtin_agent_library::install_builtin_agent_library,
         channel::ChannelUseCases,
         company::CompanyUseCases,
         company_invite::CompanyInviteUseCases,
         company_resend_api::CompanyResendApiUseCases,
-        memory::MemoryUseCases,
-        response_review::ResponseReviewUseCases,
         schedule::ScheduleUseCases,
         skill::SkillUseCases,
         thread::{InboundIngestPorts, ThreadStores, ThreadUseCases},
-        thread_handoff::ThreadHandoffUseCases,
         user::{EmailConfirmation, UserUseCases},
     },
 };
@@ -55,7 +46,6 @@ use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberI
 
 pub async fn init_app_state() -> anyhow::Result<AppState> {
     let config = Arc::new(AppConfig::from_env());
-    let agent_run_timeout = agent_run_timeout_from_env();
 
     // The relay every company that has *not* connected a provider account of its own sends
     // through, and the one every platform notice sends through whatever its tenants have
@@ -81,55 +71,6 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
     install_builtin_agent_library(postgres_arc.as_ref()).await?;
     let database_query_health = Arc::new(DatabaseQueryHealthService::new(postgres_arc.clone()));
     let dashboard_snapshots = Arc::new(DashboardSnapshotService::new(postgres_arc.clone()));
-    let memory_provider_activity = MemoryProviderActivity::default();
-    // One registry entry and one configured-set entry per provider this deployment carries
-    // credentials for. The activity handle is shared: the runtime panel is a machine-level
-    // aggregate, not a per-provider split.
-    let mut memory_providers = MemoryProviderRegistry::default();
-    let mut configured_memory_providers = Vec::new();
-    if let Some(hydradb) = config.hydradb.as_ref() {
-        let provider = HydraDbProvider::new(
-            hydradb.base_url.clone(),
-            hydradb.api_key.clone(),
-            hydradb.fast_timeout,
-            hydradb.thinking_timeout,
-        )?
-        .with_activity(memory_provider_activity.clone());
-        memory_providers =
-            memory_providers.register(MemoryProviderKind::Hydradb, Arc::new(provider));
-        configured_memory_providers.push(MemoryProviderKind::Hydradb);
-    }
-    if let Some(hindsight) = config.hindsight.as_ref() {
-        let provider = HindsightProvider::new(
-            hindsight.base_url.clone(),
-            hindsight.api_key.clone(),
-            hindsight.fast_timeout,
-            hindsight.thinking_timeout,
-        )?
-        .with_activity(memory_provider_activity.clone());
-        memory_providers =
-            memory_providers.register(MemoryProviderKind::Hindsight, Arc::new(provider));
-        configured_memory_providers.push(MemoryProviderKind::Hindsight);
-    }
-    let configured_memory_providers =
-        ConfiguredMemoryProviders::from_iter(configured_memory_providers);
-    let memory_providers = Arc::new(memory_providers);
-    let memory_coordinator = Arc::new(MemoryCoordinator::new(
-        postgres_arc.clone(),
-        memory_providers.clone(),
-        monitoring.clone(),
-    ));
-    let memory_use_cases = Arc::new(MemoryUseCases::new(
-        postgres_arc.clone(),
-        postgres_arc.clone(),
-        postgres_arc.clone(),
-        configured_memory_providers,
-    ));
-    let memory_worker = Arc::new(MemoryWorker::new(
-        postgres_arc.clone(),
-        memory_providers,
-        monitoring.clone(),
-    ));
     let runtime_identity = MachineIdentity::process().clone();
     let argon_hasher = argon2_password_hasher();
 
@@ -157,7 +98,7 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
         postgres_arc.clone(),
         postgres_arc.clone(),
         postgres_arc.clone(),
-        mcp_client,
+        mcp_client.clone(),
     ));
     let company_resend_api_use_cases =
         Arc::new(CompanyResendApiUseCases::new(postgres_arc.clone()));
@@ -170,19 +111,14 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
     )?);
     let company_invite_use_cases =
         CompanyInviteUseCases::new(postgres_arc.clone(), postgres_arc.clone());
-    let channel_use_cases = Arc::new(
-        ChannelUseCases::new(
-            postgres_arc.clone(),
-            postgres_arc.clone(),
-            postgres_arc.clone(),
-            config.clone(),
-        )
-        .with_memory_persistence(postgres_arc.clone()),
-    );
-    let harnesses = Arc::new(crate::adapters::harness::deployment_registry(
+    let channel_use_cases = Arc::new(ChannelUseCases::new(
         postgres_arc.clone(),
-    )?);
-    // The system-prompt generator's one-shot completion; agents themselves run on `harnesses`.
+        postgres_arc.clone(),
+        postgres_arc.clone(),
+        config.clone(),
+    ));
+    // The system-prompt generator's one-shot completion; agents themselves run as workflow model
+    // steps.
     let prompt_classifier: Arc<dyn TextClassifier> =
         Arc::new(crate::adapters::harness::rig::RigTextClassifier::new(
             crate::adapters::harness::rig::providers::ProviderRegistry::standard()?,
@@ -192,15 +128,7 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
         postgres_arc.clone(),
         postgres_arc.clone(),
         postgres_arc.clone(),
-        if config.is_spam_scan_enabled() {
-            crate::use_cases::agent::SpamScanning::Available
-        } else {
-            crate::use_cases::agent::SpamScanning::Unavailable
-        },
     )
-    .with_response_validator(Arc::new(
-        crate::adapters::response_schema::JsonResponseValidator,
-    ))
     .with_prompt_classifier(prompt_classifier);
     let skill_use_cases = Arc::new(SkillUseCases::new(
         postgres_arc.clone(),
@@ -218,20 +146,24 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
             .map_err(|error| anyhow::anyhow!("Could not register the email renderer: {error}"))?,
     );
     let delivery_composer = DeliveryComposer::new(renderers.clone(), postgres_arc.clone());
+    let workflow = Arc::new(crate::infra::workflow::WorkflowEngine::new(
+        (*postgres_arc).clone(),
+        &config.public_base_url(),
+        &config.app_domain_name,
+        delivery_composer.clone(),
+        mcp_client,
+        monitoring.clone(),
+        crate::infra::workflow::worker_slots(
+            std::env::var("WORKFLOW_WORKER_SLOTS").ok().as_deref(),
+            crate::infra::db::max_connections(),
+        )?,
+    )?);
     let notification_worker = Arc::new(NotificationWorker::new(
         postgres_arc.clone(),
         delivery_composer.clone(),
         config.clone(),
         monitoring.clone(),
     ));
-
-    let approval_use_cases = Arc::new(ApprovalUseCases::new(
-        postgres_arc.clone(),
-        delivery_composer.clone(),
-        config.clone(),
-    ));
-    let response_review_use_cases = Arc::new(ResponseReviewUseCases::new(postgres_arc.clone()));
-    let thread_handoff_use_cases = Arc::new(ThreadHandoffUseCases::new(postgres_arc.clone()));
 
     let thread_use_cases = Arc::new(
         ThreadUseCases::new(
@@ -240,8 +172,6 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
                 channels: postgres_arc.clone(),
                 companies: postgres_arc.clone(),
                 participants: postgres_arc.clone(),
-                tasks: postgres_arc.clone(),
-                handoff_policy: postgres_arc.clone(),
             },
             InboundIngestPorts {
                 committer: postgres_arc.clone(),
@@ -252,17 +182,8 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
             renderers.clone(),
             config.clone(),
         )
-        .with_response_validator(Arc::new(
-            crate::adapters::response_schema::JsonResponseValidator,
-        ))
-        .with_agent_run_timeout(agent_run_timeout)
-        .with_harness_run_store(postgres_arc.clone())
-        .with_agent_persistence(postgres_arc.clone())
-        .with_agent_capability_reader(postgres_arc.clone())
-        .with_approval_use_cases(approval_use_cases.clone())
         .with_monitoring(monitoring.clone())
-        .with_memory(memory_coordinator)
-        .with_harnesses(harnesses),
+        .with_intent_wakeups(workflow.intent_wakeups.clone()),
     );
 
     // Registered unconditionally now that Resend is configured per company: any tenant may connect
@@ -280,7 +201,6 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
             anyhow::anyhow!("Could not register the Resend inbound decoder: {error}")
         })?;
     let inbound_event_wakeups = InboundEventWakeups::new();
-    let task_wakeups = TaskWakeups::new();
     let inbound_event_worker = Arc::new(
         InboundEventWorker::new(
             postgres_arc.clone(),
@@ -288,7 +208,8 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
             Arc::new(inbound_decoders),
             inbound_event_wakeups.clone(),
         )
-        .with_monitoring(monitoring.clone()),
+        .with_monitoring(monitoring.clone())
+        .with_intent_wakeups(workflow.intent_wakeups.clone()),
     );
     let inbound_event_inbox = Arc::new(MonitoredInboundEventInbox::new(
         postgres_arc.clone(),
@@ -316,15 +237,15 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
 
     let schedule_use_cases = Arc::new(ScheduleUseCases::new(
         postgres_arc.clone(),
-        postgres_arc.clone(),
-        postgres_arc.clone(),
-        postgres_arc.clone(),
-        postgres_arc.clone(),
+        workflow.authorization(),
+        workflow.schedule_run_now(),
     ));
 
     Ok(AppState {
         model_usage: postgres_arc.clone(),
-        task_counts: postgres_arc.clone(),
+        run_counts: postgres_arc.clone(),
+        thread_activity: postgres_arc.clone(),
+        message_outcomes: postgres_arc.clone(),
         db: postgres_arc.pool().clone(),
         mcp_use_cases,
         config,
@@ -339,15 +260,9 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
         agent_use_cases: Arc::new(agent_use_cases),
         skill_use_cases,
         thread_use_cases,
-        approval_use_cases,
-        response_review_use_cases,
-        thread_handoff_use_cases,
-        memory_use_cases,
-        memory_worker,
         inbound_event_worker,
         inbound_event_inbox,
         inbound_event_wakeups,
-        task_wakeups,
         dashboard_snapshots,
         attention: postgres_arc.clone(),
         notifications: postgres_arc.clone(),
@@ -356,13 +271,13 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
         dashboard_sse_connections: Arc::new(std::sync::atomic::AtomicU64::new(0)),
         runtime_metrics: postgres_arc.clone(),
         runtime_identity,
-        memory_provider_activity,
         sessions,
         file_storage,
         transports,
         deliveries: postgres_arc.clone(),
         delivery_queue: postgres_arc.clone(),
         events: MailboxEvents::new(),
+        workflow,
     })
 }
 

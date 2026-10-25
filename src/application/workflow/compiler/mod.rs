@@ -16,7 +16,7 @@ mod schema;
 mod schema_budget;
 mod shape;
 mod source;
-pub use rebase::{MAX_SOURCE_BYTES, SourceDecoder, rebase_workflow_id};
+pub use rebase::{MAX_SOURCE_BYTES, SourceDecoder, rebase_workflow_id, retarget_agent};
 mod syntax;
 mod wire;
 

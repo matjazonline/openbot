@@ -380,9 +380,8 @@ impl AuthservId {
 // [`AvatarUrl::parse`], so a misconfigured base URL cannot put a non-`http` scheme in an `<img>`.
 string_newtype!(ObjectUrl);
 
-// The id of one tool a Rig run declares to the model -- since 06C only `read_resource`, which
-// loads an attached skill's text. Workflow tools are named by `TypeName` and dispatched by
-// workflow actions, not by this id.
+// The id of one tool a Rig run declares to the model. Workflow tools are named by `TypeName` and
+// dispatched by workflow actions; this id keys the run's own record of a call.
 //
 // A newtype because it keys the run's tool registry, its trace and its diagnostics. It
 // deliberately has no `parse`: a tool id is valid only by being registered in that run, and the

@@ -269,6 +269,8 @@ async fn workflow_tool_revocation_refuses_new_runs_and_calls_while_parked_calls_
             version: setup.parent,
             params: json!({}),
             resources: BTreeMap::new(),
+            run_as: None,
+            message_trigger: None,
         })
         .await
     {

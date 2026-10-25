@@ -15,13 +15,10 @@ use uuid::Uuid;
 use crate::{
     adapters::http::{app_state::AppState, auth::AuthenticatedUser, pages},
     app_error::{AppError, AppResult},
-    entities::{
-        schedule::{
-            ChannelSchedule, ScheduleDeliveryMode, ScheduleTimezone, ScheduleType, ScheduleWrite,
-        },
-        value_objects::EmailAddress,
+    entities::schedule::{
+        ChannelSchedule, ScheduleRun, ScheduleTimezone, ScheduleType, ScheduleWrite,
     },
-    use_cases::schedule::ScheduleUseCases,
+    use_cases::schedule::{ScheduleBindingChoice, ScheduleScope, ScheduleUseCases},
 };
 
 pub fn router() -> Router<AppState> {
@@ -39,6 +36,14 @@ pub fn router() -> Router<AppState> {
         .route(
             "/api/companies/{company_id}/channels/{channel_id}/schedules/{id}/run-now",
             post(run_schedule_now_json),
+        )
+        .route(
+            "/api/companies/{company_id}/channels/{channel_id}/schedules/{id}/runs",
+            get(list_schedule_runs_json),
+        )
+        .route(
+            "/api/companies/{company_id}/channels/{channel_id}/schedule-bindings",
+            get(list_schedule_bindings_json),
         )
         .route(
             "/api/companies/{company_id}/channels/{channel_id}/schedules/{id}/toggle",
@@ -69,24 +74,12 @@ pub struct ScheduleRequest {
     pub schedule_type: ScheduleType,
     pub interval_seconds: Option<i64>,
     pub scheduled_at: Option<DateTime<Utc>>,
-    pub subject_template: String,
-    pub prompt_template: String,
-    #[serde(default = "default_delivery_mode")]
-    pub delivery_mode: ScheduleDeliveryMode,
-    #[serde(default)]
-    pub recipient_emails: Vec<String>,
     #[serde(default)]
     pub timezone: ScheduleTimezone,
-    /// The team member the runs act as. Checked against what the caller may attribute a run to
-    /// before it is stored, so a client naming somebody else is refused rather than obeyed.
-    #[serde(default)]
-    pub run_as_user_id: Option<Uuid>,
+    /// The workflow binding each occurrence runs; its run-as member is whom the runs act as.
+    pub binding_id: Uuid,
     #[serde(default = "default_true")]
     pub enabled: bool,
-}
-
-fn default_delivery_mode() -> ScheduleDeliveryMode {
-    ScheduleDeliveryMode::MailboxOnly
 }
 
 fn default_true() -> bool {
@@ -100,16 +93,8 @@ impl ScheduleRequest {
             schedule_type: self.schedule_type,
             interval_seconds: self.interval_seconds,
             scheduled_at: self.scheduled_at,
-            subject_template: self.subject_template,
-            prompt_template: self.prompt_template,
-            delivery_mode: self.delivery_mode,
-            recipient_emails: self
-                .recipient_emails
-                .into_iter()
-                .map(EmailAddress::from)
-                .collect(),
             timezone: self.timezone,
-            run_as_user_id: self.run_as_user_id,
+            binding_id: self.binding_id,
             enabled: self.enabled,
         }
     }
@@ -150,14 +135,9 @@ pub struct UiScheduleForm {
     #[serde(default, deserialize_with = "deserialize_interval_seconds")]
     pub interval_seconds: Option<i64>,
     pub scheduled_at: Option<String>,
-    pub subject_template: String,
-    pub prompt_template: String,
-    pub delivery_mode: String,
-    pub recipient_emails: Option<String>,
     pub timezone: Option<String>,
-    /// The picked team member, as the select submits it: their account id, or the empty string
-    /// for a run attributed to nobody.
-    pub run_as_user_id: Option<String>,
+    /// The picked workflow binding, as the select submits it.
+    pub binding_id: Option<String>,
 }
 
 impl UiScheduleForm {
@@ -165,10 +145,6 @@ impl UiScheduleForm {
         let schedule_type = self
             .schedule_type
             .parse::<ScheduleType>()
-            .map_err(AppError::BadRequest)?;
-        let delivery_mode = self
-            .delivery_mode
-            .parse::<ScheduleDeliveryMode>()
             .map_err(AppError::BadRequest)?;
         let timezone = self
             .timezone
@@ -196,33 +172,25 @@ impl UiScheduleForm {
             _ => None,
         };
 
-        let run_as_user_id = match self.run_as_user_id.as_deref().map(str::trim) {
-            Some(picked) if !picked.is_empty() => Some(Uuid::parse_str(picked).map_err(|_| {
-                AppError::BadRequest("Run-as team member is not a valid account.".into())
-            })?),
-            _ => None,
-        };
-
-        let recipient_emails = self
-            .recipient_emails
-            .unwrap_or_default()
-            .split(',')
+        let binding_id = self
+            .binding_id
+            .as_deref()
             .map(str::trim)
-            .filter(|s| !s.is_empty())
-            .map(EmailAddress::from)
-            .collect();
+            .filter(|picked| !picked.is_empty())
+            .ok_or_else(|| AppError::BadRequest("Choose the workflow this schedule runs.".into()))
+            .and_then(|picked| {
+                Uuid::parse_str(picked).map_err(|_| {
+                    AppError::BadRequest("The chosen workflow binding is not valid.".into())
+                })
+            })?;
 
         Ok(ScheduleWrite {
             name: self.name,
             schedule_type,
             interval_seconds: self.interval_seconds,
             scheduled_at,
-            subject_template: self.subject_template,
-            prompt_template: self.prompt_template,
-            delivery_mode,
-            recipient_emails,
             timezone,
-            run_as_user_id,
+            binding_id,
             // Not the form's to decide: pausing and resuming is its own action, so an edit that
             // did not ask to change it must not resume a paused schedule.
             enabled: true,
@@ -259,10 +227,10 @@ pub async fn create_channel_schedule_json(
 pub async fn get_schedule_json(
     State(schedule_use_cases): State<Arc<ScheduleUseCases>>,
     user: AuthenticatedUser,
-    Path((company_id, _channel_id, id)): Path<(Uuid, Uuid, Uuid)>,
+    Path((company_id, channel_id, id)): Path<(Uuid, Uuid, Uuid)>,
 ) -> AppResult<Json<ChannelSchedule>> {
     let schedule = schedule_use_cases
-        .get_schedule(user.id, company_id, id)
+        .get_schedule(user.id, ScheduleScope::channel(company_id, channel_id), id)
         .await?
         .ok_or_else(|| AppError::NotFound("Schedule not found.".into()))?;
     Ok(Json(schedule))
@@ -286,24 +254,100 @@ pub async fn update_schedule_json(
 pub async fn delete_schedule_json(
     State(schedule_use_cases): State<Arc<ScheduleUseCases>>,
     user: AuthenticatedUser,
-    Path((company_id, _channel_id, id)): Path<(Uuid, Uuid, Uuid)>,
+    Path((company_id, channel_id, id)): Path<(Uuid, Uuid, Uuid)>,
 ) -> AppResult<StatusCode> {
     schedule_use_cases
-        .delete_schedule(user.id, company_id, id)
+        .delete_schedule(user.id, ScheduleScope::channel(company_id, channel_id), id)
         .await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
-#[instrument(skip(schedule_use_cases, user))]
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RunNowBody {
+    /// The client's key: repeating it returns the same occurrence and run.
+    pub command_key: String,
+}
+
+#[instrument(skip(schedule_use_cases, user, body))]
 pub async fn run_schedule_now_json(
     State(schedule_use_cases): State<Arc<ScheduleUseCases>>,
     user: AuthenticatedUser,
-    Path((company_id, _channel_id, id)): Path<(Uuid, Uuid, Uuid)>,
-) -> AppResult<Json<ChannelSchedule>> {
-    let schedule = schedule_use_cases
-        .trigger_schedule_now(user.id, company_id, id)
+    Path((company_id, channel_id, id)): Path<(Uuid, Uuid, Uuid)>,
+    Json(body): Json<RunNowBody>,
+) -> AppResult<Json<ScheduleRun>> {
+    let run = schedule_use_cases
+        .trigger_schedule_now(
+            user.id,
+            ScheduleScope::channel(company_id, channel_id),
+            id,
+            &body.command_key,
+        )
         .await?;
-    Ok(Json(schedule))
+    Ok(Json(run))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RunsQuery {
+    #[serde(default)]
+    pub offset: i64,
+    #[serde(default = "default_runs_limit")]
+    pub limit: i64,
+}
+
+fn default_runs_limit() -> i64 {
+    20
+}
+
+#[instrument(skip(schedule_use_cases, user))]
+pub async fn list_schedule_runs_json(
+    State(schedule_use_cases): State<Arc<ScheduleUseCases>>,
+    user: AuthenticatedUser,
+    Path((company_id, channel_id, id)): Path<(Uuid, Uuid, Uuid)>,
+    axum::extract::Query(query): axum::extract::Query<RunsQuery>,
+) -> AppResult<Json<Vec<ScheduleRun>>> {
+    let runs = schedule_use_cases
+        .list_schedule_runs(
+            user.id,
+            ScheduleScope::channel(company_id, channel_id),
+            id,
+            query.offset,
+            query.limit,
+        )
+        .await?;
+    Ok(Json(runs))
+}
+
+#[derive(Debug, Serialize)]
+pub struct ScheduleBindingJson {
+    pub binding_id: Uuid,
+    pub channel_id: Option<Uuid>,
+    pub title: String,
+    pub active: bool,
+}
+
+impl From<ScheduleBindingChoice> for ScheduleBindingJson {
+    fn from(choice: ScheduleBindingChoice) -> Self {
+        Self {
+            binding_id: choice.binding_id,
+            channel_id: choice.channel_id,
+            title: choice.title,
+            active: choice.active,
+        }
+    }
+}
+
+/// The bindings a schedule on this channel may name.
+#[instrument(skip(schedule_use_cases, user))]
+pub async fn list_schedule_bindings_json(
+    State(schedule_use_cases): State<Arc<ScheduleUseCases>>,
+    user: AuthenticatedUser,
+    Path((company_id, channel_id)): Path<(Uuid, Uuid)>,
+) -> AppResult<Json<Vec<ScheduleBindingJson>>> {
+    let choices = schedule_use_cases
+        .binding_choices(user.id, company_id, Some(channel_id))
+        .await?;
+    Ok(Json(choices.into_iter().map(Into::into).collect()))
 }
 
 #[derive(Debug, Deserialize)]
@@ -315,13 +359,18 @@ pub struct ToggleBody {
 pub async fn toggle_schedule_json(
     State(schedule_use_cases): State<Arc<ScheduleUseCases>>,
     user: AuthenticatedUser,
-    Path((company_id, _channel_id, id)): Path<(Uuid, Uuid, Uuid)>,
+    Path((company_id, channel_id, id)): Path<(Uuid, Uuid, Uuid)>,
     Json(body): Json<ToggleBody>,
 ) -> AppResult<Json<bool>> {
-    let res = schedule_use_cases
-        .toggle_schedule(user.id, company_id, id, body.enabled)
+    schedule_use_cases
+        .toggle_schedule(
+            user.id,
+            ScheduleScope::channel(company_id, channel_id),
+            id,
+            body.enabled,
+        )
         .await?;
-    Ok(Json(res))
+    Ok(Json(body.enabled))
 }
 
 // ---------------------------------------------------------------------------
@@ -329,7 +378,7 @@ pub async fn toggle_schedule_json(
 // ---------------------------------------------------------------------------
 
 /// The card every write below re-renders: the channel's schedules as they now stand, beside the
-/// team members this caller may attribute a new one to.
+/// workflow bindings a new one may name.
 async fn schedules_card(
     schedule_use_cases: &ScheduleUseCases,
     user_id: Uuid,
@@ -339,8 +388,8 @@ async fn schedules_card(
     let schedules = schedule_use_cases
         .list_channel_schedules(user_id, company_id, channel_id)
         .await?;
-    let run_as = schedule_use_cases
-        .run_as_choices(user_id, company_id)
+    let bindings = schedule_use_cases
+        .binding_choices(user_id, company_id, Some(channel_id))
         .await?;
 
     Ok(pages::channel_schedules_card(
@@ -348,7 +397,7 @@ async fn schedules_card(
             company_id,
             channel_id,
             schedules: &schedules,
-            run_as: &run_as,
+            bindings: &bindings,
         },
     ))
 }
@@ -375,6 +424,21 @@ pub struct UiScheduleActionQuery {
     pub company_id: Uuid,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct UiRunNowForm {
+    pub company_id: Uuid,
+    /// Rendered fresh with every card, so a double submit captures one occurrence.
+    pub command_key: Option<String>,
+}
+
+/// The form's key, or a fresh one for a client that sent none.
+pub fn run_now_key(submitted: Option<String>) -> String {
+    submitted
+        .map(|key| key.trim().to_owned())
+        .filter(|key| !key.is_empty())
+        .unwrap_or_else(|| Uuid::new_v4().to_string())
+}
+
 #[instrument(skip(schedule_use_cases, user))]
 pub async fn ui_delete_schedule(
     State(schedule_use_cases): State<Arc<ScheduleUseCases>>,
@@ -383,7 +447,11 @@ pub async fn ui_delete_schedule(
     Form(query): Form<UiScheduleActionQuery>,
 ) -> AppResult<impl IntoResponse> {
     schedule_use_cases
-        .delete_schedule(user.id, query.company_id, id)
+        .delete_schedule(
+            user.id,
+            ScheduleScope::channel(query.company_id, channel_id),
+            id,
+        )
         .await?;
 
     schedules_card(&schedule_use_cases, user.id, query.company_id, channel_id).await
@@ -394,13 +462,18 @@ pub async fn ui_run_schedule_now(
     State(schedule_use_cases): State<Arc<ScheduleUseCases>>,
     user: AuthenticatedUser,
     Path((channel_id, id)): Path<(Uuid, Uuid)>,
-    Form(query): Form<UiScheduleActionQuery>,
+    Form(form): Form<UiRunNowForm>,
 ) -> AppResult<impl IntoResponse> {
     schedule_use_cases
-        .trigger_schedule_now(user.id, query.company_id, id)
+        .trigger_schedule_now(
+            user.id,
+            ScheduleScope::channel(form.company_id, channel_id),
+            id,
+            &run_now_key(form.command_key),
+        )
         .await?;
 
-    schedules_card(&schedule_use_cases, user.id, query.company_id, channel_id).await
+    schedules_card(&schedule_use_cases, user.id, form.company_id, channel_id).await
 }
 
 #[derive(Debug, Deserialize)]
@@ -418,7 +491,12 @@ pub async fn ui_toggle_schedule(
 ) -> AppResult<impl IntoResponse> {
     let enabled = form.enabled.as_deref() == Some("true") || form.enabled.as_deref() == Some("on");
     schedule_use_cases
-        .toggle_schedule(user.id, form.company_id, id, enabled)
+        .toggle_schedule(
+            user.id,
+            ScheduleScope::channel(form.company_id, channel_id),
+            id,
+            enabled,
+        )
         .await?;
 
     schedules_card(&schedule_use_cases, user.id, form.company_id, channel_id).await
@@ -430,80 +508,83 @@ mod tests {
 
     #[test]
     fn ui_schedule_form_parses_interval_correctly() {
+        let binding = Uuid::new_v4();
         let form = UiScheduleForm {
             company_id: Uuid::new_v4(),
             name: "Hourly Triage".into(),
             schedule_type: "interval".into(),
             interval_seconds: Some(3600),
             scheduled_at: None,
-            subject_template: "[Hourly] {{date}}".into(),
-            prompt_template: "Scan tickets".into(),
-            delivery_mode: "mailbox_only".into(),
-            recipient_emails: None,
             timezone: None,
-            run_as_user_id: None,
+            binding_id: Some(binding.to_string()),
         };
 
         let write = form.into_write().unwrap();
         assert_eq!(write.name, "Hourly Triage");
         assert_eq!(write.schedule_type, ScheduleType::Interval);
         assert_eq!(write.interval_seconds, Some(3600));
-        assert_eq!(write.delivery_mode, ScheduleDeliveryMode::MailboxOnly);
-        assert!(write.recipient_emails.is_empty());
+        assert_eq!(write.binding_id, binding);
     }
 
     #[test]
-    fn ui_schedule_form_parses_one_off_with_custom_emails() {
+    fn ui_schedule_form_parses_one_off_and_requires_a_binding() {
         let form = UiScheduleForm {
             company_id: Uuid::new_v4(),
             name: "One-Off Audit".into(),
             schedule_type: "one_off".into(),
             interval_seconds: None,
             scheduled_at: Some("2026-08-25T14:30".into()),
-            subject_template: "[Audit] {{time}}".into(),
-            prompt_template: "Run audit".into(),
-            delivery_mode: "email_custom".into(),
-            recipient_emails: Some("dev@example.com, ops@example.com".into()),
             timezone: Some("Europe/Ljubljana".into()),
-            run_as_user_id: None,
+            binding_id: Some(Uuid::new_v4().to_string()),
         };
-
-        let write = form.into_write().unwrap();
-        assert_eq!(write.name, "One-Off Audit");
+        let write = form.clone().into_write().unwrap();
         assert_eq!(write.schedule_type, ScheduleType::OneOff);
         assert!(write.scheduled_at.is_some());
-        assert_eq!(write.delivery_mode, ScheduleDeliveryMode::EmailCustom);
-        assert_eq!(write.recipient_emails.len(), 2);
-        assert_eq!(
-            write.recipient_emails[0],
-            EmailAddress::from("dev@example.com")
-        );
-        assert_eq!(
-            write.recipient_emails[1],
-            EmailAddress::from("ops@example.com")
+
+        let missing = UiScheduleForm {
+            binding_id: Some(String::new()),
+            ..form.clone()
+        };
+        assert!(matches!(missing.into_write(), Err(AppError::BadRequest(_))));
+        let invalid = UiScheduleForm {
+            binding_id: Some("not-a-binding".into()),
+            ..form
+        };
+        assert!(matches!(invalid.into_write(), Err(AppError::BadRequest(_))));
+    }
+
+    #[test]
+    fn schedule_request_deserializes_json_and_refuses_removed_fields() {
+        let binding = Uuid::new_v4();
+        let req: ScheduleRequest = serde_json::from_value(serde_json::json!({
+            "name": "Daily Digest",
+            "schedule_type": "interval",
+            "interval_seconds": 86400,
+            "binding_id": binding,
+        }))
+        .unwrap();
+        assert_eq!(req.name, "Daily Digest");
+        assert!(req.enabled);
+        assert_eq!(req.into_write().binding_id, binding);
+
+        let legacy = serde_json::from_value::<ScheduleRequest>(serde_json::json!({
+            "name": "Daily Digest",
+            "schedule_type": "interval",
+            "interval_seconds": 86400,
+            "binding_id": binding,
+            "prompt_template": "Summarize inbox",
+        }));
+        assert!(
+            legacy.is_err(),
+            "a prompt template is no longer a schedule field"
         );
     }
 
     #[test]
-    fn schedule_request_deserializes_json() {
-        let json_data = serde_json::json!({
-            "name": "Daily Digest",
-            "schedule_type": "interval",
-            "interval_seconds": 86400,
-            "subject_template": "[Daily] {{date}}",
-            "prompt_template": "Summarize inbox",
-            "delivery_mode": "email_participants"
-        });
-
-        let req: ScheduleRequest = serde_json::from_value(json_data).unwrap();
-        assert_eq!(req.name, "Daily Digest");
-        assert_eq!(req.schedule_type, ScheduleType::Interval);
-        assert_eq!(req.interval_seconds, Some(86400));
-        assert_eq!(req.delivery_mode, ScheduleDeliveryMode::EmailParticipants);
-        assert!(req.enabled);
-
-        let write = req.into_write();
-        assert_eq!(write.name, "Daily Digest");
+    fn run_now_keys_default_to_a_fresh_one() {
+        assert_eq!(run_now_key(Some(" k-1 ".into())), "k-1");
+        assert_ne!(run_now_key(None), run_now_key(None));
+        assert_ne!(run_now_key(Some(" ".into())), "");
     }
 }
 

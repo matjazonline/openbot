@@ -47,7 +47,6 @@ pub struct DeliveryRequest<'a> {
     /// The canonical message this delivery exposes. Minted by the producer, which is what lets it
     /// write the message and the delivery in one transaction.
     pub message_id: CanonicalMessageId,
-    pub task_id: Option<Uuid>,
     pub correlation_id: CorrelationId,
     pub purpose: DeliveryPurpose,
     pub source_key: String,
@@ -175,7 +174,6 @@ impl DeliveryComposer {
                     DeliveryDestination::External(external) => Some(external.clone()),
                     DeliveryDestination::Binding(_) => None,
                 },
-                task_id: request.task_id,
                 depends_on_delivery_id: None,
                 correlation_id: request.correlation_id,
                 transport,

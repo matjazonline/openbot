@@ -1,0 +1,4733 @@
+--- a/migrations/20260817000000_init_schema.sql
++++ b/migrations/20260817000000_init_schema.sql
+@@ -5575,6 +5575,8 @@
+     bundle bytea NOT NULL,
+     content_hash text NOT NULL,
+     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
++    agent_ids uuid[] NOT NULL,
++    CONSTRAINT workflow_versions_agent_ids_check CHECK ((array_position(agent_ids, NULL::uuid) IS NULL)),
+     CONSTRAINT workflow_versions_bundle_check CHECK (((octet_length(bundle) >= 1) AND (octet_length(bundle) <= 4194304))),
+     CONSTRAINT workflow_versions_command_key_check CHECK (((octet_length(command_key) >= 1) AND (octet_length(command_key) <= 128))),
+     CONSTRAINT workflow_versions_content_hash_check CHECK ((content_hash ~ '^[0-9a-f]{64}$'::text)),
+@@ -5587,6 +5589,13 @@
+ 
+ 
+ --
++-- Name: COLUMN workflow_versions.agent_ids; Type: COMMENT; Schema: public; Owner: -
++--
++
++COMMENT ON COLUMN public.workflow_versions.agent_ids IS 'Display index only: the distinct agents frozen in this version''s bundle and its pinned children, written once with the row. No execution, admission or authorization path reads it.';
++
++
++--
+ -- Name: workflow_wait_events; Type: TABLE; Schema: public; Owner: -
+ --
+ 
+--- a/src/adapters/http/pages/agent_settings.rs
++++ b/src/adapters/http/pages/agent_settings.rs
+@@ -310,9 +310,11 @@
+                     </div>
+                 </form>
+                 {assistant_html}
++                {workflow_cards}
+             </div>
+         "##,
+         assistant_html = assistant_channel_card(company_id, pane.agent, None),
++        workflow_cards = super::workflow_agent_cards(company_id, agent_id),
+         name = escape_html_attr(&pane.agent.name),
+         error_html = form_error_banner(pane.error),
+         fields = agent_fields(&AgentFields {
+--- a/src/adapters/http/pages/channel_settings.rs
++++ b/src/adapters/http/pages/channel_settings.rs
+@@ -289,6 +289,7 @@
+                 </form>
+ 
+                 {schedules_html}
++                {workflows_html}
+             </div>
+         </section>
+         "##,
+@@ -307,6 +308,11 @@
+             spam_scan_enabled: pane.spam_scan_enabled,
+         }),
+         delete_action = delete_action,
++        workflows_html = super::lazy_card(
++            &format!("/ui/workflows/channels/{channel_id}/bindings?company_id={company_id}"),
++            "Loading the workflows on this channel…",
++            "The workflows on this channel could not be loaded.",
++        ),
+         schedules_html = channel_schedules_card(&ChannelSchedulesCard {
+             company_id,
+             channel_id,
+--- a/src/adapters/http/pages/workflow_authoring/bindings.rs
++++ b/src/adapters/http/pages/workflow_authoring/bindings.rs
+@@ -0,0 +1,711 @@
++//! The bindings tab (p09 B1b): every binding of the workflow the viewer may see, with its
++//! version, state, trigger, run-as, resources and schedules; one form that creates or
++//! configures a binding (association, version, schema-driven params, a resource per declared
++//! slot, message trigger, run-as); activate and deactivate at the state revision seen. And the
++//! channel pane's card of the bindings on that channel. Every write is the binding command the
++//! JSON routes call; readiness, params and run-as are checked there, not here.
++use super::*;
++use crate::application::workflow::RelatedAssociation;
++use crate::application::workflow::authoring::{ParameterField, ParameterInput};
++use crate::application::workflow::reads::{BindingUse, ChoiceOption, VersionSummary};
++use crate::domain::workflow::WorkflowDefinition;
++use std::collections::BTreeMap;
++
++const TRIGGERS: [(&str, &str); 5] = [
++    ("", "No message trigger: messages never start it"),
++    ("direct", "Addressed in To, or mentioned"),
++    ("any", "Addressed in To or Cc, or mentioned"),
++    ("mentioned", "Mentioned by name, alias, address or handle"),
++    (
++        "mentioned_or_reply",
++        "Mentioned, or a direct reply to a message a run published",
++    ),
++];
++
++/// What the last write on the tab did.
++pub enum BindingBanner<'a> {
++    Done(&'a str),
++    /// A refused activation or deactivation, shown on its binding's row.
++    RowRefused {
++        binding: Uuid,
++        message: &'a str,
++    },
++}
++
++pub struct BindingsView<'a> {
++    pub company_id: Uuid,
++    pub workflow: Uuid,
++    pub archived: bool,
++    /// Newest first.
++    pub versions: &'a [VersionSummary],
++    /// The bindings the viewer may see.
++    pub bindings: &'a [BindingUse],
++    pub truncated: bool,
++    /// Bindings left out (of those listed) because they are on channels the viewer cannot see.
++    pub hidden: usize,
++    /// Every person the company has, for naming the run-as.
++    pub people: &'a [ChoiceOption],
++    pub banner: Option<BindingBanner<'a>>,
++    /// The form, already rendered (create unless a binding is being configured).
++    pub form_html: &'a str,
++}
++
++pub fn workflow_bindings_body(view: &BindingsView<'_>) -> String {
++    let banner = match &view.banner {
++        Some(BindingBanner::Done(message)) => status_banner(message),
++        _ => String::new(),
++    };
++    let rows: String = view
++        .bindings
++        .iter()
++        .map(|binding| binding_row(view, binding))
++        .collect();
++    let empty = if view.bindings.is_empty() && view.hidden == 0 {
++        r#"<div role="status" class="alert alert-warning text-sm">Not bound: nothing runs this workflow. Messages and schedules never fall back to a default workflow; a published version runs only once a binding selects it and is activated.</div>"#
++    } else {
++        ""
++    };
++    let hidden = if view.hidden > 0 {
++        format!(
++            r#"<p class="text-xs opacity-70">{} more of the listed binding{} {} on channels you cannot see.</p>"#,
++            view.hidden,
++            if view.hidden == 1 { "" } else { "s" },
++            if view.hidden == 1 { "is" } else { "are" },
++        )
++    } else {
++        String::new()
++    };
++    let cut = if view.truncated {
++        r#"<p class="text-xs text-error">Only the first 200 bindings are listed.</p>"#
++    } else {
++        ""
++    };
++    format!(
++        r#"{banner}<div class="space-y-6">
++            <section class="space-y-2"><h3 class="font-semibold">Bindings</h3>{empty}<ul class="divide-y divide-base-300">{rows}</ul>{hidden}{cut}</section>
++            {form}
++        </div>"#,
++        form = view.form_html,
++    )
++}
++
++fn version_label(versions: &[VersionSummary], version: Uuid) -> String {
++    match versions.iter().position(|v| v.version.as_uuid() == version) {
++        Some(0) => format!(
++            "version {} (newest, draft revision {})",
++            short_id(version),
++            versions[0].draft_revision
++        ),
++        Some(index) => format!(
++            "older version {} (draft revision {})",
++            short_id(version),
++            versions[index].draft_revision
++        ),
++        None => format!("version {}", short_id(version)),
++    }
++}
++
++fn person_label(people: &[ChoiceOption], user: Uuid) -> String {
++    people
++        .iter()
++        .find(|person| person.id == user)
++        .map(|person| format!("{} ({})", person.label, person.detail))
++        .unwrap_or_else(|| format!("user {}", short_id(user)))
++}
++
++fn binding_row(view: &BindingsView<'_>, binding: &BindingUse) -> String {
++    let (company_id, workflow) = (view.company_id, view.workflow);
++    let summary = &binding.binding;
++    let id = summary.binding.as_uuid();
++    let state = if summary.active {
++        r#"<span class="badge badge-sm badge-success">active</span>"#
++    } else {
++        r#"<span class="badge badge-sm badge-ghost">paused: admits nothing</span>"#
++    };
++    let trigger = match summary.message_trigger {
++        Some(trigger) => format!(
++            r#"Message trigger <span class="font-mono">{}</span>"#,
++            trigger.as_str()
++        ),
++        None => "No message trigger".to_owned(),
++    };
++    let resources = if binding.resources.is_empty() {
++        String::new()
++    } else {
++        let slots: Vec<String> = binding
++            .resources
++            .iter()
++            .map(|(slot, resource)| {
++                format!(
++                    r#"<span class="font-mono">{}</span> → {}"#,
++                    escape_html_text(slot),
++                    short_id(*resource)
++                )
++            })
++            .collect();
++        format!(
++            r#"<p class="text-xs opacity-70">Resources: {}</p>"#,
++            slots.join(", ")
++        )
++    };
++    let schedules = if binding.schedules.is_empty() {
++        String::new()
++    } else {
++        let names: Vec<String> = binding
++            .schedules
++            .iter()
++            .map(|schedule| {
++                format!(
++                    "{}{}",
++                    escape_html_text(&schedule.name),
++                    if schedule.enabled { "" } else { " (disabled)" }
++                )
++            })
++            .collect();
++        format!(
++            r#"<p class="text-xs opacity-70">Schedules: {}{}</p>"#,
++            names.join(", "),
++            if binding.schedules_truncated {
++                ", …"
++            } else {
++                ""
++            }
++        )
++    };
++    let refused = match &view.banner {
++        Some(BindingBanner::RowRefused { binding, message }) if *binding == id => format!(
++            r#"<div role="alert" class="alert alert-error mt-2 text-sm">{}</div>"#,
++            escape_html_text(message)
++        ),
++        _ => String::new(),
++    };
++    // An archived workflow's binding can still be paused, never activated or reconfigured.
++    let toggle = if view.archived && !summary.active {
++        String::new()
++    } else if view.archived {
++        format!(
++            r##"<button type="button" class="btn btn-xs btn-outline"
++                hx-post="/ui/workflows/{workflow}/bindings/{id}/deactivate?company_id={company_id}"
++                hx-vals='{{"expected_state_revision": "{revision}"}}'
++                hx-target="#workflow-pane" hx-swap="outerHTML">Deactivate</button>"##,
++            revision = summary.state_revision,
++        )
++    } else {
++        let (action, label, class) = if summary.active {
++            ("deactivate", "Deactivate", "btn-outline")
++        } else {
++            ("activate", "Activate", "btn-primary")
++        };
++        format!(
++            r##"<button type="button" class="btn btn-xs {class}"
++                hx-post="/ui/workflows/{workflow}/bindings/{id}/{action}?company_id={company_id}"
++                hx-vals='{{"expected_state_revision": "{revision}"}}'
++                hx-target="#workflow-pane" hx-swap="outerHTML">{label}</button>
++            <button type="button" class="btn btn-ghost btn-xs"
++                hx-get="/ui/workflows/{workflow}/bindings/form?company_id={company_id}&amp;binding_id={id}"
++                hx-target="#binding-form" hx-swap="outerHTML">Configure</button>"##,
++            revision = summary.state_revision,
++        )
++    };
++    format!(
++        r#"<li class="py-3" id="binding-{id}">
++            <div class="flex flex-wrap items-center gap-2"><span class="font-semibold">{association}</span>{state}<span class="ml-auto flex gap-1">{toggle}</span></div>
++            <p class="text-xs opacity-70">Runs {version} · {trigger} · as {run_as}</p>
++            {resources}{schedules}
++            <p class="font-mono text-[11px] opacity-60">binding {short} · state revision {revision}</p>{refused}
++        </li>"#,
++        association = escape_html_text(&super::versions::association_label(binding)),
++        version = escape_html_text(&version_label(view.versions, summary.version.as_uuid())),
++        run_as = escape_html_text(&person_label(view.people, summary.run_as)),
++        short = short_id(id),
++        revision = summary.state_revision,
++    )
++}
++
++/// The params part of the form: one field per schema property, or the whole object as JSON.
++pub enum BindingParams<'a> {
++    Fields {
++        fields: &'a [ParameterField],
++        /// The value each field shows, by parameter name.
++        values: &'a BTreeMap<String, String>,
++    },
++    Json(&'a str),
++}
++
++pub struct BindingFormView<'a> {
++    pub company_id: Uuid,
++    pub workflow: Uuid,
++    /// The binding being configured; `None` creates one under `form_key`.
++    pub editing: Option<&'a BindingUse>,
++    pub form_key: &'a str,
++    /// Newest first.
++    pub versions: &'a [VersionSummary],
++    pub version: Option<Uuid>,
++    /// The chosen version's definition, when it is selectable.
++    pub definition: Option<&'a WorkflowDefinition>,
++    /// `company` or `channel:<id>`.
++    pub association: &'a str,
++    /// The channels the viewer can see.
++    pub channels: &'a [ChoiceOption],
++    pub params: BindingParams<'a>,
++    /// The resource chosen per slot.
++    pub resources: &'a BTreeMap<String, Uuid>,
++    pub http: &'a [ChoiceOption],
++    pub mcp: &'a [ChoiceOption],
++    pub message_trigger: &'a str,
++    pub run_as: Option<Uuid>,
++    /// Only the company owner may name somebody else.
++    pub owner: bool,
++    pub viewer: Uuid,
++    pub people: &'a [ChoiceOption],
++    pub options_truncated: bool,
++    pub error: Option<&'a str>,
++}
++
++pub fn workflow_binding_form(form: &BindingFormView<'_>) -> String {
++    let (company_id, workflow) = (form.company_id, form.workflow);
++    if form.versions.is_empty() {
++        return r#"<section id="binding-form" class="space-y-2 rounded-box border border-base-300 p-4"><h3 class="font-semibold">New binding</h3><p class="text-sm opacity-70">Publish a version first: a binding selects a published version, never the draft.</p></section>"#.to_owned();
++    }
++    let heading = match form.editing {
++        Some(binding) => format!(
++            "Configure binding {}",
++            short_id(binding.binding.binding.as_uuid())
++        ),
++        None => "New binding".to_owned(),
++    };
++    let identity = match form.editing {
++        Some(binding) => format!(
++            r#"<input type="hidden" name="binding_id" value="{id}">
++            <input type="hidden" name="expected_state_revision" value="{revision}">"#,
++            id = binding.binding.binding.as_uuid(),
++            revision = binding.binding.state_revision,
++        ),
++        None => format!(
++            r#"<input type="hidden" name="form_key" value="{}">"#,
++            escape_html_attr(form.form_key)
++        ),
++    };
++    let error = form_error_banner(form.error);
++    format!(
++        r##"<section id="binding-form" class="space-y-3 rounded-box border border-base-300 p-4">
++            <h3 class="font-semibold">{heading}</h3>
++            {error}
++            <form hx-post="/ui/workflows/{workflow}/bindings?company_id={company_id}" hx-target="#workflow-pane" hx-swap="outerHTML"
++                hx-disabled-elt="find button[type='submit']" class="space-y-4">
++                {identity}
++                <div class="grid gap-3 sm:grid-cols-2">{association}{version}</div>
++                {params}
++                {resources}
++                <div class="grid gap-3 sm:grid-cols-2">{trigger}{run_as}</div>
++                {cut}
++                <div class="flex items-center gap-3 border-t border-base-300 pt-3">
++                    <button type="submit" class="btn btn-primary btn-sm">Save binding</button>
++                    <p class="text-xs opacity-70">A saved binding stays paused until you activate it; activation checks readiness again.</p>
++                </div>
++            </form>
++        </section>"##,
++        heading = escape_html_text(&heading),
++        association = association_field(form),
++        version = version_field(form),
++        params = params_fields(form),
++        resources = resource_fields(form),
++        trigger = trigger_field(form),
++        run_as = run_as_field(form),
++        cut = if form.options_truncated {
++            r#"<p class="text-xs text-error">Some lists are cut at 200 entries.</p>"#
++        } else {
++            ""
++        },
++    )
++}
++
++fn labelled(label: &str, hint: &str, control: &str) -> String {
++    format!(
++        // `.label` already dims its text; another opacity on top falls under 3:1 in light.
++        r#"<label class="form-control w-full"><div class="label"><span class="text-xs">{label}</span></div>{control}{hint}</label>"#,
++        label = escape_html_text(label),
++        hint = if hint.is_empty() {
++            String::new()
++        } else {
++            format!(
++                r#"<div class="label"><span class="text-xs">{}</span></div>"#,
++                escape_html_text(hint)
++            )
++        },
++    )
++}
++
++fn association_field(form: &BindingFormView<'_>) -> String {
++    if let Some(binding) = form.editing {
++        return labelled(
++            "Association",
++            "Fixed once created: a different channel needs a new binding.",
++            &format!(
++                r#"<p class="py-2 text-sm font-semibold">{}</p>"#,
++                escape_html_text(&super::versions::association_label(binding))
++            ),
++        );
++    }
++    let option = |value: String, label: &str| {
++        format!(
++            r#"<option value="{value}"{selected}>{label}</option>"#,
++            selected = if value == form.association {
++                " selected"
++            } else {
++                ""
++            },
++            value = escape_html_attr(&value),
++            label = escape_html_text(label),
++        )
++    };
++    let mut options = option(
++        "company".into(),
++        "Company-wide (manual starts and schedules)",
++    );
++    for channel in form.channels {
++        options.push_str(&option(
++            format!("channel:{}", channel.id),
++            &format!("Channel {}", channel.label),
++        ));
++    }
++    labelled(
++        "Association",
++        "A channel binding can answer that channel's messages; thread bindings are made through the API.",
++        &format!(r#"<select class="select w-full" name="association">{options}</select>"#),
++    )
++}
++
++fn version_field(form: &BindingFormView<'_>) -> String {
++    let options: String = form
++        .versions
++        .iter()
++        .map(|version| {
++            let id = version.version.as_uuid();
++            format!(
++                r#"<option value="{id}"{selected}>{label}</option>"#,
++                selected = if Some(id) == form.version {
++                    " selected"
++                } else {
++                    ""
++                },
++                label = escape_html_text(&version_label(form.versions, id)),
++            )
++        })
++        .collect();
++    labelled(
++        "Published version",
++        "Changing it reloads the parameters and resources this version declares.",
++        &format!(
++            r##"<select class="select w-full" name="version_id"
++                hx-get="/ui/workflows/{workflow}/bindings/form?company_id={company_id}" hx-include="closest form"
++                hx-target="#binding-form" hx-swap="outerHTML" hx-trigger="change">{options}</select>"##,
++            workflow = form.workflow,
++            company_id = form.company_id,
++        ),
++    )
++}
++
++fn params_fields(form: &BindingFormView<'_>) -> String {
++    let Some(_) = form.definition else {
++        return r#"<p class="text-sm text-error">This version cannot be selected now (its workflow is archived).</p>"#.to_owned();
++    };
++    match &form.params {
++        BindingParams::Json(raw) => format!(
++            r#"<fieldset class="space-y-1"><legend class="text-sm font-semibold">Parameters</legend>{field}</fieldset>"#,
++            field = labelled(
++                "Parameters (JSON object)",
++                "The version's parameter schema has no fields this form can show; the binding command validates the object against it.",
++                &format!(
++                    r#"<textarea class="textarea w-full font-mono text-xs" rows="6" name="params_json">
++{}</textarea>"#,
++                    escape_html_text(raw)
++                ),
++            ),
++        ),
++        BindingParams::Fields { fields, values } => {
++            let people: String = form
++                .people
++                .iter()
++                .map(|person| {
++                    format!(
++                        r#"<option value="{id}">{label}</option>"#,
++                        id = person.id,
++                        label = escape_html_attr(&format!("{} ({})", person.label, person.detail)),
++                    )
++                })
++                .collect();
++            let controls: String = fields
++                .iter()
++                .map(|field| param_field(field, values.get(&field.name).map_or("", String::as_str)))
++                .collect();
++            format!(
++                r#"<fieldset class="space-y-1"><legend class="text-sm font-semibold">Parameters</legend>
++                    <div class="grid gap-3 sm:grid-cols-2">{controls}</div>
++                    <datalist id="binding-people">{people}</datalist>
++                    <p class="text-xs opacity-60">A text parameter suggests the company's people by id; an empty optional field is left out.</p>
++                </fieldset>"#
++            )
++        }
++    }
++}
++
++fn param_field(field: &ParameterField, value: &str) -> String {
++    let name = format!("param:{}", field.name);
++    let required = if field.required { " required" } else { "" };
++    let control = match &field.input {
++        ParameterInput::Text { max_length } => format!(
++            r#"<input class="input w-full" name="{name}" value="{value}" list="binding-people"{max}{required}>"#,
++            name = escape_html_attr(&name),
++            value = escape_html_attr(value),
++            max = max_length
++                .map(|max| format!(r#" maxlength="{max}""#))
++                .unwrap_or_default(),
++        ),
++        ParameterInput::Integer | ParameterInput::Number => format!(
++            r#"<input class="input w-full" type="number" step="{step}" name="{name}" value="{value}"{required}>"#,
++            step = if field.input == ParameterInput::Integer {
++                "1"
++            } else {
++                "any"
++            },
++            name = escape_html_attr(&name),
++            value = escape_html_attr(value),
++        ),
++        ParameterInput::Boolean | ParameterInput::Choice(_) => {
++            let choices: Vec<&str> = match &field.input {
++                ParameterInput::Choice(choices) => choices.iter().map(String::as_str).collect(),
++                _ => vec!["true", "false"],
++            };
++            let options: String = std::iter::once("")
++                .chain(choices)
++                .map(|choice| {
++                    format!(
++                        r#"<option value="{choice}"{selected}>{label}</option>"#,
++                        selected = if choice == value { " selected" } else { "" },
++                        label = if choice.is_empty() {
++                            "(not set)".to_owned()
++                        } else {
++                            escape_html_text(choice)
++                        },
++                        choice = escape_html_attr(choice),
++                    )
++                })
++                .collect();
++            format!(
++                r#"<select class="select w-full" name="{name}">{options}</select>"#,
++                name = escape_html_attr(&name),
++            )
++        }
++        ParameterInput::Json => format!(
++            r#"<textarea class="textarea w-full font-mono text-xs" rows="3" name="{name}">
++{value}</textarea>"#,
++            name = escape_html_attr(&name),
++            value = escape_html_text(value),
++        ),
++    };
++    let label = format!(
++        "{}{}",
++        field.name,
++        if field.required { " (required)" } else { "" }
++    );
++    labelled(&label, field.description.as_deref().unwrap_or(""), &control)
++}
++
++fn resource_fields(form: &BindingFormView<'_>) -> String {
++    let Some(definition) = form.definition else {
++        return String::new();
++    };
++    if definition.resources.is_empty() {
++        return String::new();
++    }
++    let fields: String = definition
++        .resources
++        .iter()
++        .map(|requirement| {
++            let slot = requirement.slot.as_str();
++            let name = format!("resource:{slot}");
++            let chosen = form.resources.get(slot).copied();
++            let choices = match requirement.kind.as_str() {
++                "messaging" => {
++                    return labelled(
++                        &format!("Slot {slot} (messaging)"),
++                        "",
++                        &format!(
++                            r#"<input type="hidden" name="{name}" value="{company}"><p class="py-2 text-sm">This company's messaging</p>"#,
++                            name = escape_html_attr(&name),
++                            company = form.company_id,
++                        ),
++                    );
++                }
++                "http" => form.http,
++                "mcp" => form.mcp,
++                _ => &[][..],
++            };
++            let options: String = std::iter::once(format!(
++                r#"<option value="">(choose a {} connection)</option>"#,
++                escape_html_text(requirement.kind.as_str())
++            ))
++            .chain(choices.iter().map(|choice| {
++                format!(
++                    r#"<option value="{id}"{selected}>{label}{disabled}</option>"#,
++                    id = choice.id,
++                    selected = if Some(choice.id) == chosen { " selected" } else { "" },
++                    label = escape_html_text(&choice.label),
++                    disabled = if choice.enabled { "" } else { " (disabled)" },
++                )
++            }))
++            .collect();
++            let hint = match &requirement.contract {
++                Some(contract) => format!("Must support {}.", contract.as_str()),
++                None => String::new(),
++            };
++            labelled(
++                &format!("Slot {slot} ({})", requirement.kind.as_str()),
++                &hint,
++                &format!(
++                    r#"<select class="select w-full" name="{name}">{options}</select>"#,
++                    name = escape_html_attr(&name),
++                ),
++            )
++        })
++        .collect();
++    format!(
++        r#"<fieldset class="space-y-1"><legend class="text-sm font-semibold">Resources</legend><div class="grid gap-3 sm:grid-cols-2">{fields}</div></fieldset>"#
++    )
++}
++
++fn trigger_field(form: &BindingFormView<'_>) -> String {
++    let options: String = TRIGGERS
++        .iter()
++        .map(|(value, label)| {
++            format!(
++                r#"<option value="{value}"{selected}>{label}</option>"#,
++                selected = if *value == form.message_trigger {
++                    " selected"
++                } else {
++                    ""
++                },
++                label = escape_html_text(label),
++            )
++        })
++        .collect();
++    labelled(
++        "Message trigger",
++        "Channel bindings only; a company-wide binding takes none.",
++        &format!(r#"<select class="select w-full" name="message_trigger">{options}</select>"#),
++    )
++}
++
++fn run_as_field(form: &BindingFormView<'_>) -> String {
++    let current = form
++        .run_as
++        .or(form.editing.map(|binding| binding.binding.run_as))
++        .unwrap_or(form.viewer);
++    if !form.owner {
++        let said = match form.editing {
++            Some(binding) => format!(
++                "Runs as {}; only the company owner may change who a binding runs as.",
++                person_label(form.people, binding.binding.run_as)
++            ),
++            None => "Runs as you; only the company owner may name somebody else.".to_owned(),
++        };
++        return labelled(
++            "Runs as",
++            "",
++            &format!(r#"<p class="py-2 text-sm">{}</p>"#, escape_html_text(&said)),
++        );
++    }
++    let options: String = form
++        .people
++        .iter()
++        .filter(|person| person.detail == "owner" || person.detail == "admin")
++        .map(|person| {
++            format!(
++                r#"<option value="{id}"{selected}>{label}</option>"#,
++                id = person.id,
++                selected = if person.id == current {
++                    " selected"
++                } else {
++                    ""
++                },
++                label = escape_html_text(&format!("{} ({})", person.label, person.detail)),
++            )
++        })
++        .collect();
++    labelled(
++        "Runs as",
++        "An owner or admin who can see the channel; automatic runs use their authority.",
++        &format!(r#"<select class="select w-full" name="run_as">{options}</select>"#),
++    )
++}
++
++pub struct ChannelBindingsCard<'a> {
++    pub company_id: Uuid,
++    pub bindings: &'a [BindingUse],
++    pub truncated: bool,
++}
++
++/// "Workflows on this channel": the bindings on the channel (and its threads), and plainly
++/// whether any active one answers its messages.
++pub fn channel_bindings_card(card: &ChannelBindingsCard<'_>) -> String {
++    let company_id = card.company_id;
++    let answering = card.bindings.iter().any(|binding| {
++        binding.binding.active
++            && binding.binding.message_trigger.is_some()
++            && matches!(binding.binding.association, RelatedAssociation::Channel(_))
++    });
++    let status = if answering {
++        r#"<p class="text-sm">An active workflow answers this channel's messages under its trigger.</p>"#
++    } else {
++        r#"<div role="status" class="alert alert-warning text-sm">No active workflow answers this channel's messages. Messages are stored and nothing runs until a binding with a message trigger is activated.</div>"#
++    };
++    let rows: String = card
++        .bindings
++        .iter()
++        .map(|binding| {
++            let summary = &binding.binding;
++            let workflow = summary.workflow.as_uuid();
++            format!(
++                r#"<li class="py-2"><div class="flex flex-wrap items-center gap-2">
++                    <a class="link font-semibold" href="/ui/workflows?company_id={company_id}&amp;workflow_id={workflow}&amp;tab=bindings">{title}</a>{state}</div>
++                    <p class="text-xs opacity-70">{association} · {trigger}</p></li>"#,
++                title = escape_html_text(if binding.workflow_title.is_empty() {
++                    "(untitled workflow)"
++                } else {
++                    &binding.workflow_title
++                }),
++                state = if summary.active {
++                    r#"<span class="badge badge-sm badge-success">active</span>"#
++                } else {
++                    r#"<span class="badge badge-sm badge-ghost">paused</span>"#
++                },
++                association = match summary.association {
++                    RelatedAssociation::Thread { .. } => "one thread",
++                    _ => "the whole channel",
++                },
++                trigger = match summary.message_trigger {
++                    Some(trigger) => format!("message trigger {}", trigger.as_str()),
++                    None => "no message trigger".to_owned(),
++                },
++            )
++        })
++        .collect();
++    let list = if card.bindings.is_empty() {
++        r#"<p class="text-xs opacity-70">No workflow is bound to this channel.</p>"#.to_owned()
++    } else {
++        format!(r#"<ul class="divide-y divide-base-300">{rows}</ul>"#)
++    };
++    format!(
++        r#"<section id="channel-workflows-card" class="space-y-3 rounded-box border border-base-300 p-4">
++            <div><h3 class="text-sm font-bold">Workflows on this channel</h3>
++            <p class="text-xs opacity-70">Bind a workflow from its Bindings tab in Workflows.</p></div>
++            {status}{list}{cut}
++        </section>"#,
++        cut = if card.truncated {
++            r#"<p class="text-xs text-error">Only the first 200 bindings are listed.</p>"#
++        } else {
++            ""
++        },
++    )
++}
+--- a/src/adapters/http/pages/workflow_authoring/catalogue.rs
++++ b/src/adapters/http/pages/workflow_authoring/catalogue.rs
+@@ -78,7 +78,7 @@
+             })
+             .collect();
+         format!(
+-            r#"<p class="text-xs opacity-70">Name an agent by its handle in a step's <span class="font-mono">agent</span> input: <span class="font-mono">agent: {{literal: &lt;handle&gt;}}</span>.</p><div class="overflow-x-auto"><table class="table table-xs"><thead><tr><th>Agent</th><th>Handle</th><th>Model</th></tr></thead><tbody>{rows}</tbody></table></div>"#
++            r#"<p class="text-xs opacity-70">Name an agent by its handle in a step's <span class="font-mono">agent</span> input: <span class="font-mono">agent: {{literal: &lt;handle&gt;}}</span>.</p><div class="overflow-x-auto"><table class="table table-xs"><thead class="text-base-content"><tr><th>Agent</th><th>Handle</th><th>Model</th></tr></thead><tbody>{rows}</tbody></table></div>"#
+         )
+     };
+     // Replaces the loading body whole, so its busy state goes with it.
+--- a/src/adapters/http/pages/workflow_authoring/editor.rs
++++ b/src/adapters/http/pages/workflow_authoring/editor.rs
+@@ -224,7 +224,7 @@
+             hx-confirm="Archive this workflow? Its draft can no longer be saved or published; published versions keep serving their bindings."
+             hx-disabled-elt="find button[type='submit']">
+             <input type="hidden" name="expected_revision" value="{expected}">
+-            <button type="submit" class="btn btn-sm btn-error btn-outline">
++            <button type="submit" class="btn btn-sm btn-error">
+                 <span class="loading loading-spinner loading-xs hidden [.htmx-request_&]:inline-block"></span>
+                 <span class="[.htmx-request_&]:hidden">Archive workflow</span>
+                 <span class="hidden [.htmx-request_&]:inline">Archiving…</span>
+@@ -304,7 +304,7 @@
+             String::new()
+         } else {
+             format!(
+-                r#"<pre class="w-full overflow-x-auto rounded-box bg-base-100 p-2 font-mono text-xs">{excerpt}</pre>"#
++                r#"<pre class="w-full overflow-x-auto rounded-box bg-base-100 p-2 font-mono text-xs text-base-content">{excerpt}</pre>"#
+             )
+         },
+     )
+@@ -567,6 +567,13 @@
+         if (window.htmx) window.htmx.process(elt);
+     }
+ });
++// A card loaded after the page (`pages::lazy_card`) says so when its load fails.
++document.body.addEventListener('htmx:afterRequest', function (event) {
++    var elt = event.detail.elt;
++    if (!(elt && elt.hasAttribute && elt.hasAttribute('data-lazy-card')) || event.detail.successful) return;
++    elt.removeAttribute('aria-busy');
++    elt.textContent = elt.getAttribute('data-lazy-card');
++});
+ window.addEventListener('beforeunload', function (event) {
+     if (!workflowEditorDirty()) return;
+     event.preventDefault();
+--- a/src/adapters/http/pages/workflow_authoring/mod.rs
++++ b/src/adapters/http/pages/workflow_authoring/mod.rs
+@@ -1,21 +1,25 @@
+-//! The `/ui/workflows` workspace (p09 B1a): the company's workflow library in the sidebar, and
+-//! one workflow's editor, validation preview, versions and usage in `#workflow-pane`. Every
+-//! command a page sends is one of the lifecycle commands the JSON routes call; the pages only
+-//! render what those commands and the read models answer.
++//! The `/ui/workflows` workspace (p09 B1a, B1b): the company's workflow library in the sidebar,
++//! and one workflow's editor, validation preview, versions and usage, and bindings in
++//! `#workflow-pane`. Every command a page sends is one of the lifecycle commands the JSON
++//! routes call; the pages only render what those commands and the read models answer.
+ use super::*;
+ use crate::application::workflow::reads::DefinitionSummary;
+ use crate::application::workflow::templates::WorkflowTemplate;
+ 
++mod bindings;
+ mod catalogue;
+ mod editor;
+ mod graph;
+ mod preview;
++mod tools;
+ mod versions;
+ 
++pub use bindings::*;
+ pub use catalogue::*;
+ pub use editor::*;
+ pub use graph::*;
+ pub use preview::*;
++pub use tools::*;
+ pub use versions::*;
+ 
+ /// The sidebar list: one page of definitions, and the cursor for the next.
+@@ -48,10 +52,13 @@
+             "Workflows",
+             "Drafts, published versions and where they run.",
+             &format!(
+-                r##"<button type="button" class="btn btn-primary btn-xs shrink-0"
++                r##"<div class="flex shrink-0 gap-1"><button type="button" class="btn btn-ghost btn-xs"
++                    hx-get="/ui/workflows/tools?company_id={company_id}"
++                    hx-target="#workflow-pane" hx-swap="outerHTML" hx-sync="#workflow-pane:replace">Tools</button>
++                <button type="button" class="btn btn-primary btn-xs"
+                     hx-get="/ui/workflows/new?company_id={company_id}"
+                     hx-target="#workflow-pane" hx-swap="outerHTML" hx-sync="#workflow-pane:replace"
+-                    hx-push-url="/ui/workflows?company_id={company_id}&new=1">{plus} New</button>"##,
++                    hx-push-url="/ui/workflows?company_id={company_id}&new=1">{plus} New</button></div>"##,
+                 plus = icon(Icon::Plus, BUTTON_ICON),
+             ),
+         ),
+@@ -202,11 +209,13 @@
+ pub enum WorkflowTab {
+     Editor,
+     Versions,
++    Bindings,
+ }
+ impl WorkflowTab {
+     pub fn parse(value: Option<&str>) -> Self {
+         match value {
+             Some("versions") => Self::Versions,
++            Some("bindings") => Self::Bindings,
+             _ => Self::Editor,
+         }
+     }
+@@ -214,6 +223,7 @@
+         match self {
+             Self::Editor => "editor",
+             Self::Versions => "versions",
++            Self::Bindings => "bindings",
+         }
+     }
+ }
+@@ -266,7 +276,7 @@
+                     <h2 class="min-w-0 truncate text-xl font-bold">{title}</h2>{archived}
+                 </div>
+                 <p class="mt-1 text-xs opacity-60">Draft revision {revision} · {versions} published version{plural}{origin}</p>
+-                <nav role="tablist" class="tabs tabs-border mt-3" aria-label="Workflow views">{editor}{versions_tab}</nav>
++                <nav role="tablist" class="tabs tabs-border mt-3" aria-label="Workflow views">{editor}{versions_tab}{bindings_tab}</nav>
+             </div>
+             <div class="flex-1 overflow-y-auto px-4 py-4 sm:px-6">{body}</div>
+         </section>"##,
+@@ -276,6 +286,7 @@
+         plural = if header.versions == 1 { "" } else { "s" },
+         editor = tab_link(WorkflowTab::Editor, "Editor"),
+         versions_tab = tab_link(WorkflowTab::Versions, "Versions and usage"),
++        bindings_tab = tab_link(WorkflowTab::Bindings, "Bindings"),
+     )
+ }
+ 
+--- a/src/adapters/http/pages/workflow_authoring/preview.rs
++++ b/src/adapters/http/pages/workflow_authoring/preview.rs
+@@ -290,7 +290,7 @@
+             })
+             .collect();
+         format!(
+-            r#"<table class="table table-xs"><thead><tr><th>Slot</th><th>Kind</th><th>Contract</th></tr></thead><tbody>{rows}</tbody></table><p class="text-xs opacity-70">Each binding selects a company resource for every slot before it can be activated.</p>"#
++            r#"<table class="table table-xs"><thead class="text-base-content"><tr><th>Slot</th><th>Kind</th><th>Contract</th></tr></thead><tbody>{rows}</tbody></table><p class="text-xs opacity-70">Each binding selects a company resource for every slot before it can be activated.</p>"#
+         )
+     };
+     format!(
+@@ -317,7 +317,7 @@
+             <p class="text-xs opacity-70">Publishing creates an immutable version. It does not activate it or move any binding: bindings keep their versions until you reconfigure them.</p>
+             <div class="space-y-2"><h4 class="font-semibold">Graph</h4>{graph}</div>
+             <div class="space-y-2"><h4 class="font-semibold">Steps</h4>
+-                <div class="overflow-x-auto"><table class="table table-xs"><thead><tr><th>Step</th><th>Type</th><th>Routes</th><th>After retries</th></tr></thead><tbody>{steps}</tbody></table></div></div>
++                <div class="overflow-x-auto"><table class="table table-xs"><thead class="text-base-content"><tr><th>Step</th><th>Type</th><th>Routes</th><th>After retries</th></tr></thead><tbody>{steps}</tbody></table></div></div>
+             <div class="space-y-2"><h4 class="font-semibold">Resource slots</h4>{resources}</div>
+             <div class="space-y-1"><h4 class="font-semibold">Schemas</h4>{input}{params}{output}</div>
+             {capabilities}
+--- a/src/adapters/http/pages/workflow_authoring/tools.rs
++++ b/src/adapters/http/pages/workflow_authoring/tools.rs
+@@ -0,0 +1,384 @@
++//! Workflow tools (p09 B1b, notice WF-C003): the company's registrations with revoke, the
++//! versions tab's "Use as a workflow tool" form, and the agent pane's two cards — the agent's
++//! ordered tool grants and the bindings that run it ("used by", F098.2). What reuse does to
++//! published versions follows P07-D2 rev 4 §D2.2: a frozen pin runs while its name is
++//! registered for the same workflow, whatever version it pins now.
++use super::*;
++use crate::application::workflow::RelatedAssociation;
++use crate::application::workflow::reads::{BindingUse, ToolTarget, VersionSummary};
++use crate::application::workflow::tools::WorkflowToolRegistration;
++
++/// What revoking a name does, said where the author revokes it.
++pub const REVOKE_WARNING: &str = "Revoking refuses every call to this tool from published versions that froze it, including runs already waiting on one. Registering the name again for the same workflow lets those versions call it again; for another workflow they stay refused until republished.";
++
++fn target_label(targets: &[ToolTarget], registration: &WorkflowToolRegistration) -> String {
++    match targets
++        .iter()
++        .find(|target| target.version == registration.version)
++    {
++        Some(target) => format!(
++            "{} · version {} (draft revision {}){}",
++            target.workflow_title,
++            short_id(target.version.as_uuid()),
++            target.draft_revision,
++            if target.archived { " · archived" } else { "" },
++        ),
++        None => format!(
++            "workflow {} · version {}",
++            short_id(registration.workflow.as_uuid()),
++            short_id(registration.version.as_uuid())
++        ),
++    }
++}
++
++pub struct ToolsView<'a> {
++    pub company_id: Uuid,
++    pub tools: &'a [WorkflowToolRegistration],
++    pub targets: &'a [ToolTarget],
++    pub banner: Option<&'a str>,
++    pub error: Option<&'a str>,
++}
++
++/// `#workflow-pane` with the company's workflow tools.
++pub fn workflow_tools_pane(view: &ToolsView<'_>) -> String {
++    let company_id = view.company_id;
++    let rows: String = view
++        .tools
++        .iter()
++        .map(|tool| {
++            let name = tool.name.as_str();
++            format!(
++                r##"<li class="py-3">
++                    <div class="flex flex-wrap items-center gap-2"><span class="font-mono font-semibold">{name_text}</span>
++                        <a class="link text-sm" href="/ui/workflows?company_id={company_id}&amp;workflow_id={workflow}&amp;tab=versions">{target}</a>
++                        <button type="button" class="btn btn-error btn-xs ml-auto"
++                            hx-post="/ui/workflows/tools/revoke?company_id={company_id}"
++                            hx-vals='{{"name": "{name_attr}", "expected_revision": "{revision}"}}'
++                            hx-confirm="Revoke {name_attr}? {warning}"
++                            hx-target="#workflow-pane" hx-swap="outerHTML">Revoke</button></div>
++                    <p class="font-mono text-[11px] opacity-60">registration revision {revision}</p>
++                    <details class="mt-1"><summary class="cursor-pointer text-xs opacity-70">Static parameters</summary>{params}</details>
++                </li>"##,
++                name_text = escape_html_text(name),
++                name_attr = escape_html_attr(name),
++                workflow = tool.workflow.as_uuid(),
++                target = escape_html_text(&target_label(view.targets, tool)),
++                revision = tool.revision,
++                warning = escape_html_attr(REVOKE_WARNING),
++                params = json_block(&tool.params),
++            )
++        })
++        .collect();
++    let list = if view.tools.is_empty() {
++        r#"<p class="text-sm opacity-70">No workflow tools yet. Register one from a workflow's Versions tab; an agent calls it only once the agent grants its name.</p>"#.to_owned()
++    } else {
++        format!(r#"<ul class="divide-y divide-base-300">{rows}</ul>"#)
++    };
++    format!(
++        r#"<section id="workflow-pane" class="ui-pane-detail flex min-w-0 flex-1 flex-col bg-base-100">
++            <div class="border-b border-base-300 px-4 py-4 sm:px-6"><h2 class="text-xl font-bold">Workflow tools</h2>
++            <p class="mt-1 text-xs opacity-60">Published workflows agents may call as tools. A version that froze a tool keeps calling the version it froze; re-pinning a name changes only what later publications freeze.</p></div>
++            <div class="flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-6">{banner}{error}{list}</div>
++        </section>"#,
++        banner = view.banner.map(status_banner).unwrap_or_default(),
++        error = form_error_banner(view.error),
++    )
++}
++
++/// The registration a "Use as a workflow tool" submission found under its name.
++pub struct ExistingTool<'a> {
++    pub registration: &'a WorkflowToolRegistration,
++    pub target: String,
++    /// Whether the existing registration is for this same workflow.
++    pub same_workflow: bool,
++}
++
++pub struct ToolFormView<'a> {
++    pub company_id: Uuid,
++    pub workflow: Uuid,
++    /// Newest first.
++    pub versions: &'a [VersionSummary],
++    pub name: &'a str,
++    pub version: Option<Uuid>,
++    pub params: &'a str,
++    /// Set when the name is registered already: the form asks before replacing it.
++    pub existing: Option<ExistingTool<'a>>,
++    pub banner: Option<&'a str>,
++    pub error: Option<&'a str>,
++}
++
++pub fn workflow_tool_form(form: &ToolFormView<'_>) -> String {
++    let (company_id, workflow) = (form.company_id, form.workflow);
++    if form.versions.is_empty() {
++        return String::new();
++    }
++    let versions: String = form
++        .versions
++        .iter()
++        .enumerate()
++        .map(|(index, version)| {
++            let id = version.version.as_uuid();
++            format!(
++                r#"<option value="{id}"{selected}>Version {short} · draft revision {revision}{newest}</option>"#,
++                selected = if Some(id) == form.version { " selected" } else { "" },
++                short = short_id(id),
++                revision = version.draft_revision,
++                newest = if index == 0 { " (newest)" } else { "" },
++            )
++        })
++        .collect();
++    let (confirm, button) = match &form.existing {
++        None => (String::new(), "Register tool"),
++        Some(existing) => {
++            let consequence = if existing.same_workflow {
++                "It is registered for this workflow already. Re-pinning it changes only what later publications freeze; published versions keep calling the version they froze."
++            } else {
++                "It is registered for another workflow. Pointing it here refuses every call from published versions that froze the other workflow, until they are republished."
++            };
++            (
++                format!(
++                    r#"<div role="alert" class="alert alert-warning text-sm"><div><p class="font-semibold">{name} is {target} (revision {revision}).</p><p>{consequence}</p></div></div>
++                    <input type="hidden" name="expected_revision" value="{revision}">"#,
++                    name = escape_html_text(existing.registration.name.as_str()),
++                    target = escape_html_text(&existing.target),
++                    revision = existing.registration.revision,
++                    consequence = escape_html_text(consequence),
++                ),
++                if existing.same_workflow {
++                    "Re-pin tool"
++                } else {
++                    "Point tool here"
++                },
++            )
++        }
++    };
++    format!(
++        r##"<section id="workflow-tool-form" class="space-y-3 rounded-box border border-base-300 p-4">
++            <div><h3 class="font-semibold">Use as a workflow tool</h3>
++            <p class="text-xs opacity-70">An agent that grants the name can call this version as a tool. The version needs an input and an output schema. Names starting with <span class="font-mono">message.</span> and the provisioning tools are reserved.</p></div>
++            {banner}{error}
++            <form hx-post="/ui/workflows/{workflow}/tools?company_id={company_id}" hx-target="#workflow-tool-form" hx-swap="outerHTML"
++                hx-disabled-elt="find button[type='submit']" class="space-y-3">
++                {confirm}
++                <div class="grid gap-3 sm:grid-cols-2">
++                    <label class="form-control w-full"><div class="label"><span class="text-xs">Tool name</span></div>
++                        <input class="input w-full font-mono" name="name" required maxlength="128" value="{name}" placeholder="lookup_order"></label>
++                    <label class="form-control w-full"><div class="label"><span class="text-xs">Version</span></div>
++                        <select class="select w-full" name="version_id">{versions}</select></label>
++                </div>
++                <label class="form-control w-full"><div class="label"><span class="text-xs">Static parameters (JSON object, validated against the version's parameter schema)</span></div>
++                    <textarea class="textarea w-full font-mono text-xs" rows="3" name="params_json">
++{params}</textarea></label>
++                <button type="submit" class="btn btn-outline btn-sm">{button}</button>
++                <a class="link text-xs" href="/ui/workflows?company_id={company_id}&amp;tools=1">All workflow tools</a>
++            </form>
++        </section>"##,
++        banner = form.banner.map(status_banner).unwrap_or_default(),
++        error = form_error_banner(form.error),
++        name = escape_html_attr(form.name),
++        params = escape_html_text(form.params),
++    )
++}
++
++/// What one granted name resolves to at publication, for the grants card's reference.
++pub enum GrantResolution {
++    /// A registered workflow tool, with what it pins.
++    Workflow(String),
++    Message,
++    Provisioning,
++    /// An HTTP operation or a selected MCP slot tool, resolved against the publishing workflow.
++    Elsewhere,
++}
++
++pub struct AgentToolsCard<'a> {
++    pub company_id: Uuid,
++    pub agent: Uuid,
++    /// The grants as stored, in order.
++    pub granted: &'a [String],
++    /// What the field shows (the typed text after a refusal).
++    pub typed: Option<&'a str>,
++    /// The list the form was opened with, sent back as `expected`.
++    pub expected: &'a [String],
++    pub resolutions: &'a [(String, GrantResolution)],
++    /// Registered workflow tools the agent does not grant yet.
++    pub available: &'a [(String, String)],
++    pub banner: Option<&'a str>,
++    pub error: Option<&'a str>,
++}
++
++/// The agent pane's "Workflow tools" card: its ordered grants, one name per line.
++pub fn agent_tools_card(card: &AgentToolsCard<'_>) -> String {
++    let (company_id, agent) = (card.company_id, card.agent);
++    let resolved: String = card
++        .resolutions
++        .iter()
++        .map(|(name, resolution)| {
++            let what = match resolution {
++                GrantResolution::Workflow(target) => format!("workflow tool: {target}"),
++                GrantResolution::Message => "built-in message tool".to_owned(),
++                GrantResolution::Provisioning => {
++                    "provisioning tool (the Agent Builder's: a grant may keep or drop it, never add it)"
++                        .to_owned()
++                }
++                GrantResolution::Elsewhere => "resolved at publication: an HTTP operation, or an MCP tool the workflow selects; publication refuses a name nothing provides".to_owned(),
++            };
++            format!(
++                r#"<li><span class="font-mono">{}</span> — {}</li>"#,
++                escape_html_text(name),
++                escape_html_text(&what)
++            )
++        })
++        .collect();
++    let available: String = card
++        .available
++        .iter()
++        .map(|(name, target)| {
++            format!(
++                r#"<li><span class="font-mono">{}</span> — {}</li>"#,
++                escape_html_text(name),
++                escape_html_text(target)
++            )
++        })
++        .collect();
++    let typed = card
++        .typed
++        .map(str::to_owned)
++        .unwrap_or_else(|| card.granted.join("\n"));
++    format!(
++        r##"<section id="agent-workflow-tools" class="mt-6 space-y-3 rounded-box border border-base-300 p-4">
++            <div><h3 class="font-semibold">Workflow tools</h3>
++            <p class="text-sm opacity-70">The tools this agent may call in a workflow, in order. A workflow freezes them when it is published; revoking a tool later still stops it.</p></div>
++            {banner}{error}
++            <form hx-post="/ui/workflows/agents/{agent}/tools?company_id={company_id}" hx-target="#agent-workflow-tools" hx-swap="outerHTML"
++                hx-disabled-elt="find button[type='submit']" class="space-y-2">
++                <input type="hidden" name="expected" value="{expected}">
++                <label class="form-control w-full"><div class="label"><span class="text-xs">Granted tools, one name per line (at most 32)</span></div>
++                    <textarea class="textarea w-full font-mono text-xs" rows="4" name="tools">
++{typed}</textarea></label>
++                <button type="submit" class="btn btn-outline btn-sm">Save tools</button>
++            </form>
++            {resolved_list}{available_list}
++        </section>"##,
++        banner = card.banner.map(status_banner).unwrap_or_default(),
++        error = form_error_banner(card.error),
++        expected = escape_html_attr(&card.expected.join("\n")),
++        typed = escape_html_text(&typed),
++        resolved_list = if resolved.is_empty() {
++            String::new()
++        } else {
++            format!(
++                r#"<div><p class="text-xs font-semibold">What each granted name is</p><ul class="space-y-1 text-xs opacity-80">{resolved}</ul></div>"#
++            )
++        },
++        available_list = if available.is_empty() {
++            String::new()
++        } else {
++            format!(
++                r#"<div><p class="text-xs font-semibold">Registered workflow tools not granted</p><ul class="space-y-1 text-xs opacity-80">{available}</ul></div>"#
++            )
++        },
++    )
++}
++
++pub struct AgentUsageCard<'a> {
++    pub company_id: Uuid,
++    pub bindings: &'a [BindingUse],
++    /// Of the listed bindings, those on channels the viewer cannot see.
++    pub hidden: usize,
++    pub truncated: bool,
++}
++
++/// The agent pane's "Used by" card (F098.2): the bindings whose bound version froze this
++/// agent, directly or through a child workflow it pins.
++pub fn agent_usage_card(card: &AgentUsageCard<'_>) -> String {
++    let company_id = card.company_id;
++    let rows: String = card
++        .bindings
++        .iter()
++        .map(|binding| {
++            let summary = &binding.binding;
++            format!(
++                r#"<li class="py-2"><div class="flex flex-wrap items-center gap-2">
++                    <a class="link font-semibold" href="/ui/workflows?company_id={company_id}&amp;workflow_id={workflow}&amp;tab=bindings">{title}</a>{state}</div>
++                    <p class="text-xs opacity-70">{association}</p></li>"#,
++                workflow = summary.workflow.as_uuid(),
++                title = escape_html_text(if binding.workflow_title.is_empty() {
++                    "(untitled workflow)"
++                } else {
++                    &binding.workflow_title
++                }),
++                state = if summary.active {
++                    r#"<span class="badge badge-sm badge-success">active</span>"#
++                } else {
++                    r#"<span class="badge badge-sm badge-ghost">paused</span>"#
++                },
++                association = escape_html_text(&match summary.association {
++                    RelatedAssociation::Company => "Company-wide".to_owned(),
++                    RelatedAssociation::Channel(_) => format!(
++                        "Channel {}",
++                        binding.channel_name.as_deref().unwrap_or("(unnamed)")
++                    ),
++                    RelatedAssociation::Thread { .. } => format!(
++                        "One thread of channel {}",
++                        binding.channel_name.as_deref().unwrap_or("(unnamed)")
++                    ),
++                }),
++            )
++        })
++        .collect();
++    let list = if card.bindings.is_empty() && card.hidden == 0 {
++        r#"<p class="text-xs opacity-70">No binding runs this agent. A workflow uses it only once a version that names it is published and bound.</p>"#.to_owned()
++    } else {
++        format!(r#"<ul class="divide-y divide-base-300">{rows}</ul>"#)
++    };
++    format!(
++        r#"<section id="agent-workflow-usage" class="mt-6 space-y-2 rounded-box border border-base-300 p-4">
++            <div><h3 class="font-semibold">Used by</h3>
++            <p class="text-sm opacity-70">Bindings whose published version runs this agent, directly or through a child workflow.</p></div>
++            {list}{hidden}{cut}
++        </section>"#,
++        hidden = if card.hidden > 0 {
++            format!(
++                r#"<p class="text-xs opacity-70">{} more of the listed binding{} {} on channels you cannot see.</p>"#,
++                card.hidden,
++                if card.hidden == 1 { "" } else { "s" },
++                if card.hidden == 1 { "is" } else { "are" },
++            )
++        } else {
++            String::new()
++        },
++        cut = if card.truncated {
++            r#"<p class="text-xs text-error">Only the first 50 bindings are listed.</p>"#
++        } else {
++            ""
++        },
++    )
++}
++
++/// A card the page loads after it renders, from a workflow route; a failed load says so.
++pub(crate) fn lazy_card(url: &str, loading: &str, failed: &str) -> String {
++    format!(
++        r#"<div class="mt-6 rounded-box border border-dashed border-base-300 p-4 text-xs opacity-70" aria-busy="true"
++            hx-get="{url}" hx-trigger="load" hx-swap="outerHTML" data-lazy-card="{failed}">{loading}</div>"#,
++        url = escape_html_attr(url),
++        failed = escape_html_attr(failed),
++        loading = escape_html_text(loading),
++    )
++}
++
++/// The agent pane's workflow cards: its tool grants and the bindings that run it.
++pub(crate) fn workflow_agent_cards(company_id: Uuid, agent: Uuid) -> String {
++    format!(
++        "{}{}",
++        lazy_card(
++            &format!("/ui/workflows/agents/{agent}/tools?company_id={company_id}"),
++            "Loading the agent's workflow tools…",
++            "The agent's workflow tools could not be loaded.",
++        ),
++        lazy_card(
++            &format!("/ui/workflows/agents/{agent}/usage?company_id={company_id}"),
++            "Loading where this agent is used…",
++            "Where this agent is used could not be loaded.",
++        ),
++    )
++}
+--- a/src/adapters/http/pages/workflow_authoring/versions.rs
++++ b/src/adapters/http/pages/workflow_authoring/versions.rs
+@@ -24,6 +24,8 @@
+     pub banner: Option<&'a str>,
+     /// A compare already rendered into `#workflow-compare`.
+     pub compare_html: Option<&'a str>,
++    /// The "Use as a workflow tool" form, already rendered (empty without a version).
++    pub tool_form_html: &'a str,
+ }
+ 
+ fn version_label(versions: &[VersionSummary], version: Uuid) -> String {
+@@ -73,7 +75,7 @@
+     )
+ }
+ 
+-fn association_label(binding: &BindingUse) -> String {
++pub(super) fn association_label(binding: &BindingUse) -> String {
+     match binding.binding.association {
+         RelatedAssociation::Company => "Company-wide (manual starts and schedules)".to_owned(),
+         RelatedAssociation::Channel(_) => format!(
+@@ -178,7 +180,7 @@
+         r#"<p class="text-sm opacity-70">Nothing published yet. Validate the draft in the editor, then publish it from the validation preview.</p>"#.to_owned()
+     } else {
+         format!(
+-            r#"<div class="overflow-x-auto"><table class="table table-xs"><thead><tr><th>Version</th><th>From draft revision</th><th>Published</th><th>Content</th></tr></thead><tbody>{rows}</tbody></table></div>{cut}"#,
++            r#"<div class="overflow-x-auto"><table class="table table-xs"><thead class="text-base-content"><tr><th>Version</th><th>From draft revision</th><th>Published</th><th>Content</th></tr></thead><tbody>{rows}</tbody></table></div>{cut}"#,
+             cut = if view.versions_truncated {
+                 r#"<p class="text-xs text-error">Only the newest 200 versions are listed.</p>"#
+             } else {
+@@ -194,11 +196,13 @@
+             <section class="space-y-2"><h3 class="font-semibold">Where it runs</h3>
+                 <p class="text-xs opacity-70">Publishing never moves a binding. A binding keeps the version it was configured with until someone reconfigures it.</p>
+                 {usage}</section>
++            {tool_form}
+         </div>"##,
+         banner = view.banner.map(status_banner).unwrap_or_default(),
+         form = compare_form(view),
+         compare = view.compare_html.unwrap_or_default(),
+         usage = usage_list(view),
++        tool_form = view.tool_form_html,
+     )
+ }
+ 
+--- a/src/adapters/http/routes/workflows/bindings.rs
++++ b/src/adapters/http/routes/workflows/bindings.rs
+@@ -203,7 +203,41 @@
+     Path((company_id, binding)): Path<(Uuid, Uuid)>,
+     Json(body): Json<ConfigureBody>,
+ ) -> WorkflowResult<Json<Value>> {
+-    let resources = body
++    let request = BindingRequest {
++        expected_state_revision: body.expected_state_revision,
++        association: body.association.into(),
++        version: body.version_id,
++        params: body.params,
++        resources: body.resources,
++        run_as: body.run_as,
++        message_trigger: body.message_trigger,
++    };
++    let state = configure_binding(&engine, company_id, actor(&user)?, binding, request).await?;
++    Ok(ok(state_json(&state)))
++}
++
++/// One binding configuration as the JSON route and the bindings tab send it.
++pub(super) struct BindingRequest {
++    /// Absent creates the binding; present must be its current state revision.
++    pub expected_state_revision: Option<u64>,
++    pub association: RelatedAssociation,
++    pub version: Uuid,
++    pub params: Value,
++    pub resources: BTreeMap<String, Uuid>,
++    pub run_as: Option<Uuid>,
++    pub message_trigger: Option<String>,
++}
++
++/// Configure (or create) `binding` through the binding command, which authorizes, checks the
++/// revision, validates the params and checks readiness.
++pub(super) async fn configure_binding(
++    engine: &WorkflowEngine,
++    company_id: Uuid,
++    actor: WorkflowActor,
++    binding: Uuid,
++    request: BindingRequest,
++) -> WorkflowResult<BindingState> {
++    let resources = request
+         .resources
+         .iter()
+         .map(|(slot, resource)| {
+@@ -214,20 +248,23 @@
+             ))
+         })
+         .collect::<AppResult<BTreeMap<_, _>>>()?;
+-    let state = engine
++    Ok(engine
+         .bindings()
+         .configure(ConfigureBinding {
+-            target: binding_target(company_id, actor(&user)?, binding),
+-            expected: body
++            target: binding_target(company_id, actor, binding),
++            expected: request
+                 .expected_state_revision
+                 .map(|value| revision(value, BindingStateRevision::new))
+                 .transpose()?,
+-            association: body.association.into(),
+-            version: VersionId::new(body.version_id),
+-            params: body.params,
++            association: request.association,
++            version: VersionId::new(request.version),
++            params: request.params,
+             resources,
+-            run_as: body.run_as.map(WorkflowActor::authenticated).transpose()?,
+-            message_trigger: body
++            run_as: request
++                .run_as
++                .map(WorkflowActor::authenticated)
++                .transpose()?,
++            message_trigger: request
+                 .message_trigger
+                 .map(|trigger| {
+                     trigger.parse::<MessageTrigger>().map_err(|_| {
+@@ -236,8 +273,7 @@
+                 })
+                 .transpose()?,
+         })
+-        .await?;
+-    Ok(ok(state_json(&state)))
++        .await?)
+ }
+ 
+ #[derive(Debug, Deserialize)]
+@@ -254,17 +290,37 @@
+     body: ActivityBody,
+     active: bool,
+ ) -> WorkflowResult<Json<Value>> {
++    let state = set_binding_activity(
++        engine,
++        company_id,
++        actor(user)?,
++        binding,
++        body.expected_state_revision,
++        active,
++    )
++    .await?;
++    Ok(ok(state_json(&state)))
++}
++
++/// Activate (readiness checked again) or deactivate `binding` at the state revision seen.
++pub(super) async fn set_binding_activity(
++    engine: &WorkflowEngine,
++    company_id: Uuid,
++    actor: WorkflowActor,
++    binding: Uuid,
++    expected_state_revision: u64,
++    active: bool,
++) -> WorkflowResult<BindingState> {
+     let request = SetBindingActivity {
+-        target: binding_target(company_id, actor(user)?, binding),
+-        expected: revision(body.expected_state_revision, BindingStateRevision::new)?,
++        target: binding_target(company_id, actor, binding),
++        expected: revision(expected_state_revision, BindingStateRevision::new)?,
+     };
+     let bindings = engine.bindings();
+-    let state = if active {
++    Ok(if active {
+         bindings.activate(request).await?
+     } else {
+         bindings.deactivate(request).await?
+-    };
+-    Ok(ok(state_json(&state)))
++    })
+ }
+ 
+ pub async fn activate(
+--- a/src/adapters/http/routes/workflows/ui/authoring/access_tests.rs
++++ b/src/adapters/http/routes/workflows/ui/authoring/access_tests.rs
+@@ -33,6 +33,7 @@
+             workflow_id: Some(workflow),
+             tab: None,
+             new: None,
++            tools: None,
+         }),
+     )
+     .await
+@@ -136,6 +137,7 @@
+                 workflow_id: Some(workflow),
+                 tab: None,
+                 new: None,
++                tools: None,
+             }),
+         )
+         .await
+@@ -280,7 +282,10 @@
+     for pattern in WRITE_ROUTES {
+         let path = pattern
+             .replace("{workflow_id}", &Uuid::new_v4().to_string())
++            .replace("{binding_id}", &Uuid::new_v4().to_string())
++            .replace("{agent_id}", &Uuid::new_v4().to_string())
+             .replace("{template_id}", "reviewed-support");
++        assert!(!path.contains('{'), "{path}");
+         let request = |origin: &str| {
+             Request::post(path.as_str())
+                 .header(header::HOST, "localhost")
+--- a/src/adapters/http/routes/workflows/ui/authoring/bindings.rs
++++ b/src/adapters/http/routes/workflows/ui/authoring/bindings.rs
+@@ -0,0 +1,652 @@
++//! The bindings tab (p09 B1b): the tab body, its form (rendered again when the chosen version
++//! changes, since params and slots are the version's), create or configure through the JSON
++//! route's own command (`bindings::configure_binding`), activate and deactivate at the state
++//! revision seen, and the channel pane's card of the bindings on one channel.
++use super::super::super::bindings::{
++    BindingRequest, Visibility, configure_binding, set_binding_activity,
++};
++use super::*;
++use crate::application::workflow::authoring::{
++    field_value, parameter_fields, parameters_from_fields, parameters_from_json,
++};
++use crate::application::workflow::reads::{BindingOptions, BindingUse, WorkflowUsage};
++use crate::application::workflow::{RelatedAssociation, RelatedChannelId};
++use crate::domain::workflow::WorkflowDefinition;
++
++/// What the tab's last write did.
++pub(super) enum BindingsBanner {
++    Done(String),
++    RowRefused { binding: Uuid, message: String },
++}
++
++/// The params the form shows: a stored binding's, or what the author typed.
++pub(super) enum ParamsInput {
++    Stored(serde_json::Value),
++    Typed {
++        values: BTreeMap<String, String>,
++        json: String,
++    },
++}
++
++/// The form as opened or as submitted.
++pub(super) struct BindingForm {
++    /// The binding being configured; `None` creates one under `form_key`.
++    binding: Option<Uuid>,
++    form_key: String,
++    version: Option<Uuid>,
++    association: String,
++    params: ParamsInput,
++    resources: BTreeMap<String, Uuid>,
++    message_trigger: String,
++    run_as: Option<Uuid>,
++    error: Option<String>,
++}
++
++impl BindingForm {
++    fn new_binding(newest: Option<Uuid>) -> Self {
++        Self {
++            binding: None,
++            form_key: Uuid::new_v4().to_string(),
++            version: newest,
++            association: "company".into(),
++            params: ParamsInput::Stored(serde_json::json!({})),
++            resources: BTreeMap::new(),
++            message_trigger: String::new(),
++            run_as: None,
++            error: None,
++        }
++    }
++
++    fn stored(binding: &BindingUse) -> Self {
++        let summary = &binding.binding;
++        Self {
++            binding: Some(summary.binding.as_uuid()),
++            form_key: String::new(),
++            version: Some(summary.version.as_uuid()),
++            association: association_value(summary.association),
++            params: ParamsInput::Stored(summary.params.clone()),
++            resources: binding.resources.clone(),
++            message_trigger: summary
++                .message_trigger
++                .map(|trigger| trigger.as_str().to_owned())
++                .unwrap_or_default(),
++            run_as: Some(summary.run_as),
++            error: None,
++        }
++    }
++
++    fn typed(form: &FormFields) -> Self {
++        let mut values = BTreeMap::new();
++        let mut resources = BTreeMap::new();
++        for (name, value) in form.pairs() {
++            if let Some(parameter) = name.strip_prefix("param:") {
++                values.insert(parameter.to_owned(), value.to_owned());
++            } else if let Some(slot) = name.strip_prefix("resource:")
++                && let Ok(resource) = value.parse()
++            {
++                resources.insert(slot.to_owned(), resource);
++            }
++        }
++        Self {
++            binding: form.get("binding_id").and_then(|id| id.parse().ok()),
++            form_key: form.text("form_key"),
++            version: form.get("version_id").and_then(|id| id.parse().ok()),
++            association: form.get("association").unwrap_or("company").to_owned(),
++            params: ParamsInput::Typed {
++                values,
++                json: form.text("params_json"),
++            },
++            resources,
++            message_trigger: form.text("message_trigger"),
++            run_as: form.get("run_as").and_then(|id| id.parse().ok()),
++            error: None,
++        }
++    }
++}
++
++fn association_value(association: RelatedAssociation) -> String {
++    match association {
++        RelatedAssociation::Company => "company".into(),
++        RelatedAssociation::Channel(channel) => format!("channel:{}", channel.as_uuid()),
++        RelatedAssociation::Thread { channel_id, .. } => {
++            format!("channel:{}", channel_id.as_uuid())
++        }
++    }
++}
++
++fn parse_association(value: &str) -> AppResult<RelatedAssociation> {
++    match value.strip_prefix("channel:") {
++        None if value == "company" => Ok(RelatedAssociation::Company),
++        Some(channel) => channel
++            .parse()
++            .map(|channel| RelatedAssociation::Channel(RelatedChannelId::new(channel)))
++            .map_err(|_| AppError::BadRequest("The association names no channel".into())),
++        None => Err(AppError::BadRequest(
++            "The association is the company or a channel".into(),
++        )),
++    }
++}
++
++/// The form's params and the params object they build, by the version's schema.
++fn params_of(
++    definition: &WorkflowDefinition,
++    form: &FormFields,
++) -> Result<serde_json::Value, String> {
++    match parameter_fields(definition.parameter_schema.as_ref()) {
++        Some(fields) => parameters_from_fields(&fields, |name| {
++            form.get(&format!("param:{name}")).map(str::to_owned)
++        }),
++        None => parameters_from_json(&form.text("params_json")),
++    }
++}
++
++/// The message a refused configure or activation shows; `None` is not the author's to fix.
++fn binding_refusal(error: &WorkflowError) -> Option<String> {
++    match error {
++        WorkflowError::Diagnostic(diagnostic) => Some(match &diagnostic.instance_path {
++            Some(path) if !path.is_empty() => format!("{} (at {path})", diagnostic.message),
++            _ => diagnostic.message.to_string(),
++        }),
++        WorkflowError::App(AppError::BadRequest(message)) => Some(message.clone()),
++        WorkflowError::App(AppError::NotFound(_)) => Some(
++            "A chosen channel, version, run-as or resource is not available: it may be hidden from \
++             you, disabled, revoked or not ready, or a tool the version froze is no longer \
++             registered or approved."
++                .into(),
++        ),
++        _ => None,
++    }
++}
++
++impl Ui {
++    /// The bindings of a workflow listing the viewer may see, and how many were left out.
++    pub(super) async fn visible_usage(
++        &self,
++        company: Uuid,
++        usage: WorkflowUsage,
++        listing: &'static str,
++    ) -> AppResult<(Vec<BindingUse>, usize)> {
++        let mut visibility = Visibility::new(&self.engine, super::company(company), self.actor()?);
++        let mut visible = Vec::new();
++        let mut hidden = 0;
++        for binding in usage.bindings {
++            if visibility.allows(binding.binding.association).await? {
++                visible.push(binding);
++            } else {
++                hidden += 1;
++            }
++        }
++        visibility.report(listing);
++        Ok((visible, hidden))
++    }
++
++    /// The choices a binding form offers, with the channels the viewer cannot see left out.
++    async fn binding_options(&self, company: Uuid) -> AppResult<BindingOptions> {
++        let company_id = super::company(company);
++        let mut options = self
++            .engine
++            .authoring_reads()
++            .binding_options(company_id)
++            .await?;
++        let mut visibility = Visibility::new(&self.engine, company_id, self.actor()?);
++        let mut channels = Vec::new();
++        for channel in std::mem::take(&mut options.channels) {
++            let association = RelatedAssociation::Channel(RelatedChannelId::new(channel.id));
++            if visibility.allows(association).await? {
++                channels.push(channel);
++            }
++        }
++        visibility.report("workflow-binding-channels");
++        options.channels = channels;
++        Ok(options)
++    }
++
++    /// The chosen version's definition, when it is a selectable version of this workflow.
++    async fn binding_definition(
++        &self,
++        company: Uuid,
++        workflow: Uuid,
++        version: Option<Uuid>,
++    ) -> AppResult<Option<WorkflowDefinition>> {
++        let Some(version) = version else {
++            return Ok(None);
++        };
++        let bundle = self
++            .engine
++            .selectable_bundle(super::company(company), VersionId::new(version))
++            .await?;
++        Ok(bundle
++            .map(|bundle| bundle.compiled().graph().definition().clone())
++            .filter(|definition| definition.workflow_id.as_uuid() == workflow))
++    }
++
++    async fn binding_form_html(
++        &self,
++        company: &crate::entities::company::Company,
++        detail: &DefinitionDetail,
++        form: &BindingForm,
++        options: &BindingOptions,
++        editing: Option<&BindingUse>,
++    ) -> AppResult<String> {
++        let workflow = detail.summary.workflow.as_uuid();
++        let definition = self
++            .binding_definition(company.id, workflow, form.version)
++            .await?;
++        let fields = definition
++            .as_ref()
++            .and_then(|definition| parameter_fields(definition.parameter_schema.as_ref()));
++        let (values, json) = match (&form.params, &fields) {
++            (ParamsInput::Stored(params), Some(fields)) => (
++                fields
++                    .iter()
++                    .map(|field| (field.name.clone(), field_value(field, params)))
++                    .collect(),
++                String::new(),
++            ),
++            (ParamsInput::Stored(params), None) => (
++                BTreeMap::new(),
++                serde_json::to_string_pretty(params).unwrap_or_default(),
++            ),
++            (ParamsInput::Typed { values, json }, _) => (values.clone(), json.clone()),
++        };
++        let params = match &fields {
++            Some(fields) => pages::BindingParams::Fields {
++                fields,
++                values: &values,
++            },
++            None => pages::BindingParams::Json(&json),
++        };
++        Ok(pages::workflow_binding_form(&pages::BindingFormView {
++            company_id: company.id,
++            workflow,
++            editing,
++            form_key: &form.form_key,
++            versions: &detail.versions,
++            version: form.version,
++            definition: definition.as_ref(),
++            association: &form.association,
++            channels: &options.channels,
++            params,
++            resources: &form.resources,
++            http: &options.http,
++            mcp: &options.mcp,
++            message_trigger: &form.message_trigger,
++            run_as: form.run_as,
++            owner: company.user_id == self.user,
++            viewer: self.user,
++            people: &options.people,
++            options_truncated: options.truncated,
++            error: form.error.as_deref(),
++        }))
++    }
++
++    /// The whole pane on the bindings tab, with `form` open (a fresh create form when `None`).
++    pub(super) async fn bindings_pane(
++        &self,
++        company: Uuid,
++        workflow: Uuid,
++        banner: Option<BindingsBanner>,
++        form: Option<BindingForm>,
++    ) -> AppResult<String> {
++        let detail = self.detail(company, workflow).await?;
++        let body = self.bindings_body(company, &detail, banner, form).await?;
++        Ok(self
++            .render_pane(company, &detail, pages::WorkflowTab::Bindings, body)
++            .await)
++    }
++
++    pub(super) async fn bindings_body(
++        &self,
++        company: Uuid,
++        detail: &DefinitionDetail,
++        banner: Option<BindingsBanner>,
++        form: Option<BindingForm>,
++    ) -> AppResult<String> {
++        let managed = self.company(company).await?;
++        let usage = self
++            .engine
++            .authoring_reads()
++            .workflow_usage(super::company(company), detail.summary.workflow)
++            .await?;
++        let truncated = usage.truncated;
++        let (bindings, hidden) = self
++            .visible_usage(company, usage, "workflow-bindings-tab")
++            .await?;
++        let options = self.binding_options(company).await?;
++        let form = form.unwrap_or_else(|| {
++            BindingForm::new_binding(detail.versions.first().map(|v| v.version.as_uuid()))
++        });
++        let editing = match form.binding {
++            Some(binding) => Some(
++                self.visible_binding(company, detail.summary.workflow.as_uuid(), binding)
++                    .await?,
++            ),
++            None => None,
++        };
++        let form_html = self
++            .binding_form_html(&managed, detail, &form, &options, editing.as_ref())
++            .await?;
++        let banner = match &banner {
++            Some(BindingsBanner::Done(message)) => Some(pages::BindingBanner::Done(message)),
++            Some(BindingsBanner::RowRefused { binding, message }) => {
++                Some(pages::BindingBanner::RowRefused {
++                    binding: *binding,
++                    message,
++                })
++            }
++            None => None,
++        };
++        Ok(pages::workflow_bindings_body(&pages::BindingsView {
++            company_id: company,
++            workflow: detail.summary.workflow.as_uuid(),
++            archived: detail.summary.archived,
++            versions: &detail.versions,
++            bindings: &bindings,
++            truncated,
++            hidden,
++            people: &options.people,
++            banner,
++            form_html: &form_html,
++        }))
++    }
++
++    /// A binding of this workflow the viewer may see.
++    async fn visible_binding(
++        &self,
++        company: Uuid,
++        workflow: Uuid,
++        binding: Uuid,
++    ) -> AppResult<BindingUse> {
++        let not_found = || AppError::NotFound("Workflow binding not found".into());
++        let found = self
++            .engine
++            .authoring_reads()
++            .binding_use(super::company(company), binding)
++            .await?
++            .filter(|found| found.binding.workflow.as_uuid() == workflow)
++            .ok_or_else(not_found)?;
++        let mut visibility = Visibility::new(&self.engine, super::company(company), self.actor()?);
++        if !visibility.allows(found.binding.association).await? {
++            return Err(not_found());
++        }
++        Ok(found)
++    }
++}
++
++#[derive(Deserialize)]
++pub(super) struct BindingFormQuery {
++    pub(super) company_id: Uuid,
++    pub(super) binding_id: Option<Uuid>,
++}
++
++/// GET /ui/workflows/{workflow}/bindings/form — the form for `binding_id` as stored, or the
++/// fields it carries (a version change), rendered for the chosen version.
++pub(super) async fn binding_form(
++    ui: Ui,
++    Path(workflow): Path<Uuid>,
++    Query(query): Query<BindingFormQuery>,
++    uri: axum::http::Uri,
++) -> AppResult<Html<String>> {
++    let company = ui.company(query.company_id).await?;
++    let detail = ui.detail(company.id, workflow).await?;
++    let fields = FormFields::parse(uri.query().unwrap_or_default().as_bytes());
++    let typed = fields.get("version_id").is_some();
++    let editing = match query.binding_id {
++        Some(binding) => Some(ui.visible_binding(company.id, workflow, binding).await?),
++        None => None,
++    };
++    let form = match (&editing, typed) {
++        (_, true) => BindingForm::typed(&fields),
++        (Some(binding), false) => BindingForm::stored(binding),
++        (None, false) => {
++            BindingForm::new_binding(detail.versions.first().map(|v| v.version.as_uuid()))
++        }
++    };
++    let options = ui.binding_options(company.id).await?;
++    Ok(Html(
++        ui.binding_form_html(&company, &detail, &form, &options, editing.as_ref())
++            .await?,
++    ))
++}
++
++/// POST /ui/workflows/{workflow}/bindings — create (keyed by the form) or configure a binding
++/// through the binding command. A refusal keeps every choice in the form.
++pub(super) async fn save_binding(
++    ui: Ui,
++    Path(workflow): Path<Uuid>,
++    Query(query): Query<CompanyQuery>,
++    body: Bytes,
++) -> WorkflowResult<Html<String>> {
++    let company = ui.company(query.company_id).await?.id;
++    let fields = FormFields::parse(&body);
++    let mut form = BindingForm::typed(&fields);
++    let refused = |mut form: BindingForm, message: String| {
++        form.error = Some(message);
++        form
++    };
++    let editing = match form.binding {
++        Some(binding) => Some(ui.visible_binding(company, workflow, binding).await?),
++        None => None,
++    };
++    let Some(definition) = ui
++        .binding_definition(company, workflow, form.version)
++        .await?
++    else {
++        let form = refused(
++            form,
++            "Choose a published version of this workflow; its workflow may have been archived."
++                .into(),
++        );
++        return Ok(Html(
++            ui.bindings_pane(company, workflow, None, Some(form))
++                .await?,
++        ));
++    };
++    let params = match params_of(&definition, &fields) {
++        Ok(params) => params,
++        Err(message) => {
++            let form = refused(form, message);
++            return Ok(Html(
++                ui.bindings_pane(company, workflow, None, Some(form))
++                    .await?,
++            ));
++        }
++    };
++    let association = match &editing {
++        Some(binding) => binding.binding.association,
++        None => parse_association(&form.association)?,
++    };
++    let binding = match form.binding {
++        Some(binding) => binding,
++        None => {
++            let key = crate::application::workflow::IdempotencyKey::parse(form.form_key.clone())?;
++            keyed_id("workflow.ui_binding", super::company(company), key.as_str())
++        }
++    };
++    // The revision the author saw; a binding changed since then is the command's conflict.
++    let expected_state_revision = match &editing {
++        Some(_) => Some(fields.number("expected_state_revision")?),
++        None => None,
++    };
++    let request = BindingRequest {
++        expected_state_revision,
++        association,
++        version: definition.version_id.as_uuid(),
++        params,
++        resources: form.resources.clone(),
++        run_as: form.run_as,
++        message_trigger: Some(form.message_trigger.clone()).filter(|trigger| !trigger.is_empty()),
++    };
++    match configure_binding(&ui.engine, company, ui.actor()?, binding, request).await {
++        Ok(state) => {
++            let message = format!(
++                "Saved binding {} at state revision {}; it is {}.",
++                pages::short_id(binding),
++                state.revision.get(),
++                if state.active {
++                    "active"
++                } else {
++                    "paused until you activate it"
++                },
++            );
++            Ok(Html(
++                ui.bindings_pane(company, workflow, Some(BindingsBanner::Done(message)), None)
++                    .await?,
++            ))
++        }
++        Err(WorkflowError::App(AppError::Conflict(_))) if editing.is_none() => {
++            // A double submit of the create (the key names the binding) or a reused key.
++            Ok(Html(
++                ui.bindings_pane(
++                    company,
++                    workflow,
++                    Some(BindingsBanner::Done(format!(
++                        "Binding {} was already created; it is listed above.",
++                        pages::short_id(binding)
++                    ))),
++                    None,
++                )
++                .await?,
++            ))
++        }
++        Err(WorkflowError::App(AppError::Conflict(_))) => {
++            form.error = Some(
++                "Someone changed this binding while you saved it. Your choices are kept below; \
++                 saving again replaces its configuration."
++                    .into(),
++            );
++            Ok(Html(
++                ui.bindings_pane(company, workflow, None, Some(form))
++                    .await?,
++            ))
++        }
++        Err(error) => match binding_refusal(&error) {
++            Some(message) => {
++                let form = refused(form, format!("Not saved: {message}"));
++                Ok(Html(
++                    ui.bindings_pane(company, workflow, None, Some(form))
++                        .await?,
++                ))
++            }
++            None => Err(error),
++        },
++    }
++}
++
++#[derive(Deserialize)]
++pub(super) struct ActivityForm {
++    pub(super) expected_state_revision: u64,
++}
++
++async fn set_activity(
++    ui: Ui,
++    company_id: Uuid,
++    workflow: Uuid,
++    binding: Uuid,
++    expected: u64,
++    active: bool,
++) -> WorkflowResult<Html<String>> {
++    let company = ui.company(company_id).await?.id;
++    ui.visible_binding(company, workflow, binding).await?;
++    let banner =
++        match set_binding_activity(&ui.engine, company, ui.actor()?, binding, expected, active)
++            .await
++        {
++            Ok(state) => BindingsBanner::Done(format!(
++                "{} binding {} (state revision {}).",
++                if state.active {
++                    "Activated"
++                } else {
++                    "Deactivated"
++                },
++                pages::short_id(binding),
++                state.revision.get(),
++            )),
++            Err(WorkflowError::App(AppError::Conflict(_))) => BindingsBanner::RowRefused {
++                binding,
++                message: "This binding changed since the page was shown; here it is as it is now. \
++                      Nothing was changed."
++                    .into(),
++            },
++            Err(error) => match binding_refusal(&error) {
++                Some(message) => BindingsBanner::RowRefused {
++                    binding,
++                    message: format!(
++                        "Not {}: {message}",
++                        if active { "activated" } else { "deactivated" }
++                    ),
++                },
++                None => return Err(error),
++            },
++        };
++    Ok(Html(
++        ui.bindings_pane(company, workflow, Some(banner), None)
++            .await?,
++    ))
++}
++
++/// POST /ui/workflows/{workflow}/bindings/{binding}/activate — readiness is checked again.
++pub(super) async fn activate_binding(
++    ui: Ui,
++    Path((workflow, binding)): Path<(Uuid, Uuid)>,
++    Query(query): Query<CompanyQuery>,
++    axum::Form(form): axum::Form<ActivityForm>,
++) -> WorkflowResult<Html<String>> {
++    set_activity(
++        ui,
++        query.company_id,
++        workflow,
++        binding,
++        form.expected_state_revision,
++        true,
++    )
++    .await
++}
++
++/// POST /ui/workflows/{workflow}/bindings/{binding}/deactivate.
++pub(super) async fn deactivate_binding(
++    ui: Ui,
++    Path((workflow, binding)): Path<(Uuid, Uuid)>,
++    Query(query): Query<CompanyQuery>,
++    axum::Form(form): axum::Form<ActivityForm>,
++) -> WorkflowResult<Html<String>> {
++    set_activity(
++        ui,
++        query.company_id,
++        workflow,
++        binding,
++        form.expected_state_revision,
++        false,
++    )
++    .await
++}
++
++/// GET /ui/workflows/channels/{channel}/bindings — the channel pane's "Workflows on this
++/// channel" card, for a channel the viewer can see.
++pub(super) async fn channel_bindings(
++    ui: Ui,
++    Path(channel): Path<Uuid>,
++    Query(query): Query<CompanyQuery>,
++) -> AppResult<Html<String>> {
++    let company = ui.company(query.company_id).await?.id;
++    let company_id = super::company(company);
++    let mut visibility = Visibility::new(&ui.engine, company_id, ui.actor()?);
++    if !visibility
++        .allows(RelatedAssociation::Channel(RelatedChannelId::new(channel)))
++        .await?
++    {
++        return Err(AppError::NotFound("Channel not found".into()));
++    }
++    let usage = ui
++        .engine
++        .authoring_reads()
++        .channel_usage(company_id, channel)
++        .await?;
++    Ok(Html(pages::channel_bindings_card(
++        &pages::ChannelBindingsCard {
++            company_id: company,
++            bindings: &usage.bindings,
++            truncated: usage.truncated,
++        },
++    )))
++}
+--- a/src/adapters/http/routes/workflows/ui/authoring/bindings_tests.rs
++++ b/src/adapters/http/routes/workflows/ui/authoring/bindings_tests.rs
+@@ -0,0 +1,553 @@
++//! The bindings tab and the channel card: a keyed create that a double submit cannot repeat,
++//! schema-driven params, refusals that keep every choice, a version change that re-renders the
++//! form, configure and activation at the revision seen, channels an admin cannot see, other
++//! tenants and plain members, and hostile names.
++use super::*;
++use crate::application::workflow::reads::BindingUse;
++
++/// A source whose parameters the form shows as fields.
++fn with_params(workflow: Uuid, extra: serde_json::Value) -> String {
++    let mut source = example("data.map", workflow);
++    let mut properties = json!({
++        "reviewer": {"type": "string", "maxLength": 64, "description": "Who reviews"},
++        "tone": {"enum": ["warm", "brief"]},
++        "limit": {"type": "integer"}
++    });
++    for (name, schema) in extra.as_object().unwrap() {
++        properties[name] = schema.clone();
++    }
++    source["parameter_schema"] = json!({
++        "type": "object",
++        "properties": properties,
++        "required": ["reviewer"],
++        "additionalProperties": false
++    });
++    serde_json::to_string_pretty(&source).unwrap()
++}
++
++impl Fixture {
++    async fn save_binding(&self, user: Uuid, workflow: Uuid, fields: &[(&str, &str)]) -> String {
++        save_binding(self.ui(user), Path(workflow), self.query(), form(fields))
++            .await
++            .unwrap()
++            .0
++    }
++
++    async fn activity(
++        &self,
++        user: Uuid,
++        workflow: Uuid,
++        binding: Uuid,
++        revision: u64,
++        active: bool,
++    ) -> WorkflowResult<String> {
++        let form = axum::Form(ActivityForm {
++            expected_state_revision: revision,
++        });
++        let path = Path((workflow, binding));
++        if active {
++            activate_binding(self.ui(user), path, self.query(), form).await
++        } else {
++            deactivate_binding(self.ui(user), path, self.query(), form).await
++        }
++        .map(|html| html.0)
++    }
++
++    async fn usage(&self, workflow: Uuid) -> Vec<BindingUse> {
++        self.engine
++            .authoring_reads()
++            .workflow_usage(CompanyId::new(self.company), WorkflowId::new(workflow))
++            .await
++            .unwrap()
++            .bindings
++    }
++}
++
++#[tokio::test]
++async fn a_binding_is_created_once_paused_then_activated_at_the_revision_seen() {
++    let Some(f) = Fixture::new().await else {
++        return;
++    };
++    let workflow = Uuid::new_v4();
++    let version = f
++        .published(workflow, "Support", &with_params(workflow, json!({})))
++        .await
++        .to_string();
++    let pane = f.pane(f.owner, workflow, "bindings").await.unwrap();
++    assert!(
++        pane.contains("Not bound: nothing runs this workflow"),
++        "{pane}"
++    );
++    assert!(pane.contains(r#"name="param:reviewer""#) && pane.contains(r#"maxlength="64""#));
++    assert!(pane.contains("reviewer (required)") && pane.contains("Who reviews"));
++    assert!(pane.contains(r#"<option value="warm">warm</option>"#));
++    // The owner names the run-as; the fields carry the form's key.
++    assert!(pane.contains(r#"name="run_as""#));
++    let key = field_value(&pane, "form_key");
++    let fields = [
++        ("form_key", key.as_str()),
++        ("version_id", version.as_str()),
++        ("association", "company"),
++        ("param:reviewer", "rev-1"),
++        ("param:tone", "warm"),
++        ("param:limit", ""),
++        ("message_trigger", ""),
++    ];
++    let saved = f.save_binding(f.owner, workflow, &fields).await;
++    assert!(saved.contains("Saved binding"), "{saved}");
++    assert!(saved.contains("paused until you activate it"));
++    assert!(saved.contains("paused: admits nothing") && !saved.contains("Not bound"));
++    let usage = f.usage(workflow).await;
++    assert_eq!(usage.len(), 1);
++    assert_eq!(
++        usage[0].binding.params,
++        json!({"reviewer": "rev-1", "tone": "warm"})
++    );
++    assert_eq!(usage[0].binding.run_as, f.owner);
++    // A double submit of the same form creates nothing more.
++    let again = f.save_binding(f.owner, workflow, &fields).await;
++    assert!(again.contains("was already created"), "{again}");
++    assert_eq!(f.usage(workflow).await.len(), 1);
++
++    let binding = usage[0].binding.binding.as_uuid();
++    let revision = usage[0].binding.state_revision;
++    let active = f
++        .activity(f.owner, workflow, binding, revision, true)
++        .await
++        .unwrap();
++    assert!(active.contains("Activated binding"), "{active}");
++    assert!(active.contains(">Deactivate</button>"));
++    // The page's revision is stale now: nothing changes, and the row says why.
++    let stale = f
++        .activity(f.owner, workflow, binding, revision, false)
++        .await
++        .unwrap();
++    assert!(
++        stale.contains("This binding changed since the page was shown"),
++        "{stale}"
++    );
++    assert!(f.usage(workflow).await[0].binding.active);
++    let paused = f
++        .activity(f.owner, workflow, binding, revision + 1, false)
++        .await
++        .unwrap();
++    assert!(paused.contains("Deactivated binding"), "{paused}");
++}
++
++#[tokio::test]
++async fn a_refused_binding_keeps_every_choice_and_says_why() {
++    let Some(f) = Fixture::new().await else {
++        return;
++    };
++    let workflow = Uuid::new_v4();
++    let version = f
++        .published(workflow, "Support", &with_params(workflow, json!({})))
++        .await
++        .to_string();
++    let base = |limit: &'static str, reviewer: &'static str, trigger: &'static str| {
++        let version = version.clone();
++        move |key: &str| {
++            vec![
++                ("form_key".to_owned(), key.to_owned()),
++                ("version_id".to_owned(), version.clone()),
++                ("association".to_owned(), "company".to_owned()),
++                ("param:reviewer".to_owned(), reviewer.to_owned()),
++                ("param:tone".to_owned(), "brief".to_owned()),
++                ("param:limit".to_owned(), limit.to_owned()),
++                ("message_trigger".to_owned(), trigger.to_owned()),
++            ]
++        }
++    };
++    let submit = async |fields: Vec<(String, String)>| {
++        let pairs: Vec<(&str, &str)> = fields
++            .iter()
++            .map(|(name, value)| (name.as_str(), value.as_str()))
++            .collect();
++        f.save_binding(f.owner, workflow, &pairs).await
++    };
++    // A field that does not parse as its type: nothing is sent to the command.
++    let html = submit(base("7.5", "rev-1", "")("k1")).await;
++    assert!(
++        html.contains("Parameter limit must be a whole number."),
++        "{html}"
++    );
++    assert!(html.contains(r#"value="rev-1""#) && html.contains(r#"value="7.5""#));
++    assert!(html.contains(r#"<option value="brief" selected>"#));
++    // The command's own refusals: a missing required parameter, a trigger on the company.
++    let html = submit(base("3", "", "")("k2")).await;
++    assert!(html.contains("Not saved:"), "{html}");
++    assert!(html.contains(r#"value="3""#));
++    let html = submit(base("3", "rev-1", "direct")("k3")).await;
++    assert!(html.contains("Not saved:"), "{html}");
++    assert!(html.contains(r#"<option value="direct" selected>"#));
++    assert!(f.usage(workflow).await.is_empty());
++}
++
++#[tokio::test]
++async fn a_version_change_renders_that_versions_fields_and_keeps_matching_values() {
++    let Some(f) = Fixture::new().await else {
++        return;
++    };
++    let workflow = Uuid::new_v4();
++    f.published(workflow, "Support", &with_params(workflow, json!({})))
++        .await;
++    let newer = f
++        .published(
++            workflow,
++            "Support",
++            &with_params(workflow, json!({"loud": {"type": "boolean"}})),
++        )
++        .await;
++    let query = format!(
++        "company_id={}&version_id={newer}&association=company&param%3Areviewer=kept&param%3Atone=warm",
++        f.company
++    );
++    let html = binding_form(
++        f.ui(f.owner),
++        Path(workflow),
++        Query(BindingFormQuery {
++            company_id: f.company,
++            binding_id: None,
++        }),
++        format!("/ui/workflows/{workflow}/bindings/form?{query}")
++            .parse()
++            .unwrap(),
++    )
++    .await
++    .unwrap()
++    .0;
++    assert!(html.starts_with(r#"<section id="binding-form""#), "{html}");
++    assert!(html.contains(&format!(r#"<option value="{newer}" selected>"#)));
++    assert!(html.contains(r#"name="param:loud""#) && html.contains(r#"value="kept""#));
++    assert!(html.contains(r#"<option value="warm" selected>"#));
++}
++
++#[tokio::test]
++async fn configure_saves_at_the_revision_seen_and_a_stale_one_keeps_the_choices() {
++    let Some(f) = Fixture::new().await else {
++        return;
++    };
++    let workflow = Uuid::new_v4();
++    let version = f
++        .published(workflow, "Support", &with_params(workflow, json!({})))
++        .await
++        .to_string();
++    let pane = f.pane(f.owner, workflow, "bindings").await.unwrap();
++    let key = field_value(&pane, "form_key");
++    f.save_binding(
++        f.owner,
++        workflow,
++        &[
++            ("form_key", &key),
++            ("version_id", &version),
++            ("association", "company"),
++            ("param:reviewer", "rev-1"),
++        ],
++    )
++    .await;
++    let binding = f.usage(workflow).await[0].binding.binding.as_uuid();
++    let opened = binding_form(
++        f.ui(f.owner),
++        Path(workflow),
++        Query(BindingFormQuery {
++            company_id: f.company,
++            binding_id: Some(binding),
++        }),
++        "/".parse().unwrap(),
++    )
++    .await
++    .unwrap()
++    .0;
++    assert!(opened.contains("Configure binding"), "{opened}");
++    assert!(opened.contains("Fixed once created"));
++    assert_eq!(field_value(&opened, "expected_state_revision"), "1");
++    assert!(opened.contains(r#"value="rev-1""#));
++    let id = binding.to_string();
++    let f = &f;
++    let edit = |reviewer: &'static str, revision: &'static str| {
++        let (id, version) = (id.clone(), version.clone());
++        async move {
++            f.save_binding(
++                f.owner,
++                workflow,
++                &[
++                    ("binding_id", &id),
++                    ("expected_state_revision", revision),
++                    ("version_id", &version),
++                    ("param:reviewer", reviewer),
++                ],
++            )
++            .await
++        }
++    };
++    let saved = edit("rev-2", "1").await;
++    assert!(saved.contains("Saved binding"), "{saved}");
++    assert_eq!(
++        f.usage(workflow).await[0].binding.params["reviewer"],
++        "rev-2"
++    );
++    let stale = edit("rev-3", "1").await;
++    assert!(stale.contains("Someone changed this binding"), "{stale}");
++    assert!(stale.contains(r#"value="rev-3""#));
++    assert_eq!(
++        f.usage(workflow).await[0].binding.params["reviewer"],
++        "rev-2"
++    );
++}
++
++#[tokio::test]
++async fn channels_an_admin_cannot_see_stay_out_of_the_tab_the_form_and_the_card() {
++    let Some(f) = Fixture::new().await else {
++        return;
++    };
++    let workflow = Uuid::new_v4();
++    let version = f
++        .published(workflow, "Support", &with_params(workflow, json!({})))
++        .await
++        .to_string();
++    let board = f.channel("Board", "board", true).await;
++    let open = f.channel("Open desk", "open-desk", false).await;
++    let bind = async |user: Uuid, channel: Uuid, trigger: &str| {
++        let pane = f.pane(user, workflow, "bindings").await.unwrap();
++        let key = field_value(&pane, "form_key");
++        f.save_binding(
++            user,
++            workflow,
++            &[
++                ("form_key", &key),
++                ("version_id", &version),
++                ("association", &format!("channel:{channel}")),
++                ("param:reviewer", "rev-1"),
++                ("message_trigger", trigger),
++            ],
++        )
++        .await
++    };
++    let saved = bind(f.owner, board, "").await;
++    assert!(
++        saved.contains("Saved binding") && saved.contains("Channel Board"),
++        "{saved}"
++    );
++    // The admin manages the workflow but is not on the board's allowlist.
++    let admin = f.pane(f.admin, workflow, "bindings").await.unwrap();
++    assert!(!admin.contains("Board"), "{admin}");
++    assert!(admin.contains("1 more of the listed binding is on channels you cannot see"));
++    assert!(admin.contains(&format!(
++        r#"<option value="channel:{open}">Channel Open desk</option>"#
++    )));
++    let refused = bind(f.admin, board, "").await;
++    assert!(refused.contains("Not saved: A chosen channel"), "{refused}");
++    let card = async |user: Uuid, channel: Uuid| {
++        channel_bindings(f.ui(user), Path(channel), f.query())
++            .await
++            .map(|html| html.0)
++    };
++    assert!(matches!(
++        card(f.admin, board).await,
++        Err(AppError::NotFound(_))
++    ));
++    let quiet = card(f.admin, open).await.unwrap();
++    assert!(
++        quiet.contains("No active workflow answers this channel's messages"),
++        "{quiet}"
++    );
++    assert!(quiet.contains("No workflow is bound to this channel."));
++    // An active binding with a message trigger answers the channel.
++    let saved = bind(f.owner, open, "direct").await;
++    assert!(saved.contains("Saved binding"), "{saved}");
++    let on_open = f
++        .usage(workflow)
++        .await
++        .into_iter()
++        .find(|binding| binding.channel_name.as_deref() == Some("Open desk"))
++        .unwrap();
++    let active = f
++        .activity(
++            f.owner,
++            workflow,
++            on_open.binding.binding.as_uuid(),
++            on_open.binding.state_revision,
++            true,
++        )
++        .await
++        .unwrap();
++    assert!(active.contains("Activated binding"), "{active}");
++    let answering = card(f.admin, open).await.unwrap();
++    assert!(
++        answering.contains("An active workflow answers"),
++        "{answering}"
++    );
++    assert!(answering.contains("message trigger direct") && answering.contains("Support"));
++}
++
++#[tokio::test]
++async fn other_tenants_and_plain_members_reach_no_binding() {
++    let Some(f) = Fixture::new().await else {
++        return;
++    };
++    let workflow = Uuid::new_v4();
++    let version = f
++        .published(workflow, "Support", &with_params(workflow, json!({})))
++        .await
++        .to_string();
++    let pane = f.pane(f.owner, workflow, "bindings").await.unwrap();
++    let key = field_value(&pane, "form_key");
++    f.save_binding(
++        f.owner,
++        workflow,
++        &[
++            ("form_key", &key),
++            ("version_id", &version),
++            ("association", "company"),
++            ("param:reviewer", "rev-1"),
++        ],
++    )
++    .await;
++    let binding = f.usage(workflow).await[0].binding.binding.as_uuid();
++    let not_found =
++        |error: &WorkflowError| matches!(error, WorkflowError::App(AppError::NotFound(_)));
++    // A member manages nothing; a stranger names its own company with this workflow's ids.
++    for (user, company) in [(f.member, f.company), (f.stranger, f.other)] {
++        let query = || {
++            Query(CompanyQuery {
++                company_id: company,
++            })
++        };
++        let saved = save_binding(
++            f.ui(user),
++            Path(workflow),
++            query(),
++            form(&[
++                ("binding_id", &binding.to_string()),
++                ("expected_state_revision", "1"),
++                ("version_id", &version),
++            ]),
++        )
++        .await;
++        assert!(not_found(&saved.unwrap_err()));
++        let activated = activate_binding(
++            f.ui(user),
++            Path((workflow, binding)),
++            query(),
++            axum::Form(ActivityForm {
++                expected_state_revision: 1,
++            }),
++        )
++        .await;
++        assert!(not_found(&activated.unwrap_err()));
++        let opened = binding_form(
++            f.ui(user),
++            Path(workflow),
++            Query(BindingFormQuery {
++                company_id: company,
++                binding_id: Some(binding),
++            }),
++            "/".parse().unwrap(),
++        )
++        .await;
++        assert!(matches!(opened, Err(AppError::NotFound(_))));
++    }
++    assert!(!f.usage(workflow).await[0].binding.active);
++}
++
++#[tokio::test]
++async fn hostile_names_are_escaped_in_the_tab_the_form_and_the_card() {
++    let Some(f) = Fixture::new().await else {
++        return;
++    };
++    let hostile = format!("<{}>alert(1)</script>", "script");
++    let escaped = "&lt;script&gt;alert(1)&lt;/script&gt;";
++    let workflow = Uuid::new_v4();
++    let mut source = example("data.map", workflow);
++    source["parameter_schema"] = json!({
++        "type": "object",
++        "properties": {"note": {"type": "string", "description": hostile}}
++    });
++    let version = f
++        .published(
++            workflow,
++            &hostile,
++            &serde_json::to_string_pretty(&source).unwrap(),
++        )
++        .await
++        .to_string();
++    let channel = f.channel(&hostile, "hostile", false).await;
++    sqlx::query("UPDATE users SET username = $2 WHERE id = $1")
++        .bind(f.admin)
++        .bind(&hostile)
++        .execute(f.persistence.pool())
++        .await
++        .unwrap();
++    let pane = f.pane(f.owner, workflow, "bindings").await.unwrap();
++    let key = field_value(&pane, "form_key");
++    let saved = f
++        .save_binding(
++            f.owner,
++            workflow,
++            &[
++                ("form_key", &key),
++                ("version_id", &version),
++                ("association", &format!("channel:{channel}")),
++                ("param:note", &hostile),
++            ],
++        )
++        .await;
++    let card = channel_bindings(f.ui(f.owner), Path(channel), f.query())
++        .await
++        .unwrap()
++        .0;
++    for html in [&pane, &saved, &card] {
++        assert!(!html.contains(&hostile), "{html}");
++        assert!(html.contains(escaped), "{html}");
++    }
++}
++
++#[test]
++fn an_archived_workflows_binding_can_still_be_paused_but_not_activated_or_configured() {
++    use crate::application::workflow::reads::BindingSummary;
++    use crate::domain::workflow::{VersionId, WorkflowBindingId};
++    let (company, workflow) = (Uuid::new_v4(), Uuid::new_v4());
++    let binding = |active: bool| BindingUse {
++        binding: BindingSummary {
++            binding: WorkflowBindingId::new(Uuid::new_v4()),
++            state_revision: 4,
++            configuration_revision: 1,
++            active,
++            association: crate::application::workflow::RelatedAssociation::Company,
++            workflow: WorkflowId::new(workflow),
++            version: VersionId::new(Uuid::new_v4()),
++            params: json!({}),
++            run_as: Uuid::new_v4(),
++            message_trigger: None,
++        },
++        workflow_title: "Support".into(),
++        channel_name: None,
++        resources: BTreeMap::new(),
++        schedules: Vec::new(),
++        schedules_truncated: false,
++    };
++    let render = |bindings: &[BindingUse]| {
++        pages::workflow_bindings_body(&pages::BindingsView {
++            company_id: company,
++            workflow,
++            archived: true,
++            versions: &[],
++            bindings,
++            truncated: false,
++            hidden: 0,
++            people: &[],
++            banner: None,
++            form_html: "",
++        })
++    };
++    let active = render(&[binding(true)]);
++    assert!(
++        active.contains("/deactivate?") && active.contains(r#""expected_state_revision": "4""#)
++    );
++    assert!(
++        !active.contains("/activate?") && !active.contains("Configure"),
++        "{active}"
++    );
++    let paused = render(&[binding(false)]);
++    assert!(!paused.contains("<button"), "{paused}");
++}
+--- a/src/adapters/http/routes/workflows/ui/authoring/library.rs
++++ b/src/adapters/http/routes/workflows/ui/authoring/library.rs
+@@ -14,13 +14,16 @@
+     let company_id = company.id;
+     let (items, next) = ui.list(company_id, None).await?;
+     let creating = matches!(query.new.as_deref(), Some("1") | Some("true"));
++    let tools = matches!(query.tools.as_deref(), Some("1") | Some("true"));
+     let selected = query.workflow_id.or_else(|| {
+-        (!creating)
++        (!creating && !tools)
+             .then(|| items.first().map(|item| item.workflow.as_uuid()))
+             .flatten()
+     });
+     let pane = if creating {
+         new_pane_html(&ui, company_id, None)
++    } else if tools && query.workflow_id.is_none() {
++        ui.tools_pane_html(company_id, None, None).await?
+     } else {
+         match selected {
+             Some(workflow) => {
+--- a/src/adapters/http/routes/workflows/ui/authoring/mod.rs
++++ b/src/adapters/http/routes/workflows/ui/authoring/mod.rs
+@@ -1,5 +1,6 @@
+ //! `/ui/workflows`: the library, the editor and its validation preview, publication, the
+-//! versions tab with compare and usage, archive, and the step catalogue (p09 B1a). Each write is
++//! versions tab with compare and usage, archive, and the step catalogue (p09 B1a); the
++//! bindings tab, the channel card, workflow tools and the agent pane's cards (p09 B1b). Each write is
+ //! the JSON routes' own command (`definitions::*_draft`), so the browser and the API cannot
+ //! drift on what a save, a validation or a publication means.
+ use super::super::definitions::{
+@@ -23,12 +24,16 @@
+ use serde::Deserialize;
+ use std::collections::BTreeMap;
+ 
++mod bindings;
+ mod editor;
+ mod library;
++mod tools;
+ mod versions;
+ 
++use bindings::*;
+ use editor::*;
+ use library::*;
++use tools::*;
+ use versions::*;
+ 
+ const NEW_ROUTE: &str = "/ui/workflows/new";
+@@ -36,14 +41,26 @@
+ const SAVE_ROUTE: &str = "/ui/workflows/{workflow_id}/save";
+ const PUBLISH_ROUTE: &str = "/ui/workflows/{workflow_id}/publish";
+ const ARCHIVE_ROUTE: &str = "/ui/workflows/{workflow_id}/archive";
++const BINDINGS_ROUTE: &str = "/ui/workflows/{workflow_id}/bindings";
++const ACTIVATE_ROUTE: &str = "/ui/workflows/{workflow_id}/bindings/{binding_id}/activate";
++const DEACTIVATE_ROUTE: &str = "/ui/workflows/{workflow_id}/bindings/{binding_id}/deactivate";
++const REGISTER_TOOL_ROUTE: &str = "/ui/workflows/{workflow_id}/tools";
++const REVOKE_TOOL_ROUTE: &str = "/ui/workflows/tools/revoke";
++const GRANT_ROUTE: &str = "/ui/workflows/agents/{agent_id}/tools";
+ /// Every write this workspace registers; the CSRF test routes these same patterns.
+ #[cfg(test)]
+-const WRITE_ROUTES: [&str; 5] = [
++const WRITE_ROUTES: [&str; 11] = [
+     NEW_ROUTE,
+     COPY_ROUTE,
+     SAVE_ROUTE,
+     PUBLISH_ROUTE,
+     ARCHIVE_ROUTE,
++    BINDINGS_ROUTE,
++    ACTIVATE_ROUTE,
++    DEACTIVATE_ROUTE,
++    REGISTER_TOOL_ROUTE,
++    REVOKE_TOOL_ROUTE,
++    GRANT_ROUTE,
+ ];
+ 
+ pub(super) fn router() -> Router<AppState> {
+@@ -58,6 +75,22 @@
+         .route(PUBLISH_ROUTE, post(publish))
+         .route(ARCHIVE_ROUTE, post(archive))
+         .route("/ui/workflows/{workflow_id}/compare", get(compare))
++        .route(BINDINGS_ROUTE, post(save_binding))
++        .route(
++            "/ui/workflows/{workflow_id}/bindings/form",
++            get(binding_form),
++        )
++        .route(ACTIVATE_ROUTE, post(activate_binding))
++        .route(DEACTIVATE_ROUTE, post(deactivate_binding))
++        .route(
++            "/ui/workflows/channels/{channel_id}/bindings",
++            get(channel_bindings),
++        )
++        .route("/ui/workflows/tools", get(tools_pane))
++        .route(REVOKE_TOOL_ROUTE, post(revoke_tool))
++        .route(REGISTER_TOOL_ROUTE, post(register_tool))
++        .route(GRANT_ROUTE, get(agent_tools).post(grant_agent_tools))
++        .route("/ui/workflows/agents/{agent_id}/usage", get(agent_usage))
+ }
+ 
+ /// The sidebar's page size.
+@@ -69,6 +102,7 @@
+     pub workflow_id: Option<Uuid>,
+     pub tab: Option<String>,
+     pub new: Option<String>,
++    pub tools: Option<String>,
+ }
+ 
+ #[derive(Debug, Deserialize)]
+@@ -295,6 +329,9 @@
+                 };
+                 self.versions_body(company, &detail, banner, None).await?
+             }
++            pages::WorkflowTab::Bindings => {
++                self.bindings_body(company, &detail, None, None).await?
++            }
+         };
+         Ok(self.render_pane(company, &detail, tab, body).await)
+     }
+--- a/src/adapters/http/routes/workflows/ui/authoring/publish_tests.rs
++++ b/src/adapters/http/routes/workflows/ui/authoring/publish_tests.rs
+@@ -59,7 +59,7 @@
+ 
+     // A binding on the first version, then a second version.
+     let binding = Uuid::new_v4();
+-    let _configured = super::super::bindings::configure(
++    let _configured = crate::adapters::http::routes::workflows::bindings::configure(
+         State(f.engine.clone()),
+         AuthenticatedUser { id: f.owner },
+         Path((f.company, binding)),
+--- a/src/adapters/http/routes/workflows/ui/authoring/tests.rs
++++ b/src/adapters/http/routes/workflows/ui/authoring/tests.rs
+@@ -107,10 +107,105 @@
+                 title: title.into(),
+                 description: String::new(),
+                 source: source.into(),
++            },
++        )
++        .await
++        .unwrap();
++    }
++
++    /// `source` saved over the draft (creating it when new) and published; the version's id.
++    async fn published(&self, workflow: Uuid, title: &str, source: &str) -> Uuid {
++        let actor = WorkflowActor::authenticated(self.owner).unwrap();
++        let current = self
++            .engine
++            .reads()
++            .definition(CompanyId::new(self.company), WorkflowId::new(workflow))
++            .await
++            .unwrap()
++            .map(|detail| detail.summary.revision);
++        let draft = save_draft(
++            &self.engine,
++            self.company,
++            actor,
++            workflow,
++            current,
++            DraftContent {
++                title: title.into(),
++                description: String::new(),
++                source: source.into(),
++            },
++        )
++        .await
++        .unwrap();
++        let key = Uuid::new_v4().to_string();
++        let (version, _) = publish_draft(
++            &self.engine,
++            self.company,
++            actor,
++            workflow,
++            PublishRequest {
++                expected_revision: draft.revision().get(),
++                command_key: &key,
++                http: &[],
++                mcp: &[],
++            },
++        )
++        .await
++        .unwrap();
++        version.as_uuid()
++    }
++
++    /// A channel of the company; `restricted` makes it one an admin who is not on its allowlist
++    /// cannot see (the owner still can).
++    async fn channel(&self, name: &str, slug: &str, restricted: bool) -> Uuid {
++        use crate::use_cases::channel::{ChannelPersistence, ChannelWrite};
++        let channel = ChannelPersistence::create(
++            &self.persistence,
++            self.company,
++            ChannelWrite {
++                name: name.into(),
++                slug: slug.into(),
++                enabled: false,
++                ..ChannelWrite::default()
+             },
+         )
+         .await
++        .unwrap()
++        .id;
++        if restricted {
++            sqlx::query("UPDATE channels SET access_mode = 'allowlist' WHERE id = $1")
++                .bind(channel)
++                .execute(self.persistence.pool())
++                .await
++                .unwrap();
++        }
++        channel
++    }
++
++    /// A company agent with a model, by slug.
++    async fn agent(&self, name: &str, slug: &str) -> Uuid {
++        sqlx::query(
++            "INSERT INTO company_model_connections(company_id, provider, api_key, models) \
++             VALUES ($1, 'openai', 'fixture-key', '{gpt-test}') ON CONFLICT DO NOTHING",
++        )
++        .bind(self.company)
++        .execute(self.persistence.pool())
++        .await
+         .unwrap();
++        AgentPersistence::create(
++            &self.persistence,
++            self.company,
++            AgentWrite {
++                name: name.into(),
++                slug: slug.into(),
++                provider: Some("openai".into()),
++                model: Some("gpt-test".into()),
++                ..Default::default()
++            },
++        )
++        .await
++        .unwrap()
++        .id
+     }
+ }
+ 
+@@ -164,6 +259,7 @@
+             workflow_id: None,
+             tab: None,
+             new: None,
++            tools: None,
+         }),
+     )
+     .await
+@@ -473,7 +569,11 @@
+ 
+ #[path = "access_tests.rs"]
+ mod access_tests;
++#[path = "bindings_tests.rs"]
++mod bindings_tests;
+ #[path = "editor_tests.rs"]
+ mod editor_tests;
+ #[path = "publish_tests.rs"]
+ mod publish_tests;
++#[path = "tools_tests.rs"]
++mod tools_tests;
+--- a/src/adapters/http/routes/workflows/ui/authoring/tools.rs
++++ b/src/adapters/http/routes/workflows/ui/authoring/tools.rs
+@@ -0,0 +1,424 @@
++//! Workflow tools (p09 B1b, WF-C003): the registrations pane with revoke, the versions tab's
++//! "Use as a workflow tool" form, and the agent pane's grants and "used by" cards. Every write
++//! is the `WorkflowTools` command the JSON routes call (register with the revision seen,
++//! revoke, grant against the list seen).
++use super::*;
++use crate::application::workflow::authoring::parameters_from_json;
++use crate::application::workflow::message::MessageKind;
++use crate::application::workflow::provisioning::is_builtin_provisioning_tool;
++use crate::application::workflow::reads::ToolTarget;
++use crate::application::workflow::tools::{WorkflowToolRegistration, WorkflowToolWrite};
++use crate::domain::workflow::TypeName;
++
++fn tool_name(value: &str) -> Result<TypeName, String> {
++    TypeName::parse(value.trim())
++        .map_err(|_| format!("'{}' is not a valid tool name.", value.trim()))
++}
++
++impl Ui {
++    async fn registrations(
++        &self,
++        company: Uuid,
++    ) -> AppResult<(Vec<WorkflowToolRegistration>, Vec<ToolTarget>)> {
++        let company_id = super::company(company);
++        let tools = self
++            .engine
++            .workflow_tools()
++            .workflow_tools(company_id, self.actor()?)
++            .await?;
++        let versions: Vec<VersionId> = tools.iter().map(|tool| tool.version).collect();
++        let targets = self
++            .engine
++            .authoring_reads()
++            .tool_targets(company_id, &versions)
++            .await?;
++        Ok((tools, targets))
++    }
++
++    pub(super) async fn tools_pane_html(
++        &self,
++        company: Uuid,
++        banner: Option<&str>,
++        error: Option<&str>,
++    ) -> AppResult<String> {
++        let (tools, targets) = self.registrations(company).await?;
++        Ok(pages::workflow_tools_pane(&pages::ToolsView {
++            company_id: company,
++            tools: &tools,
++            targets: &targets,
++            banner,
++            error,
++        }))
++    }
++
++    /// The versions tab's "Use as a workflow tool" form, empty.
++    pub(super) fn tool_form_html(&self, company: Uuid, detail: &DefinitionDetail) -> String {
++        pages::workflow_tool_form(&pages::ToolFormView {
++            company_id: company,
++            workflow: detail.summary.workflow.as_uuid(),
++            versions: &detail.versions,
++            name: "",
++            version: detail
++                .versions
++                .first()
++                .map(|version| version.version.as_uuid()),
++            params: "{}",
++            existing: None,
++            banner: None,
++            error: None,
++        })
++    }
++}
++
++fn target_of(targets: &[ToolTarget], registration: &WorkflowToolRegistration) -> String {
++    match targets
++        .iter()
++        .find(|target| target.version == registration.version)
++    {
++        Some(target) => format!(
++            "registered for {} version {} (draft revision {})",
++            target.workflow_title,
++            pages::short_id(target.version.as_uuid()),
++            target.draft_revision
++        ),
++        None => format!(
++            "registered for version {}",
++            pages::short_id(registration.version.as_uuid())
++        ),
++    }
++}
++
++/// GET /ui/workflows/tools — the company's workflow tools in `#workflow-pane`.
++pub(super) async fn tools_pane(ui: Ui, Query(query): Query<CompanyQuery>) -> AppResult<Response> {
++    let company = ui.company(query.company_id).await?.id;
++    Ok(pushed(
++        ui.tools_pane_html(company, None, None).await?,
++        &format!("/ui/workflows?company_id={company}&tools=1"),
++    ))
++}
++
++/// POST /ui/workflows/tools/revoke — revoke `name` at the registration revision seen.
++pub(super) async fn revoke_tool(
++    ui: Ui,
++    Query(query): Query<CompanyQuery>,
++    body: Bytes,
++) -> AppResult<Html<String>> {
++    let company = ui.company(query.company_id).await?.id;
++    let form = FormFields::parse(&body);
++    let name = tool_name(&form.text("name")).map_err(AppError::BadRequest)?;
++    let revision = i64::try_from(form.number("expected_revision")?)
++        .map_err(|_| AppError::BadRequest("The revision is out of range".into()))?;
++    let outcome = ui
++        .engine
++        .workflow_tools()
++        .revoke_workflow_tool(super::company(company), ui.actor()?, name.clone(), revision)
++        .await;
++    let (banner, error) = match outcome {
++        Ok(()) => (
++            Some(format!(
++                "Revoked {}. Published versions that froze it can no longer call it.",
++                name.as_str()
++            )),
++            None,
++        ),
++        Err(AppError::Conflict(_) | AppError::NotFound(_)) => (
++            None,
++            Some(format!(
++                "{} changed or was revoked since the page was shown; nothing was revoked. Here are the tools as they are now.",
++                name.as_str()
++            )),
++        ),
++        Err(error) => return Err(error),
++    };
++    Ok(Html(
++        ui.tools_pane_html(company, banner.as_deref(), error.as_deref())
++            .await?,
++    ))
++}
++
++/// POST /ui/workflows/{workflow}/tools — register a version of this workflow as a tool. A name
++/// already registered is replaced only after the form has said what that does and the author
++/// submits again with its revision.
++pub(super) async fn register_tool(
++    ui: Ui,
++    Path(workflow): Path<Uuid>,
++    Query(query): Query<CompanyQuery>,
++    body: Bytes,
++) -> AppResult<Html<String>> {
++    let company = ui.company(query.company_id).await?.id;
++    let detail = ui.detail(company, workflow).await?;
++    let form = FormFields::parse(&body);
++    let (name_text, params_text) = (form.text("name"), form.text("params_json"));
++    let version = form
++        .get("version_id")
++        .and_then(|id| id.parse::<Uuid>().ok())
++        .filter(|id| detail.versions.iter().any(|v| v.version.as_uuid() == *id));
++    let expected = form
++        .get("expected_revision")
++        .and_then(|value| value.parse::<i64>().ok());
++    let (tools, targets) = ui.registrations(company).await?;
++    let render =
++        |existing: Option<&WorkflowToolRegistration>, banner: Option<&str>, error: Option<&str>| {
++            pages::workflow_tool_form(&pages::ToolFormView {
++                company_id: company,
++                workflow,
++                versions: &detail.versions,
++                name: &name_text,
++                version,
++                params: &params_text,
++                existing: existing.map(|registration| pages::ExistingTool {
++                    registration,
++                    target: target_of(&targets, registration),
++                    same_workflow: registration.workflow.as_uuid() == workflow,
++                }),
++                banner,
++                error,
++            })
++        };
++    let name = match tool_name(&name_text) {
++        Ok(name) => name,
++        Err(message) => return Ok(Html(render(None, None, Some(&message)))),
++    };
++    let Some(version) = version else {
++        return Ok(Html(render(
++            None,
++            None,
++            Some("Choose a published version of this workflow."),
++        )));
++    };
++    let params = match parameters_from_json(&params_text) {
++        Ok(params) => params,
++        Err(message) => return Ok(Html(render(None, None, Some(&message)))),
++    };
++    let existing = tools.iter().find(|tool| tool.name == name);
++    // The name is taken and the form has not yet said so: say what replacing it does.
++    if let (Some(current), None) = (existing, expected) {
++        return Ok(Html(render(Some(current), None, None)));
++    }
++    let outcome = ui
++        .engine
++        .workflow_tools()
++        .register_workflow_tool(
++            super::company(company),
++            ui.actor()?,
++            WorkflowToolWrite {
++                name: name.clone(),
++                workflow: WorkflowId::new(workflow),
++                version: VersionId::new(version),
++                params,
++                expected,
++            },
++        )
++        .await;
++    match outcome {
++        Ok(registration) => {
++            let message = match existing {
++                None => format!(
++                    "Registered {} for version {}. An agent calls it once it grants the name.",
++                    name.as_str(),
++                    pages::short_id(version)
++                ),
++                Some(previous) if previous.workflow.as_uuid() == workflow => format!(
++                    "Re-pinned {} to version {} (revision {}). Published versions keep calling the version they froze.",
++                    name.as_str(),
++                    pages::short_id(version),
++                    registration.revision
++                ),
++                Some(_) => format!(
++                    "Pointed {} at this workflow, version {} (revision {}). Versions that froze the other workflow can no longer call it.",
++                    name.as_str(),
++                    pages::short_id(version),
++                    registration.revision
++                ),
++            };
++            let detail = &detail;
++            Ok(Html(pages::workflow_tool_form(&pages::ToolFormView {
++                company_id: company,
++                workflow,
++                versions: &detail.versions,
++                name: "",
++                version: Some(version),
++                params: "{}",
++                existing: None,
++                banner: Some(&message),
++                error: None,
++            })))
++        }
++        Err(AppError::Conflict(_)) => {
++            // Registered meanwhile, or changed since the warning was shown: show it as it is now.
++            let (tools, _) = ui.registrations(company).await?;
++            let current = tools.iter().find(|tool| tool.name == name);
++            Ok(Html(render(
++                current,
++                None,
++                Some(
++                    "This name changed since the form was shown; nothing was registered. Here it is as it is now.",
++                ),
++            )))
++        }
++        Err(AppError::BadRequest(message)) => Ok(Html(render(
++            existing,
++            None,
++            Some(&format!("Not registered: {message}")),
++        ))),
++        Err(AppError::NotFound(_)) => Ok(Html(render(
++            existing,
++            None,
++            Some("Not registered: the version is not available to register now."),
++        ))),
++        Err(error) => Err(error),
++    }
++}
++
++/// The grants card for `agent`, with the names it grants resolved against the registrations.
++async fn grants_card(
++    ui: &Ui,
++    company: Uuid,
++    agent: Uuid,
++    typed: Option<&str>,
++    banner: Option<&str>,
++    error: Option<&str>,
++) -> AppResult<String> {
++    let granted = ui
++        .engine
++        .authoring_reads()
++        .agent_tool_grants(super::company(company), agent)
++        .await?
++        .ok_or_else(|| AppError::NotFound("Agent not found".into()))?;
++    let (tools, targets) = ui.registrations(company).await?;
++    let label = |registration: &WorkflowToolRegistration| target_of(&targets, registration);
++    let resolutions: Vec<(String, pages::GrantResolution)> = granted
++        .iter()
++        .map(|name| {
++            let resolution = match tools.iter().find(|tool| tool.name.as_str() == name) {
++                Some(registration) => pages::GrantResolution::Workflow(label(registration)),
++                None if MessageKind::parse(name).is_some() => pages::GrantResolution::Message,
++                None if is_builtin_provisioning_tool(name) => pages::GrantResolution::Provisioning,
++                None => pages::GrantResolution::Elsewhere,
++            };
++            (name.clone(), resolution)
++        })
++        .collect();
++    let available: Vec<(String, String)> = tools
++        .iter()
++        .filter(|tool| !granted.iter().any(|name| name == tool.name.as_str()))
++        .map(|tool| (tool.name.as_str().to_owned(), label(tool)))
++        .collect();
++    Ok(pages::agent_tools_card(&pages::AgentToolsCard {
++        company_id: company,
++        agent,
++        granted: &granted,
++        typed,
++        expected: &granted,
++        resolutions: &resolutions,
++        available: &available,
++        banner,
++        error,
++    }))
++}
++
++/// GET /ui/workflows/agents/{agent}/tools — the agent pane's "Workflow tools" card.
++pub(super) async fn agent_tools(
++    ui: Ui,
++    Path(agent): Path<Uuid>,
++    Query(query): Query<CompanyQuery>,
++) -> AppResult<Html<String>> {
++    let company = ui.company(query.company_id).await?.id;
++    Ok(Html(
++        grants_card(&ui, company, agent, None, None, None).await?,
++    ))
++}
++
++/// POST /ui/workflows/agents/{agent}/tools — replace the grants, only while they are still the
++/// list the card was opened with.
++pub(super) async fn grant_agent_tools(
++    ui: Ui,
++    Path(agent): Path<Uuid>,
++    Query(query): Query<CompanyQuery>,
++    body: Bytes,
++) -> AppResult<Html<String>> {
++    let company = ui.company(query.company_id).await?.id;
++    let form = FormFields::parse(&body);
++    let typed = form.text("tools");
++    let names = |text: &str| -> Result<Vec<TypeName>, String> {
++        text.lines()
++            .map(str::trim)
++            .filter(|line| !line.is_empty())
++            .map(tool_name)
++            .collect()
++    };
++    let refused = |message: String| {
++        let typed = typed.clone();
++        let ui = &ui;
++        async move { grants_card(ui, company, agent, Some(&typed), None, Some(&message)).await }
++    };
++    let (expected, tools) = match (names(&form.text("expected")), names(&typed)) {
++        (Ok(expected), Ok(tools)) => (expected, tools),
++        (Err(message), _) | (_, Err(message)) => return Ok(Html(refused(message).await?)),
++    };
++    let outcome = ui
++        .engine
++        .workflow_tools()
++        .grant_agent_tools(
++            super::company(company),
++            ui.actor()?,
++            agent,
++            &expected,
++            &tools,
++        )
++        .await;
++    match outcome {
++        Ok(granted) => {
++            let message = format!(
++                "Saved {} granted tool{}. Workflows published from now on freeze them.",
++                granted.len(),
++                if granted.len() == 1 { "" } else { "s" }
++            );
++            Ok(Html(
++                grants_card(&ui, company, agent, None, Some(&message), None).await?,
++            ))
++        }
++        Err(AppError::Conflict(_)) => Ok(Html(
++            refused(
++                "The grants changed since this card was shown; nothing was saved. Your text is kept; the list below is the current one, and saving again replaces it."
++                    .into(),
++            )
++            .await?,
++        )),
++        Err(AppError::BadRequest(message)) => {
++            Ok(Html(refused(format!("Not saved: {message}")).await?))
++        }
++        Err(error) => Err(error),
++    }
++}
++
++/// GET /ui/workflows/agents/{agent}/usage — the agent pane's "Used by" card (F098.2).
++pub(super) async fn agent_usage(
++    ui: Ui,
++    Path(agent): Path<Uuid>,
++    Query(query): Query<CompanyQuery>,
++) -> AppResult<Html<String>> {
++    let company = ui.company(query.company_id).await?.id;
++    let company_id = super::company(company);
++    // Company-scoped: another company's agent is not found, never an empty list.
++    ui.engine
++        .authoring_reads()
++        .agent_tool_grants(company_id, agent)
++        .await?
++        .ok_or_else(|| AppError::NotFound("Agent not found".into()))?;
++    let usage = ui
++        .engine
++        .authoring_reads()
++        .agent_usage(company_id, agent)
++        .await?;
++    let truncated = usage.truncated;
++    let (bindings, hidden) = ui
++        .visible_usage(company, usage, "workflow-agent-usage")
++        .await?;
++    Ok(Html(pages::agent_usage_card(&pages::AgentUsageCard {
++        company_id: company,
++        bindings: &bindings,
++        hidden,
++        truncated,
++    })))
++}
+--- a/src/adapters/http/routes/workflows/ui/authoring/tools_tests.rs
++++ b/src/adapters/http/routes/workflows/ui/authoring/tools_tests.rs
+@@ -0,0 +1,437 @@
++//! Workflow tools and the agent pane's cards: register, re-pin, re-point and revoke with what
++//! each does to published versions said first; grants against the list seen; "used by" through
++//! a diamond of child workflows, which the version's `agent_ids` index stores once (gate
++//! P09-B1b-D1).
++use super::*;
++
++impl Fixture {
++    async fn register(&self, workflow: Uuid, fields: &[(&str, &str)]) -> String {
++        register_tool(
++            self.ui(self.owner),
++            Path(workflow),
++            self.query(),
++            form(fields),
++        )
++        .await
++        .unwrap()
++        .0
++    }
++
++    async fn grant(&self, user: Uuid, agent: Uuid, fields: &[(&str, &str)]) -> AppResult<String> {
++        grant_agent_tools(self.ui(user), Path(agent), self.query(), form(fields))
++            .await
++            .map(|html| html.0)
++    }
++
++    async fn agent_ids(&self, version: Uuid) -> Vec<Uuid> {
++        sqlx::query_scalar("SELECT agent_ids FROM workflow_versions WHERE id = $1")
++            .bind(version)
++            .fetch_one(self.persistence.pool())
++            .await
++            .unwrap()
++    }
++}
++
++/// A workflow whose input and output a tool call can carry.
++fn tool_source(workflow: Uuid) -> String {
++    let mut source = example("data.map", workflow);
++    source["input_schema"] = json!({"type": "object", "properties": {"key": {"type": "string"}}});
++    source["output_schema"] = json!(true);
++    serde_json::to_string_pretty(&source).unwrap()
++}
++
++#[tokio::test]
++async fn a_tool_name_is_registered_re_pinned_re_pointed_and_revoked_saying_what_each_does() {
++    let Some(f) = Fixture::new().await else {
++        return;
++    };
++    let (a, b) = (Uuid::new_v4(), Uuid::new_v4());
++    let a1 = f.published(a, "Orders", &tool_source(a)).await.to_string();
++    let a2 = f.published(a, "Orders", &tool_source(a)).await.to_string();
++    let b1 = f.published(b, "Refunds", &tool_source(b)).await.to_string();
++    let versions = f.pane(f.owner, a, "versions").await.unwrap();
++    assert!(versions.contains("Use as a workflow tool"), "{versions}");
++
++    let registered = f
++        .register(
++            a,
++            &[
++                ("name", "lookup"),
++                ("version_id", &a1),
++                ("params_json", "{}"),
++            ],
++        )
++        .await;
++    assert!(registered.contains("Registered lookup"), "{registered}");
++    let listed = tools_pane(f.ui(f.owner), f.query()).await.unwrap();
++    let listed = text(listed).await;
++    assert!(
++        listed.contains("lookup") && listed.contains("Orders"),
++        "{listed}"
++    );
++    assert!(listed.contains("Revoking refuses every call"));
++
++    // The name is taken: the form says what re-pinning does before anything is written.
++    let asked = f
++        .register(
++            a,
++            &[
++                ("name", "lookup"),
++                ("version_id", &a2),
++                ("params_json", "{}"),
++            ],
++        )
++        .await;
++    assert!(
++        asked.contains("registered for this workflow already"),
++        "{asked}"
++    );
++    assert!(
++        asked.contains("Re-pin tool") && asked.contains(r#"name="expected_revision" value="1""#)
++    );
++    let repinned = f
++        .register(
++            a,
++            &[
++                ("name", "lookup"),
++                ("version_id", &a2),
++                ("params_json", "{}"),
++                ("expected_revision", "1"),
++            ],
++        )
++        .await;
++    assert!(repinned.contains("Re-pinned lookup"), "{repinned}");
++    assert!(repinned.contains("Published versions keep calling the version they froze"));
++
++    // From another workflow: re-pointing refuses the old pins, said first.
++    let asked = f
++        .register(
++            b,
++            &[
++                ("name", "lookup"),
++                ("version_id", &b1),
++                ("params_json", "{}"),
++            ],
++        )
++        .await;
++    assert!(asked.contains("registered for another workflow"), "{asked}");
++    assert!(asked.contains("Point tool here"));
++    let stale = f
++        .register(
++            b,
++            &[
++                ("name", "lookup"),
++                ("version_id", &b1),
++                ("params_json", "{}"),
++                ("expected_revision", "1"),
++            ],
++        )
++        .await;
++    assert!(
++        stale.contains("changed since the form was shown"),
++        "{stale}"
++    );
++    let pointed = f
++        .register(
++            b,
++            &[
++                ("name", "lookup"),
++                ("version_id", &b1),
++                ("params_json", "{}"),
++                ("expected_revision", "2"),
++            ],
++        )
++        .await;
++    assert!(
++        pointed.contains("Pointed lookup at this workflow"),
++        "{pointed}"
++    );
++
++    // Refusals stay in the form.
++    let reserved = f
++        .register(
++            b,
++            &[
++                ("name", "message.send"),
++                ("version_id", &b1),
++                ("params_json", "{}"),
++            ],
++        )
++        .await;
++    assert!(
++        reserved.contains("Not registered:") && reserved.contains("reserved"),
++        "{reserved}"
++    );
++    let invalid = f
++        .register(
++            b,
++            &[
++                ("name", "Bad Name"),
++                ("version_id", &b1),
++                ("params_json", "{}"),
++            ],
++        )
++        .await;
++    assert!(invalid.contains("is not a valid tool name"), "{invalid}");
++    let foreign = f
++        .register(
++            b,
++            &[
++                ("name", "other"),
++                ("version_id", &a1),
++                ("params_json", "{}"),
++            ],
++        )
++        .await;
++    assert!(
++        foreign.contains("Choose a published version of this workflow"),
++        "{foreign}"
++    );
++
++    let revoke = |revision: &'static str| {
++        revoke_tool(
++            f.ui(f.owner),
++            f.query(),
++            form(&[("name", "lookup"), ("expected_revision", revision)]),
++        )
++    };
++    let stale = revoke("2").await.unwrap().0;
++    assert!(stale.contains("changed or was revoked"), "{stale}");
++    let revoked = revoke("3").await.unwrap().0;
++    assert!(revoked.contains("Revoked lookup"), "{revoked}");
++    assert!(revoked.contains("No workflow tools yet"));
++}
++
++#[tokio::test]
++async fn an_agents_grants_save_against_the_list_seen_and_say_what_each_name_is() {
++    let Some(f) = Fixture::new().await else {
++        return;
++    };
++    let agent = f.agent("Assistant", "assistant").await;
++    let workflow = Uuid::new_v4();
++    let version = f
++        .published(workflow, "Orders", &tool_source(workflow))
++        .await;
++    f.register(
++        workflow,
++        &[
++            ("name", "lookup"),
++            ("version_id", &version.to_string()),
++            ("params_json", "{}"),
++        ],
++    )
++    .await;
++    let card = agent_tools(f.ui(f.owner), Path(agent), f.query())
++        .await
++        .unwrap()
++        .0;
++    assert!(
++        card.starts_with(r#"<section id="agent-workflow-tools""#),
++        "{card}"
++    );
++    assert!(card.contains("Registered workflow tools not granted") && card.contains("lookup"));
++
++    let saved = f
++        .grant(
++            f.owner,
++            agent,
++            &[
++                ("expected", ""),
++                ("tools", "lookup\n message.send \n\nhttp_lookup"),
++            ],
++        )
++        .await
++        .unwrap();
++    assert!(saved.contains("Saved 3 granted tools"), "{saved}");
++    assert!(saved.contains("workflow tool: registered for Orders"));
++    assert!(saved.contains("built-in message tool"));
++    assert!(saved.contains("resolved at publication"));
++    assert_eq!(
++        field_value(&saved, "expected"),
++        "lookup\nmessage.send\nhttp_lookup"
++    );
++
++    // The card was opened before that save: nothing changes and the typed text stays.
++    let stale = f
++        .grant(f.owner, agent, &[("expected", ""), ("tools", "lookup")])
++        .await
++        .unwrap();
++    assert!(
++        stale.contains("The grants changed since this card was shown"),
++        "{stale}"
++    );
++    assert!(stale.contains("\nlookup</textarea>"));
++    let provisioning = f
++        .grant(
++            f.owner,
++            agent,
++            &[
++                ("expected", "lookup\nmessage.send\nhttp_lookup"),
++                ("tools", "lookup\nlist_company_agents"),
++            ],
++        )
++        .await
++        .unwrap();
++    assert!(
++        provisioning.contains("Not saved: Provisioning tools"),
++        "{provisioning}"
++    );
++    let invalid = f
++        .grant(f.owner, agent, &[("expected", ""), ("tools", "Not A Name")])
++        .await
++        .unwrap();
++    assert!(invalid.contains("is not a valid tool name"), "{invalid}");
++    let granted = f
++        .engine
++        .authoring_reads()
++        .agent_tool_grants(CompanyId::new(f.company), agent)
++        .await
++        .unwrap()
++        .unwrap();
++    assert_eq!(granted, ["lookup", "message.send", "http_lookup"]);
++
++    // Another company's admin, naming its own company with this agent, finds no agent.
++    let f = &f;
++    let foreign = |user: Uuid, company: Uuid| {
++        let query = move || {
++            Query(CompanyQuery {
++                company_id: company,
++            })
++        };
++        async move {
++            (
++                agent_tools(f.ui(user), Path(agent), query()).await.err(),
++                grant_agent_tools(
++                    f.ui(user),
++                    Path(agent),
++                    query(),
++                    form(&[
++                        ("expected", "lookup\nmessage.send\nhttp_lookup"),
++                        ("tools", ""),
++                    ]),
++                )
++                .await
++                .err(),
++                agent_usage(f.ui(user), Path(agent), query()).await.err(),
++            )
++        }
++    };
++    for (user, company) in [(f.stranger, f.other), (f.member, f.company)] {
++        let (read, write, usage) = foreign(user, company).await;
++        for error in [read, write, usage] {
++            assert!(matches!(error, Some(AppError::NotFound(_))), "{error:?}");
++        }
++    }
++    assert_eq!(
++        f.engine
++            .authoring_reads()
++            .agent_tool_grants(CompanyId::new(f.company), agent)
++            .await
++            .unwrap()
++            .unwrap()
++            .len(),
++        3
++    );
++}
++
++#[tokio::test]
++async fn used_by_lists_a_binding_that_reaches_the_agent_only_through_a_child_diamond() {
++    let Some(f) = Fixture::new().await else {
++        return;
++    };
++    let agent = f.agent("Assistant", "assistant").await;
++    // The grandchild runs the agent; two children each call it; the parent calls both.
++    let grandchild = Uuid::new_v4();
++    let mut source = example("agent.run", grandchild);
++    source["input_schema"] = json!({"type": "object", "properties": {"text": {"type": "string", "maxLength": 128}}, "required": ["text"]});
++    source["output_schema"] = json!(true);
++    let grandchild_version = f
++        .published(
++            grandchild,
++            "Drafter",
++            &serde_json::to_string_pretty(&source).unwrap(),
++        )
++        .await;
++    assert_eq!(f.agent_ids(grandchild_version).await, [agent]);
++    let caller = |workflow: Uuid, child: Uuid, version: Uuid| {
++        let mut source = example("workflow.call", workflow);
++        source["input_schema"] = json!({"type": "object", "properties": {"text": {"type": "string", "maxLength": 128}}, "required": ["text"]});
++        source["output_schema"] = json!(true);
++        source["steps"]["start"]["child_workflow_id"] = json!(child.to_string());
++        source["steps"]["start"]["child_version_id"] = json!(version.to_string());
++        source
++    };
++    let (left, right) = (Uuid::new_v4(), Uuid::new_v4());
++    let mut children = Vec::new();
++    for (workflow, title) in [(left, "Left"), (right, "Right")] {
++        let source = caller(workflow, grandchild, grandchild_version);
++        children.push(
++            f.published(
++                workflow,
++                title,
++                &serde_json::to_string_pretty(&source).unwrap(),
++            )
++            .await,
++        );
++    }
++    let parent = Uuid::new_v4();
++    let mut source = caller(parent, left, children[0]);
++    let mut second = source["steps"]["start"].clone();
++    second["child_workflow_id"] = json!(right.to_string());
++    second["child_version_id"] = json!(children[1].to_string());
++    source["steps"]["start"]["routes"] = json!({"success": "second"});
++    source["steps"]["second"] = second;
++    let parent_version = f
++        .published(
++            parent,
++            "Router",
++            &serde_json::to_string_pretty(&source).unwrap(),
++        )
++        .await;
++    // Stored once, though two paths reach it.
++    assert_eq!(f.agent_ids(parent_version).await, [agent]);
++    let plain = Uuid::new_v4();
++    let plain_version = f
++        .published(plain, "Plain", &source_of("data.map", plain))
++        .await;
++    assert!(f.agent_ids(plain_version).await.is_empty());
++
++    let usage = async || {
++        agent_usage(f.ui(f.owner), Path(agent), f.query())
++            .await
++            .unwrap()
++            .0
++    };
++    let none = usage().await;
++    assert!(none.contains("No binding runs this agent"), "{none}");
++    let configure = async |binding: Uuid, expected: Option<u64>, version: Uuid| {
++        crate::adapters::http::routes::workflows::bindings::configure_binding(
++            &f.engine,
++            f.company,
++            WorkflowActor::authenticated(f.owner).unwrap(),
++            binding,
++            crate::adapters::http::routes::workflows::bindings::BindingRequest {
++                expected_state_revision: expected,
++                association: crate::application::workflow::RelatedAssociation::Company,
++                version,
++                params: json!({}),
++                resources: BTreeMap::new(),
++                run_as: None,
++                message_trigger: None,
++            },
++        )
++        .await
++        .unwrap()
++    };
++    let binding = Uuid::new_v4();
++    configure(binding, None, parent_version).await;
++    let listed = usage().await;
++    assert!(
++        listed.contains("Router") && listed.contains("Company-wide"),
++        "{listed}"
++    );
++    // Configured off that version, the binding no longer runs the agent.
++    configure(binding, Some(1), plain_version).await;
++    let gone = usage().await;
++    assert!(gone.contains("No binding runs this agent"), "{gone}");
++}
+--- a/src/adapters/http/routes/workflows/ui/authoring/versions.rs
++++ b/src/adapters/http/routes/workflows/ui/authoring/versions.rs
+@@ -1,5 +1,4 @@
+ //! The versions tab: its usage list and the compare between two sources.
+-use super::super::super::bindings::Visibility;
+ use super::*;
+ 
+ impl Ui {
+@@ -16,17 +15,8 @@
+             .authoring_reads()
+             .workflow_usage(company_id, detail.summary.workflow)
+             .await?;
+-        let mut visibility = Visibility::new(&self.engine, company_id, self.actor()?);
+-        let mut visible = Vec::new();
+-        let mut hidden = 0;
+-        for binding in usage.bindings {
+-            if visibility.allows(binding.binding.association).await? {
+-                visible.push(binding);
+-            } else {
+-                hidden += 1;
+-            }
+-        }
+-        visibility.report("workflow-usage");
++        let usage_truncated = usage.truncated;
++        let (visible, hidden) = self.visible_usage(company, usage, "workflow-usage").await?;
+         Ok(pages::workflow_versions(&pages::VersionsView {
+             company_id: company,
+             workflow: detail.summary.workflow.as_uuid(),
+@@ -34,10 +24,11 @@
+             versions: &detail.versions,
+             versions_truncated: detail.versions_truncated,
+             usage: &visible,
+-            usage_truncated: usage.truncated,
++            usage_truncated,
+             hidden_bindings: hidden,
+             banner,
+             compare_html,
++            tool_form_html: &self.tool_form_html(company, detail),
+         }))
+     }
+ }
+--- a/src/adapters/persistence/workflow/authoring_reads.rs
++++ b/src/adapters/persistence/workflow/authoring_reads.rs
+@@ -1,12 +1,11 @@
+ //! The authoring pages' reads (p09 B1a): plain company-scoped reads with no locks. A route
+ //! authorizes before it shows any of them.
+-use super::reads::{
+-    BINDING_COLUMNS, BINDING_FROM, BindingRow, binding_summary, bounded, revision_of,
+-};
++use super::reads::{BINDING_COLUMNS, BINDING_FROM, BindingRow, binding_summary, revision_of};
+ use super::*;
+ use crate::application::workflow::reads::*;
+ use chrono::{DateTime, Utc};
+ use serde_json::Value;
++use std::collections::{BTreeMap, HashMap};
+ 
+ #[derive(sqlx::FromRow)]
+ struct OperationRow {
+@@ -63,6 +62,123 @@
+ }
+ 
+ impl PostgresPersistence {
++    /// A page of binding rows with what each reaches: its workflow's title, its channel's name,
++    /// its current resources, and its first schedules by name.
++    async fn binding_uses(
++        &self,
++        company: CompanyId,
++        mut rows: Vec<BindingRow>,
++        limit: i64,
++    ) -> AppResult<WorkflowUsage> {
++        let truncated = rows.len() as i64 > limit;
++        rows.truncate(limit as usize);
++        let bindings = rows
++            .into_iter()
++            .map(binding_summary)
++            .collect::<AppResult<Vec<_>>>()?;
++        let ids: Vec<Uuid> = bindings.iter().map(|b| b.binding.as_uuid()).collect();
++        let workflows: Vec<Uuid> = bindings.iter().map(|b| b.workflow.as_uuid()).collect();
++        let channels: Vec<Uuid> = bindings
++            .iter()
++            .filter_map(|b| match b.association {
++                RelatedAssociation::Company => None,
++                RelatedAssociation::Channel(channel)
++                | RelatedAssociation::Thread {
++                    channel_id: channel,
++                    ..
++                } => Some(channel.as_uuid()),
++            })
++            .collect();
++        let names: HashMap<Uuid, String> =
++            sqlx::query_as("SELECT id, name FROM channels WHERE company_id = $1 AND id = ANY($2)")
++                .bind(company.as_uuid())
++                .bind(&channels)
++                .fetch_all(self.pool())
++                .await?
++                .into_iter()
++                .collect();
++        let titles: HashMap<Uuid, String> = sqlx::query_as(
++            "SELECT id, title FROM workflow_definitions WHERE company_id = $1 AND id = ANY($2)",
++        )
++        .bind(company.as_uuid())
++        .bind(&workflows)
++        .fetch_all(self.pool())
++        .await?
++        .into_iter()
++        .collect();
++        let mut resources: HashMap<Uuid, BTreeMap<String, Uuid>> = HashMap::new();
++        let stored: Vec<(Uuid, Value)> = sqlx::query_as(
++            "SELECT binding.id, revision.resources FROM workflow_bindings AS binding \
++               JOIN workflow_binding_revisions AS revision \
++                 ON revision.company_id = binding.company_id AND revision.binding_id = binding.id \
++                AND revision.revision = binding.configuration_revision \
++              WHERE binding.company_id = $1 AND binding.id = ANY($2)",
++        )
++        .bind(company.as_uuid())
++        .bind(&ids)
++        .fetch_all(self.pool())
++        .await?;
++        for (binding, value) in stored {
++            resources.insert(
++                binding,
++                serde_json::from_value(value).map_err(|_| invalid())?,
++            );
++        }
++        // Each binding's first schedules by name, one past the bound to flag the cut.
++        let schedules: Vec<(Uuid, Uuid, String, bool)> = sqlx::query_as(
++            "SELECT binding.id, schedule.id, schedule.name, schedule.enabled \
++               FROM unnest($2::uuid[]) AS binding(id) \
++               CROSS JOIN LATERAL ( \
++                 SELECT id, name, enabled FROM channel_schedules \
++                  WHERE company_id = $1 AND binding_id = binding.id \
++                  ORDER BY name, id LIMIT $3) AS schedule",
++        )
++        .bind(company.as_uuid())
++        .bind(&ids)
++        .bind(MAX_SCHEDULES_PER_BINDING + 1)
++        .fetch_all(self.pool())
++        .await?;
++        let mut by_binding: HashMap<Uuid, Vec<ScheduleUse>> = HashMap::new();
++        for (binding, schedule, name, enabled) in schedules {
++            by_binding.entry(binding).or_default().push(ScheduleUse {
++                schedule,
++                name,
++                enabled,
++            });
++        }
++        Ok(WorkflowUsage {
++            bindings: bindings
++                .into_iter()
++                .map(|binding| {
++                    let id = binding.binding.as_uuid();
++                    let mut schedules = by_binding.remove(&id).unwrap_or_default();
++                    let schedules_truncated = schedules.len() > MAX_SCHEDULES_PER_BINDING as usize;
++                    schedules.truncate(MAX_SCHEDULES_PER_BINDING as usize);
++                    let channel_name = match binding.association {
++                        RelatedAssociation::Company => None,
++                        RelatedAssociation::Channel(channel)
++                        | RelatedAssociation::Thread {
++                            channel_id: channel,
++                            ..
++                        } => names.get(&channel.as_uuid()).cloned(),
++                    };
++                    BindingUse {
++                        workflow_title: titles
++                            .get(&binding.workflow.as_uuid())
++                            .cloned()
++                            .unwrap_or_default(),
++                        resources: resources.remove(&id).unwrap_or_default(),
++                        binding,
++                        channel_name,
++                        schedules,
++                        schedules_truncated,
++                    }
++                })
++                .collect(),
++            truncated,
++        })
++    }
++
+     async fn options(
+         &self,
+         sql: &str,
+@@ -136,81 +252,159 @@
+         .bind(MAX_LISTED + 1)
+         .fetch_all(self.pool())
+         .await?;
+-        let (rows, truncated) = bounded(rows);
+-        let bindings = rows
+-            .into_iter()
+-            .map(binding_summary)
+-            .collect::<AppResult<Vec<_>>>()?;
+-        let ids: Vec<Uuid> = bindings.iter().map(|b| b.binding.as_uuid()).collect();
+-        let channels: Vec<Uuid> = bindings
+-            .iter()
+-            .filter_map(|b| match b.association {
+-                RelatedAssociation::Company => None,
+-                RelatedAssociation::Channel(channel)
+-                | RelatedAssociation::Thread {
+-                    channel_id: channel,
+-                    ..
+-                } => Some(channel.as_uuid()),
+-            })
+-            .collect();
+-        let names: std::collections::HashMap<Uuid, String> =
+-            sqlx::query_as("SELECT id, name FROM channels WHERE company_id = $1 AND id = ANY($2)")
+-                .bind(company.as_uuid())
+-                .bind(&channels)
+-                .fetch_all(self.pool())
+-                .await?
++        self.binding_uses(company, rows, MAX_LISTED).await
++    }
++
++    async fn binding_use(
++        &self,
++        company: CompanyId,
++        binding: Uuid,
++    ) -> AppResult<Option<BindingUse>> {
++        let rows = sqlx::query_as::<_, BindingRow>(&format!(
++            "SELECT {BINDING_COLUMNS} {BINDING_FROM} \
++              WHERE binding.company_id = $1 AND binding.id = $2"
++        ))
++        .bind(company.as_uuid())
++        .bind(binding)
++        .fetch_all(self.pool())
++        .await?;
++        Ok(self.binding_uses(company, rows, 1).await?.bindings.pop())
++    }
++
++    async fn channel_usage(&self, company: CompanyId, channel: Uuid) -> AppResult<WorkflowUsage> {
++        let rows = sqlx::query_as::<_, BindingRow>(&format!(
++            "SELECT {BINDING_COLUMNS} {BINDING_FROM} \
++              WHERE binding.company_id = $1 AND binding.channel_id = $2 \
++              ORDER BY binding.id LIMIT $3"
++        ))
++        .bind(company.as_uuid())
++        .bind(channel)
++        .bind(MAX_LISTED + 1)
++        .fetch_all(self.pool())
++        .await?;
++        self.binding_uses(company, rows, MAX_LISTED).await
++    }
++
++    async fn agent_usage(&self, company: CompanyId, agent: Uuid) -> AppResult<WorkflowUsage> {
++        // `agent_ids` is a display index (gate P09-B1b-D1): this listing is all that reads it.
++        let rows = sqlx::query_as::<_, BindingRow>(&format!(
++            "SELECT {BINDING_COLUMNS} {BINDING_FROM} \
++              WHERE binding.company_id = $1 AND $2 = ANY(version.agent_ids) \
++              ORDER BY binding.id LIMIT $3"
++        ))
++        .bind(company.as_uuid())
++        .bind(agent)
++        .bind(MAX_AGENT_USES + 1)
++        .fetch_all(self.pool())
++        .await?;
++        self.binding_uses(company, rows, MAX_AGENT_USES).await
++    }
++
++    async fn binding_options(&self, company: CompanyId) -> AppResult<BindingOptions> {
++        let bound = MAX_BINDING_OPTIONS + 1;
++        let choices = |rows: Vec<(Uuid, String, bool, String)>| {
++            let truncated = rows.len() as i64 > MAX_BINDING_OPTIONS;
++            let options = rows
+                 .into_iter()
+-                .collect();
+-        // Each binding's first schedules by name, one past the bound to flag the cut.
+-        let schedules: Vec<(Uuid, Uuid, String, bool)> = sqlx::query_as(
+-            "SELECT binding.id, schedule.id, schedule.name, schedule.enabled \
+-               FROM unnest($2::uuid[]) AS binding(id) \
+-               CROSS JOIN LATERAL ( \
+-                 SELECT id, name, enabled FROM channel_schedules \
+-                  WHERE company_id = $1 AND binding_id = binding.id \
+-                  ORDER BY name, id LIMIT $3) AS schedule",
++                .take(MAX_BINDING_OPTIONS as usize)
++                .map(|(id, label, enabled, detail)| ChoiceOption {
++                    id,
++                    label,
++                    enabled,
++                    detail,
++                })
++                .collect::<Vec<_>>();
++            (options, truncated)
++        };
++        let read = |sql: &'static str| {
++            sqlx::query_as::<_, (Uuid, String, bool, String)>(sql)
++                .bind(company.as_uuid())
++                .bind(bound)
++                .fetch_all(self.pool())
++        };
++        let (channels, channels_cut) = choices(
++            read(
++                "SELECT id, name, true, '' FROM channels WHERE company_id = $1 \
++                 ORDER BY name, id LIMIT $2",
++            )
++            .await?,
++        );
++        let (http, http_cut) = choices(
++            read(
++                "SELECT id, origin, enabled, '' FROM workflow_http_connections \
++                 WHERE company_id = $1 ORDER BY origin, id LIMIT $2",
++            )
++            .await?,
++        );
++        let (mcp, mcp_cut) = choices(
++            read(
++                "SELECT id, slug::text, enabled, '' FROM company_mcp_connections \
++                 WHERE company_id = $1 AND deleted_at IS NULL ORDER BY slug, id LIMIT $2",
++            )
++            .await?,
++        );
++        let (people, people_cut) = choices(
++            read(
++                "SELECT member.user_id, account.username::text, true, member.role \
++                   FROM company_members AS member \
++                   JOIN users AS account ON account.id = member.user_id \
++                  WHERE member.company_id = $1 \
++                  ORDER BY member.role = 'member', account.username, member.user_id LIMIT $2",
++            )
++            .await?,
++        );
++        Ok(BindingOptions {
++            channels,
++            http,
++            mcp,
++            people,
++            truncated: channels_cut || http_cut || mcp_cut || people_cut,
++        })
++    }
++
++    async fn agent_tool_grants(
++        &self,
++        company: CompanyId,
++        agent: Uuid,
++    ) -> AppResult<Option<Vec<String>>> {
++        Ok(sqlx::query_scalar(
++            "SELECT workflow_tools FROM agents WHERE company_id = $1 AND id = $2",
+         )
+         .bind(company.as_uuid())
++        .bind(agent)
++        .fetch_optional(self.pool())
++        .await?)
++    }
++
++    async fn tool_targets(
++        &self,
++        company: CompanyId,
++        versions: &[VersionId],
++    ) -> AppResult<Vec<ToolTarget>> {
++        let ids: Vec<Uuid> = versions.iter().map(|version| version.as_uuid()).collect();
++        let rows: Vec<(Uuid, Uuid, String, i64, bool)> = sqlx::query_as(
++            "SELECT version.id, version.workflow_id, definition.title, version.draft_revision, \
++                    definition.archived \
++               FROM workflow_versions AS version \
++               JOIN workflow_definitions AS definition ON definition.company_id = version.company_id \
++                AND definition.id = version.workflow_id \
++              WHERE version.company_id = $1 AND version.id = ANY($2)",
++        )
++        .bind(company.as_uuid())
+         .bind(&ids)
+-        .bind(MAX_SCHEDULES_PER_BINDING + 1)
+         .fetch_all(self.pool())
+         .await?;
+-        let mut by_binding: std::collections::HashMap<Uuid, Vec<ScheduleUse>> =
+-            std::collections::HashMap::new();
+-        for (binding, schedule, name, enabled) in schedules {
+-            by_binding.entry(binding).or_default().push(ScheduleUse {
+-                schedule,
+-                name,
+-                enabled,
+-            });
+-        }
+-        Ok(WorkflowUsage {
+-            bindings: bindings
+-                .into_iter()
+-                .map(|binding| {
+-                    let mut schedules = by_binding
+-                        .remove(&binding.binding.as_uuid())
+-                        .unwrap_or_default();
+-                    let schedules_truncated = schedules.len() > MAX_SCHEDULES_PER_BINDING as usize;
+-                    schedules.truncate(MAX_SCHEDULES_PER_BINDING as usize);
+-                    let channel_name = match binding.association {
+-                        RelatedAssociation::Company => None,
+-                        RelatedAssociation::Channel(channel)
+-                        | RelatedAssociation::Thread {
+-                            channel_id: channel,
+-                            ..
+-                        } => names.get(&channel.as_uuid()).cloned(),
+-                    };
+-                    BindingUse {
+-                        binding,
+-                        channel_name,
+-                        schedules,
+-                        schedules_truncated,
+-                    }
++        rows.into_iter()
++            .map(|(version, workflow, title, draft_revision, archived)| {
++                Ok(ToolTarget {
++                    version: VersionId::new(version),
++                    workflow: WorkflowId::new(workflow),
++                    workflow_title: title,
++                    draft_revision: revision_of(draft_revision)?,
++                    archived,
+                 })
+-                .collect(),
+-            truncated,
+-        })
++            })
++            .collect()
+     }
+ 
+     async fn publication_options(
+--- a/src/adapters/persistence/workflow/definitions.rs
++++ b/src/adapters/persistence/workflow/definitions.rs
+@@ -264,8 +264,8 @@
+     let draft = &command.draft;
+     sqlx::query(
+         "INSERT INTO workflow_versions (company_id, workflow_id, id, draft_revision, command_key, \
+-        actor_id, title, description, source, template_origin, bundle, content_hash) \
+-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)",
++        actor_id, title, description, source, template_origin, bundle, content_hash, agent_ids) \
++        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)",
+     )
+     .bind(draft.company().as_uuid())
+     .bind(draft.workflow().as_uuid())
+@@ -279,6 +279,13 @@
+     .bind(origin_json(draft)?)
+     .bind(store_bundle(&command.bundle)?)
+     .bind(command.bundle.content_hash().as_str())
++    .bind(
++        command
++            .bundle
++            .frozen_agent_ids()
++            .into_iter()
++            .collect::<Vec<Uuid>>(),
++    )
+     .execute(&mut **tx)
+     .await
+     .map_err(write_error)?;
+--- a/src/adapters/persistence/workflow/tests.rs
++++ b/src/adapters/persistence/workflow/tests.rs
+@@ -405,8 +405,8 @@
+     .await
+     .unwrap();
+     let error = sqlx::query("INSERT INTO workflow_versions \
+-        (company_id, workflow_id, id, draft_revision, command_key, actor_id, title, description, source, bundle, content_hash) \
+-        SELECT $1, workflow_id, id, draft_revision, command_key, actor_id, title, description, source, bundle, content_hash \
++        (company_id, workflow_id, id, draft_revision, command_key, actor_id, title, description, source, bundle, content_hash, agent_ids) \
++        SELECT $1, workflow_id, id, draft_revision, command_key, actor_id, title, description, source, bundle, content_hash, agent_ids \
+         FROM workflow_versions WHERE company_id = $2")
+         .bind(other.id).bind(fixture.target.company.as_uuid()).execute(fixture.persistence.pool()).await.unwrap_err();
+     assert!(
+--- a/src/application/workflow/authoring/mod.rs
++++ b/src/application/workflow/authoring/mod.rs
+@@ -1,16 +1,22 @@
+-//! Pure views the authoring pages render (p09 B1a): the read-only graph of a compiled
++//! Pure views the authoring pages render (p09 B1a, B1b): the read-only graph of a compiled
+ //! definition, a bounded line diff between two sources, the publication selections a draft
+-//! asks for, and the step catalogue reference. Nothing here decides or grants anything; the
+-//! lifecycle commands still validate, compile and authorize every save and publication.
++//! asks for, the step catalogue reference, and the binding form's parameter fields. Nothing
++//! here decides or grants anything; the lifecycle commands still validate, compile and
++//! authorize every save, publication and binding.
+ mod catalogue;
+ mod diff;
+ mod graph;
+ mod needs;
++mod params;
+ 
+ pub use catalogue::{CatalogueEntry, catalogue_reference};
+ pub use diff::{DiffLine, LineDiff, MAX_DIFF_CELLS, line_diff};
+ pub use graph::{END_NODE, GraphEdge, GraphEdgeKind, GraphNode, WorkflowGraph, workflow_graph};
+ pub use needs::{McpNeed, PublicationNeeds, ToolNeed, publication_needs};
++pub use params::{
++    MAX_PARAMETER_FIELDS, ParameterField, ParameterInput, field_value, parameter_fields,
++    parameters_from_fields, parameters_from_json,
++};
+ 
+ #[cfg(test)]
+ mod tests;
+--- a/src/application/workflow/authoring/params.rs
++++ b/src/application/workflow/authoring/params.rs
+@@ -0,0 +1,144 @@
++//! Schema-driven binding parameter fields (p09 B1b): which form field each top-level property
++//! of a version's `parameter_schema` gets, the starting value of each from stored params, and
++//! the params object a submitted form builds. The binding command still validates that object
++//! against the schema; this only shapes the form.
++use serde_json::{Map, Value};
++
++/// Past this many properties the form takes the whole params object as JSON.
++pub const MAX_PARAMETER_FIELDS: usize = 64;
++
++#[derive(Debug, Clone, PartialEq)]
++pub enum ParameterInput {
++    Text {
++        max_length: Option<u64>,
++    },
++    Integer,
++    Number,
++    /// A select of `true`/`false`, unset allowed.
++    Boolean,
++    /// A string `enum`: a select of its values.
++    Choice(Vec<String>),
++    /// Anything else (object, array, untyped, a non-string enum): one JSON value.
++    Json,
++}
++
++#[derive(Debug, Clone, PartialEq)]
++pub struct ParameterField {
++    pub name: String,
++    pub required: bool,
++    pub input: ParameterInput,
++    pub description: Option<String>,
++}
++
++/// One field per property of an object schema, by name; `None` when the schema is not an
++/// object with properties (or has more than [`MAX_PARAMETER_FIELDS`]), so the form takes the
++/// whole object as JSON.
++pub fn parameter_fields(schema: Option<&Value>) -> Option<Vec<ParameterField>> {
++    let properties = schema?.get("properties")?.as_object()?;
++    if properties.is_empty() || properties.len() > MAX_PARAMETER_FIELDS {
++        return None;
++    }
++    let required: Vec<&str> = schema?
++        .get("required")
++        .and_then(Value::as_array)
++        .map(|names| names.iter().filter_map(Value::as_str).collect())
++        .unwrap_or_default();
++    Some(
++        properties
++            .iter()
++            .map(|(name, property)| ParameterField {
++                name: name.clone(),
++                required: required.contains(&name.as_str()),
++                input: input_of(property),
++                description: property
++                    .get("description")
++                    .and_then(Value::as_str)
++                    .map(str::to_owned),
++            })
++            .collect(),
++    )
++}
++
++fn input_of(property: &Value) -> ParameterInput {
++    if let Some(values) = property.get("enum").and_then(Value::as_array) {
++        let choices: Option<Vec<String>> = values
++            .iter()
++            .map(|value| value.as_str().map(str::to_owned))
++            .collect();
++        return choices.map_or(ParameterInput::Json, ParameterInput::Choice);
++    }
++    match property.get("type").and_then(Value::as_str) {
++        Some("string") => ParameterInput::Text {
++            max_length: property.get("maxLength").and_then(Value::as_u64),
++        },
++        Some("integer") => ParameterInput::Integer,
++        Some("number") => ParameterInput::Number,
++        Some("boolean") => ParameterInput::Boolean,
++        _ => ParameterInput::Json,
++    }
++}
++
++/// A field's starting value from stored params: the string itself for text and choices, the
++/// number or boolean as written, JSON for the rest; empty when the parameter is not set.
++pub fn field_value(field: &ParameterField, params: &Value) -> String {
++    match (params.get(&field.name), &field.input) {
++        (None, _) => String::new(),
++        (Some(Value::String(text)), ParameterInput::Text { .. } | ParameterInput::Choice(_)) => {
++            text.clone()
++        }
++        (Some(value), ParameterInput::Json) => {
++            serde_json::to_string_pretty(value).unwrap_or_default()
++        }
++        (Some(value), _) => value.to_string(),
++    }
++}
++
++/// The params object a submitted form builds from `value(name)` per field; an empty value
++/// leaves its parameter out. `Err` says which field does not parse as its type.
++pub fn parameters_from_fields(
++    fields: &[ParameterField],
++    value: impl Fn(&str) -> Option<String>,
++) -> Result<Value, String> {
++    let mut params = Map::new();
++    for field in fields {
++        let Some(raw) = value(&field.name).filter(|raw| !raw.trim().is_empty()) else {
++            continue;
++        };
++        let parsed = match &field.input {
++            ParameterInput::Text { .. } | ParameterInput::Choice(_) => Value::String(raw),
++            ParameterInput::Integer => raw
++                .trim()
++                .parse::<i64>()
++                .map(Value::from)
++                .map_err(|_| format!("Parameter {} must be a whole number.", field.name))?,
++            ParameterInput::Number => raw
++                .trim()
++                .parse::<f64>()
++                .ok()
++                .and_then(serde_json::Number::from_f64)
++                .map(Value::Number)
++                .ok_or_else(|| format!("Parameter {} must be a number.", field.name))?,
++            ParameterInput::Boolean => match raw.trim() {
++                "true" => Value::Bool(true),
++                "false" => Value::Bool(false),
++                _ => return Err(format!("Parameter {} must be true or false.", field.name)),
++            },
++            ParameterInput::Json => serde_json::from_str(&raw)
++                .map_err(|_| format!("Parameter {} must be valid JSON.", field.name))?,
++        };
++        params.insert(field.name.clone(), parsed);
++    }
++    Ok(Value::Object(params))
++}
++
++/// The whole params object typed as JSON (a schema the form has no fields for); empty is `{}`.
++pub fn parameters_from_json(raw: &str) -> Result<Value, String> {
++    if raw.trim().is_empty() {
++        return Ok(Value::Object(Map::new()));
++    }
++    match serde_json::from_str(raw) {
++        Ok(Value::Object(params)) => Ok(Value::Object(params)),
++        Ok(_) => Err("Parameters must be a JSON object.".into()),
++        Err(_) => Err("Parameters must be valid JSON.".into()),
++    }
++}
+--- a/src/application/workflow/authoring/tests.rs
++++ b/src/application/workflow/authoring/tests.rs
+@@ -3,6 +3,7 @@
+ use crate::application::workflow::compiler::parse_workflow;
+ use crate::application::workflow::registry::TYPES;
+ use crate::domain::workflow::{VersionId, validate};
++use serde_json::{Value, json};
+ use uuid::Uuid;
+ 
+ fn definition(source: &str) -> crate::domain::workflow::WorkflowDefinition {
+@@ -166,3 +167,106 @@
+         .unwrap();
+     assert_eq!((repeat.control, repeat.declared_choices), ("repeat", false));
+ }
++
++#[test]
++fn parameter_fields_follow_the_schema_and_build_the_params_object() {
++    let schema = json!({
++        "type": "object",
++        "properties": {
++            "reviewer": {"type": "string", "maxLength": 128, "description": "Who reviews"},
++            "tone": {"enum": ["warm", "brief"]},
++            "limit": {"type": "integer"},
++            "ratio": {"type": "number"},
++            "loud": {"type": "boolean"},
++            "extra": {"type": "object"},
++            "mixed": {"enum": [1, "two"]}
++        },
++        "required": ["reviewer"]
++    });
++    let fields = parameter_fields(Some(&schema)).unwrap();
++    let by_name = |name: &str| fields.iter().find(|field| field.name == name).unwrap();
++    assert_eq!(
++        by_name("reviewer").input,
++        ParameterInput::Text {
++            max_length: Some(128)
++        }
++    );
++    assert!(by_name("reviewer").required && !by_name("tone").required);
++    assert_eq!(
++        by_name("reviewer").description.as_deref(),
++        Some("Who reviews")
++    );
++    assert_eq!(
++        by_name("tone").input,
++        ParameterInput::Choice(vec!["warm".into(), "brief".into()])
++    );
++    assert_eq!(by_name("limit").input, ParameterInput::Integer);
++    assert_eq!(by_name("ratio").input, ParameterInput::Number);
++    assert_eq!(by_name("loud").input, ParameterInput::Boolean);
++    assert_eq!(by_name("extra").input, ParameterInput::Json);
++    // A non-string enum has no select; it is typed as JSON.
++    assert_eq!(by_name("mixed").input, ParameterInput::Json);
++
++    let typed = std::collections::HashMap::from([
++        ("reviewer", "u-1"),
++        ("tone", "warm"),
++        ("limit", " 7 "),
++        ("ratio", "0.5"),
++        ("loud", "false"),
++        ("extra", r#"{"a": [1]}"#),
++        ("mixed", ""),
++    ]);
++    let params = parameters_from_fields(&fields, |name| {
++        typed.get(name).map(|value| value.to_string())
++    })
++    .unwrap();
++    assert_eq!(
++        params,
++        json!({"reviewer": "u-1", "tone": "warm", "limit": 7, "ratio": 0.5, "loud": false,
++               "extra": {"a": [1]}})
++    );
++    // The stored params come back as the same field values.
++    for field in &fields {
++        let value = field_value(field, &params);
++        let again =
++            parameters_from_fields(std::slice::from_ref(field), |_| Some(value.clone())).unwrap();
++        assert_eq!(
++            again.get(&field.name),
++            params.get(&field.name),
++            "{}",
++            field.name
++        );
++    }
++    for (name, raw, message) in [
++        ("limit", "7.5", "Parameter limit must be a whole number."),
++        ("ratio", "x", "Parameter ratio must be a number."),
++        ("loud", "yes", "Parameter loud must be true or false."),
++        ("extra", "{", "Parameter extra must be valid JSON."),
++    ] {
++        let error =
++            parameters_from_fields(&fields, |field| (field == name).then(|| raw.to_owned()))
++                .unwrap_err();
++        assert_eq!(error, message);
++    }
++}
++
++#[test]
++fn a_schema_without_properties_takes_the_params_as_one_json_object() {
++    assert_eq!(parameter_fields(None), None);
++    assert_eq!(parameter_fields(Some(&json!(true))), None);
++    assert_eq!(parameter_fields(Some(&json!({"type": "object"}))), None);
++    let many: serde_json::Map<String, Value> = (0..=MAX_PARAMETER_FIELDS)
++        .map(|index| (format!("p{index}"), json!({"type": "string"})))
++        .collect();
++    assert_eq!(parameter_fields(Some(&json!({"properties": many}))), None);
++    assert_eq!(parameters_from_json("  "), Ok(json!({})));
++    assert_eq!(parameters_from_json(r#"{"a": 1}"#), Ok(json!({"a": 1})));
++    assert_eq!(
++        parameters_from_json("[1]"),
++        Err("Parameters must be a JSON object.".into())
++    );
++    assert_eq!(
++        parameters_from_json("{"),
++        Err("Parameters must be valid JSON.".into())
++    );
++}
+--- a/src/application/workflow/publication/mod.rs
++++ b/src/application/workflow/publication/mod.rs
+@@ -55,6 +55,23 @@
+         &self.hash
+     }
+ 
++    /// The distinct agents frozen in this bundle and in every child it pins (step children and
++    /// workflow-tool pins), each child version visited once however many parents pin it. A
++    /// display index for "used by" (p09 gate P09-B1b-D1); nothing decides on it.
++    pub fn frozen_agent_ids(&self) -> std::collections::BTreeSet<uuid::Uuid> {
++        let mut agents = std::collections::BTreeSet::new();
++        let mut visited = std::collections::BTreeSet::new();
++        let mut pending = vec![self];
++        while let Some(next) = pending.pop() {
++            if !visited.insert(next.compiled.graph().definition().version_id) {
++                continue;
++            }
++            agents.extend(next.snapshots.agents.iter().map(|agent| agent.agent_id));
++            pending.extend(next.children.values().map(AsRef::as_ref));
++        }
++        agents
++    }
++
+     /// Admission/runtime must use this hook, not the compiler-only hook, to reject
+     /// agent selectors outside the published finite catalogue. Current grants and
+     /// revocation still require the runtime authorization boundary.
+--- a/src/application/workflow/reads.rs
++++ b/src/application/workflow/reads.rs
+@@ -250,7 +250,10 @@
+ #[derive(Debug, Clone, PartialEq)]
+ pub struct BindingUse {
+     pub binding: BindingSummary,
++    pub workflow_title: String,
+     pub channel_name: Option<String>,
++    /// The current configuration's resource per slot, as stored.
++    pub resources: std::collections::BTreeMap<String, Uuid>,
+     /// At most [`MAX_SCHEDULES_PER_BINDING`], by name.
+     pub schedules: Vec<ScheduleUse>,
+     pub schedules_truncated: bool,
+@@ -297,7 +300,47 @@
+     pub http_cut: std::collections::BTreeSet<String>,
+ }
+ 
+-/// The authoring pages' reads (p09 B1a); company-scoped, lock-free, granting nothing.
++/// The most bindings the agent pane lists as using an agent.
++pub const MAX_AGENT_USES: i64 = 50;
++
++/// The most of each kind of choice a binding form offers (channels, connections, people).
++pub const MAX_BINDING_OPTIONS: i64 = 200;
++
++/// A channel, connection or person a binding form may offer. Connection labels are the MCP
++/// name or the HTTP origin; never an endpoint path, header or credential.
++#[derive(Debug, Clone, PartialEq)]
++pub struct ChoiceOption {
++    pub id: Uuid,
++    pub label: String,
++    /// A connection's `enabled`; a person's role is in `detail`.
++    pub enabled: bool,
++    pub detail: String,
++}
++
++/// What a binding form chooses from, each list at most [`MAX_BINDING_OPTIONS`] by label. The
++/// route still drops the channels the caller cannot see; the command checks every choice.
++#[derive(Debug, Clone, PartialEq, Default)]
++pub struct BindingOptions {
++    pub channels: Vec<ChoiceOption>,
++    pub http: Vec<ChoiceOption>,
++    pub mcp: Vec<ChoiceOption>,
++    /// Owners and admins (the run-as candidates) first, then members, by name.
++    pub people: Vec<ChoiceOption>,
++    /// Which lists were cut at the bound.
++    pub truncated: bool,
++}
++
++/// The version a workflow tool registration pins, as the tools page names it.
++#[derive(Debug, Clone, PartialEq)]
++pub struct ToolTarget {
++    pub version: VersionId,
++    pub workflow: WorkflowId,
++    pub workflow_title: String,
++    pub draft_revision: u64,
++    pub archived: bool,
++}
++
++/// The authoring pages' reads (p09 B1a, B1b); company-scoped, lock-free, granting nothing.
+ #[async_trait]
+ pub trait AuthoringReads: Send + Sync {
+     async fn version_source(
+@@ -319,4 +362,26 @@
+         mcp_tools: &[String],
+         http_tools: &[String],
+     ) -> AppResult<PublicationOptions>;
++    /// One binding of the company with what it reaches, whatever the listings' bounds.
++    async fn binding_use(&self, company: CompanyId, binding: Uuid)
++    -> AppResult<Option<BindingUse>>;
++    /// Every binding on `channel` (and on its threads), at most [`MAX_LISTED`], oldest first.
++    async fn channel_usage(&self, company: CompanyId, channel: Uuid) -> AppResult<WorkflowUsage>;
++    /// The bindings whose bound version froze `agent`, directly or through a pinned child, at
++    /// most [`MAX_AGENT_USES`] by binding id (`truncated` says more exist). Reads the version's
++    /// `agent_ids` display index (p09 gate P09-B1b-D1).
++    async fn agent_usage(&self, company: CompanyId, agent: Uuid) -> AppResult<WorkflowUsage>;
++    async fn binding_options(&self, company: CompanyId) -> AppResult<BindingOptions>;
++    /// The agent's ordered workflow tool grants; `None` when the company has no such agent.
++    async fn agent_tool_grants(
++        &self,
++        company: CompanyId,
++        agent: Uuid,
++    ) -> AppResult<Option<Vec<String>>>;
++    /// The pinned versions among `versions` that this company holds.
++    async fn tool_targets(
++        &self,
++        company: CompanyId,
++        versions: &[VersionId],
++    ) -> AppResult<Vec<ToolTarget>>;
+ }
+--- a/src/infra/workflow.rs
++++ b/src/infra/workflow.rs
+@@ -306,6 +306,24 @@
+     /// The authoring pages' read models (p09 B1a).
+     pub fn authoring_reads(&self) -> &dyn crate::application::workflow::reads::AuthoringReads {
+         &self.persistence
++    }
++
++    /// A published version of this company whose workflow is not archived — the one a binding
++    /// may select — for the binding form's parameter fields and resource slots (p09 B1b). It
++    /// authorizes nothing; the route has.
++    pub async fn selectable_bundle(
++        &self,
++        company: crate::domain::workflow::CompanyId,
++        version: crate::domain::workflow::VersionId,
++    ) -> crate::app_error::AppResult<
++        Option<Arc<crate::application::workflow::publication::PublishedBundle>>,
++    > {
++        crate::application::workflow::lifecycle::WorkflowDefinitions::selectable_version(
++            &self.persistence,
++            company,
++            version,
++        )
++        .await
+     }
+ 
+     /// The editor's step catalogue reference: every kind this deployment runs, each derived from

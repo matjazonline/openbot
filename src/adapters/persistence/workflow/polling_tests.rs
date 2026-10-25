@@ -41,6 +41,7 @@ fn polling<'a>(
         worker: worker(),
         lease: policy(),
         poll: PollPolicy::new(Duration::from_millis(50), 2).unwrap(),
+        active_jobs: None,
     }
 }
 async fn run_state(p: &PostgresPersistence, scope: ActivationRequest) -> String {
@@ -305,6 +306,8 @@ impl WorkflowHandler for DroppingHandler {
         )
     }
 }
+/// The runtime panel's gauge counts the slot while its job runs, and a shutdown that drops the job
+/// takes the count with it.
 #[tokio::test]
 async fn workflow_poll_shutdown_drops_actual_future_and_leaves_recoverable_lease() {
     let (f, scope) = fixture().await;
@@ -313,6 +316,7 @@ async fn workflow_poll_shutdown_drops_actual_future_and_leaves_recoverable_lease
         started: Notify::new(),
         dropped: AtomicUsize::new(0),
     };
+    let active = crate::application::services::runtime_metrics::ActiveWorkflowJobs::default();
     let runner = WorkflowWorker {
         port: p,
         handler: &handler,
@@ -320,18 +324,22 @@ async fn workflow_poll_shutdown_drops_actual_future_and_leaves_recoverable_lease
         worker: worker(),
         lease: policy(),
         poll: PollPolicy::new(Duration::from_millis(50), 2).unwrap(),
+        active_jobs: Some(&active),
     };
     let cancel = CancellationToken::new();
     let wakeup = Notify::new();
+    assert_eq!(active.current(), 0);
     tokio::time::timeout(Duration::from_secs(2), async {
         tokio::join!(runner.run(&wakeup, &cancel), async {
             handler.started.notified().await;
+            assert_eq!(active.current(), 1, "the slot is executing a job");
             cancel.cancel();
         });
     })
     .await
     .unwrap();
     assert_eq!(handler.dropped.load(Ordering::SeqCst), 1);
+    assert_eq!(active.current(), 0, "the dropped job leaves the gauge");
     assert!(p.poll_work(None, 2).await.unwrap().candidates.is_empty());
     expire(&f, scope).await;
     let next = scripted();

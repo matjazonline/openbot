@@ -136,17 +136,91 @@ async fn workflow_wait_consumed_event_does_not_resume_new_wait() {
     recorded(p, signal(next)).await.unwrap();
     completed(p.resume_wait(next).await.unwrap());
 }
+/// The wait's own deadline, not the run's (later) one, decides whether an event answers it.
+/// p08 D1.5.6 replaced the rule that a commit landing after that deadline is refused: an event
+/// recorded by the deadline completes the wait even through a slow commit, and an event recorded
+/// after it never does — the wait expires and the event stays unconsumed.
 #[tokio::test]
 async fn workflow_wait_event_deadline_guard_is_independent_of_run_deadline() {
+    let wait = |p: &PostgresPersistence, run: RunId| {
+        let pool = p.pool().clone();
+        async move {
+            sqlx::query_as::<_, (String, Option<Uuid>)>(
+                "SELECT state, consumed_event_id FROM workflow_waits WHERE run_id=$1",
+            )
+            .bind(run.as_uuid())
+            .fetch_one(&pool)
+            .await
+            .unwrap()
+        }
+    };
     let (f, scope) = fixture_source(source(false)).await;
     let p = f.persistence();
     p.park_wait(scope).await.unwrap().unwrap();
-    recorded(p, signal(scope)).await.unwrap();
+    let event = signal(scope);
+    recorded(p, event.clone()).await.unwrap();
     sqlx::query("UPDATE workflow_waits SET deadline=clock_timestamp()+interval '600 milliseconds' WHERE run_id=$1").bind(scope.run.as_uuid()).execute(p.pool()).await.unwrap();
-    let before = snapshot_all(&f).await;
     sqlx::raw_sql("CREATE FUNCTION wait_event_slow() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN PERFORM pg_sleep(0.7); RETURN NEW; END $$; CREATE TRIGGER wait_event_slow AFTER INSERT ON workflow_run_events FOR EACH ROW EXECUTE FUNCTION wait_event_slow();").execute(p.pool()).await.unwrap();
-    assert!(p.resume_wait(scope).await.is_err());
-    assert_eq!(snapshot_all(&f).await, before);
+    completed(p.resume_wait(scope).await.unwrap());
+    assert_eq!(
+        wait(p, scope.run).await,
+        ("completed".to_string(), Some(event.id.0))
+    );
+
+    let (f, scope) = fixture_source(source(false)).await;
+    let p = f.persistence();
+    p.park_wait(scope).await.unwrap().unwrap();
+    sqlx::query("UPDATE workflow_waits SET deadline=clock_timestamp() WHERE run_id=$1")
+        .bind(scope.run.as_uuid())
+        .execute(p.pool())
+        .await
+        .unwrap();
+    // Recorded after the deadline, as a producer racing it could.
+    let late = signal(scope);
+    sqlx::query("INSERT INTO workflow_wait_events(company_id,run_id,id,event_name,correlation,payload) VALUES($1,$2,$3,$4,$5,$6)")
+        .bind(late.company.as_uuid()).bind(late.run.as_uuid()).bind(late.id.0)
+        .bind(&late.name.0).bind(&late.correlation.0).bind(&late.payload)
+        .execute(p.pool()).await.unwrap();
+    p.resume_wait(scope).await.unwrap();
+    assert_eq!(wait(p, scope.run).await, ("expired".to_string(), None));
+}
+/// D-3 backstop (WF-P08-F025.4): the commit guard itself, not only `resume_on`, refuses to
+/// complete an event wait with an event recorded after the wait's deadline.
+#[tokio::test]
+async fn workflow_wait_commit_guard_refuses_an_event_recorded_after_the_deadline() {
+    let (f, scope) = fixture_source(source(false)).await;
+    let p = f.persistence();
+    p.park_wait(scope).await.unwrap().unwrap();
+    sqlx::query("UPDATE workflow_waits SET deadline=clock_timestamp() WHERE run_id=$1")
+        .bind(scope.run.as_uuid())
+        .execute(p.pool())
+        .await
+        .unwrap();
+    let late = signal(scope);
+    sqlx::query("INSERT INTO workflow_wait_events(company_id,run_id,id,event_name,correlation,payload) VALUES($1,$2,$3,$4,$5,$6)")
+        .bind(late.company.as_uuid()).bind(late.run.as_uuid()).bind(late.id.0)
+        .bind(&late.name.0).bind(&late.correlation.0).bind(&late.payload)
+        .execute(p.pool()).await.unwrap();
+    let mut tx = p.pool().begin().await.unwrap();
+    sqlx::query("UPDATE workflow_wait_events SET consumed_execution_id=$2 WHERE id=$1")
+        .bind(late.id.0)
+        .bind(scope.execution.as_uuid())
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE workflow_waits SET state='completed',settled_at=clock_timestamp(),consumed_event_id=$2 WHERE run_id=$1")
+        .bind(scope.run.as_uuid())
+        .bind(late.id.0)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    let refused = tx.commit().await.unwrap_err();
+    assert!(
+        refused
+            .to_string()
+            .contains("workflow wait deadline reached before commit"),
+        "{refused}"
+    );
 }
 #[tokio::test]
 async fn workflow_wait_expiry_competes_with_resume() {

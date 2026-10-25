@@ -1,0 +1,1739 @@
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -102,6 +102,12 @@
+         run: cargo test --locked --offline --all-targets --no-run
+       - name: Database-backed test suite (isolated network)
+         run: scripts/test-network-isolation.sh cargo test --locked --offline --all-targets
++      - name: Decision browser forms
++        env:
++          WORKFLOW_DECISION_BROWSER_FIXTURES: /tmp/workflow-decision-browser
++        run: |
++          cargo test --locked --offline --lib decision_browser_markup_and_closed_draft_recovery
++          node --test scripts/tests/workflow-decisions.mjs
+       # .cargo/config.toml gives every test thread 16 MiB, which is what keeps the
+       # task-worker -> dispatch -> agent-runner chain off the guard page -- and which would also
+       # let that chain grow twelvefold before anything complained. Re-run the suite at the stack a
+--- a/migrations/20260817000000_init_schema.sql
++++ b/migrations/20260817000000_init_schema.sql
+@@ -6917,6 +6917,8 @@
+ -- reviewer key, which stays bounded by open decisions as a reviewer's history grows) and the
+ -- operational summary (P08-D4 §D4.2; logs/b4a-index-explain.log).
+ CREATE INDEX workflow_decisions_open ON public.workflow_decisions(company_id, run_id) WHERE submitted_at IS NULL;
++-- Bounded decision history, including closed artifacts in sibling revision rounds.
++CREATE INDEX workflow_decisions_history ON public.workflow_decisions(company_id, run_id, created_at DESC, id DESC);
+ -- Failed schedule materializations in the work list's refusal window (P08-D4 §D4.2).
+ CREATE INDEX schedule_runs_failed_recent ON public.schedule_runs(company_id, created_at DESC) WHERE materialization_status = 'failed';
+ ALTER TABLE ONLY public.workflow_decisions ADD UNIQUE(company_id,run_id,execution_id,id);
+--- a/scripts/tests/workflow-decisions.mjs
++++ b/scripts/tests/workflow-decisions.mjs
+@@ -0,0 +1,91 @@
++// Actual Rust-rendered decision forms with the shipped HTMX, CSS and request guard.
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { readFileSync } from 'node:fs';
++import { createServer } from 'node:http';
++import { chromium, expect } from '@playwright/test';
++
++const directory = process.env.WORKFLOW_DECISION_BROWSER_FIXTURES;
++assert.ok(directory, 'Generate markup with WORKFLOW_DECISION_BROWSER_FIXTURES=<dir> cargo test --lib decision_browser_markup_and_closed_draft_recovery');
++const fixtures = Object.fromEntries(['waiting','comment','closed'].map(name => [name,readFileSync(`${directory}/${name}.html`,'utf8')]));
++const read = path => readFileSync(new URL(`../../${path}`, import.meta.url),'utf8');
++const guard = read('src/adapters/http/pages/workflow_runs/mod.rs').split('const WORKFLOW_RUNS_SCRIPT: &str = r#"')[1].split('"#;')[0];
++
++test('comment preserves the unfinished exact decision; queued submission settles without stale replacement', async () => {
++    const pending = [];
++    const received = [];
++    const server = createServer(async (request,response) => {
++        const url = request.url.split('?')[0];
++        if (url.endsWith('.js')) {
++            response.setHeader('Content-Type','text/javascript');
++            return response.end(url.includes('htmx-') ? read('assets/htmx-2.0.4.min.js') : url.includes('theme') ? '' : guard);
++        }
++        if (url.endsWith('.css')) { response.setHeader('Content-Type','text/css'); return response.end(read('assets/app.css')); }
++        if (request.method === 'POST') {
++            const chunks=[];for await (const chunk of request) chunks.push(chunk);
++            const body=new URLSearchParams(Buffer.concat(chunks).toString());
++            received.push({url,body});pending.push(response);return;
++        }
++        response.setHeader('Content-Type','text/html');response.end(fixtures.waiting);
++    });
++    await new Promise(resolve => server.listen(0,'127.0.0.1',resolve));
++    const browser=await chromium.launch(process.env.CHROME_PATH ? {executablePath:process.env.CHROME_PATH}:{});
++    const page=await browser.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
++    try {
++        const colors=[];
++        for (const theme of ['dark','light']) {
++            await page.goto(`http://127.0.0.1:${server.address().port}/`);
++            await page.evaluate(theme => document.documentElement.setAttribute('data-theme',theme),theme);
++            await page.locator('[name="data:body"]').fill('Unfinished draft');
++            await page.locator('[name=feedback]').fill('Keep this feedback');
++            await page.locator('[name="data:body"]').focus();await page.keyboard.press('Tab');
++            await expect(page.getByText('Data schema',{exact:true})).toBeFocused();
++            await page.keyboard.press('Tab');
++            await expect(page.locator('[name=feedback]')).toBeFocused();
++            colors.push(await page.locator('[name=feedback]').evaluate(el=>getComputedStyle(el).color));
++            const key=await page.locator('form[hx-preserve] [name=command_key]').inputValue();
++            await page.getByRole('textbox',{name:'Comment',exact:true}).fill('Discussion only');
++            await page.getByRole('button',{name:'Add comment',exact:true}).click();
++            await expect.poll(()=>pending.length).toBe(1);
++            await expect(page.getByRole('button',{name:'Submit decision: accept',exact:true})).toBeDisabled();
++            pending.shift().end(fixtures.comment);
++            await expect(page.getByRole('status').filter({hasText:'Comment posted'})).toBeVisible();
++            await expect(page.locator('[name="data:body"]')).toHaveValue('Unfinished draft');
++            await expect(page.locator('[name=feedback]')).toHaveValue('Keep this feedback');
++            await expect(page.locator('form[hx-preserve] [name=command_key]')).toHaveValue(key);
++            await expect(page.getByRole('button',{name:'Submit decision: accept',exact:true})).toBeEnabled();
++            await page.getByRole('button',{name:'Submit decision: accept',exact:true}).focus();await page.keyboard.press('Enter');
++            await expect.poll(()=>pending.length).toBe(1);
++            assert.equal(received.at(-1).body.get('data:body'),'Unfinished draft');
++            assert.equal(received.at(-1).body.get('choice'),'accept');
++            pending.shift().end(fixtures.closed);
++            await expect(page.getByText('Decision submitted',{exact:true})).toBeVisible();
++            await expect(page.locator('#workflow-decision form')).toHaveCount(0);
++            await expect(page.locator('#decision-shell')).toHaveCount(1);
++            await expect(page.locator('#--htmx-preserve-pantry--')).toHaveCount(0);
++        }
++        // Programmatically overlap requests, as can happen before a disabled state is painted.
++        await page.goto(`http://127.0.0.1:${server.address().port}/`);
++        await page.locator('[name="data:body"]').fill('Queued draft');
++        await page.getByRole('textbox',{name:'Comment',exact:true}).fill('Concurrent comment');
++        await page.getByRole('button',{name:'Add comment',exact:true}).click();
++        await expect.poll(()=>pending.length).toBe(1);
++        await page.getByRole('button',{name:'Submit decision: accept',exact:true}).evaluate(button=>{
++            button.disabled=false;button.click();
++        });
++        await page.waitForTimeout(100);
++        assert.equal(pending.length,1,'the second write waits for the comment');
++        pending.shift().end(fixtures.comment);
++        await expect.poll(()=>pending.length).toBe(1);
++        assert.equal(received.at(-1).body.get('data:body'),'Queued draft');
++        assert.equal(received.at(-1).body.get('choice'),'accept');
++        pending.shift().end(fixtures.closed);
++        await expect(page.getByText('Decision submitted',{exact:true})).toBeVisible();
++        await expect(page.locator('#workflow-decision form')).toHaveCount(0);
++        assert.notEqual(colors[0],colors[1],'real text colors follow both themes');
++        assert.deepEqual(errors,[]);
++    } finally {
++        await browser.close();for(const response of pending) response.destroy();
++        server.closeAllConnections();await new Promise(resolve=>server.close(resolve));
++    }
++});
+--- a/src/adapters/http/pages/workflow_decision.rs
++++ b/src/adapters/http/pages/workflow_decision.rs
+@@ -1,30 +1,53 @@
+-//! The workflow decision page review notices link to (p08 B3b-1): the proposal, the deadline,
+-//! a submission form over the decision's own choices, and the discussion.
++//! Exact human decision identities, artifacts and discussion over the production commands.
+ use super::*;
+-use crate::application::workflow::decisions::DecisionView;
++use crate::application::workflow::decisions::{DecisionSubject, DecisionView};
++use std::collections::BTreeMap;
+ 
+-/// What the last submission or comment from this page did, for the section to say.
++mod forms;
++
+ pub enum DecisionOutcome<'a> {
+     Done(&'a str),
+     Refused(&'a str),
+ }
+ 
++/// Raw form values survive validation errors without being coerced through a JSON value first.
++#[derive(Debug, Clone, Default)]
++pub struct DecisionInputs {
++    pub values: BTreeMap<String, String>,
++}
++pub enum DecisionFormInputs {
++    Submission(DecisionInputs),
++    Comment(DecisionInputs),
++}
++impl DecisionInputs {
++    pub fn get(&self, name: &str) -> Option<&str> {
++        self.values.get(name).map(String::as_str)
++    }
++}
++
+ pub fn workflow_decision_page(view: &DecisionView) -> String {
+     base_layout(
+-        "Workflow decision",
++        view.subject.label(),
+         &format!(
+-            r#"<main class="mx-auto w-full max-w-3xl px-4 py-6">{}</main>"#,
+-            workflow_decision_section(view, None)
++            r#"<main id="decision-shell" class="mx-auto w-full max-w-3xl px-4 py-6">{}</main>"#,
++            workflow_decision_section(view, None, None)
+         ),
+     )
+ }
+ 
+-/// The page's live region; its forms swap it in place.
+ pub fn workflow_decision_section(
+     view: &DecisionView,
+     outcome: Option<DecisionOutcome<'_>>,
++    inputs: Option<&DecisionFormInputs>,
+ ) -> String {
+-    let decision = view.decision.0;
++    let submission = inputs.and_then(|inputs| match inputs {
++        DecisionFormInputs::Submission(inputs) => Some(inputs),
++        _ => None,
++    });
++    let comment = inputs.and_then(|inputs| match inputs {
++        DecisionFormInputs::Comment(inputs) => Some(inputs),
++        _ => None,
++    });
+     let banner = match outcome {
+         None => String::new(),
+         Some(DecisionOutcome::Done(message)) => format!(
+@@ -33,110 +56,153 @@
+         ),
+         Some(DecisionOutcome::Refused(message)) => form_error_banner(Some(message)),
+     };
+-    let proposal = serde_json::to_string_pretty(&view.proposal).unwrap_or_default();
+-    let open = view.state == "waiting" && view.submission.is_none();
++    let decision = view.decision.0;
++    let open =
++        view.state == "waiting" && view.submission.is_none() && view.deadline > chrono::Utc::now();
++    format!(
++        r##"<section id="workflow-decision" class="space-y-6">
++        <header class="space-y-1"><h1 class="text-xl font-bold">{subject}</h1>
++        <p class="text-sm">{title} · step {step}</p><p class="text-xs opacity-70">Decision {decision} · deadline {deadline}</p></header>
++        {banner}{context}
++        <section class="space-y-2"><h2 class="font-semibold">Reviewed artifact</h2>
++            <p class="break-all font-mono text-xs">SHA-256 {digest}</p>
++            <pre class="overflow-x-auto whitespace-pre-wrap rounded-box bg-base-200 p-3 text-sm">{proposal}</pre></section>
++        {form}{history}{discussion}
++        </section>"##,
++        subject = view.subject.label(),
++        title = escape_html_text(&view.context.workflow_title),
++        step = escape_html_text(view.step.as_str()),
++        deadline = escape_html_text(&view.deadline.to_rfc3339()),
++        context = context(view),
++        digest = escape_html_text(&view.artifact_digest),
++        proposal = pretty(&view.proposal),
++        form = if view.can_submit && open {
++            forms::submission(view, submission)
++        } else {
++            settled(view, submission, open)
++        },
++        history = history(view),
++        discussion = discussion(view, open, comment),
++    )
++}
++
++fn pretty(value: &serde_json::Value) -> String {
++    escape_html_text(&serde_json::to_string_pretty(value).unwrap_or_default())
++}
++
++fn context(view: &DecisionView) -> String {
++    let company = view.context.company.as_uuid();
++    let conversation = match (view.context.channel, view.context.thread) {
++        (Some(channel), Some(thread)) => {
++            let anchor = view
++                .context
++                .trigger_message
++                .map(|id| format!("#message-runs-{id}"))
++                .unwrap_or_default();
++            format!(
++                r#"<a class="link" href="/ui?company_id={company}&amp;channel_id={channel}&amp;thread_id={thread}{anchor}">{label}</a>"#,
++                label = if view.context.trigger_message.is_some() {
++                    "Source message"
++                } else {
++                    "Conversation"
++                }
++            )
++        }
++        _ => String::new(),
++    };
++    format!(
++        r#"<section class="space-y-1 text-xs"><h2 class="font-semibold">Context</h2><p>{run} · {conversation}</p>
++        <p class="break-all">Published version {version} · execution {execution} · decision revision {revision}</p></section>"#,
++        run = run_chip(
++            company,
++            view.run.as_uuid(),
++            if view.context.inspect_run {
++                RunLinkAccess::Inspect
++            } else {
++                RunLinkAccess::Label
++            }
++        ),
++        version = view.context.version.as_uuid(),
++        execution = view.execution.as_uuid(),
++        revision = view.revision
++    )
++}
++
++fn settled(view: &DecisionView, inputs: Option<&DecisionInputs>, open: bool) -> String {
++    let message = if open {
++        "You can read and discuss this decision; only its assigned reviewers may submit it."
++    } else {
++        "This exact decision is closed or its deadline has passed. This link cannot submit to a later round."
++    };
++    let outcome=view.submission.as_ref().map(|submission|format!(r#"<p>Decided: <strong>{choice}</strong> at {at}.</p>
++        <p class="whitespace-pre-wrap">{feedback}</p><details><summary class="link">Submitted data</summary><pre class="whitespace-pre-wrap">{data}</pre></details>"#,
++        choice=escape_html_text(&submission.choice),at=escape_html_text(&submission.submitted_at.to_rfc3339()),
++        feedback=escape_html_text(&submission.feedback),data=pretty(&submission.data))).unwrap_or_default();
++    let unsent=inputs.map(|inputs|format!(r#"<details open><summary>Your unsubmitted input</summary><pre class="whitespace-pre-wrap text-xs">{}</pre></details>"#,
++        pretty(&serde_json::to_value(inputs.values.iter().filter(|(key, _)| matches!(key.as_str(), "choice" | "feedback" | "data") || key.starts_with("data:")).collect::<BTreeMap<_,_>>()).unwrap_or_default()))).unwrap_or_default();
++    format!(r#"<section class="space-y-2 text-sm"><p>{message}</p>{outcome}{unsent}</section>"#)
++}
++
++fn history(view: &DecisionView) -> String {
++    let rows:String=view.history.iter().map(|entry|{
++        let round=entry.round.map(|round|format!(" · round {round}")).unwrap_or_default();
++        let choice=entry.choice.as_deref().unwrap_or(&entry.state);
++        format!(r#"<li class="space-y-1 rounded-box border border-base-300 p-3 text-xs">
++            <a class="link" href="/ui/workflow-decisions/{id}">{subject} · {step}{round}{current}</a>
++            <p>{choice} · {at}</p><p class="break-all font-mono">Artifact {digest}</p><p class="whitespace-pre-wrap">{feedback}</p></li>"#,
++            id=entry.decision.0,subject=entry.subject.label(),step=escape_html_text(entry.step.as_str()),
++            current=if entry.decision==view.decision {" (this decision)"}else{""},choice=escape_html_text(choice),
++            at=escape_html_text(&entry.created_at.to_rfc3339()),digest=escape_html_text(&entry.artifact_digest),
++            feedback=escape_html_text(entry.feedback.as_deref().unwrap_or("")))
++    }).collect();
++    format!(
++        r#"<section class="space-y-2"><h2 class="font-semibold">Draft and decision history</h2>
++        <p class="text-xs opacity-70">Exact artifacts and feedback in this run and its sibling revision rounds. Open a decision to inspect its draft.</p>
++        <ol class="space-y-2">{rows}</ol>{more}</section>"#,
++        more = if view.history_truncated {
++            "<p class=\"text-xs\">Showing the newest 40 decisions from up to 20 recent rounds. Older history is omitted.</p>"
++        } else {
++            ""
++        }
++    )
++}
++
++fn discussion(view: &DecisionView, open: bool, inputs: Option<&DecisionInputs>) -> String {
++    let comments:String=view.comments.iter().map(|comment|format!(r#"<li class="rounded-box border border-base-300 p-3 text-sm">
++        <p class="whitespace-pre-wrap">{body}</p><p class="text-xs opacity-60">{at} · author {author}</p></li>"#,
++        body=escape_html_text(&comment.body),at=escape_html_text(&comment.created_at.to_rfc3339()),author=comment.author_principal)).collect();
+     let form = if open {
+-        let buttons = view
+-            .choices
+-            .iter()
+-            .map(|choice| {
+-                format!(
+-                    r#"<button type="submit" name="choice" value="{value}" class="btn btn-outline">{label}</button>"#,
+-                    value = escape_html_attr(choice),
+-                    label = escape_html_text(choice),
+-                )
+-            })
+-            .collect::<String>();
+         format!(
+-            r##"<form hx-post="/ui/workflow-decisions/{decision}/submit"
+-                    hx-target="#workflow-decision" hx-swap="outerHTML"
+-                    hx-disabled-elt="find button[type='submit']" class="space-y-3">
+-                    <input type="hidden" name="command_key" value="{command_key}">
+-                    <input type="hidden" name="expected_revision" value="{revision}">
+-                    <input type="hidden" name="expected_artifact" value="{artifact}">
+-                    <fieldset class="fieldset">
+-                        <legend class="fieldset-legend">Data (JSON, edit before approving)</legend>
+-                        <textarea name="data" rows="8" class="textarea w-full font-mono text-sm">{proposal}</textarea>
+-                    </fieldset>
+-                    <fieldset class="fieldset">
+-                        <legend class="fieldset-legend">Feedback</legend>
+-                        <textarea name="feedback" rows="3" class="textarea w-full"></textarea>
+-                    </fieldset>
+-                    <div class="flex flex-wrap items-center gap-2">
+-                        {buttons}
+-                        <span class="hidden text-sm [.htmx-request_&]:inline" role="status">
+-                            <span class="loading loading-spinner loading-sm" aria-hidden="true"></span> Submitting…
+-                        </span>
+-                    </div>
+-                </form>"##,
+-            command_key = Uuid::new_v4(),
+-            revision = view.revision,
+-            artifact = escape_html_attr(&view.artifact_digest),
+-            proposal = escape_html_text(&proposal),
++            r##"<form hx-post="/ui/workflow-decisions/{decision}/comments" hx-target="#workflow-decision" hx-swap="outerHTML"
++        hx-sync="#decision-shell:queue all" hx-disabled-elt="#workflow-decision button[type='submit']" class="space-y-2">
++        <input type="hidden" name="command_key" value="{key}"><label class="fieldset"><span class="fieldset-legend">Comment</span>
++        <textarea name="body" rows="2" required maxlength="16384" class="textarea w-full">
++{body}</textarea></label>
++        <p class="text-xs opacity-70">Add comment leaves the decision open. It does not approve, reject or request a revision.</p>
++        <button type="submit" class="btn btn-sm">Add comment</button><span class="hidden text-sm [.htmx-request_&]:inline" role="status">Posting…</span></form>"##,
++            decision = view.decision.0,
++            key = escape_html_attr(
++                inputs
++                    .and_then(|inputs| inputs.get("command_key"))
++                    .unwrap_or(&Uuid::new_v4().to_string())
++            ),
++            body = escape_html_text(inputs.and_then(|inputs| inputs.get("body")).unwrap_or(""))
+         )
+     } else {
+-        match &view.submission {
+-            Some(submission) => format!(
+-                r#"<p class="text-sm">Decided: <strong>{choice}</strong> at {at}.</p>{feedback}"#,
+-                choice = escape_html_text(&submission.choice),
+-                at = escape_html_text(&submission.submitted_at.to_rfc3339()),
+-                feedback = if submission.feedback.is_empty() {
+-                    String::new()
+-                } else {
+-                    format!(
+-                        r#"<p class="text-sm opacity-80">{}</p>"#,
+-                        escape_html_text(&submission.feedback)
+-                    )
+-                },
+-            ),
+-            None => format!(
+-                r#"<p class="text-sm">This decision is closed ({}).</p>"#,
+-                escape_html_text(&view.state)
+-            ),
+-        }
++        inputs
++            .and_then(|inputs| inputs.get("body"))
++            .map(|body| {
++                format!(
++                    r#"<p>Your unposted comment:</p><p class="whitespace-pre-wrap">{}</p>"#,
++                    escape_html_text(body)
++                )
++            })
++            .unwrap_or_default()
+     };
+-    let comments = view
+-        .comments
+-        .iter()
+-        .map(|comment| {
+-            format!(
+-                r#"<li class="rounded-box border border-base-300 p-3 text-sm"><p class="whitespace-pre-wrap">{body}</p><p class="mt-1 text-xs opacity-60">{at}</p></li>"#,
+-                body = escape_html_text(&comment.body),
+-                at = escape_html_text(&comment.created_at.to_rfc3339()),
+-            )
+-        })
+-        .collect::<String>();
+     format!(
+-        r##"<section id="workflow-decision" class="space-y-6">
+-            <header class="space-y-1">
+-                <h1 class="text-xl font-bold">Workflow decision</h1>
+-                <p class="text-sm opacity-70">Step {step} · deadline {deadline}</p>
+-            </header>
+-            {banner}
+-            <div class="space-y-2">
+-                <h2 class="font-semibold">Proposal</h2>
+-                <pre class="overflow-x-auto rounded-box bg-base-200 p-3 text-sm">{proposal}</pre>
+-            </div>
+-            {form}
+-            <div class="space-y-2">
+-                <h2 class="font-semibold">Discussion</h2>
+-                <ul class="space-y-2">{comments}</ul>
+-                <form hx-post="/ui/workflow-decisions/{decision}/comments"
+-                    hx-target="#workflow-decision" hx-swap="outerHTML"
+-                    hx-disabled-elt="find button[type='submit']" class="space-y-2">
+-                    <input type="hidden" name="command_key" value="{comment_key}">
+-                    <textarea name="body" rows="2" required maxlength="16384" class="textarea w-full" aria-label="Comment"></textarea>
+-                    <button type="submit" class="btn btn-sm">
+-                        <span class="loading loading-spinner loading-xs hidden [.htmx-request_&]:inline-block"></span>
+-                        <span class="[.htmx-request_&]:hidden">Comment</span>
+-                        <span class="hidden [.htmx-request_&]:inline">Posting…</span>
+-                    </button>
+-                </form>
+-            </div>
+-        </section>"##,
+-        step = escape_html_text(view.step.as_str()),
+-        deadline = escape_html_text(&view.deadline.to_rfc3339()),
+-        proposal = escape_html_text(&proposal),
+-        comment_key = Uuid::new_v4(),
++        r#"<section class="space-y-2"><h2 class="font-semibold">Discussion</h2><ul class="space-y-2">{comments}</ul>{form}</section>"#
+     )
+ }
++
++#[cfg(test)]
++mod tests;
+--- a/src/adapters/http/pages/workflow_decision/forms.rs
++++ b/src/adapters/http/pages/workflow_decision/forms.rs
+@@ -0,0 +1,149 @@
++use super::*;
++use crate::application::workflow::authoring::{
++    ParameterField, ParameterInput, field_value, fields_for, parameter_fields,
++};
++
++pub(super) fn submission(view: &DecisionView, inputs: Option<&DecisionInputs>) -> String {
++    let fresh_key = Uuid::new_v4().to_string();
++    let revision = view.revision.to_string();
++    let value = |name: &str, default: &str| {
++        escape_html_attr(
++            inputs
++                .and_then(|inputs| inputs.get(name))
++                .unwrap_or(default),
++        )
++    };
++    let buttons:String=view.choices.iter().map(|choice|format!(r#"<button type="submit" name="choice" value="{value}" class="btn btn-outline">Submit decision: {choice}{required}</button>"#,
++        value=escape_html_attr(choice),choice=escape_html_text(choice),required=if view.feedback_required.contains(choice){" (feedback required)"}else{""})).collect();
++    format!(
++        r##"<form id="decision-inputs-{decision}-{revision}" hx-preserve="true"
++        hx-post="/ui/workflow-decisions/{decision}/submit" hx-target="#workflow-decision" hx-swap="outerHTML"
++        hx-sync="#decision-shell:queue all" hx-disabled-elt="#workflow-decision button[type='submit']" class="space-y-3">
++        <input type="hidden" name="command_key" value="{key}">
++        <input type="hidden" name="expected_revision" value="{expected}">
++        <input type="hidden" name="expected_artifact" value="{artifact}">
++        {data}<label class="fieldset"><span class="fieldset-legend">Feedback</span>
++        <textarea name="feedback" rows="3" maxlength="16384" class="textarea w-full">
++{feedback}</textarea></label>
++        <p class="text-xs opacity-70">Submitting settles this exact artifact. Required feedback and data are validated before the decision closes.</p>
++        <div class="flex flex-wrap gap-2">{buttons}</div>
++        <span class="hidden text-sm [.htmx-request_&]:inline" role="status">Submitting…</span></form>"##,
++        decision = view.decision.0,
++        key = value("command_key", &fresh_key),
++        expected = value("expected_revision", &revision),
++        artifact = value("expected_artifact", &view.artifact_digest),
++        data = data(view, inputs),
++        feedback = escape_html_text(
++            inputs
++                .and_then(|inputs| inputs.get("feedback"))
++                .unwrap_or("")
++        )
++    )
++}
++
++fn data(view: &DecisionView, inputs: Option<&DecisionInputs>) -> String {
++    if view.subject != DecisionSubject::Business {
++        return r#"<input type="hidden" name="data_mode" value="json"><input type="hidden" name="data" value="{}"><p class="text-sm">The protected request above is immutable. Approve or reject it as shown.</p>"#.into();
++    }
++    let fields = match inputs.and_then(|inputs| inputs.get("data_mode")) {
++        Some("json") => None,
++        Some("fields") => parameter_fields(view.data_schema.as_ref()),
++        _ => fields_for(view.data_schema.as_ref(), &view.proposal),
++    };
++    let controls = if let Some(fields) = fields {
++        let controls: String = fields
++            .iter()
++            .map(|field| {
++                let name = format!("data:{}", field.name);
++                let initial = field_value(field, &view.proposal);
++                let value = inputs
++                    .and_then(|inputs| inputs.get(&name))
++                    .unwrap_or(&initial);
++                field_control(field, value)
++            })
++            .collect();
++        format!(
++            r#"<input type="hidden" name="data_mode" value="fields"><fieldset class="space-y-2"><legend class="font-semibold">Editable decision data</legend>{controls}</fieldset>"#
++        )
++    } else {
++        let initial = serde_json::to_string_pretty(&view.proposal).unwrap_or_default();
++        let raw = inputs
++            .and_then(|inputs| inputs.get("data"))
++            .unwrap_or(&initial);
++        format!(
++            r#"<input type="hidden" name="data_mode" value="json"><label class="fieldset"><span class="fieldset-legend">Decision data (JSON)</span>
++            <textarea name="data" rows="8" class="textarea w-full font-mono text-sm">
++{raw}</textarea></label><p class="text-xs opacity-70">This value uses JSON so all keys and values are preserved exactly.</p>"#,
++            raw = escape_html_text(raw)
++        )
++    };
++    format!(
++        r#"{controls}<details><summary class="link text-xs">Data schema</summary><pre class="whitespace-pre-wrap text-xs">{schema}</pre></details>"#,
++        schema = pretty(
++            view.data_schema
++                .as_ref()
++                .unwrap_or(&serde_json::Value::Null)
++        )
++    )
++}
++
++fn field_control(field: &ParameterField, value: &str) -> String {
++    let name = escape_html_attr(&format!("data:{}", field.name));
++    let required = if field.required { " required" } else { "" };
++    let control = match &field.input {
++        ParameterInput::Text { max_length } => format!(
++            r#"<textarea name="{name}" class="textarea w-full" rows="2"{required}{max}>
++{value}</textarea>"#,
++            max = max_length
++                .map(|max| format!(r#" maxlength="{max}""#))
++                .unwrap_or_default(),
++            value = escape_html_text(value)
++        ),
++        ParameterInput::Integer | ParameterInput::Number => format!(
++            r#"<input type="number" name="{name}" class="input w-full" step="{step}" value="{value}"{required}>"#,
++            step = if field.input == ParameterInput::Integer {
++                "1"
++            } else {
++                "any"
++            },
++            value = escape_html_attr(value)
++        ),
++        ParameterInput::Boolean | ParameterInput::Choice(_) => {
++            let choices: Vec<&str> = match &field.input {
++                ParameterInput::Choice(choices) => choices.iter().map(String::as_str).collect(),
++                _ => vec!["true", "false"],
++            };
++            let mut choices: Vec<_> = std::iter::once("").chain(choices).collect();
++            if !choices.contains(&value) {
++                choices.push(value);
++            }
++            let options: String = choices
++                .into_iter()
++                .map(|choice| {
++                    format!(
++                        r#"<option value="{value}"{selected}>{label}</option>"#,
++                        value = escape_html_attr(choice),
++                        selected = if choice == value { " selected" } else { "" },
++                        label = escape_html_text(if choice.is_empty() {
++                            "(not set)"
++                        } else {
++                            choice
++                        })
++                    )
++                })
++                .collect();
++            format!(r#"<select name="{name}" class="select w-full"{required}>{options}</select>"#)
++        }
++        ParameterInput::Json => format!(
++            r#"<textarea name="{name}" rows="3" class="textarea w-full font-mono text-xs"{required}>
++{value}</textarea>"#,
++            value = escape_html_text(value)
++        ),
++    };
++    format!(
++        r#"<label class="fieldset"><span class="fieldset-legend">{label}{mark}</span>{control}<span class="text-xs opacity-70">{description}</span></label>"#,
++        label = escape_html_text(&field.name),
++        mark = if field.required { " (required)" } else { "" },
++        description = escape_html_text(field.description.as_deref().unwrap_or(""))
++    )
++}
+--- a/src/adapters/http/pages/workflow_decision/tests.rs
++++ b/src/adapters/http/pages/workflow_decision/tests.rs
+@@ -0,0 +1,121 @@
++use super::*;
++use crate::application::workflow::decisions::*;
++use crate::domain::workflow::{CompanyId, ExecutionId, RunId, StepId, VersionId};
++use serde_json::json;
++
++fn view() -> DecisionView {
++    DecisionView {
++        subject: DecisionSubject::Business,
++        context: DecisionContext {
++            company: CompanyId::new(Uuid::new_v4()),
++            workflow_title: "Review <draft>".into(),
++            version: VersionId::new(Uuid::new_v4()),
++            channel: None,
++            thread: None,
++            trigger_message: None,
++            inspect_run: true,
++        },
++        data_schema: Some(
++            json!({"type":"object","properties":{"body":{"type":"string","maxLength":32}},"required":["body"],"additionalProperties":false}),
++        ),
++        feedback_required: vec!["revise".into()],
++        can_submit: true,
++        history: vec![],
++        history_truncated: false,
++        decision: DecisionId(Uuid::new_v4()),
++        run: RunId::new(Uuid::new_v4()),
++        execution: ExecutionId::new(Uuid::new_v4()),
++        step: StepId::parse("review").unwrap(),
++        revision: 1,
++        artifact_digest: "digest".into(),
++        proposal: json!({"body":"Initial draft"}),
++        deadline: chrono::Utc::now() + chrono::Duration::hours(1),
++        state: "waiting".into(),
++        reviewers: vec![],
++        choices: vec!["accept".into(), "revise".into()],
++        submission: None,
++        comments: vec![],
++    }
++}
++
++#[test]
++fn decision_data_forms_preserve_raw_errors_and_protected_requests_are_immutable() {
++    let mut view = view();
++    let inputs = DecisionFormInputs::Submission(DecisionInputs {
++        values: [
++            ("data_mode".into(), "json".into()),
++            ("data".into(), "{ invalid <script>".into()),
++            ("feedback".into(), "Keep\nthis".into()),
++        ]
++        .into_iter()
++        .collect(),
++    });
++    let page = workflow_decision_section(
++        &view,
++        Some(DecisionOutcome::Refused("invalid")),
++        Some(&inputs),
++    );
++    assert!(page.contains("{ invalid &lt;script&gt;"));
++    assert!(page.contains("Keep\nthis"));
++    assert!(!page.contains("<script>"));
++    assert!(page.contains("Review &lt;draft&gt;"));
++    for subject in [
++        DecisionSubject::ProtectedAction,
++        DecisionSubject::TokenAllowance,
++    ] {
++        view.subject = subject;
++        view.proposal = json!({"secret_effect":"immutable <request>"});
++        let page = workflow_decision_section(&view, None, None);
++        assert!(page.contains(subject.label()));
++        assert!(page.contains("immutable &lt;request&gt;"));
++        assert!(page.contains("name=\"data\" value=\"{}\""));
++        assert!(!page.contains("name=\"data:body\""));
++    }
++    view.can_submit = false;
++    let page = workflow_decision_section(&view, None, None);
++    assert!(!page.contains("/submit\""));
++    assert!(page.contains("assigned reviewers"));
++}
++
++/// Optional rendered fixtures let the browser exercise the actual server markup with shipped HTMX.
++#[test]
++fn decision_browser_markup_and_closed_draft_recovery() {
++    let view = view();
++    let waiting = workflow_decision_page(&view);
++    assert!(waiting.contains("id=\"decision-shell\""));
++    assert!(waiting.contains("hx-sync=\"#decision-shell:queue all\""));
++    let mut closed = view.clone();
++    closed.state = "completed".into();
++    closed.can_submit = false;
++    closed.revision = 2;
++    closed.submission = Some(DecisionSubmissionView {
++        submitted_by: Uuid::new_v4(),
++        submitted_at: chrono::Utc::now(),
++        choice: "accept".into(),
++        feedback: "Accepted".into(),
++        data: json!({"body":"Final"}),
++    });
++    let inputs = DecisionFormInputs::Comment(DecisionInputs {
++        values: [("body".into(), "Unposted <comment>".into())]
++            .into_iter()
++            .collect(),
++    });
++    let settled = workflow_decision_section(
++        &closed,
++        Some(DecisionOutcome::Done("Decision submitted")),
++        Some(&inputs),
++    );
++    assert!(settled.contains("Unposted &lt;comment&gt;"));
++    assert!(!settled.contains("<form"));
++    if let Some(dir) = std::env::var_os("WORKFLOW_DECISION_BROWSER_FIXTURES") {
++        let dir = std::path::PathBuf::from(dir);
++        std::fs::create_dir_all(&dir).unwrap();
++        std::fs::write(dir.join("waiting.html"), waiting).unwrap();
++        std::fs::write(
++            dir.join("comment.html"),
++            workflow_decision_section(&view, Some(DecisionOutcome::Done("Comment posted")), None),
++        )
++        .unwrap();
++        std::fs::write(dir.join("closed.html"), settled).unwrap();
++    }
++}
+--- a/src/adapters/http/pages/workflow_runs/mod.rs
++++ b/src/adapters/http/pages/workflow_runs/mod.rs
+@@ -23,7 +23,7 @@
+ }
+ document.addEventListener('htmx:beforeRequest', function (event) {
+     var element = event.detail.elt;
+-    if (!element.closest('#run-pane, #run-list')) return;
++    if (!element.closest('#run-pane, #run-list, #workflow-decision')) return;
+     element.addEventListener('htmx:beforeOnLoad', discardDetachedRunResponse, { once: true });
+ });
+ "#;
+--- a/src/adapters/http/routes/workflows/decision_review_tests.rs
++++ b/src/adapters/http/routes/workflows/decision_review_tests.rs
+@@ -0,0 +1,184 @@
++//! A real two-round review journey, including raw invalid input and exact late links.
++use super::*;
++
++fn child_source(reviewer: Uuid) -> Value {
++    let mut source = decision_source(Uuid::new_v4(), reviewer);
++    source["input_schema"] = json!({"type":"object","properties":{"body":{"type":"string","maxLength":32},"feedback":{"type":"string","maxLength":16384}},"required":["body","feedback"],"additionalProperties":false});
++    source["output_schema"] = json!({"type":"object","properties":{"choice":{"type":"string","enum":["accept","revise"]},"feedback":{"type":"string"},"artifact":{"type":"object","properties":{"body":{"type":"string","maxLength":32}},"required":["body"],"additionalProperties":false}},"required":["choice","feedback","artifact"],"additionalProperties":false});
++    source["steps"]["start"]["with"]["proposal"] = json!({"object":{"body":{"ref":"/input/body"}}});
++    source["steps"]["start"]["with"]["data_schema"] = json!({"literal":{"type":"object","properties":{"body":{"type":"string","maxLength":32}},"required":["body"],"additionalProperties":false}});
++    source["steps"]["start"]["with"]["feedback_required"] = json!({"literal":["revise"]});
++    source["steps"]["finish"]["with"] = json!({"value":{"object":{
++        "choice":{"ref":"/steps/start/output/choice"},"feedback":{"ref":"/steps/start/output/feedback"},
++        "artifact":{"ref":"/steps/start/output/data"}}},"output_schema":{"literal":true}});
++    source["steps"]["finish"]["with"]["output_schema"] =
++        json!({"literal":source["output_schema"].clone()});
++    source
++}
++
++fn parent_source(child: Uuid, version: Uuid) -> Value {
++    let mut source = example("flow.repeat", Uuid::new_v4());
++    source["output_schema"] = json!(true);
++    let start = &mut source["steps"]["start"];
++    start["child_workflow_id"] = json!(child);
++    start["child_version_id"] = json!(version);
++    start["max_iterations"] = json!(2);
++    start["with"] = json!({"input":{"literal":{"body":"Draft one","feedback":""}}});
++    start["repeat"] = json!({"next_input":{"object":{
++        "body":{"ref":"/steps/start/output/result/artifact/body"},
++        "feedback":{"ref":"/steps/start/output/result/feedback"}}},
++        "exit_when":{"ne":[{"ref":"/steps/start/output/result/choice"},{"literal":"revise"}]}});
++    source
++}
++
++async fn decision_ids(f: &Fixture, parent: Uuid) -> Vec<Uuid> {
++    sqlx::query_scalar("SELECT decision.id FROM workflow_decisions AS decision JOIN workflow_runs AS run ON run.id=decision.run_id WHERE run.parent_run_id=$1 ORDER BY decision.created_at,decision.id")
++        .bind(parent).fetch_all(f.persistence.pool()).await.unwrap()
++}
++async fn view(f: &Fixture, decision: Uuid) -> Value {
++    let (status, view) =
++        answer(decisions::read(f.state(), by(f.owner), Path((f.company, decision))).await).await;
++    assert_eq!(status, StatusCode::OK, "{view}");
++    view
++}
++async fn submit_fields(
++    f: &Fixture,
++    view: &Value,
++    choice: &str,
++    feedback: &str,
++    data: &str,
++) -> String {
++    let body = url::form_urlencoded::Serializer::new(String::new())
++        .extend_pairs([
++            ("command_key", Uuid::new_v4().to_string()),
++            ("expected_revision", view["revision"].to_string()),
++            (
++                "expected_artifact",
++                view["artifact_digest"].as_str().unwrap().to_owned(),
++            ),
++            ("choice", choice.into()),
++            ("feedback", feedback.into()),
++            ("data_mode", "fields".into()),
++            ("data:body", data.into()),
++        ])
++        .finish();
++    let (status, page) = answer(
++        decisions::ui_submit(
++            f.state(),
++            by(f.owner),
++            Path(uuid(&view["decision_id"])),
++            axum::body::Bytes::from(body),
++        )
++        .await,
++    )
++    .await;
++    assert_eq!(status, StatusCode::OK, "{page}");
++    page.as_str().unwrap().into()
++}
++
++#[tokio::test]
++async fn reviewer_comments_revises_reads_next_draft_and_accepts_exact_artifact() {
++    let Some(f) = Fixture::new().await else {
++        return;
++    };
++    let parent = start_review(&f).await;
++    let first = decision_ids(&f, parent).await[0];
++    let first_view = view(&f, first).await;
++    assert_eq!(first_view["proposal"], json!({"body":"Draft one"}));
++    assert_eq!(first_view["subject"], "business");
++    assert_eq!(first_view["feedback_required"], json!(["revise"]));
++    comment_on_first(&f, first).await;
++    let refused = submit_fields(&f, &first_view, "revise", "", "Draft two").await;
++    assert!(
++        refused.contains("Draft two") && !refused.contains("Decision submitted"),
++        "{refused}"
++    );
++    assert_eq!(view(&f, first).await["state"], "waiting");
++    let accepted = submit_fields(&f, &first_view, "revise", "Shorter <please>", "Draft two").await;
++    assert!(accepted.contains("Decision submitted"), "{accepted}");
++    f.run_until("second review", async || {
++        decision_ids(&f, parent).await.len() == 2
++    })
++    .await;
++    let second = decision_ids(&f, parent).await[1];
++    let second_view = view(&f, second).await;
++    assert_eq!(second_view["proposal"], json!({"body":"Draft two"}));
++    assert_ne!(
++        first_view["artifact_digest"],
++        second_view["artifact_digest"]
++    );
++    let history = second_view["history"].as_array().unwrap();
++    assert_eq!(history.len(), 2, "{second_view}");
++    assert_eq!(history[0]["round"], 1);
++    assert_eq!(history[0]["feedback"], "Shorter <please>");
++    assert_eq!(history[1]["round"], 2);
++    assert_eq!(history[1]["decision_id"], second.to_string());
++    let (_, page) = answer(decisions::page(f.state(), by(f.owner), Path(second)).await).await;
++    let page = page.as_str().unwrap();
++    assert!(page.contains("Shorter &lt;please&gt;"));
++    assert!(page.contains("name=\"data:body\""));
++    let stale = submit_fields(&f, &first_view, "accept", "late", "Wrong draft").await;
++    assert!(
++        stale.contains("already") || stale.contains("closed") || stale.contains("changed"),
++        "{stale}"
++    );
++    assert!(!stale.contains("/submit\""));
++    assert_eq!(view(&f, second).await["state"], "waiting");
++    assert!(
++        submit_fields(&f, &second_view, "accept", "", "Final draft")
++            .await
++            .contains("Decision submitted")
++    );
++    f.run_until("parent completed", async || {
++        sqlx::query_scalar::<_, String>("SELECT state FROM workflow_runs WHERE id=$1")
++            .bind(parent)
++            .fetch_one(f.persistence.pool())
++            .await
++            .unwrap()
++            == "succeeded"
++    })
++    .await;
++    assert_eq!(view(&f, second).await["can_submit"], false);
++}
++
++async fn start_review(f: &Fixture) -> Uuid {
++    let (child, version) = f.published(f.owner, f.company, child_source(f.owner)).await;
++    let (_, version) = f
++        .published(f.owner, f.company, parent_source(child, version))
++        .await;
++    let binding = f.bound(f.owner, f.company, version).await;
++    let (status, started) = f
++        .start(
++            f.owner,
++            f.company,
++            binding,
++            "review-rounds",
++            json!({"text":"review"}),
++        )
++        .await;
++    assert_eq!(status, StatusCode::CREATED, "{started}");
++    let parent = uuid(&started["run_id"]);
++    f.run_until("first review", async || {
++        decision_ids(f, parent).await.len() == 1
++    })
++    .await;
++    parent
++}
++
++async fn comment_on_first(f: &Fixture, first: Uuid) {
++    let (status, _) = answer(
++        decisions::ui_comment(
++            f.state(),
++            by(f.owner),
++            Path(first),
++            Form(decisions::CommentForm {
++                command_key: "comment".into(),
++                body: "Please inspect <this>".into(),
++            }),
++        )
++        .await,
++    )
++    .await;
++    assert_eq!(status, StatusCode::OK);
++    assert_eq!(view(f, first).await["state"], "waiting");
++}
+--- a/src/adapters/http/routes/workflows/decision_tests.rs
++++ b/src/adapters/http/routes/workflows/decision_tests.rs
+@@ -95,14 +95,25 @@
+             f.state(),
+             by(user),
+             Path(decision),
+-            Form(decisions::SubmitForm {
+-                command_key: key.into(),
+-                expected_revision: view["revision"].as_i64().unwrap(),
+-                expected_artifact: view["artifact_digest"].as_str().unwrap().into(),
+-                choice: "accept".into(),
+-                feedback: String::new(),
+-                data: data.into(),
+-            }),
++            axum::body::Bytes::from(
++                url::form_urlencoded::Serializer::new(String::new())
++                    .extend_pairs([
++                        ("command_key", key.to_owned()),
++                        (
++                            "expected_revision",
++                            view["revision"].as_i64().unwrap().to_string(),
++                        ),
++                        (
++                            "expected_artifact",
++                            view["artifact_digest"].as_str().unwrap().to_owned(),
++                        ),
++                        ("choice", "accept".into()),
++                        ("feedback", String::new()),
++                        ("data_mode", "json".into()),
++                        ("data", data.to_owned()),
++                    ])
++                    .finish(),
++            ),
+         )
+     };
+     let (status, refused) = answer(ui_submit(f.owner, "s0", "{not json").await).await;
+@@ -231,3 +242,6 @@
+         StatusCode::NOT_FOUND
+     );
+ }
++
++#[path = "decision_review_tests.rs"]
++mod review;
+--- a/src/adapters/http/routes/workflows/decisions.rs
++++ b/src/adapters/http/routes/workflows/decisions.rs
+@@ -2,7 +2,8 @@
+ //! reviewer (05-D2), and the page the review notices link to, which submits the same commands.
+ use super::*;
+ use crate::adapters::http::pages::{
+-    DecisionOutcome, workflow_decision_page, workflow_decision_section,
++    DecisionFormInputs, DecisionInputs, DecisionOutcome, workflow_decision_page,
++    workflow_decision_section,
+ };
+ use crate::application::workflow::decisions::{
+     AddDecisionComment, DecisionCommandKey, DecisionDisposition, DecisionId, DecisionView,
+@@ -10,6 +11,7 @@
+ };
+ use axum::{
+     Form,
++    body::Bytes,
+     extract::{Path, State},
+     response::Html,
+ };
+@@ -17,6 +19,10 @@
+ 
+ fn view_json(view: &DecisionView) -> Value {
+     json!({
++        "subject":view.subject.as_str(),"data_schema":view.data_schema,"feedback_required":view.feedback_required,"can_submit":view.can_submit,
++        "version_id":view.context.version.as_uuid(),
++        "history":view.history.iter().map(|entry|json!({"decision_id":entry.decision.0,"run_id":entry.run.as_uuid(),"step":entry.step.as_str(),"round":entry.round,"artifact_digest":entry.artifact_digest,"choice":entry.choice,"feedback":entry.feedback,"state":entry.state})).collect::<Vec<_>>(),
++        "history_truncated":view.history_truncated,
+         "decision_id": view.decision.0,
+         "run_id": view.run.as_uuid(),
+         "execution_id": view.execution.as_uuid(),
+@@ -181,18 +187,6 @@
+ }
+ 
+ #[derive(Debug, Deserialize)]
+-pub struct SubmitForm {
+-    pub command_key: String,
+-    pub expected_revision: i64,
+-    pub expected_artifact: String,
+-    pub choice: String,
+-    #[serde(default)]
+-    pub feedback: String,
+-    #[serde(default)]
+-    pub data: String,
+-}
+-
+-#[derive(Debug, Deserialize)]
+ pub struct CommentForm {
+     pub command_key: String,
+     pub body: String,
+@@ -207,6 +201,7 @@
+     user: &AuthenticatedUser,
+     decision: Uuid,
+     result: AppResult<&str>,
++    inputs: Option<&DecisionFormInputs>,
+ ) -> AppResult<Html<String>> {
+     // The banner: what the command did, or why it was refused.
+     let banner: Result<&str, String> = match result {
+@@ -223,42 +218,79 @@
+         Ok(done) => DecisionOutcome::Done(done),
+         Err(refusal) => DecisionOutcome::Refused(refusal),
+     };
+-    Ok(Html(workflow_decision_section(&view, Some(outcome))))
++    Ok(Html(workflow_decision_section(
++        &view,
++        Some(outcome),
++        if banner.is_err() { inputs } else { None },
++    )))
+ }
+ 
+ pub async fn ui_submit(
+     State(engine): State<Engine>,
+     user: AuthenticatedUser,
+     Path(decision): Path<Uuid>,
+-    Form(form): Form<SubmitForm>,
++    body: Bytes,
+ ) -> AppResult<Html<String>> {
+     let company_id = page_company(&engine, decision).await?;
+-    let result = match serde_json::from_str::<Value>(if form.data.trim().is_empty() {
+-        "null"
+-    } else {
+-        &form.data
+-    }) {
+-        Err(_) => Err(AppError::BadRequest("The data is not valid JSON".into())),
+-        Ok(data) => submit_command(
+-            &engine,
+-            company_id,
+-            &user,
+-            decision,
+-            SubmitBody {
+-                command_key: form.command_key,
+-                expected_revision: form.expected_revision,
+-                expected_artifact: form.expected_artifact,
+-                choice: form.choice,
+-                feedback: form.feedback,
+-                data,
+-            },
+-        )
+-        .await
+-        .map(|_| "Decision submitted"),
++    let view = engine
++        .decisions()
++        .read_decision(company(company_id), actor(&user)?, DecisionId(decision))
++        .await?;
++    let fields = super::ui::FormFields::parse(&body);
++    let mut inputs = DecisionInputs::default();
++    for (name, value) in fields.pairs() {
++        inputs
++            .values
++            .entry(name.to_owned())
++            .or_insert_with(|| value.to_owned());
++    }
++    let result = match submission_body(&view, &inputs) {
++        Ok(body) => submit_command(&engine, company_id, &user, decision, body)
++            .await
++            .map(|_| "Decision submitted"),
++        Err(error) => Err(error),
+     };
+-    section_after(&engine, company_id, &user, decision, result).await
++    section_after(
++        &engine,
++        company_id,
++        &user,
++        decision,
++        result,
++        Some(&DecisionFormInputs::Submission(inputs)),
++    )
++    .await
+ }
+ 
++fn submission_body(view: &DecisionView, inputs: &DecisionInputs) -> AppResult<SubmitBody> {
++    use crate::application::workflow::authoring::{parameter_fields, parameters_from_fields};
++    let text = |name: &str| inputs.get(name).unwrap_or("").to_owned();
++    let data = if inputs.get("data_mode") == Some("fields") {
++        let fields = parameter_fields(view.data_schema.as_ref())
++            .ok_or_else(|| AppError::BadRequest("This decision requires JSON data".into()))?;
++        parameters_from_fields(&fields, |name| {
++            inputs.get(&format!("data:{name}")).map(str::to_owned)
++        })
++        .map_err(AppError::BadRequest)?
++    } else {
++        serde_json::from_str(if text("data").trim().is_empty() {
++            "null"
++        } else {
++            inputs.get("data").unwrap_or("null")
++        })
++        .map_err(|_| AppError::BadRequest("The data is not valid JSON".into()))?
++    };
++    Ok(SubmitBody {
++        command_key: text("command_key"),
++        expected_revision: text("expected_revision")
++            .parse()
++            .map_err(|_| AppError::BadRequest("The decision revision is missing".into()))?,
++        expected_artifact: text("expected_artifact"),
++        choice: text("choice"),
++        feedback: text("feedback"),
++        data,
++    })
++}
++
+ pub async fn ui_comment(
+     State(engine): State<Engine>,
+     user: AuthenticatedUser,
+@@ -266,6 +298,14 @@
+     Form(form): Form<CommentForm>,
+ ) -> AppResult<Html<String>> {
+     let company_id = page_company(&engine, decision).await?;
++    let inputs = DecisionFormInputs::Comment(DecisionInputs {
++        values: [
++            ("command_key".into(), form.command_key.clone()),
++            ("body".into(), form.body.clone()),
++        ]
++        .into_iter()
++        .collect(),
++    });
+     let result = comment_command(
+         &engine,
+         company_id,
+@@ -278,5 +318,5 @@
+     )
+     .await
+     .map(|_| "Comment posted");
+-    section_after(&engine, company_id, &user, decision, result).await
++    section_after(&engine, company_id, &user, decision, result, Some(&inputs)).await
+ }
+--- a/src/adapters/persistence/attention.rs
++++ b/src/adapters/persistence/attention.rs
+@@ -102,7 +102,8 @@
+            'open'::text AS state,
+            viewer.id AS responsible_principal_id, 'principal'::text AS responsibility_kind,
+            viewer.display_label AS responsibility_label,
+-           version.title,
++           CASE decision.subject_kind WHEN 'action_approval' THEN 'Protected-action approval · '
++             WHEN 'token_allowance' THEN 'Token allowance approval · ' ELSE 'Business decision · ' END || version.title AS title,
+            CASE decision.subject_kind
+              WHEN 'action_approval' THEN 'Approve or reject the action'
+              WHEN 'token_allowance' THEN 'Approve or reject the token allowance'
+@@ -137,7 +138,8 @@
+             FROM workflow_decision_reviewers AS reviewer
+             WHERE reviewer.company_id = decision.company_id
+               AND reviewer.decision_id = decision.id),
+-           version.title,
++           CASE decision.subject_kind WHEN 'action_approval' THEN 'Protected-action approval · '
++             WHEN 'token_allowance' THEN 'Token allowance approval · ' ELSE 'Business decision · ' END || version.title AS title,
+            CASE decision.subject_kind
+              WHEN 'action_approval' THEN 'Approve or reject the action'
+              WHEN 'token_allowance' THEN 'Approve or reject the token allowance'
+--- a/src/adapters/persistence/workflow/decisions.rs
++++ b/src/adapters/persistence/workflow/decisions.rs
+@@ -607,128 +607,10 @@
+         disposition: DecisionDisposition::Applied,
+         sequence: last + 1,
+     })
+-}
+-
+-#[derive(sqlx::FromRow)]
+-struct ViewRow {
+-    subject_kind: String,
+-    step_id: String,
+-    revision: i64,
+-    proposal_digest: String,
+-    proposal: Value,
+-    deadline: DateTime<Utc>,
+-    state: String,
+-    submitted_by: Option<Uuid>,
+-    submitted_at: Option<DateTime<Utc>>,
+-    choice: Option<String>,
+-    feedback: Option<String>,
+-    data: Option<Value>,
+ }
+ 
+-async fn read_on(
+-    tx: &mut Transaction<'_, Postgres>,
+-    company: CompanyId,
+-    actor: WorkflowActor,
+-    decision: DecisionId,
+-) -> AppResult<DecisionView> {
+-    let Locked { scope, .. } = lock_decision(tx, company, actor, decision).await?;
+-    let row: ViewRow = sqlx::query_as("SELECT decision.subject_kind,execution.step_id,decision.revision,decision.proposal_digest,COALESCE(execution.frozen_inputs->'proposal','null'::jsonb) AS proposal,wait.deadline,wait.state,decision.submitted_by,decision.submitted_at,decision.choice,decision.feedback,decision.data FROM workflow_decisions AS decision JOIN workflow_executions AS execution ON execution.company_id=decision.company_id AND execution.id=decision.execution_id JOIN workflow_waits AS wait ON wait.company_id=decision.company_id AND wait.id=decision.wait_id WHERE decision.company_id=$1 AND decision.id=$2")
+-        .bind(company.as_uuid()).bind(decision.0).fetch_one(&mut **tx).await?;
+-    let reviewers: Vec<Uuid> = sqlx::query_scalar("SELECT reviewer.user_id FROM workflow_decision_reviewers AS reviewer WHERE reviewer.company_id=$1 AND reviewer.decision_id=$2 ORDER BY reviewer.ordinal")
+-        .bind(company.as_uuid()).bind(decision.0).fetch_all(&mut **tx).await?;
+-    let comments: Vec<(i64, Uuid, String, DateTime<Utc>)> = sqlx::query_as("SELECT sequence,author_principal_id,body,created_at FROM workflow_decision_comments WHERE company_id=$1 AND decision_id=$2 ORDER BY sequence")
+-        .bind(company.as_uuid()).bind(decision.0).fetch_all(&mut **tx).await?;
+-    let submission = match (
+-        row.submitted_by,
+-        row.submitted_at,
+-        row.choice,
+-        row.feedback,
+-        row.data,
+-    ) {
+-        (Some(submitted_by), Some(submitted_at), Some(choice), Some(feedback), Some(data)) => {
+-            Some(DecisionSubmissionView {
+-                submitted_by,
+-                submitted_at,
+-                choice,
+-                feedback,
+-                data,
+-            })
+-        }
+-        (None, None, None, None, None) => None,
+-        _ => return Err(invalid()),
+-    };
+-    let step = StepId::parse(&row.step_id).map_err(|_| invalid())?;
+-    let choices = if row.subject_kind == "business" {
+-        let binding: Uuid = sqlx::query_scalar(
+-            "SELECT binding_id FROM workflow_runs WHERE company_id=$1 AND id=$2",
+-        )
+-        .bind(company.as_uuid())
+-        .bind(scope.run.as_uuid())
+-        .fetch_one(&mut **tx)
+-        .await?;
+-        let binding = admission_binding::read_saved_binding(
+-            tx,
+-            company,
+-            WorkflowBindingId::new(binding),
+-            scope.run.as_uuid(),
+-        )
+-        .await?;
+-        match binding
+-            .bundle()
+-            .compiled()
+-            .graph()
+-            .definition()
+-            .steps
+-            .get(&step)
+-            .map(|definition| &definition.routes)
+-        {
+-            Some(Routes::Choices(routes)) => routes
+-                .iter()
+-                .map(|(choice, _)| choice.as_str().to_owned())
+-                .collect(),
+-            _ => return Err(invalid()),
+-        }
+-    } else {
+-        vec!["approve".into(), "reject".into()]
+-    };
+-    Ok(DecisionView {
+-        decision,
+-        run: scope.run,
+-        execution: scope.execution,
+-        step,
+-        revision: row.revision,
+-        artifact_digest: row.proposal_digest,
+-        proposal: if row.subject_kind == "action_approval" {
+-            approvals::view_proposal(tx, company, decision).await?
+-        } else if row.subject_kind == "token_allowance" {
+-            sqlx::query_scalar(
+-                "SELECT token_proposal FROM workflow_decisions WHERE company_id=$1 AND id=$2",
+-            )
+-            .bind(company.as_uuid())
+-            .bind(decision.0)
+-            .fetch_one(&mut **tx)
+-            .await?
+-        } else {
+-            row.proposal
+-        },
+-        deadline: row.deadline,
+-        state: row.state,
+-        reviewers,
+-        choices,
+-        submission,
+-        comments: comments
+-            .into_iter()
+-            .map(
+-                |(sequence, author_principal, body, created_at)| DecisionCommentView {
+-                    sequence,
+-                    author_principal,
+-                    body,
+-                    created_at,
+-                },
+-            )
+-            .collect(),
+-    })
+-}
++mod read;
++use read::read_on;
+ 
+ #[path = "decision_approvals.rs"]
+ pub(super) mod approvals;
+--- a/src/adapters/persistence/workflow/decisions/read.rs
++++ b/src/adapters/persistence/workflow/decisions/read.rs
+@@ -0,0 +1,267 @@
++//! Authorized decision projections. Commands and their lock/settlement protocol remain in the parent.
++use super::*;
++
++mod history;
++
++#[derive(sqlx::FromRow)]
++struct ViewRow {
++    subject_kind: String,
++    step_id: String,
++    revision: i64,
++    proposal_digest: String,
++    proposal: Value,
++    data_schema: Option<Value>,
++    feedback_required: Option<Value>,
++    deadline: DateTime<Utc>,
++    state: String,
++    submitted_by: Option<Uuid>,
++    submitted_at: Option<DateTime<Utc>>,
++    choice: Option<String>,
++    feedback: Option<String>,
++    data: Option<Value>,
++}
++
++#[derive(sqlx::FromRow)]
++struct ContextRow {
++    binding_id: Uuid,
++    root_run_id: Uuid,
++    version_id: Uuid,
++    title: String,
++    channel_id: Option<Uuid>,
++    thread_id: Option<Uuid>,
++    parent_run_id: Option<Uuid>,
++    parent_execution_id: Option<Uuid>,
++}
++
++pub(super) async fn read_on(
++    tx: &mut Transaction<'_, Postgres>,
++    company: CompanyId,
++    actor: WorkflowActor,
++    decision: DecisionId,
++) -> AppResult<DecisionView> {
++    let Locked {
++        scope, reviewer, ..
++    } = lock_decision(tx, company, actor, decision).await?;
++    let row: ViewRow = sqlx::query_as(READ_SQL)
++        .bind(company.as_uuid())
++        .bind(decision.0)
++        .fetch_one(&mut **tx)
++        .await?;
++    let context: ContextRow = sqlx::query_as(
++        "SELECT run.binding_id,budget.root_run_id,run.version_id,version.title,run.channel_id,run.thread_id,run.parent_run_id,run.parent_execution_id \
++         FROM workflow_runs AS run JOIN workflow_versions AS version ON (version.company_id,version.id)=(run.company_id,run.version_id) \
++         JOIN workflow_run_budgets AS budget ON (budget.company_id,budget.run_id)=(run.company_id,run.id) \
++         WHERE run.company_id=$1 AND run.id=$2")
++        .bind(company.as_uuid()).bind(scope.run.as_uuid()).fetch_one(&mut **tx).await?;
++    let reviewers: Vec<Uuid> = sqlx::query_scalar("SELECT user_id FROM workflow_decision_reviewers WHERE company_id=$1 AND decision_id=$2 ORDER BY ordinal")
++        .bind(company.as_uuid()).bind(decision.0).fetch_all(&mut **tx).await?;
++    let comments = comments(tx, company, decision).await?;
++    let subject = subject(&row.subject_kind)?;
++    let step = StepId::parse(&row.step_id).map_err(|_| invalid())?;
++    let choices = choices(tx, scope, context.binding_id, &step, subject).await?;
++    let proposal = proposal(tx, company, decision, subject, &row.proposal).await?;
++    let history = history::read(tx, scope, &context).await?;
++    let trigger_message = sqlx::query_scalar(
++        "SELECT intent.message_id FROM workflow_message_intent_bindings AS outcome \
++         JOIN workflow_message_intents AS intent ON (intent.company_id,intent.id)=(outcome.company_id,outcome.intent_id) \
++         WHERE outcome.company_id=$1 AND outcome.run_id=$2 LIMIT 1")
++        .bind(company.as_uuid()).bind(context.root_run_id).fetch_optional(&mut **tx).await?;
++    assemble(
++        row,
++        scope,
++        decision,
++        DecisionReadParts {
++            subject,
++            context: DecisionContext {
++                company,
++                workflow_title: context.title,
++                version: crate::domain::workflow::VersionId::new(context.version_id),
++                channel: context.channel_id,
++                thread: context.thread_id,
++                trigger_message,
++                inspect_run: reviewer.privileged,
++            },
++            reviewers,
++            actor: actor.user_id(),
++            step,
++            choices,
++            proposal,
++            comments,
++            history,
++        },
++    )
++}
++
++struct DecisionReadParts {
++    subject: DecisionSubject,
++    context: DecisionContext,
++    reviewers: Vec<Uuid>,
++    actor: Uuid,
++    step: StepId,
++    choices: Vec<String>,
++    proposal: Value,
++    comments: Vec<DecisionCommentView>,
++    history: history::History,
++}
++
++fn assemble(
++    row: ViewRow,
++    scope: ActivationRequest,
++    decision: DecisionId,
++    parts: DecisionReadParts,
++) -> AppResult<DecisionView> {
++    let feedback_required = row
++        .feedback_required
++        .map(serde_json::from_value)
++        .transpose()
++        .map_err(|_| invalid())?
++        .unwrap_or_default();
++    let submission = match (
++        row.submitted_by,
++        row.submitted_at,
++        row.choice,
++        row.feedback,
++        row.data,
++    ) {
++        (Some(submitted_by), Some(submitted_at), Some(choice), Some(feedback), Some(data)) => {
++            Some(DecisionSubmissionView {
++                submitted_by,
++                submitted_at,
++                choice,
++                feedback,
++                data,
++            })
++        }
++        (None, None, None, None, None) => None,
++        _ => return Err(invalid()),
++    };
++    Ok(DecisionView {
++        subject: parts.subject,
++        context: parts.context,
++        data_schema: if parts.subject == DecisionSubject::Business {
++            row.data_schema
++        } else {
++            None
++        },
++        feedback_required,
++        can_submit: row.deadline > Utc::now()
++            && row.state == "waiting"
++            && submission.is_none()
++            && parts.reviewers.contains(&parts.actor),
++        history: parts.history.items,
++        history_truncated: parts.history.truncated,
++        decision,
++        run: scope.run,
++        execution: scope.execution,
++        step: parts.step,
++        revision: row.revision,
++        artifact_digest: row.proposal_digest,
++        proposal: parts.proposal,
++        deadline: row.deadline,
++        state: row.state,
++        reviewers: parts.reviewers,
++        choices: parts.choices,
++        submission,
++        comments: parts.comments,
++    })
++}
++
++fn subject(value: &str) -> AppResult<DecisionSubject> {
++    match value {
++        "business" => Ok(DecisionSubject::Business),
++        "action_approval" => Ok(DecisionSubject::ProtectedAction),
++        "token_allowance" => Ok(DecisionSubject::TokenAllowance),
++        _ => Err(invalid()),
++    }
++}
++
++async fn choices(
++    tx: &mut Transaction<'_, Postgres>,
++    scope: ActivationRequest,
++    binding: Uuid,
++    step: &StepId,
++    subject: DecisionSubject,
++) -> AppResult<Vec<String>> {
++    if subject != DecisionSubject::Business {
++        return Ok(vec!["approve".into(), "reject".into()]);
++    }
++    let binding = admission_binding::read_saved_binding(
++        tx,
++        scope.company,
++        WorkflowBindingId::new(binding),
++        scope.run.as_uuid(),
++    )
++    .await?;
++    match binding
++        .bundle()
++        .compiled()
++        .graph()
++        .definition()
++        .steps
++        .get(step)
++        .map(|step| &step.routes)
++    {
++        Some(Routes::Choices(routes)) => Ok(routes
++            .iter()
++            .map(|(choice, _)| choice.as_str().to_owned())
++            .collect()),
++        _ => Err(invalid()),
++    }
++}
++
++async fn proposal(
++    tx: &mut Transaction<'_, Postgres>,
++    company: CompanyId,
++    decision: DecisionId,
++    subject: DecisionSubject,
++    business: &Value,
++) -> AppResult<Value> {
++    match subject {
++        DecisionSubject::Business => Ok(business.clone()),
++        DecisionSubject::ProtectedAction => approvals::view_proposal(tx, company, decision).await,
++        DecisionSubject::TokenAllowance => Ok(sqlx::query_scalar(
++            "SELECT token_proposal FROM workflow_decisions WHERE company_id=$1 AND id=$2",
++        )
++        .bind(company.as_uuid())
++        .bind(decision.0)
++        .fetch_one(&mut **tx)
++        .await?),
++    }
++}
++
++async fn comments(
++    tx: &mut Transaction<'_, Postgres>,
++    company: CompanyId,
++    decision: DecisionId,
++) -> AppResult<Vec<DecisionCommentView>> {
++    #[derive(sqlx::FromRow)]
++    struct Row {
++        sequence: i64,
++        author_principal: Uuid,
++        body: String,
++        created_at: DateTime<Utc>,
++    }
++    let rows:Vec<Row>=sqlx::query_as("SELECT sequence,author_principal_id AS author_principal,body,created_at FROM workflow_decision_comments WHERE company_id=$1 AND decision_id=$2 ORDER BY sequence LIMIT $3")
++        .bind(company.as_uuid()).bind(decision.0).bind(MAX_DECISION_COMMENTS).fetch_all(&mut **tx).await?;
++    Ok(rows
++        .into_iter()
++        .map(|row| DecisionCommentView {
++            sequence: row.sequence,
++            author_principal: row.author_principal,
++            body: row.body,
++            created_at: row.created_at,
++        })
++        .collect())
++}
++
++const READ_SQL: &str = r#"
++SELECT decision.subject_kind,execution.step_id,decision.revision,decision.proposal_digest,
++       COALESCE(execution.frozen_inputs->'proposal','null'::jsonb) AS proposal,
++       execution.frozen_inputs->'data_schema' AS data_schema,
++       execution.frozen_inputs->'feedback_required' AS feedback_required,
++       wait.deadline,wait.state,decision.submitted_by,decision.submitted_at,decision.choice,decision.feedback,decision.data
++FROM workflow_decisions AS decision
++JOIN workflow_executions AS execution ON (execution.company_id,execution.id)=(decision.company_id,decision.execution_id)
++JOIN workflow_waits AS wait ON (wait.company_id,wait.id)=(decision.company_id,decision.wait_id)
++WHERE decision.company_id=$1 AND decision.id=$2
++"#;
+--- a/src/adapters/persistence/workflow/decisions/read/history.rs
++++ b/src/adapters/persistence/workflow/decisions/read/history.rs
+@@ -0,0 +1,102 @@
++use super::*;
++use std::collections::HashMap;
++
++const ROUND_LIMIT: i64 = 20;
++const HISTORY_LIMIT: i64 = 40;
++
++pub(super) struct History {
++    pub items: Vec<DecisionHistoryEntry>,
++    pub truncated: bool,
++}
++
++/// Revision rounds are siblings of the same parent execution, not arbitrary runs on a thread.
++/// The child writer inherits the parent's channel/thread; the final query checks it again.
++pub(super) async fn read(
++    tx: &mut Transaction<'_, Postgres>,
++    scope: ActivationRequest,
++    context: &ContextRow,
++) -> AppResult<History> {
++    let mut rounds:Vec<(Uuid,i32)>=match (context.parent_run_id,context.parent_execution_id) {
++        (Some(parent),Some(execution))=>sqlx::query_as(
++            "SELECT child_run_id,child_ordinal FROM workflow_waits WHERE company_id=$1 AND run_id=$2 AND execution_id=$3 \
++             AND reason='child_run' AND child_ordinal IS NOT NULL ORDER BY child_ordinal DESC LIMIT $4")
++            .bind(scope.company.as_uuid()).bind(parent).bind(execution).bind(ROUND_LIMIT+1).fetch_all(&mut **tx).await?,
++        _=>Vec::new(),
++    };
++    let more_rounds = rounds.len() > ROUND_LIMIT as usize;
++    rounds.truncate(ROUND_LIMIT as usize);
++    let rounds: HashMap<Uuid, i32> = rounds.into_iter().collect();
++    let mut runs: Vec<_> = rounds.keys().copied().collect();
++    runs.push(scope.run.as_uuid());
++    if let Some(parent) = context.parent_run_id {
++        runs.push(parent);
++    }
++    runs.sort();
++    runs.dedup();
++    let mut rows: Vec<Row> = sqlx::query_as(HISTORY_SQL)
++        .bind(scope.company.as_uuid())
++        .bind(runs)
++        .bind(context.channel_id)
++        .bind(context.thread_id)
++        .bind(HISTORY_LIMIT + 1)
++        .fetch_all(&mut **tx)
++        .await?;
++    let truncated = more_rounds || rows.len() > HISTORY_LIMIT as usize;
++    rows.truncate(HISTORY_LIMIT as usize);
++    rows.reverse();
++    let items = rows
++        .into_iter()
++        .map(|row| {
++            Ok(DecisionHistoryEntry {
++                decision: DecisionId(row.id),
++                run: RunId::new(row.run_id),
++                step: StepId::parse(row.step_id).map_err(|_| invalid())?,
++                round: rounds.get(&row.run_id).copied(),
++                artifact_digest: row.proposal_digest,
++                subject: subject(&row.subject_kind)?,
++                state: row.state,
++                choice: row.choice,
++                feedback: row.feedback,
++                created_at: row.created_at,
++            })
++        })
++        .collect::<AppResult<_>>()?;
++    Ok(History { items, truncated })
++}
++
++#[derive(sqlx::FromRow)]
++struct Row {
++    id: Uuid,
++    run_id: Uuid,
++    step_id: String,
++    proposal_digest: String,
++    subject_kind: String,
++    state: String,
++    choice: Option<String>,
++    feedback: Option<String>,
++    created_at: DateTime<Utc>,
++}
++
++// Limit cheap identities per selected run before reading feedback or joining its execution/wait.
++// workflow_decisions_history serves each newest-first probe. The working set is <=22 *41 heads.
++const HISTORY_SQL: &str = r#"
++WITH eligible AS MATERIALIZED (
++    SELECT run.id AS run_id FROM unnest($2::uuid[]) AS related(run_id)
++    JOIN workflow_runs AS run ON run.company_id=$1 AND run.id=related.run_id
++    WHERE run.channel_id IS NOT DISTINCT FROM $3::uuid AND run.thread_id IS NOT DISTINCT FROM $4::uuid
++), heads AS MATERIALIZED (
++    SELECT head.id,head.run_id,head.execution_id,head.wait_id,head.created_at FROM eligible
++    CROSS JOIN LATERAL (
++        SELECT id,run_id,execution_id,wait_id,created_at FROM workflow_decisions
++        WHERE company_id=$1 AND run_id=eligible.run_id ORDER BY created_at DESC,id DESC LIMIT $5
++    ) AS head
++    ORDER BY head.created_at DESC,head.id DESC LIMIT $5
++)
++SELECT decision.id,decision.run_id,execution.step_id,decision.proposal_digest,decision.subject_kind,
++       wait.state,decision.choice,decision.feedback,heads.created_at
++FROM heads
++JOIN workflow_decisions AS decision ON decision.company_id=$1 AND decision.id=heads.id
++JOIN workflow_executions AS execution ON execution.company_id=$1 AND execution.id=heads.execution_id
++JOIN workflow_waits AS wait ON wait.company_id=$1 AND wait.id=heads.wait_id
++ORDER BY heads.created_at DESC,heads.id DESC
++"#;
+--- a/src/application/workflow/decisions.rs
++++ b/src/application/workflow/decisions.rs
+@@ -147,9 +147,66 @@
+     pub data: Value,
+ }
+ 
++/// The subject whose immutable artifact a reviewer is settling.
++#[derive(Debug, Clone, Copy, PartialEq, Eq)]
++pub enum DecisionSubject {
++    Business,
++    ProtectedAction,
++    TokenAllowance,
++}
++impl DecisionSubject {
++    pub fn label(self) -> &'static str {
++        match self {
++            Self::Business => "Business decision",
++            Self::ProtectedAction => "Protected-action approval",
++            Self::TokenAllowance => "Token allowance approval",
++        }
++    }
++    pub fn as_str(self) -> &'static str {
++        match self {
++            Self::Business => "business",
++            Self::ProtectedAction => "action_approval",
++            Self::TokenAllowance => "token_allowance",
++        }
++    }
++}
++
++#[derive(Debug, Clone, PartialEq)]
++pub struct DecisionContext {
++    pub company: CompanyId,
++    pub workflow_title: String,
++    pub version: crate::domain::workflow::VersionId,
++    pub channel: Option<Uuid>,
++    pub thread: Option<Uuid>,
++    pub trigger_message: Option<Uuid>,
++    pub inspect_run: bool,
++}
++
++/// Bounded links to exact artifacts in this run and sibling revision rounds.
++#[derive(Debug, Clone, PartialEq)]
++pub struct DecisionHistoryEntry {
++    pub decision: DecisionId,
++    pub run: RunId,
++    pub step: StepId,
++    pub round: Option<i32>,
++    pub artifact_digest: String,
++    pub subject: DecisionSubject,
++    pub state: String,
++    pub choice: Option<String>,
++    pub feedback: Option<String>,
++    pub created_at: DateTime<Utc>,
++}
++
+ /// What a member with run visibility may see. Comments are internal discussion.
+ #[derive(Debug, Clone, PartialEq)]
+ pub struct DecisionView {
++    pub subject: DecisionSubject,
++    pub context: DecisionContext,
++    pub data_schema: Option<Value>,
++    pub feedback_required: Vec<String>,
++    pub can_submit: bool,
++    pub history: Vec<DecisionHistoryEntry>,
++    pub history_truncated: bool,
+     pub decision: DecisionId,
+     pub run: RunId,
+     pub execution: ExecutionId,

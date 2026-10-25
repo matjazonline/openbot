@@ -112,14 +112,10 @@ fn the_application_layer_imports_no_adapter_framework_or_provider_type() {
     );
 }
 
-/// The agent runtime belongs behind [`AgentHarness`], and nothing above the adapter may name it.
+/// The agent runtime belongs in the rig adapter, and nothing above the adapter may name it.
 ///
-/// This is the boundary the harness phases exist to create: a single `use rig::...` in the
-/// application layer would make a port an alias for one runtime's types and nothing would fail.
-/// `src/application/services/harness/tests.rs` asserts the same thing one module in; this is the
-/// whole layer.
-///
-/// [`AgentHarness`]: crate::services::harness::AgentHarness
+/// A single `use rig::...` in the application layer would make a port an alias for one runtime's
+/// types and nothing would fail.
 #[test]
 fn the_application_layer_names_no_agent_runtime() {
     let sources = application_sources();

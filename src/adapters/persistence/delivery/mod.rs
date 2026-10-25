@@ -42,8 +42,7 @@ use crate::{
 /// The columns every read of a delivery selects, named once so the claim, the paging read and the
 /// single-row read cannot select different shapes.
 pub(crate) const DELIVERY_COLUMNS: &str = r#"id, company_id, channel_id, message_id,
-    source_binding_id, destination_binding_id, external_destination, task_id,
-    depends_on_delivery_id, correlation_id, transport, purpose, idempotency_key, status,
+    source_binding_id, destination_binding_id, external_destination, depends_on_delivery_id, correlation_id, transport, purpose, idempotency_key, status,
     attempt_count, max_attempts, available_at, last_error_class, last_error_detail,
     execution_id, owner_worker_id, locked_at, lock_expires_at, delivered_at,
     created_at, updated_at, cancellation_requested_at, cancellation_reason"#;
@@ -148,7 +147,6 @@ pub(crate) struct DeliveryDb {
     pub source_binding_id: Option<Uuid>,
     pub destination_binding_id: Option<Uuid>,
     pub external_destination: Option<String>,
-    pub task_id: Option<Uuid>,
     pub depends_on_delivery_id: Option<Uuid>,
     pub correlation_id: Uuid,
     pub transport: String,
@@ -254,7 +252,6 @@ impl DeliveryDb {
             id: DeliveryId::new(self.id),
             attribution,
             external_destination,
-            task_id: self.task_id,
             correlation_id: CorrelationId::from(self.correlation_id),
             transport,
             purpose: self.purpose()?,

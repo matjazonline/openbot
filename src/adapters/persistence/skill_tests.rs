@@ -3,10 +3,9 @@ use std::sync::Arc;
 
 use crate::{
     adapters::persistence::test_support::test_pool,
-    entities::{creation::CreationProvenance, harness::SubAgentScope, skill::SkillInstruction},
+    entities::{creation::CreationProvenance, skill::SkillInstruction},
     use_cases::{
-        agent::{AgentPersistence, AgentWrite, OwnedAgentChannelPersistence},
-        channel::ChannelWrite,
+        agent::{AgentPersistence, AgentWrite, LibraryAgentCopyPersistence},
         company::{CompanyPersistence, CompanyWrite},
         skill::AgentCapabilityReader,
         user::UserPersistence,
@@ -212,7 +211,7 @@ async fn capability_selection_is_scoped_and_updates_atomically() {
             .is_err()
     );
     let snapshot = persistence
-        .load_for_execution(company_id, agent.id)
+        .load_capabilities(company_id, agent.id)
         .await
         .unwrap()
         .unwrap();
@@ -278,7 +277,7 @@ async fn a_capability_snapshot_never_mixes_an_agent_row_with_a_different_relatio
 
     for _ in 0..200 {
         let snapshot = persistence
-            .load_for_execution(company_id, agent.id)
+            .load_capabilities(company_id, agent.id)
             .await
             .unwrap()
             .unwrap();
@@ -367,27 +366,6 @@ async fn deleting_an_in_use_library_skill_is_refused() {
 }
 
 #[tokio::test]
-async fn a_direct_library_agent_resolves_to_all_company_siblings() {
-    let Some(pool) = test_pool().await else {
-        return;
-    };
-    let persistence = PostgresPersistence::new(pool);
-    let company_id = company(&persistence, "library-scope").await;
-    let agent = AgentPersistence::create_library(
-        &persistence,
-        agent_write(format!("global-{}", Uuid::new_v4().simple())),
-    )
-    .await
-    .unwrap();
-    let snapshot = persistence
-        .load_for_execution(company_id, agent.id)
-        .await
-        .unwrap()
-        .unwrap();
-    assert_eq!(snapshot.sub_agent_scope, SubAgentScope::AllCompanySiblings);
-}
-
-#[tokio::test]
 async fn picking_a_library_agent_copies_its_skills_with_the_agent_and_channel() {
     let Some(pool) = test_pool().await else {
         return;
@@ -412,23 +390,12 @@ async fn picking_a_library_agent_copies_its_skills_with_the_agent_and_channel() 
         created_by: Some(CreationProvenance::system()),
         ..Default::default()
     };
-    let channel_write = ChannelWrite {
-        name: "Picked agent".into(),
-        slug: company_write.slug.clone(),
-        created_by: Some(CreationProvenance::system()),
-        ..Default::default()
-    };
-    let (created, _channel) = persistence
-        .create_owned_agent_channel_from_library(
-            company_id,
-            source_agent.id,
-            company_write,
-            channel_write,
-        )
+    let created = persistence
+        .create_agent_from_library(company_id, source_agent.id, company_write)
         .await
         .unwrap();
     let snapshot = persistence
-        .load_for_execution(company_id, created.id)
+        .load_capabilities(company_id, created.id)
         .await
         .unwrap()
         .unwrap();
@@ -445,7 +412,7 @@ async fn picking_a_library_agent_copies_its_skills_with_the_agent_and_channel() 
 }
 
 #[tokio::test]
-async fn database_bounds_skill_and_sub_agent_positions() {
+async fn database_bounds_skill_positions() {
     let Some(pool) = test_pool().await else {
         return;
     };
@@ -466,23 +433,6 @@ async fn database_bounds_skill_and_sub_agent_positions() {
             .execute(&pool)
             .await
             .is_err()
-    );
-
-    let sibling =
-        AgentPersistence::create(&persistence, company_id, agent_write("bounded-sibling"))
-            .await
-            .unwrap();
-    assert!(
-        sqlx::query(
-            "INSERT INTO agent_sub_agents (company_id, agent_id, sub_agent_id, position) \
-             VALUES ($1, $2, $3, 64)",
-        )
-        .bind(company_id)
-        .bind(agent.id)
-        .bind(sibling.id)
-        .execute(&pool)
-        .await
-        .is_err()
     );
 }
 
@@ -560,42 +510,4 @@ async fn malformed_but_deserializable_skill_json_is_a_contextual_conversion_erro
     .unwrap();
     let error = persistence.get_company(company_id, id).await.unwrap_err();
     assert!(error.to_string().contains(&id.to_string()), "{error}");
-}
-
-#[tokio::test]
-async fn direct_sql_agent_config_cannot_reach_runtime_authority_paths() {
-    let Some(pool) = test_pool().await else {
-        return;
-    };
-    let persistence = PostgresPersistence::new(pool.clone());
-    let company_id = company(&persistence, "unsafe-config").await;
-    let agent =
-        AgentPersistence::create(&persistence, company_id, agent_write("unsafe-config-agent"))
-            .await
-            .unwrap();
-    sqlx::query("UPDATE agents SET config_json = $1 WHERE id = $2")
-        .bind(serde_json::json!({
-            "version": 1,
-            "spawner": {"management_tools": ["command"]},
-            "persona": {"evolution": {"allow_llm_evolve": true}},
-            "tool_security": {"enabled": false},
-            "observability": {"include_prompts": true}
-        }))
-        .bind(agent.id)
-        .execute(&pool)
-        .await
-        .unwrap();
-
-    let error = AgentPersistence::get_by_id(&persistence, agent.id)
-        .await
-        .unwrap_err();
-    let message = error.to_string();
-    assert!(message.contains(&agent.id.to_string()), "{error}");
-    assert!(message.contains("not accepted"), "{error}");
-    assert!(
-        ["spawner", "persona", "tool_security", "observability"]
-            .iter()
-            .any(|path| message.contains(path)),
-        "{error}"
-    );
 }

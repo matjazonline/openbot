@@ -42,6 +42,10 @@ budget failures remain errors. The compiler preflights all binding branches even
 if evaluation later short circuits.
 
 `run.id` is a string and `run.parent_id` is always present as a string or `null`.
+`run.deadline` is the run's own deadline, fixed at admission and inherited by child runs, as a
+UTC RFC3339 string with microsecond precision (`2030-01-01T00:00:00.000000Z`); bind it where a
+step needs a deadline that moves with each run, such as a `decision.human` that should expire
+with its run.
 Before a step starts, the caller must use `prepare_step_inputs` and durably save
 its owned snapshot; retries must reuse that saved value. The helper performs no
 I/O. Call `validate_step_output` before committing the named step's own output.

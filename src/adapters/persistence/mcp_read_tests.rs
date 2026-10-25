@@ -1,7 +1,7 @@
 use super::*;
 
 #[tokio::test]
-async fn runtime_catalog_reads_are_bounded_tenant_scoped_and_exclude_deleted_rows() {
+async fn catalog_reads_are_tenant_scoped_and_exclude_deleted_rows() {
     let Some(pool) = test_pool().await else {
         return;
     };
@@ -23,33 +23,16 @@ async fn runtime_catalog_reads_are_bounded_tenant_scoped_and_exclude_deleted_row
     p.delete_mcp_connection(owner, deleted.id, deleted.revision)
         .await
         .unwrap();
-    let rows = p
-        .mcp_connections_by_ids(
-            owner,
-            &[
-                selected.id,
-                selected.id,
-                deleted.id,
-                other.id,
-                Uuid::new_v4(),
-            ],
-        )
-        .await
-        .unwrap();
+    // The owner's catalog: its live connection only, not the deleted one or another company's.
+    let rows = p.list_mcp_connections(owner).await.unwrap();
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0].id, selected.id);
     assert_eq!(rows[0].discovered_tools, selected.discovered_tools);
     assert_eq!(rows[0].tool_grants, selected.tool_grants);
-    assert!(
-        p.mcp_connections_by_ids(owner, &[])
-            .await
-            .unwrap()
-            .is_empty()
-    );
-    assert!(
-        p.mcp_connections_by_ids(owner, &[selected.id; MAX_MCP_CONNECTIONS + 1])
-            .await
-            .is_err()
+    let foreign_rows = p.list_mcp_connections(foreign).await.unwrap();
+    assert_eq!(
+        foreign_rows.iter().map(|row| row.id).collect::<Vec<_>>(),
+        vec![other.id]
     );
     CompanyPersistence::delete(&p, owner).await.unwrap();
     CompanyPersistence::delete(&p, foreign).await.unwrap();

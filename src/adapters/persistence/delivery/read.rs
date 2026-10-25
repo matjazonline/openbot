@@ -41,7 +41,7 @@ struct DeliveryViewDb {
 const DELIVERY_VIEW_SELECT: &str = r#"
     SELECT delivery.id, delivery.company_id, delivery.channel_id, delivery.message_id,
            delivery.source_binding_id, delivery.destination_binding_id,
-           delivery.external_destination, delivery.task_id, delivery.depends_on_delivery_id,
+           delivery.external_destination, delivery.depends_on_delivery_id,
            delivery.correlation_id, delivery.transport, delivery.purpose,
            delivery.idempotency_key, delivery.status, delivery.attempt_count,
            delivery.max_attempts, delivery.available_at, delivery.last_error_class,
@@ -128,48 +128,6 @@ impl DeliveryReader for PostgresPersistence {
             .into_iter()
             .next())
     }
-
-    async fn list_task_deliveries(
-        &self,
-        company_id: Uuid,
-        task_id: Uuid,
-    ) -> AppResult<Vec<DeliveryEntry>> {
-        let rows = sqlx::query_as::<_, DeliveryViewDb>(&format!(
-            "{DELIVERY_VIEW_SELECT} WHERE delivery.company_id = $1 AND delivery.task_id = $2
-              ORDER BY delivery.created_at, delivery.id"
-        ))
-        .bind(company_id)
-        .bind(task_id)
-        .fetch_all(&self.pool)
-        .await
-        .map_err(AppError::from)?;
-        self.with_parts(rows).await
-    }
-}
-
-/// Every delivery belonging to any of `task_ids`, bounded by `limit`.
-///
-/// The batch form of [`DeliveryReader::list_task_deliveries`], for the chain detail view, which
-/// renders a whole correlation chain's tasks at once. A per-task loop there would be one round
-/// trip per task on a page that already caps its working set.
-pub(crate) async fn deliveries_for_tasks(
-    pool: &sqlx::PgPool,
-    company_id: Uuid,
-    task_ids: &[Uuid],
-    limit: i64,
-) -> AppResult<Vec<DeliveryEntry>> {
-    let rows = sqlx::query_as::<_, DeliveryViewDb>(&format!(
-        "{DELIVERY_VIEW_SELECT} WHERE delivery.company_id = $1 AND delivery.task_id = ANY($2)
-          ORDER BY delivery.task_id, delivery.created_at, delivery.id
-          LIMIT $3"
-    ))
-    .bind(company_id)
-    .bind(task_ids)
-    .bind(limit)
-    .fetch_all(pool)
-    .await
-    .map_err(AppError::from)?;
-    attach_parts(pool, rows).await
 }
 
 impl PostgresPersistence {
@@ -228,7 +186,6 @@ fn entry(row: DeliveryViewDb, parts: Vec<DeliveryPartEntry>) -> AppResult<Delive
         company_id: attribution.company_id,
         channel_id: attribution.channel_id,
         message_id: attribution.message_id,
-        task_id: delivery.task_id,
         correlation_id: CorrelationId::from(delivery.correlation_id),
         transport: delivery.transport()?,
         purpose: delivery.purpose()?,

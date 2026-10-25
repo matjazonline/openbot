@@ -544,7 +544,6 @@ fn record() -> DeliveryRecord {
             destination_binding_id: ChannelBindingId::random(),
         }),
         external_destination: None,
-        task_id: None,
         correlation_id: CorrelationId::new(),
         transport: TransportKind::Email,
         purpose: DeliveryPurpose::Reply,

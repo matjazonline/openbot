@@ -110,13 +110,18 @@ struct Occurrence {
     channel: Uuid,
 }
 impl Occurrence {
+    /// An occurrence of a schedule of the fixture's own binding.
     async fn new(f: &AdmissionFixture, company: CompanyId, channel: Uuid) -> Self {
+        Self::of(f, company, channel, f.binding.target.binding.as_uuid()).await
+    }
+
+    async fn of(f: &AdmissionFixture, company: CompanyId, channel: Uuid, binding: Uuid) -> Self {
         let schedule = Uuid::new_v4();
         let occurrence = Uuid::new_v4();
-        sqlx::query("INSERT INTO channel_schedules (id,company_id,channel_id,name,schedule_type,subject_template,prompt_template) VALUES ($1,$2,$3,'Admission','one_off','Subject','Prompt')")
-            .bind(schedule).bind(company.as_uuid()).bind(channel).execute(f.persistence().pool()).await.unwrap();
-        sqlx::query("INSERT INTO schedule_runs (id,schedule_id,scheduled_for,schedule_snapshot,company_id,channel_id) VALUES ($1,$2,CURRENT_TIMESTAMP,'{}',$3,$4)")
-            .bind(occurrence).bind(schedule).bind(company.as_uuid()).bind(channel).execute(f.persistence().pool()).await.unwrap();
+        sqlx::query("INSERT INTO channel_schedules (id,company_id,channel_id,binding_id,name,schedule_type) VALUES ($1,$2,$3,$4,'Admission','one_off')")
+            .bind(schedule).bind(company.as_uuid()).bind(channel).bind(binding).execute(f.persistence().pool()).await.unwrap();
+        sqlx::query("INSERT INTO schedule_runs (id,schedule_id,scheduled_for,schedule_snapshot,company_id,channel_id,binding_id) VALUES ($1,$2,CURRENT_TIMESTAMP,'{}',$3,$4,$5)")
+            .bind(occurrence).bind(schedule).bind(company.as_uuid()).bind(channel).bind(binding).execute(f.persistence().pool()).await.unwrap();
         Self {
             schedule,
             occurrence,
@@ -144,13 +149,53 @@ async fn workflow_admit_sql_schedule_source_checks_occurrence_owner_and_associat
     let foreign = ForeignSource::new(&f).await;
     let first = Occurrence::new(&f, f.binding.target.company, c.channel).await;
     let second = Occurrence::new(&f, f.binding.target.company, c.channel).await;
-    let foreign = Occurrence::new(&f, foreign.company, foreign.channel).await;
+    let foreign_binding = {
+        use crate::adapters::persistence::workflow::schedule_test_support::{
+            bind, publish, source,
+        };
+        let p = f.persistence();
+        let owner = f.binding.target.actor.user_id();
+        let version = publish(p, foreign.company.as_uuid(), owner, source(None)).await;
+        bind(
+            p,
+            foreign.company.as_uuid(),
+            owner,
+            version,
+            RelatedAssociation::Company,
+            None,
+        )
+        .await
+        .as_uuid()
+    };
+    let foreign = Occurrence::of(&f, foreign.company, foreign.channel, foreign_binding).await;
+    // A schedule of another binding of this company is not this binding's source either.
+    let other_binding = {
+        use crate::adapters::persistence::workflow::schedule_test_support::{
+            bind, publish, source,
+        };
+        let p = f.persistence();
+        let company = f.binding.target.company.as_uuid();
+        let owner = f.binding.target.actor.user_id();
+        let version = publish(p, company, owner, source(None)).await;
+        bind(
+            p,
+            company,
+            owner,
+            version,
+            RelatedAssociation::Company,
+            None,
+        )
+        .await
+        .as_uuid()
+    };
+    let other = Occurrence::of(&f, f.binding.target.company, c.channel, other_binding).await;
     for (key, schedule, occurrence) in [
         ("missing-schedule", Uuid::new_v4(), first.occurrence),
         ("missing-occurrence", first.schedule, Uuid::new_v4()),
         ("wrong-owner", second.schedule, first.occurrence),
         ("foreign-owner", foreign.schedule, foreign.occurrence),
         ("foreign-occurrence", first.schedule, foreign.occurrence),
+        ("other-binding", other.schedule, other.occurrence),
     ] {
         let mut request = source_request(
             &f,

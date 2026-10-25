@@ -14,31 +14,28 @@ JSON API are rejected as unknown fields.
 
 ## What an agent can use now
 
-- **Skills** are prompt-only. Attached skills appear in a scoped catalog and the model loads one
-  with `read_resource`, the only tool the Rig runtime exposes. Loading executes nothing; the model
-  follows the prompt steps. See [Rig agents](rig.md).
+- **Skills** are prompt-only. An `agent.run` step appends each attached skill's instructions to
+  the agent's prompt. That executes nothing; the model follows the prompt steps. See
+  [Rig agents](rig.md).
 - **Workflow tools.** An agent's `workflow_tools` names the workflow tool types it may use. The
   list is frozen into a workflow at publication and revoked if the agent loses it later. Calls are
   workflow actions dispatched through the application's action service, never runtime tools.
 - **Company HTTP MCP** tools are reached the same way: through workflow MCP actions against the
   company catalog and its reviewed grants. See [Company HTTP MCP](rig.md#company-http-mcp).
 
-The stored `config_json` is not runtime YAML and cannot grant tools. Rig V1 accepts only
-`version` and `max_turns` (1–16, default 8):
-
-```json
-{ "version": 1, "max_turns": 8 }
-```
+An agent has no runtime configuration of its own, so nothing stored on it can grant tools beyond
+the two lists above.
 
 ## Agent Builder
 
 The server installs an `agent-builder` definition into the global agent library after database
 migrations, inserted only when that library slug is absent. It guides a user through the agent's
-purpose, constraints, system prompt, least-privilege workflow tools and company skills, and ends
-with a specification the user creates in the company agent settings. It no longer creates agents
-itself.
+purpose, constraints, system prompt, least-privilege workflow tools and company skills. It is
+granted two workflow tools:
 
-## Planned
+- `list_company_agents`: the company's agents, so it does not duplicate one;
+- `create_agent_channel`: provisions the new agent together with a team (never public) channel,
+  bound to the reply-mode workflow the conversation chose (p08 D2). The requester must be an
+  owner or admin, and becomes the binding's run-as member.
 
-Phase 08 rebuilds agent creation (`create_agent_channel`) and the company agent directory
-(`list_company_agents`) as workflow tools, together with production workflow worker wiring.
+An owner or admin can provision the same way from the UI ("Create assistant channel").

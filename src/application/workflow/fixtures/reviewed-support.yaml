@@ -5,14 +5,15 @@ input_schema:
   properties:
     message: {type: string}
     source_message: {type: string, maxLength: 128}
+    subject: {type: string, maxLength: 998}
+    sender: {type: string, maxLength: 320}
   required: [message, source_message]
   additionalProperties: false
 parameter_schema:
   type: object
   properties:
     reviewer: {type: string, maxLength: 128}
-    deadline: {type: string, maxLength: 64}
-  required: [reviewer, deadline]
+  required: [reviewer]
   additionalProperties: false
 output_schema: true
 resources: []
@@ -35,7 +36,7 @@ steps:
     with:
       proposal: {ref: /steps/draft/output}
       reviewers: {array: [{object: {kind: {literal: user}, id: {ref: /params/reviewer}}}]}
-      deadline: {ref: /params/deadline}
+      deadline: {ref: /run/deadline}
       data_schema:
         literal:
           type: object

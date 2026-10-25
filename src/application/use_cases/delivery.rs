@@ -31,15 +31,4 @@ pub trait DeliveryReader: Send + Sync {
     /// One delivery by id. The caller checks its `company_id` before showing it -- the id comes
     /// from a URL.
     async fn get_delivery(&self, delivery_id: DeliveryId) -> AppResult<Option<DeliveryEntry>>;
-
-    /// Every delivery one task handed to a transport, oldest first.
-    ///
-    /// Exists so the task view can show delivery state without the transport writing back into
-    /// task state. `company_id` is part of the query rather than checked afterwards, because the
-    /// task id originates in a browser.
-    async fn list_task_deliveries(
-        &self,
-        company_id: Uuid,
-        task_id: Uuid,
-    ) -> AppResult<Vec<DeliveryEntry>>;
 }

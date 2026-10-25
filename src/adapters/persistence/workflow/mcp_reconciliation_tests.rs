@@ -165,3 +165,55 @@ async fn workflow_mcp_verified_not_applied_retries_lazily_and_checks_live_drift(
         }
     }
 }
+
+/// P08-D3 (F065, F069): the production composition annotates an MCP action whose outcome is
+/// unknown (`Connection { mcp }` through `CompanyReconciliationResources`, no verifier).
+#[tokio::test]
+async fn workflow_mcp_unknown_note_through_the_production_composition() {
+    let setup = Box::pin(mcp_setup(Call::Fail)).await;
+    let p = &setup.fixture.persistence;
+    let claim = claimed(&setup).await;
+    let failure = setup
+        .runtime()
+        .run(&kind(), &claim)
+        .await
+        .completed_result()
+        .unwrap_err();
+    let request = p.mcp_step_request(&claim, &kind()).await.unwrap();
+    let intent = ActionService::new(p.clone())
+        .prepare_step(request.clone())
+        .await
+        .unwrap();
+    assert_eq!(
+        retire(p, &claim, lease(), failure).await.run_state,
+        "waiting"
+    );
+    let marker: Uuid = sqlx::query_scalar("SELECT id FROM workflow_action_dispatches")
+        .fetch_one(p.pool())
+        .await
+        .unwrap();
+    let command = ReconcileActionCommand {
+        actor: setup.actor(),
+        scope: request.scope,
+        subject: intent.approval_subject(),
+        marker: ActionRemoteMarkerId::new(marker),
+        target: ReconciliationTarget::Remote,
+        expected_revision: p
+            .head(request.scope.company, request.scope.run)
+            .await
+            .unwrap()
+            .unwrap()
+            .revision,
+        command_key: IdempotencyKey::parse("mcp-production-note").unwrap(),
+        input: EvidenceInput::UnknownNote {
+            note: "the server never answered".into(),
+            claimed: ClaimedDisposition::Unknown,
+        },
+    };
+    let production = crate::infra::workflow::WorkflowEngine::for_tests(p.clone()).reconciliation();
+    let result =
+        Box::pin(production.reconcile(&command, &CancellationToken::new(), Duration::from_secs(5)))
+            .await
+            .unwrap();
+    assert_eq!(result.outcome, ReconciliationOutcome::UnknownRecorded);
+}

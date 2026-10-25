@@ -1154,5 +1154,69 @@ fn a_stored_destination_is_read_through_its_own_transport() {
     );
 }
 
+/// The stuck-delivery census counts each stall once, over the whole queue, and leaves a delivery
+/// that is merely due alone.
+#[tokio::test]
+async fn the_stuck_delivery_census_counts_each_stall_and_not_a_due_delivery() {
+    let Some(database) = own_database().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(database.pool.clone());
+    let scope = scope(&persistence).await;
+    let mut ids = Vec::new();
+    for key in [
+        "census-dead",
+        "census-overdue",
+        "census-unknown",
+        "census-due",
+        "census-sent",
+    ] {
+        let fixture = queue(
+            &persistence,
+            &scope,
+            DeliveryFixtureRequest::new(scope.company.id, scope.channel.id, scope.thread_id, key),
+        )
+        .await;
+        ids.push(fixture.delivery.id.as_uuid());
+    }
+    let set = |id: Uuid, status: &'static str, available: chrono::Duration| {
+        let pool = database.pool.clone();
+        async move {
+            sqlx::query(
+                "UPDATE message_deliveries
+                    SET status = $2, available_at = CURRENT_TIMESTAMP - $3::interval,
+                        delivered_at = CASE WHEN $2 = 'delivered' THEN CURRENT_TIMESTAMP END
+                  WHERE id = $1",
+            )
+            .bind(id)
+            .bind(status)
+            .bind(sqlx::postgres::types::PgInterval::try_from(available.to_std().unwrap()).unwrap())
+            .execute(&pool)
+            .await
+            .unwrap();
+        }
+    };
+    set(ids[0], "dead_letter", chrono::Duration::hours(1)).await;
+    set(ids[1], "retryable", chrono::Duration::minutes(10)).await;
+    set(ids[2], "outcome_unknown", chrono::Duration::hours(1)).await;
+    // Due, but inside the threshold: the worker has not fallen behind on it yet.
+    set(ids[3], "pending", chrono::Duration::minutes(1)).await;
+    set(ids[4], "delivered", chrono::Duration::hours(1)).await;
+
+    let census = persistence
+        .census_stuck_deliveries(Duration::from_secs(5 * 60))
+        .await
+        .unwrap();
+
+    assert_eq!(
+        census,
+        crate::entities::stuck_work::StuckWorkCensus {
+            delivery_dead_lettered: 1,
+            delivery_overdue: 1,
+            delivery_unconfirmed: 1,
+        }
+    );
+}
+
 #[path = "cancellation_tests.rs"]
 mod cancellation;

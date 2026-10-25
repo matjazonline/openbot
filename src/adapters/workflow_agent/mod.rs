@@ -1,9 +1,11 @@
 //! Production edges of `agent.run` saved tool calls: every effect enters ActionService
-//! through the HTTP, MCP or messaging runtime's direct-tool entry, one call at a time. A workflow
+//! through the HTTP, MCP, messaging or provisioning runtime's direct-tool entry, one call at a
+//! time. A workflow
 //! tool starts its pinned child through the workflow tool runtime instead (07-D2 §D2.3a).
 use crate::{
     adapters::{
         workflow_http::HttpRuntime, workflow_mcp::McpRuntime, workflow_message::MessageRuntime,
+        workflow_provisioning::ProvisioningRuntime,
     },
     app_error::{AppError, AppResult, ExecutionFailure},
     application::workflow::{
@@ -13,6 +15,7 @@ use crate::{
         lease::WorkflowFence,
         mcp::McpToolCall,
         message::{MessageObservation, MessageToolCall},
+        provisioning::ProvisioningToolCall,
         tools::{WorkflowToolCall, WorkflowToolDispatch},
     },
     domain::workflow::ToolCallId,
@@ -29,6 +32,9 @@ pub struct AgentActionTools {
     /// Every production composition includes it (notice WF-C001 r2); without it a frozen
     /// workflow tool fails closed.
     workflow: Option<Arc<dyn WorkflowToolDispatch>>,
+    /// The built-in provisioning tools (p08 D2.2a); without them a frozen provisioning tool
+    /// fails closed.
+    provisioning: Option<Arc<ProvisioningRuntime>>,
 }
 impl AgentActionTools {
     pub fn new(http: Arc<HttpRuntime>, mcp: Arc<McpRuntime>, message: Arc<MessageRuntime>) -> Self {
@@ -37,10 +43,15 @@ impl AgentActionTools {
             mcp,
             message,
             workflow: None,
+            provisioning: None,
         }
     }
     pub fn with_workflow_tools(mut self, workflow: Arc<dyn WorkflowToolDispatch>) -> Self {
         self.workflow = Some(workflow);
+        self
+    }
+    pub fn with_provisioning(mut self, provisioning: Arc<ProvisioningRuntime>) -> Self {
+        self.provisioning = Some(provisioning);
         self
     }
 }
@@ -100,6 +111,26 @@ impl AgentToolDispatch for AgentActionTools {
                                 })?,
                             ),
                         arguments,
+                    },
+                ))
+                .await
+            }
+            // The effect, its marker and its receipt commit together (p08 D2.2).
+            AgentToolTarget::Provisioning { .. } => {
+                let provisioning = self.provisioning.as_ref().ok_or_else(|| {
+                    AppError::BadRequest(
+                        "Provisioning tools are not available to this worker".into(),
+                    )
+                })?;
+                let kind = tool
+                    .provisioning_kind()
+                    .ok_or_else(|| AppError::BadRequest("Unknown provisioning tool".into()))?;
+                Box::pin(provisioning.call_tool(
+                    fence,
+                    ProvisioningToolCall {
+                        kind,
+                        arguments,
+                        call,
                     },
                 ))
                 .await

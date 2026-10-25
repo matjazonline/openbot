@@ -1,4 +1,4 @@
-//! Shared, mostly-pure helpers for the inbound ingest and agent dispatch pipelines.
+//! Shared, mostly-pure helpers for the inbound ingest pipeline.
 //!
 //! Everything here is either a pure decision (no `self`, no I/O) or a memoizing wrapper around
 //! persistence lookups. Keeping them out of the pipeline bodies is what lets those bodies read as
@@ -11,18 +11,11 @@ use uuid::Uuid;
 use crate::{
     app_error::AppResult,
     entities::{
-        agent::Agent,
-        channel::Channel,
-        company::Company,
-        email_message::EmailMessageMetadata,
-        message::AttachmentMetadata,
-        message_view::AgentHistoryMessage,
-        participant::PrincipalAccessContext,
-        quoted_text,
-        transport::QualifiedIdentity,
-        value_objects::{CompanySlug, MessageId},
+        channel::Channel, company::Company, message_view::AgentHistoryMessage,
+        participant::PrincipalAccessContext, quoted_text, transport::QualifiedIdentity,
+        value_objects::CompanySlug,
     },
-    transport::{InboundDraft, InboundEnvelope, SMALL_INLINE_IMAGE_BYTES},
+    transport::InboundDraft,
 };
 
 use super::ThreadUseCases;
@@ -37,7 +30,6 @@ pub(crate) struct DirectoryCache<'a> {
     companies: HashMap<String, Option<Company>>,
     channels: HashMap<Uuid, Vec<Channel>>,
     access_contexts: HashMap<(Uuid, QualifiedIdentity), PrincipalAccessContext>,
-    agents: HashMap<Uuid, Option<Agent>>,
 }
 
 impl<'a> DirectoryCache<'a> {
@@ -47,7 +39,6 @@ impl<'a> DirectoryCache<'a> {
             companies: HashMap::new(),
             channels: HashMap::new(),
             access_contexts: HashMap::new(),
-            agents: HashMap::new(),
         }
     }
 
@@ -93,46 +84,6 @@ impl<'a> DirectoryCache<'a> {
         self.access_contexts.insert(key, loaded);
         Ok(loaded)
     }
-
-    /// One configured agent, cached because several channel matches may reference the same
-    /// library definition.
-    pub(crate) async fn agent(&mut self, id: Uuid) -> AppResult<Option<Agent>> {
-        if let Some(cached) = self.agents.get(&id) {
-            return Ok(cached.clone());
-        }
-        let Some(persistence) = self.use_cases.agent_persistence() else {
-            return Ok(None);
-        };
-        let loaded = persistence.get_by_id(id).await?;
-        self.agents.insert(id, loaded.clone());
-        Ok(loaded)
-    }
-}
-
-/// The `References` chain to put on a reply: the inbound chain, extended with the message it
-/// answers.
-///
-/// Ordered for the wire, oldest first, which is the opposite of the nearest-ancestor order
-/// [`EmailMessageMetadata::reference_candidates`] uses for thread lookup.
-pub(super) fn outbound_reference_ids(envelope: &InboundEnvelope) -> Vec<MessageId> {
-    let Some(metadata) = envelope.extension.email_metadata() else {
-        return Vec::new();
-    };
-    let mut references = metadata.references.clone();
-    if let Some(in_reply_to) = metadata.in_reply_to.as_ref()
-        && !references.contains(in_reply_to)
-    {
-        references.push(in_reply_to.clone());
-    }
-    references
-}
-
-/// The RFC id this message will be answered `In-Reply-To`, when mail carried it.
-pub(super) fn rfc_message_id(envelope: &InboundEnvelope) -> Option<&MessageId> {
-    envelope
-        .extension
-        .email_metadata()
-        .map(|metadata: &EmailMessageMetadata| &metadata.rfc_message_id)
 }
 
 /// Strip quoted history from a reply, falling back to matching against the thread's own stored
@@ -150,65 +101,6 @@ pub(super) fn strip_quoted_history(
         .map(|message| message.body.as_str())
         .collect();
     quoted_text::strip(body, &history_bodies)
-}
-
-/// The prompt handed to the agent: the cleaned body plus a description of every attachment worth
-/// mentioning (tiny inline images are signature decorations, not content).
-pub(super) fn build_prompt_text(envelope: &InboundEnvelope) -> String {
-    prompt_text(envelope.content.body_text(), &envelope.attachments)
-}
-
-/// The prompt handed to the agent: the cleaned body plus a description of every attachment worth
-/// mentioning.
-fn prompt_text(clean_body: &str, attachments: &[AttachmentMetadata]) -> String {
-    let attachment_prompts: Vec<String> = attachments
-        .iter()
-        .filter(|att| {
-            !(att.content_type.to_lowercase().starts_with("image/")
-                && att.size_bytes < SMALL_INLINE_IMAGE_BYTES)
-        })
-        .map(|meta| {
-            format!(
-                "[Attachment: {}, Type: {}, SHA256: {}, Size: {} bytes]",
-                meta.filename, meta.content_type, meta.sha256_hash, meta.size_bytes
-            )
-        })
-        .collect();
-
-    if attachment_prompts.is_empty() {
-        clean_body.to_string()
-    } else {
-        format!("{}\n\n{}", clean_body, attachment_prompts.join("\n"))
-    }
-}
-
-impl ThreadUseCases {
-    /// Whether this address belongs to someone outside the platform.
-    ///
-    /// The single definition of "third party" on the *egress* side: it decides who is dropped from
-    /// an agent reply's `Cc` when a channel has `add_3rd_party` off. Ingress no longer asks -- the
-    /// adapter already classified every recipient before the application saw it -- and this goes
-    /// with the reply renderer in step 9.
-    pub(super) async fn is_third_party_address(
-        &self,
-        address: &str,
-        sender: &str,
-        _directory: &mut DirectoryCache<'_>,
-    ) -> AppResult<bool> {
-        let address = address.trim();
-        if address.is_empty() || address.eq_ignore_ascii_case(sender) {
-            return Ok(false);
-        }
-        let classification = self
-            .deliveries
-            .renderer(crate::entities::transport::TransportKind::Email)?
-            .classify_external_destination(address);
-        Ok(matches!(
-            classification,
-            crate::transport::ExternalDestinationClassification::External(_)
-                | crate::transport::ExternalDestinationClassification::InvalidSyntax
-        ))
-    }
 }
 
 /// Whether a body contains an email address as a complete address-like token.

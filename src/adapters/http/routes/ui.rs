@@ -14,7 +14,7 @@ use std::{
 
 use axum::{
     Form, Router,
-    extract::{Path, Query, State},
+    extract::{Query, State},
     http::HeaderMap,
     response::{
         Html, IntoResponse, Response,
@@ -22,7 +22,6 @@ use axum::{
     },
     routing::get,
 };
-use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use tokio_stream::{Stream, StreamExt};
 use tracing::{instrument, warn};
@@ -31,22 +30,14 @@ use uuid::Uuid;
 use crate::{
     adapters::http::{app_state::AppState, auth::AuthenticatedUser, pages},
     app_error::{AppError, AppResult},
+    application::thread_activity::ThreadActivityReader,
     entities::{
-        agent::Agent,
         channel::Channel,
-        collaboration::CollaborationSummary,
         company::{Company, CompanyAccess},
         company_member::CompanyMembership,
-        delegation::{DelegationActor, DelegationAuthority, DelegationCommand, DelegationReason},
         message::CanonicalMessageId,
-        task::{
-            BackgroundTask, TaskOwner, TaskOwnerCandidate, TaskOwnershipActor,
-            TaskOwnershipAuthority, TaskOwnershipCommand, TaskOwnershipOperation,
-            TaskOwnershipReason, ThreadActivity,
-        },
         thread::Thread,
-        thread_handoff::{ThreadHandoff, ThreadHandoffDraft, ThreadHandoffState},
-        transport::PrincipalId,
+        thread_activity::ThreadActivity,
         user::{User, Viewer},
         value_objects::EmailAddress,
     },
@@ -54,24 +45,24 @@ use crate::{
         config::AppConfig,
         events::{MailboxEvent, MailboxEvents},
     },
-    task_queue::CollaborationReadScope,
     use_cases::{
-        agent::AgentUseCases,
         channel::ChannelUseCases,
         company::CompanyUseCases,
         thread::{
-            CanonicalMessageIngress, HumanCompletionDraft, IngressOrigin, ReplyDelivery,
-            ThreadUseCases, qualified_email_identity,
+            CanonicalMessageIngress, IngressOrigin, ReplyDelivery, ThreadUseCases,
+            qualified_email_identity,
         },
-        thread_handoff::ThreadHandoffUseCases,
         user::UserUseCases,
     },
 };
 
 use super::{
     channel::{ThreadListQuery, ThreadListResponse, load_thread_page},
-    live_updates::{Wake, mailbox_channel_wake_ups, mailbox_thread_wake_ups},
+    live_updates::{Wake, channel_wake_ups, thread_wake_ups},
 };
+
+#[path = "ui_message.rs"]
+mod message;
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -79,23 +70,12 @@ pub fn router() -> Router<AppState> {
         .route("/ui/threads", get(thread_column_fragment))
         .route("/ui/threads/list", get(thread_page_fragment))
         .route("/ui/messages", get(message_pane_fragment))
+        .route("/ui/message", get(message::page))
         .route("/ui/events", get(thread_message_stream))
         .route("/ui/threads/events", get(thread_column_stream))
         .route("/ui/compose", get(compose_form).post(create_thread))
         .route("/ui/reply", get(reply_form).post(send_reply))
         .merge(super::ui_internal_notes::router())
-        .route(
-            "/ui/task-complete",
-            axum::routing::post(complete_human_task),
-        )
-        .route(
-            "/ui/task-ownership/{task_id}/{operation}",
-            axum::routing::post(change_visible_task_ownership),
-        )
-        .route(
-            "/ui/task-delegation/{task_id}/{operation}",
-            axum::routing::post(control_visible_task_delegation),
-        )
 }
 
 /// What the mailbox shell has selected, all optional so `/ui` alone is a valid entry point.
@@ -164,51 +144,6 @@ pub struct ReplyForm {
     pub text_body: Option<String>,
     /// Present only when the "deliver by email" toggle is on.
     pub deliver: Option<String>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct VisibleOwnershipForm {
-    pub company_id: Uuid,
-    pub channel_id: Uuid,
-    pub thread_id: Uuid,
-    pub command_id: Uuid,
-    pub expected_ownership_version: u64,
-    pub owner: Option<String>,
-    pub reason_detail: Option<String>,
-    pub handoff_instruction: Option<String>,
-}
-
-/// A delegation control submitted from a thread the reader can see, rather than from the
-/// manager-only Tasks workspace. The scope fields say which thread it was drawn on; the rest is the
-/// same command envelope `/ui/tasks/{task_id}/delegation/{operation}` takes.
-#[derive(Debug, Clone, Deserialize)]
-pub struct VisibleDelegationForm {
-    pub company_id: Uuid,
-    pub channel_id: Uuid,
-    pub thread_id: Uuid,
-    pub command_id: Uuid,
-    pub expected_version: u64,
-    pub outreach_id: Uuid,
-    #[serde(default)]
-    pub target_id: Option<Uuid>,
-    #[serde(default)]
-    pub new_channel_id: Option<Uuid>,
-    #[serde(default)]
-    pub deadline_hours: Option<i64>,
-    pub reason: DelegationReason,
-    #[serde(default)]
-    pub reason_detail: Option<String>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct HumanCompletionForm {
-    pub company_id: Uuid,
-    pub channel_id: Uuid,
-    pub thread_id: Uuid,
-    pub task_id: Uuid,
-    pub command_id: Uuid,
-    pub expected_ownership_version: u64,
-    pub text_body: String,
 }
 
 /// How the "deliver by email" toggle arrives on both send forms.
@@ -332,35 +267,16 @@ fn empty_thread_page() -> ThreadListResponse {
 /// Every column render goes through this rather than asking per row: a page is up to 50 threads,
 /// and a query each would be 50 round trips for a badge most of them do not have.
 async fn page_activity(
-    thread_use_cases: &ThreadUseCases,
+    activity_reader: &dyn ThreadActivityReader,
+    company_id: Uuid,
     threads: &[Thread],
 ) -> AppResult<HashMap<Uuid, ThreadActivity>> {
     let ids: Vec<Uuid> = threads.iter().map(|thread| thread.id).collect();
-    Ok(thread_use_cases
-        .thread_work_summary(&ids)
+    Ok(activity_reader
+        .thread_activity(company_id, &ids)
         .await?
         .into_iter()
         .filter_map(|(thread_id, summary)| summary.activity.map(|activity| (thread_id, activity)))
-        .collect())
-}
-
-/// The held customer reply each thread in a rendered page is waiting on, in one batched lookup.
-///
-/// `visible_channel_ids` is passed through rather than derived from the thread list: the page
-/// handler proved channel visibility for the *selected* channel, and this query must prove it for
-/// every row it answers.
-async fn page_handoffs(
-    handoffs: &ThreadHandoffUseCases,
-    company_id: Uuid,
-    visible_channel_ids: &[Uuid],
-    threads: &[Thread],
-) -> AppResult<HashMap<Uuid, pages::ThreadHandoffMark>> {
-    let ids: Vec<Uuid> = threads.iter().map(|thread| thread.id).collect();
-    Ok(handoffs
-        .thread_handoffs_for_threads(company_id, &ids, visible_channel_ids)
-        .await?
-        .iter()
-        .map(|(thread_id, handoff)| (*thread_id, pages::ThreadHandoffMark::of(handoff)))
         .collect())
 }
 
@@ -377,317 +293,41 @@ async fn first_page_thread_ids(
         .collect())
 }
 
-/// What one thread is doing, for the strip under its messages.
-async fn thread_collaboration(
-    thread_use_cases: &ThreadUseCases,
-    company_id: Uuid,
-    channel_id: Uuid,
-    thread_id: Uuid,
-) -> AppResult<(Option<ThreadActivity>, Option<CollaborationSummary>)> {
-    let work = thread_use_cases
-        .thread_work_summary(&[thread_id])
-        .await?
-        .remove(&thread_id);
-    let collaboration = match work.as_ref() {
-        Some(work) => {
-            thread_use_cases
-                .get_task_persistence()
-                .await
-                .get_collaboration_summary(
-                    CollaborationReadScope {
-                        company_id,
-                        visible_channel_ids: &[channel_id],
-                    },
-                    work.task_id,
-                )
-                .await?
-        }
-        None => None,
-    };
-    Ok((
-        work.as_ref().and_then(|summary| summary.activity),
-        collaboration,
-    ))
-}
-
-/// The face and name the agent side of a thread is drawn with.
-///
-/// A reply is stored with the *channel's* address as its sender, not the agent that wrote it, so
-/// the agent is only unambiguous while the channel runs exactly one. With a stack of them the
-/// messages stay on the address they were sent from -- better a plain address than the wrong face.
-pub(super) async fn channel_agent(
-    agent_use_cases: &AgentUseCases,
-    viewer: &Viewer,
-    channel: &Channel,
-) -> AppResult<Option<Agent>> {
-    let [agent_id] = channel.agent_ids.as_deref().unwrap_or_default() else {
-        return Ok(None);
-    };
-
-    agent_use_cases
-        .get_readable_agent(viewer, channel.company_id, *agent_id)
-        .await
-}
-
-/// Which thread's held reply to load, and for whom.
-///
-/// A named struct rather than three bare `Uuid`s and a `bool`: a transposed company and channel
-/// would compile and would then answer for the wrong tenant.
-#[derive(Clone, Copy)]
-struct HeldReplyScope {
-    company_id: Uuid,
-    channel_id: Uuid,
-    thread_id: Uuid,
-    /// Whether the reader may hand the reply to somebody else, which decides whether the roster
-    /// behind that control is worth loading at all.
-    viewer_manages_tasks: bool,
-}
-
-/// Who is reading, and when, for the banner the load feeds.
-#[derive(Clone, Copy)]
-struct HeldReplyViewer {
-    company_id: Uuid,
-    channel_id: Uuid,
-    thread_id: Uuid,
-    viewer_principal_id: Option<PrincipalId>,
-    viewer_manages_tasks: bool,
-    as_of: DateTime<Utc>,
-}
-
-/// One thread's held customer reply, with everything the banner says about it.
-struct HeldReply {
-    handoff: ThreadHandoff,
-    draft: Option<ThreadHandoffDraft>,
-    /// Every principal this channel lets in, which is where both the responsible name and the
-    /// hand-over roster come from. Empty when neither is needed.
-    principals: Vec<TaskOwnerCandidate>,
-}
-
-impl HeldReply {
-    /// The banner's whole view, built in exactly one place.
-    ///
-    /// The page render and the live stream both come through here and then through
-    /// [`pages::thread_handoff_banner`], which is what makes a banner that streams in
-    /// indistinguishable from one that came with the page.
-    fn banner_view(&self, viewer: HeldReplyViewer) -> pages::ThreadHandoffBannerView<'_> {
-        pages::ThreadHandoffBannerView {
-            company_id: viewer.company_id,
-            channel_id: viewer.channel_id,
-            thread_id: viewer.thread_id,
-            handoff: &self.handoff,
-            responsible_label: self.responsible_label(),
-            viewer_principal_id: viewer.viewer_principal_id,
-            viewer_manages_tasks: viewer.viewer_manages_tasks,
-            draft: self.draft,
-            // Only a manager is offered the hand-over, so only they are given the roster.
-            reassign_candidates: if viewer.viewer_manages_tasks {
-                &self.principals
-            } else {
-                &[]
-            },
-            as_of: viewer.as_of,
-            error: None,
-        }
-    }
-
-    /// The responsible principal's display name. `None` for an unclaimed reply, which the banner
-    /// words as the channel team.
-    fn responsible_label(&self) -> Option<&str> {
-        let responsible = self.handoff.responsible_principal_id?;
-        self.principals
-            .iter()
-            .find(|candidate| candidate.owner.principal_id() == Some(responsible))
-            .map(|candidate| candidate.label.as_str())
-    }
-}
-
-/// The held reply on one thread, or `None` when it has none.
-///
-/// Three reads rather than one join, and each one paid for only when it is needed: the
-/// overwhelmingly common case is a thread with no handoff at all, which pays for none of them; the
-/// draft exists only for a `draft_ready` handoff; and the roster is loaded only when somebody is
-/// named on the reply or the reader could hand it over.
-async fn load_held_reply(
-    thread_use_cases: &ThreadUseCases,
-    handoff_use_cases: &ThreadHandoffUseCases,
-    scope: HeldReplyScope,
-) -> AppResult<Option<HeldReply>> {
-    let visible = [scope.channel_id];
-    let Some(handoff) = handoff_use_cases
-        .thread_handoffs_for_threads(scope.company_id, &[scope.thread_id], &visible)
-        .await?
-        .remove(&scope.thread_id)
-    else {
-        return Ok(None);
-    };
-    let draft = if handoff.state == ThreadHandoffState::DraftReady {
-        handoff_use_cases
-            .thread_handoff_draft(scope.company_id, handoff.id, handoff.generation, &visible)
-            .await?
-    } else {
-        None
-    };
-    let principals = if handoff.responsible_principal_id.is_some() || scope.viewer_manages_tasks {
-        thread_use_cases
-            .get_task_persistence()
-            .await
-            .list_task_owner_candidates(scope.company_id, scope.channel_id)
-            .await?
-    } else {
-        Vec::new()
-    };
-    Ok(Some(HeldReply {
-        handoff,
-        draft,
-        principals,
-    }))
-}
-
-/// The open thread's held-reply banner as the live stream sends it: the empty string when the
-/// thread has no open handoff, which is what clears the banner after a send or a dismissal.
-async fn thread_handoff_banner_html(
-    thread_use_cases: &ThreadUseCases,
-    handoff_use_cases: &ThreadHandoffUseCases,
-    viewer: HeldReplyViewer,
-) -> AppResult<String> {
-    let held = load_held_reply(
-        thread_use_cases,
-        handoff_use_cases,
-        HeldReplyScope {
-            company_id: viewer.company_id,
-            channel_id: viewer.channel_id,
-            thread_id: viewer.thread_id,
-            viewer_manages_tasks: viewer.viewer_manages_tasks,
-        },
-    )
-    .await?;
-    Ok(held.map_or_else(String::new, |held| {
-        pages::thread_handoff_banner(&held.banner_view(viewer))
-    }))
-}
-
-#[expect(
-    clippy::too_many_arguments,
-    reason = "the pane is assembled from every port it reads, each named rather than bundled"
-)]
 pub(super) async fn render_message_pane(
     thread_use_cases: &ThreadUseCases,
-    handoff_use_cases: &ThreadHandoffUseCases,
+    activity_reader: &dyn ThreadActivityReader,
     company_id: Uuid,
     channel: &Channel,
     thread: &Thread,
-    agent: Option<&Agent>,
     viewer: &Viewer,
-    ownership_error: Option<&str>,
+    error: Option<&str>,
 ) -> AppResult<String> {
     let messages = thread_use_cases.get_thread_history(thread.id).await?;
-    let access = thread_use_cases
-        .principal_access_for_user(company_id, viewer.user_id)
+    let activity = activity_reader
+        .thread_runs(company_id, thread.id, viewer.user_id)
         .await?;
-    let viewer_principal_id = access.and_then(|context| context.principal_id);
-    let viewer_manages_tasks =
-        access.is_some_and(|context| context.membership.manages_company_operations());
-    let work = thread_use_cases
-        .thread_work_summary(&[thread.id])
+    let viewer_membership = thread_use_cases
+        .principal_access_for_user(company_id, viewer.user_id)
         .await?
-        .remove(&thread.id);
-    let mut collaboration = match work.as_ref() {
-        Some(work) => {
-            thread_use_cases
-                .get_task_persistence()
-                .await
-                .get_collaboration_summary(
-                    CollaborationReadScope {
-                        company_id,
-                        visible_channel_ids: &[channel.id],
-                    },
-                    work.task_id,
-                )
-                .await?
-        }
-        None => None,
-    };
-    if viewer_manages_tasks && let Some(summary) = collaboration.as_mut() {
-        summary.detail_href = Some(format!(
-            "/ui/tasks?company_id={company_id}&view=board&correlation_id={}",
-            summary.correlation_id
-        ));
-    }
-    let may_read_handoff = work.as_ref().is_some_and(|summary| {
-        summary.ownership.owner.principal_id() == viewer_principal_id
-            || access.is_some_and(|context| context.membership.manages_company_operations())
-    });
-    let ownership_events = match (may_read_handoff, work.as_ref()) {
-        (true, Some(summary)) => {
-            thread_use_cases
-                .get_task_persistence()
-                .await
-                .list_task_ownership_events(company_id, summary.task_id)
-                .await?
-        }
-        _ => Vec::new(),
-    };
-    let private_handoff = ownership_events
-        .iter()
-        .rev()
-        .find_map(|event| event.handoff_instruction.as_deref());
-    let owner_candidates = match (may_read_handoff, work.as_ref()) {
-        (true, Some(summary)) => thread_use_cases
-            .get_task_persistence()
-            .await
-            .list_task_owner_candidates(company_id, channel.id)
-            .await?
-            .into_iter()
-            .filter(|candidate| candidate.owner != summary.ownership.owner)
-            .collect(),
-        _ => Vec::new(),
-    };
-    let held_reply = load_held_reply(
-        thread_use_cases,
-        handoff_use_cases,
-        HeldReplyScope {
-            company_id,
-            channel_id: channel.id,
-            thread_id: thread.id,
-            viewer_manages_tasks,
-        },
-    )
-    .await?;
+        .map_or(CompanyMembership::None, |access| access.membership);
     Ok(pages::message_pane(&pages::MessagePane {
         company_id,
         channel,
         thread,
         messages: &messages,
-        agent,
         viewer_email: &viewer.email,
-        activity: work.as_ref().and_then(|summary| summary.activity),
-        work,
-        viewer_principal_id,
-        viewer_manages_tasks,
-        private_handoff,
-        ownership_error,
-        owner_candidates: &owner_candidates,
-        collaboration: collaboration.as_ref(),
-        handoff: held_reply.as_ref().map(|held| {
-            held.banner_view(HeldReplyViewer {
-                company_id,
-                channel_id: channel.id,
-                thread_id: thread.id,
-                viewer_principal_id,
-                viewer_manages_tasks,
-                as_of: chrono::Utc::now(),
-            })
-        }),
+        activity: &activity,
+        error,
+        viewer_membership,
     }))
 }
 
 /// GET /ui - The full mailbox shell for the selected company / channel / thread (Protected).
 #[instrument(skip(
-    handoff_use_cases,
+    activity_reader,
     company_use_cases,
     channel_use_cases,
     thread_use_cases,
-    agent_use_cases,
     user_use_cases,
     config,
     user
@@ -700,8 +340,7 @@ async fn mailbox_page(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
-    State(handoff_use_cases): State<Arc<ThreadHandoffUseCases>>,
-    State(agent_use_cases): State<Arc<AgentUseCases>>,
+    State(activity_reader): State<Arc<dyn ThreadActivityReader>>,
     State(user_use_cases): State<Arc<UserUseCases>>,
     State(config): State<Arc<AppConfig>>,
     user: AuthenticatedUser,
@@ -747,14 +386,12 @@ async fn mailbox_page(
 
     let detail_html = match (selected_channel, &selected_thread) {
         (Some(channel), Some(thread)) => {
-            let agent = channel_agent(&agent_use_cases, &viewer, channel).await?;
             render_message_pane(
                 &thread_use_cases,
-                &handoff_use_cases,
+                activity_reader.as_ref(),
                 company.id,
                 channel,
                 thread,
-                agent.as_ref(),
                 &viewer,
                 None,
             )
@@ -780,29 +417,18 @@ async fn mailbox_page(
         threads: &thread_page.threads,
         next_cursor: thread_page.next_cursor.as_deref(),
         selected_thread_id: selected_thread.as_ref().map(|thread| thread.id),
-        activity: &page_activity(&thread_use_cases, &thread_page.threads).await?,
-        handoffs: &match selected_channel {
-            Some(channel) => {
-                page_handoffs(
-                    &handoff_use_cases,
-                    company.id,
-                    &[channel.id],
-                    &thread_page.threads,
-                )
-                .await?
-            }
-            None => HashMap::new(),
-        },
+        activity: &page_activity(activity_reader.as_ref(), company.id, &thread_page.threads)
+            .await?,
         detail_html: &detail_html,
     })))
 }
 
 /// GET /ui/threads - The thread column for a channel, clearing the detail pane (Protected).
-#[instrument(skip(channel_use_cases, thread_use_cases, handoff_use_cases, config, viewer))]
+#[instrument(skip(channel_use_cases, thread_use_cases, activity_reader, config, viewer))]
 async fn thread_column_fragment(
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
-    State(handoff_use_cases): State<Arc<ThreadHandoffUseCases>>,
+    State(activity_reader): State<Arc<dyn ThreadActivityReader>>,
     State(config): State<Arc<AppConfig>>,
     viewer: Viewer,
     Query(query): Query<ChannelQuery>,
@@ -814,14 +440,7 @@ async fn thread_column_fragment(
 
     let page = load_thread_page(&thread_use_cases, channel.id, &ThreadListQuery::default()).await?;
 
-    let activity = page_activity(&thread_use_cases, &page.threads).await?;
-    let handoffs = page_handoffs(
-        &handoff_use_cases,
-        query.company_id,
-        &[channel.id],
-        &page.threads,
-    )
-    .await?;
+    let activity = page_activity(activity_reader.as_ref(), query.company_id, &page.threads).await?;
     let column = pages::thread_column(&pages::ThreadColumn {
         company_id: query.company_id,
         channel: &channel,
@@ -830,7 +449,6 @@ async fn thread_column_fragment(
         next_cursor: page.next_cursor.as_deref(),
         selected_thread_id: None,
         activity: &activity,
-        handoffs: &handoffs,
     });
     let detail = pages::empty_detail_pane(
         "Select a thread, or use New Thread to start a new one.",
@@ -846,11 +464,11 @@ async fn thread_column_fragment(
 }
 
 /// GET /ui/threads/list - One older page of threads, appended to the open column (Protected).
-#[instrument(skip(channel_use_cases, thread_use_cases, handoff_use_cases, config, viewer))]
+#[instrument(skip(channel_use_cases, thread_use_cases, activity_reader, config, viewer))]
 async fn thread_page_fragment(
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
-    State(handoff_use_cases): State<Arc<ThreadHandoffUseCases>>,
+    State(activity_reader): State<Arc<dyn ThreadActivityReader>>,
     State(config): State<Arc<AppConfig>>,
     viewer: Viewer,
     Query(query): Query<ThreadPageQuery>,
@@ -870,14 +488,7 @@ async fn thread_page_fragment(
     )
     .await?;
 
-    let activity = page_activity(&thread_use_cases, &page.threads).await?;
-    let handoffs = page_handoffs(
-        &handoff_use_cases,
-        query.company_id,
-        &[channel.id],
-        &page.threads,
-    )
-    .await?;
+    let activity = page_activity(activity_reader.as_ref(), query.company_id, &page.threads).await?;
     Ok(Html(pages::thread_list_fragment(
         &pages::ThreadColumn {
             company_id: query.company_id,
@@ -887,25 +498,17 @@ async fn thread_page_fragment(
             next_cursor: page.next_cursor.as_deref(),
             selected_thread_id: None,
             activity: &activity,
-            handoffs: &handoffs,
         },
         pages::FragmentSwap::OutOfBand,
     )))
 }
 
 /// GET /ui/messages - The messages of one thread (Protected).
-#[instrument(skip(
-    handoff_use_cases,
-    channel_use_cases,
-    thread_use_cases,
-    agent_use_cases,
-    viewer
-))]
+#[instrument(skip(activity_reader, channel_use_cases, thread_use_cases, viewer))]
 async fn message_pane_fragment(
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
-    State(handoff_use_cases): State<Arc<ThreadHandoffUseCases>>,
-    State(agent_use_cases): State<Arc<AgentUseCases>>,
+    State(activity_reader): State<Arc<dyn ThreadActivityReader>>,
     viewer: Viewer,
     Query(query): Query<ThreadQuery>,
 ) -> AppResult<Html<String>> {
@@ -917,16 +520,13 @@ async fn message_pane_fragment(
         .await?
         .ok_or_else(|| AppError::NotFound("Thread not found".into()))?;
 
-    let agent = channel_agent(&agent_use_cases, &viewer, &channel).await?;
-
     Ok(Html(
         render_message_pane(
             &thread_use_cases,
-            &handoff_use_cases,
+            activity_reader.as_ref(),
             query.company_id,
             &channel,
             &thread,
-            agent.as_ref(),
             &viewer,
             None,
         )
@@ -961,21 +561,15 @@ fn resume_cursor<C: FromStr>(headers: &HeaderMap, after: Option<&str>) -> Option
 #[instrument(skip(
     channel_use_cases,
     thread_use_cases,
-    handoff_use_cases,
-    agent_use_cases,
+    activity_reader,
     events,
     viewer,
     headers
 ))]
-#[expect(
-    clippy::too_many_arguments,
-    reason = "Axum handlers receive request state and extractors as parameters"
-)]
 async fn thread_message_stream(
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
-    State(handoff_use_cases): State<Arc<ThreadHandoffUseCases>>,
-    State(agent_use_cases): State<Arc<AgentUseCases>>,
+    State(activity_reader): State<Arc<dyn ThreadActivityReader>>,
     State(events): State<MailboxEvents>,
     viewer: Viewer,
     headers: HeaderMap,
@@ -991,84 +585,31 @@ async fn thread_message_stream(
         .await?
         .ok_or_else(|| AppError::NotFound("Thread not found".into()))?;
 
-    // Resolved once, up here: the stream is authorized already and the channel's agent does not
-    // change under it, so every bubble it renders can borrow this rather than re-query.
-    let agent = channel_agent(&agent_use_cases, &viewer, &channel).await?;
-
-    // Resolved once, up here, for the same reason as the agent: the stream is authorized already
-    // and neither of these changes under it, so every banner it renders can reuse them.
-    let access = thread_use_cases
-        .principal_access_for_user(query.company_id, viewer.user_id)
-        .await?;
-    let viewer_principal_id = access.and_then(|context| context.principal_id);
-    let viewer_manages_tasks =
-        access.is_some_and(|context| context.membership.manages_company_operations());
-
     let mut cursor = resume_cursor(&headers, query.after.as_deref());
     let thread_id = thread.id;
-    let mut wake_ups = Box::pin(mailbox_thread_wake_ups(
-        &events, "messages", thread_id, channel.id,
-    ));
+    let mut wake_ups = Box::pin(thread_wake_ups(&events, "messages", thread_id));
 
     let stream = async_stream::stream! {
         // Both start true so a connect emits the reader's backlog and the current activity, rather
         // than leaving a freshly opened thread blank until something happens to change.
         let mut pending_messages = true;
         let mut pending_activity = true;
-        // Starts true for the same reason: a reconnecting reader must be handed the banner as it
-        // stands now, not left looking at the one their last connection rendered.
-        let mut pending_handoff = true;
 
         loop {
-            if pending_handoff {
-                pending_handoff = false;
-                match thread_handoff_banner_html(
-                    &thread_use_cases,
-                    &handoff_use_cases,
-                    HeldReplyViewer {
-                        company_id: query.company_id,
-                        channel_id: channel.id,
-                        thread_id,
-                        viewer_principal_id,
-                        viewer_manages_tasks,
-                        as_of: Utc::now(),
-                    },
-                )
-                .await
-                {
-                    // State, not an append: no `id:` and no cursor, exactly as the activity event
-                    // below. A thread whose handoff closed renders the empty string, which clears
-                    // the banner.
-                    Ok(banner) => {
-                        yield Ok(Event::default().event("handoff").data(banner));
-                    }
-                    Err(error) => {
-                        warn!(%error, %thread_id, "Thread handoff query failed");
-                        return;
-                    }
-                }
-            }
-
             if pending_activity {
                 pending_activity = false;
-                match thread_collaboration(
-                    &thread_use_cases,
-                    query.company_id,
-                    channel.id,
-                    thread_id,
-                )
-                .await
+                match activity_reader.thread_runs(query.company_id, thread_id, viewer.user_id)
+                    .await
                 {
                     // Activity is state, not an append: it carries no cursor and is re-read whole
-                    // every time, which is also what makes it correct after a reconnect. An idle
-                    // thread renders as an empty strip, clearing whatever was there.
-                    Ok((activity, collaboration)) => {
+                    // every time, which is also what makes it correct after a reconnect. A thread
+                    // with no run renders as an empty strip, clearing whatever was there.
+                    Ok(activity) => {
+                        let run_access = pages::RunLinkAccess::Authorized(&activity.inspectable);
+                        let html = format!("{}{}", pages::thread_activity_strip(&activity, query.company_id, run_access), pages::thread_run_attribution_updates(&activity, query.company_id, run_access));
                         yield Ok(Event::default()
                             .event("activity")
-                            .data(pages::thread_collaboration_strip(
-                                activity,
-                                collaboration.as_ref(),
-                            )));
+                            .data(html));
                     }
                     Err(error) => {
                         warn!(%error, %thread_id, "Thread activity query failed");
@@ -1083,6 +624,11 @@ async fn thread_message_stream(
                     .await
                 {
                     Ok(messages) => {
+                        let ids: Vec<_> = messages.iter().flat_map(|message| message.run_ids.iter().copied()).collect();
+                        let inspectable = match activity_reader.inspectable_runs(query.company_id, viewer.user_id, &ids).await {
+                            Ok(ids) => ids,
+                            Err(error) => { warn!(%error, %thread_id, "Message run visibility query failed"); return; }
+                        };
                         for message in &messages {
                             cursor = Some(message.cursor());
                             yield Ok(Event::default()
@@ -1090,12 +636,12 @@ async fn thread_message_stream(
                                 .event("message")
                                 .data(pages::message_bubble_chat(
                                     message,
-                                    agent.as_ref(),
                                     Some(&viewer.email),
                                     pages::MessageScope {
                                         company_id: query.company_id,
                                         channel_id: channel.id,
                                     },
+                                    pages::RunLinkAccess::Authorized(&inspectable),
                                 )));
                         }
                         // A full batch means the reader is still behind; keep going rather than
@@ -1115,22 +661,20 @@ async fn thread_message_stream(
             }
 
             match wake_ups.next().await {
-                Some(Wake::Event(MailboxEvent::MessageCommitted(_))) => pending_messages = true,
+                Some(Wake::Event(MailboxEvent::MessageCommitted(_))) => { pending_messages = true; pending_activity = true; },
                 Some(Wake::Event(MailboxEvent::ActivityChanged(_))) => pending_activity = true,
-                // Thread-scoped wake_ups filters these out before they reach this stream.
-                Some(Wake::Event(MailboxEvent::TaskChainChanged(_))) => {}
-                // Channel-scoped, deliberately: the payload names the handoff, not the thread, so
-                // this stream cannot tell whether the change was its own without re-reading. See
-                // `mailbox_thread_wake_ups`. A change on another thread costs one query and an
-                // identical swap.
-                Some(Wake::Event(MailboxEvent::AttentionChanged(_))) => pending_handoff = true,
-                // Thread-scoped wake_ups filters these out before they reach this stream.
-                Some(Wake::Event(MailboxEvent::NotificationChanged(_))) => {}
-                // Something was missed and there is no telling what, so redo all three.
+                // Thread-scoped wake_ups filters these out before they reach this stream; a resync
+                // arrives as `Lagged`, and a run on this thread reaches it as activity.
+                Some(Wake::Event(
+                    MailboxEvent::AttentionChanged(_)
+                    | MailboxEvent::NotificationChanged(_)
+                    | MailboxEvent::WorkflowRunChanged(_)
+                    | MailboxEvent::Resync,
+                )) => {}
+                // Something was missed and there is no telling what, so redo both.
                 Some(Wake::Lagged) => {
                     pending_messages = true;
                     pending_activity = true;
-                    pending_handoff = true;
                 }
                 None => return,
             }
@@ -1151,7 +695,7 @@ async fn thread_message_stream(
 #[instrument(skip(
     channel_use_cases,
     thread_use_cases,
-    handoff_use_cases,
+    activity_reader,
     events,
     config,
     viewer,
@@ -1164,7 +708,7 @@ async fn thread_message_stream(
 async fn thread_column_stream(
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
-    State(handoff_use_cases): State<Arc<ThreadHandoffUseCases>>,
+    State(activity_reader): State<Arc<dyn ThreadActivityReader>>,
     State(events): State<MailboxEvents>,
     State(config): State<Arc<AppConfig>>,
     viewer: Viewer,
@@ -1182,12 +726,11 @@ async fn thread_column_stream(
     let app_domain_name = config.app_domain_name.clone();
     let mut cursor = resume_cursor(&headers, query.after.as_deref());
     let channel_id = channel.id;
-    let mut wake_ups = Box::pin(mailbox_channel_wake_ups(&events, "threads", channel_id));
-    // Subscribe first, then snapshot every badge that can already be on screen. An activity or
-    // handoff change during this query stays buffered; one before the connection is recovered by
-    // the snapshot itself.
+    let mut wake_ups = Box::pin(channel_wake_ups(&events, "threads", channel_id));
+    // Subscribe first, then snapshot every badge that can already be on screen. An activity
+    // change during this query stays buffered; one before the connection is recovered by the
+    // snapshot itself.
     let initial_stale_badges = first_page_thread_ids(&thread_use_cases, channel_id).await?;
-    let initial_stale_handoffs = initial_stale_badges.clone();
 
     let stream = async_stream::stream! {
         let mut pending_rows = true;
@@ -1195,41 +738,14 @@ async fn thread_column_stream(
         // status change must redraw *only* that badge: re-sending the row would insert it at the
         // top of the column and move a thread for no reason a reader could see.
         let mut stale_badges = initial_stale_badges;
-        // The held-reply badges, kept as their own set for the same reason: a claim must redraw
-        // only that badge, not move the row it is on.
-        let mut stale_handoffs = initial_stale_handoffs;
 
         loop {
-            if !stale_handoffs.is_empty() {
-                let ids: Vec<Uuid> = stale_handoffs.drain().collect();
-                match handoff_use_cases
-                    .thread_handoffs_for_threads(company_id, &ids, &[channel_id])
-                    .await
-                {
-                    Ok(handoffs) => {
-                        for id in ids {
-                            // A thread absent from the map has no open handoff, and an empty
-                            // payload is what clears its badge after a send or a dismissal.
-                            yield Ok(Event::default()
-                                .event(pages::thread_handoff_event(id))
-                                .data(pages::thread_handoff_mark(
-                                    handoffs.get(&id).map(pages::ThreadHandoffMark::of),
-                                )));
-                        }
-                    }
-                    Err(error) => {
-                        warn!(%error, %channel_id, "Thread handoff query failed");
-                        return;
-                    }
-                }
-            }
-
             if !stale_badges.is_empty() {
                 let ids: Vec<Uuid> = stale_badges.drain().collect();
-                match thread_use_cases.thread_work_summary(&ids).await {
+                match activity_reader.thread_activity(company_id, &ids).await {
                     Ok(activity) => {
                         for id in ids {
-                            // A thread absent from the map has gone idle, and an empty payload is
+                            // A thread absent from the map has no run, and an empty payload is
                             // what clears its badge.
                             yield Ok(Event::default()
                                 .event(pages::thread_activity_event(id))
@@ -1251,34 +767,17 @@ async fn thread_column_stream(
                     .await
                 {
                     Ok(threads) => {
-                        // A streamed row must arrive with its badges already on it, or a thread
-                        // bumped mid-run would blink back to "idle" -- and a held one back to
-                        // plain -- until its next status change.
+                        // A streamed row must arrive with its badge already on it, or a thread
+                        // bumped mid-run would blink back to idle until its next run change.
                         let ids: Vec<Uuid> = threads.iter().map(|thread| thread.id).collect();
-                        let handoffs = match page_handoffs(
-                            &handoff_use_cases,
+                        let activity = match page_activity(
+                            activity_reader.as_ref(),
                             company_id,
-                            &[channel_id],
                             &threads,
                         )
                         .await
                         {
-                            Ok(handoffs) => handoffs,
-                            Err(error) => {
-                                warn!(%error, %channel_id, "Thread handoff query failed");
-                                return;
-                            }
-                        };
-                        let activity: HashMap<Uuid, ThreadActivity> = match thread_use_cases
-                            .thread_work_summary(&ids)
-                            .await
-                        {
-                            Ok(summary) => summary
-                                .into_iter()
-                                .filter_map(|(id, summary)| {
-                                    summary.activity.map(|activity| (id, activity))
-                                })
-                                .collect(),
+                            Ok(activity) => activity,
                             Err(error) => {
                                 warn!(%error, %channel_id, "Thread activity query failed");
                                 return;
@@ -1309,7 +808,6 @@ async fn thread_column_stream(
                                     false,
                                     pages::ThreadRowMarks {
                                         activity: activity.get(&thread.id).copied(),
-                                        handoff: handoffs.get(&thread.id).copied(),
                                         last_role: last_roles.get(&thread.id).copied(),
                                         from_other_channel: pages::opened_by_another_channel(
                                             thread,
@@ -1335,31 +833,20 @@ async fn thread_column_stream(
                 Some(Wake::Event(MailboxEvent::ActivityChanged(scope))) => {
                     stale_badges.insert(scope.thread_id);
                 }
-                // Channel-scoped wake_ups filters these out before they reach this stream.
-                Some(Wake::Event(MailboxEvent::TaskChainChanged(_))) => {}
-                // The payload names the handoff, not the thread, so every first-page badge is
-                // re-sent. Bounded by `STREAM_BATCH_LIMIT`, one query, and an idempotent swap --
-                // cheaper than the per-connection memory a diff would need.
-                Some(Wake::Event(MailboxEvent::AttentionChanged(_))) => {
-                    match first_page_thread_ids(&thread_use_cases, channel_id).await {
-                        Ok(ids) => stale_handoffs.extend(ids),
-                        Err(error) => {
-                            warn!(%error, %channel_id, "Thread column catch-up query failed");
-                            return;
-                        }
-                    }
-                }
-                // Channel-scoped wake_ups filters these out before they reach this stream.
-                Some(Wake::Event(MailboxEvent::NotificationChanged(_))) => {}
+                // Channel-scoped wake_ups filters these out before they reach this stream; a resync
+                // arrives as `Lagged`, and a run on one of its threads reaches it as activity.
+                Some(Wake::Event(
+                    MailboxEvent::AttentionChanged(_)
+                    | MailboxEvent::NotificationChanged(_)
+                    | MailboxEvent::WorkflowRunChanged(_)
+                    | MailboxEvent::Resync,
+                )) => {}
                 // What was missed is unknown, so redraw the rows and every badge the column is
                 // likely to be showing rather than leave a stale spinner or a stale badge behind.
                 Some(Wake::Lagged) => {
                     pending_rows = true;
                     match first_page_thread_ids(&thread_use_cases, channel_id).await {
-                        Ok(ids) => {
-                            stale_badges.extend(ids.iter().copied());
-                            stale_handoffs.extend(ids);
-                        }
+                        Ok(ids) => stale_badges.extend(ids),
                         Err(error) => {
                             warn!(%error, %channel_id, "Thread column catch-up query failed");
                             return;
@@ -1414,11 +901,10 @@ async fn compose_form(
 /// is not the company's owner composes from the mailbox exactly as they would by email, and the
 /// channel's own participant rules still decide whether the message lands.
 #[instrument(skip(
-    handoff_use_cases,
+    activity_reader,
     company_use_cases,
     channel_use_cases,
     thread_use_cases,
-    agent_use_cases,
     user_use_cases,
     config,
     viewer,
@@ -1432,8 +918,7 @@ async fn create_thread(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
-    State(handoff_use_cases): State<Arc<ThreadHandoffUseCases>>,
-    State(agent_use_cases): State<Arc<AgentUseCases>>,
+    State(activity_reader): State<Arc<dyn ThreadActivityReader>>,
     State(user_use_cases): State<Arc<UserUseCases>>,
     State(config): State<Arc<AppConfig>>,
     viewer: Viewer,
@@ -1497,16 +982,13 @@ async fn create_thread(
         return Ok(compose_error(reason.to_string()));
     };
 
-    let agent = channel_agent(&agent_use_cases, &viewer, &channel).await?;
-
     sent_message_response(
         &thread_use_cases,
-        &handoff_use_cases,
+        activity_reader.as_ref(),
         company.id,
         &channel,
         &config.app_domain_name,
         &thread,
-        agent.as_ref(),
         &viewer,
     )
     .await
@@ -1560,11 +1042,10 @@ async fn reply_form(
 /// Like Compose, the message takes the inbound path a real email would; the threading headers are
 /// what keep it in this conversation instead of starting a new one.
 #[instrument(skip(
-    handoff_use_cases,
+    activity_reader,
     company_use_cases,
     channel_use_cases,
     thread_use_cases,
-    agent_use_cases,
     user_use_cases,
     config,
     viewer,
@@ -1578,8 +1059,7 @@ async fn send_reply(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
-    State(handoff_use_cases): State<Arc<ThreadHandoffUseCases>>,
-    State(agent_use_cases): State<Arc<AgentUseCases>>,
+    State(activity_reader): State<Arc<dyn ThreadActivityReader>>,
     State(user_use_cases): State<Arc<UserUseCases>>,
     State(config): State<Arc<AppConfig>>,
     viewer: Viewer,
@@ -1652,477 +1132,40 @@ async fn send_reply(
         return Ok(reply_error(reason.to_string()));
     };
 
-    let agent = channel_agent(&agent_use_cases, &viewer, &channel).await?;
-
     sent_message_response(
         &thread_use_cases,
-        &handoff_use_cases,
+        activity_reader.as_ref(),
         company.id,
         &channel,
         &config.app_domain_name,
         &sent_thread,
-        agent.as_ref(),
         &viewer,
     )
     .await
-}
-
-#[expect(
-    clippy::too_many_arguments,
-    reason = "Axum handlers receive request state and extractors as parameters"
-)]
-async fn complete_human_task(
-    State(company_use_cases): State<Arc<CompanyUseCases>>,
-    State(channel_use_cases): State<Arc<ChannelUseCases>>,
-    State(thread_use_cases): State<Arc<ThreadUseCases>>,
-    State(handoff_use_cases): State<Arc<ThreadHandoffUseCases>>,
-    State(agent_use_cases): State<Arc<AgentUseCases>>,
-    State(config): State<Arc<AppConfig>>,
-    viewer: Viewer,
-    Form(form): Form<HumanCompletionForm>,
-) -> AppResult<Response> {
-    let (company, channel) = load_viewable_channel(
-        &company_use_cases,
-        &channel_use_cases,
-        &viewer,
-        form.company_id,
-        form.channel_id,
-    )
-    .await?;
-    let thread = load_channel_thread(&thread_use_cases, channel.id, form.thread_id)
-        .await?
-        .ok_or_else(|| AppError::NotFound("Thread not found".into()))?;
-    let task = thread_use_cases
-        .get_task_persistence()
-        .await
-        .get_task_by_id(form.task_id)
-        .await?
-        .filter(|task| {
-            task.company_id == company.id
-                && task.channel_id == channel.id
-                && task.thread_id == Some(thread.id)
-        })
-        .ok_or_else(|| AppError::NotFound("Task not found".into()))?;
-    let owner = thread_use_cases
-        .principal_access_for_user(company.id, viewer.user_id)
-        .await?
-        .and_then(|access| access.principal_id)
-        .ok_or_else(|| AppError::NotFound("Task not found".into()))?;
-
-    let outcome = thread_use_cases
-        .complete_human_owned_task(HumanCompletionDraft {
-            task: &task,
-            company: &company,
-            channel: &channel,
-            thread: &thread,
-            owner_principal_id: owner,
-            expected_ownership_version: form.expected_ownership_version,
-            command_id: form.command_id,
-            text_body: &form.text_body,
-        })
-        .await;
-    let outcome = match outcome {
-        Ok(outcome) => outcome,
-        Err(error) => {
-            return render_mailbox_pane_error(
-                &thread_use_cases,
-                &handoff_use_cases,
-                &agent_use_cases,
-                &viewer,
-                &company,
-                &channel,
-                &thread,
-                &error.to_string(),
-            )
-            .await;
-        }
-    };
-    if outcome.pending_review {
-        return Ok(Html(pages::response_review_action_result(
-            "The response is frozen and waiting for human review; nothing has been sent.",
-            company.id,
-        ))
-        .into_response());
-    }
-    let agent = channel_agent(&agent_use_cases, &viewer, &channel).await?;
-    sent_message_response(
-        &thread_use_cases,
-        &handoff_use_cases,
-        company.id,
-        &channel,
-        &config.app_domain_name,
-        &thread,
-        agent.as_ref(),
-        &viewer,
-    )
-    .await
-}
-
-#[expect(
-    clippy::too_many_arguments,
-    reason = "Axum handlers receive request state and extractors as parameters"
-)]
-async fn change_visible_task_ownership(
-    State(company_use_cases): State<Arc<CompanyUseCases>>,
-    State(channel_use_cases): State<Arc<ChannelUseCases>>,
-    State(thread_use_cases): State<Arc<ThreadUseCases>>,
-    State(handoff_use_cases): State<Arc<ThreadHandoffUseCases>>,
-    State(agent_use_cases): State<Arc<AgentUseCases>>,
-    State(config): State<Arc<AppConfig>>,
-    viewer: Viewer,
-    Path((task_id, operation)): Path<(Uuid, String)>,
-    Form(form): Form<VisibleOwnershipForm>,
-) -> AppResult<Response> {
-    let VisibleTask {
-        company,
-        channel,
-        thread,
-        task: _,
-    } = load_visible_task(
-        &company_use_cases,
-        &channel_use_cases,
-        &thread_use_cases,
-        &viewer,
-        task_id,
-        &VisibleThreadScope {
-            company_id: form.company_id,
-            channel_id: form.channel_id,
-            thread_id: form.thread_id,
-        },
-    )
-    .await?;
-    let access = thread_use_cases
-        .principal_access_for_user(company.id, viewer.user_id)
-        .await?;
-    let actor = access
-        .and_then(|access| access.principal_id)
-        .ok_or_else(|| AppError::NotFound("Task not found".into()))?;
-    let authority = if access.is_some_and(|access| access.membership.manages_company_operations()) {
-        TaskOwnershipAuthority::Manager
-    } else {
-        TaskOwnershipAuthority::CurrentOwner
-    };
-    let (operation, authority, new_owner, reason) = match operation.as_str() {
-        "claim" => (
-            TaskOwnershipOperation::Claim,
-            if authority == TaskOwnershipAuthority::Manager {
-                TaskOwnershipAuthority::Manager
-            } else {
-                TaskOwnershipAuthority::UnassignedClaimant
-            },
-            TaskOwner::Human(actor),
-            TaskOwnershipReason::SelfClaim,
-        ),
-        "release" => (
-            TaskOwnershipOperation::Release,
-            authority,
-            TaskOwner::Unassigned,
-            TaskOwnershipReason::Released,
-        ),
-        "transfer" => {
-            let owner = form
-                .owner
-                .as_deref()
-                .ok_or_else(|| AppError::BadRequest("Choose a task owner.".into()))?;
-            let (kind, id) = owner
-                .split_once(':')
-                .ok_or_else(|| AppError::BadRequest("Choose a valid task owner.".into()))?;
-            let id = Uuid::parse_str(id)
-                .map_err(|_| AppError::BadRequest("Choose a valid task owner.".into()))?;
-            let target = match kind {
-                "human" => TaskOwner::Human(id.into()),
-                "agent" => TaskOwner::Agent(id.into()),
-                _ => return Err(AppError::BadRequest("Choose a valid task owner.".into())),
-            };
-            (
-                TaskOwnershipOperation::Transfer,
-                authority,
-                target,
-                TaskOwnershipReason::Delegated,
-            )
-        }
-        _ => return Err(AppError::NotFound("Ownership action not found.".into())),
-    };
-    let outcome = thread_use_cases
-        .change_task_ownership(TaskOwnershipCommand {
-            execution: None,
-            invocation: None,
-            task_id,
-            company_id: company.id,
-            command_id: form.command_id,
-            expected_version: form.expected_ownership_version,
-            actor: TaskOwnershipActor {
-                principal_id: actor,
-                authority,
-            },
-            operation,
-            new_owner,
-            reason,
-            reason_detail: form.reason_detail,
-            handoff_instruction: form.handoff_instruction,
-        })
-        .await;
-    if let Err(error) = outcome {
-        return render_mailbox_pane_error(
-            &thread_use_cases,
-            &handoff_use_cases,
-            &agent_use_cases,
-            &viewer,
-            &company,
-            &channel,
-            &thread,
-            &error.to_string(),
-        )
-        .await;
-    }
-    let agent = channel_agent(&agent_use_cases, &viewer, &channel).await?;
-    sent_message_response(
-        &thread_use_cases,
-        &handoff_use_cases,
-        company.id,
-        &channel,
-        &config.app_domain_name,
-        &thread,
-        agent.as_ref(),
-        &viewer,
-    )
-    .await
-}
-
-/// Where a mailbox recovery command was drawn, as the form's hidden fields name it.
-struct VisibleThreadScope {
-    company_id: Uuid,
-    channel_id: Uuid,
-    thread_id: Uuid,
-}
-
-/// One thread's task, with everything the pane is re-rendered from.
-struct VisibleTask {
-    company: Company,
-    channel: Channel,
-    thread: Thread,
-    task: BackgroundTask,
-}
-
-/// The task a mailbox recovery command names, loaded through the scope that authorizes reading it.
-///
-/// Each step is scoped by the one above: the channel comes from the reader's own readable channels,
-/// the thread must belong to that channel, and the task must belong to that company, channel *and*
-/// thread together. A guessed id in any single field therefore finds nothing rather than reaching
-/// another team's work — which is the whole guard on both mailbox recovery routes, since the
-/// commands themselves are authorized on the task's owner rather than on the channel.
-async fn load_visible_task(
-    company_use_cases: &CompanyUseCases,
-    channel_use_cases: &ChannelUseCases,
-    thread_use_cases: &ThreadUseCases,
-    viewer: &Viewer,
-    task_id: Uuid,
-    scope: &VisibleThreadScope,
-) -> AppResult<VisibleTask> {
-    let (company, channel) = load_viewable_channel(
-        company_use_cases,
-        channel_use_cases,
-        viewer,
-        scope.company_id,
-        scope.channel_id,
-    )
-    .await?;
-    let thread = load_channel_thread(thread_use_cases, channel.id, scope.thread_id)
-        .await?
-        .ok_or_else(|| AppError::NotFound("Thread not found".into()))?;
-    let task = thread_use_cases
-        .get_task_persistence()
-        .await
-        .get_task_by_id(task_id)
-        .await?
-        .filter(|task| {
-            task.company_id == company.id
-                && task.channel_id == channel.id
-                && task.thread_id == Some(thread.id)
-        })
-        .ok_or_else(|| AppError::NotFound("Task not found".into()))?;
-    Ok(VisibleTask {
-        company,
-        channel,
-        thread,
-        task,
-    })
-}
-
-/// POST /ui/task-delegation/{task_id}/{operation} — recover delegated work from the thread it was
-/// delegated on (Protected).
-///
-/// The twin of [`change_visible_task_ownership`], and it exists for the same reason: the only other
-/// route submitting these commands lives under the manager-only Tasks workspace and hardcodes
-/// [`DelegationAuthority::CompanyManager`], so a teammate who owns a task but administers nothing
-/// had no way to extend, cancel or stop the delegation on their own task — even though
-/// [`DelegationAuthority::HumanOwner`] was built to let them.
-///
-/// Like its twin, this does not itself check that the reader really is the current owner: it
-/// resolves the authority optimistically and the version-fenced transaction behind
-/// [`ThreadUseCases::execute_delegation_command`] is what enforces it, rejecting a `HumanOwner`
-/// claim from anyone who is not the task's owner at the moment the command lands. Deciding it here
-/// as well would be a second copy of an authorization rule, and the copy that ran first would be
-/// the one reading a stale owner.
-#[expect(
-    clippy::too_many_arguments,
-    reason = "Axum handlers receive request state and extractors as parameters"
-)]
-async fn control_visible_task_delegation(
-    State(company_use_cases): State<Arc<CompanyUseCases>>,
-    State(channel_use_cases): State<Arc<ChannelUseCases>>,
-    State(thread_use_cases): State<Arc<ThreadUseCases>>,
-    State(handoff_use_cases): State<Arc<ThreadHandoffUseCases>>,
-    State(agent_use_cases): State<Arc<AgentUseCases>>,
-    State(config): State<Arc<AppConfig>>,
-    viewer: Viewer,
-    Path((task_id, operation)): Path<(Uuid, String)>,
-    Form(form): Form<VisibleDelegationForm>,
-) -> AppResult<Response> {
-    let visible = load_visible_task(
-        &company_use_cases,
-        &channel_use_cases,
-        &thread_use_cases,
-        &viewer,
-        task_id,
-        &VisibleThreadScope {
-            company_id: form.company_id,
-            channel_id: form.channel_id,
-            thread_id: form.thread_id,
-        },
-    )
-    .await?;
-    let access = thread_use_cases
-        .principal_access_for_user(visible.company.id, viewer.user_id)
-        .await?;
-    let actor = access
-        .and_then(|access| access.principal_id)
-        .ok_or_else(|| AppError::NotFound("Delegated work not found.".into()))?;
-    let authority = if access.is_some_and(|access| access.membership.manages_company_operations()) {
-        DelegationAuthority::CompanyManager
-    } else {
-        DelegationAuthority::HumanOwner
-    };
-    let operation = super::ui_tasks::delegation_operation(
-        &operation,
-        &super::ui_tasks::DelegationOperationRequest {
-            outreach_id: form.outreach_id,
-            target_id: form.target_id,
-            new_channel_id: form.new_channel_id,
-            deadline_hours: form.deadline_hours,
-        },
-    )?;
-    let outcome = thread_use_cases
-        .execute_delegation_command(
-            &visible.company,
-            &visible.task,
-            DelegationCommand {
-                company_id: visible.company.id,
-                task_id,
-                command_id: form.command_id,
-                expected_version: form.expected_version,
-                actor: DelegationActor {
-                    principal_id: actor,
-                    authority,
-                },
-                reason: form.reason,
-                reason_detail: form.reason_detail,
-                operation,
-            },
-        )
-        .await;
-    if let Err(error) = outcome {
-        let message = match error {
-            AppError::Conflict(message) => format!("Delegation changed: {message}"),
-            other => format!("Could not apply delegation control: {other}"),
-        };
-        return render_mailbox_pane_error(
-            &thread_use_cases,
-            &handoff_use_cases,
-            &agent_use_cases,
-            &viewer,
-            &visible.company,
-            &visible.channel,
-            &visible.thread,
-            &message,
-        )
-        .await;
-    }
-    let agent = channel_agent(&agent_use_cases, &viewer, &visible.channel).await?;
-    sent_message_response(
-        &thread_use_cases,
-        &handoff_use_cases,
-        visible.company.id,
-        &visible.channel,
-        &config.app_domain_name,
-        &visible.thread,
-        agent.as_ref(),
-        &viewer,
-    )
-    .await
-}
-
-#[expect(
-    clippy::too_many_arguments,
-    reason = "the pane is assembled from every port it reads, each named rather than bundled"
-)]
-async fn render_mailbox_pane_error(
-    thread_use_cases: &ThreadUseCases,
-    handoff_use_cases: &ThreadHandoffUseCases,
-    agent_use_cases: &AgentUseCases,
-    viewer: &Viewer,
-    company: &Company,
-    channel: &Channel,
-    thread: &Thread,
-    error: &str,
-) -> AppResult<Response> {
-    let agent = channel_agent(agent_use_cases, viewer, channel).await?;
-    Ok(Html(
-        render_message_pane(
-            thread_use_cases,
-            handoff_use_cases,
-            company.id,
-            channel,
-            thread,
-            agent.as_ref(),
-            viewer,
-            Some(error),
-        )
-        .await?,
-    )
-    .into_response())
 }
 
 /// What both send forms return: the thread's messages, with its column refreshed beside them.
-#[expect(
-    clippy::too_many_arguments,
-    reason = "the pane is assembled from every port it reads, each named rather than bundled"
-)]
 async fn sent_message_response(
     thread_use_cases: &ThreadUseCases,
-    handoff_use_cases: &ThreadHandoffUseCases,
+    activity_reader: &dyn ThreadActivityReader,
     company_id: Uuid,
     channel: &Channel,
     app_domain_name: &str,
     thread: &Thread,
-    agent: Option<&Agent>,
     viewer: &Viewer,
 ) -> AppResult<Response> {
     let pane = render_message_pane(
         thread_use_cases,
-        handoff_use_cases,
+        activity_reader,
         company_id,
         channel,
         thread,
-        agent,
         viewer,
         None,
     )
     .await?;
     let page = load_thread_page(thread_use_cases, channel.id, &ThreadListQuery::default()).await?;
-    let activity = page_activity(thread_use_cases, &page.threads).await?;
-    let handoffs =
-        page_handoffs(handoff_use_cases, company_id, &[channel.id], &page.threads).await?;
+    let activity = page_activity(activity_reader, company_id, &page.threads).await?;
     let refreshed_list = pages::thread_list_oob(&pages::ThreadColumn {
         company_id,
         channel,
@@ -2131,7 +1174,6 @@ async fn sent_message_response(
         next_cursor: page.next_cursor.as_deref(),
         selected_thread_id: Some(thread.id),
         activity: &activity,
-        handoffs: &handoffs,
     });
 
     Ok((

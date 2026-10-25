@@ -153,6 +153,7 @@ fn workflow_publication_runtime_agent_selection_uses_only_frozen_catalogue() {
             run: RunMetadata {
                 run_id: RunId::new(Uuid::nil()),
                 parent_run_id: None,
+                deadline: None,
             },
         };
         let result = bundle.prepare_step_inputs(&StepId::parse("start").unwrap(), &context);

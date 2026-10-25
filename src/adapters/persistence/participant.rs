@@ -434,31 +434,6 @@ impl IdentityDirectory for PostgresPersistence {
         transaction.commit().await.map_err(AppError::from)?;
         Ok(created)
     }
-
-    async fn identities_for_principals(
-        &self,
-        company_id: Uuid,
-        principal_ids: &[PrincipalId],
-        transport: TransportKind,
-    ) -> AppResult<Vec<PrincipalIdentity>> {
-        if principal_ids.is_empty() {
-            return Ok(Vec::new());
-        }
-        let ids: Vec<Uuid> = principal_ids.iter().map(|id| id.as_uuid()).collect();
-        let query = format!(
-            "{IDENTITY_SELECT} WHERE company_id = $1 AND principal_id = ANY($2) AND transport = $3 AND status <> 'disabled' ORDER BY created_at, id"
-        );
-        sqlx::query_as::<_, IdentityDb>(&query)
-            .bind(company_id)
-            .bind(ids)
-            .bind(transport.as_str())
-            .fetch_all(&self.pool)
-            .await
-            .map_err(AppError::from)?
-            .into_iter()
-            .map(TryInto::try_into)
-            .collect()
-    }
 }
 
 fn membership_from_db(value: Option<&str>) -> AppResult<CompanyMembership> {

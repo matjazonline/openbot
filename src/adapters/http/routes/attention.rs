@@ -1,11 +1,12 @@
 use std::{convert::Infallible, sync::Arc, time::Instant};
 
+use crate::infra::events::MailboxEvent;
 use async_stream::stream;
 use axum::{
     Json, Router,
     extract::{Path, Query, State},
     response::{Html, Sse, sse::Event},
-    routing::{get, post},
+    routing::get,
 };
 use serde::Deserialize;
 use tokio_stream::{Stream, StreamExt, wrappers::BroadcastStream};
@@ -17,11 +18,7 @@ use crate::{
     application::attention::AttentionPersistence,
     domain::monitoring::MonitoringService,
     entities::{
-        attention::{
-            AttentionCursor, AttentionPage, AttentionQuery, AttentionSourceCommand,
-            AttentionSourceKind, AttentionView, BusinessPriority, HandoffResolution,
-            NewManualHandoff, ResolveHandoffCommand,
-        },
+        attention::{AttentionCursor, AttentionPage, AttentionQuery, AttentionView},
         company::CompanyAccess,
         transport::PrincipalId,
         user::Viewer,
@@ -39,18 +36,6 @@ pub fn router() -> Router<AppState> {
             get(operational_summary),
         )
         .route(
-            "/companies/{company_id}/attention/handoffs",
-            post(create_handoff),
-        )
-        .route(
-            "/companies/{company_id}/attention/{source_kind}/{source_id}",
-            post(change_source),
-        )
-        .route(
-            "/companies/{company_id}/attention/handoffs/{handoff_id}/resolve",
-            post(resolve_handoff),
-        )
-        .route(
             "/companies/{company_id}/attention/events",
             get(attention_events),
         )
@@ -63,8 +48,6 @@ struct ListQuery {
     view: Option<String>,
     cursor: Option<String>,
     limit: Option<usize>,
-    #[serde(default)]
-    all_owned: bool,
 }
 
 impl ListQuery {
@@ -141,8 +124,8 @@ async fn read_page(
             company_id: context.access.company.id,
             principal_id: context.principal_id,
             visible_channel_ids: &context.visible_channel_ids,
+            manager: context.access.membership.manages_company_operations(),
             view,
-            all_owned: query.all_owned && view == AttentionView::MyWork,
             cursor: cursor.as_ref(),
             limit: query.limit.unwrap_or(AttentionQuery::DEFAULT_LIMIT),
         })
@@ -225,122 +208,19 @@ async fn operational_summary(
     Ok(Json(summary))
 }
 
-#[derive(Deserialize)]
-struct HandoffBody {
-    id: Uuid,
-    command_id: Uuid,
-    channel_id: Uuid,
-    thread_id: Option<Uuid>,
-    correlation_id: Option<Uuid>,
-    title: String,
-    next_action: String,
-    responsible_principal_id: Option<Uuid>,
-    priority: Option<BusinessPriority>,
-    due_at: Option<chrono::DateTime<chrono::Utc>>,
-}
-
-async fn create_handoff(
-    State(attention): State<Arc<dyn AttentionPersistence>>,
-    State(companies): State<Arc<CompanyUseCases>>,
-    State(channels): State<Arc<ChannelUseCases>>,
-    State(threads): State<Arc<ThreadUseCases>>,
-    viewer: Viewer,
-    Path(company_id): Path<Uuid>,
-    Json(body): Json<HandoffBody>,
-) -> AppResult<Json<serde_json::Value>> {
-    let context = read_context(&companies, &channels, &threads, &viewer, company_id).await?;
-    if !context.visible_channel_ids.contains(&body.channel_id) {
-        return Err(AppError::NotFound("Channel not found.".into()));
-    }
-    let version = attention
-        .create_handoff(NewManualHandoff {
-            id: body.id,
-            company_id,
-            channel_id: body.channel_id,
-            thread_id: body.thread_id,
-            correlation_id: body.correlation_id.map(Into::into),
-            title: body.title,
-            next_action: body.next_action,
-            responsible_principal_id: body.responsible_principal_id.map(PrincipalId::new),
-            priority: body.priority.unwrap_or_default(),
-            due_at: body.due_at,
-            command_id: body.command_id,
-            actor_principal_id: context.principal_id,
+/// Whether an event changes what this viewer's work list may show: a resync, a delivery or other
+/// attention source in a visible channel, or a workflow run in a visible channel or company-wide
+/// (P08-D4 §D4.2).
+fn wakes_attention(event: &MailboxEvent, company_id: Uuid, visible_channel_ids: &[Uuid]) -> bool {
+    event.is_resync()
+        || event
+            .attention_scope(company_id)
+            .is_some_and(|scope| visible_channel_ids.contains(&scope.channel_id))
+        || event.run_scope(company_id).is_some_and(|scope| {
+            scope
+                .channel_id
+                .is_none_or(|channel| visible_channel_ids.contains(&channel))
         })
-        .await?;
-    Ok(Json(
-        serde_json::json!({ "id": body.id, "version": version }),
-    ))
-}
-
-#[derive(Deserialize)]
-struct ChangeBody {
-    command_id: Uuid,
-    expected_version: u64,
-    priority: BusinessPriority,
-    due_at: Option<chrono::DateTime<chrono::Utc>>,
-    responsible_principal_id: Option<Uuid>,
-}
-
-async fn change_source(
-    State(attention): State<Arc<dyn AttentionPersistence>>,
-    State(companies): State<Arc<CompanyUseCases>>,
-    State(channels): State<Arc<ChannelUseCases>>,
-    State(threads): State<Arc<ThreadUseCases>>,
-    viewer: Viewer,
-    Path((company_id, source_kind, source_id)): Path<(Uuid, String, Uuid)>,
-    Json(body): Json<ChangeBody>,
-) -> AppResult<Json<serde_json::Value>> {
-    let context = read_context(&companies, &channels, &threads, &viewer, company_id).await?;
-    let source_kind = source_kind
-        .parse::<AttentionSourceKind>()
-        .map_err(AppError::BadRequest)?;
-    let version = attention
-        .change_source_attributes(AttentionSourceCommand {
-            company_id,
-            source_kind,
-            source_id,
-            command_id: body.command_id,
-            expected_version: body.expected_version,
-            actor_principal_id: context.principal_id,
-            visible_channel_ids: context.visible_channel_ids,
-            priority: body.priority,
-            due_at: body.due_at,
-            responsible_principal_id: body.responsible_principal_id.map(PrincipalId::new),
-        })
-        .await?;
-    Ok(Json(serde_json::json!({ "version": version })))
-}
-
-#[derive(Deserialize)]
-struct ResolveBody {
-    command_id: Uuid,
-    expected_version: u64,
-    resolution: HandoffResolution,
-}
-
-async fn resolve_handoff(
-    State(attention): State<Arc<dyn AttentionPersistence>>,
-    State(companies): State<Arc<CompanyUseCases>>,
-    State(channels): State<Arc<ChannelUseCases>>,
-    State(threads): State<Arc<ThreadUseCases>>,
-    viewer: Viewer,
-    Path((company_id, handoff_id)): Path<(Uuid, Uuid)>,
-    Json(body): Json<ResolveBody>,
-) -> AppResult<Json<serde_json::Value>> {
-    let context = read_context(&companies, &channels, &threads, &viewer, company_id).await?;
-    let version = attention
-        .resolve_handoff(ResolveHandoffCommand {
-            company_id,
-            handoff_id,
-            command_id: body.command_id,
-            expected_version: body.expected_version,
-            actor_principal_id: context.principal_id,
-            visible_channel_ids: context.visible_channel_ids,
-            resolution: body.resolution,
-        })
-        .await?;
-    Ok(Json(serde_json::json!({ "version": version })))
 }
 
 async fn attention_events(
@@ -373,9 +253,7 @@ async fn attention_events(
         loop {
             tokio::select! {
                 event = events.next() => match event {
-                    Some(Ok(event)) => if event.attention_scope(company_id).is_some_and(
-                        |scope| visible_channel_ids.contains(&scope.channel_id)
-                    ) {
+                    Some(Ok(event)) => if wakes_attention(&event, company_id, &visible_channel_ids) {
                         yield Ok(Event::default().event("reconcile").json_data(
                             serde_json::json!({ "company_id": company_id })
                         )
@@ -409,8 +287,6 @@ struct WorkQuery {
     view: Option<String>,
     cursor: Option<String>,
     limit: Option<usize>,
-    #[serde(default)]
-    all_owned: bool,
 }
 
 async fn work_page(
@@ -433,7 +309,6 @@ async fn work_page(
         view: query.view,
         cursor: query.cursor,
         limit: query.limit,
-        all_owned: query.all_owned,
     };
     let page = read_page(
         state.attention.as_ref(),
@@ -454,7 +329,6 @@ async fn work_page(
         companies: &company_list,
         company: &access.company,
         view: list_query.view()?,
-        all_owned: list_query.all_owned,
         page: &page,
         manager: access.membership.manages_company_operations(),
     })))
@@ -476,7 +350,6 @@ async fn work_list(
         view: query.view,
         cursor: query.cursor,
         limit: query.limit,
-        all_owned: query.all_owned,
     };
     let view = list_query.view()?;
     let page = read_page(
@@ -486,10 +359,46 @@ async fn work_list(
         &list_query,
     )
     .await?;
-    Ok(Html(pages::attention_list(
-        access.company.id,
-        view,
-        &page,
-        list_query.all_owned,
-    )))
+    Ok(Html(pages::attention_list(access.company.id, view, &page)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::infra::events::RunScope;
+
+    fn run(company_id: Uuid, channel_id: Option<Uuid>) -> MailboxEvent {
+        MailboxEvent::WorkflowRunChanged(RunScope {
+            company_id,
+            channel_id,
+            thread_id: None,
+            run_id: Uuid::new_v4(),
+        })
+    }
+
+    /// p08 D4.2 freshness: a run change wakes the list when its channel is readable or it has
+    /// none; another channel's or company's run does not; a resync always does.
+    #[test]
+    fn a_run_change_wakes_the_work_list_it_could_change() {
+        let company = Uuid::new_v4();
+        let readable = Uuid::new_v4();
+        let visible = [readable];
+        assert!(wakes_attention(
+            &run(company, Some(readable)),
+            company,
+            &visible
+        ));
+        assert!(wakes_attention(&run(company, None), company, &visible));
+        assert!(!wakes_attention(
+            &run(company, Some(Uuid::new_v4())),
+            company,
+            &visible
+        ));
+        assert!(!wakes_attention(
+            &run(Uuid::new_v4(), Some(readable)),
+            company,
+            &visible
+        ));
+        assert!(wakes_attention(&MailboxEvent::Resync, company, &visible));
+    }
 }

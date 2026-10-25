@@ -7,21 +7,15 @@ use uuid::Uuid;
 use crate::{
     app_error::{AppError, AppResult},
     entities::{
-        agent::{
-            Agent, MAX_AGENT_RUN_TIMEOUT_SECS, MAX_AGENT_SKILLS, MAX_AGENT_SUB_AGENTS,
-            MIN_AGENT_RUN_TIMEOUT_SECS,
-        },
-        channel::{Channel, PUBLIC_PARTICIPANT},
-        company::{Company, CompanyChannelDefaults},
+        agent::{Agent, MAX_AGENT_SKILLS},
+        company::Company,
         creation::CreationProvenance,
-        harness::{HarnessConfig, HarnessKind},
-        memory::{MemoryPersistenceMode, MemoryRecallMode, default_memory_max_results},
         user::Viewer,
         value_objects::{AvatarUrl, ModelName, ModelProvider},
     },
     services::harness::{ClassificationRequest, TextClassifier},
     use_cases::{
-        channel::{ChannelWrite, SlugKind, check_spam_interlock, validate_slug},
+        channel::{SlugKind, validate_slug},
         company::{CompanyPersistence, managed_company},
     },
 };
@@ -37,89 +31,23 @@ pub fn agent_not_found() -> AppError {
 ///
 /// Values reach persistence already normalized — see [`AgentWrite::normalize`]. Mirrors
 /// [`crate::use_cases::channel::ChannelWrite`].
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct AgentWrite {
     pub name: String,
     pub slug: String,
     pub provider: Option<String>,
     pub model: Option<String>,
-    pub run_timeout_secs: Option<u32>,
     pub system_prompt: Option<String>,
     /// Short statement of what the agent is for, read by the agent directory tool.
     pub description: Option<String>,
     /// Ordered workflow tool grants (06-D5). `None` keeps the stored list on update.
     pub workflow_tools: Option<Vec<crate::domain::workflow::TypeName>>,
-    pub config_json: Option<serde_json::Value>,
-    pub response_contract: crate::entities::response_contract::ContractUpdate,
     pub skill_ids: Vec<Uuid>,
-    pub sub_agent_ids: Vec<Uuid>,
-    pub memory_enabled: bool,
-    pub memory_persistence_mode: MemoryPersistenceMode,
-    pub memory_recall_mode: MemoryRecallMode,
-    pub memory_max_results: u8,
     pub avatar_url: Option<AvatarUrl>,
     pub created_by: Option<CreationProvenance>,
 }
 
-impl Default for AgentWrite {
-    fn default() -> Self {
-        Self {
-            name: String::new(),
-            slug: String::new(),
-            provider: None,
-            model: None,
-            run_timeout_secs: None,
-            system_prompt: None,
-            description: None,
-            workflow_tools: None,
-            response_contract: Default::default(),
-            config_json: None,
-            skill_ids: Vec::new(),
-            sub_agent_ids: Vec::new(),
-            memory_enabled: false,
-            memory_persistence_mode: MemoryPersistenceMode::AudienceOnly,
-            memory_recall_mode: MemoryRecallMode::Fast,
-            memory_max_results: default_memory_max_results(),
-            avatar_url: None,
-            created_by: None,
-        }
-    }
-}
-
 impl AgentWrite {
-    /// Validate an update together with the stored settings it leaves unchanged, then restore
-    /// the submitted omissions so persistence keeps the stored values.
-    fn validate_update(&mut self, stored: &Agent) -> AppResult<()> {
-        let supplied_config = self.config_json.is_some();
-        if !supplied_config {
-            self.config_json = stored.config_json.clone();
-        }
-        let submitted_contract = self.response_contract.clone();
-        if self.response_contract.0.is_none() {
-            self.response_contract.0 = Some(stored.response_contract.clone());
-        }
-        self.normalize()?;
-        // Keep an explicit empty config distinguishable from omission until the locked write.
-        // Persistence canonicalizes this shared empty representation back to SQL NULL.
-        if supplied_config && self.config_json.is_none() {
-            self.config_json = Some(serde_json::json!({"version": 1}));
-        }
-        if !supplied_config {
-            self.config_json = None;
-        }
-        self.response_contract = submitted_contract;
-        Ok(())
-    }
-
-    fn normalize_harness_config(&mut self) -> AppResult<()> {
-        let harness_config = HarnessConfig::parse(HarnessKind::Rig, self.config_json.as_ref())
-            .map_err(AppError::BadRequest)?;
-        let canonical = harness_config.to_json().map_err(AppError::BadRequest)?;
-        self.config_json = (canonical != serde_json::json!({"version": 1})).then_some(canonical);
-
-        Ok(())
-    }
-
     /// Trim the fields that have canonical forms and drop the blanks. Runs once, in the use case,
     /// so create and update store the same shape.
     pub(crate) fn normalize(&mut self) -> AppResult<()> {
@@ -132,14 +60,6 @@ impl AgentWrite {
             ));
         }
         validate_slug(&self.slug, SlugKind::AgentSlug)?;
-
-        if let Some(seconds) = self.run_timeout_secs
-            && !(MIN_AGENT_RUN_TIMEOUT_SECS..=MAX_AGENT_RUN_TIMEOUT_SECS).contains(&seconds)
-        {
-            return Err(AppError::BadRequest(format!(
-                "Agent run timeout must be between {MIN_AGENT_RUN_TIMEOUT_SECS} and {MAX_AGENT_RUN_TIMEOUT_SECS} seconds."
-            )));
-        }
 
         for field in [
             &mut self.provider,
@@ -155,23 +75,11 @@ impl AgentWrite {
             }
         }
 
-        if !(1..=20).contains(&self.memory_max_results) {
-            return Err(AppError::BadRequest(
-                "Memory result limit must be between 1 and 20.".into(),
-            ));
-        }
-        self.normalize_harness_config()?;
         validate_workflow_names(self.workflow_tools.as_deref(), "workflow tools")?;
         deduplicate(&mut self.skill_ids);
         if self.skill_ids.len() > MAX_AGENT_SKILLS {
             return Err(AppError::BadRequest(format!(
                 "An agent may carry at most {MAX_AGENT_SKILLS} skills."
-            )));
-        }
-        deduplicate(&mut self.sub_agent_ids);
-        if self.sub_agent_ids.len() > MAX_AGENT_SUB_AGENTS {
-            return Err(AppError::BadRequest(format!(
-                "An agent may name at most {MAX_AGENT_SUB_AGENTS} sub-agents."
             )));
         }
 
@@ -198,12 +106,6 @@ pub trait AgentPersistence: Send + Sync {
 
     async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Agent>>;
 
-    async fn get_by_company_slug_and_agent_slug(
-        &self,
-        company_slug: &str,
-        agent_slug: &str,
-    ) -> AppResult<Option<Agent>>;
-
     async fn list_by_company_id(&self, company_id: Uuid) -> AppResult<Vec<Agent>>;
 
     async fn list_library(&self) -> AppResult<Vec<Agent>>;
@@ -214,26 +116,14 @@ pub trait AgentPersistence: Send + Sync {
 }
 
 #[async_trait]
-pub trait OwnedAgentChannelPersistence: Send + Sync {
-    async fn create_owned_agent_channel(
-        &self,
-        company_id: Uuid,
-        agent: AgentWrite,
-        channel: ChannelWrite,
-    ) -> AppResult<(Agent, Channel)>;
-
-    async fn create_owned_agent_channel_from_library(
+pub trait LibraryAgentCopyPersistence: Send + Sync {
+    /// A company agent copied from a library definition: its skills and workflow tool grants
+    /// come with it, in one transaction. Agent only: no channel (P08-D4 §D4.7).
+    async fn create_agent_from_library(
         &self,
         company_id: Uuid,
         library_agent_id: Uuid,
         agent: AgentWrite,
-        channel: ChannelWrite,
-    ) -> AppResult<(Agent, Channel)>;
-
-    async fn update_agent_and_owned_address(
-        &self,
-        agent_id: Uuid,
-        write: AgentWrite,
     ) -> AppResult<Agent>;
 }
 
@@ -246,7 +136,6 @@ pub struct ProvisioningWarning {
 #[derive(Debug, Clone)]
 pub struct ProvisionedAgent {
     pub agent: Agent,
-    pub channel: Channel,
     pub warnings: Vec<ProvisioningWarning>,
 }
 
@@ -256,94 +145,48 @@ pub enum SpamScanning {
     Unavailable,
 }
 
-/// Where the personal channel a new agent gets comes from.
-///
-/// An agent is never created without one, so this is not "should there be a channel" but "who
-/// wrote it" -- and the two cases carry different data, which is why it is an enum rather than an
-/// `Option<ChannelWrite>` beside a confirmation flag.
-#[derive(Debug, Clone)]
-pub enum PersonalChannelPlan {
-    /// Derived from the company's channel defaults, which is what every caller outside the
-    /// Agents workspace's channel step asks for.
-    CompanyDefaults,
-    /// Written by the caller, on the create form's channel step. Boxed because it dwarfs the
-    /// other variant, and this plan travels inside the create future.
-    Configured(Box<ConfiguredPersonalChannel>),
+/// Whether one of `connections` enables `model` for `provider`, both compared canonically: the
+/// model-selection rule agent writes and assistant provisioning (p08 D2.3) share.
+pub(crate) fn model_allowed(
+    connections: &[crate::entities::company::CompanyModelConnection],
+    provider: &str,
+    model: &str,
+) -> bool {
+    let provider = ModelProvider::canonical(provider);
+    let model = ModelName::canonical(model);
+    connections
+        .iter()
+        .any(|connection| connection.provider == provider && connection.models.contains(&model))
 }
 
-impl PersonalChannelPlan {
-    /// A channel the caller wrote, and its answer to the `@public` spam interlock.
-    pub fn configured(write: ChannelWrite, spam_disabled_confirmed: bool) -> Self {
-        Self::Configured(Box::new(ConfiguredPersonalChannel {
-            write,
-            spam_disabled_confirmed,
-        }))
-    }
+/// The model an agent pinned to the company default runs on: the default connection's first
+/// model, when the connection has a key. A workflow runs an agent only on an explicit model.
+pub fn pinned_default_model(
+    connections: &[crate::entities::company::CompanyModelConnection],
+) -> Option<(String, String)> {
+    let connection = connections
+        .iter()
+        .find(|connection| connection.is_default && connection.has_api_key)?;
+    let model = connection.models.first()?;
+    Some((
+        connection.provider.as_str().to_owned(),
+        model.as_str().to_owned(),
+    ))
 }
 
-/// A personal channel as the channel step submitted it.
-#[derive(Debug, Clone)]
-pub struct ConfiguredPersonalChannel {
-    pub write: ChannelWrite,
-    /// Whether the `@public`-without-spam-scanning interlock was answered on the step.
-    pub spam_disabled_confirmed: bool,
-}
-
-#[derive(Debug, Clone)]
-pub(crate) struct PersonalChannelDecision {
-    pub channel: ChannelWrite,
-    pub warnings: Vec<ProvisioningWarning>,
-}
-
-pub(crate) fn personal_channel_write(
-    agent: &AgentWrite,
-    defaults: &CompanyChannelDefaults,
-    spam_scanning: SpamScanning,
-) -> PersonalChannelDecision {
-    let mut participants = defaults
-        .participant_emails
-        .as_ref()
-        .map(|values| values.iter().map(ToString::to_string).collect::<Vec<_>>());
-    let mut warnings = Vec::new();
-    if spam_scanning == SpamScanning::Unavailable {
-        let had_public = participants.as_mut().is_some_and(|values| {
-            let before = values.len();
-            values.retain(|value| !value.eq_ignore_ascii_case(PUBLIC_PARTICIPANT));
-            before != values.len()
-        });
-        if had_public {
-            warnings.push(ProvisioningWarning {
-                code: "public_access_removed".into(),
-                message: "The personal channel was created without public access because spam scanning is unavailable.".into(),
-            });
-        }
-    }
-    if participants.as_ref().is_some_and(Vec::is_empty) {
-        participants = None;
-    }
-
-    PersonalChannelDecision {
-        channel: ChannelWrite {
-            name: agent.name.clone(),
-            description: agent.description.clone(),
-            slug: agent.slug.clone(),
-            participant_emails: participants,
-            enabled: true,
-            add_3rd_party: defaults.add_3rd_party,
-            retrieve_company_memory: defaults.retrieve_company_memory,
-            retrieve_agent_memory: defaults.retrieve_agent_memory,
-            retrieve_user_memory: defaults.retrieve_user_memory,
-            persist_company_memory: defaults.persist_company_memory,
-            persist_agent_memory: defaults.persist_agent_memory,
-            persist_user_memory: defaults.persist_user_memory,
-            ..ChannelWrite::default()
-        },
-        warnings,
-    }
+/// What a library copy that names no usable model runs on.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LibraryCopyModel {
+    /// The company default, followed as it changes, unless the definition grants workflow tools:
+    /// those copies are pinned to it.
+    FollowDefault,
+    /// Pinned to the company default: onboarding gives each copy an assistant channel (p08 D4.7).
+    PinDefault,
 }
 
 /// One library definition as a company agent write: every stored field, with the provenance left
-/// for [`AgentUseCases::create_addressable_agent`] to stamp with whoever picked it.
+/// for [`AgentUseCases::create_agent_from_library`] to stamp with whoever picked it. Its workflow
+/// tool grants are copied with its skills, in the creating transaction.
 fn library_agent_write(definition: &Agent) -> AgentWrite {
     AgentWrite {
         workflow_tools: None,
@@ -351,43 +194,24 @@ fn library_agent_write(definition: &Agent) -> AgentWrite {
         slug: definition.slug.clone(),
         provider: definition.provider.clone(),
         model: definition.model.clone(),
-        run_timeout_secs: definition.run_timeout_secs,
         system_prompt: definition.system_prompt.clone(),
         description: definition.description.clone(),
-        config_json: definition.config_json.clone(),
-        response_contract: crate::entities::response_contract::ContractUpdate(Some(
-            definition.response_contract.clone(),
-        )),
         skill_ids: Vec::new(),
-        sub_agent_ids: Vec::new(),
-        memory_enabled: definition.memory_enabled,
-        memory_persistence_mode: definition.memory_persistence_mode,
-        memory_recall_mode: definition.memory_recall_mode,
-        memory_max_results: definition.memory_max_results,
         avatar_url: definition.avatar_url.clone(),
         created_by: None,
     }
 }
 
-#[derive(Debug, Clone, Default)]
-pub struct SelectableAgents {
-    pub company_agents: Vec<Agent>,
-    pub library_agents: Vec<Agent>,
-}
-
 #[derive(Clone)]
 pub struct AgentUseCases {
-    response_validator:
-        Option<Arc<dyn crate::services::response_contract::ResponseContractValidator>>,
     company_persistence: Arc<dyn CompanyPersistence>,
     agent_persistence: Arc<dyn AgentPersistence>,
-    owned_persistence: Arc<dyn OwnedAgentChannelPersistence>,
-    spam_scanning: SpamScanning,
+    library_copy_persistence: Arc<dyn LibraryAgentCopyPersistence>,
     /// What writes a system prompt when an operator asks for one to be generated.
     ///
-    /// Optional because every other use case here works without a model, and wired separately for
-    /// the same reason `with_memory_persistence` is: a deployment that has not configured one
-    /// still manages agents. The one path that needs it refuses rather than degrading.
+    /// Optional because every other use case here works without a model: a deployment that has
+    /// not configured one still manages agents. The one path that needs it refuses rather than
+    /// degrading.
     prompt_classifier: Option<Arc<dyn TextClassifier>>,
 }
 
@@ -395,35 +219,14 @@ impl AgentUseCases {
     pub fn new(
         company_persistence: Arc<dyn CompanyPersistence>,
         agent_persistence: Arc<dyn AgentPersistence>,
-        owned_persistence: Arc<dyn OwnedAgentChannelPersistence>,
-        spam_scanning: SpamScanning,
+        library_copy_persistence: Arc<dyn LibraryAgentCopyPersistence>,
     ) -> Self {
         Self {
             company_persistence,
             agent_persistence,
-            owned_persistence,
-            spam_scanning,
+            library_copy_persistence,
             prompt_classifier: None,
-            response_validator: None,
         }
-    }
-
-    pub fn with_response_validator(
-        mut self,
-        validator: Arc<dyn crate::services::response_contract::ResponseContractValidator>,
-    ) -> Self {
-        self.response_validator = Some(validator);
-        self
-    }
-
-    fn validate_response_contract(&self, write: &AgentWrite) -> AppResult<()> {
-        if let Some(Some(contract)) = &write.response_contract.0 {
-            self.response_validator
-                .as_ref()
-                .ok_or_else(|| AppError::Internal("Response validator unavailable".into()))?
-                .validate_contract(contract)?;
-        }
-        Ok(())
     }
 
     pub fn with_prompt_classifier(mut self, classifier: Arc<dyn TextClassifier>) -> Self {
@@ -464,14 +267,11 @@ impl AgentUseCases {
             .company_persistence
             .list_model_connections(company_id)
             .await?;
-        let provider = ModelProvider::canonical(provider);
-        let model = ModelName::canonical(model);
-        let allowed = connections.iter().any(|connection| {
-            connection.provider == provider && connection.models.contains(&model)
-        });
-        if !allowed {
+        if !model_allowed(&connections, provider, model) {
             return Err(AppError::BadRequest(format!(
-                "Model '{model}' is not enabled for provider '{provider}' in this company."
+                "Model '{}' is not enabled for provider '{}' in this company.",
+                ModelName::canonical(model),
+                ModelProvider::canonical(provider)
             )));
         }
         Ok(())
@@ -488,6 +288,8 @@ impl AgentUseCases {
             .await
     }
 
+    /// Create a company agent, and only the agent: its address is an assistant channel the agent
+    /// page's "Create assistant channel" action makes (P08-D4 §D4.7).
     #[instrument(skip(self))]
     pub async fn create_agent(
         &self,
@@ -495,79 +297,20 @@ impl AgentUseCases {
         company_id: Uuid,
         write: AgentWrite,
     ) -> AppResult<Agent> {
-        Ok(self
-            .create_addressable_agent(user_id, company_id, write)
-            .await?
-            .agent)
-    }
-
-    #[instrument(skip(self))]
-    pub async fn create_addressable_agent(
-        &self,
-        user_id: Uuid,
-        company_id: Uuid,
-        write: AgentWrite,
-    ) -> AppResult<ProvisionedAgent> {
-        self.create_addressable_agent_with(
-            user_id,
-            company_id,
-            write,
-            PersonalChannelPlan::CompanyDefaults,
-        )
-        .await
-    }
-
-    /// [`create_addressable_agent`](Self::create_addressable_agent), told where the personal
-    /// channel comes from.
-    ///
-    /// Both go through one body because the agent and its channel are written in a single
-    /// transaction either way: what the plan changes is who filled the channel in, not when it is
-    /// created.
-    #[instrument(skip(self))]
-    pub async fn create_addressable_agent_with(
-        &self,
-        user_id: Uuid,
-        company_id: Uuid,
-        write: AgentWrite,
-        plan: PersonalChannelPlan,
-    ) -> AppResult<ProvisionedAgent> {
-        let (company, write) = self
+        let (_, write) = self
             .prepared_agent_write(user_id, company_id, write)
             .await?;
-
         info!(
             "Creating agent '{}' ({}) for company {}",
             write.name, write.slug, company_id
         );
-
-        let mut decision = match plan {
-            PersonalChannelPlan::CompanyDefaults => {
-                personal_channel_write(&write, &company.channel_defaults, self.spam_scanning)
-            }
-            PersonalChannelPlan::Configured(configured) => {
-                self.configured_personal_channel(&write, *configured)?
-            }
-        };
-        decision.channel.created_by = Some(CreationProvenance::user(user_id));
-        decision
-            .channel
-            .normalize_with(crate::use_cases::channel::ActiveAgent::SuppliedByCaller)?;
-        let (agent, channel) = self
-            .owned_persistence
-            .create_owned_agent_channel(company_id, write, decision.channel)
-            .await?;
-        Ok(ProvisionedAgent {
-            agent,
-            channel,
-            warnings: decision.warnings,
-        })
+        self.agent_persistence.create(company_id, write).await
     }
 
     /// Everything a create checks before it writes anything, answering with the normalized write.
     ///
-    /// The create form's channel step calls it so a bad handle, model pair or config JSON is
-    /// refused on the agent step rather than after the channel is filled in, and the step renders
-    /// the handle in the form it will be stored in.
+    /// The Simple create path calls it so a bad handle or model pair is refused before a system
+    /// prompt is generated for it.
     pub async fn validate_new_agent(
         &self,
         user_id: Uuid,
@@ -582,8 +325,8 @@ impl AgentUseCases {
 
     /// The company a new agent belongs to, and the write itself normalized and checked.
     ///
-    /// One place for "is this a valid new agent here", so the channel step and the create that
-    /// follows it cannot disagree about what will be accepted.
+    /// One place for "is this a valid new agent here", so the Simple path's check and the create
+    /// that follows it cannot disagree about what will be accepted.
     async fn prepared_agent_write(
         &self,
         user_id: Uuid,
@@ -594,57 +337,24 @@ impl AgentUseCases {
             managed_company(self.company_persistence.as_ref(), user_id, company_id).await?;
         write.created_by = Some(CreationProvenance::user(user_id));
         write.normalize()?;
-        self.validate_response_contract(&write)?;
         self.validate_model_selection(company_id, &write).await?;
         Ok((company, write))
-    }
-
-    /// The channel the create form's channel step submitted, held to the two rules a personal
-    /// channel has that its form cannot enforce.
-    ///
-    /// Its address follows the agent handle -- [`update_agent_and_owned_address`] keeps them in
-    /// step forever after -- so the submitted slug is replaced rather than trusted; and `@public`
-    /// on a server without spam scanning needs the confirmation the step showed. The defaults path
-    /// strips `@public` and warns instead, because nobody was there to answer.
-    ///
-    /// [`update_agent_and_owned_address`]: OwnedAgentChannelPersistence::update_agent_and_owned_address
-    fn configured_personal_channel(
-        &self,
-        agent: &AgentWrite,
-        configured: ConfiguredPersonalChannel,
-    ) -> AppResult<PersonalChannelDecision> {
-        let ConfiguredPersonalChannel {
-            mut write,
-            spam_disabled_confirmed,
-        } = configured;
-
-        check_spam_interlock(&write, self.spam_scanning, spam_disabled_confirmed)?;
-
-        write.slug = agent.slug.clone();
-        if write.name.trim().is_empty() {
-            write.name = agent.name.clone();
-        }
-
-        Ok(PersonalChannelDecision {
-            channel: write,
-            warnings: Vec::new(),
-        })
     }
 
     /// Create one company agent from a global library definition.
     ///
     /// The definition is copied rather than referenced: the company owns what it creates and can
-    /// edit it afterwards without the global entry changing under it, and it gets the personal
-    /// channel every other created agent gets.
+    /// edit it afterwards without the global entry changing under it. Agent only, like every
+    /// create (P08-D4 §D4.7).
     #[instrument(skip(self))]
     pub async fn create_agent_from_library(
         &self,
         user_id: Uuid,
         company_id: Uuid,
         library_agent_id: Uuid,
+        copy_model: LibraryCopyModel,
     ) -> AppResult<ProvisionedAgent> {
-        let company =
-            managed_company(self.company_persistence.as_ref(), user_id, company_id).await?;
+        managed_company(self.company_persistence.as_ref(), user_id, company_id).await?;
         let definition = self
             .get_library_agent(library_agent_id)
             .await?
@@ -672,31 +382,35 @@ impl AgentUseCases {
             });
         }
 
+        if copy_model == LibraryCopyModel::PinDefault && write.provider.is_none() {
+            let connections = self
+                .company_persistence
+                .list_model_connections(company_id)
+                .await?;
+            if let Some((provider, model)) = pinned_default_model(&connections) {
+                write.provider = Some(provider);
+                write.model = Some(model);
+            }
+        }
+
         write.created_by = Some(CreationProvenance::user(user_id));
         write.normalize()?;
-        self.validate_response_contract(&write)?;
         self.validate_model_selection(company_id, &write).await?;
-        let mut decision =
-            personal_channel_write(&write, &company.channel_defaults, self.spam_scanning);
-        decision.channel.created_by = Some(CreationProvenance::user(user_id));
-        decision
-            .channel
-            .normalize_with(crate::use_cases::channel::ActiveAgent::SuppliedByCaller)?;
-        let (agent, channel) = self
-            .owned_persistence
-            .create_owned_agent_channel_from_library(
-                company_id,
-                library_agent_id,
-                write,
-                decision.channel,
-            )
+        let inherited = write.provider.is_none();
+        let agent = self
+            .library_copy_persistence
+            .create_agent_from_library(company_id, library_agent_id, write)
             .await?;
-        warnings.append(&mut decision.warnings);
-        Ok(ProvisionedAgent {
-            agent,
-            channel,
-            warnings,
-        })
+        if inherited && let (Some(provider), Some(model)) = (&agent.provider, &agent.model) {
+            warnings.push(ProvisioningWarning {
+                code: "library_model_pinned".into(),
+                message: format!(
+                    "'{}' runs workflows, which need an explicit model, so it was created on the company's default: {provider} {model}.",
+                    definition.name
+                ),
+            });
+        }
+        Ok(ProvisionedAgent { agent, warnings })
     }
 
     #[instrument(skip(self))]
@@ -707,35 +421,6 @@ impl AgentUseCases {
     ) -> AppResult<Vec<Agent>> {
         self.verify_company_manager(user_id, company_id).await?;
         self.agent_persistence.list_by_company_id(company_id).await
-    }
-
-    /// Definitions a company owner or admin may assign to a channel, grouped by ownership.
-    pub async fn list_selectable_agents(
-        &self,
-        user_id: Uuid,
-        company_id: Uuid,
-    ) -> AppResult<SelectableAgents> {
-        self.verify_company_manager(user_id, company_id).await?;
-        Ok(SelectableAgents {
-            company_agents: self
-                .agent_persistence
-                .list_by_company_id(company_id)
-                .await?,
-            library_agents: self.agent_persistence.list_library().await?,
-        })
-    }
-
-    pub async fn list_assignable_agents(
-        &self,
-        user_id: Uuid,
-        company_id: Uuid,
-    ) -> AppResult<Vec<Agent>> {
-        let selectable = self.list_selectable_agents(user_id, company_id).await?;
-        Ok(selectable
-            .library_agents
-            .into_iter()
-            .chain(selectable.company_agents)
-            .collect())
     }
 
     pub async fn list_library_agents(&self) -> AppResult<Vec<Agent>> {
@@ -753,7 +438,6 @@ impl AgentUseCases {
     pub async fn create_library_agent(&self, mut write: AgentWrite) -> AppResult<Agent> {
         write.created_by = Some(CreationProvenance::system());
         write.normalize()?;
-        self.validate_response_contract(&write)?;
         self.agent_persistence.create_library(write).await
     }
 
@@ -762,15 +446,11 @@ impl AgentUseCases {
         agent_id: Uuid,
         mut write: AgentWrite,
     ) -> AppResult<Agent> {
-        let agent = self
-            .get_library_agent(agent_id)
+        self.get_library_agent(agent_id)
             .await?
             .ok_or_else(agent_not_found)?;
-        write.validate_update(&agent)?;
-        self.validate_response_contract(&write)?;
-        self.owned_persistence
-            .update_agent_and_owned_address(agent_id, write)
-            .await
+        write.normalize()?;
+        self.agent_persistence.update(agent_id, write).await
     }
 
     pub async fn delete_library_agent(&self, agent_id: Uuid) -> AppResult<()> {
@@ -846,8 +526,7 @@ impl AgentUseCases {
             return Err(agent_not_found());
         }
 
-        write.validate_update(&agent)?;
-        self.validate_response_contract(&write)?;
+        write.normalize()?;
         self.validate_model_selection(company_id, &write).await?;
 
         info!(
@@ -855,9 +534,7 @@ impl AgentUseCases {
             agent_id, company_id, write.name, write.slug
         );
 
-        self.owned_persistence
-            .update_agent_and_owned_address(agent_id, write)
-            .await
+        self.agent_persistence.update(agent_id, write).await
     }
 
     #[instrument(skip(self))]

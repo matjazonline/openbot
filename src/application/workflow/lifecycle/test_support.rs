@@ -316,6 +316,8 @@ pub(super) fn configuration(expected: Option<BindingStateRevision>) -> Configure
         version: publish().version,
         params: serde_json::json!({}),
         resources: Default::default(),
+        run_as: None,
+        message_trigger: None,
     }
 }
 pub(super) fn definitions(

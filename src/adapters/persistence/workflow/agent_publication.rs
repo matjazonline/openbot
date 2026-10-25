@@ -5,6 +5,9 @@ use super::http::begin_http;
 use super::*;
 use crate::application::workflow::lifecycle::{PublicationDependencies, PublicationDirectory};
 use crate::application::workflow::message::{MessageKind, builtin_message_snapshot};
+use crate::application::workflow::provisioning::{
+    ProvisioningKind, builtin_provisioning_snapshot, is_trusted_provisioning_snapshot,
+};
 use crate::application::workflow::templates::CompanyWorkflowDraft;
 use crate::entities::skill::SkillInstruction;
 use serde_json::Value;
@@ -202,62 +205,90 @@ impl<D: PublicationDirectory> PublicationDirectory for AgentPublicationDirectory
         draft: &CompanyWorkflowDraft,
     ) -> AppResult<PublicationDependencies> {
         let mut captured = self.inner.capture(actor, draft).await?;
-        let decoded = crate::adapters::workflow_source::decode(draft.source())
-            .map_err(|diagnostic| AppError::BadRequest(diagnostic.message.into()))?;
-        let keys = agent_universe(&decoded).map_err(AppError::BadRequest)?;
-        let parsed = crate::application::workflow::compiler::parse_workflow(
-            &decoded,
-            VersionId::new(Uuid::nil()),
-        )
-        .map_err(|diagnostic| AppError::BadRequest(diagnostic.message.into()))?;
-        if keys.is_empty() {
+        let Some(selection) = agent_selection(draft)? else {
             return Ok(captured);
-        }
+        };
         let company = draft.company();
         let mut tx = begin_http(&self.persistence).await?;
         authority::authorize_company(&mut tx, company, actor).await?;
-        for key in &keys {
-            let (agent, skills) = derive_on(&mut tx, company, key, Rows::Read).await?;
-            for name in &agent.tools {
-                let tool = granted_tool(
-                    &mut tx,
-                    company,
-                    name,
-                    &captured.snapshots.tools,
-                    &parsed.definition,
-                )
-                .await?;
-                if let Some(tool) = tool {
-                    captured.snapshots.tools.push(tool);
-                }
-            }
-            for skill in skills {
-                match captured
-                    .snapshots
-                    .skills
-                    .iter()
-                    .find(|known| known.name == skill.name)
-                {
-                    Some(known) if known.skill_id == skill.skill_id => {}
-                    Some(_) => {
-                        return Err(refused(format!(
-                            "Two different skills are named {}",
-                            skill.name
-                        )));
-                    }
-                    None => captured.snapshots.skills.push(skill),
-                }
-            }
-            captured.snapshots.agents.push(agent);
-        }
+        capture_agents_on(&mut tx, company, &selection, &mut captured).await?;
         tx.commit().await?;
         Ok(captured)
     }
 }
 
+/// The agents a draft's `agent.run` steps can select, with its parsed definition; `None` when it
+/// selects none.
+pub(super) struct AgentSelection {
+    keys: Vec<AgentKey>,
+    definition: crate::domain::workflow::WorkflowDefinition,
+}
+pub(super) fn agent_selection(draft: &CompanyWorkflowDraft) -> AppResult<Option<AgentSelection>> {
+    let decoded = crate::adapters::workflow_source::decode(draft.source())
+        .map_err(|diagnostic| AppError::BadRequest(diagnostic.message.into()))?;
+    let keys = agent_universe(&decoded).map_err(AppError::BadRequest)?;
+    let parsed = crate::application::workflow::compiler::parse_workflow(
+        &decoded,
+        VersionId::new(Uuid::nil()),
+    )
+    .map_err(|diagnostic| AppError::BadRequest(diagnostic.message.into()))?;
+    Ok((!keys.is_empty()).then_some(AgentSelection {
+        keys,
+        definition: parsed.definition,
+    }))
+}
+
+/// Capture the selected agents, their skills and their granted tools on the caller's
+/// transaction, into the dependencies the inner directories captured. The caller holds the
+/// company lock. Provisioning captures this way, where the agent it just wrote is visible
+/// (p08 D2.3).
+pub(super) async fn capture_agents_on(
+    tx: &mut Transaction<'_, Postgres>,
+    company: CompanyId,
+    selection: &AgentSelection,
+    captured: &mut PublicationDependencies,
+) -> AppResult<()> {
+    for key in &selection.keys {
+        let (agent, skills) = derive_on(tx, company, key, Rows::Read).await?;
+        for name in &agent.tools {
+            let tool = granted_tool(
+                tx,
+                company,
+                name,
+                &captured.snapshots.tools,
+                &selection.definition,
+            )
+            .await?;
+            if let Some(tool) = tool {
+                captured.snapshots.tools.push(tool);
+            }
+        }
+        for skill in skills {
+            match captured
+                .snapshots
+                .skills
+                .iter()
+                .find(|known| known.name == skill.name)
+            {
+                Some(known) if known.skill_id == skill.skill_id => {}
+                Some(_) => {
+                    return Err(refused(format!(
+                        "Two different skills are named {}",
+                        skill.name
+                    )));
+                }
+                None => captured.snapshots.skills.push(skill),
+            }
+        }
+        captured.snapshots.agents.push(agent);
+    }
+    Ok(())
+}
+
 /// Resolve one agent grant with the SQL owner's rules: an already captured snapshot of that
 /// name (step-direct HTTP, a selected MCP slot, or the same workflow tool) is reused when
-/// unique; a built-in message tool is its trusted snapshot; then the company's workflow tool
+/// unique; a built-in message tool is its trusted snapshot; a provisioning name is only ever the
+/// built-in; then the company's workflow tool
 /// registration of that name (07-D2 §D2.2); otherwise the company's single ready HTTP
 /// registration. A name that two of these could answer is refused as ambiguous.
 async fn granted_tool(
@@ -272,6 +303,16 @@ async fn granted_tool(
             "Agent tool {name} conflicts with another tool of the same name in this workflow"
         ))
     };
+    // A provisioning name resolves to the built-in before anything captured (p08 D2.1, F047): an
+    // MCP tool of that name stays a slot tool and must never answer the grant.
+    if let Some(kind) = ProvisioningKind::parse(name.as_str()) {
+        let mut known = captured.iter().filter(|tool| &tool.contract.name == name);
+        return match (known.next(), known.next()) {
+            (None, _) => Ok(Some(builtin_provisioning_snapshot(company, kind)?)),
+            (Some(tool), None) if is_trusted_provisioning_snapshot(tool)? => Ok(None),
+            _ => Err(ambiguous()),
+        };
+    }
     let workflow = super::workflow_tools::workflow_tool_snapshot(tx, company, name).await?;
     let known: Vec<&ToolSnapshot> = captured
         .iter()
@@ -293,6 +334,7 @@ async fn granted_tool(
         ([tool], None)
             if match tool.kind() {
                 ToolKind::Message | ToolKind::Http => true,
+                ToolKind::Provisioning => false,
                 ToolKind::Slot(slot) => {
                     super::resources::slot_kind(definition, slot) == Some("mcp")
                 }

@@ -85,7 +85,7 @@ impl NotificationEventDb {
 struct SourceSnapshot {
     channel_id: Uuid,
     thread_id: Option<Uuid>,
-    task_id: Option<Uuid>,
+    run_id: Option<Uuid>,
     correlation_id: Option<Uuid>,
     responsible_principal_id: Option<Uuid>,
     lifecycle: SourceLifecycle,
@@ -99,54 +99,13 @@ enum SourceLifecycle {
 }
 
 #[derive(Debug, sqlx::FromRow)]
-struct TaskSourceRow {
-    channel_id: Uuid,
-    thread_id: Option<Uuid>,
-    correlation_id: Uuid,
-    status: String,
-    owner_principal_id: Option<Uuid>,
-    owner_principal_kind: Option<String>,
-}
-
-#[derive(Debug, sqlx::FromRow)]
-struct HandoffSourceRow {
-    channel_id: Uuid,
-    thread_id: Option<Uuid>,
-    correlation_id: Option<Uuid>,
-    status: String,
-    responsible_principal_id: Option<Uuid>,
-}
-
-#[derive(Debug, sqlx::FromRow)]
-struct ReviewSourceRow {
-    channel_id: Uuid,
-    thread_id: Uuid,
-    task_id: Option<Uuid>,
-    correlation_id: Option<Uuid>,
-    status: String,
-    reviewer_principal_id: Uuid,
-}
-
-#[derive(Debug, sqlx::FromRow)]
-struct DelegationSourceRow {
-    channel_id: Uuid,
-    thread_id: Option<Uuid>,
-    task_id: Uuid,
-    correlation_id: Uuid,
-    status: String,
-    owner_principal_id: Option<Uuid>,
-    owner_principal_kind: Option<String>,
-}
-
-#[derive(Debug, sqlx::FromRow)]
 struct DeliverySourceRow {
     channel_id: Uuid,
-    thread_id: Option<Uuid>,
-    task_id: Option<Uuid>,
+    thread_id: Uuid,
+    run_id: Uuid,
     correlation_id: Uuid,
     status: String,
-    owner_principal_id: Option<Uuid>,
-    owner_principal_kind: Option<String>,
+    actor_principal_id: Option<Uuid>,
 }
 
 #[derive(Debug, sqlx::FromRow)]
@@ -636,82 +595,31 @@ async fn resolve_projection_on(
     })
 }
 
+/// What a notification event is about (p08 D4.3). After B4 the only source is a workflow
+/// delivery: it resolves to its run through the destination, and its run actor is responsible
+/// while they are a person of the company. A delivery with no run (a person's mailbox send) is no
+/// source at all, so it notifies nobody.
 async fn source_snapshot(
     connection: &mut PgConnection,
     event: &NotificationEvent,
 ) -> AppResult<Option<SourceSnapshot>> {
     match (event.source_kind, event.action_kind) {
-        (NotificationSourceKind::Task, NotificationActionKind::Assignment) => {
-            let row = sqlx::query_as::<_, TaskSourceRow>(
-                r#"SELECT channel_id, thread_id, correlation_id, status,
-                              owner_principal_id, owner_principal_kind
-                         FROM background_tasks AS task
-                        WHERE task.queue_kind = 'legacy' AND task.company_id = $1 AND task.id = $2
-                        FOR SHARE OF task"#,
-            )
-            .bind(event.company_id)
-            .bind(event.source_id)
-            .fetch_optional(&mut *connection)
-            .await
-            .map_err(AppError::from)?;
-            Ok(row.map(|row| {
-                let lifecycle = match row.status.as_str() {
-                    "completed" | "stopped" | "dead_letter" => SourceLifecycle::Resolved,
-                    _ if row.owner_principal_kind.as_deref() == Some("person") => {
-                        SourceLifecycle::Active
-                    }
-                    _ => SourceLifecycle::Withdrawn,
-                };
-                SourceSnapshot {
-                    channel_id: row.channel_id,
-                    thread_id: row.thread_id,
-                    task_id: Some(event.source_id),
-                    correlation_id: Some(row.correlation_id),
-                    responsible_principal_id: row.owner_principal_id,
-                    lifecycle,
-                }
-            }))
-        }
-        (NotificationSourceKind::Handoff, NotificationActionKind::Assignment) => {
-            let row = sqlx::query_as::<_, HandoffSourceRow>(
-                r#"SELECT channel_id, thread_id, correlation_id, status,
-                              responsible_principal_id
-                         FROM manual_handoffs AS handoff
-                        WHERE handoff.company_id = $1 AND handoff.id = $2
-                        FOR SHARE OF handoff"#,
-            )
-            .bind(event.company_id)
-            .bind(event.source_id)
-            .fetch_optional(&mut *connection)
-            .await
-            .map_err(AppError::from)?;
-            Ok(row.map(|row| SourceSnapshot {
-                channel_id: row.channel_id,
-                thread_id: row.thread_id,
-                task_id: None,
-                correlation_id: row.correlation_id,
-                responsible_principal_id: row.responsible_principal_id,
-                lifecycle: match row.status.as_str() {
-                    "open" => SourceLifecycle::Active,
-                    "resolved" => SourceLifecycle::Resolved,
-                    _ => SourceLifecycle::Withdrawn,
-                },
-            }))
-        }
-        (NotificationSourceKind::ResponseReview, NotificationActionKind::ResponseReview) => {
-            let row = sqlx::query_as::<_, ReviewSourceRow>(
-                r#"SELECT draft.channel_id, draft.thread_id, draft.task_id,
-                              task.correlation_id, review.status, review.reviewer_principal_id
-                         FROM response_reviews AS review
-                         JOIN response_drafts AS draft
-                           ON (draft.company_id, draft.id, draft.version) =
-                              (review.company_id, review.draft_id, review.draft_version)
-                         LEFT JOIN background_tasks AS task
-                           ON task.company_id = draft.company_id AND task.id = draft.task_id
-                        WHERE review.company_id = $1 AND review.draft_id = $2
-                          AND (draft.task_id IS NULL OR task.queue_kind = 'legacy')
-                        ORDER BY review.draft_version DESC LIMIT 1
-                        FOR SHARE OF review"#,
+        (NotificationSourceKind::Delivery, NotificationActionKind::DeliveryFailure) => {
+            let row = sqlx::query_as::<_, DeliverySourceRow>(
+                r#"SELECT delivery.channel_id, destination.thread_id, run.id AS run_id,
+                          delivery.correlation_id, delivery.status,
+                          actor.id AS actor_principal_id
+                     FROM message_deliveries AS delivery
+                     JOIN workflow_message_destinations AS destination
+                       ON destination.company_id = delivery.company_id
+                      AND destination.delivery_id = delivery.id
+                     JOIN workflow_runs AS run
+                       ON run.company_id = destination.company_id AND run.id = destination.run_id
+                     LEFT JOIN principals AS actor
+                       ON actor.company_id = run.company_id AND actor.user_id = run.actor_id
+                      AND actor.kind = 'person'
+                    WHERE delivery.company_id = $1 AND delivery.id = $2
+                    FOR SHARE OF delivery"#,
             )
             .bind(event.company_id)
             .bind(event.source_id)
@@ -721,102 +629,11 @@ async fn source_snapshot(
             Ok(row.map(|row| SourceSnapshot {
                 channel_id: row.channel_id,
                 thread_id: Some(row.thread_id),
-                task_id: row.task_id,
-                correlation_id: row.correlation_id,
-                responsible_principal_id: Some(row.reviewer_principal_id),
-                lifecycle: match row.status.as_str() {
-                    "pending" => SourceLifecycle::Active,
-                    "superseded" => SourceLifecycle::Withdrawn,
-                    _ => SourceLifecycle::Resolved,
-                },
-            }))
-        }
-        (NotificationSourceKind::Delegation, NotificationActionKind::DelegationTimeout) => {
-            let row = sqlx::query_as::<_, DelegationSourceRow>(
-                r#"SELECT task.channel_id, task.thread_id, task.id AS task_id, task.correlation_id,
-                              outreach.status, task.owner_principal_id, task.owner_principal_kind
-                         FROM task_outreaches AS outreach
-                         JOIN background_tasks AS task ON task.id = outreach.task_id
-                        WHERE task.queue_kind = 'legacy' AND task.company_id = $1 AND outreach.id = $2
-                        FOR SHARE OF outreach, task"#,
-            )
-            .bind(event.company_id)
-            .bind(event.source_id)
-            .fetch_optional(&mut *connection)
-            .await
-            .map_err(AppError::from)?;
-            Ok(row.map(|row| SourceSnapshot {
-                channel_id: row.channel_id,
-                thread_id: row.thread_id,
-                task_id: Some(row.task_id),
+                run_id: Some(row.run_id),
                 correlation_id: Some(row.correlation_id),
-                responsible_principal_id: row.owner_principal_id,
-                lifecycle: if row.status == "timeout_pending_approval" {
-                    if row.owner_principal_kind.as_deref() == Some("person") {
-                        SourceLifecycle::Active
-                    } else {
-                        SourceLifecycle::Withdrawn
-                    }
-                } else {
-                    SourceLifecycle::Resolved
-                },
-            }))
-        }
-        (NotificationSourceKind::Task, NotificationActionKind::TaskFailure) => {
-            let row = sqlx::query_as::<_, TaskSourceRow>(
-                r#"SELECT channel_id, thread_id, correlation_id, status,
-                              owner_principal_id, owner_principal_kind
-                         FROM background_tasks AS task
-                        WHERE task.queue_kind = 'legacy' AND task.company_id = $1 AND task.id = $2
-                        FOR SHARE OF task"#,
-            )
-            .bind(event.company_id)
-            .bind(event.source_id)
-            .fetch_optional(&mut *connection)
-            .await
-            .map_err(AppError::from)?;
-            Ok(row.map(|row| SourceSnapshot {
-                channel_id: row.channel_id,
-                thread_id: row.thread_id,
-                task_id: Some(event.source_id),
-                correlation_id: Some(row.correlation_id),
-                responsible_principal_id: row.owner_principal_id,
-                lifecycle: if row.status == "dead_letter" {
-                    if row.owner_principal_kind.as_deref() == Some("person") {
-                        SourceLifecycle::Active
-                    } else {
-                        SourceLifecycle::Withdrawn
-                    }
-                } else {
-                    SourceLifecycle::Resolved
-                },
-            }))
-        }
-        (NotificationSourceKind::Delivery, NotificationActionKind::DeliveryFailure) => {
-            let row = sqlx::query_as::<_, DeliverySourceRow>(
-                r#"SELECT delivery.channel_id, task.thread_id, delivery.task_id,
-                          delivery.correlation_id, delivery.status,
-                          task.owner_principal_id, task.owner_principal_kind
-                     FROM message_deliveries AS delivery
-                     JOIN background_tasks AS task
-                       ON task.company_id = delivery.company_id AND task.id = delivery.task_id
-                    WHERE delivery.company_id = $1 AND delivery.id = $2
-                      AND task.queue_kind = 'legacy'
-                    FOR SHARE OF delivery, task"#,
-            )
-            .bind(event.company_id)
-            .bind(event.source_id)
-            .fetch_optional(&mut *connection)
-            .await
-            .map_err(AppError::from)?;
-            Ok(row.map(|row| SourceSnapshot {
-                channel_id: row.channel_id,
-                thread_id: row.thread_id,
-                task_id: row.task_id,
-                correlation_id: Some(row.correlation_id),
-                responsible_principal_id: row.owner_principal_id,
+                responsible_principal_id: row.actor_principal_id,
                 lifecycle: if matches!(row.status.as_str(), "dead_letter" | "outcome_unknown") {
-                    if row.owner_principal_kind.as_deref() == Some("person") {
+                    if row.actor_principal_id.is_some() {
                         SourceLifecycle::Active
                     } else {
                         SourceLifecycle::Withdrawn
@@ -826,10 +643,6 @@ async fn source_snapshot(
                 },
             }))
         }
-        _ => Err(AppError::Internal(format!(
-            "Invalid notification source/action pair {}/{}",
-            event.source_kind, event.action_kind
-        ))),
     }
 }
 
@@ -845,25 +658,16 @@ async fn recipient_for_source(
         email: String,
         company_label: String,
         channel_label: String,
-        assignment_email_enabled: bool,
-        response_review_email_enabled: bool,
-        delegation_timeout_email_enabled: bool,
-        task_failure_email_enabled: bool,
         delivery_failure_email_enabled: bool,
+        decision_email_enabled: bool,
     }
     let row = sqlx::query_as::<_, RecipientRow>(
         r#"SELECT principal.user_id, account.email,
                   company.name AS company_label, channel.name AS channel_label,
-                  COALESCE(preference.assignment_email_enabled, TRUE)
-                      AS assignment_email_enabled,
-                  COALESCE(preference.response_review_email_enabled, TRUE)
-                      AS response_review_email_enabled,
-                  COALESCE(preference.delegation_timeout_email_enabled, TRUE)
-                      AS delegation_timeout_email_enabled,
-                  COALESCE(preference.task_failure_email_enabled, TRUE)
-                      AS task_failure_email_enabled,
                   COALESCE(preference.delivery_failure_email_enabled, TRUE)
-                      AS delivery_failure_email_enabled
+                      AS delivery_failure_email_enabled,
+                  COALESCE(preference.decision_email_enabled, TRUE)
+                      AS decision_email_enabled
              FROM principals AS principal
              JOIN users AS account ON account.id = principal.user_id
              JOIN company_members AS member
@@ -887,11 +691,8 @@ async fn recipient_for_source(
     .map_err(AppError::from)?;
     Ok(row.map(|row| {
         let preferences = NotificationPreferences {
-            assignment_email_enabled: row.assignment_email_enabled,
-            response_review_email_enabled: row.response_review_email_enabled,
-            delegation_timeout_email_enabled: row.delegation_timeout_email_enabled,
-            task_failure_email_enabled: row.task_failure_email_enabled,
             delivery_failure_email_enabled: row.delivery_failure_email_enabled,
+            decision_email_enabled: row.decision_email_enabled,
         };
         NotificationRecipient {
             principal_id: PrincipalId::new(principal_id),
@@ -901,7 +702,7 @@ async fn recipient_for_source(
             channel_label: row.channel_label,
             channel_id: source.channel_id,
             thread_id: source.thread_id,
-            task_id: source.task_id,
+            run_id: source.run_id,
             correlation_id: source
                 .correlation_id
                 .map(Into::into)
@@ -1018,36 +819,11 @@ async fn apply_projection_on(
     Ok(result)
 }
 
-fn source_href(event: &NotificationEvent, recipient: &NotificationRecipient) -> String {
+fn source_href(event: &NotificationEvent, _recipient: &NotificationRecipient) -> String {
     match event.action_kind {
-        NotificationActionKind::ResponseReview => format!(
-            "/reviews/{}?company_id={}",
-            event.source_id, event.company_id
-        ),
         NotificationActionKind::DeliveryFailure => {
             format!("/ui/deliveries?company_id={}", event.company_id)
         }
-        NotificationActionKind::TaskFailure | NotificationActionKind::DelegationTimeout => {
-            format!(
-                "/ui/tasks?company_id={}&view=board&correlation_id={}",
-                event.company_id, recipient.correlation_id
-            )
-        }
-        NotificationActionKind::Assignment => match recipient.thread_id {
-            Some(thread_id) => format!(
-                "/ui?company_id={}&channel_id={}&thread_id={thread_id}",
-                event.company_id, recipient.channel_id
-            ),
-            None => recipient.task_id.map_or_else(
-                || format!("/ui/work?company_id={}", event.company_id),
-                |task_id| {
-                    format!(
-                        "/ui/tasks?company_id={}&task_id={task_id}&view=list",
-                        event.company_id
-                    )
-                },
-            ),
-        },
     }
 }
 

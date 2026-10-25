@@ -192,26 +192,60 @@ impl<
         version: VersionId,
     ) -> LifecycleResult<Arc<PublishedBundle>> {
         let decoded = self.decoder.decode(draft.source())?;
-        let identity_span = workflow_identity_span(&decoded);
         let captured = self.directory.capture(actor, draft).await?;
-        let bundle = publication::freeze(
-            decoded,
-            draft.company(),
-            version,
-            captured.snapshots,
-            captured.children,
-        )?;
-        if bundle.compiled().graph().definition().workflow_id != draft.workflow() {
-            return Err(compiler::Diagnostic::at(
-                "workflow.identity",
-                "workflow_id must match the workflow draft being edited",
-                "/workflow_id",
-                identity_span,
-            )
-            .into());
-        }
+        let bundle = compile_bundle(decoded, draft, version, captured, self.refused_kinds)?;
         Ok(Arc::new(bundle))
     }
+}
+
+/// Freeze a decoded draft with its captured dependencies, then hold it to the workflow identity
+/// and the deployment's refused step kinds. `DefinitionService::compile` and assistant
+/// provisioning (p08 D2.3) both compile through here.
+pub fn compile_bundle(
+    decoded: compiler::DecodedSource,
+    draft: &CompanyWorkflowDraft,
+    version: VersionId,
+    captured: PublicationDependencies,
+    refused_kinds: &[&str],
+) -> LifecycleResult<PublishedBundle> {
+    let identity_span = workflow_identity_span(&decoded);
+    let bundle = publication::freeze(
+        decoded,
+        draft.company(),
+        version,
+        captured.snapshots,
+        captured.children,
+    )?;
+    if bundle.compiled().graph().definition().workflow_id != draft.workflow() {
+        return Err(compiler::Diagnostic::at(
+            "workflow.identity",
+            "workflow_id must match the workflow draft being edited",
+            "/workflow_id",
+            identity_span,
+        )
+        .into());
+    }
+    if let Some((id, step)) = bundle
+        .compiled()
+        .graph()
+        .definition()
+        .steps
+        .iter()
+        .find(|(_, step)| refused_kinds.contains(&step.step_type.as_str()))
+    {
+        let path = format!("/steps/{id}/type");
+        return Err(compiler::Diagnostic::at(
+            "workflow.unsupported_step",
+            &format!(
+                "Step kind {} is not available in this deployment",
+                step.step_type.as_str()
+            ),
+            &path,
+            compiler::input_span(bundle.compiled().source_map(), &path),
+        )
+        .into());
+    }
+    Ok(bundle)
 }
 
 fn workflow_identity_span(decoded: &compiler::DecodedSource) -> compiler::SourceSpan {

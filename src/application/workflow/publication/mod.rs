@@ -55,6 +55,23 @@ impl PublishedBundle {
         &self.hash
     }
 
+    /// The distinct agents frozen in this bundle and in every child it pins (step children and
+    /// workflow-tool pins), each child version visited once however many parents pin it. A
+    /// display index for "used by" (p09 gate P09-B1b-D1); nothing decides on it.
+    pub fn frozen_agent_ids(&self) -> std::collections::BTreeSet<uuid::Uuid> {
+        let mut agents = std::collections::BTreeSet::new();
+        let mut visited = std::collections::BTreeSet::new();
+        let mut pending = vec![self];
+        while let Some(next) = pending.pop() {
+            if !visited.insert(next.compiled.graph().definition().version_id) {
+                continue;
+            }
+            agents.extend(next.snapshots.agents.iter().map(|agent| agent.agent_id));
+            pending.extend(next.children.values().map(AsRef::as_ref));
+        }
+        agents
+    }
+
     /// Admission/runtime must use this hook, not the compiler-only hook, to reject
     /// agent selectors outside the published finite catalogue. Current grants and
     /// revocation still require the runtime authorization boundary.

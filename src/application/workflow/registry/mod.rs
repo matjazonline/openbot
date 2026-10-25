@@ -8,6 +8,7 @@ mod facts;
 mod families;
 mod help;
 pub(crate) mod mcp;
+pub(crate) use mcp::tool_result as mcp_tool_result;
 mod metadata;
 mod schemas;
 pub use examples::{AuthoringExample, example};
@@ -210,6 +211,47 @@ impl<'a> Registration<'a> {
                 "registry.event_schema",
                 "Every wait for one event name must declare the same payload_schema",
                 "payload_schema",
+            ));
+        }
+        Ok(())
+    }
+    /// A `message.reply` wait receives a reply delivered by ingress (p08 D1.5): its payload is
+    /// the registry's `MessageTriggerInput`, and its correlation must name the outbound message
+    /// of a message step in this graph, the only correlation a reply can ever carry.
+    fn message_reply_wait(&mut self, schema: &Value) -> Result<(), Diagnostic> {
+        use crate::application::workflow::triggers::{MESSAGE_REPLY_EVENT, MessageTriggerInput};
+        // `event_identity` already required (and recorded) the literal.
+        let reply = Value::String(MESSAGE_REPLY_EVENT.into());
+        if !matches!(self.parsed.definition.steps[self.id].inputs.get("event"),
+            Some(Binding::Literal(event)) if *event == reply)
+        {
+            return Ok(());
+        }
+        if *schema != MessageTriggerInput::schema() {
+            return Err(self.error(
+                "registry.message_reply_schema",
+                "A message.reply wait must declare the standard message payload_schema \
+                 (source_message, message, subject, sender)",
+                "payload_schema",
+            ));
+        }
+        let steps = &self.parsed.definition.steps;
+        let awaited = match steps[self.id].inputs.get("correlation") {
+            Some(Binding::Reference(reference)) => reference.step_id().filter(|step| {
+                matches!(reference.tail(), [messages, index, field]
+                    if messages == "messages" && field == "message_id"
+                        && !index.is_empty() && index.bytes().all(|byte| byte.is_ascii_digit()))
+                    && steps.get(*step).is_some_and(|sent| {
+                        matches!(sent.step_type.as_str(), "message.send" | "message.reply")
+                    })
+            }),
+            _ => None,
+        };
+        if awaited.is_none() {
+            return Err(self.error(
+                "registry.message_reply_correlation",
+                "A message.reply wait must correlate on /steps/<message step>/output/messages/<n>/message_id",
+                "correlation",
             ));
         }
         Ok(())

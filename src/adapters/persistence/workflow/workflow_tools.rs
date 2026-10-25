@@ -177,8 +177,10 @@ impl WorkflowTools for PostgresPersistence {
         actor: WorkflowActor,
         write: WorkflowToolWrite,
     ) -> AppResult<WorkflowToolRegistration> {
-        if crate::application::workflow::message::is_builtin_message_tool(write.name.as_str()) {
-            return Err(refused("message.* tool names are reserved"));
+        if crate::application::workflow::provisioning::is_reserved_tool_name(write.name.as_str()) {
+            return Err(refused(
+                "Built-in tool names (message.*, list_company_agents, create_agent_channel) are reserved",
+            ));
         }
         if !write.params.is_object()
             || serde_json::to_vec(&write.params)
@@ -293,5 +295,61 @@ impl WorkflowTools for PostgresPersistence {
             return Err(invalid());
         }
         rows.into_iter().map(RegistrationRow::decode).collect()
+    }
+
+    async fn grant_agent_tools(
+        &self,
+        company: CompanyId,
+        actor: WorkflowActor,
+        agent: Uuid,
+        expected: &[TypeName],
+        tools: &[TypeName],
+    ) -> AppResult<Vec<TypeName>> {
+        let names = |names: &[TypeName]| {
+            names
+                .iter()
+                .map(|name| name.as_str().to_owned())
+                .collect::<Vec<_>>()
+        };
+        let granted = names(tools);
+        let unique = granted.iter().collect::<std::collections::BTreeSet<_>>();
+        if granted.len() > MAX_AGENT_TOOL_GRANTS || unique.len() != granted.len() {
+            return Err(refused("An agent grants at most 32 distinct tool names"));
+        }
+        let mut tx = begin_http(self).await?;
+        authority::authorize_company(&mut tx, company, actor).await?;
+        let current: Option<Vec<String>> = sqlx::query_scalar(
+            "SELECT workflow_tools FROM agents WHERE company_id=$1 AND id=$2 FOR UPDATE",
+        )
+        .bind(company.as_uuid())
+        .bind(agent)
+        .fetch_optional(&mut *tx)
+        .await?;
+        let current = current.ok_or_else(|| AppError::NotFound("Agent not found".into()))?;
+        // A retry of a grant that already applied finds its own list: done, whatever it expected.
+        if current == granted {
+            return Ok(tools.to_vec());
+        }
+        if current != names(expected) {
+            return Err(conflict());
+        }
+        // Provisioning is the Agent Builder's alone (P08-D2 invariant 6): a grant may keep or drop
+        // the provisioning tools an agent already holds, never add them.
+        if granted.iter().any(|name| {
+            crate::application::workflow::provisioning::is_builtin_provisioning_tool(name)
+                && !current.contains(name)
+        }) {
+            return Err(refused(
+                "Provisioning tools (list_company_agents, create_agent_channel) are granted only to the Agent Builder",
+            ));
+        }
+        sqlx::query("UPDATE agents SET workflow_tools=$3 WHERE company_id=$1 AND id=$2")
+            .bind(company.as_uuid())
+            .bind(agent)
+            .bind(&granted)
+            .execute(&mut *tx)
+            .await?;
+        tx.commit().await?;
+        Ok(tools.to_vec())
     }
 }

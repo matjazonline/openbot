@@ -7,8 +7,11 @@
 use super::resolution_gate::*;
 use super::*;
 use crate::adapters::persistence::workflow::persistence_bound::recorder::Injected;
-use sqlx::postgres::PgPoolOptions;
 
+/// The bound hands the server its timeout as whole milliseconds, floored, so the server can
+/// cancel a lock wait up to a millisecond before the client deadline (WF-P08-F094). The outcome
+/// is "unknown" either way; only the exact lower bound needs the slack.
+const SERVER_TIMEOUT_GRANULARITY: Duration = Duration::from_millis(1);
 const CLAIM_ROW: &str = "true";
 const RETIREMENT: &str = "OLD.status='processing' AND NEW.status<>'processing'";
 const RENEWAL: &str = "OLD.status='processing' AND NEW.status='processing' AND NEW.lock_expires_at > OLD.lock_expires_at";
@@ -320,7 +323,10 @@ async fn workflow_lease_resolution_release_retry_stays_inside_deadline() {
         if retry_stalls {
             let error = result.unwrap_err();
             assert!(unknown(&error, "lease.release"), "{error:?}");
-            assert!(elapsed >= gated_policy().persistence_deadline());
+            assert!(
+                elapsed + SERVER_TIMEOUT_GRANULARITY >= gated_policy().persistence_deadline(),
+                "{elapsed:?}"
+            );
             // The stalled retry aborts too: nothing was released, the fence still owns.
             gate.release().await;
             gate.retake().await;
@@ -396,7 +402,10 @@ async fn workflow_lease_resolution_stall_beyond_deadline_unknown_then_one_expiry
         .unwrap_err();
     let elapsed = started.elapsed();
     assert!(unknown(&error, "lease.claim"), "{error:?}");
-    assert!(elapsed >= gated_policy().persistence_deadline());
+    assert!(
+        elapsed + SERVER_TIMEOUT_GRANULARITY >= gated_policy().persistence_deadline(),
+        "{elapsed:?}"
+    );
     assert!(elapsed < gated_policy().supervision_guard(), "{elapsed:?}");
     gate.drain().await;
     let saved = job(&f, scope).await;
@@ -462,8 +471,11 @@ async fn workflow_lease_resolution_read_only_validate_rolls_back_under_stalled_r
     let (f, scope) = fixture().await;
     let owned = claimed(&f, scope).await;
     let (mut observer, _) = connect(&f).await;
-    // A one-connection pool pins the validation to a backend the test can name.
-    let single = PgPoolOptions::new()
+    // A one-connection pool pins the validation to a backend the test can name. It is the one
+    // deliberately unguarded pool (WF-C004 r2): the leaked-transaction guard runs a statement on
+    // every release, which would replace the ROLLBACK this test reads back. Nothing here cancels
+    // a `begin`.
+    let single = sqlx::postgres::PgPoolOptions::new()
         .max_connections(1)
         .connect_with((*f.persistence().pool().connect_options()).clone())
         .await

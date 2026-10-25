@@ -2,28 +2,20 @@ use super::*;
 use crate::adapters::monitoring::in_memory_monitor::InMemoryMonitor;
 use crate::adapters::protocols::email::parser::RawInboundPayload;
 use crate::domain::monitoring::MonitoringService;
-use crate::entities::agent::Agent;
-use crate::entities::channel::{Channel, ChannelAccessMode, ChannelResponseTrigger};
+use crate::entities::channel::{Channel, ChannelAccessMode};
 use crate::entities::company::CompanyAccess;
 use crate::entities::company_member::CompanyMembership;
 use crate::entities::correlation::CorrelationId;
 use crate::entities::message::MessageDirection;
-use crate::entities::task::NewTask;
-use crate::entities::task::{ResumeActor, StopActor, TaskFailure, TaskLeaseRef};
-use crate::entities::thread_handoff::ExternalReplyHandling;
 use crate::infra::config::ResendApiConfig;
-use crate::task_queue::{AgentDispatchCommit, DispatchCommit};
-use crate::transport::{DeliveryCreation, NewDelivery};
+use crate::transport::InboundOrigin;
 use crate::transport::{MAX_ATTACHMENTS, MAX_BODY_BYTES, MAX_INGRESS_HOPS};
-use crate::use_cases::agent::{AgentPersistence, AgentWrite};
 use crate::use_cases::channel::{ChannelPersistence, ChannelWrite};
 use crate::use_cases::company::CompanyWrite;
 use crate::use_cases::participant::test_support::{
     InMemoryParticipantDirectory, TeamFixture, email_allowlist_grants, email_allowlist_policy,
 };
-use crate::use_cases::skill::{AgentCapabilityReader, StoredAgentCapabilities};
 use crate::use_cases::thread::test_support::InMemoryThreads;
-use crate::use_cases::thread::test_support::{EmailMessageDraft, email_write};
 use chrono::Utc;
 use std::sync::Mutex;
 
@@ -32,8 +24,6 @@ fn internal_test_config() -> Arc<AppConfig> {
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
         resend_api: ResendApiConfig::default(),
-        hydradb: None,
-        hindsight: None,
         refresh_token_ttl: time::Duration::days(30),
         app_domain_name: "mailagents.com".to_string(),
         cors_allowed_origins: vec![],
@@ -154,21 +144,6 @@ impl CompanyPersistence for MockCompanyPersistence {
     async fn delete(&self, _id: Uuid) -> AppResult<()> {
         unimplemented!()
     }
-    async fn list_company_team_emails(&self, company_id: Uuid) -> AppResult<Vec<String>> {
-        let members = self.team_members.lock().unwrap();
-        Ok(members
-            .iter()
-            .filter(|(cid, _)| *cid == company_id)
-            .map(|(_, e)| e.clone())
-            .collect())
-    }
-
-    async fn list_company_team_accounts(
-        &self,
-        _company_id: Uuid,
-    ) -> AppResult<Vec<crate::entities::company::CompanyTeamAccount>> {
-        unimplemented!("this double is not exercised on the team-account path")
-    }
 
     /// This double never reaches a provider call: the tests around it assert on ingestion and
     /// threading, and an agent run that gets this far fails at parameter resolution by design.
@@ -241,29 +216,12 @@ impl ChannelPersistence for MockChannelPersistence {
     async fn update(
         &self,
         _request: crate::use_cases::channel::ChannelUpdate,
-    ) -> AppResult<crate::use_cases::channel::ChannelUpdateOutcome> {
+    ) -> AppResult<crate::entities::channel::Channel> {
         unimplemented!()
     }
     async fn delete(&self, _id: Uuid) -> AppResult<()> {
         unimplemented!()
     }
-}
-
-#[derive(Default)]
-struct MockTaskPersistence {
-    tasks: Mutex<Vec<crate::entities::task::BackgroundTask>>,
-    /// The channels each enqueued run drives, as its producer stated them. Recorded because a
-    /// multi-channel pipeline's whole point is that the run answers on more than one, and a double
-    /// that forgot them would let a pipeline test pass with a single-channel run.
-    task_targets: Mutex<HashMap<Uuid, Vec<crate::entities::task::TaskTarget>>>,
-    /// Every delivery this double was asked to queue, whether on its own or as part of a dispatch
-    /// commit. A double that does not record cannot prove a send was *not* made -- which is
-    /// exactly what the failed-run tests assert.
-    deliveries: Mutex<Vec<NewDelivery>>,
-    /// Reply messages committed through `commit_agent_dispatch`. They arrive here rather than at
-    /// the thread double because the dispatch commits them as one transaction with the
-    /// deliveries and the task payload.
-    committed_replies: Mutex<Vec<MessageWrite>>,
 }
 
 /// One inter-channel hop, as the email sender hands it to the relay.
@@ -344,492 +302,6 @@ fn refusal(disposition: &crate::transport::RelayDisposition) -> Option<&str> {
     }
 }
 
-struct MockAgentPersistence {
-    agents: Vec<Agent>,
-}
-
-#[async_trait]
-impl AgentPersistence for MockAgentPersistence {
-    async fn create(&self, _company_id: Uuid, _write: AgentWrite) -> AppResult<Agent> {
-        unimplemented!()
-    }
-
-    async fn create_library(&self, _write: AgentWrite) -> AppResult<Agent> {
-        unimplemented!()
-    }
-
-    async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Agent>> {
-        Ok(self.agents.iter().find(|agent| agent.id == id).cloned())
-    }
-
-    async fn get_by_company_slug_and_agent_slug(
-        &self,
-        _company_slug: &str,
-        _agent_slug: &str,
-    ) -> AppResult<Option<Agent>> {
-        unimplemented!()
-    }
-
-    async fn list_by_company_id(&self, _company_id: Uuid) -> AppResult<Vec<Agent>> {
-        unimplemented!()
-    }
-
-    async fn list_library(&self) -> AppResult<Vec<Agent>> {
-        unimplemented!()
-    }
-
-    async fn update(&self, _id: Uuid, _write: AgentWrite) -> AppResult<Agent> {
-        unimplemented!()
-    }
-
-    async fn delete(&self, _id: Uuid) -> AppResult<()> {
-        unimplemented!()
-    }
-}
-
-#[async_trait]
-impl AgentCapabilityReader for MockAgentPersistence {
-    async fn load_for_execution(
-        &self,
-        execution_company_id: Uuid,
-        agent_id: Uuid,
-    ) -> AppResult<Option<StoredAgentCapabilities>> {
-        Ok(self
-            .agents
-            .iter()
-            .find(|agent| {
-                agent.id == agent_id
-                    && agent
-                        .company_id
-                        .is_none_or(|company_id| company_id == execution_company_id)
-            })
-            .cloned()
-            .map(|agent| StoredAgentCapabilities {
-                agent,
-                skills: Vec::new(),
-                sub_agent_scope: crate::entities::harness::SubAgentScope::AllCompanySiblings,
-            }))
-    }
-}
-
-#[async_trait]
-impl TaskPersistence for MockTaskPersistence {
-    async fn execute_delegation_command(
-        &self,
-        _request: crate::task_queue::DelegationCommandRequest,
-    ) -> AppResult<crate::entities::delegation::DelegationCommandResult> {
-        unreachable!("thread fixture does not execute delegation controls")
-    }
-
-    async fn outreach_reassignment_context(
-        &self,
-        _company_id: Uuid,
-        _task_id: Uuid,
-        _outreach_id: Uuid,
-        _target_id: Uuid,
-    ) -> AppResult<Option<crate::task_queue::OutreachReassignmentContext>> {
-        unreachable!("thread fixture does not reassign delegation targets")
-    }
-
-    async fn ask_owner_to_act(
-        &self,
-        _command: &crate::entities::internal_note::AskOwnerToAct,
-        _actor: crate::entities::transport::PrincipalId,
-    ) -> AppResult<crate::entities::internal_note::AskOwnerOutcome> {
-        Err(AppError::Internal(
-            "agent instructions are not configured in this double".into(),
-        ))
-    }
-
-    async fn start_agent_task(
-        &self,
-        _command: &crate::entities::internal_note::StartAgentTask,
-        _actor: crate::entities::transport::PrincipalId,
-    ) -> AppResult<crate::entities::task::BackgroundTask> {
-        Err(AppError::Internal(
-            "agent task starts are not configured in this double".into(),
-        ))
-    }
-
-    async fn claim_agent_instruction_notes(
-        &self,
-        _company_id: Uuid,
-        _thread_id: Uuid,
-        _lease: crate::entities::task::TaskLeaseRef,
-    ) -> AppResult<Vec<crate::entities::internal_note::AgentInstructionNote>> {
-        Ok(Vec::new())
-    }
-
-    /// No fixture here sends an outreach, so nothing ever asks one to be recorded.
-    async fn record_outreach_request_message(
-        &self,
-        _delivery_id: crate::entities::transport::DeliveryId,
-        _write: &crate::use_cases::thread::MessageWrite,
-    ) -> AppResult<crate::entities::message::CanonicalMessageId> {
-        unreachable!("no fixture here sends an outreach")
-    }
-
-    async fn list_task_channel_targets(
-        &self,
-        _company_id: Uuid,
-        task_id: Uuid,
-    ) -> AppResult<Vec<crate::use_cases::thread::TaskChannelTarget>> {
-        Ok(self
-            .task_targets
-            .lock()
-            .unwrap()
-            .get(&task_id)
-            .cloned()
-            .unwrap_or_default()
-            .into_iter()
-            .map(|target| crate::use_cases::thread::TaskChannelTarget {
-                channel_id: target.channel_id,
-                thread_id: target.thread_id,
-                recipient_role: target.recipient_role,
-            })
-            .collect())
-    }
-
-    async fn commit_agent_dispatch(
-        &self,
-        commit: AgentDispatchCommit<'_>,
-    ) -> AppResult<DispatchCommit> {
-        self.committed_replies
-            .lock()
-            .unwrap()
-            .push(commit.reply.message.clone());
-        let mut queued = Vec::with_capacity(commit.deliveries.len());
-        for delivery in commit.deliveries {
-            queued.push(DeliveryCreation::Created(delivery.id));
-            self.deliveries.lock().unwrap().push(delivery);
-        }
-        Ok(DispatchCommit::Committed { deliveries: queued })
-    }
-
-    async fn renew_task_lease(
-        &self,
-        _lease: TaskLeaseRef,
-        _lock_expires_at: chrono::DateTime<chrono::Utc>,
-    ) -> AppResult<bool> {
-        Ok(true)
-    }
-
-    /// Records instead of refusing, so a test can assert nothing was queued.
-    async fn enqueue_delivery(&self, delivery: NewDelivery) -> AppResult<DeliveryCreation> {
-        let created = DeliveryCreation::Created(delivery.id);
-        self.deliveries.lock().unwrap().push(delivery);
-        Ok(created)
-    }
-
-    async fn find_correlated_outreach_reply(
-        &self,
-        company_id: Uuid,
-        channel_id: Uuid,
-        thread_id: Uuid,
-        sender: &str,
-        references: &[MessageId],
-    ) -> AppResult<Option<crate::entities::outreach::OutreachReplyMatch>> {
-        let tasks = self.tasks.lock().unwrap();
-        Ok(tasks.iter().find_map(|task| {
-            let outreach = task.payload.get("test_outreach")?;
-            let target = outreach.get("target_email")?.as_str()?;
-            let outbound_message_id = outreach.get("outbound_message_id")?.as_str()?;
-            (task.company_id == company_id
-                && task.channel_id == channel_id
-                && task.thread_id == Some(thread_id)
-                && target.eq_ignore_ascii_case(sender)
-                && references.iter().any(|value| value == outbound_message_id))
-            .then(|| crate::entities::outreach::OutreachReplyMatch {
-                outreach_id: outreach
-                    .get("outreach_id")
-                    .and_then(serde_json::Value::as_str)
-                    .and_then(|value| Uuid::parse_str(value).ok())
-                    .unwrap(),
-                task_id: task.id,
-                target_id: Uuid::new_v4(),
-                target_email: target.into(),
-            })
-        }))
-    }
-
-    async fn record_outreach_reply(
-        &self,
-        matched: &crate::entities::outreach::OutreachReplyMatch,
-        _response_association_id: Uuid,
-    ) -> AppResult<crate::entities::outreach::OutreachProgress> {
-        let mut tasks = self.tasks.lock().unwrap();
-        let task = tasks
-            .iter_mut()
-            .find(|task| task.id == matched.task_id)
-            .unwrap();
-        task.status = crate::entities::task::TaskStatus::Pending;
-        Ok(crate::entities::outreach::OutreachProgress {
-            id: matched.outreach_id,
-            task_id: matched.task_id,
-            status: crate::entities::outreach::OutreachStatus::ThresholdMet,
-            required_threshold_percent: 100.0,
-            target_count: 1,
-            response_count: 1,
-            required_response_count: 1,
-            expires_at: Utc::now() + chrono::Duration::hours(1),
-            suspended: false,
-        })
-    }
-
-    async fn enqueue_task(
-        &self,
-        NewTask {
-            company_id,
-            channel_id,
-            thread_id,
-            task_type,
-            payload,
-            targets,
-            source: _,
-            correlation_id,
-        }: NewTask,
-    ) -> AppResult<crate::entities::task::BackgroundTask> {
-        let task = crate::entities::task::BackgroundTask {
-            id: Uuid::new_v4(),
-            company_id,
-            channel_id,
-            thread_id,
-            correlation_id,
-            task_type,
-            status: crate::entities::task::TaskStatus::Pending,
-            payload,
-            retry_count: 0,
-            max_retries: 3,
-            last_error: None,
-            business_priority: Default::default(),
-            business_due_at: None,
-            attention_version: 1,
-            ownership: Default::default(),
-            worker_id: None,
-            execution_generation: None,
-            locked_at: None,
-            lock_expires_at: None,
-            run_at: Utc::now(),
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
-        };
-        self.task_targets.lock().unwrap().insert(task.id, targets);
-        self.tasks.lock().unwrap().push(task.clone());
-        Ok(task)
-    }
-
-    async fn get_task_by_id(
-        &self,
-        id: Uuid,
-    ) -> AppResult<Option<crate::entities::task::BackgroundTask>> {
-        Ok(self
-            .tasks
-            .lock()
-            .unwrap()
-            .iter()
-            .find(|t| t.id == id)
-            .cloned())
-    }
-
-    async fn claim_pending_tasks(
-        &self,
-        worker_id: Uuid,
-        lock_expires_at: chrono::DateTime<chrono::Utc>,
-        limit: i64,
-    ) -> AppResult<Vec<crate::entities::task::BackgroundTask>> {
-        let now = Utc::now();
-        let mut tasks = self.tasks.lock().unwrap();
-        let mut claimed = Vec::new();
-        for task in tasks
-            .iter_mut()
-            .filter(|task| {
-                (task.status == crate::entities::task::TaskStatus::Pending && task.run_at <= now)
-                    || (task.status == crate::entities::task::TaskStatus::Processing
-                        && task.lock_expires_at.is_none_or(|expires| expires <= now))
-            })
-            .take(limit as usize)
-        {
-            task.status = crate::entities::task::TaskStatus::Processing;
-            task.worker_id = Some(worker_id);
-            task.locked_at = Some(now);
-            task.lock_expires_at = Some(lock_expires_at);
-            claimed.push(task.clone());
-        }
-        Ok(claimed)
-    }
-
-    async fn claim_task(
-        &self,
-        id: Uuid,
-        worker_id: Uuid,
-        lock_expires_at: chrono::DateTime<chrono::Utc>,
-    ) -> AppResult<bool> {
-        let mut list = self.tasks.lock().unwrap();
-        let now = Utc::now();
-        if let Some(t) = list.iter_mut().find(|t| {
-            t.id == id && t.status == crate::entities::task::TaskStatus::Pending && t.run_at <= now
-        }) {
-            t.status = crate::entities::task::TaskStatus::Processing;
-            t.worker_id = Some(worker_id);
-            t.locked_at = Some(now);
-            t.lock_expires_at = Some(lock_expires_at);
-            Ok(true)
-        } else {
-            Ok(false)
-        }
-    }
-
-    async fn mark_task_completed(&self, lease: TaskLeaseRef) -> AppResult<bool> {
-        let mut list = self.tasks.lock().unwrap();
-        let now = Utc::now();
-        if let Some(t) = list.iter_mut().find(|t| {
-            t.id == lease.task_id
-                && t.status == crate::entities::task::TaskStatus::Processing
-                && t.worker_id == Some(lease.worker_id)
-                && t.lock_expires_at.is_some_and(|expires| expires > now)
-        }) {
-            t.status = crate::entities::task::TaskStatus::Completed;
-            t.worker_id = None;
-            t.locked_at = None;
-            t.lock_expires_at = None;
-            Ok(true)
-        } else {
-            Ok(false)
-        }
-    }
-
-    async fn mark_task_failed(&self, failure: TaskFailure<'_>) -> AppResult<bool> {
-        let mut list = self.tasks.lock().unwrap();
-        let now = Utc::now();
-        if let Some(t) = list.iter_mut().find(|t| {
-            t.id == failure.lease.task_id
-                && t.status == crate::entities::task::TaskStatus::Processing
-                && t.worker_id == Some(failure.lease.worker_id)
-                && t.lock_expires_at.is_some_and(|expires| expires > now)
-        }) {
-            t.last_error = Some(failure.error.to_string());
-            t.retry_count += 1;
-            t.run_at = failure.next_run_at;
-            t.status = failure.outcome.status();
-            t.worker_id = None;
-            t.locked_at = None;
-            t.lock_expires_at = None;
-            Ok(true)
-        } else {
-            Ok(false)
-        }
-    }
-
-    async fn stop_task(
-        &self,
-        id: Uuid,
-        _actor: StopActor,
-    ) -> AppResult<crate::entities::task::BackgroundTask> {
-        let mut list = self.tasks.lock().unwrap();
-        let t = list
-            .iter_mut()
-            .find(|t| {
-                t.id == id
-                    && matches!(
-                        t.status,
-                        crate::entities::task::TaskStatus::Pending
-                            | crate::entities::task::TaskStatus::Processing
-                            | crate::entities::task::TaskStatus::PendingApproval
-                            | crate::entities::task::TaskStatus::WaitingForThirdPartyReply
-                            | crate::entities::task::TaskStatus::Failed
-                    )
-            })
-            .unwrap();
-        t.status = crate::entities::task::TaskStatus::Stopped;
-        t.worker_id = None;
-        t.locked_at = None;
-        t.lock_expires_at = None;
-        Ok(t.clone())
-    }
-
-    async fn resume_task(
-        &self,
-        id: Uuid,
-        _actor: ResumeActor,
-    ) -> AppResult<crate::entities::task::BackgroundTask> {
-        let mut list = self.tasks.lock().unwrap();
-        let t = list
-            .iter_mut()
-            .find(|t| {
-                t.id == id
-                    && matches!(
-                        t.status,
-                        crate::entities::task::TaskStatus::Stopped
-                            | crate::entities::task::TaskStatus::PendingApproval
-                            | crate::entities::task::TaskStatus::WaitingForThirdPartyReply
-                            | crate::entities::task::TaskStatus::Failed
-                    )
-            })
-            .unwrap();
-        t.status = crate::entities::task::TaskStatus::Pending;
-        t.run_at = Utc::now();
-        t.worker_id = None;
-        t.locked_at = None;
-        t.lock_expires_at = None;
-        Ok(t.clone())
-    }
-
-    async fn list_company_tasks(
-        &self,
-        company_id: Uuid,
-        channel_id: Option<Uuid>,
-        status: Option<crate::entities::task::TaskStatus>,
-        _sort_asc: bool,
-    ) -> AppResult<Vec<crate::entities::task::BackgroundTask>> {
-        Ok(self
-            .tasks
-            .lock()
-            .unwrap()
-            .iter()
-            .filter(|t| t.company_id == company_id)
-            .filter(|t| channel_id.is_none_or(|w_id| t.channel_id == w_id))
-            .filter(|t| status.as_ref().is_none_or(|s| t.status == *s))
-            .cloned()
-            .collect())
-    }
-}
-
-/// Whether a reply leaves the building is a property of the message, decided at ingest and read
-/// back by a different process. A payload that does not state it is refused rather than defaulted:
-/// guessing "send" would mail out an answer the user asked to keep in the app, and guessing
-/// "in-app" would silently swallow a real customer's reply.
-#[test]
-fn a_payload_that_does_not_state_its_delivery_choice_is_refused() {
-    use crate::transport::{InboundTaskPayload, InboundTaskPayloadV1};
-
-    let complete = InboundTaskPayloadV1 {
-        company_id: Uuid::new_v4(),
-        channel_id: Uuid::new_v4(),
-        thread_id: Uuid::new_v4(),
-        source_message_id: crate::entities::message::CanonicalMessageId::random(),
-        correlation_id: CorrelationId::new(),
-        hop_count: 0,
-        trace_channels: BoundedVec::empty(),
-        is_forwarded: false,
-        reply_delivery: ReplyDelivery::InAppOnly,
-    };
-    let encoded = InboundTaskPayload::v1(complete).encode().unwrap();
-    assert_eq!(
-        InboundTaskPayload::decode(&encoded)
-            .unwrap()
-            .identifiers()
-            .reply_delivery,
-        ReplyDelivery::InAppOnly
-    );
-
-    let mut without_choice = encoded.clone();
-    without_choice
-        .as_object_mut()
-        .unwrap()
-        .remove("reply_delivery");
-    assert!(InboundTaskPayload::decode(&without_choice).is_err());
-}
-
 #[tokio::test]
 async fn test_inter_channel_hop_limit_rejection() {
     let company_id = Uuid::new_v4();
@@ -843,15 +315,12 @@ async fn test_inter_channel_hop_limit_rejection() {
         name: "Acme Corp".to_string(),
         slug: "acme".into(),
         avatar_url: None,
-        memory_provider: None,
         created_at: Utc::now(),
     }]));
 
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![
             Channel {
-                response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
-                owner_agent_id: None,
                 enabled: true,
                 add_3rd_party: true,
                 id: channel_id,
@@ -863,19 +332,11 @@ async fn test_inter_channel_hop_limit_rejection() {
                 participant_emails: None,
                 access_mode: ChannelAccessMode::Team,
                 principal_grants: Vec::new(),
-                agent_ids: Some(vec![Uuid::new_v4()]),
-                retrieve_company_memory: false,
-                retrieve_agent_memory: false,
-                retrieve_user_memory: false,
-                persist_company_memory: false,
-                persist_agent_memory: false,
-                persist_user_memory: false,
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
+                settings_revision: 0,
             },
             Channel {
-                response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
-                owner_agent_id: None,
                 enabled: true,
                 add_3rd_party: true,
                 id: source_channel_id,
@@ -887,15 +348,9 @@ async fn test_inter_channel_hop_limit_rejection() {
                 participant_emails: None,
                 access_mode: ChannelAccessMode::Team,
                 principal_grants: Vec::new(),
-                agent_ids: Some(vec![Uuid::new_v4()]),
-                retrieve_company_memory: false,
-                retrieve_agent_memory: false,
-                retrieve_user_memory: false,
-                persist_company_memory: false,
-                persist_agent_memory: false,
-                persist_user_memory: false,
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
+                settings_revision: 0,
             },
         ]),
     });
@@ -906,8 +361,6 @@ async fn test_inter_channel_hop_limit_rejection() {
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
         resend_api: ResendApiConfig::default(),
-        hydradb: None,
-        hindsight: None,
         refresh_token_ttl: time::Duration::days(30),
         app_domain_name: "mailagents.com".to_string(),
         cors_allowed_origins: vec![],
@@ -933,14 +386,11 @@ async fn test_inter_channel_hop_limit_rejection() {
         operator_emails: Vec::new(),
     });
 
-    let task_persistence = Arc::new(MockTaskPersistence::default());
-
     let thread_use_cases = ThreadUseCases::for_test(
         thread_persistence,
         channel_persistence,
         company_persistence.clone(),
         Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
-        task_persistence,
         config,
     );
 
@@ -980,14 +430,11 @@ async fn test_spf_authentication_failure_rejection() {
         name: "Acme Corp".to_string(),
         slug: "acme".into(),
         avatar_url: None,
-        memory_provider: None,
         created_at: Utc::now(),
     }]));
 
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
-            response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
-            owner_agent_id: None,
             enabled: true,
             add_3rd_party: true,
             id: channel_id,
@@ -999,15 +446,9 @@ async fn test_spf_authentication_failure_rejection() {
             participant_emails: Some(vec!["@public".into()]),
             access_mode: ChannelAccessMode::Public,
             principal_grants: Vec::new(),
-            agent_ids: None,
-            retrieve_company_memory: false,
-            retrieve_agent_memory: false,
-            retrieve_user_memory: false,
-            persist_company_memory: false,
-            persist_agent_memory: false,
-            persist_user_memory: false,
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
+            settings_revision: 0,
         }]),
     });
 
@@ -1017,8 +458,6 @@ async fn test_spf_authentication_failure_rejection() {
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
         resend_api: ResendApiConfig::default(),
-        hydradb: None,
-        hindsight: None,
         refresh_token_ttl: time::Duration::days(30),
         app_domain_name: "mailagents.com".to_string(),
         cors_allowed_origins: vec![],
@@ -1044,14 +483,11 @@ async fn test_spf_authentication_failure_rejection() {
         operator_emails: Vec::new(),
     });
 
-    let task_persistence = Arc::new(MockTaskPersistence::default());
-
     let thread_use_cases = ThreadUseCases::for_test(
         thread_persistence,
         channel_persistence,
         company_persistence.clone(),
         Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
-        task_persistence,
         config,
     );
 
@@ -1086,14 +522,11 @@ async fn test_high_spam_score_rejection() {
         name: "Acme Corp".to_string(),
         slug: "acme".into(),
         avatar_url: None,
-        memory_provider: None,
         created_at: Utc::now(),
     }]));
 
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
-            response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
-            owner_agent_id: None,
             enabled: true,
             add_3rd_party: true,
             id: channel_id,
@@ -1105,15 +538,9 @@ async fn test_high_spam_score_rejection() {
             participant_emails: Some(vec!["@public".into()]),
             access_mode: ChannelAccessMode::Public,
             principal_grants: Vec::new(),
-            agent_ids: None,
-            retrieve_company_memory: false,
-            retrieve_agent_memory: false,
-            retrieve_user_memory: false,
-            persist_company_memory: false,
-            persist_agent_memory: false,
-            persist_user_memory: false,
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
+            settings_revision: 0,
         }]),
     });
 
@@ -1123,8 +550,6 @@ async fn test_high_spam_score_rejection() {
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
         resend_api: ResendApiConfig::default(),
-        hydradb: None,
-        hindsight: None,
         refresh_token_ttl: time::Duration::days(30),
         app_domain_name: "mailagents.com".to_string(),
         cors_allowed_origins: vec![],
@@ -1150,14 +575,11 @@ async fn test_high_spam_score_rejection() {
         operator_emails: Vec::new(),
     });
 
-    let task_persistence = Arc::new(MockTaskPersistence::default());
-
     let thread_use_cases = ThreadUseCases::for_test(
         thread_persistence,
         channel_persistence,
         company_persistence.clone(),
         Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
-        task_persistence,
         config,
     );
 
@@ -1190,14 +612,11 @@ async fn test_dmarc_authentication_failure_rejection() {
         name: "Acme Corp".to_string(),
         slug: "acme".into(),
         avatar_url: None,
-        memory_provider: None,
         created_at: Utc::now(),
     }]));
 
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
-            response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
-            owner_agent_id: None,
             enabled: true,
             add_3rd_party: true,
             id: channel_id,
@@ -1209,15 +628,9 @@ async fn test_dmarc_authentication_failure_rejection() {
             participant_emails: None,
             access_mode: ChannelAccessMode::Team,
             principal_grants: Vec::new(),
-            agent_ids: None,
-            retrieve_company_memory: false,
-            retrieve_agent_memory: false,
-            retrieve_user_memory: false,
-            persist_company_memory: false,
-            persist_agent_memory: false,
-            persist_user_memory: false,
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
+            settings_revision: 0,
         }]),
     });
 
@@ -1227,8 +640,6 @@ async fn test_dmarc_authentication_failure_rejection() {
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
         resend_api: ResendApiConfig::default(),
-        hydradb: None,
-        hindsight: None,
         refresh_token_ttl: time::Duration::days(30),
         app_domain_name: "mailagents.com".to_string(),
         cors_allowed_origins: vec![],
@@ -1254,14 +665,11 @@ async fn test_dmarc_authentication_failure_rejection() {
         operator_emails: Vec::new(),
     });
 
-    let task_persistence = Arc::new(MockTaskPersistence::default());
-
     let thread_use_cases = ThreadUseCases::for_test(
         thread_persistence,
         channel_persistence,
         company_persistence.clone(),
         Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
-        task_persistence,
         config,
     );
 
@@ -1294,14 +702,11 @@ async fn test_unauthorized_sender_blocked_before_spam_checks() {
         name: "Acme Corp".to_string(),
         slug: "acme".into(),
         avatar_url: None,
-        memory_provider: None,
         created_at: Utc::now(),
     }]));
 
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
-            response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
-            owner_agent_id: None,
             enabled: true,
             add_3rd_party: true,
             id: channel_id,
@@ -1313,15 +718,9 @@ async fn test_unauthorized_sender_blocked_before_spam_checks() {
             participant_emails: Some(vec!["alice@example.com".into()]),
             access_mode: ChannelAccessMode::Allowlist,
             principal_grants: email_allowlist_grants(company_id, &["alice@example.com"]),
-            agent_ids: None,
-            retrieve_company_memory: false,
-            retrieve_agent_memory: false,
-            retrieve_user_memory: false,
-            persist_company_memory: false,
-            persist_agent_memory: false,
-            persist_user_memory: false,
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
+            settings_revision: 0,
         }]),
     });
 
@@ -1331,8 +730,6 @@ async fn test_unauthorized_sender_blocked_before_spam_checks() {
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
         resend_api: ResendApiConfig::default(),
-        hydradb: None,
-        hindsight: None,
         refresh_token_ttl: time::Duration::days(30),
         app_domain_name: "mailagents.com".to_string(),
         cors_allowed_origins: vec![],
@@ -1358,14 +755,11 @@ async fn test_unauthorized_sender_blocked_before_spam_checks() {
         operator_emails: Vec::new(),
     });
 
-    let task_persistence = Arc::new(MockTaskPersistence::default());
-
     let thread_use_cases = ThreadUseCases::for_test(
         thread_persistence,
         channel_persistence,
         company_persistence.clone(),
         Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
-        task_persistence,
         config,
     );
 
@@ -1399,14 +793,11 @@ async fn test_participant_sender_bypasses_spam_checks() {
         name: "Acme Corp".to_string(),
         slug: "acme".into(),
         avatar_url: None,
-        memory_provider: None,
         created_at: Utc::now(),
     }]));
 
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
-            response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
-            owner_agent_id: None,
             enabled: true,
             add_3rd_party: true,
             id: channel_id,
@@ -1418,15 +809,9 @@ async fn test_participant_sender_bypasses_spam_checks() {
             participant_emails: Some(vec!["alice@example.com".into()]),
             access_mode: ChannelAccessMode::Allowlist,
             principal_grants: email_allowlist_grants(company_id, &["alice@example.com"]),
-            agent_ids: None,
-            retrieve_company_memory: false,
-            retrieve_agent_memory: false,
-            retrieve_user_memory: false,
-            persist_company_memory: false,
-            persist_agent_memory: false,
-            persist_user_memory: false,
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
+            settings_revision: 0,
         }]),
     });
 
@@ -1436,8 +821,6 @@ async fn test_participant_sender_bypasses_spam_checks() {
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
         resend_api: ResendApiConfig::default(),
-        hydradb: None,
-        hindsight: None,
         refresh_token_ttl: time::Duration::days(30),
         app_domain_name: "mailagents.com".to_string(),
         cors_allowed_origins: vec![],
@@ -1463,14 +846,11 @@ async fn test_participant_sender_bypasses_spam_checks() {
         operator_emails: Vec::new(),
     });
 
-    let task_persistence = Arc::new(MockTaskPersistence::default());
-
     let thread_use_cases = ThreadUseCases::for_test(
         thread_persistence,
         channel_persistence,
         company_persistence.clone(),
         Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
-        task_persistence,
         config,
     );
 
@@ -1505,14 +885,11 @@ async fn test_channel_in_cc_resolves_properly() {
         name: "Acme Corp".to_string(),
         slug: "acme".into(),
         avatar_url: None,
-        memory_provider: None,
         created_at: Utc::now(),
     }]));
 
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
-            response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
-            owner_agent_id: None,
             enabled: true,
             add_3rd_party: true,
             id: channel_id,
@@ -1524,15 +901,9 @@ async fn test_channel_in_cc_resolves_properly() {
             participant_emails: None,
             access_mode: ChannelAccessMode::Team,
             principal_grants: Vec::new(),
-            agent_ids: None,
-            retrieve_company_memory: false,
-            retrieve_agent_memory: false,
-            retrieve_user_memory: false,
-            persist_company_memory: false,
-            persist_agent_memory: false,
-            persist_user_memory: false,
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
+            settings_revision: 0,
         }]),
     });
 
@@ -1542,8 +913,6 @@ async fn test_channel_in_cc_resolves_properly() {
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
         resend_api: ResendApiConfig::default(),
-        hydradb: None,
-        hindsight: None,
         refresh_token_ttl: time::Duration::days(30),
         app_domain_name: "mailagents.com".to_string(),
         cors_allowed_origins: vec![],
@@ -1569,14 +938,11 @@ async fn test_channel_in_cc_resolves_properly() {
         operator_emails: Vec::new(),
     });
 
-    let task_persistence = Arc::new(MockTaskPersistence::default());
-
     let thread_use_cases = ThreadUseCases::for_test(
         thread_persistence.clone(),
         channel_persistence,
         company_persistence.clone(),
         Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
-        task_persistence.clone(),
         config,
     );
 
@@ -1595,12 +961,11 @@ async fn test_channel_in_cc_resolves_properly() {
         .unwrap();
 
     assert!(result.accepted);
-    assert!(result.task_ids.is_empty());
-    assert!(!result.answers());
+    // Copying a channel records its intent; whether a Cc starts anything is its bindings' call.
+    assert_eq!(result.intent_ids.len(), 1);
     assert_eq!(result.channel_matches.len(), 1);
     assert_eq!(result.channel_matches[0].recipient_role, RecipientRole::Cc);
     assert_eq!(thread_persistence.messages().len(), 1);
-    assert!(task_persistence.tasks.lock().unwrap().is_empty());
 }
 
 #[tokio::test]
@@ -1616,15 +981,12 @@ async fn test_multi_channel_to_and_cc_execution() {
         name: "Acme Corp".to_string(),
         slug: "acme".into(),
         avatar_url: None,
-        memory_provider: None,
         created_at: Utc::now(),
     }]));
 
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![
             Channel {
-                response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
-                owner_agent_id: None,
                 enabled: true,
                 add_3rd_party: true,
                 id: wf1_id,
@@ -1636,19 +998,11 @@ async fn test_multi_channel_to_and_cc_execution() {
                 participant_emails: None,
                 access_mode: ChannelAccessMode::Team,
                 principal_grants: Vec::new(),
-                agent_ids: None,
-                retrieve_company_memory: false,
-                retrieve_agent_memory: false,
-                retrieve_user_memory: false,
-                persist_company_memory: false,
-                persist_agent_memory: false,
-                persist_user_memory: false,
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
+                settings_revision: 0,
             },
             Channel {
-                response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
-                owner_agent_id: None,
                 enabled: true,
                 add_3rd_party: true,
                 id: wf2_id,
@@ -1660,15 +1014,9 @@ async fn test_multi_channel_to_and_cc_execution() {
                 participant_emails: None,
                 access_mode: ChannelAccessMode::Team,
                 principal_grants: Vec::new(),
-                agent_ids: None,
-                retrieve_company_memory: false,
-                retrieve_agent_memory: false,
-                retrieve_user_memory: false,
-                persist_company_memory: false,
-                persist_agent_memory: false,
-                persist_user_memory: false,
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
+                settings_revision: 0,
             },
         ]),
     });
@@ -1679,8 +1027,6 @@ async fn test_multi_channel_to_and_cc_execution() {
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
         resend_api: ResendApiConfig::default(),
-        hydradb: None,
-        hindsight: None,
         refresh_token_ttl: time::Duration::days(30),
         app_domain_name: "mailagents.com".to_string(),
         cors_allowed_origins: vec![],
@@ -1706,14 +1052,11 @@ async fn test_multi_channel_to_and_cc_execution() {
         operator_emails: Vec::new(),
     });
 
-    let task_persistence = Arc::new(MockTaskPersistence::default());
-
     let thread_use_cases = ThreadUseCases::for_test(
         thread_persistence.clone(),
         channel_persistence,
         company_persistence.clone(),
         Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
-        task_persistence.clone(),
         config,
     );
 
@@ -1743,19 +1086,26 @@ async fn test_multi_channel_to_and_cc_execution() {
     assert_eq!(threads.len(), 2);
     drop(threads);
 
-    // One task, driving only the channel that was actually asked something. The `Cc`'d channel
-    // has the message on its history; it is not a target, because a copy is not a question.
-    let tasks = task_persistence.tasks.lock().unwrap();
-    assert_eq!(tasks.len(), 1);
-    let targets = task_persistence.task_targets.lock().unwrap();
-    let targets = targets
-        .get(&tasks[0].id)
-        .expect("the task states its targets");
-    assert_eq!(targets.len(), 1);
-    assert_eq!(targets[0].channel_id, ingest.channel_matches[0].channel.id);
-    // Identifiers only: no entity, no provider content, nothing a rename could break.
-    assert_eq!(tasks[0].payload["version"], "1");
-    assert!(tasks[0].payload.get("channel_matches").is_none());
+    // One intent per association, each with its own role; whether the `Cc`'d copy starts anything
+    // is its bindings' trigger, not ingress's decision. Nothing is queued as a legacy task.
+    assert_eq!(ingest.intent_ids.len(), 2);
+    let request = thread_persistence
+        .committed_requests()
+        .last()
+        .cloned()
+        .unwrap();
+    let roles: Vec<_> = request
+        .intents
+        .iter()
+        .map(|intent| (intent.channel_id, intent.role))
+        .collect();
+    assert_eq!(
+        roles,
+        vec![
+            (ingest.channel_matches[0].channel.id, RecipientRole::To),
+            (ingest.channel_matches[1].channel.id, RecipientRole::Cc),
+        ]
+    );
 }
 
 #[tokio::test]
@@ -1772,15 +1122,12 @@ async fn test_pipeline_address_chaining_execution() {
         name: "Acme Corp".to_string(),
         slug: "acme".into(),
         avatar_url: None,
-        memory_provider: None,
         created_at: Utc::now(),
     }]));
 
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![
             Channel {
-                response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
-                owner_agent_id: None,
                 enabled: true,
                 add_3rd_party: true,
                 id: wf1_id,
@@ -1792,19 +1139,11 @@ async fn test_pipeline_address_chaining_execution() {
                 participant_emails: None,
                 access_mode: ChannelAccessMode::Team,
                 principal_grants: Vec::new(),
-                agent_ids: None,
-                retrieve_company_memory: false,
-                retrieve_agent_memory: false,
-                retrieve_user_memory: false,
-                persist_company_memory: false,
-                persist_agent_memory: false,
-                persist_user_memory: false,
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
+                settings_revision: 0,
             },
             Channel {
-                response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
-                owner_agent_id: None,
                 enabled: true,
                 add_3rd_party: true,
                 id: wf2_id,
@@ -1816,19 +1155,11 @@ async fn test_pipeline_address_chaining_execution() {
                 participant_emails: None,
                 access_mode: ChannelAccessMode::Team,
                 principal_grants: Vec::new(),
-                agent_ids: None,
-                retrieve_company_memory: false,
-                retrieve_agent_memory: false,
-                retrieve_user_memory: false,
-                persist_company_memory: false,
-                persist_agent_memory: false,
-                persist_user_memory: false,
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
+                settings_revision: 0,
             },
             Channel {
-                response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
-                owner_agent_id: None,
                 enabled: true,
                 add_3rd_party: true,
                 id: wf3_id,
@@ -1840,15 +1171,9 @@ async fn test_pipeline_address_chaining_execution() {
                 participant_emails: None,
                 access_mode: ChannelAccessMode::Team,
                 principal_grants: Vec::new(),
-                agent_ids: None,
-                retrieve_company_memory: false,
-                retrieve_agent_memory: false,
-                retrieve_user_memory: false,
-                persist_company_memory: false,
-                persist_agent_memory: false,
-                persist_user_memory: false,
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
+                settings_revision: 0,
             },
         ]),
     });
@@ -1859,8 +1184,6 @@ async fn test_pipeline_address_chaining_execution() {
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
         resend_api: ResendApiConfig::default(),
-        hydradb: None,
-        hindsight: None,
         refresh_token_ttl: time::Duration::days(30),
         app_domain_name: "mailagents.com".to_string(),
         cors_allowed_origins: vec![],
@@ -1886,14 +1209,11 @@ async fn test_pipeline_address_chaining_execution() {
         operator_emails: Vec::new(),
     });
 
-    let task_persistence = Arc::new(MockTaskPersistence::default());
-
     let thread_use_cases = ThreadUseCases::for_test(
         thread_persistence.clone(),
         channel_persistence,
         company_persistence.clone(),
         Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
-        task_persistence,
         config,
     );
 
@@ -1936,15 +1256,12 @@ async fn test_misspelled_channel_bounce_and_strict_pipeline_validation() {
         name: "Acme Corp".to_string(),
         slug: "acme".into(),
         avatar_url: None,
-        memory_provider: None,
         created_at: Utc::now(),
     }]));
 
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![
             Channel {
-                response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
-                owner_agent_id: None,
                 enabled: true,
                 add_3rd_party: true,
                 id: Uuid::new_v4(),
@@ -1956,19 +1273,11 @@ async fn test_misspelled_channel_bounce_and_strict_pipeline_validation() {
                 participant_emails: None,
                 access_mode: ChannelAccessMode::Team,
                 principal_grants: Vec::new(),
-                agent_ids: None,
-                retrieve_company_memory: false,
-                retrieve_agent_memory: false,
-                retrieve_user_memory: false,
-                persist_company_memory: false,
-                persist_agent_memory: false,
-                persist_user_memory: false,
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
+                settings_revision: 0,
             },
             Channel {
-                response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
-                owner_agent_id: None,
                 enabled: true,
                 add_3rd_party: true,
                 id: Uuid::new_v4(),
@@ -1980,15 +1289,9 @@ async fn test_misspelled_channel_bounce_and_strict_pipeline_validation() {
                 participant_emails: None,
                 access_mode: ChannelAccessMode::Team,
                 principal_grants: Vec::new(),
-                agent_ids: None,
-                retrieve_company_memory: false,
-                retrieve_agent_memory: false,
-                retrieve_user_memory: false,
-                persist_company_memory: false,
-                persist_agent_memory: false,
-                persist_user_memory: false,
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
+                settings_revision: 0,
             },
         ]),
     });
@@ -1999,8 +1302,6 @@ async fn test_misspelled_channel_bounce_and_strict_pipeline_validation() {
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
         resend_api: ResendApiConfig::default(),
-        hydradb: None,
-        hindsight: None,
         refresh_token_ttl: time::Duration::days(30),
         app_domain_name: "mailagents.com".to_string(),
         cors_allowed_origins: vec![],
@@ -2026,14 +1327,11 @@ async fn test_misspelled_channel_bounce_and_strict_pipeline_validation() {
         operator_emails: Vec::new(),
     });
 
-    let task_persistence = Arc::new(MockTaskPersistence::default());
-
     let thread_use_cases = ThreadUseCases::for_test(
         thread_persistence.clone(),
         channel_persistence,
         company_persistence.clone(),
         Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
-        task_persistence,
         config,
     );
 
@@ -2116,14 +1414,11 @@ async fn test_quote_stripping_rules_for_first_in_thread_and_forwarded_emails() {
         name: "Acme Corp".to_string(),
         slug: "acme".into(),
         avatar_url: None,
-        memory_provider: None,
         created_at: Utc::now(),
     }]));
 
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
-            response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
-            owner_agent_id: None,
             enabled: true,
             add_3rd_party: true,
             id: channel_id,
@@ -2135,15 +1430,9 @@ async fn test_quote_stripping_rules_for_first_in_thread_and_forwarded_emails() {
             participant_emails: None,
             access_mode: ChannelAccessMode::Team,
             principal_grants: Vec::new(),
-            agent_ids: None,
-            retrieve_company_memory: false,
-            retrieve_agent_memory: false,
-            retrieve_user_memory: false,
-            persist_company_memory: false,
-            persist_agent_memory: false,
-            persist_user_memory: false,
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
+            settings_revision: 0,
         }]),
     });
 
@@ -2153,8 +1442,6 @@ async fn test_quote_stripping_rules_for_first_in_thread_and_forwarded_emails() {
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
         resend_api: ResendApiConfig::default(),
-        hydradb: None,
-        hindsight: None,
         refresh_token_ttl: time::Duration::days(30),
         app_domain_name: "mailagents.com".to_string(),
         cors_allowed_origins: vec![],
@@ -2180,14 +1467,11 @@ async fn test_quote_stripping_rules_for_first_in_thread_and_forwarded_emails() {
         operator_emails: Vec::new(),
     });
 
-    let task_persistence = Arc::new(MockTaskPersistence::default());
-
     let thread_use_cases = ThreadUseCases::for_test(
         thread_persistence.clone(),
         channel_persistence,
         company_persistence.clone(),
         Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
-        task_persistence,
         config,
     );
 
@@ -2268,7 +1552,6 @@ async fn test_participant_modes_company_team_public_and_explicit() {
             name: "Acme Corp".to_string(),
             slug: "acme".into(),
             avatar_url: None,
-            memory_provider: None,
             created_at: Utc::now(),
         }],
         vec![(company_id, "team_member@acme.com".to_string())],
@@ -2281,8 +1564,6 @@ async fn test_participant_modes_company_team_public_and_explicit() {
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![
             Channel {
-                response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
-                owner_agent_id: None,
                 enabled: true,
                 add_3rd_party: true,
                 id: flow_team_only,
@@ -2294,19 +1575,11 @@ async fn test_participant_modes_company_team_public_and_explicit() {
                 participant_emails: None, // Default = Company Team
                 access_mode: ChannelAccessMode::Team,
                 principal_grants: Vec::new(),
-                agent_ids: None,
-                retrieve_company_memory: false,
-                retrieve_agent_memory: false,
-                retrieve_user_memory: false,
-                persist_company_memory: false,
-                persist_agent_memory: false,
-                persist_user_memory: false,
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
+                settings_revision: 0,
             },
             Channel {
-                response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
-                owner_agent_id: None,
                 enabled: true,
                 add_3rd_party: true,
                 id: flow_public,
@@ -2318,19 +1591,11 @@ async fn test_participant_modes_company_team_public_and_explicit() {
                 participant_emails: Some(vec!["@public".into()]), // Public
                 access_mode: ChannelAccessMode::Public,
                 principal_grants: Vec::new(),
-                agent_ids: None,
-                retrieve_company_memory: false,
-                retrieve_agent_memory: false,
-                retrieve_user_memory: false,
-                persist_company_memory: false,
-                persist_agent_memory: false,
-                persist_user_memory: false,
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
+                settings_revision: 0,
             },
             Channel {
-                response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
-                owner_agent_id: None,
                 enabled: true,
                 add_3rd_party: true,
                 id: flow_explicit,
@@ -2342,15 +1607,9 @@ async fn test_participant_modes_company_team_public_and_explicit() {
                 participant_emails: Some(vec!["allowed@external.com".into()]), // Explicit list
                 access_mode: ChannelAccessMode::Allowlist,
                 principal_grants: email_allowlist_grants(company_id, &["allowed@external.com"]),
-                agent_ids: None,
-                retrieve_company_memory: false,
-                retrieve_agent_memory: false,
-                retrieve_user_memory: false,
-                persist_company_memory: false,
-                persist_agent_memory: false,
-                persist_user_memory: false,
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
+                settings_revision: 0,
             },
         ]),
     });
@@ -2361,8 +1620,6 @@ async fn test_participant_modes_company_team_public_and_explicit() {
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
         resend_api: ResendApiConfig::default(),
-        hydradb: None,
-        hindsight: None,
         refresh_token_ttl: time::Duration::days(30),
         app_domain_name: "mailagents.com".to_string(),
         cors_allowed_origins: vec![],
@@ -2388,14 +1645,11 @@ async fn test_participant_modes_company_team_public_and_explicit() {
         operator_emails: Vec::new(),
     });
 
-    let task_persistence = Arc::new(MockTaskPersistence::default());
-
     let thread_use_cases = ThreadUseCases::for_test(
         thread_persistence,
         channel_persistence,
         company_persistence.clone(),
         Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
-        task_persistence,
         config,
     );
 
@@ -2467,7 +1721,7 @@ async fn test_participant_modes_company_team_public_and_explicit() {
 }
 
 #[tokio::test]
-async fn test_sender_verification_and_delegation_target_check() {
+async fn test_sender_verification_refuses_strangers_replying_into_a_thread() {
     let company_id = Uuid::new_v4();
     let channel_id = Uuid::new_v4();
 
@@ -2478,14 +1732,11 @@ async fn test_sender_verification_and_delegation_target_check() {
         name: "Acme Corp".to_string(),
         slug: "acme".into(),
         avatar_url: None,
-        memory_provider: None,
         created_at: Utc::now(),
     }]));
 
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
-            response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
-            owner_agent_id: None,
             enabled: true,
             add_3rd_party: true,
             id: channel_id,
@@ -2497,15 +1748,9 @@ async fn test_sender_verification_and_delegation_target_check() {
             participant_emails: Some(vec!["@public".into()]),
             access_mode: ChannelAccessMode::Public,
             principal_grants: Vec::new(),
-            agent_ids: None,
-            retrieve_company_memory: false,
-            retrieve_agent_memory: false,
-            retrieve_user_memory: false,
-            persist_company_memory: false,
-            persist_agent_memory: false,
-            persist_user_memory: false,
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
+            settings_revision: 0,
         }]),
     });
 
@@ -2515,8 +1760,6 @@ async fn test_sender_verification_and_delegation_target_check() {
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
         resend_api: ResendApiConfig::default(),
-        hydradb: None,
-        hindsight: None,
         refresh_token_ttl: time::Duration::days(30),
         app_domain_name: "mailagents.com".to_string(),
         cors_allowed_origins: vec![],
@@ -2542,14 +1785,11 @@ async fn test_sender_verification_and_delegation_target_check() {
         operator_emails: Vec::new(),
     });
 
-    let task_persistence = Arc::new(MockTaskPersistence::default());
-
     let thread_use_cases = ThreadUseCases::for_test(
         thread_persistence,
         channel_persistence,
         company_persistence.clone(),
         Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
-        task_persistence.clone(),
         config,
     );
 
@@ -2566,34 +1806,7 @@ async fn test_sender_verification_and_delegation_target_check() {
         .await
         .unwrap();
     assert!(res1.accepted);
-    let thread_id = res1.thread.unwrap().id;
-
-    // 2. Enqueue a waiting outreach with one target and a sent outbound Message-ID.
-    let outreach_id = Uuid::new_v4();
-    let delegation_payload = serde_json::json!({
-        "test_outreach": {
-            "outreach_id": outreach_id,
-            "target_email": "vendor@supplier.com",
-            "outbound_message_id": "<outreach-vendor@mailagents.com>"
-        }
-    });
-    let task = task_persistence
-        .enqueue_task(NewTask::starting_new_chain(
-            company_id,
-            channel_id,
-            Some(thread_id),
-            "email_agent_dispatch",
-            delegation_payload,
-        ))
-        .await
-        .unwrap();
-
-    {
-        let mut list = task_persistence.tasks.lock().unwrap();
-        if let Some(t) = list.iter_mut().find(|t| t.id == task.id) {
-            t.status = crate::entities::task::TaskStatus::WaitingForThirdPartyReply;
-        }
-    }
+    assert!(res1.thread.is_some());
 
     // 3. Unauthorized third-party attacker tries to inject message into thread using In-Reply-To
     let res_attacker = thread_use_cases
@@ -2617,242 +1830,24 @@ async fn test_sender_verification_and_delegation_target_check() {
         Some("Sender is not an authorized participant or delegation target for this thread")
     );
 
-    // 4. Authorized vendor replies to their exact outreach Message-ID.
-    let res_vendor = thread_use_cases.ingest_test_email(RawInboundPayload {
-            headers: Some("Message-ID: <msg-vendor-1@supplier.com>\nIn-Reply-To: <outreach-vendor@mailagents.com>\nReferences: <msg-client-1@external.com>\n".to_string()),
+    // 4. Answering an outbound message the thread sent does not make a stranger a party to it:
+    //    there is no outreach authorization any more, and a workflow that wants an answer from
+    //    a member addresses them so they become a participant (p08 D1.5.4).
+    let res_vendor = thread_use_cases
+        .ingest_test_email(RawInboundPayload {
+            headers: Some(
+                "Message-ID: <msg-vendor-1@supplier.com>\nIn-Reply-To: <outreach-vendor@mailagents.com>\nReferences: <msg-client-1@external.com>\n"
+                    .to_string(),
+            ),
             to: "support@acme.mailagents.com".to_string(),
             from: "vendor@supplier.com".to_string(),
             subject: Some("Re: Need quote".to_string()),
             text: Some("Quote is $500".to_string()),
             ..Default::default()
-        }).await.unwrap();
-    assert!(res_vendor.accepted);
-
-    // Verify task was resumed to Pending
-    let resumed_task = task_persistence
-        .get_task_by_id(task.id)
-        .await
-        .unwrap()
-        .unwrap();
-    assert_eq!(
-        resumed_task.status,
-        crate::entities::task::TaskStatus::Pending
-    );
-
-    // Outreach authorization is scoped to the correlated outbound message and does not
-    // permanently promote the target to a thread participant.
-    let res_uncorrelated = thread_use_cases
-            .ingest_test_email(RawInboundPayload {
-                headers: Some(
-                    "Message-ID: <msg-vendor-2@supplier.com>\nIn-Reply-To: <msg-client-1@external.com>\n"
-                        .to_string(),
-                ),
-                to: "support@acme.mailagents.com".to_string(),
-                from: "vendor@supplier.com".to_string(),
-                subject: Some("Re: Need quote".to_string()),
-                text: Some("Uncorrelated follow-up".to_string()),
-                ..Default::default()
-            })
-            .await
-            .unwrap();
-    assert!(!res_uncorrelated.accepted);
-}
-
-#[tokio::test]
-async fn internal_channel_callback_resumes_original_task_without_new_task() {
-    let company_id = Uuid::new_v4();
-    let channel_a_id = Uuid::new_v4();
-    let channel_b_id = Uuid::new_v4();
-    let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
-        channel_defaults: Default::default(),
-        id: company_id,
-        user_id: Uuid::new_v4(),
-        name: "Acme Corp".to_string(),
-        slug: "acme".into(),
-        avatar_url: None,
-        memory_provider: None,
-        created_at: Utc::now(),
-    }]));
-    let channel_persistence = Arc::new(MockChannelPersistence {
-        channels: Mutex::new(vec![
-            Channel {
-                response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
-                owner_agent_id: None,
-                enabled: true,
-                add_3rd_party: true,
-                id: channel_a_id,
-                company_id,
-                name: "Agent A".to_string(),
-                description: None,
-                slug: "agent-a".into(),
-                alias_slugs: Vec::new(),
-                participant_emails: Some(vec!["@public".into()]),
-                access_mode: ChannelAccessMode::Public,
-                principal_grants: Vec::new(),
-                agent_ids: Some(vec![Uuid::new_v4()]),
-                retrieve_company_memory: false,
-                retrieve_agent_memory: false,
-                retrieve_user_memory: false,
-                persist_company_memory: false,
-                persist_agent_memory: false,
-                persist_user_memory: false,
-                created_by: crate::entities::creation::CreationProvenance::system(),
-                created_at: Utc::now(),
-            },
-            Channel {
-                response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
-                owner_agent_id: None,
-                enabled: true,
-                add_3rd_party: true,
-                id: channel_b_id,
-                company_id,
-                name: "Agent B".to_string(),
-                description: None,
-                slug: "agent-b".into(),
-                alias_slugs: Vec::new(),
-                participant_emails: None,
-                access_mode: ChannelAccessMode::Team,
-                principal_grants: Vec::new(),
-                agent_ids: Some(vec![Uuid::new_v4()]),
-                retrieve_company_memory: false,
-                retrieve_agent_memory: false,
-                retrieve_user_memory: false,
-                persist_company_memory: false,
-                persist_agent_memory: false,
-                persist_user_memory: false,
-                created_by: crate::entities::creation::CreationProvenance::system(),
-                created_at: Utc::now(),
-            },
-        ]),
-    });
-    let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
-    let task_persistence = Arc::new(MockTaskPersistence::default());
-    let use_cases = ThreadUseCases::for_test(
-        thread_persistence.clone(),
-        channel_persistence,
-        company_persistence.clone(),
-        Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
-        task_persistence.clone(),
-        internal_test_config(),
-    );
-
-    let initial = use_cases
-        .ingest_test_email(RawInboundPayload {
-            headers: Some("Message-ID: <human-request@example.com>\n".to_string()),
-            to: "agent-a@acme.mailagents.com".to_string(),
-            from: "human@example.com".to_string(),
-            subject: Some("Acquire data".to_string()),
-            text: Some("Please obtain supplier data".to_string()),
-            ..Default::default()
         })
         .await
         .unwrap();
-    let parent_task_id = initial.task_ids[0];
-    let thread_a = initial.thread.unwrap();
-    // The frozen hop agent A sends to agent B. The sender chooses the `Message-ID` before it
-    // relays, which is exactly what lets the calling thread record the question it asked.
-    let call = InternalHop {
-        in_reply_to: Some("<human-request@example.com>".into()),
-        ..InternalHop::new(
-            channel_a_id,
-            "agent-a@acme.mailagents.com",
-            "agent-b@acme.mailagents.com",
-            "Acquire data",
-            "Obtain supplier data",
-        )
-    };
-    let call_message_id = call.message_id.clone();
-    thread_persistence
-        .create_message(&email_write(EmailMessageDraft {
-            id: Uuid::new_v4(),
-            thread_id: thread_a.id,
-            message_id: call_message_id.clone(),
-            in_reply_to: call.in_reply_to.clone(),
-            references_list: call.references.clone(),
-            sender: call.from.clone(),
-            recipients_to: vec![call.to.clone()],
-            recipients_cc: Vec::new(),
-            subject: call.subject.clone(),
-            clean_text_body: call.body.clone(),
-            raw_text_body: None,
-            raw_html_body: None,
-            attachments: None,
-            direction: MessageDirection::Outbound,
-            role: MessageRole::Agent,
-            thread_index: None,
-            created_at: Utc::now(),
-        }))
-        .await
-        .unwrap();
-    let outreach_id = Uuid::new_v4();
-    {
-        let mut tasks = task_persistence.tasks.lock().unwrap();
-        let parent_task = tasks
-            .iter_mut()
-            .find(|task| task.id == parent_task_id)
-            .unwrap();
-        parent_task.payload = serde_json::json!({
-            "test_outreach": {
-                "outreach_id": outreach_id,
-                "target_email": "agent-b@acme.mailagents.com",
-                "outbound_message_id": call_message_id.clone()
-            }
-        });
-        parent_task.status = crate::entities::task::TaskStatus::WaitingForThirdPartyReply;
-    }
-    assert_eq!(
-        relay_hop(&use_cases, &call).await,
-        crate::transport::RelayDisposition::Relayed
-    );
-    let delegated_threads = thread_persistence.threads();
-    let delegated = delegated_threads
-        .iter()
-        .find(|thread| thread.channel_id == channel_b_id)
-        .expect("the hop opened a thread on the receiving channel");
-    assert_ne!(delegated.id, thread_a.id);
-    assert_eq!(
-        task_persistence.tasks.lock().unwrap().len(),
-        2,
-        "the delegated hop earned the receiving channel a run of its own"
-    );
-
-    // And agent B's answer, back over the same relay.
-    assert_eq!(
-        relay_hop(
-            &use_cases,
-            &InternalHop {
-                hop_count: 1,
-                trace_channels: vec![channel_a_id],
-                in_reply_to: Some(call_message_id.clone()),
-                references: vec![
-                    "<human-request@example.com>".into(),
-                    call_message_id.clone()
-                ],
-                ..InternalHop::new(
-                    channel_b_id,
-                    "agent-b@acme.mailagents.com",
-                    "agent-a@acme.mailagents.com",
-                    "Acquire data",
-                    "Supplier confirmed 2,000 units",
-                )
-            }
-        )
-        .await,
-        crate::transport::RelayDisposition::Relayed
-    );
-
-    // The answer lands in the *calling* thread rather than opening a third one, and it resumes the
-    // parked run rather than starting another: agent A asked, agent B answered, one chain.
-    assert_eq!(
-        task_persistence
-            .get_task_by_id(parent_task_id)
-            .await
-            .unwrap()
-            .unwrap()
-            .status,
-        crate::entities::task::TaskStatus::Pending
-    );
-    assert_eq!(task_persistence.tasks.lock().unwrap().len(), 2);
+    assert!(!res_vendor.accepted);
 }
 
 #[tokio::test]
@@ -2867,14 +1862,11 @@ async fn uncorrelated_inter_channel_cycle_is_rejected() {
         name: "Acme Corp".to_string(),
         slug: "acme".into(),
         avatar_url: None,
-        memory_provider: None,
         created_at: Utc::now(),
     }]));
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![
             Channel {
-                response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
-                owner_agent_id: None,
                 enabled: true,
                 add_3rd_party: true,
                 id: channel_a_id,
@@ -2886,19 +1878,11 @@ async fn uncorrelated_inter_channel_cycle_is_rejected() {
                 participant_emails: None,
                 access_mode: ChannelAccessMode::Team,
                 principal_grants: Vec::new(),
-                agent_ids: Some(vec![Uuid::new_v4()]),
-                retrieve_company_memory: false,
-                retrieve_agent_memory: false,
-                retrieve_user_memory: false,
-                persist_company_memory: false,
-                persist_agent_memory: false,
-                persist_user_memory: false,
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
+                settings_revision: 0,
             },
             Channel {
-                response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
-                owner_agent_id: None,
                 enabled: true,
                 add_3rd_party: true,
                 id: channel_b_id,
@@ -2910,26 +1894,18 @@ async fn uncorrelated_inter_channel_cycle_is_rejected() {
                 participant_emails: None,
                 access_mode: ChannelAccessMode::Team,
                 principal_grants: Vec::new(),
-                agent_ids: Some(vec![Uuid::new_v4()]),
-                retrieve_company_memory: false,
-                retrieve_agent_memory: false,
-                retrieve_user_memory: false,
-                persist_company_memory: false,
-                persist_agent_memory: false,
-                persist_user_memory: false,
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
+                settings_revision: 0,
             },
         ]),
     });
     let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
-    let task_persistence = Arc::new(MockTaskPersistence::default());
     let use_cases = ThreadUseCases::for_test(
         thread_persistence,
         channel_persistence,
         company_persistence.clone(),
         Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
-        task_persistence,
         internal_test_config(),
     );
 
@@ -2957,6 +1933,86 @@ async fn uncorrelated_inter_channel_cycle_is_rejected() {
     );
 }
 
+/// p08 DV-B4c2-1: a channel needs no agent. What answers it is a workflow binding at admission,
+/// so the relay accepts a well-formed hop to a plain channel rather than refusing it for having
+/// no configured agent.
+#[tokio::test]
+async fn a_hop_to_a_plain_channel_is_relayed() {
+    let company_id = Uuid::new_v4();
+    let channel_a_id = Uuid::new_v4();
+    let channel_b_id = Uuid::new_v4();
+    let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
+        channel_defaults: Default::default(),
+        id: company_id,
+        user_id: Uuid::new_v4(),
+        name: "Acme Corp".to_string(),
+        slug: "acme".into(),
+        avatar_url: None,
+        created_at: Utc::now(),
+    }]));
+    let channel_persistence = Arc::new(MockChannelPersistence {
+        channels: Mutex::new(vec![
+            Channel {
+                enabled: true,
+                add_3rd_party: true,
+                id: channel_a_id,
+                company_id,
+                name: "Agent A".to_string(),
+                description: None,
+                slug: "agent-a".into(),
+                alias_slugs: Vec::new(),
+                participant_emails: None,
+                access_mode: ChannelAccessMode::Team,
+                principal_grants: Vec::new(),
+                created_by: crate::entities::creation::CreationProvenance::system(),
+                created_at: Utc::now(),
+                settings_revision: 0,
+            },
+            Channel {
+                enabled: true,
+                add_3rd_party: true,
+                id: channel_b_id,
+                company_id,
+                name: "Agent B".to_string(),
+                description: None,
+                slug: "agent-b".into(),
+                alias_slugs: Vec::new(),
+                participant_emails: None,
+                access_mode: ChannelAccessMode::Team,
+                principal_grants: Vec::new(),
+                created_by: crate::entities::creation::CreationProvenance::system(),
+                created_at: Utc::now(),
+                settings_revision: 0,
+            },
+        ]),
+    });
+    let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
+    let use_cases = ThreadUseCases::for_test(
+        thread_persistence,
+        channel_persistence,
+        company_persistence.clone(),
+        Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
+        internal_test_config(),
+    );
+
+    let disposition = relay_hop(
+        &use_cases,
+        &InternalHop::new(
+            channel_a_id,
+            "agent-a@acme.mailagents.com",
+            "agent-b@acme.mailagents.com",
+            "A question for B",
+            "Can you take this one?",
+        ),
+    )
+    .await;
+
+    assert!(
+        matches!(disposition, crate::transport::RelayDisposition::Relayed),
+        "{disposition:?}"
+    );
+}
+
 #[tokio::test]
 async fn inter_channel_max_hops_exceeded_is_rejected() {
     let company_id = Uuid::new_v4();
@@ -2969,14 +2025,11 @@ async fn inter_channel_max_hops_exceeded_is_rejected() {
         name: "Acme Corp".to_string(),
         slug: "acme".into(),
         avatar_url: None,
-        memory_provider: None,
         created_at: Utc::now(),
     }]));
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![
             Channel {
-                response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
-                owner_agent_id: None,
                 enabled: true,
                 add_3rd_party: true,
                 id: channel_a_id,
@@ -2988,19 +2041,11 @@ async fn inter_channel_max_hops_exceeded_is_rejected() {
                 participant_emails: None,
                 access_mode: ChannelAccessMode::Team,
                 principal_grants: Vec::new(),
-                agent_ids: Some(vec![Uuid::new_v4()]),
-                retrieve_company_memory: false,
-                retrieve_agent_memory: false,
-                retrieve_user_memory: false,
-                persist_company_memory: false,
-                persist_agent_memory: false,
-                persist_user_memory: false,
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
+                settings_revision: 0,
             },
             Channel {
-                response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
-                owner_agent_id: None,
                 enabled: true,
                 add_3rd_party: true,
                 id: channel_b_id,
@@ -3012,26 +2057,18 @@ async fn inter_channel_max_hops_exceeded_is_rejected() {
                 participant_emails: None,
                 access_mode: ChannelAccessMode::Team,
                 principal_grants: Vec::new(),
-                agent_ids: Some(vec![Uuid::new_v4()]),
-                retrieve_company_memory: false,
-                retrieve_agent_memory: false,
-                retrieve_user_memory: false,
-                persist_company_memory: false,
-                persist_agent_memory: false,
-                persist_user_memory: false,
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
+                settings_revision: 0,
             },
         ]),
     });
     let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
-    let task_persistence = Arc::new(MockTaskPersistence::default());
     let use_cases = ThreadUseCases::for_test(
         thread_persistence,
         channel_persistence,
         company_persistence.clone(),
         Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
-        task_persistence,
         internal_test_config(),
     );
 
@@ -3070,7 +2107,6 @@ async fn test_third_party_thread_participants_addition_and_authorization() {
             name: "Acme Corp".to_string(),
             slug: "acme".into(),
             avatar_url: None,
-            memory_provider: None,
             created_at: Utc::now(),
         }],
         vec![(company_id, "team@acme.com".to_string())],
@@ -3078,8 +2114,6 @@ async fn test_third_party_thread_participants_addition_and_authorization() {
 
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
-            response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
-            owner_agent_id: None,
             enabled: true,
             add_3rd_party: true,
             id: channel_id,
@@ -3091,15 +2125,9 @@ async fn test_third_party_thread_participants_addition_and_authorization() {
             participant_emails: None, // Default = company team members
             access_mode: ChannelAccessMode::Team,
             principal_grants: Vec::new(),
-            agent_ids: None,
-            retrieve_company_memory: false,
-            retrieve_agent_memory: false,
-            retrieve_user_memory: false,
-            persist_company_memory: false,
-            persist_agent_memory: false,
-            persist_user_memory: false,
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
+            settings_revision: 0,
         }]),
     });
 
@@ -3109,8 +2137,6 @@ async fn test_third_party_thread_participants_addition_and_authorization() {
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
         resend_api: ResendApiConfig::default(),
-        hydradb: None,
-        hindsight: None,
         refresh_token_ttl: time::Duration::days(30),
         app_domain_name: "mailagents.com".to_string(),
         cors_allowed_origins: vec![],
@@ -3136,14 +2162,11 @@ async fn test_third_party_thread_participants_addition_and_authorization() {
         operator_emails: Vec::new(),
     });
 
-    let task_persistence = Arc::new(MockTaskPersistence::default());
-
     let thread_use_cases = ThreadUseCases::for_test(
         thread_persistence.clone(),
         channel_persistence,
         company_persistence.clone(),
         Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
-        task_persistence,
         config,
     );
 
@@ -3287,7 +2310,6 @@ async fn test_context_only_quiet_mode_ingestion() {
             name: "Acme Corp".to_string(),
             slug: "acme".into(),
             avatar_url: None,
-            memory_provider: None,
             created_at: Utc::now(),
         }],
         vec![(company_id, "team@acme.com".to_string())],
@@ -3295,8 +2317,6 @@ async fn test_context_only_quiet_mode_ingestion() {
 
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
-            response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
-            owner_agent_id: None,
             enabled: true,
             add_3rd_party: true,
             id: channel_id,
@@ -3308,15 +2328,9 @@ async fn test_context_only_quiet_mode_ingestion() {
             participant_emails: None,
             access_mode: ChannelAccessMode::Team,
             principal_grants: Vec::new(),
-            agent_ids: None,
-            retrieve_company_memory: false,
-            retrieve_agent_memory: false,
-            retrieve_user_memory: false,
-            persist_company_memory: false,
-            persist_agent_memory: false,
-            persist_user_memory: false,
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
+            settings_revision: 0,
         }]),
     });
 
@@ -3326,8 +2340,6 @@ async fn test_context_only_quiet_mode_ingestion() {
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
         resend_api: ResendApiConfig::default(),
-        hydradb: None,
-        hindsight: None,
         refresh_token_ttl: time::Duration::days(30),
         app_domain_name: "mailagents.com".to_string(),
         cors_allowed_origins: vec![],
@@ -3353,18 +2365,15 @@ async fn test_context_only_quiet_mode_ingestion() {
         operator_emails: Vec::new(),
     });
 
-    let task_persistence = Arc::new(MockTaskPersistence::default());
-
     let thread_use_cases = ThreadUseCases::for_test(
         thread_persistence.clone(),
         channel_persistence,
         company_persistence.clone(),
         Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
-        task_persistence,
         config,
     );
 
-    // 1. Ingest email with .quiet suffix in address -> accepted, task_ids is empty (agent execution skipped)
+    // 1. Ingest email with .quiet suffix in address -> accepted, recorded but not answering
     let res_quiet_addr = thread_use_cases
         .ingest_test_email(RawInboundPayload {
             headers: Some("Message-ID: <msg-quiet-1@acme.com>\n".to_string()),
@@ -3378,10 +2387,10 @@ async fn test_context_only_quiet_mode_ingestion() {
         .unwrap();
 
     assert!(res_quiet_addr.accepted);
-    assert!(res_quiet_addr.task_ids.is_empty());
+    assert_eq!(res_quiet_addr.intent_ids.len(), 1);
     assert!(!res_quiet_addr.answers());
 
-    // 2. Ingest email with [[quiet]] body tag -> accepted, task_ids is empty, tag stripped from text
+    // 2. Ingest email with [[quiet]] body tag -> accepted, not answering, tag stripped from text
     let res_quiet_body = thread_use_cases
         .ingest_test_email(RawInboundPayload {
             headers: Some(
@@ -3398,7 +2407,7 @@ async fn test_context_only_quiet_mode_ingestion() {
         .unwrap();
 
     assert!(res_quiet_body.accepted);
-    assert!(res_quiet_body.task_ids.is_empty());
+    assert_eq!(res_quiet_body.intent_ids.len(), 1);
     assert!(!res_quiet_body.answers());
     assert_eq!(
         res_quiet_body
@@ -3416,12 +2425,10 @@ async fn test_context_only_quiet_mode_ingestion() {
 /// Named fields rather than positional arguments: `enabled` and `add_3rd_party` are same-typed
 /// switches that a positional call could silently transpose.
 struct TestChannel {
-    response_trigger: ChannelResponseTrigger,
     enabled: bool,
     add_3rd_party: bool,
     alias_slugs: Vec<ChannelSlug>,
     participant_emails: Option<Vec<EmailAddress>>,
-    agent_ids: Option<Vec<Uuid>>,
 }
 
 impl Default for TestChannel {
@@ -3429,12 +2436,10 @@ impl Default for TestChannel {
     /// what every channel is until someone changes it.
     fn default() -> Self {
         Self {
-            response_trigger: ChannelResponseTrigger::Always,
             enabled: true,
             add_3rd_party: true,
             alias_slugs: Vec::new(),
             participant_emails: None,
-            agent_ids: None,
         }
     }
 }
@@ -3460,24 +2465,19 @@ fn use_cases_with_channel(spec: TestChannel) -> (ThreadUseCases, Uuid) {
 }
 
 struct ChannelFixture {
-    channels: Arc<MockChannelPersistence>,
     use_cases: ThreadUseCases,
     company_id: Uuid,
     channel_id: Uuid,
     threads: Arc<InMemoryThreads>,
     participants: Arc<InMemoryParticipantDirectory>,
-    tasks: Arc<MockTaskPersistence>,
 }
 
 impl ChannelFixture {
-    fn durable_counts(&self) -> [usize; 6] {
+    fn durable_counts(&self) -> [usize; 3] {
         [
             self.threads.threads().len(),
             self.threads.messages().len(),
             self.participants.identity_count(),
-            self.tasks.tasks.lock().unwrap().len(),
-            self.tasks.deliveries.lock().unwrap().len(),
-            self.tasks.committed_replies.lock().unwrap().len(),
         ]
     }
 }
@@ -3488,12 +2488,10 @@ fn channel_fixture(spec: TestChannel) -> ChannelFixture {
 
 fn channel_fixture_with_config(spec: TestChannel, config: Arc<AppConfig>) -> ChannelFixture {
     let TestChannel {
-        response_trigger,
         enabled,
         add_3rd_party,
         alias_slugs,
         participant_emails,
-        agent_ids,
     } = spec;
     let company_id = Uuid::new_v4();
     let channel_id = Uuid::new_v4();
@@ -3508,7 +2506,6 @@ fn channel_fixture_with_config(spec: TestChannel, config: Arc<AppConfig>) -> Cha
             name: "Acme Corp".to_string(),
             slug: "acme".into(),
             avatar_url: None,
-            memory_provider: None,
             created_at: Utc::now(),
         }],
         vec![(company_id, "team@acme.com".to_string())],
@@ -3516,8 +2513,6 @@ fn channel_fixture_with_config(spec: TestChannel, config: Arc<AppConfig>) -> Cha
 
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
-            response_trigger,
-            owner_agent_id: None,
             enabled,
             add_3rd_party,
             id: channel_id,
@@ -3529,39 +2524,29 @@ fn channel_fixture_with_config(spec: TestChannel, config: Arc<AppConfig>) -> Cha
             participant_emails,
             access_mode,
             principal_grants,
-            agent_ids,
-            retrieve_company_memory: false,
-            retrieve_agent_memory: false,
-            retrieve_user_memory: false,
-            persist_company_memory: false,
-            persist_agent_memory: false,
-            persist_user_memory: false,
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
+            settings_revision: 0,
         }]),
     });
 
     let threads = Arc::new(InMemoryThreads::for_company(company_id));
     let participants =
         Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence.clone()));
-    let tasks = Arc::new(MockTaskPersistence::default());
     let use_cases = ThreadUseCases::for_test(
         threads.clone(),
         channel_persistence.clone(),
         company_persistence,
         participants.clone(),
-        tasks.clone(),
         config,
     );
 
     ChannelFixture {
-        channels: channel_persistence,
         use_cases,
         company_id,
         channel_id,
         threads,
         participants,
-        tasks,
     }
 }
 
@@ -3849,11 +2834,22 @@ fn cc_message(message_id: &str, body: &str, cc: &str) -> RawInboundPayload {
     }
 }
 
-#[tokio::test]
-async fn a_cc_d_channel_runs_when_its_email_is_mentioned() {
-    let (thread_use_cases, _) = use_cases_with_channel(TestChannel::default());
+/// The intent the last commit recorded for the fixture's channel.
+fn committed_intent(fixture: &ChannelFixture) -> crate::transport::InboundAdmissionIntent {
+    let request = last_commit(fixture);
+    *request
+        .intents
+        .iter()
+        .find(|intent| intent.channel_id == fixture.channel_id)
+        .expect("the channel was associated, so it has an intent")
+}
 
-    let result = thread_use_cases
+#[tokio::test]
+async fn a_cc_d_channels_address_in_the_body_is_a_mention() {
+    let fixture = channel_fixture(TestChannel::default());
+
+    let result = fixture
+        .use_cases
         .ingest_test_email(cc_message(
             "cc-email-mention",
             "Please ask SUPPORT@ACME.MAILAGENTS.COM to help.",
@@ -3863,80 +2859,64 @@ async fn a_cc_d_channel_runs_when_its_email_is_mentioned() {
         .unwrap();
 
     assert!(result.accepted);
-    assert!(!result.task_ids.is_empty());
-    assert!(result.answers());
+    assert_eq!(result.intent_ids.len(), 1);
+    let intent = committed_intent(&fixture);
+    assert_eq!(intent.role, RecipientRole::Cc);
+    assert!(intent.mentioned);
+    assert!(last_commit(&fixture).admissible);
 }
 
 #[tokio::test]
-async fn a_cc_d_channel_runs_for_a_plain_channel_or_alias_mention() {
+async fn a_cc_d_channels_name_or_alias_in_the_body_is_a_mention() {
     for (message_id, body) in [
         ("cc-channel-mention", "Please ask @support."),
         ("cc-alias-mention", "Please ask @helpdesk."),
     ] {
-        let (thread_use_cases, _) = use_cases_with_channel_aliases(vec!["helpdesk".into()]);
-        let result = thread_use_cases
+        let fixture = channel_fixture(TestChannel {
+            alias_slugs: vec!["helpdesk".into()],
+            ..TestChannel::default()
+        });
+        let result = fixture
+            .use_cases
             .ingest_test_email(cc_message(message_id, body, "helpdesk@acme.mailagents.com"))
             .await
             .unwrap();
 
         assert!(result.accepted);
         assert!(
-            !result.task_ids.is_empty(),
-            "body did not activate CC: {body}"
+            committed_intent(&fixture).mentioned,
+            "body did not mention the channel: {body}"
         );
     }
 }
 
+/// A plain copy is recorded too, unmentioned: whether a Cc starts anything is its bindings' call.
 #[tokio::test]
-async fn a_cc_d_channel_runs_for_its_assigned_agent_slug() {
-    let agent_id = Uuid::new_v4();
-    let (thread_use_cases, _) = use_cases_with_channel(TestChannel {
-        agent_ids: Some(vec![agent_id]),
-        ..TestChannel::default()
-    });
-    let agent_persistence = Arc::new(MockAgentPersistence {
-        agents: vec![Agent {
-            response_contract: None,
-            memory_enabled: false,
-            memory_persistence_mode: crate::entities::memory::MemoryPersistenceMode::AudienceOnly,
-            memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
-            memory_max_results: 5,
-            id: agent_id,
-            company_id: None,
-            name: "Triage Bot".to_string(),
-            slug: "triage-bot".to_string(),
-            provider: None,
-            model: None,
-            run_timeout_secs: None,
-            system_prompt: None,
-            description: None,
-            config_json: None,
-            avatar_url: None,
-            created_by: crate::entities::creation::CreationProvenance::system(),
-            created_at: Utc::now(),
-        }],
-    });
-    let thread_use_cases = thread_use_cases
-        .with_agent_persistence(agent_persistence.clone())
-        .with_agent_capability_reader(agent_persistence);
+async fn a_cc_d_channel_the_body_never_names_is_not_mentioned() {
+    let fixture = channel_fixture(TestChannel::default());
 
-    let result = thread_use_cases
+    let result = fixture
+        .use_cases
         .ingest_test_email(cc_message(
-            "cc-agent-mention",
-            "Please ask @triage-bot.",
+            "cc-no-mention",
+            "Just keeping you posted.",
             "support@acme.mailagents.com",
         ))
         .await
         .unwrap();
 
     assert!(result.accepted);
-    assert!(!result.task_ids.is_empty());
+    assert_eq!(result.intent_ids.len(), 1);
+    let intent = committed_intent(&fixture);
+    assert_eq!(intent.role, RecipientRole::Cc);
+    assert!(!intent.mentioned);
 }
 
 #[tokio::test]
-async fn a_mention_only_in_quoted_history_does_not_activate_a_cc_d_channel() {
-    let (thread_use_cases, _) = use_cases_with_channel(TestChannel::default());
-    let first = thread_use_cases
+async fn a_mention_only_in_quoted_history_is_not_a_mention() {
+    let fixture = channel_fixture(TestChannel::default());
+    let first = fixture
+        .use_cases
         .ingest_test_email(RawInboundPayload {
             headers: Some("Message-ID: <quoted-mention-root@acme.com>\n".to_string()),
             to: "support@acme.mailagents.com".to_string(),
@@ -3947,9 +2927,11 @@ async fn a_mention_only_in_quoted_history_does_not_activate_a_cc_d_channel() {
         })
         .await
         .unwrap();
-    assert!(!first.task_ids.is_empty());
+    assert!(committed_intent(&fixture).mentioned);
+    assert_eq!(first.intent_ids.len(), 1);
 
-    let result = thread_use_cases
+    let result = fixture
+        .use_cases
         .ingest_test_email(RawInboundPayload {
             headers: Some(
                 "Message-ID: <quoted-mention-reply@acme.com>\nIn-Reply-To: <quoted-mention-root@acme.com>\n"
@@ -3969,15 +2951,15 @@ async fn a_mention_only_in_quoted_history_does_not_activate_a_cc_d_channel() {
         .unwrap();
 
     assert!(result.accepted);
-    assert!(result.task_ids.is_empty());
-    assert!(!result.answers());
+    assert!(!committed_intent(&fixture).mentioned);
 }
 
 #[tokio::test]
-async fn an_explicit_quiet_trigger_wins_over_a_cc_mention() {
-    let (thread_use_cases, _) = use_cases_with_channel(TestChannel::default());
+async fn an_explicit_quiet_trigger_makes_a_mentioning_message_inadmissible() {
+    let fixture = channel_fixture(TestChannel::default());
 
-    let result = thread_use_cases
+    let result = fixture
+        .use_cases
         .ingest_test_email(cc_message(
             "quiet-cc-mention",
             "[quiet] Please ask @support.",
@@ -3987,8 +2969,9 @@ async fn an_explicit_quiet_trigger_wins_over_a_cc_mention() {
         .unwrap();
 
     assert!(result.accepted);
-    assert!(result.task_ids.is_empty());
     assert!(!result.answers());
+    assert!(!last_commit(&fixture).admissible);
+    assert_eq!(result.intent_ids.len(), 1);
 }
 
 /// The flag off makes the channel internal: the CC'd outsider is not recorded on the thread, and
@@ -4123,58 +3106,6 @@ fn outsider_reply() -> RawInboundPayload {
         text: Some("Replying to all".to_string()),
         ..Default::default()
     }
-}
-
-/// The reply's Cc is where "never copied on the agent's reply" is actually enforced: the inbound
-/// Cc line is the only thing that decides who a reply reaches, and thread membership never enters
-/// into it. Platform addresses survive the filter — a pipeline's later steps ride the Cc line.
-#[tokio::test]
-async fn a_closed_channel_drops_outsiders_from_the_reply_cc() {
-    let (thread_use_cases, _) = use_cases_with_channel(TestChannel {
-        add_3rd_party: false,
-        ..TestChannel::default()
-    });
-
-    // Both kinds on one `Cc` line: the outsider the channel refuses to copy, and a platform
-    // address, which rides the Cc line for pipeline steps and must survive the filter.
-    let result = thread_use_cases
-        .ingest_test_email(RawInboundPayload {
-            cc: Some("client@external.com, support@acme.mailagents.com".to_string()),
-            ..message_to_support_cc_outsider()
-        })
-        .await
-        .unwrap();
-
-    let cc = thread_use_cases
-        .outbound_cc_for(
-            &result.channel_matches[0],
-            result.envelope.as_deref().unwrap(),
-        )
-        .await
-        .unwrap();
-
-    assert_eq!(cc, vec!["support@acme.mailagents.com".to_string()]);
-}
-
-/// The default channel copies everyone the inbound message copied, as it always has.
-#[tokio::test]
-async fn an_open_channel_keeps_outsiders_on_the_reply_cc() {
-    let (thread_use_cases, _) = use_cases_with_channel(TestChannel::default());
-
-    let result = thread_use_cases
-        .ingest_test_email(message_to_support_cc_outsider())
-        .await
-        .unwrap();
-
-    let cc = thread_use_cases
-        .outbound_cc_for(
-            &result.channel_matches[0],
-            result.envelope.as_deref().unwrap(),
-        )
-        .await
-        .unwrap();
-
-    assert!(cc.iter().any(|to| to == "client@external.com"));
 }
 
 fn message_to_support() -> RawInboundPayload {
@@ -4314,7 +3245,6 @@ struct DirectoryChannel {
     description: Option<&'static str>,
     enabled: bool,
     participant_emails: Option<Vec<EmailAddress>>,
-    agent_ids: Option<Vec<Uuid>>,
 }
 
 impl Default for DirectoryChannel {
@@ -4325,14 +3255,13 @@ impl Default for DirectoryChannel {
             description: None,
             enabled: true,
             participant_emails: None,
-            agent_ids: None,
         }
     }
 }
 
 /// A company whose channel list the bounce directory has to filter, with `team@acme.com` on the
 /// team and nobody else.
-fn use_cases_with_directory(specs: Vec<DirectoryChannel>, agents: Vec<Agent>) -> ThreadUseCases {
+fn use_cases_with_directory(specs: Vec<DirectoryChannel>) -> ThreadUseCases {
     let company_id = Uuid::new_v4();
 
     let company_persistence = Arc::new(MockCompanyPersistence::with_team_members(
@@ -4343,7 +3272,6 @@ fn use_cases_with_directory(specs: Vec<DirectoryChannel>, agents: Vec<Agent>) ->
             name: "Acme Corp".to_string(),
             slug: "acme".into(),
             avatar_url: None,
-            memory_provider: None,
             created_at: Utc::now(),
         }],
         vec![(company_id, "team@acme.com".to_string())],
@@ -4355,8 +3283,6 @@ fn use_cases_with_directory(specs: Vec<DirectoryChannel>, agents: Vec<Agent>) ->
             let (access_mode, principal_grants) =
                 email_allowlist_policy(company_id, spec.participant_emails.as_deref());
             Channel {
-                response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
-                owner_agent_id: None,
                 id: Uuid::new_v4(),
                 company_id,
                 name: spec.name.to_string(),
@@ -4366,22 +3292,15 @@ fn use_cases_with_directory(specs: Vec<DirectoryChannel>, agents: Vec<Agent>) ->
                 participant_emails: spec.participant_emails,
                 access_mode,
                 principal_grants,
-                agent_ids: spec.agent_ids,
                 enabled: spec.enabled,
                 add_3rd_party: true,
-                retrieve_company_memory: false,
-                retrieve_agent_memory: false,
-                retrieve_user_memory: false,
-                persist_company_memory: false,
-                persist_agent_memory: false,
-                persist_user_memory: false,
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
+                settings_revision: 0,
             }
         })
         .collect();
 
-    let agent_persistence = Arc::new(MockAgentPersistence { agents });
     ThreadUseCases::for_test(
         Arc::new(InMemoryThreads::for_company(company_id)),
         Arc::new(MockChannelPersistence {
@@ -4389,11 +3308,8 @@ fn use_cases_with_directory(specs: Vec<DirectoryChannel>, agents: Vec<Agent>) ->
         }),
         company_persistence.clone(),
         Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
-        Arc::new(MockTaskPersistence::default()),
         internal_test_config(),
     )
-    .with_agent_persistence(agent_persistence.clone())
-    .with_agent_capability_reader(agent_persistence)
 }
 
 fn misspelled_message_from(sender: &str) -> RawInboundPayload {
@@ -4415,8 +3331,7 @@ fn misspelled_message_from(sender: &str) -> RawInboundPayload {
 #[tokio::test]
 async fn a_malformed_thread_index_is_dropped_at_the_boundary_and_counted_by_ingest() {
     let monitor = Arc::new(InMemoryMonitor::new());
-    let use_cases =
-        use_cases_with_directory(Vec::new(), Vec::new()).with_monitoring(monitor.clone());
+    let use_cases = use_cases_with_directory(Vec::new()).with_monitoring(monitor.clone());
 
     let accepted = crate::adapters::protocols::email::EmailIngressAdapter::new("mailagents.com")
         .accept(
@@ -4480,22 +3395,19 @@ fn listed_addresses(bounce: &BounceInfo) -> Vec<String> {
 
 #[tokio::test]
 async fn a_team_member_who_mistypes_a_channel_is_told_which_ones_they_can_use() {
-    let use_cases = use_cases_with_directory(
-        vec![
-            DirectoryChannel {
-                slug: "support",
-                name: "Support Desk",
-                description: Some("Answers customer support and refund questions."),
-                ..DirectoryChannel::default()
-            },
-            DirectoryChannel {
-                slug: "billing",
-                name: "Billing",
-                ..DirectoryChannel::default()
-            },
-        ],
-        Vec::new(),
-    );
+    let use_cases = use_cases_with_directory(vec![
+        DirectoryChannel {
+            slug: "support",
+            name: "Support Desk",
+            description: Some("Answers customer support and refund questions."),
+            ..DirectoryChannel::default()
+        },
+        DirectoryChannel {
+            slug: "billing",
+            name: "Billing",
+            ..DirectoryChannel::default()
+        },
+    ]);
 
     let bounce = bounce_for(&use_cases, "team@acme.com").await;
 
@@ -4522,15 +3434,12 @@ async fn a_team_member_who_mistypes_a_channel_is_told_which_ones_they_can_use() 
 
 #[tokio::test]
 async fn an_outsider_s_bounce_never_discloses_the_channel_directory() {
-    let use_cases = use_cases_with_directory(
-        vec![DirectoryChannel {
-            slug: "support",
-            name: "Support Desk",
-            description: Some("Answers customer support and refund questions."),
-            ..DirectoryChannel::default()
-        }],
-        Vec::new(),
-    );
+    let use_cases = use_cases_with_directory(vec![DirectoryChannel {
+        slug: "support",
+        name: "Support Desk",
+        description: Some("Answers customer support and refund questions."),
+        ..DirectoryChannel::default()
+    }]);
 
     let bounce = bounce_for(&use_cases, "stranger@elsewhere.com").await;
 
@@ -4550,28 +3459,25 @@ async fn an_outsider_s_bounce_never_discloses_the_channel_directory() {
 
 #[tokio::test]
 async fn the_directory_lists_only_what_this_sender_could_actually_reach() {
-    let use_cases = use_cases_with_directory(
-        vec![
-            DirectoryChannel {
-                slug: "support",
-                name: "Support Desk",
-                ..DirectoryChannel::default()
-            },
-            DirectoryChannel {
-                slug: "legal",
-                name: "Legal",
-                participant_emails: Some(vec![EmailAddress::from("counsel@acme.com")]),
-                ..DirectoryChannel::default()
-            },
-            DirectoryChannel {
-                slug: "archive",
-                name: "Archive",
-                enabled: false,
-                ..DirectoryChannel::default()
-            },
-        ],
-        Vec::new(),
-    );
+    let use_cases = use_cases_with_directory(vec![
+        DirectoryChannel {
+            slug: "support",
+            name: "Support Desk",
+            ..DirectoryChannel::default()
+        },
+        DirectoryChannel {
+            slug: "legal",
+            name: "Legal",
+            participant_emails: Some(vec![EmailAddress::from("counsel@acme.com")]),
+            ..DirectoryChannel::default()
+        },
+        DirectoryChannel {
+            slug: "archive",
+            name: "Archive",
+            enabled: false,
+            ..DirectoryChannel::default()
+        },
+    ]);
 
     let bounce = bounce_for(&use_cases, "team@acme.com").await;
 
@@ -4580,63 +3486,6 @@ async fn the_directory_lists_only_what_this_sender_could_actually_reach() {
         vec!["support@acme.mailagents.com".to_string()],
         "a restricted channel the sender is not a participant of, and a disabled one, stay hidden"
     );
-}
-
-#[tokio::test]
-async fn a_channel_without_its_own_description_borrows_its_agent_s() {
-    let agent_id = Uuid::new_v4();
-    let use_cases = use_cases_with_directory(
-        vec![
-            DirectoryChannel {
-                slug: "vendors",
-                name: "Supplier Desk",
-                agent_ids: Some(vec![agent_id]),
-                ..DirectoryChannel::default()
-            },
-            DirectoryChannel {
-                slug: "support",
-                name: "Support Desk",
-                ..DirectoryChannel::default()
-            },
-        ],
-        vec![Agent {
-            memory_enabled: false,
-            memory_persistence_mode: crate::entities::memory::MemoryPersistenceMode::AudienceOnly,
-            memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
-            memory_max_results: 5,
-            id: agent_id,
-            company_id: None,
-            name: "VendorResearchAgent".to_string(),
-            response_contract: None,
-            slug: "vendor-research".to_string(),
-            provider: None,
-            model: None,
-            run_timeout_secs: None,
-            system_prompt: None,
-            description: Some("Answers supplier capacity and delivery-date questions.".to_string()),
-            config_json: None,
-            avatar_url: None,
-            created_by: crate::entities::creation::CreationProvenance::system(),
-            created_at: Utc::now(),
-        }],
-    );
-
-    let bounce = bounce_for(&use_cases, "team@acme.com").await;
-
-    assert_eq!(
-        bounce.available_channels[1].description.as_deref(),
-        Some("Answers supplier capacity and delivery-date questions."),
-        "a channel created before descriptions existed still explains itself"
-    );
-    assert_eq!(
-        bounce.available_channels[0].description, None,
-        "a channel with neither its own description nor an agent renders address and name only"
-    );
-
-    let body = format_bounce_email_body(&bounce, "mailagents.com");
-    assert!(body.contains("vendors@acme.mailagents.com — Supplier Desk"));
-    assert!(body.contains("      Answers supplier capacity and delivery-date questions."));
-    assert!(body.contains("support@acme.mailagents.com — Support Desk\n"));
 }
 
 #[test]
@@ -4673,15 +3522,12 @@ fn help_message_from(sender: &str, to: &str) -> RawInboundPayload {
 
 #[tokio::test]
 async fn a_team_member_writing_to_help_is_answered_and_nothing_is_routed() {
-    let use_cases = use_cases_with_directory(
-        vec![DirectoryChannel {
-            slug: "support",
-            name: "Support Desk",
-            description: Some("Answers customer support and refund questions."),
-            ..DirectoryChannel::default()
-        }],
-        Vec::new(),
-    );
+    let use_cases = use_cases_with_directory(vec![DirectoryChannel {
+        slug: "support",
+        name: "Support Desk",
+        description: Some("Answers customer support and refund questions."),
+        ..DirectoryChannel::default()
+    }]);
 
     let result = use_cases
         .ingest_test_email(help_message_from(
@@ -4697,7 +3543,10 @@ async fn a_team_member_writing_to_help_is_answered_and_nothing_is_routed() {
         Some(IngestRejection::SystemAddressAnswered.as_str())
     );
     assert!(result.thread.is_none(), "a help request opens no thread");
-    assert!(result.task_ids.is_empty(), "and runs no agent");
+    assert!(
+        result.intent_ids.is_empty(),
+        "and offers nothing to a workflow"
+    );
     assert!(
         result.bounce_info().is_none(),
         "a reserved address is answered, not bounced"
@@ -4706,15 +3555,12 @@ async fn a_team_member_writing_to_help_is_answered_and_nothing_is_routed() {
 
 #[tokio::test]
 async fn help_discloses_nothing_to_someone_outside_the_company() {
-    let use_cases = use_cases_with_directory(
-        vec![DirectoryChannel {
-            slug: "support",
-            name: "Support Desk",
-            description: Some("Answers customer support and refund questions."),
-            ..DirectoryChannel::default()
-        }],
-        Vec::new(),
-    );
+    let use_cases = use_cases_with_directory(vec![DirectoryChannel {
+        slug: "support",
+        name: "Support Desk",
+        description: Some("Answers customer support and refund questions."),
+        ..DirectoryChannel::default()
+    }]);
 
     let result = use_cases
         .ingest_test_email(help_message_from(
@@ -4736,19 +3582,16 @@ async fn help_discloses_nothing_to_someone_outside_the_company() {
          fuzzy suggestions on it could name a real channel to a stranger"
     );
     assert!(result.thread.is_none());
-    assert!(result.task_ids.is_empty());
+    assert!(result.intent_ids.is_empty());
 }
 
 #[tokio::test]
 async fn help_cc_d_alongside_a_real_channel_still_reaches_that_channel() {
-    let use_cases = use_cases_with_directory(
-        vec![DirectoryChannel {
-            slug: "support",
-            name: "Support Desk",
-            ..DirectoryChannel::default()
-        }],
-        Vec::new(),
-    );
+    let use_cases = use_cases_with_directory(vec![DirectoryChannel {
+        slug: "support",
+        name: "Support Desk",
+        ..DirectoryChannel::default()
+    }]);
 
     let result = use_cases
         .ingest_test_email(RawInboundPayload {
@@ -4808,14 +3651,11 @@ fn the_help_body_still_teaches_the_syntax_when_there_is_nothing_to_list() {
 
 #[tokio::test]
 async fn an_agent_cannot_use_help_to_enumerate_its_company() {
-    let use_cases = use_cases_with_directory(
-        vec![DirectoryChannel {
-            slug: "support",
-            name: "Support Desk",
-            ..DirectoryChannel::default()
-        }],
-        Vec::new(),
-    );
+    let use_cases = use_cases_with_directory(vec![DirectoryChannel {
+        slug: "support",
+        name: "Support Desk",
+        ..DirectoryChannel::default()
+    }]);
 
     let source_channel_id = Uuid::new_v4();
     let company_id = Uuid::new_v4();
@@ -4856,143 +3696,6 @@ async fn an_agent_cannot_use_help_to_enumerate_its_company() {
     );
 }
 
-/// A provider failure must leave no trace a customer could see.
-///
-/// This is the regression for the shape where `run_agents` turned an `Err` into an `AgentOutput`
-/// whose content was `"Agent execution failed: .."`. That string became the reply body, was
-/// written into every matched thread as an agent message, and was queued for
-/// delivery -- and only afterwards was the failure reported to the worker for retry. So a
-/// transient provider blip both emailed the error to the customer and left a message the retry
-/// then had to reconcile with.
-#[tokio::test]
-async fn a_failed_agent_run_commits_no_reply_message_and_no_delivery() {
-    let company_id = Uuid::new_v4();
-    let channel_id = Uuid::new_v4();
-
-    // No provider anywhere -- not on the company, the channel, or an agent -- so resolving the
-    // run's parameters fails and stands in for any provider-side failure.
-    let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
-        channel_defaults: Default::default(),
-        id: company_id,
-        user_id: Uuid::new_v4(),
-        name: "Acme Corp".to_string(),
-        slug: "acme".into(),
-        avatar_url: None,
-        memory_provider: None,
-        created_at: Utc::now(),
-    }]));
-
-    let channel_persistence = Arc::new(MockChannelPersistence {
-        channels: Mutex::new(vec![Channel {
-            response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
-            owner_agent_id: None,
-            enabled: true,
-            add_3rd_party: true,
-            id: channel_id,
-            company_id,
-            name: "Support".to_string(),
-            description: None,
-            slug: "support".into(),
-            alias_slugs: Vec::new(),
-            participant_emails: None,
-            access_mode: ChannelAccessMode::Team,
-            principal_grants: Vec::new(),
-            agent_ids: None,
-            retrieve_company_memory: false,
-            retrieve_agent_memory: false,
-            retrieve_user_memory: false,
-            persist_company_memory: false,
-            persist_agent_memory: false,
-            persist_user_memory: false,
-            created_by: crate::entities::creation::CreationProvenance::system(),
-            created_at: Utc::now(),
-        }]),
-    });
-
-    let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
-    let task_persistence = Arc::new(MockTaskPersistence::default());
-
-    let thread_use_cases = ThreadUseCases::for_test(
-        thread_persistence.clone(),
-        channel_persistence,
-        company_persistence.clone(),
-        Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
-        task_persistence.clone(),
-        internal_test_config(),
-    );
-
-    let ingest = thread_use_cases
-        .ingest_test_email(RawInboundPayload {
-            to: "support@acme.mailagents.com".to_string(),
-            from: "customer@client.com".to_string(),
-            subject: Some("Help please".to_string()),
-            text: Some("My invoice is wrong.".to_string()),
-            ..Default::default()
-        })
-        .await
-        .unwrap();
-    assert!(ingest.accepted);
-    assert_eq!(ingest.channel_matches.len(), 1);
-
-    let inbound_messages = thread_persistence.messages().len();
-    drop(thread_persistence.messages());
-
-    let dispatched = thread_use_cases
-        .execute_claimed_agent_task_and_dispatch(
-            &ingest,
-            ReplyDelivery::Send,
-            TaskLeaseRef {
-                task_id: ingest.task_ids[0],
-                worker_id: Uuid::new_v4(),
-                execution_generation: Uuid::new_v4(),
-                claimed_owner: Default::default(),
-                ownership_version: 1,
-            },
-            CorrelationId::new(),
-        )
-        .await;
-
-    // The worker is told it failed, so the task is retried rather than marked done.
-    let error = dispatched.expect_err("a run whose agent failed must report the failure");
-    assert!(
-        !error.to_string().is_empty(),
-        "the failure must carry a reason for the attempt ledger"
-    );
-
-    // Nothing was committed: no agent message in any thread, and nothing queued for delivery.
-    let messages = thread_persistence.messages();
-    assert_eq!(
-        messages.len(),
-        inbound_messages,
-        "a failed run must not add a message; found {:?}",
-        messages
-            .iter()
-            .skip(inbound_messages)
-            .map(|message| message.clean_text_body.clone())
-            .collect::<Vec<_>>()
-    );
-    assert!(
-        !messages
-            .iter()
-            .any(|message| message.direction == MessageDirection::Outbound),
-        "a failed run must not write an outbound reply into the thread"
-    );
-    drop(messages);
-
-    assert!(
-        task_persistence
-            .committed_replies
-            .lock()
-            .unwrap()
-            .is_empty(),
-        "a failed run must commit no reply through the dispatch commit either"
-    );
-    assert!(
-        task_persistence.deliveries.lock().unwrap().is_empty(),
-        "a failed run must queue no email"
-    );
-}
-
 #[tokio::test]
 async fn send_reply_in_thread_with_prior_agent_turn_stays_in_same_thread() {
     let company_id = Uuid::new_v4();
@@ -5003,15 +3706,12 @@ async fn send_reply_in_thread_with_prior_agent_turn_stays_in_same_thread() {
         name: "Acme Corp".to_string(),
         slug: "acme".into(),
         avatar_url: None,
-        memory_provider: None,
         created_at: Utc::now(),
     }]));
 
     let channel_id = Uuid::new_v4();
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
-            response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
-            owner_agent_id: None,
             enabled: true,
             add_3rd_party: true,
             id: channel_id,
@@ -5023,27 +3723,19 @@ async fn send_reply_in_thread_with_prior_agent_turn_stays_in_same_thread() {
             participant_emails: None,
             access_mode: ChannelAccessMode::Public,
             principal_grants: Vec::new(),
-            agent_ids: None,
-            retrieve_company_memory: false,
-            retrieve_agent_memory: false,
-            retrieve_user_memory: false,
-            persist_company_memory: false,
-            persist_agent_memory: false,
-            persist_user_memory: false,
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
+            settings_revision: 0,
         }]),
     });
 
     let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
-    let task_persistence = Arc::new(MockTaskPersistence::default());
 
     let thread_use_cases = ThreadUseCases::for_test(
         thread_persistence.clone(),
         channel_persistence,
         company_persistence.clone(),
         Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
-        task_persistence.clone(),
         internal_test_config(),
     );
 
@@ -5112,15 +3804,12 @@ async fn external_email_cannot_use_mailagents_thread_id_header_to_inject() {
         name: "Acme Corp".to_string(),
         slug: "acme".into(),
         avatar_url: None,
-        memory_provider: None,
         created_at: Utc::now(),
     }]));
 
     let channel_id = Uuid::new_v4();
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
-            response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
-            owner_agent_id: None,
             enabled: true,
             add_3rd_party: true,
             id: channel_id,
@@ -5132,27 +3821,19 @@ async fn external_email_cannot_use_mailagents_thread_id_header_to_inject() {
             participant_emails: None,
             access_mode: ChannelAccessMode::Public,
             principal_grants: Vec::new(),
-            agent_ids: None,
-            retrieve_company_memory: false,
-            retrieve_agent_memory: false,
-            retrieve_user_memory: false,
-            persist_company_memory: false,
-            persist_agent_memory: false,
-            persist_user_memory: false,
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
+            settings_revision: 0,
         }]),
     });
 
     let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
-    let task_persistence = Arc::new(MockTaskPersistence::default());
 
     let thread_use_cases = ThreadUseCases::for_test(
         thread_persistence.clone(),
         channel_persistence,
         company_persistence.clone(),
         Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
-        task_persistence.clone(),
         internal_test_config(),
     );
 
@@ -5201,15 +3882,12 @@ async fn ingest_canonical_threads_correctly_with_target_thread_and_reply_to() {
         name: "Acme Corp".to_string(),
         slug: "acme".into(),
         avatar_url: None,
-        memory_provider: None,
         created_at: Utc::now(),
     }]));
 
     let channel_id = Uuid::new_v4();
     let channel_persistence = Arc::new(MockChannelPersistence {
         channels: Mutex::new(vec![Channel {
-            response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
-            owner_agent_id: None,
             enabled: true,
             add_3rd_party: true,
             id: channel_id,
@@ -5221,27 +3899,19 @@ async fn ingest_canonical_threads_correctly_with_target_thread_and_reply_to() {
             participant_emails: None,
             access_mode: ChannelAccessMode::Public,
             principal_grants: Vec::new(),
-            agent_ids: None,
-            retrieve_company_memory: false,
-            retrieve_agent_memory: false,
-            retrieve_user_memory: false,
-            persist_company_memory: false,
-            persist_agent_memory: false,
-            persist_user_memory: false,
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
+            settings_revision: 0,
         }]),
     });
 
     let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
-    let task_persistence = Arc::new(MockTaskPersistence::default());
 
     let thread_use_cases = ThreadUseCases::for_test(
         thread_persistence.clone(),
         channel_persistence,
         company_persistence.clone(),
         Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
-        task_persistence.clone(),
         internal_test_config(),
     );
 
@@ -5328,28 +3998,17 @@ async fn ingest_canonical_threads_correctly_with_target_thread_and_reply_to() {
         .await
         .unwrap();
     assert!(quiet_result.accepted);
-    assert!(
-        quiet_result.task_ids.is_empty(),
-        "FileOnly must not create an agent task"
-    );
+    assert!(!quiet_result.answers(), "FileOnly must not answer");
 }
 
 // ---------------------------------------------------------------------------------------------
-// The hold gate, driven end to end through the in-memory committer.
+// Admission intents, driven end to end through the in-memory committer.
 //
-// Every row of the plan's behaviour table is a case here. The assertions are on the *captured
-// commit request* rather than on what the double chose to store, because the request is what the
-// read-only phases decided and the SQL committer would have been handed.
+// The assertions are on the *captured commit request* rather than on what the double chose to
+// store, because the request is what the read-only phases decided and the SQL committer would have
+// been handed. There is no hold gate in front of admission any more: every accepted association
+// records an intent, and the bindings decide what it starts (p08 D1.3).
 // ---------------------------------------------------------------------------------------------
-
-/// A team-only `support` channel that anyone may write to, so an outsider's first contact is
-/// authorized and the "new conversations are never held" row can actually be exercised.
-fn public_support_fixture() -> ChannelFixture {
-    channel_fixture(TestChannel {
-        participant_emails: Some(vec!["@public".into(), "team@acme.com".into()]),
-        ..TestChannel::default()
-    })
-}
 
 /// The last commit request the double was handed.
 fn last_commit(fixture: &ChannelFixture) -> crate::transport::InboundCommitRequest {
@@ -5372,12 +4031,11 @@ async fn open_thread_with_an_outsider(fixture: &ChannelFixture) {
     assert!(opened.accepted, "the fixture's own thread must open");
 }
 
+/// An outside reply into an existing thread is offered to the channel like any other message, as
+/// an external, admissible intent addressed to it.
 #[tokio::test]
-async fn an_outside_reply_to_an_existing_thread_is_held_on_a_manual_handoff_channel() {
+async fn an_outside_reply_to_an_existing_thread_records_an_admissible_intent() {
     let fixture = channel_fixture(TestChannel::default());
-    fixture
-        .threads
-        .set_channel_reply_handling(fixture.channel_id, ExternalReplyHandling::ManualHandoff);
     open_thread_with_an_outsider(&fixture).await;
 
     let reply = fixture
@@ -5386,125 +4044,21 @@ async fn an_outside_reply_to_an_existing_thread_is_held_on_a_manual_handoff_chan
         .await
         .unwrap();
 
-    assert!(
-        reply.accepted,
-        "a held message is still filed on the thread"
-    );
-    assert!(reply.task_ids.is_empty(), "no agent runs for a held reply");
+    assert!(reply.accepted);
+    assert_eq!(reply.intent_ids.len(), 1);
     let request = last_commit(&fixture);
-    assert!(request.tasks.is_empty());
-    assert_eq!(request.holds.len(), 1);
-    assert_eq!(request.holds[0].channel_id, fixture.channel_id);
-    // The hold is a separate axis from the disposition: this is still the customer's own message.
-    assert_eq!(
-        request.envelope.directives.disposition,
-        MessageDisposition::Answer
-    );
-    assert_eq!(request.associations.len(), 1);
+    assert!(request.admissible);
+    assert_eq!(request.origin, InboundOrigin::External);
+    assert_eq!(request.intents.len(), 1);
+    assert_eq!(request.intents[0].channel_id, fixture.channel_id);
+    assert_eq!(request.intents[0].role, RecipientRole::To);
 }
 
+/// A quiet message is still an intent, so it can answer a workflow that is waiting for it, but it
+/// is not admissible: it starts nothing.
 #[tokio::test]
-async fn an_outside_reply_is_answered_immediately_on_an_automatic_channel() {
+async fn a_quiet_outside_reply_records_an_inadmissible_intent() {
     let fixture = channel_fixture(TestChannel::default());
-    open_thread_with_an_outsider(&fixture).await;
-
-    let reply = fixture
-        .use_cases
-        .ingest_test_email(outsider_reply())
-        .await
-        .unwrap();
-
-    assert!(
-        !reply.task_ids.is_empty(),
-        "today's behaviour is the default"
-    );
-    assert!(last_commit(&fixture).holds.is_empty());
-}
-
-/// A company that switches its default moves every inheriting channel with it, live — the channel
-/// row is never touched, so this is the test that proves the policy is resolved rather than copied.
-#[tokio::test]
-async fn an_inheriting_channel_follows_the_company_default_into_holding() {
-    let fixture = channel_fixture(TestChannel::default());
-    fixture
-        .threads
-        .set_company_reply_handling(fixture.company_id, ExternalReplyHandling::ManualHandoff);
-    open_thread_with_an_outsider(&fixture).await;
-
-    let reply = fixture
-        .use_cases
-        .ingest_test_email(outsider_reply())
-        .await
-        .unwrap();
-
-    assert!(reply.task_ids.is_empty());
-    assert_eq!(last_commit(&fixture).holds.len(), 1);
-}
-
-/// A first contact has nothing to hold *against*: no history for a teammate to instruct from, and
-/// the agent's greeting is the fastest useful answer.
-#[tokio::test]
-async fn a_new_conversation_from_outside_is_never_held() {
-    let fixture = public_support_fixture();
-    fixture
-        .threads
-        .set_channel_reply_handling(fixture.channel_id, ExternalReplyHandling::ManualHandoff);
-
-    let first = fixture
-        .use_cases
-        .ingest_test_email(RawInboundPayload {
-            headers: Some("Message-ID: <first-contact@external.com>\n".to_string()),
-            to: "support@acme.mailagents.com".to_string(),
-            from: "client@external.com".to_string(),
-            subject: Some("Hello".to_string()),
-            text: Some("Do you sell widgets?".to_string()),
-            ..Default::default()
-        })
-        .await
-        .unwrap();
-
-    assert!(first.accepted);
-    assert!(
-        !first.task_ids.is_empty(),
-        "the agent greets a first contact"
-    );
-    assert!(last_commit(&fixture).holds.is_empty());
-}
-
-/// The team is not "outside". A teammate who wants a hold writes an internal note instead.
-#[tokio::test]
-async fn a_teammates_reply_to_an_existing_thread_is_never_held() {
-    let fixture = channel_fixture(TestChannel::default());
-    fixture
-        .threads
-        .set_channel_reply_handling(fixture.channel_id, ExternalReplyHandling::ManualHandoff);
-    open_thread_with_an_outsider(&fixture).await;
-
-    let reply = fixture
-        .use_cases
-        .ingest_test_email(RawInboundPayload {
-            headers: Some(
-                "Message-ID: <team-reply@acme.com>\nIn-Reply-To: <cc-outsider@acme.com>\n"
-                    .to_string(),
-            ),
-            from: "team@acme.com".to_string(),
-            ..message_to_support_cc_outsider()
-        })
-        .await
-        .unwrap();
-
-    assert!(!reply.task_ids.is_empty());
-    assert!(last_commit(&fixture).holds.is_empty());
-}
-
-/// An explicit `FileOnly` already produces no task; a handoff would ask the team to act on a
-/// message that asked nobody to.
-#[tokio::test]
-async fn a_quiet_outside_reply_is_never_held() {
-    let fixture = channel_fixture(TestChannel::default());
-    fixture
-        .threads
-        .set_channel_reply_handling(fixture.channel_id, ExternalReplyHandling::ManualHandoff);
     open_thread_with_an_outsider(&fixture).await;
 
     let reply = fixture
@@ -5517,25 +4071,20 @@ async fn a_quiet_outside_reply_is_never_held() {
         .unwrap();
 
     assert!(reply.accepted);
-    assert!(reply.task_ids.is_empty());
     let request = last_commit(&fixture);
-    assert!(
-        request.holds.is_empty(),
-        "the two gates are independent and only the quiet one fires"
-    );
+    assert!(!request.admissible, "a quiet message starts no workflow");
+    assert_eq!(request.intents.len(), 1);
     assert_eq!(
         request.envelope.directives.disposition,
         MessageDisposition::FileOnly
     );
 }
 
-/// A channel the body never named was not going to answer, so there is nothing to hold.
+/// A channel only copied, and never named in the body, records a Cc intent that is not mentioned:
+/// whether that starts anything is the binding's trigger, not ingress's decision.
 #[tokio::test]
-async fn a_passively_copied_held_channel_is_never_held() {
+async fn a_passively_copied_channel_records_an_unmentioned_cc_intent() {
     let fixture = channel_fixture(TestChannel::default());
-    fixture
-        .threads
-        .set_channel_reply_handling(fixture.channel_id, ExternalReplyHandling::ManualHandoff);
     open_thread_with_an_outsider(&fixture).await;
 
     let reply = fixture
@@ -5556,102 +4105,9 @@ async fn a_passively_copied_held_channel_is_never_held() {
         .unwrap();
 
     assert!(reply.accepted);
-    assert!(reply.task_ids.is_empty(), "a passive copy runs no agent");
-    assert!(last_commit(&fixture).holds.is_empty());
-}
-
-/// Holding a correlated outreach reply would strand the task that is waiting for it. The match is
-/// read *after* `authorize_thread_injection` folded it in, which is what this exercises.
-#[tokio::test]
-async fn an_outside_reply_that_closes_an_outreach_is_never_held() {
-    let fixture = channel_fixture(TestChannel::default());
-    fixture
-        .threads
-        .set_channel_reply_handling(fixture.channel_id, ExternalReplyHandling::ManualHandoff);
-    open_thread_with_an_outsider(&fixture).await;
-
-    // The waiting run, as the outreach correlation double states it: this thread is expecting
-    // exactly this address to answer exactly this outbound turn.
-    let thread_id = fixture.threads.threads()[0].id;
-    {
-        let mut tasks = fixture.tasks.tasks.lock().unwrap();
-        let waiting = tasks
-            .first_mut()
-            .expect("the opening message ran the agent");
-        waiting.thread_id = Some(thread_id);
-        waiting.payload = serde_json::json!({
-            "test_outreach": {
-                "outreach_id": Uuid::new_v4(),
-                "target_email": "client@external.com",
-                "outbound_message_id": "<outreach-question@acme.com>"
-            }
-        });
-    }
-
-    let reply = fixture
-        .use_cases
-        .ingest_test_email(RawInboundPayload {
-            headers: Some(
-                "Message-ID: <outreach-answer@external.com>\n\
-                 In-Reply-To: <cc-outsider@acme.com>\n\
-                 References: <cc-outsider@acme.com> <outreach-question@acme.com>\n"
-                    .to_string(),
-            ),
-            ..outsider_reply()
-        })
-        .await
-        .unwrap();
-
-    assert!(reply.accepted);
     let request = last_commit(&fixture);
-    assert_eq!(
-        request.outreach_transitions.len(),
-        1,
-        "the reply must still close the outreach it answers"
-    );
-    assert!(
-        request.holds.is_empty(),
-        "holding it would strand the waiting task"
-    );
+    assert!(request.admissible);
+    assert_eq!(request.intents.len(), 1);
+    assert_eq!(request.intents[0].role, RecipientRole::Cc);
+    assert!(!request.intents[0].mentioned);
 }
-
-/// A second reply while the first is still held takes a new generation rather than a second hold.
-#[tokio::test]
-async fn a_second_outside_reply_opens_another_generation_on_the_same_thread() {
-    let fixture = channel_fixture(TestChannel::default());
-    fixture
-        .threads
-        .set_channel_reply_handling(fixture.channel_id, ExternalReplyHandling::ManualHandoff);
-    open_thread_with_an_outsider(&fixture).await;
-
-    fixture
-        .use_cases
-        .ingest_test_email(outsider_reply())
-        .await
-        .unwrap();
-    let first = last_commit(&fixture);
-
-    fixture
-        .use_cases
-        .ingest_test_email(RawInboundPayload {
-            headers: Some(
-                "Message-ID: <outsider-reply-2@external.com>\n\
-                 In-Reply-To: <cc-outsider@acme.com>\n"
-                    .to_string(),
-            ),
-            ..outsider_reply()
-        })
-        .await
-        .unwrap();
-    let second = last_commit(&fixture);
-
-    assert_eq!(first.holds.len(), 1);
-    assert_eq!(second.holds.len(), 1);
-    assert_ne!(
-        first.holds[0].generation, second.holds[0].generation,
-        "each held message opens a generation of its own"
-    );
-}
-
-#[path = "response_trigger_tests.rs"]
-mod response_trigger_tests;

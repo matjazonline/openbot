@@ -168,48 +168,69 @@ impl WorkflowDefinitions for PostgresPersistence {
         Ok(())
     }
     async fn publish(&self, prepared: PreparedPublication) -> AppResult<Arc<PublishedBundle>> {
-        let command = prepared.command();
-        let request = &command.request;
+        let request = &prepared.command().request;
         let mut tx = self.pool.begin().await?;
         authorize_company(&mut tx, request.target.company, request.target.actor).await?;
-        if let Some(saved) = read_publication(&mut tx, request.target.company, &request.key).await?
-        {
-            if !saved.request.equivalent(request) {
-                return Err(conflict());
-            }
-            tx.commit().await?;
-            return Ok(saved.bundle);
-        }
-        let current = read_draft(&mut tx, request.target.company, request.target.workflow)
-            .await?
-            .ok_or_else(missing)?;
-        if current.archived
-            || current.draft != command.draft
-            || current.draft.revision() != request.expected
-        {
+        let bundle = publish_on(&mut tx, &prepared).await?;
+        tx.commit().await?;
+        Ok(bundle)
+    }
+}
+
+/// Publish under the company lock the caller holds: replay by key, the draft comparison, the
+/// publication checks (`supported_publication` at Publish, `verify_on`, `verify_children`), the
+/// version and its event. `publish` and assistant provisioning (p08 D2.3) both use it.
+pub(super) async fn publish_on(
+    tx: &mut Transaction<'_, Postgres>,
+    prepared: &PreparedPublication,
+) -> AppResult<Arc<PublishedBundle>> {
+    let command = prepared.command();
+    let request = &command.request;
+    if let Some(saved) = read_publication(tx, request.target.company, &request.key).await? {
+        if !saved.request.equivalent(request) {
             return Err(conflict());
         }
-        supported_publication(
-            &mut tx,
-            &command.bundle,
-            super::workflow_tools::ToolCheck::Publish,
-        )
-        .await?;
-        // Agent/skill snapshots are compared with their durable rows at publish only (06-D5).
-        super::agent_publication::verify_on(&mut tx, &command.bundle).await?;
-        verify_children(&mut tx, &command.bundle).await?;
-        insert_version(&mut tx, command).await?;
-        event(
-            &mut tx,
-            &command.draft,
-            request.target.actor,
-            "published",
-            Some(request.version),
-        )
-        .await?;
-        tx.commit().await?;
-        Ok(command.bundle.clone())
+        return Ok(saved.bundle);
     }
+    let current = read_draft(tx, request.target.company, request.target.workflow)
+        .await?
+        .ok_or_else(missing)?;
+    if current.archived
+        || current.draft != command.draft
+        || current.draft.revision() != request.expected
+    {
+        return Err(conflict());
+    }
+    supported_publication(
+        tx,
+        &command.bundle,
+        super::workflow_tools::ToolCheck::Publish,
+    )
+    .await?;
+    // Agent/skill snapshots are compared with their durable rows at publish only (06-D5).
+    super::agent_publication::verify_on(tx, &command.bundle).await?;
+    verify_children(tx, &command.bundle).await?;
+    insert_version(tx, command).await?;
+    event(
+        tx,
+        &command.draft,
+        request.target.actor,
+        "published",
+        Some(request.version),
+    )
+    .await?;
+    Ok(command.bundle.clone())
+}
+
+/// The draft write a template copy makes, with its event, under the caller's company lock.
+pub(super) async fn insert_draft_on(
+    tx: &mut Transaction<'_, Postgres>,
+    draft: &CompanyWorkflowDraft,
+    actor: WorkflowActor,
+    kind: &str,
+) -> AppResult<()> {
+    insert_draft(tx, draft).await?;
+    event(tx, draft, actor, kind, None).await
 }
 
 async fn verify_children(
@@ -243,8 +264,8 @@ async fn insert_version(
     let draft = &command.draft;
     sqlx::query(
         "INSERT INTO workflow_versions (company_id, workflow_id, id, draft_revision, command_key, \
-        actor_id, title, description, source, template_origin, bundle, content_hash) \
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)",
+        actor_id, title, description, source, template_origin, bundle, content_hash, agent_ids) \
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)",
     )
     .bind(draft.company().as_uuid())
     .bind(draft.workflow().as_uuid())
@@ -258,6 +279,13 @@ async fn insert_version(
     .bind(origin_json(draft)?)
     .bind(store_bundle(&command.bundle)?)
     .bind(command.bundle.content_hash().as_str())
+    .bind(
+        command
+            .bundle
+            .frozen_agent_ids()
+            .into_iter()
+            .collect::<Vec<Uuid>>(),
+    )
     .execute(&mut **tx)
     .await
     .map_err(write_error)?;

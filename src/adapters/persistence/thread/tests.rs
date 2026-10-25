@@ -1040,10 +1040,10 @@ async fn a_message_no_transport_carried_needs_no_email_fields() {
     fixture.cleanup().await;
 }
 
-/// The idempotency guard the agent worker runs on: an answer already in the thread means the run
-/// happened, and an outreach's own outbound mail is not that answer.
+/// The idempotency guard: an answer already in the thread means the run happened, and an outbound
+/// relay entry -- the conversation handed to another channel -- is not that answer.
 #[tokio::test]
-async fn find_outbound_reply_after_sees_answers_and_ignores_outreach_mail() {
+async fn find_outbound_reply_after_sees_answers_and_ignores_relayed_mail() {
     let Some(fixture) = Fixture::new("outbound_reply").await else {
         return;
     };
@@ -1068,16 +1068,16 @@ async fn find_outbound_reply_after_sees_answers_and_ignores_outreach_mail() {
         "nothing has answered yet"
     );
 
-    let outreach_rfc = format!("<outreach-{}@partner.test>", fixture.suffix);
-    let outreach = fixture
+    let relay_rfc = format!("<relay-{}@partner.test>", fixture.suffix);
+    let relay = fixture
         .persistence
         .create_message(&MessageWrite {
             structured: None,
             id: CanonicalMessageId::random(),
             thread_id: fixture.thread.id,
             author: observed("primary@example.com", IdentityProvenance::Agent),
-            subject: "Outreach".into(),
-            clean_text_body: "Asking a third party".into(),
+            subject: "Relayed".into(),
+            clean_text_body: "Handed to another channel".into(),
             attachments: Vec::new(),
             direction: MessageDirection::Outbound,
             role: MessageRole::Agent,
@@ -1088,91 +1088,11 @@ async fn find_outbound_reply_after_sees_answers_and_ignores_outreach_mail() {
                 MessageParticipantKind::To,
                 "target@partner.test",
             )],
-            correlation: MessageCorrelation::Email(email_metadata(&outreach_rfc)),
+            correlation: MessageCorrelation::Email(email_metadata(&relay_rfc)),
             created_at: Utc::now(),
         })
         .await
         .unwrap();
-    // The whole point of the canonical link: this message has an RFC id, but the guard is not
-    // going to look at it. Give the outreach target the *message*, and stop joining a delivery's
-    // provider id entirely -- the exclusion must still hold.
-    let outreach_message_id = outreach.canonical_id;
-
-    // Wire the outreach bookkeeping that marks this send as "the agent asking", not "the answer".
-    let task_id = Uuid::new_v4();
-    sqlx::query(
-        "INSERT INTO background_tasks (id, company_id, channel_id, thread_id, correlation_id, \
-         task_type, status, payload) \
-         VALUES ($1, $2, $3, $4, gen_random_uuid(), 'email_agent_dispatch', \
-                 'waiting_for_third_party_reply', '{}')",
-    )
-    .bind(task_id)
-    .bind(fixture.company_id)
-    .bind(fixture.channel_id)
-    .bind(fixture.thread.id)
-    .execute(&fixture.pool)
-    .await
-    .unwrap();
-    let outreach_id = Uuid::new_v4();
-    sqlx::query(
-        r#"INSERT INTO task_outreaches (
-                id, company_id, task_id, outreach_key, status, required_threshold_percent,
-                expires_at, subject, body
-           ) VALUES ($1, $2, $3, $4, 'waiting', 100.0, $5, 'Outreach', 'Outreach body')"#,
-    )
-    .bind(outreach_id)
-    .bind(fixture.company_id)
-    .bind(task_id)
-    .bind(&fixture.suffix)
-    .bind(Utc::now() + chrono::Duration::hours(1))
-    .execute(&fixture.pool)
-    .await
-    .unwrap();
-    let side_thread =
-        ThreadPersistence::create_thread(&fixture.persistence, fixture.channel_id, "Fixtures", &[])
-            .await
-            .unwrap();
-    // The delivery that carried the question. It names the same canonical message the target row
-    // marks, which is the relation the guard reads -- no RFC header is involved, so a transport
-    // with none is excluded on exactly the same terms.
-    let delivery = crate::adapters::persistence::test_support::delivery_fixture(
-        &fixture.persistence,
-        crate::adapters::persistence::test_support::DeliveryFixtureRequest {
-            task_id: Some(task_id),
-            recipient: "target@partner.test",
-            purpose: crate::entities::transport::DeliveryPurpose::Outreach,
-            // The fixture writes an outbound message of its own, and the guard under test is
-            // "what is the newest outbound message in this thread" -- so it goes somewhere else.
-            ..crate::adapters::persistence::test_support::DeliveryFixtureRequest::new(
-                fixture.company_id,
-                fixture.channel_id,
-                side_thread.id,
-                &format!("outreach-{}", fixture.suffix),
-            )
-        },
-    )
-    .await
-    .delivery;
-    let delivery_id = delivery.id;
-    let mut tx = fixture.pool.begin().await.unwrap();
-    crate::adapters::persistence::delivery::enqueue::insert_delivery_on(&mut tx, &delivery)
-        .await
-        .unwrap();
-    tx.commit().await.unwrap();
-
-    sqlx::query(
-        "INSERT INTO task_outreach_targets (outreach_id, company_id, email, target_kind, \
-         external_transport, external_namespace, external_subject, delivery_id, \
-         request_message_id) VALUES ($1, $2, 'target@partner.test', 'external', 'email', \
-         'email', 'target@partner.test', $3, $4)",
-    )
-    .bind(outreach_id)
-    .bind(fixture.company_id)
-    .bind(delivery_id.as_uuid())
-    .bind(outreach_message_id.as_uuid())
-    .execute(&fixture.pool)
-    .await
-    .unwrap();
 
     assert!(
         fixture
@@ -1181,7 +1101,7 @@ async fn find_outbound_reply_after_sees_answers_and_ignores_outreach_mail() {
             .await
             .unwrap()
             .is_none(),
-        "an outreach's own mail is the agent asking, not the agent answering"
+        "a relay entry is the conversation moving on, not the agent answering"
     );
 
     let answer = fixture
@@ -1219,7 +1139,7 @@ async fn find_outbound_reply_after_sees_answers_and_ignores_outreach_mail() {
         .unwrap()
         .expect("the answer must be found");
     assert_eq!(found.canonical_id, answer.canonical_id);
-    assert_ne!(found.canonical_id, outreach.canonical_id);
+    assert_ne!(found.canonical_id, relay.canonical_id);
 
     fixture.cleanup().await;
 }

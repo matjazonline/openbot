@@ -43,10 +43,10 @@ async fn reserve_on(
          SELECT task.company_id,$2,task.id,$4,$5,$6,$7,$8,
                 owner.workflow_id,owner.version_id,owner.id,execution.id,budget.root_run_id
          FROM background_tasks AS task
-         LEFT JOIN workflow_executions AS execution ON execution.company_id=task.company_id
-            AND execution.id=task.workflow_execution_id AND task.queue_kind='workflow'
-         LEFT JOIN workflow_runs AS owner ON owner.company_id=execution.company_id AND owner.id=execution.run_id
-         LEFT JOIN workflow_run_budgets AS budget ON budget.company_id=owner.company_id AND budget.run_id=owner.id
+         JOIN workflow_executions AS execution ON execution.company_id=task.company_id
+            AND execution.id=task.workflow_execution_id
+         JOIN workflow_runs AS owner ON owner.company_id=execution.company_id AND owner.id=execution.run_id
+         JOIN workflow_run_budgets AS budget ON budget.company_id=owner.company_id AND budget.run_id=owner.id
          WHERE task.company_id=$1 AND task.id=$3",
     )
     .bind(run.identity.company_id)

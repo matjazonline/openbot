@@ -1,29 +1,16 @@
 use super::*;
-use crate::entities::collaboration::{
-    CollaborationOwner, CollaborationOwnerKind, CollaborationProgress, CollaborationTarget,
-};
 use crate::entities::correlation::CorrelationId;
 use crate::entities::delivery::{DeliveryPartEntry, DeliveryQuery};
 use crate::entities::internal_note::{InternalNoteProvenance, InternalNoteView};
-use crate::entities::member_removal::{DelegatedAskAtStake, OwnedTaskAtStake};
 use crate::entities::message::CanonicalMessageId;
 use crate::entities::message_view::{AuthorView, ExternalMessageRef};
-use crate::entities::runtime_metrics::{MachineId, MachineRegion};
-use crate::entities::schedule::ScheduleRunAsChoices;
-use crate::entities::task::{
-    TaskAttemptRecord, TaskAttemptRecordStatus, TaskStatusEvent, TaskStopReason,
-    TaskTransitionActorKind, TaskTransitionReason,
-};
+use crate::entities::notification::NotificationPreferences;
 use crate::entities::transport::{
     ChannelBindingId, DeliveryId, DeliveryPartId, ExternalMessageKey, FailureClass, PrincipalId,
 };
-use crate::use_cases::thread::{
-    qualified_email_identity,
-    test_support::{EmailMessageDraft, stored_email_view},
-};
+use crate::use_cases::thread::test_support::{EmailMessageDraft, stored_email_view};
 use crate::use_cases::user::LoginMethods;
 use chrono::Utc;
-use serde_json::json;
 use uuid::Uuid;
 
 #[test]
@@ -39,46 +26,9 @@ fn test_render_markdown_formats_content_and_removes_unsafe_html() {
 }
 
 #[test]
-fn legacy_approval_prompts_escape_every_external_field() {
-    let now = Utc::now();
-    let approval = HumanApproval {
-        id: Uuid::new_v4(),
-        company_id: Uuid::new_v4(),
-        channel_id: Uuid::new_v4(),
-        thread_id: Uuid::new_v4(),
-        task_id: None,
-        step_key: "step".into(),
-        approver_email: r#"approver" onmouseover="alert(1)@example.com"#.into(),
-        approver_principal_id: None,
-        action_type: "<script>type</script>".into(),
-        action_title: "Approve <img src=x onerror=alert(1)>".into(),
-        action_summary: "Summary </p><script>alert(1)</script>".into(),
-        payload: json!({}),
-        token: "safe-token".into(),
-        status: ApprovalStatus::Pending,
-        expires_at: now,
-        created_at: now,
-        updated_at: now,
-    };
-
-    let details = approval_details_page(&approval);
-    let result = approval_result_page("Result <script>", &approval, "Done </p>");
-    let list = channel_approvals_fragment(std::slice::from_ref(&approval));
-    for html in [&details, &result, &list] {
-        assert!(!html.contains("<script>type"));
-        assert!(!html.contains("<img src=x"));
-        assert!(!html.contains("onmouseover=\"alert(1)"));
-    }
-    assert!(details.contains("&lt;script&gt;type&lt;/script&gt;"));
-    assert!(result.contains("Result &lt;script&gt;"));
-}
-
-#[test]
-fn legacy_agent_json_and_confirmation_attribute_are_escaped() {
+fn legacy_agent_fields_and_confirmation_attribute_are_escaped() {
     let company = mailbox_company();
     let agent = Agent {
-        memory_enabled: false,
-        config_json: Some(json!({"label": "</span><script>alert(1)</script>"})),
         system_prompt: Some("Answer <unsafe> input".into()),
         ..settings_agent(
             company.id,
@@ -93,7 +43,6 @@ fn legacy_agent_json_and_confirmation_attribute_are_escaped() {
         assert!(!html.contains("<script>alert(1)</script>"));
         assert!(!html.contains("autofocus onfocus=\"alert(1)"));
     }
-    assert!(row.contains("&lt;/span&gt;&lt;script&gt;alert(1)&lt;/script&gt;"));
     assert!(row.contains("Triage&quot; autofocus"));
     assert!(edit.contains("Answer &lt;unsafe&gt; input"));
 }
@@ -131,7 +80,7 @@ fn simulation_attribute_values_and_message_ids_are_escaped() {
             references: Vec::new(),
             cc: Vec::new(),
         }),
-        tasks: &[],
+        outcomes: &[],
         include_oob: false,
     });
     assert!(
@@ -155,111 +104,13 @@ fn library_agent_fields_reuse_the_advanced_editor_and_avatar_picker() {
     assert!(html.contains("Agent Picture"));
     assert!(html.contains("/ui/uploads/avatar"));
     assert!(html.contains("/ui/agent-library/generate-prompt"));
-    assert!(html.contains("Memory persistence"));
+    assert!(html.contains("Capabilities &amp; advanced options"));
     assert!(!html.contains("Overrides the company key"));
-}
-
-/// The payload names the message it answers and the reply it produced by canonical id, so a
-/// thread whose turns carry no mail headers at all matches on exactly this path.
-#[test]
-fn a_message_is_matched_to_its_task_by_canonical_id() {
-    let thread_id = Uuid::new_v4();
-    let company_id = Uuid::new_v4();
-    let channel_id = Uuid::new_v4();
-
-    let msg_in1 = mailbox_message_view(thread_id, "Inbound 1");
-    let msg_out1 = agent_reply_view(thread_id, "Response 1");
-    let msg_in2 = mailbox_message_view(thread_id, "Inbound 2");
-    let msg_out2 = agent_reply_view(thread_id, "Response 2");
-
-    let task = |id: Uuid, answered: &ThreadMessageView, reply: &ThreadMessageView| BackgroundTask {
-        correlation_id: CorrelationId::new(),
-        id,
-        company_id,
-        channel_id,
-        thread_id: Some(thread_id),
-        task_type: "email_agent_dispatch".to_string(),
-        status: TaskStatus::Completed,
-        payload: json!({
-            "source_message_id": answered.canonical_id,
-            "execution_result": {
-                "reply_message_id": reply.canonical_id,
-                "response": reply.body,
-            }
-        }),
-        retry_count: 0,
-        max_retries: 3,
-        last_error: None,
-        business_priority: Default::default(),
-        business_due_at: None,
-        attention_version: 1,
-        ownership: Default::default(),
-        worker_id: None,
-        execution_generation: None,
-        locked_at: None,
-        lock_expires_at: None,
-        run_at: Utc::now(),
-        created_at: Utc::now(),
-        updated_at: Utc::now(),
-    };
-
-    let task1_id = Uuid::new_v4();
-    let task2_id = Uuid::new_v4();
-    let tasks = vec![
-        task(task1_id, &msg_in1, &msg_out1),
-        task(task2_id, &msg_in2, &msg_out2),
-    ];
-
-    for (message, expected) in [
-        (&msg_in1, task1_id),
-        (&msg_out1, task1_id),
-        (&msg_in2, task2_id),
-        (&msg_out2, task2_id),
-    ] {
-        let matched = find_task_for_message(message, &tasks, None, Some(thread_id)).unwrap();
-        assert_eq!(matched.id, expected);
-    }
-}
-
-#[test]
-fn test_task_parameters_render_execution_diagnostics() {
-    let html = render_message_task_parameters_html(&json!({
-        "execution_result": {
-            "metadata": {
-                "execution_diagnostics": {
-                    "duration_ms": 1250,
-                    "response_characters": 4096,
-                    "token_usage_source": "estimated",
-                    "tool_call_count": 2,
-                    "tool_names": ["search", "send_email"]
-                },
-                "observability": {
-                    "summary": {
-                        "total_events": 3,
-                        "total_llm_calls": 1
-                    }
-                }
-            }
-        }
-    }));
-
-    assert!(html.contains("Duration: 1250 ms"));
-    assert!(html.contains("Token Usage: estimated"));
-    assert!(html.contains("Response: 4096 chars"));
-    assert!(html.contains("Tool Calls: 2"));
-    assert!(html.contains("Observed: 3 events / 1 LLM calls"));
 }
 
 /// None of these fixtures has a task in flight; the activity states have their own tests below.
 fn no_activity() -> &'static HashMap<Uuid, ThreadActivity> {
     static EMPTY: std::sync::OnceLock<HashMap<Uuid, ThreadActivity>> = std::sync::OnceLock::new();
-    EMPTY.get_or_init(HashMap::new)
-}
-
-/// A column whose threads are all answering for themselves: nothing is held.
-fn no_handoffs() -> &'static HashMap<Uuid, ThreadHandoffMark> {
-    static EMPTY: std::sync::OnceLock<HashMap<Uuid, ThreadHandoffMark>> =
-        std::sync::OnceLock::new();
     EMPTY.get_or_init(HashMap::new)
 }
 
@@ -275,15 +126,12 @@ fn mailbox_company() -> Company {
         name: "Acme".to_string(),
         slug: "acme".into(),
         avatar_url: None,
-        memory_provider: None,
         created_at: Utc::now(),
     }
 }
 
 fn mailbox_channel(company_id: Uuid) -> Channel {
     Channel {
-        response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
-        owner_agent_id: None,
         enabled: true,
         add_3rd_party: true,
         id: Uuid::new_v4(),
@@ -295,15 +143,9 @@ fn mailbox_channel(company_id: Uuid) -> Channel {
         participant_emails: Some(vec!["person@example.com".into()]),
         access_mode: crate::entities::channel::ChannelAccessMode::Allowlist,
         principal_grants: Vec::new(),
-        agent_ids: None,
-        retrieve_company_memory: false,
-        retrieve_agent_memory: false,
-        retrieve_user_memory: false,
-        persist_company_memory: false,
-        persist_agent_memory: false,
-        persist_user_memory: false,
         created_by: crate::entities::creation::CreationProvenance::system(),
         created_at: Utc::now(),
+        settings_revision: 0,
     }
 }
 
@@ -361,7 +203,6 @@ fn mailbox_page_renders_three_columns_and_escapes_thread_subjects() {
         next_cursor: Some("next_cursor"),
         selected_thread_id: None,
         activity: no_activity(),
-        handoffs: no_handoffs(),
         detail_html: &detail,
     });
 
@@ -402,7 +243,6 @@ fn top_bar_carries_a_theme_controller_that_survives_a_reload() {
         next_cursor: None,
         selected_thread_id: None,
         activity: no_activity(),
-        handoffs: no_handoffs(),
         detail_html: &detail,
     });
 
@@ -527,7 +367,6 @@ fn top_bar_shows_the_logo_and_the_signed_in_account() {
         next_cursor: None,
         selected_thread_id: None,
         activity: no_activity(),
-        handoffs: no_handoffs(),
         detail_html: &detail,
     });
 
@@ -570,7 +409,6 @@ fn a_workspace_names_its_list_and_detail_columns_for_the_compact_layout() {
         next_cursor: None,
         selected_thread_id: None,
         activity: no_activity(),
-        handoffs: no_handoffs(),
         detail_html: &empty_detail_pane("Select a channel to get started.", FragmentSwap::Inline),
     });
 
@@ -601,17 +439,10 @@ fn a_detail_column_with_nothing_open_says_so() {
         channel: &channel,
         thread: &thread,
         messages: &[],
-        agent: None,
         viewer_email: &email,
-        activity: None,
-        work: None,
-        viewer_principal_id: None,
-        viewer_manages_tasks: false,
-        private_handoff: None,
-        ownership_error: None,
-        owner_candidates: &[],
-        collaboration: None,
-        handoff: None,
+        activity: &Default::default(),
+        error: None,
+        viewer_membership: CompanyMembership::Owner,
     });
     assert!(!occupied.contains("data-pane-empty"));
 }
@@ -634,7 +465,6 @@ fn compose_button_lives_in_the_thread_column_of_the_selected_channel() {
         next_cursor: None,
         selected_thread_id: None,
         activity: no_activity(),
-        handoffs: no_handoffs(),
         detail_html: &detail,
     });
     // Without a channel there is no thread column, so there is nowhere for Compose to sit.
@@ -652,7 +482,6 @@ fn compose_button_lives_in_the_thread_column_of_the_selected_channel() {
         next_cursor: None,
         selected_thread_id: None,
         activity: no_activity(),
-        handoffs: no_handoffs(),
         detail_html: &detail,
     });
     assert!(with_channel.contains("id=\"compose-button\""));
@@ -672,7 +501,6 @@ fn compose_button_lives_in_the_thread_column_of_the_selected_channel() {
         next_cursor: None,
         selected_thread_id: None,
         activity: no_activity(),
-        handoffs: no_handoffs(),
     });
     assert!(column.contains("id=\"compose-button\""));
 }
@@ -695,7 +523,6 @@ fn channel_sidebar_lists_addresses_and_offers_channel_actions() {
             next_cursor: None,
             selected_thread_id: None,
             activity: no_activity(),
-            handoffs: no_handoffs(),
             detail_html: &detail,
         })
     };
@@ -753,7 +580,6 @@ fn the_rail_ends_on_the_company_it_is_scoped_to_rather_than_on_a_way_out() {
             next_cursor: None,
             selected_thread_id: None,
             activity: no_activity(),
-            handoffs: no_handoffs(),
             detail_html: &detail,
         })
     };
@@ -938,7 +764,6 @@ fn icon_rail_lights_the_workspace_the_response_belongs_to() {
         next_cursor: None,
         selected_thread_id: None,
         activity: no_activity(),
-        handoffs: no_handoffs(),
         detail_html: &detail,
     });
 
@@ -977,7 +802,6 @@ fn icon_rail_lights_the_workspace_the_response_belongs_to() {
     let agent_list = AgentSettingsList {
         company: &company,
         app_domain_name: "mail.test",
-        channels: &[],
         agents: std::slice::from_ref(&agent),
         selected_agent_id: None,
     };
@@ -1030,7 +854,6 @@ fn the_icon_rail_only_advertises_company_workspaces_the_role_can_open() {
         "/ui/channels",
         "/ui/agents",
         "/ui/schedules",
-        "/ui/tasks",
         "/ui/deliveries",
         "/ui/dashboard",
     ] {
@@ -1043,7 +866,6 @@ fn the_icon_rail_only_advertises_company_workspaces_the_role_can_open() {
         "/ui/channels",
         "/ui/agents",
         "/ui/schedules",
-        "/ui/tasks",
         "/ui/deliveries",
         "/ui/dashboard",
         "/ui/companies",
@@ -1061,16 +883,13 @@ fn the_icon_rail_only_advertises_company_workspaces_the_role_can_open() {
 fn agent_settings_list_targets_the_pane_and_swaps_out_of_band() {
     let company = mailbox_company();
     let agent = Agent {
-        memory_enabled: false,
         provider: Some("openai".to_string()),
         model: Some("gpt-4o".to_string()),
-        run_timeout_secs: Some(45),
         ..settings_agent(company.id, "Triage", "triage")
     };
     let list = AgentSettingsList {
         company: &company,
         app_domain_name: "mail.test",
-        channels: &[],
         agents: std::slice::from_ref(&agent),
         selected_agent_id: Some(agent.id),
     };
@@ -1086,20 +905,6 @@ fn agent_settings_list_targets_the_pane_and_swaps_out_of_band() {
     assert!(inline.contains("openai / gpt-4o"));
     assert!(inline.contains("menu-active"));
     assert!(!inline.contains("hx-swap-oob"));
-
-    let owned = Channel {
-        owner_agent_id: Some(agent.id),
-        agent_ids: Some(vec![agent.id]),
-        slug: "triage".into(),
-        ..mailbox_channel(company.id)
-    };
-    let addressed = AgentSettingsList {
-        channels: std::slice::from_ref(&owned),
-        ..list
-    };
-    assert!(
-        agent_settings_list(&addressed, FragmentSwap::Inline).contains("triage@acme.mail.test")
-    );
 
     // After a write the list rides along on the pane's response.
     let oob = agent_settings_list(&list, FragmentSwap::OutOfBand);
@@ -1127,13 +932,10 @@ fn agent_settings_list_targets_the_pane_and_swaps_out_of_band() {
 fn agent_edit_pane_prefills_the_stored_agent_and_offers_delete() {
     let company = mailbox_company();
     let agent = Agent {
-        memory_enabled: false,
         provider: Some("openai".to_string()),
         model: Some("gpt-4o".to_string()),
-        run_timeout_secs: Some(45),
         system_prompt: Some("Answer <billing> questions.".to_string()),
         description: None,
-        config_json: Some(serde_json::json!({ "temperature": 0.2 })),
         ..settings_agent(company.id, "Triage <bot>", "triage")
     };
     let model_connections = [CompanyModelConnection {
@@ -1148,11 +950,9 @@ fn agent_edit_pane_prefills_the_stored_agent_and_offers_delete() {
         app_domain_name: "mail.test",
         model_connections: &model_connections,
         agent: &agent,
-        used_by: &[],
         draft: None,
         error: None,
         capability_options: AgentCapabilityOptions::default(),
-        body: AgentPaneBody::Settings,
     });
 
     assert!(html.contains(&format!(
@@ -1162,10 +962,8 @@ fn agent_edit_pane_prefills_the_stored_agent_and_offers_delete() {
     assert!(html.contains("value=\"triage\""));
     assert!(html.contains("value=\"openai\""));
     assert!(html.contains("value=\"gpt-4o\""));
-    assert!(html.contains("name=\"run_timeout_secs\" min=\"1\" max=\"3600\""));
-    assert!(html.contains("value=\"45\""));
+    assert!(!html.contains("name=\"run_timeout_secs\""));
     assert!(html.contains("Answer &lt;billing&gt; questions.</textarea>"));
-    assert!(html.contains("&quot;temperature&quot;: 0.2"));
     // Overrides are set, so the collapsed section starts open.
     assert!(html.contains("bg-base-200\" open"));
     // The name is escaped everywhere it appears, including inside the confirm prompt.
@@ -1175,7 +973,7 @@ fn agent_edit_pane_prefills_the_stored_agent_and_offers_delete() {
         "hx-delete=\"/ui/agents/{}?company_id={}\"",
         agent.id, company.id
     )));
-    assert!(html.contains("No channel is running it."));
+    assert!(html.contains("This cannot be undone."));
 
     // An agent with nothing overridden keeps the model section collapsed.
     let plain = settings_agent(company.id, "Plain", "plain");
@@ -1184,11 +982,9 @@ fn agent_edit_pane_prefills_the_stored_agent_and_offers_delete() {
         app_domain_name: "mail.test",
         model_connections: &[],
         agent: &plain,
-        used_by: &[],
         draft: None,
         error: None,
         capability_options: AgentCapabilityOptions::default(),
-        body: AgentPaneBody::Settings,
     });
     assert!(!plain_html.contains("bg-base-200\" open"));
 }
@@ -1197,7 +993,6 @@ fn agent_edit_pane_prefills_the_stored_agent_and_offers_delete() {
 fn an_agent_with_a_picture_shows_it_and_one_without_falls_back_to_its_letter() {
     let company = mailbox_company();
     let pictured = Agent {
-        memory_enabled: false,
         avatar_url: Some(AvatarUrl::from("https://example.com/triage.png")),
         ..settings_agent(company.id, "Triage", "triage")
     };
@@ -1208,11 +1003,9 @@ fn an_agent_with_a_picture_shows_it_and_one_without_falls_back_to_its_letter() {
         app_domain_name: "mail.test",
         model_connections: &[],
         agent: &pictured,
-        used_by: &[],
         draft: None,
         error: None,
         capability_options: AgentCapabilityOptions::default(),
-        body: AgentPaneBody::Settings,
     });
     assert!(html.contains(r#"src="https://example.com/triage.png""#));
     // The form round-trips it, so saving from this pane cannot silently clear the picture.
@@ -1225,11 +1018,9 @@ fn an_agent_with_a_picture_shows_it_and_one_without_falls_back_to_its_letter() {
         app_domain_name: "mail.test",
         model_connections: &[],
         agent: &plain,
-        used_by: &[],
         draft: None,
         error: None,
         capability_options: AgentCapabilityOptions::default(),
-        body: AgentPaneBody::Settings,
     });
     assert!(!plain_html.contains("<img"));
     assert!(plain_html.contains(">P</span>"));
@@ -1240,236 +1031,12 @@ fn an_agent_with_a_picture_shows_it_and_one_without_falls_back_to_its_letter() {
         &AgentSettingsList {
             company: &company,
             app_domain_name: "mail.test",
-            channels: &[],
             agents: &agents,
             selected_agent_id: None,
         },
         FragmentSwap::Inline,
     );
     assert!(list.contains(r#"src="https://example.com/triage.png""#));
-}
-
-#[test]
-fn agent_edit_pane_lists_the_channels_running_the_agent() {
-    let company = mailbox_company();
-    let agent = settings_agent(company.id, "Triage", "triage");
-    let channel = mailbox_channel(company.id);
-
-    let html = agent_edit_pane(&AgentEditPane {
-        company: &company,
-        app_domain_name: "mail.test",
-        model_connections: &[],
-        agent: &agent,
-        used_by: &[&channel],
-        draft: None,
-        error: None,
-        capability_options: AgentCapabilityOptions::default(),
-        body: AgentPaneBody::Settings,
-    });
-
-    assert!(html.contains("Run by"));
-    assert!(html.contains(&format!(
-        "/ui/channels?company_id={}&channel_id={}",
-        company.id, channel.id
-    )));
-    // Deleting it is not free, and the confirmation has to say so.
-    assert!(html.contains("1 other channel assignment will be removed."));
-}
-
-/// The personal channel has a tab of its own, so listing it under "Run by" as well would say the
-/// agent is run by something separate from itself. The delete warning still counts it, because
-/// deleting the agent really does take it.
-#[test]
-fn run_by_names_the_shared_channels_and_leaves_the_personal_one_to_its_tab() {
-    let company = mailbox_company();
-    let agent = settings_agent(company.id, "Triage", "triage");
-    let personal = owned_channel_for(&agent, &company);
-    let shared = mailbox_channel(company.id);
-
-    let html = agent_edit_pane(&AgentEditPane {
-        company: &company,
-        app_domain_name: "mail.test",
-        model_connections: &[],
-        agent: &agent,
-        used_by: &[&personal, &shared],
-        draft: None,
-        error: None,
-        capability_options: AgentCapabilityOptions::default(),
-        body: AgentPaneBody::Settings,
-    });
-
-    assert!(html.contains(&format!(
-        "/ui/channels?company_id={}&channel_id={}",
-        company.id, shared.id
-    )));
-    assert!(!html.contains(&format!("channel_id={}", personal.id)));
-    assert!(html.contains("1 owned personal channel and all of its data will be deleted"));
-
-    // Nothing but the personal channel means there is no one else to warn about at all.
-    let alone = agent_edit_pane(&AgentEditPane {
-        company: &company,
-        app_domain_name: "mail.test",
-        model_connections: &[],
-        agent: &agent,
-        used_by: &[&personal],
-        draft: None,
-        error: None,
-        capability_options: AgentCapabilityOptions::default(),
-        body: AgentPaneBody::Settings,
-    });
-    assert!(!alone.contains("Run by"));
-}
-
-#[test]
-fn the_channel_tab_appears_only_for_an_agent_that_owns_a_channel() {
-    let company = mailbox_company();
-    let agent = settings_agent(company.id, "Triage", "triage");
-    let personal = owned_channel_for(&agent, &company);
-    let settings_url = format!(
-        "hx-push-url=\"/ui/agents?company_id={}&agent_id={}&tab=settings\"",
-        company.id, agent.id
-    );
-
-    let owning = agent_edit_pane(&AgentEditPane {
-        company: &company,
-        app_domain_name: "mail.test",
-        model_connections: &[],
-        agent: &agent,
-        used_by: &[&personal],
-        draft: None,
-        error: None,
-        capability_options: AgentCapabilityOptions::default(),
-        body: AgentPaneBody::Settings,
-    });
-
-    assert!(owning.contains("role=\"tablist\""));
-    assert!(owning.contains(&settings_url));
-    assert!(owning.contains(&format!(
-        "hx-get=\"/ui/agents/{}?company_id={}&tab=channel\"",
-        agent.id, company.id
-    )));
-    // Settings is the tab it opened on, so that is the lit one.
-    assert!(owning.contains("class=\"tab tab-active\""));
-
-    // An agent with no personal channel gets no strip rather than a tab leading nowhere.
-    let alone = agent_edit_pane(&AgentEditPane {
-        company: &company,
-        app_domain_name: "mail.test",
-        model_connections: &[],
-        agent: &agent,
-        used_by: &[],
-        draft: None,
-        error: None,
-        capability_options: AgentCapabilityOptions::default(),
-        body: AgentPaneBody::Settings,
-    });
-    assert!(!alone.contains("role=\"tablist\""));
-}
-
-#[test]
-fn the_channel_tab_renders_the_owned_channel_and_cannot_delete_it() {
-    let company = mailbox_company();
-    let agent = settings_agent(company.id, "Owner <bot>", "owner");
-    let personal = Channel {
-        description: Some("Answers billing mail.".to_string()),
-        alias_slugs: vec!["billing".into()],
-        ..owned_channel_for(&agent, &company)
-    };
-    let tab = AgentChannelTab {
-        channel: &personal,
-        schedules: &[],
-        run_as: &ScheduleRunAsChoices::default(),
-        spam_scan_enabled: true,
-        memory_ready: false,
-        draft: None,
-        error: None,
-    };
-
-    let html = agent_edit_pane(&AgentEditPane {
-        company: &company,
-        app_domain_name: "mail.test",
-        model_connections: &[],
-        agent: &agent,
-        used_by: &[&personal],
-        draft: None,
-        error: None,
-        capability_options: AgentCapabilityOptions::default(),
-        body: AgentPaneBody::Channel(&tab),
-    });
-
-    assert!(html.contains(&format!(
-        "hx-put=\"/ui/agents/{}/channel?company_id={}\"",
-        agent.id, company.id
-    )));
-    // The Channels workspace's own form, with the parts an owned channel does not choose locked.
-    assert!(html.contains("name=\"slug\" required readonly"));
-    assert!(html.contains("The owner always remains the position-0 agent"));
-    assert!(html.contains(&format!("value=\"{}\"", agent.id)));
-    assert!(html.contains("value=\"Answers billing mail.\""));
-    assert!(html.contains("value=\"billing\""));
-    assert!(html.contains("No automated schedules configured for this channel yet."));
-    // The channel goes with the agent, and the database refuses it any other way.
-    assert!(!html.contains("hx-delete=\"/ui/channels/"));
-    assert!(!html.contains("Delete Channel"));
-    // The agent's own form is not on this tab, so a channel save cannot carry it along.
-    assert!(!html.contains("name=\"system_prompt\""));
-    assert!(html.contains("class=\"tab tab-active\""));
-}
-
-#[test]
-fn the_channel_tab_keeps_a_rejected_save_in_the_form() {
-    let company = mailbox_company();
-    let agent = settings_agent(company.id, "Triage", "triage");
-    let personal = owned_channel_for(&agent, &company);
-    let draft = ChannelDraft {
-        name: "Renamed",
-        slug: "triage",
-        alias_slugs: "help, sales",
-        participant_emails: "@public",
-        ..ChannelDraft::default()
-    };
-    let tab = AgentChannelTab {
-        channel: &personal,
-        schedules: &[],
-        run_as: &ScheduleRunAsChoices::default(),
-        spam_scan_enabled: false,
-        memory_ready: false,
-        draft: Some(&draft),
-        error: Some("Failed to save channel: nope"),
-    };
-
-    let html = agent_edit_pane(&AgentEditPane {
-        company: &company,
-        app_domain_name: "mail.test",
-        model_connections: &[],
-        agent: &agent,
-        used_by: &[&personal],
-        draft: None,
-        error: None,
-        capability_options: AgentCapabilityOptions::default(),
-        body: AgentPaneBody::Channel(&tab),
-    });
-
-    assert!(html.contains("alert alert-error"));
-    assert!(html.contains("Failed to save channel: nope"));
-    assert!(html.contains("value=\"Renamed\""));
-    assert!(html.contains("value=\"help, sales\""));
-    // `@public` without spam scanning is what the interlock is for.
-    assert!(html.contains("confirm_spam_disabled"));
-    // The header still names the stored agent; only the form carries the attempt.
-    assert!(html.contains("<h2 class=\"truncate text-xl font-bold\">Triage</h2>"));
-}
-
-/// The personal channel every agent is created with: its owner at position 0, its address the
-/// agent's handle.
-fn owned_channel_for(agent: &Agent, company: &Company) -> Channel {
-    Channel {
-        owner_agent_id: Some(agent.id),
-        agent_ids: Some(vec![agent.id]),
-        name: agent.name.clone(),
-        slug: agent.slug.as_str().into(),
-        ..mailbox_channel(company.id)
-    }
 }
 
 #[test]
@@ -1480,7 +1047,6 @@ fn agent_edit_pane_keeps_a_rejected_save_in_the_form() {
         name: "Renamed",
         slug: "renamed",
         system_prompt: "Be terse.",
-        config_json: "{ not json",
         advanced: true,
         ..AgentDraft::default()
     };
@@ -1490,18 +1056,17 @@ fn agent_edit_pane_keeps_a_rejected_save_in_the_form() {
         app_domain_name: "mail.test",
         model_connections: &[],
         agent: &agent,
-        used_by: &[],
         draft: Some(&draft),
         error: Some("Invalid JSON config"),
         capability_options: AgentCapabilityOptions::default(),
-        body: AgentPaneBody::Settings,
     });
 
     assert!(html.contains("alert alert-error"));
     assert!(html.contains("Invalid JSON config"));
     assert!(html.contains("value=\"Renamed\""));
     assert!(html.contains("Be terse.</textarea>"));
-    assert!(html.contains("{ not json</textarea>"));
+    // The legacy runtime configuration has no control any more (p08 B4a).
+    assert!(!html.contains("{ not json</textarea>"));
     // The header still names the stored agent; only the form carries the attempt.
     assert!(html.contains("<h2 class=\"truncate text-xl font-bold\">Triage</h2>"));
 }
@@ -1516,11 +1081,9 @@ fn prompt_generator_names_the_pane_it_answers_into() {
         app_domain_name: "mail.test",
         model_connections: &[],
         agent: &agent,
-        used_by: &[],
         draft: None,
         error: None,
         capability_options: AgentCapabilityOptions::default(),
-        body: AgentPaneBody::Settings,
     });
 
     // The box is namespaced by the agent it belongs to, and pulls the overrides along so an agent
@@ -1676,154 +1239,29 @@ fn agent_create_pane_opens_on_the_tab_that_was_submitted() {
     assert!(simple.contains(&format!("hx-post=\"/ui/agents?company_id={}\"", company.id)));
     assert!(simple.contains("name=\"form_mode\" value=\"simple\""));
     assert!(simple.contains("name=\"form_mode\" value=\"advanced\""));
-    assert!(simple.contains("agent-handle@acme.mail.test"));
+    // An agent has a handle, not an address of its own.
+    assert!(simple.contains(">@agent-handle</span>"));
+    assert!(!simple.contains("agent-handle@acme.mail.test"));
     assert!(simple.contains("data-input=\"agent-simple-address-preview\""));
     assert!(simple.contains("data-input=\"agent-address-preview\""));
     assert!(simple.contains(r##"<form id="agent-tab-advanced" class="hidden space-y-4""##));
     assert!(!simple.contains(r##"<form id="agent-tab-simple" class="hidden space-y-4""##));
 
-    // Advanced is the only tab that does not create on submit: it opens the channel step.
-    assert!(simple.contains(&format!(
-        "hx-post=\"/ui/agents/new/channel?company_id={}\"",
-        company.id
-    )));
-    assert!(simple.contains(">Next: Channel<"));
-    assert!(simple.contains(r##"<li class="step step-primary">Agent</li>"##));
+    // p08 D4.7: Advanced creates the agent on submit too; there is no channel step.
+    assert_eq!(
+        simple
+            .matches(&format!("hx-post=\"/ui/agents?company_id={}\"", company.id))
+            .count(),
+        2
+    );
+    assert!(!simple.contains("/ui/agents/new/channel"));
+    assert!(!simple.contains(">Next: Channel<"));
+    assert!(!simple.contains(r##"<li class="step step-primary">Agent</li>"##));
 
     // A rejected Advanced submit has to come back on the Advanced tab.
     let advanced = pane(AgentCreateTab::Advanced);
     assert!(advanced.contains(r##"<form id="agent-tab-simple" class="hidden space-y-4""##));
     assert!(!advanced.contains(r##"<form id="agent-tab-advanced" class="hidden space-y-4""##));
-}
-
-/// The memory-result field renders into a `min="1"` number input inside a collapsed `<details>`,
-/// so a draft that defaults it to zero makes the empty create form fail browser validation with
-/// nowhere to report it — the submit simply does nothing.
-#[test]
-fn a_blank_agent_form_stays_inside_the_bounds_its_own_fields_declare() {
-    let company = mailbox_company();
-    let pane = agent_create_pane(&AgentCreatePane {
-        company: &company,
-        app_domain_name: "mail.test",
-        model_connections: &[],
-        library_agents: &[],
-        selected_library_agent_ids: &[],
-        tab: AgentCreateTab::Advanced,
-        draft: &AgentDraft::default(),
-        error: None,
-        capability_options: AgentCapabilityOptions::default(),
-    });
-
-    assert!(pane.contains(
-        r##"<input name="memory_max_results" type="number" min="1" max="20" value="5""##
-    ));
-    assert!(pane.contains(r##"<option value="audience_only" selected>"##));
-    assert!(pane.contains(r##"<option value="fast" selected>"##));
-}
-
-#[test]
-fn the_channel_step_carries_the_agent_and_locks_the_address_it_follows() {
-    let company = mailbox_company();
-    let agent = AgentDraft {
-        name: "Support <Triage>",
-        slug: "support-triage",
-        system_prompt: "You are support",
-        description: "Answers billing",
-        memory_enabled: true,
-        memory_persistence_mode: "scope_specific_facts",
-        memory_recall_mode: "thinking",
-        memory_max_results: 7,
-        config_json: r#"{"temperature": 0.2}"#,
-        advanced: true,
-        ..AgentDraft::default()
-    };
-    let draft = ChannelDraft {
-        name: agent.name,
-        slug: agent.slug,
-        participant_emails: "@public",
-        advanced: true,
-        ..ChannelDraft::default()
-    };
-
-    let pane = agent_channel_step_pane(&AgentChannelStepPane {
-        company: &company,
-        app_domain_name: "mail.test",
-        agent: &agent,
-        draft: &draft,
-        spam_scan_enabled: false,
-        memory_ready: true,
-        error: None,
-    });
-
-    // The step submits the pair, and can go back to the agent without losing it.
-    assert!(pane.contains(&format!(
-        "hx-post=\"/ui/agents/new/create?company_id={}\"",
-        company.id
-    )));
-    assert!(pane.contains(&format!(
-        "hx-post=\"/ui/agents/new/agent?company_id={}\"",
-        company.id
-    )));
-    assert!(pane.contains(r##"<li class="step step-primary">Channel</li>"##));
-
-    // The agent rides along prefixed, so the channel's own name and slug stay unprefixed.
-    assert!(
-        pane.contains(
-            r##"<input type="hidden" name="agent_name" value="Support &lt;Triage&gt;">"##
-        )
-    );
-    assert!(pane.contains(r##"<input type="hidden" name="agent_slug" value="support-triage">"##));
-    assert!(pane.contains(r##"name="agent_system_prompt" value="You are support""##));
-    assert!(pane.contains(r##"name="agent_memory_enabled" value="true""##));
-    assert!(pane.contains(r##"name="agent_memory_max_results" value="7""##));
-    assert!(pane.contains(r##"name="agent_config_json" value="{&quot;temperature&quot;: 0.2}""##));
-
-    // The address follows the handle, so it is shown rather than offered.
-    assert!(pane.contains("support-triage@acme.mail.test"));
-    assert!(
-        pane.contains(
-            r##"<input type="text" name="slug" required readonly value="support-triage""##
-        )
-    );
-    assert!(pane.contains("Go back to the agent step to change it."));
-    // Nothing assigns the owner: the transaction that creates the pair does that itself.
-    assert!(!pane.contains(r##"name="agent_ids""##));
-    // A `@public` channel on a server without spam scanning still has to be confirmed.
-    assert!(pane.contains(r##"name="confirm_spam_disabled""##));
-    assert!(!pane.contains("pointer-events-none"));
-}
-
-#[test]
-fn a_rejected_channel_step_keeps_both_halves_and_says_why() {
-    let company = mailbox_company();
-    let agent = AgentDraft {
-        name: "Triage",
-        slug: "triage",
-        advanced: true,
-        ..AgentDraft::default()
-    };
-    let draft = ChannelDraft {
-        name: "Triage Inbox",
-        slug: "triage",
-        alias_slugs: "help, sales",
-        advanced: true,
-        ..ChannelDraft::default()
-    };
-
-    let pane = agent_channel_step_pane(&AgentChannelStepPane {
-        company: &company,
-        app_domain_name: "mail.test",
-        agent: &agent,
-        draft: &draft,
-        spam_scan_enabled: true,
-        memory_ready: false,
-        error: Some("Address 'triage' is already in use"),
-    });
-
-    assert!(pane.contains("Address &#39;triage&#39; is already in use"));
-    assert!(pane.contains("value=\"Triage Inbox\""));
-    assert!(pane.contains("value=\"help, sales\""));
-    assert!(pane.contains(r##"<input type="hidden" name="agent_name" value="Triage">"##));
 }
 
 #[test]
@@ -1863,21 +1301,14 @@ fn channel_settings_list_targets_the_pane_and_swaps_out_of_band() {
 
 fn settings_agent(company_id: Uuid, name: &str, slug: &str) -> Agent {
     Agent {
-        response_contract: None,
-        memory_enabled: false,
-        memory_persistence_mode: crate::entities::memory::MemoryPersistenceMode::AudienceOnly,
-        memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
-        memory_max_results: 5,
         id: Uuid::new_v4(),
         company_id: Some(company_id),
         name: name.to_string(),
         slug: slug.to_string(),
         provider: None,
         model: None,
-        run_timeout_secs: None,
         system_prompt: None,
         description: None,
-        config_json: None,
         avatar_url: None,
         created_by: crate::entities::creation::CreationProvenance::system(),
         created_at: Utc::now(),
@@ -1887,12 +1318,8 @@ fn settings_agent(company_id: Uuid, name: &str, slug: &str) -> Agent {
 #[test]
 fn channel_edit_pane_prefills_the_stored_channel_and_offers_delete() {
     let company = mailbox_company();
-    let triage = settings_agent(company.id, "Triage <bot>", "triage");
-    let unused = settings_agent(company.id, "Unused", "unused");
     let channel = Channel {
-        owner_agent_id: None,
         participant_emails: Some(vec!["person@example.com".into(), "@public".into()]),
-        agent_ids: Some(vec![triage.id]),
         ..mailbox_channel(company.id)
     };
 
@@ -1900,13 +1327,11 @@ fn channel_edit_pane_prefills_the_stored_channel_and_offers_delete() {
         company: &company,
         app_domain_name: "example.com",
         channel: &channel,
-        agents: &[triage.clone(), unused.clone()],
         schedules: &[],
-        run_as: &ScheduleRunAsChoices::default(),
+        schedule_bindings: &[],
         spam_scan_enabled: true,
         draft: None,
         error: None,
-        notice: None,
     });
 
     assert!(html.contains(&format!(
@@ -1919,15 +1344,8 @@ fn channel_edit_pane_prefills_the_stored_channel_and_offers_delete() {
     assert!(!html.contains("name=\"provider\""));
     assert!(!html.contains("name=\"channel_config\""));
 
-    // Only the assigned agent is checked, and the hidden field carries the submitted order.
-    assert!(html.contains(&format!("value=\"{}\" checked", triage.id)));
-    assert!(html.contains(&format!("value=\"{}\" ", unused.id)));
-    assert!(!html.contains(&format!("value=\"{}\" checked", unused.id)));
-    assert!(html.contains(&format!(
-        "<input type=\"hidden\" name=\"agent_ids\" value=\"{}\">",
-        triage.id
-    )));
-    assert!(html.contains("Triage &lt;bot&gt;"));
+    // What answers the channel is a workflow binding; the pane picks no agent.
+    assert!(!html.contains("name=\"agent_ids\""));
 
     assert!(html.contains(&format!(
         "hx-delete=\"/ui/channels/{}?company_id={}\"",
@@ -1937,102 +1355,6 @@ fn channel_edit_pane_prefills_the_stored_channel_and_offers_delete() {
 
     // Spam scanning is on, so the interlock has nothing to ask.
     assert!(!html.contains("confirm_spam_disabled"));
-}
-
-#[test]
-fn owned_channel_locks_owner_and_primary_address_and_hides_delete() {
-    let company = mailbox_company();
-    let owner = settings_agent(company.id, "Owner <bot>", "owner");
-    let other = settings_agent(company.id, "Other", "other");
-    let channel = Channel {
-        owner_agent_id: Some(owner.id),
-        agent_ids: Some(vec![owner.id]),
-        slug: "owner".into(),
-        ..mailbox_channel(company.id)
-    };
-    let html = channel_edit_pane(&ChannelEditPane {
-        company: &company,
-        app_domain_name: "example.com",
-        channel: &channel,
-        agents: &[owner.clone(), other],
-        schedules: &[],
-        run_as: &ScheduleRunAsChoices::default(),
-        spam_scan_enabled: true,
-        draft: None,
-        error: None,
-        notice: None,
-    });
-
-    assert!(html.contains("name=\"slug\" required readonly"));
-    assert!(html.contains("The owner always remains the position-0 agent"));
-    assert!(html.contains(&format!(
-        "/ui/agents?company_id={}&amp;agent_id={}",
-        company.id, owner.id
-    )));
-    assert!(html.contains("Owner &lt;bot&gt;"));
-    assert!(!html.contains("hx-delete=\"/ui/channels/"));
-    assert!(html.contains("name=\"enabled\""));
-    assert!(html.contains("name=\"retrieve_user_memory\""));
-}
-
-/// A library definition is picked on what it does, so the pane opens a modal of cards rather than
-/// a dropdown that could only carry names.
-#[test]
-fn library_agents_are_picked_from_a_modal_of_cards() {
-    let company = mailbox_company();
-    let scheduler = Agent {
-        memory_enabled: false,
-        company_id: None,
-        description: Some("Books meetings from the thread.".to_string()),
-        ..settings_agent(company.id, "Scheduler", "scheduler")
-    };
-    let researcher = Agent {
-        memory_enabled: false,
-        company_id: None,
-        ..settings_agent(company.id, "Researcher", "researcher")
-    };
-    let channel = Channel {
-        owner_agent_id: None,
-        agent_ids: Some(vec![scheduler.id]),
-        ..mailbox_channel(company.id)
-    };
-
-    let html = channel_edit_pane(&ChannelEditPane {
-        company: &company,
-        app_domain_name: "example.com",
-        channel: &channel,
-        agents: &[scheduler.clone(), researcher.clone()],
-        schedules: &[],
-        run_as: &ScheduleRunAsChoices::default(),
-        spam_scan_enabled: true,
-        draft: None,
-        error: None,
-        notice: None,
-    });
-
-    // The button names the current pick and opens the modal; the choice itself rides a hidden
-    // field, since a card is a button and cannot be submitted.
-    assert!(html.contains(r##"data-action="open-dialog""##));
-    assert!(html.contains(&format!(
-        "<input type=\"hidden\" class=\"channel-library-agent-field\" value=\"{}\">",
-        scheduler.id
-    )));
-    assert!(html.contains("data-placeholder=\"Choose a library agent…\">Scheduler</span>"));
-
-    // Both definitions are cards, and only the assigned one is marked.
-    assert!(html.contains(&format!("data-agent-id=\"{}\"", scheduler.id)));
-    assert!(html.contains(&format!("data-agent-id=\"{}\"", researcher.id)));
-    assert_eq!(html.matches("channel-library-agent-card").count(), 2);
-    assert_eq!(html.matches("border-2 border-primary").count(), 1);
-
-    // The card carries what the dropdown could not.
-    assert!(html.contains("Books meetings from the thread."));
-    assert!(html.contains("@scheduler"));
-
-    // A nested <form> would be dropped by the parser and could submit the pane, so the backdrop
-    // closes the dialog itself.
-    assert!(!html.contains("modal-backdrop\">\n"));
-    assert!(html.contains("class=\"modal-backdrop\""));
 }
 
 /// The third-party switch is a checkbox, and an unticked checkbox submits no key at all — so the
@@ -2045,20 +1367,17 @@ fn channel_edit_pane_reflects_the_stored_third_party_setting() {
         company: &company,
         app_domain_name: "example.com",
         channel: &mailbox_channel(company.id),
-        agents: &[],
         schedules: &[],
-        run_as: &ScheduleRunAsChoices::default(),
+        schedule_bindings: &[],
         spam_scan_enabled: true,
         draft: None,
         error: None,
-        notice: None,
     });
     assert!(open.contains(
         r#"name="add_3rd_party" value="true" class="checkbox checkbox-sm mt-0.5" checked"#
     ));
 
     let closed_channel = Channel {
-        owner_agent_id: None,
         add_3rd_party: false,
         ..mailbox_channel(company.id)
     };
@@ -2066,13 +1385,11 @@ fn channel_edit_pane_reflects_the_stored_third_party_setting() {
         company: &company,
         app_domain_name: "example.com",
         channel: &closed_channel,
-        agents: &[],
         schedules: &[],
-        run_as: &ScheduleRunAsChoices::default(),
+        schedule_bindings: &[],
         spam_scan_enabled: true,
         draft: None,
         error: None,
-        notice: None,
     });
     assert!(
         closed
@@ -2088,7 +1405,6 @@ fn channel_edit_pane_keeps_a_rejected_save_in_the_form() {
         name: "Renamed",
         slug: "renamed",
         participant_emails: "@public",
-        advanced: true,
         ..ChannelDraft::default()
     };
 
@@ -2096,13 +1412,11 @@ fn channel_edit_pane_keeps_a_rejected_save_in_the_form() {
         company: &company,
         app_domain_name: "example.com",
         channel: &channel,
-        agents: &[],
         schedules: &[],
-        run_as: &ScheduleRunAsChoices::default(),
+        schedule_bindings: &[],
         spam_scan_enabled: false,
         draft: Some(&draft),
         error: Some("Invalid JSON config"),
-        notice: None,
     });
 
     assert!(html.contains("alert alert-error"));
@@ -2118,9 +1432,6 @@ fn channel_edit_pane_keeps_a_rejected_save_in_the_form() {
         )
     );
     assert!(!html.contains("opacity-40"));
-    // No agents exist yet, so the field still submits and points at where to make one.
-    assert!(html.contains("<input type=\"hidden\" name=\"agent_ids\" value=\"\">"));
-    assert!(html.contains(&format!("/ui/agents?company_id={}&amp;new=1", company.id)));
 }
 
 #[test]
@@ -2132,20 +1443,17 @@ fn spam_confirmation_is_inert_until_the_channel_is_public() {
             name: "Inbox",
             slug: "inbox",
             participant_emails,
-            advanced: true,
             ..ChannelDraft::default()
         };
         channel_edit_pane(&ChannelEditPane {
             company: &company,
             app_domain_name: "example.com",
             channel: &channel,
-            agents: &[],
             schedules: &[],
-            run_as: &ScheduleRunAsChoices::default(),
+            schedule_bindings: &[],
             spam_scan_enabled,
             draft: Some(&draft),
             error: None,
-            notice: None,
         })
     };
 
@@ -2180,13 +1488,11 @@ fn cancelling_a_channel_form_dismisses_the_pane() {
         company: &company,
         app_domain_name: "example.com",
         channel: &channel,
-        agents: &[],
         schedules: &[],
-        run_as: &ScheduleRunAsChoices::default(),
+        schedule_bindings: &[],
         spam_scan_enabled: true,
         draft: None,
         error: None,
-        notice: None,
     });
     assert!(edit.contains(&close));
 
@@ -2194,26 +1500,24 @@ fn cancelling_a_channel_form_dismisses_the_pane() {
     let create = channel_create_pane(&ChannelCreatePane {
         company: &company,
         app_domain_name: "example.com",
-        agents: &[],
         spam_scan_enabled: true,
         draft: &ChannelDraft::default(),
-        easy: false,
         error: None,
     });
-    assert_eq!(create.matches(&close).count(), 3);
+    assert_eq!(create.matches(&close).count(), 1);
 }
 
+/// p08 D4.7: the create pane makes a plain channel; an agent answers it through a workflow
+/// binding, so the Easy (library agents) and Simple (instructions) tabs are gone.
 #[test]
-fn channel_create_pane_opens_on_the_tab_that_was_submitted() {
+fn channel_create_pane_makes_a_plain_channel_and_keeps_a_rejected_draft() {
     let company = mailbox_company();
     let pane = |draft: &ChannelDraft<'_>, error| {
         channel_create_pane(&ChannelCreatePane {
             company: &company,
             app_domain_name: "example.com",
-            agents: &[],
             spam_scan_enabled: true,
             draft,
-            easy: false,
             error,
         })
     };
@@ -2223,73 +1527,24 @@ fn channel_create_pane_opens_on_the_tab_that_was_submitted() {
         "hx-post=\"/ui/channels?company_id={}\"",
         company.id
     )));
-    assert!(fresh.contains("<input type=\"hidden\" name=\"form_mode\" value=\"simple\">"));
-    assert!(fresh.contains("<input type=\"hidden\" name=\"form_mode\" value=\"advanced\">"));
-    assert!(fresh.contains(">Easy</button>"));
-    assert!(fresh.contains(&format!(
-        "hx-post=\"/ui/channels/easy?company_id={}\"",
-        company.id
-    )));
-    assert!(fresh.contains(r##"id="channel-tab-easy" class="hidden space-y-4"##));
-    assert!(fresh.contains(r##"id="channel-tab-simple" class=" space-y-4"##));
-    assert!(fresh.contains(r##"id="channel-tab-advanced" class="hidden space-y-4"##));
-    assert!(fresh.contains("You can save these grants now"));
-    assert!(!fresh.contains(
-        "<fieldset class=\"rounded-lg border border-base-300 bg-base-200 p-4\" disabled"
-    ));
+    assert!(fresh.contains(r##"id="channel-create-form" class="space-y-4"##));
+    assert!(!fresh.contains("form_mode"));
+    assert!(!fresh.contains(">Easy</button>"));
+    assert!(!fresh.contains("/ui/channels/easy"));
+    assert!(!fresh.contains("system_prompt"));
+    assert!(fresh.contains("create an assistant channel from the agent's page"));
 
-    // A rejected Advanced submit comes back on the Advanced tab with what was typed.
+    // A rejected submit comes back with what was typed.
     let retried = pane(
         &ChannelDraft {
             name: "Support",
             slug: "support",
-            advanced: true,
             ..ChannelDraft::default()
         },
         Some("Failed to create channel: slug already taken"),
     );
-    assert!(retried.contains(r##"id="channel-tab-simple" class="hidden space-y-4"##));
-    assert!(retried.contains(r##"id="channel-tab-advanced" class=" space-y-4"##));
     assert!(retried.contains("slug already taken"));
     assert!(retried.contains("value=\"Support\""));
-
-    // Simple mode keeps its instructions instead.
-    let simple_retry = pane(
-        &ChannelDraft {
-            name: "Support",
-            system_prompt: "Answer billing questions",
-            ..ChannelDraft::default()
-        },
-        Some("Failed to generate agent prompt"),
-    );
-    assert!(simple_retry.contains("Answer billing questions</textarea>"));
-    assert!(simple_retry.contains(r##"id="channel-tab-simple" class=" space-y-4"##));
-
-    let scheduler = Agent {
-        memory_enabled: false,
-        company_id: None,
-        description: Some("Books meetings from email.".to_string()),
-        ..settings_agent(company.id, "Scheduler", "scheduler")
-    };
-    let selected = [scheduler.id];
-    let easy_draft = ChannelDraft {
-        agent_ids: &selected,
-        ..ChannelDraft::default()
-    };
-    let easy_retry = channel_create_pane(&ChannelCreatePane {
-        company: &company,
-        app_domain_name: "example.com",
-        agents: std::slice::from_ref(&scheduler),
-        spam_scan_enabled: true,
-        draft: &easy_draft,
-        easy: true,
-        error: Some("channel already exists"),
-    });
-    assert!(easy_retry.contains(r##"id="channel-tab-easy" class=" space-y-4"##));
-    assert!(easy_retry.contains(&format!("value=\"{}\"", scheduler.id)));
-    assert!(easy_retry.contains("class=\"checkbox checkbox-primary mt-1\" checked"));
-    assert!(easy_retry.contains("Books meetings from email."));
-    assert!(easy_retry.contains("channel already exists"));
 }
 
 #[test]
@@ -2302,7 +1557,6 @@ fn channels_page_opens_the_form_the_mailbox_asked_for() {
             company: &company,
             app_domain_name: "example.com",
             channels,
-            agents: &[],
             spam_scan_enabled: true,
             focus,
         })
@@ -2352,7 +1606,6 @@ fn appended_thread_page_swaps_pagination_out_of_band() {
             next_cursor: None,
             selected_thread_id: None,
             activity: no_activity(),
-            handoffs: no_handoffs(),
         },
         FragmentSwap::OutOfBand,
     );
@@ -2411,17 +1664,10 @@ fn message_pane_puts_the_viewers_messages_on_the_right_and_everyone_else_on_the_
         channel: &channel,
         thread: &thread,
         messages: &[inbound, outbound],
-        agent: None,
         viewer_email: &mailbox_account_email(),
-        activity: None,
-        work: None,
-        viewer_principal_id: None,
-        viewer_manages_tasks: false,
-        private_handoff: None,
-        ownership_error: None,
-        owner_candidates: &[],
-        collaboration: None,
-        handoff: None,
+        activity: &Default::default(),
+        error: None,
+        viewer_membership: CompanyMembership::Owner,
     });
 
     assert!(html.contains("chat chat-start"));
@@ -2458,7 +1704,7 @@ fn mailbox_message_view(thread_id: Uuid, body: &str) -> ThreadMessageView {
         id: Uuid::new_v4(),
         canonical_id: CanonicalMessageId::random(),
         thread_id,
-        task_id: None,
+        run_ids: Vec::new(),
         author: AuthorView {
             principal_id: PrincipalId::random(),
             label: "Ada Lovelace".into(),
@@ -2501,17 +1747,17 @@ fn internal_note_markup_is_unmistakable_escaped_and_hides_removed_text() {
         channel_id: Uuid::new_v4(),
     };
 
-    let active = message_bubble_chat(&note, None, None, scope);
+    let active = message_bubble_chat(&note, None, scope, RunLinkAccess::Label);
     assert!(active.contains("Internal only"));
     assert!(active.contains("internal_only / note"));
-    assert!(active.contains("use with agent"));
+    assert!(!active.contains("use with agent"));
     assert!(active.contains("&lt;img src=x onerror=&quot;steal()&quot;&gt;"));
     assert!(active.contains("Owner &lt;script&gt;alert(1)&lt;/script&gt;"));
     assert!(!active.contains("<img src=x"));
     assert!(!active.contains("<script>alert"));
 
     note.internal_note.as_mut().unwrap().tombstoned_at = Some(Utc::now());
-    let removed = message_bubble_chat(&note, None, None, scope);
+    let removed = message_bubble_chat(&note, None, scope, RunLinkAccess::Label);
     assert!(removed.contains("This internal note was removed"));
     assert!(removed.contains("removed</span>"));
     assert!(!removed.contains("private customer secret"));
@@ -2569,17 +1815,10 @@ fn message_pane_streams_new_messages_from_where_it_was_rendered() {
         channel: &channel,
         thread: &thread,
         messages: &[mailbox_message(thread.id, "older"), newest.clone()],
-        agent: None,
         viewer_email: &mailbox_account_email(),
-        activity: None,
-        work: None,
-        viewer_principal_id: None,
-        viewer_manages_tasks: false,
-        private_handoff: None,
-        ownership_error: None,
-        owner_candidates: &[],
-        collaboration: None,
-        handoff: None,
+        activity: &Default::default(),
+        error: None,
+        viewer_membership: CompanyMembership::Owner,
     });
 
     // The connection lives on the pane, so every existing pane swap tears it down and rebuilds it
@@ -2610,17 +1849,10 @@ fn message_pane_omits_the_resume_cursor_for_an_empty_thread() {
         channel: &channel,
         thread: &thread,
         messages: &[],
-        agent: None,
         viewer_email: &mailbox_account_email(),
-        activity: None,
-        work: None,
-        viewer_principal_id: None,
-        viewer_manages_tasks: false,
-        private_handoff: None,
-        ownership_error: None,
-        owner_candidates: &[],
-        collaboration: None,
-        handoff: None,
+        activity: &Default::default(),
+        error: None,
+        viewer_membership: CompanyMembership::Owner,
     });
 
     assert!(html.contains(&format!(
@@ -2652,7 +1884,6 @@ fn thread_column_streams_touched_threads_from_where_it_was_rendered() {
         next_cursor: None,
         selected_thread_id: None,
         activity: no_activity(),
-        handoffs: no_handoffs(),
     });
 
     assert!(html.contains("hx-ext=\"sse\""));
@@ -2685,7 +1916,6 @@ fn the_out_of_band_thread_list_stays_live() {
         next_cursor: None,
         selected_thread_id: Some(thread.id),
         activity: no_activity(),
-        handoffs: no_handoffs(),
     });
 
     assert!(oob.contains("hx-swap-oob=\"outerHTML\""));
@@ -2707,7 +1937,6 @@ fn thread_column_omits_the_resume_cursor_for_an_empty_channel() {
         next_cursor: None,
         selected_thread_id: None,
         activity: no_activity(),
-        handoffs: no_handoffs(),
     });
 
     assert!(html.contains(&format!(
@@ -2734,7 +1963,6 @@ fn a_streamed_thread_row_is_identical_to_one_rendered_with_the_column() {
         next_cursor: None,
         selected_thread_id: None,
         activity: no_activity(),
-        handoffs: no_handoffs(),
     });
 
     assert!(
@@ -2826,7 +2054,7 @@ fn a_thread_row_carries_its_own_activity_slot() {
         "a working thread must be distinguishable from an idle one"
     );
     assert!(working.contains(&icon(Icon::DotFill, BUTTON_ICON)));
-    assert!(working.contains(r#"title="Agent replying…""#));
+    assert!(working.contains(r#"title="Agent working…""#));
     assert!(working.contains("animate-pulse"));
 
     // Queued shares the glyph but not the animation: it is picked up within a poll interval, and
@@ -2852,12 +2080,12 @@ fn a_thread_row_carries_its_own_activity_slot() {
         &thread,
         false,
         ThreadRowMarks {
-            activity: Some(ThreadActivity::WaitingApproval),
+            activity: Some(ThreadActivity::AwaitingReview),
             ..ThreadRowMarks::default()
         },
     );
     assert!(blocked.contains(&icon(Icon::Hourglass, BUTTON_ICON)));
-    assert!(blocked.contains(r#"title="Waiting for approval""#));
+    assert!(blocked.contains(r#"title="Awaiting review""#));
     assert!(!blocked.contains("animate-pulse"));
 }
 
@@ -2917,17 +2145,10 @@ fn the_open_thread_is_identifiable_from_the_pane() {
         channel: &channel,
         thread: &thread,
         messages: &[],
-        agent: None,
         viewer_email: &mailbox_account_email(),
-        activity: None,
-        work: None,
-        viewer_principal_id: None,
-        viewer_manages_tasks: false,
-        private_handoff: None,
-        ownership_error: None,
-        owner_candidates: &[],
-        collaboration: None,
-        handoff: None,
+        activity: &Default::default(),
+        error: None,
+        viewer_membership: CompanyMembership::Owner,
     });
 
     assert!(html.contains(&format!(r#"data-thread-id="{}""#, thread.id)));
@@ -2941,27 +2162,38 @@ fn opening_or_receiving_a_message_scrolls_to_the_start_of_the_newest_bubble() {
     assert!(!MAILBOX_SCRIPT.contains("scrollMessagesToBottom"));
 }
 
-/// The spinner is for work actually in progress. A thread parked on an approval gets a badge with
+/// The spinner is for work actually in progress. A run parked on a decision gets a badge with
 /// no spinner — something spinning forever reads as broken rather than blocked.
 #[test]
 fn only_a_running_agent_gets_a_spinner() {
-    let working = thread_activity_strip(Some(ThreadActivity::Working));
+    let working = thread_activity_strip(
+        &test_thread_runs(ThreadActivity::Working),
+        Uuid::nil(),
+        RunLinkAccess::Label,
+    );
     assert!(working.contains("loading loading-dots"));
-    assert!(working.contains("Agent replying"));
+    assert!(working.contains("Agent working"));
 
     for blocked in [
         ThreadActivity::Queued,
-        ThreadActivity::WaitingApproval,
-        ThreadActivity::WaitingReply,
+        ThreadActivity::AwaitingReview,
+        ThreadActivity::NeedsAttention,
+        ThreadActivity::Waiting,
         ThreadActivity::Failed,
     ] {
-        let strip = thread_activity_strip(Some(blocked));
+        let strip = thread_activity_strip(
+            &test_thread_runs(blocked),
+            Uuid::nil(),
+            RunLinkAccess::Label,
+        );
         assert!(!strip.contains("loading"), "{blocked:?} must not spin");
         assert!(strip.contains(blocked.label()));
     }
 
     // An idle thread renders nothing, which is what clears the strip.
-    assert!(thread_activity_strip(None).is_empty());
+    assert!(
+        thread_activity_strip(&Default::default(), Uuid::nil(), RunLinkAccess::Label).is_empty()
+    );
 }
 
 #[test]
@@ -2975,17 +2207,10 @@ fn the_message_pane_has_a_slot_for_the_activity_strip() {
         channel: &channel,
         thread: &thread,
         messages: &[],
-        agent: None,
         viewer_email: &mailbox_account_email(),
-        activity: Some(ThreadActivity::Working),
-        work: None,
-        viewer_principal_id: None,
-        viewer_manages_tasks: false,
-        private_handoff: None,
-        ownership_error: None,
-        owner_candidates: &[],
-        collaboration: None,
-        handoff: None,
+        activity: &test_thread_runs(ThreadActivity::Working),
+        error: None,
+        viewer_membership: CompanyMembership::Owner,
     });
 
     assert!(html.contains(
@@ -3002,58 +2227,28 @@ fn the_message_pane_has_a_slot_for_the_activity_strip() {
 }
 
 #[test]
-fn an_agent_reply_is_drawn_as_the_agent_and_an_inbound_message_as_its_sender() {
+fn an_agent_reply_is_drawn_as_its_channel_address_and_an_inbound_message_as_its_sender() {
     let company = mailbox_company();
     let thread = mailbox_thread(mailbox_channel(company.id).id);
-    let agent = Agent {
-        memory_enabled: false,
-        avatar_url: Some(AvatarUrl::from("https://example.com/triage.png")),
-        ..settings_agent(company.id, "Triage", "triage")
+    let scope = MessageScope {
+        company_id: Uuid::new_v4(),
+        channel_id: Uuid::new_v4(),
     };
 
+    // A reply is stored with the channel's address as its sender, and that is what it shows.
     let reply = stored_email_view(EmailMessageDraft {
         role: MessageRole::Agent,
         direction: MessageDirection::Outbound,
         sender: EmailAddress::from("support@acme.mailagents.com"),
         ..mailbox_message_draft(thread.id, "The reply.")
     });
-    let html = message_bubble_chat(
-        &reply,
-        Some(&agent),
-        None,
-        MessageScope {
-            company_id: Uuid::new_v4(),
-            channel_id: Uuid::new_v4(),
-        },
-    );
-    assert!(html.contains("chat-image"));
-    assert!(html.contains(r#"src="https://example.com/triage.png""#));
-    assert!(html.contains("Triage"));
+    let html = message_bubble_chat(&reply, None, scope, RunLinkAccess::Label);
+    assert!(!html.contains("<img"));
+    assert!(html.contains("support@acme.mailagents.com"));
 
-    // With no single agent behind the channel, the address it was sent from stands in.
-    let anonymous = message_bubble_chat(
-        &reply,
-        None,
-        None,
-        MessageScope {
-            company_id: Uuid::new_v4(),
-            channel_id: Uuid::new_v4(),
-        },
-    );
-    assert!(!anonymous.contains("<img"));
-    assert!(anonymous.contains("support@acme.mailagents.com"));
-
-    // An inbound message is its sender's, whichever agent answers the channel.
+    // An inbound message is its sender's.
     let inbound = mailbox_message(thread.id, "The question.");
-    let inbound_html = message_bubble_chat(
-        &inbound,
-        Some(&agent),
-        None,
-        MessageScope {
-            company_id: Uuid::new_v4(),
-            channel_id: Uuid::new_v4(),
-        },
-    );
+    let inbound_html = message_bubble_chat(&inbound, None, scope, RunLinkAccess::Label);
     assert!(!inbound_html.contains("<img"));
     assert!(inbound_html.contains(inbound.author.display()));
 
@@ -3063,17 +2258,11 @@ fn an_agent_reply_is_drawn_as_the_agent_and_an_inbound_message_as_its_sender() {
 }
 
 /// A message that came in over the internal transport was written by an agent in *another*
-/// channel. Drawing it as this channel's agent would put the wrong name and face on someone else's
-/// work, which is what this pins.
+/// channel, and is marked as such.
 #[test]
 fn a_message_from_another_channel_is_marked_and_keeps_its_own_sender() {
     let company = mailbox_company();
     let thread = mailbox_thread(mailbox_channel(company.id).id);
-    let agent = Agent {
-        memory_enabled: false,
-        avatar_url: Some(AvatarUrl::from("https://example.com/triage.png")),
-        ..settings_agent(company.id, "Triage", "triage")
-    };
     let scope = MessageScope {
         company_id: Uuid::new_v4(),
         channel_id: Uuid::new_v4(),
@@ -3086,33 +2275,30 @@ fn a_message_from_another_channel_is_marked_and_keeps_its_own_sender() {
         sender: EmailAddress::from("legal@acme.mailagents.test"),
         ..mailbox_message_draft(thread.id, "Here is the contract review.")
     });
-    let html = message_bubble_chat(&delegated, Some(&agent), None, scope);
+    let html = message_bubble_chat(&delegated, None, scope, RunLinkAccess::Label);
 
     assert!(html.contains(&icon(Icon::Hubot, BUTTON_ICON)));
     assert!(html.contains(r#"title="From an agent in another channel""#));
-    // The sending channel's address, not the local agent's name or face.
+    // The sending channel's address.
     assert!(html.contains("legal@acme.mailagents.test"));
-    assert!(!html.contains("Triage"));
     assert!(!html.contains("<img"));
     // Still agent-authored, so the body is rendered as markdown and the row's mark still settles.
     assert!(html.contains(r#"data-role="agent""#));
 
-    // This channel's own reply is unchanged: the agent's name and face, and no mark.
+    // This channel's own reply carries no mark.
     let own_reply = ThreadMessageView {
         direction: MessageDirection::Outbound,
         ..delegated.clone()
     };
-    let own_html = message_bubble_chat(&own_reply, Some(&agent), None, scope);
+    let own_html = message_bubble_chat(&own_reply, None, scope, RunLinkAccess::Label);
     assert!(!own_html.contains(&icon(Icon::Hubot, BUTTON_ICON)));
-    assert!(own_html.contains("Triage"));
-    assert!(own_html.contains(r#"src="https://example.com/triage.png""#));
 
     // And an ordinary person's message carries no mark either.
     let from_person = message_bubble_chat(
         &mailbox_message(thread.id, "The question."),
-        Some(&agent),
         None,
         scope,
+        RunLinkAccess::Label,
     );
     assert!(!from_person.contains(&icon(Icon::Hubot, BUTTON_ICON)));
 }
@@ -3194,7 +2380,6 @@ fn the_column_marks_a_delegated_thread_without_being_told() {
         next_cursor: None,
         selected_thread_id: None,
         activity: no_activity(),
-        handoffs: no_handoffs(),
     });
 
     assert!(column.contains(&icon(Icon::Hubot, BUTTON_ICON)));
@@ -3223,7 +2408,6 @@ fn a_reply_in_the_open_thread_quiets_that_thread_s_activity_mark() {
         next_cursor: None,
         selected_thread_id: None,
         activity: no_activity(),
-        handoffs: no_handoffs(),
         detail_html: &detail,
     });
 
@@ -3286,7 +2470,7 @@ fn a_message_renders_for_every_transport_including_none_at_all() {
     };
 
     for message in [&email, &slack, &agent, &schedule] {
-        let html = message_bubble_chat(message, None, None, scope);
+        let html = message_bubble_chat(message, None, scope, RunLinkAccess::Label);
         assert!(
             html.contains(&escape_html_text(&message.body)),
             "the body has to render: {html}"
@@ -3301,11 +2485,11 @@ fn a_message_renders_for_every_transport_including_none_at_all() {
     }
 
     // The badge is what says which interface a turn came from, now that the name does not.
-    assert!(message_bubble_chat(&slack, None, None, scope).contains(">slack<"));
-    assert!(message_bubble_chat(&email, None, None, scope).contains(">email<"));
+    assert!(message_bubble_chat(&slack, None, scope, RunLinkAccess::Label).contains(">slack<"));
+    assert!(message_bubble_chat(&email, None, scope, RunLinkAccess::Label).contains(">email<"));
     // Nothing carried the schedule prompt or the agent's answer, so neither claims one.
     for message in [&agent, &schedule] {
-        let html = message_bubble_chat(message, None, None, scope);
+        let html = message_bubble_chat(message, None, scope, RunLinkAccess::Label);
         assert!(!html.contains(">email<"), "{html}");
         assert!(!html.contains(">slack<"), "{html}");
     }
@@ -3313,6 +2497,44 @@ fn a_message_renders_for_every_transport_including_none_at_all() {
 
 /// A thread page reaches provider identifiers only through a separately authorized request, so the
 /// link is in the HTML and the keys are not.
+/// p08 D4.6, WF-P08-F086: the simulator is the company owner's alone, so only the owner is
+/// offered the way into it; an admin, a member or a stranger would land on a refusal.
+#[test]
+fn only_the_company_owner_is_offered_the_simulator() {
+    let company = mailbox_company();
+    let channel = mailbox_channel(company.id);
+    let thread = mailbox_thread(channel.id);
+    let render = |viewer_membership| {
+        message_pane(&MessagePane {
+            company_id: company.id,
+            channel: &channel,
+            thread: &thread,
+            messages: &[],
+            viewer_email: &mailbox_account_email(),
+            activity: &Default::default(),
+            error: None,
+            viewer_membership,
+        })
+    };
+    let link = format!(
+        "/companies/{}/channels/{}/simulate?thread_id={}",
+        company.id, channel.id, thread.id
+    );
+
+    let owner = render(CompanyMembership::Owner);
+    assert!(owner.contains(&link), "{owner}");
+    assert!(owner.contains("Open in Simulator"));
+    for reader in [
+        CompanyMembership::Admin,
+        CompanyMembership::Member,
+        CompanyMembership::None,
+    ] {
+        let html = render(reader);
+        assert!(!html.contains("/simulate"), "{reader:?}: {html}");
+        assert!(!html.contains("Open in Simulator"), "{reader:?}");
+    }
+}
+
 #[test]
 fn a_thread_page_links_to_the_diagnostic_pane_rather_than_rendering_provider_keys() {
     let company = mailbox_company();
@@ -3326,17 +2548,10 @@ fn a_thread_page_links_to_the_diagnostic_pane_rather_than_rendering_provider_key
         channel: &channel,
         thread: &thread,
         messages: &[message],
-        agent: None,
         viewer_email: &mailbox_account_email(),
-        activity: None,
-        work: None,
-        viewer_principal_id: None,
-        viewer_manages_tasks: false,
-        private_handoff: None,
-        ownership_error: None,
-        owner_candidates: &[],
-        collaboration: None,
-        handoff: None,
+        activity: &Default::default(),
+        error: None,
+        viewer_membership: CompanyMembership::Owner,
     });
 
     assert!(html.contains(&format!(
@@ -3345,35 +2560,6 @@ fn a_thread_page_links_to_the_diagnostic_pane_rather_than_rendering_provider_key
     )));
     assert!(html.contains(r#"id="message-diagnostics-body""#));
     assert!(!html.contains("<live@test.com>"), "{html}");
-}
-
-#[test]
-fn each_message_bubble_links_to_tasks_in_list_view() {
-    let company = mailbox_company();
-    let channel = mailbox_channel(company.id);
-    let thread = mailbox_thread(channel.id);
-    let mut message = mailbox_message(thread.id, "A message.");
-
-    let scope = MessageScope {
-        company_id: company.id,
-        channel_id: channel.id,
-    };
-
-    let html_without_task = message_bubble_chat(&message, None, None, scope);
-    assert!(html_without_task.contains(&format!(
-        r#"href="/ui/tasks?company_id={}&amp;view=list""#,
-        company.id
-    )));
-    assert!(html_without_task.contains(">tasks</a>"));
-
-    let task_id = Uuid::new_v4();
-    message.task_id = Some(task_id);
-    let html_with_task = message_bubble_chat(&message, None, None, scope);
-    assert!(html_with_task.contains(&format!(
-        r#"href="/ui/tasks?company_id={}&amp;view=list&amp;task_id={task_id}""#,
-        company.id
-    )));
-    assert!(html_with_task.contains(">tasks</a>"));
 }
 
 /// The pane names the interface every key belongs to. A bare `Message-ID` identifies nothing: the
@@ -3471,11 +2657,11 @@ fn an_attachment_is_offered_as_a_download_scoped_to_its_thread() {
     let html = message_bubble_chat(
         &message,
         None,
-        None,
         MessageScope {
             company_id: company.id,
             channel_id: channel.id,
         },
+        RunLinkAccess::Label,
     );
 
     // The link is the app's own, carrying the scope the download is authorized against -- never a
@@ -3512,17 +2698,10 @@ fn a_streamed_bubble_is_identical_to_one_rendered_with_the_page() {
         channel: &channel,
         thread: &thread,
         messages: std::slice::from_ref(&message),
-        agent: None,
         viewer_email: &mailbox_account_email(),
-        activity: None,
-        work: None,
-        viewer_principal_id: None,
-        viewer_manages_tasks: false,
-        private_handoff: None,
-        ownership_error: None,
-        owner_candidates: &[],
-        collaboration: None,
-        handoff: None,
+        activity: &Default::default(),
+        error: None,
+        viewer_membership: CompanyMembership::Owner,
     });
 
     // Rendered with the scope the pane itself uses, so the comparison is of the markup rather
@@ -3531,12 +2710,20 @@ fn a_streamed_bubble_is_identical_to_one_rendered_with_the_page() {
         company_id: company.id,
         channel_id: channel.id,
     };
-    assert!(pane.contains(
-        message_bubble_chat(&message, None, Some(&mailbox_account_email()), scope).trim()
-    ));
+    assert!(
+        pane.contains(
+            message_bubble_chat(
+                &message,
+                Some(&mailbox_account_email()),
+                scope,
+                RunLinkAccess::Label
+            )
+            .trim()
+        )
+    );
     assert!(!pane.contains("name=\"quiet\""));
     assert!(pane.contains("hx-post=\"/ui/internal-notes\""));
-    assert!(pane.contains("Private context only. This does not run the agent"));
+    assert!(pane.contains("Private context only. This does not start a run or send anything."));
 }
 
 #[test]
@@ -3598,909 +2785,6 @@ fn compose_pane_shows_the_channel_address_and_errors() {
     assert!(html.contains("alert alert-error"));
     assert!(html.contains("Channel rejected the message"));
     assert!(html.contains("hx-post=\"/ui/compose\""));
-}
-
-/// A fixed machine for pane fixtures. The real one is boot-local off Fly, so a test asserting on
-/// what the pane rendered needs something that does not change between runs.
-fn rendered_machine() -> MachineIdentity {
-    MachineIdentity {
-        id: MachineId::new("fixture-machine"),
-        region: Some(MachineRegion::new("tst")),
-    }
-}
-
-fn monitored_task(company_id: Uuid, channel_id: Uuid, status: TaskStatus) -> BackgroundTask {
-    BackgroundTask {
-        correlation_id: CorrelationId::new(),
-        id: Uuid::new_v4(),
-        company_id,
-        channel_id,
-        thread_id: None,
-        task_type: "email_agent_dispatch".to_string(),
-        status,
-        payload: json!({
-            "execution_result": {
-                "token_usage": { "prompt_tokens": 120, "completion_tokens": 45, "total_tokens": 165 }
-            }
-        }),
-        retry_count: 1,
-        max_retries: 3,
-        last_error: None,
-        business_priority: Default::default(),
-        business_due_at: None,
-        attention_version: 1,
-        ownership: Default::default(),
-        worker_id: None,
-        execution_generation: None,
-        locked_at: None,
-        lock_expires_at: None,
-        run_at: Utc::now(),
-        created_at: Utc::now(),
-        updated_at: Utc::now(),
-    }
-}
-
-#[test]
-fn task_monitor_page_uses_the_ui_shell_and_lights_its_own_rail_icon() {
-    let company = mailbox_company();
-    let channel = mailbox_channel(company.id);
-    let task = monitored_task(company.id, channel.id, TaskStatus::Completed);
-    let filter = TaskFilter::new(
-        Some(channel.id),
-        Some(TaskStatus::Completed),
-        false,
-        None,
-        None,
-    );
-    let email = mailbox_account_email();
-
-    let list = TaskMonitorList {
-        company: &company,
-        tasks: std::slice::from_ref(&task),
-        filter: &filter,
-        has_next: false,
-        selected_task_id: None,
-    };
-    let pane = task_monitor_empty_pane("Select a task.", FragmentSwap::Inline);
-    let html = task_monitor_page(&TaskMonitorPage {
-        user: &mailbox_user(&email),
-        companies: std::slice::from_ref(&company),
-        channels: std::slice::from_ref(&channel),
-        owner_candidates: &[],
-        list: &list,
-        pane_html: &pane,
-    });
-
-    // Same chrome as the other workspaces: its own rail icon lit, the others one click away.
-    assert!(html.contains(&format!(
-        r##"<a href="/ui/tasks?company_id={}" class="btn btn-square btn-md btn-primary"##,
-        company.id
-    )));
-    assert!(html.contains(&format!(
-        r##"<a href="/ui/agents?company_id={}" class="btn btn-square btn-md btn-ghost"##,
-        company.id
-    )));
-    assert!(!html.contains("dropdown-bottom w-full p-3"));
-    assert!(html.contains("id=\"task-pane\""));
-    // The filter form keeps what the request was made with, and it sits outside the swapped list.
-    assert!(html.contains(&format!(
-        r##"<option value="{}" selected>Inbox</option>"##,
-        channel.id
-    )));
-    assert!(html.contains(r##"<option value="completed" selected>Completed</option>"##));
-    assert!(html.contains(r##"<option value="desc" selected>Newest first</option>"##));
-    assert!(html.contains(r##"aria-label="Filter by owner""##));
-    assert!(html.contains(r##"<option value="unassigned">Unassigned</option>"##));
-}
-
-#[test]
-fn task_board_renders_six_columns_toggle_overflow_and_live_chain_pane() {
-    let company = mailbox_company();
-    let channel = mailbox_channel(company.id);
-    let correlation_id = CorrelationId::new();
-    let now = Utc::now();
-    let counts = TaskChainCounts {
-        total_tasks: 2,
-        pending: 1,
-        processing: 1,
-        ..Default::default()
-    };
-    let card = TaskChainCard {
-        correlation_id,
-        stage: ChainStage::Running,
-        title: "Cross-channel rollout".into(),
-        channel_names: vec!["Inbox".into(), "Support".into()],
-        agent_names: vec!["Triage".into(), "Responder".into()],
-        counts,
-        created_at: now,
-        last_activity_at: now,
-        next_action_at: Some(now),
-        retry_count: 1,
-        failure_summary: None,
-    };
-    let mut cards = std::collections::HashMap::new();
-    cards.insert(ChainStage::Running, vec![card]);
-    let mut totals = std::collections::HashMap::new();
-    totals.insert(ChainStage::Running, 51);
-    let board = TaskChainBoard {
-        cards,
-        totals,
-        per_column_limit: 50,
-    };
-    let email = mailbox_account_email();
-    let pane = task_chain_empty_pane("Select a chain.");
-    let html = task_board_page(&TaskBoardPage {
-        user: &mailbox_user(&email),
-        companies: std::slice::from_ref(&company),
-        company: &company,
-        channels: std::slice::from_ref(&channel),
-        board: &board,
-        filter: TaskBoardFilter::new(None, now),
-        selected_correlation_id: Some(correlation_id),
-        pane_html: &pane,
-    });
-
-    for label in [
-        "Queued",
-        "Running",
-        "Waiting Approval",
-        "Waiting Reply",
-        "Completed",
-        "Needs Attention",
-    ] {
-        assert!(html.contains(label), "missing board column {label}");
-    }
-    assert!(html.contains("view=list"));
-    assert!(html.contains("View all 51 in List"));
-    assert!(html.contains("2 Running") || html.contains("1 Running"));
-    assert!(html.contains("1 Queued"));
-    assert!(html.contains("hx-ext=\"sse\""));
-    assert!(html.contains("sse-connect=\"/ui/tasks/events?company_id="));
-    assert!(html.contains("sse-swap=\"task-board\""));
-    assert!(html.contains(&format!("/ui/tasks/chains/{correlation_id}")));
-}
-
-#[test]
-fn board_cards_escape_operator_supplied_channel_and_agent_names() {
-    // Channel and agent names are free text an operator types into the UI, and a board card is the
-    // one place they reach every other operator's browser. Escaping them is the whole test: the
-    // negative assertion is what fails if the escape is ever dropped at the interpolation.
-    let company = mailbox_company();
-    let channel = mailbox_channel(company.id);
-    let correlation_id = CorrelationId::new();
-    let now = Utc::now();
-    let card = TaskChainCard {
-        correlation_id,
-        stage: ChainStage::Running,
-        title: "Cross-channel rollout".into(),
-        channel_names: vec!["<script>alert(1)</script>".into()],
-        agent_names: vec!["Ops & \"Friends\"".into()],
-        counts: TaskChainCounts {
-            total_tasks: 1,
-            processing: 1,
-            ..Default::default()
-        },
-        created_at: now,
-        last_activity_at: now,
-        next_action_at: None,
-        retry_count: 0,
-        failure_summary: Some("<img src=x onerror=alert(2)>".into()),
-    };
-    let mut cards = std::collections::HashMap::new();
-    cards.insert(ChainStage::Running, vec![card]);
-    let board = TaskChainBoard {
-        cards,
-        totals: std::collections::HashMap::new(),
-        per_column_limit: 50,
-    };
-    let email = mailbox_account_email();
-    let pane = task_chain_empty_pane("Select a chain.");
-    let html = task_board_page(&TaskBoardPage {
-        user: &mailbox_user(&email),
-        companies: std::slice::from_ref(&company),
-        company: &company,
-        channels: std::slice::from_ref(&channel),
-        board: &board,
-        filter: TaskBoardFilter::new(None, now),
-        selected_correlation_id: None,
-        pane_html: &pane,
-    });
-
-    assert!(!html.contains("<script>alert(1)</script>"));
-    assert!(!html.contains("<img src=x onerror=alert(2)>"));
-    assert!(html.contains("&lt;script&gt;alert(1)&lt;/script&gt;"));
-    assert!(html.contains("&lt;img src=x onerror=alert(2)&gt;"));
-    assert!(html.contains("Ops &amp; &quot;Friends&quot;"));
-}
-
-#[test]
-fn task_monitor_list_targets_the_pane_and_swaps_out_of_band() {
-    let company = mailbox_company();
-    let channel = mailbox_channel(company.id);
-    let task = monitored_task(company.id, channel.id, TaskStatus::Processing);
-    let filter = TaskFilter::new(None, None, false, Some(2), None);
-
-    let list = TaskMonitorList {
-        company: &company,
-        tasks: std::slice::from_ref(&task),
-        filter: &filter,
-        has_next: true,
-        selected_task_id: Some(task.id),
-    };
-
-    let inline = task_monitor_list(&list, FragmentSwap::Inline);
-    assert!(inline.contains(&format!("/ui/tasks/{}?company_id={}", task.id, company.id)));
-    assert!(inline.contains("hx-target=\"#task-pane\""));
-    assert!(inline.contains("hx-sync=\"#task-pane:replace\""));
-    assert!(inline.contains("menu-active"));
-    assert!(inline.contains("Processing"));
-    assert!(inline.contains("165 tokens"));
-    assert!(!inline.contains("hx-swap-oob"));
-    // Paging keeps the filters it was made under, and stays on the list alone.
-    assert!(inline.contains(&format!(
-        "/ui/tasks/list?company_id={}&view=list&page=3",
-        company.id
-    )));
-    // Newest-first, so "back" is towards the newer end -- and the arrow leads the word.
-    assert!(inline.contains("</svg> Newer"));
-
-    // After a stop or a resume the list rides along on the pane's response.
-    let oob = task_monitor_list(&list, FragmentSwap::OutOfBand);
-    assert!(oob.contains("id=\"task-list\""));
-    assert!(oob.contains("hx-swap-oob=\"outerHTML\""));
-
-    let empty = TaskMonitorList {
-        tasks: &[],
-        has_next: false,
-        selected_task_id: None,
-        ..list
-    };
-    let empty_html = task_monitor_list(&empty, FragmentSwap::Inline);
-    assert!(empty_html.contains("No tasks match these filters"));
-    assert!(!empty_html.contains("Older <svg"));
-}
-
-#[test]
-fn task_detail_pane_offers_the_action_the_status_allows() {
-    let company = mailbox_company();
-    let channel = mailbox_channel(company.id);
-    let thread_id = Uuid::new_v4();
-    let task = BackgroundTask {
-        thread_id: Some(thread_id),
-        last_error: Some("provider timed out".to_string()),
-        ..monitored_task(company.id, channel.id, TaskStatus::Failed)
-    };
-
-    let html = task_detail_pane(&TaskDetailPane {
-        harness_diagnostics: None,
-        harness_diagnostics_error: None,
-        deliveries: &[],
-        delivery_error: None,
-        attempts: &[],
-        attempts_error: None,
-        company_id: company.id,
-        task: &task,
-        channel: Some(&channel),
-        error: Some("Failed to stop task: worker unreachable"),
-        ownership_events: &[],
-        owner_candidates: &[],
-        collaboration: None,
-        delegation_channels: &[],
-    });
-
-    assert!(html.contains("id=\"task-pane\""));
-    assert!(html.contains(&format!(
-        "hx-post=\"/ui/tasks/{}/stop?company_id={}\"",
-        task.id, company.id
-    )));
-    assert!(!html.contains("/resume?"));
-    // A task with a thread is read in the mailbox, not in the classic simulator.
-    assert!(html.contains(&format!(
-        "/ui?company_id={}&channel_id={}&thread_id={}",
-        company.id, channel.id, thread_id
-    )));
-    assert!(html.contains("provider timed out"));
-    assert!(html.contains("Failed to stop task: worker unreachable"));
-    assert!(html.contains("Retries"));
-    assert!(html.contains("165"));
-    // The payload block is the one the simulator already renders, secrets scrubbed and all.
-    assert!(html.contains("Task Execution Parameters"));
-
-    // A stopped task is the other way round: resume, and nothing to stop.
-    let stopped = BackgroundTask {
-        status: TaskStatus::Stopped,
-        ..monitored_task(company.id, channel.id, TaskStatus::Stopped)
-    };
-    let stopped_html = task_detail_pane(&TaskDetailPane {
-        harness_diagnostics: None,
-        harness_diagnostics_error: None,
-        company_id: company.id,
-        task: &stopped,
-        channel: None,
-        deliveries: &[],
-        delivery_error: None,
-        attempts: &[],
-        attempts_error: None,
-        error: None,
-        ownership_events: &[],
-        owner_candidates: &[],
-        collaboration: None,
-        delegation_channels: &[],
-    });
-    assert!(stopped_html.contains(&format!("/ui/tasks/{}/resume", stopped.id)));
-    assert!(!stopped_html.contains("/stop?"));
-    // A task whose channel is gone still renders, falling back to the raw id.
-    assert!(stopped_html.contains(&stopped.channel_id.to_string()));
-}
-
-/// One outreach still waiting on one external recipient — the state every delegation control is
-/// drawn for.
-fn waiting_external_outreach(task: &BackgroundTask) -> CollaborationSummary {
-    let now = Utc::now();
-    CollaborationSummary {
-        task_id: task.id,
-        outreach_id: Some(Uuid::new_v4()),
-        outreach_version: Some(7),
-        correlation_id: task.correlation_id,
-        owner: CollaborationOwner {
-            kind: CollaborationOwnerKind::Agent,
-            principal_id: Some(PrincipalId::random()),
-            label: "Triage".into(),
-            available: true,
-        },
-        status: OutreachBusinessStatus::Waiting,
-        progress: Some(CollaborationProgress {
-            responded: 0,
-            required: 1,
-            total: 1,
-        }),
-        expires_at: Some(now + chrono::Duration::hours(96)),
-        next_action: None,
-        children: vec![CollaborationTargetSummary {
-            id: Uuid::new_v4(),
-            target: CollaborationTarget::External {
-                identity: qualified_email_identity("vendor@example.test").unwrap(),
-            },
-            label: "vendor@example.test".into(),
-            status: TargetBusinessStatus::Waiting,
-            responded_at: None,
-            next_action: None,
-            child: None,
-        }],
-        as_of: now,
-        truncated: false,
-        detail_href: None,
-    }
-}
-
-#[test]
-fn task_detail_delegation_controls_name_irreversible_external_consequences() {
-    let company = mailbox_company();
-    let channel = mailbox_channel(company.id);
-    let task = monitored_task(
-        company.id,
-        channel.id,
-        TaskStatus::WaitingForThirdPartyReply,
-    );
-    let summary = waiting_external_outreach(&task);
-    let html = task_detail_pane(&TaskDetailPane {
-        harness_diagnostics: None,
-        harness_diagnostics_error: None,
-        company_id: company.id,
-        task: &task,
-        channel: Some(&channel),
-        deliveries: &[],
-        delivery_error: None,
-        attempts: &[],
-        attempts_error: None,
-        error: None,
-        ownership_events: &[],
-        owner_candidates: &[],
-        collaboration: Some(&summary),
-        delegation_channels: std::slice::from_ref(&channel),
-    });
-    assert!(html.contains("Delegation controls"));
-    assert!(html.contains("expected_version\" value=\"7"));
-    assert!(html.contains("Cancel waiting"));
-    assert!(html.contains("Cancel outreach waiting"));
-    assert!(html.contains("Stop task"));
-    assert!(html.contains("may already have been received"));
-    assert!(html.contains("do not recall email"));
-    assert!(!html.to_lowercase().contains("recall email</button>"));
-    assert!(html.contains("hx-target=\"#task-pane\""));
-}
-
-/// Every label a surface offers, in the order it offers them.
-fn button_labels(html: &str) -> Vec<&str> {
-    html.split("<button")
-        .skip(1)
-        .filter_map(|button| button.split_once('>'))
-        .filter_map(|(_, rest)| rest.split_once("</button>"))
-        .map(|(label, _)| label)
-        .collect()
-}
-
-/// The two surfaces render from one source, so an operator cannot be told a control does one thing
-/// in the Tasks workspace and another in their mailbox. Only the route and the swap target differ.
-#[test]
-fn both_delegation_surfaces_offer_the_same_controls_in_the_same_words() {
-    let company = mailbox_company();
-    let channel = mailbox_channel(company.id);
-    let task = monitored_task(
-        company.id,
-        channel.id,
-        TaskStatus::WaitingForThirdPartyReply,
-    );
-    let summary = waiting_external_outreach(&task);
-
-    let workspace = delegation_control_forms(
-        &summary,
-        &DelegationSurface {
-            action_prefix: &format!("/ui/tasks/{}/delegation", task.id),
-            action_suffix: "?company_id=x&amp;view=list",
-            target: "#task-pane",
-            scope_fields: "",
-            reassign_channels: &[],
-        },
-    );
-    let mailbox = delegation_control_forms(
-        &summary,
-        &DelegationSurface {
-            action_prefix: &format!("/ui/task-delegation/{}", task.id),
-            action_suffix: "",
-            target: "#detail-pane",
-            scope_fields: r#"<input type="hidden" name="thread_id" value="t">"#,
-            reassign_channels: &[],
-        },
-    );
-
-    assert_eq!(button_labels(&workspace), button_labels(&mailbox));
-    for warning in [
-        "do not recall email",
-        "may already have been received",
-        "Cancels an unsent delivery when possible",
-    ] {
-        assert!(workspace.contains(warning), "{warning} left the task pane");
-        assert!(mailbox.contains(warning), "{warning} left the mailbox");
-    }
-    assert!(mailbox.contains(&format!(
-        r##"hx-post="/ui/task-delegation/{}/cancel-outreach" hx-target="#detail-pane""##,
-        task.id
-    )));
-    assert!(!mailbox.contains("#task-pane"));
-    assert!(!workspace.contains("thread_id"));
-}
-
-/// A teammate holding a task may recover its delegation from the thread it happened on, without
-/// administering the company. Resolving the authority is the route's job — the pane's job is to
-/// draw the controls only for someone who has one, and to carry the fence and the scope the route
-/// re-checks.
-#[test]
-fn the_mailbox_offers_delegation_controls_to_the_task_owner_and_to_a_manager() {
-    let company = mailbox_company();
-    let channel = mailbox_channel(company.id);
-    let thread = mailbox_thread(channel.id);
-    let task = monitored_task(
-        company.id,
-        channel.id,
-        TaskStatus::WaitingForThirdPartyReply,
-    );
-    let summary = waiting_external_outreach(&task);
-    let owner = PrincipalId::random();
-    let work = ThreadWorkSummary {
-        task_id: task.id,
-        ownership: crate::entities::task::TaskOwnership {
-            owner: TaskOwner::Human(owner),
-            version: 4,
-        },
-        owner_label: Some("Dana".into()),
-        activity: Some(ThreadActivity::WaitingReply),
-    };
-    let pane = |viewer: Option<PrincipalId>, manages: bool| {
-        message_pane(&MessagePane {
-            company_id: company.id,
-            channel: &channel,
-            thread: &thread,
-            messages: &[],
-            agent: None,
-            viewer_email: &mailbox_account_email(),
-            activity: Some(ThreadActivity::WaitingReply),
-            work: Some(work.clone()),
-            viewer_principal_id: viewer,
-            viewer_manages_tasks: manages,
-            private_handoff: None,
-            ownership_error: None,
-            owner_candidates: &[],
-            collaboration: Some(&summary),
-            handoff: None,
-        })
-    };
-
-    let as_owner = pane(Some(owner), false);
-    assert!(as_owner.contains("Delegation controls"));
-    assert!(as_owner.contains("Extend deadline"));
-    assert!(as_owner.contains("Cancel waiting"));
-    assert!(as_owner.contains("Cancel outreach waiting"));
-    assert!(as_owner.contains("Stop task"));
-    // The outreach version it was drawn against, and the scope the route re-loads the task through.
-    assert!(as_owner.contains(r#"name="expected_version" value="7""#));
-    assert!(as_owner.contains(&format!(r#"name="thread_id" value="{}""#, thread.id)));
-    assert!(as_owner.contains(&format!(r#"name="channel_id" value="{}""#, channel.id)));
-    assert!(as_owner.contains(&format!(
-        r#"hx-post="/ui/task-delegation/{}/extend""#,
-        task.id
-    )));
-    // Reassignment needs the company's channel list, which this pane does not load.
-    assert!(!as_owner.contains("Reassign"));
-
-    // A manager reading someone else's thread keeps the controls; an ordinary teammate who holds
-    // nothing, and a reader with no principal at all, get none.
-    assert!(pane(Some(PrincipalId::random()), true).contains("Delegation controls"));
-    for hidden in [
-        pane(Some(PrincipalId::random()), false),
-        pane(None, false),
-        pane(None, true),
-    ] {
-        assert!(!hidden.contains("Delegation controls"));
-        assert!(!hidden.contains("/ui/task-delegation/"));
-    }
-}
-
-/// Nothing is left to act on once the outreach is finished, so the panel disappears rather than
-/// offering a command the fence would reject.
-#[test]
-fn a_settled_outreach_draws_no_delegation_controls_in_either_surface() {
-    let company = mailbox_company();
-    let channel = mailbox_channel(company.id);
-    let thread = mailbox_thread(channel.id);
-    let task = monitored_task(company.id, channel.id, TaskStatus::Completed);
-    let owner = PrincipalId::random();
-
-    for status in [
-        OutreachBusinessStatus::Completed,
-        OutreachBusinessStatus::Cancelled,
-    ] {
-        let summary = CollaborationSummary {
-            status,
-            ..waiting_external_outreach(&task)
-        };
-        let html = message_pane(&MessagePane {
-            company_id: company.id,
-            channel: &channel,
-            thread: &thread,
-            messages: &[],
-            agent: None,
-            viewer_email: &mailbox_account_email(),
-            activity: None,
-            work: Some(ThreadWorkSummary {
-                task_id: task.id,
-                ownership: crate::entities::task::TaskOwnership {
-                    owner: TaskOwner::Human(owner),
-                    version: 4,
-                },
-                owner_label: Some("Dana".into()),
-                activity: None,
-            }),
-            viewer_principal_id: Some(owner),
-            viewer_manages_tasks: true,
-            private_handoff: None,
-            ownership_error: None,
-            owner_candidates: &[],
-            collaboration: Some(&summary),
-            handoff: None,
-        });
-        assert!(!html.contains("Delegation controls"), "{status:?}");
-    }
-}
-
-#[test]
-fn released_task_collaboration_status_asks_a_manager_to_assign_an_owner() {
-    let now = Utc::now();
-    let summary = CollaborationSummary {
-        task_id: Uuid::new_v4(),
-        outreach_id: None,
-        outreach_version: None,
-        correlation_id: CorrelationId::new(),
-        owner: CollaborationOwner {
-            kind: CollaborationOwnerKind::Unassigned,
-            principal_id: None,
-            label: "Unassigned".into(),
-            available: true,
-        },
-        status: OutreachBusinessStatus::ReadyToResume,
-        progress: None,
-        expires_at: None,
-        next_action: Some(CollaborationNextAction {
-            actor: NextActionActor::CompanyManager,
-            action: NextActionKind::AssignTaskOwner,
-            due_at: None,
-            href: None,
-        }),
-        children: Vec::new(),
-        as_of: now,
-        truncated: false,
-        detail_href: None,
-    };
-
-    let html = collaboration_status(&summary);
-
-    assert!(html.contains("company manager must assign an available owner"));
-    assert!(!html.contains("task queue must resume the task"));
-}
-
-#[test]
-fn task_detail_pane_surfaces_execution_history_metadata_and_load_failures() {
-    let company = mailbox_company();
-    let channel = mailbox_channel(company.id);
-    let started_at = Utc::now() - chrono::Duration::seconds(3);
-    let generation = Uuid::new_v4();
-    let mut task = monitored_task(company.id, channel.id, TaskStatus::Processing);
-    task.worker_id = Some(Uuid::new_v4());
-    task.execution_generation = Some(generation);
-    task.locked_at = Some(started_at);
-    task.lock_expires_at = Some(Utc::now() + chrono::Duration::minutes(5));
-    task.payload = json!({
-        "execution_parameters": {
-            "provider": "openai<script>",
-            "model": "gpt-test",
-            "agent_name": "Triage",
-            "executed_at": started_at.to_rfc3339(),
-        },
-        "execution_result": {
-            "email_sent": true,
-            "outbound_message_id": "message-123",
-            "token_usage": { "prompt_tokens": 5, "completion_tokens": 6, "total_tokens": 11 },
-            "metadata": {
-                "finish_reason": "end_turn",
-                "execution_diagnostics": {
-                    "duration_ms": 1250,
-                    "tool_call_count": 2,
-                    "response_characters": 800,
-                    "token_usage_source": "provider"
-                },
-                "observability": { "summary": { "total_events": 9, "total_llm_calls": 2 } }
-            }
-        }
-    });
-    // Two runs of the same task on different workers: the ledger has to keep them apart, which is
-    // the whole reason it records a worker at all.
-    let first_worker = Uuid::new_v4();
-    let second_worker = Uuid::new_v4();
-    let attempts = [
-        TaskAttemptRecord {
-            attempt_number: 1,
-            status: TaskAttemptRecordStatus::Failed,
-            error: Some("provider timed out <unsafe>".to_string()),
-            stop_reason: Some(TaskStopReason::TimedOut),
-            prompt_tokens: Some(100),
-            completion_tokens: Some(20),
-            result: Some(json!({ "api_key": "do-not-render", "note": "first run" })),
-            started_at,
-            finished_at: Some(started_at + chrono::Duration::seconds(2)),
-            execution_generation: Uuid::new_v4(),
-            worker_id: first_worker,
-            machine: rendered_machine(),
-        },
-        TaskAttemptRecord {
-            attempt_number: 2,
-            status: TaskAttemptRecordStatus::Processing,
-            error: None,
-            stop_reason: None,
-            prompt_tokens: Some(5),
-            completion_tokens: Some(6),
-            result: None,
-            started_at,
-            finished_at: None,
-            execution_generation: generation,
-            worker_id: second_worker,
-            machine: rendered_machine(),
-        },
-    ];
-
-    let html = task_detail_pane(&TaskDetailPane {
-        harness_diagnostics: None,
-        harness_diagnostics_error: None,
-        company_id: company.id,
-        task: &task,
-        channel: Some(&channel),
-        deliveries: &[],
-        delivery_error: Some("Delivery details could not be loaded: database unavailable"),
-        attempts: &attempts,
-        attempts_error: Some("Execution attempts were partially unavailable"),
-        error: None,
-        ownership_events: &[],
-        owner_candidates: &[],
-        collaboration: None,
-        delegation_channels: &[],
-    });
-
-    assert!(html.contains("Latest execution"));
-    assert!(html.contains("openai&lt;script&gt;"));
-    assert!(!html.contains("openai<script>"));
-    assert!(html.contains("gpt-test"));
-    assert!(html.contains("1.25 s"));
-    assert!(html.contains("end_turn"));
-    assert!(html.contains("Tool calls"));
-    assert!(html.contains("Execution attempts"));
-    assert!(html.contains("Attempt 1"));
-    assert!(html.contains("Attempt 2"));
-    assert!(html.contains("timed_out"));
-    assert!(html.contains("131 tokens"));
-    assert!(html.contains("All attempts"));
-    assert!(html.contains("125"));
-    assert!(html.contains("***masked***"));
-    assert!(!html.contains("do-not-render"));
-    assert!(html.contains("provider timed out &lt;unsafe&gt;"));
-    assert!(html.contains("Queue diagnostics"));
-    assert!(html.contains(&task.correlation_id.to_string()));
-    assert!(html.contains(&generation.to_string()));
-    assert!(html.contains("Delivery details could not be loaded"));
-    assert!(html.contains("Execution attempts were partially unavailable"));
-    // Each attempt names the run that made it, and the machine it ran on.
-    assert!(html.contains(&short_id(first_worker)));
-    assert!(html.contains(&short_id(second_worker)));
-    assert!(html.contains("fixture-machine · tst"));
-}
-
-#[test]
-fn task_monitor_displays_same_execution_data_fields_for_scheduled_agent_run() {
-    let company = mailbox_company();
-    let channel = mailbox_channel(company.id);
-    let started_at = Utc::now() - chrono::Duration::seconds(30);
-    let generation = Uuid::new_v4();
-    let thread_id = Uuid::new_v4();
-
-    let task = BackgroundTask {
-        correlation_id: CorrelationId::new(),
-        id: Uuid::new_v4(),
-        company_id: company.id,
-        channel_id: channel.id,
-        thread_id: Some(thread_id),
-        task_type: "scheduled_agent_run".to_string(),
-        status: TaskStatus::Completed,
-        payload: json!({
-            "schedule_id": Uuid::new_v4(),
-            "schedule_name": "Daily Summary",
-            "prompt": "Summarize yesterday's tickets",
-            "execution_parameters": {
-                "provider": "anthropic",
-                "model": "claude-3-5-sonnet",
-                "agent_name": "Summary Agent",
-                "executed_at": started_at.to_rfc3339(),
-            },
-            "execution_result": {
-                "response": "Here is the summary of yesterday's tickets.",
-                "email_sent": true,
-                "reply_message_id": "reply-msg-456",
-                "outbound_message_id": "reply-msg-456",
-                "token_usage": { "prompt_tokens": 80, "completion_tokens": 40, "total_tokens": 120 },
-                "metadata": {
-                    "finish_reason": "end_turn",
-                    "execution_diagnostics": {
-                        "duration_ms": 1500,
-                        "tool_call_count": 3,
-                        "response_characters": 500,
-                        "token_usage_source": "provider"
-                    },
-                    "observability": { "summary": { "total_events": 5, "total_llm_calls": 1 } }
-                }
-            }
-        }),
-        retry_count: 0,
-        max_retries: 3,
-        last_error: None,
-        business_priority: Default::default(),
-        business_due_at: None,
-        attention_version: 1,
-        ownership: Default::default(),
-        worker_id: Some(Uuid::new_v4()),
-        execution_generation: Some(generation),
-        locked_at: None,
-        lock_expires_at: None,
-        run_at: started_at,
-        created_at: started_at,
-        updated_at: started_at + chrono::Duration::seconds(2),
-    };
-
-    assert_eq!(task.token_usage().unwrap().total_tokens, 120);
-
-    let filter = TaskFilter::new(None, None, false, None, None);
-    let list = TaskMonitorList {
-        company: &company,
-        tasks: std::slice::from_ref(&task),
-        filter: &filter,
-        has_next: false,
-        selected_task_id: Some(task.id),
-    };
-
-    let list_html = task_monitor_list(&list, FragmentSwap::Inline);
-    assert!(list_html.contains("scheduled_agent_run"));
-    assert!(list_html.contains("120 tokens"));
-
-    let attempts = [TaskAttemptRecord {
-        attempt_number: 1,
-        status: TaskAttemptRecordStatus::Completed,
-        error: None,
-        stop_reason: Some(TaskStopReason::Completed),
-        prompt_tokens: Some(80),
-        completion_tokens: Some(40),
-        result: None,
-        started_at,
-        finished_at: Some(started_at + chrono::Duration::seconds(2)),
-        execution_generation: generation,
-        worker_id: Uuid::new_v4(),
-        machine: rendered_machine(),
-    }];
-
-    let pane_html = task_detail_pane(&TaskDetailPane {
-        harness_diagnostics: None,
-        harness_diagnostics_error: None,
-        company_id: company.id,
-        task: &task,
-        channel: Some(&channel),
-        deliveries: &[],
-        delivery_error: None,
-        attempts: &attempts,
-        attempts_error: None,
-        error: None,
-        ownership_events: &[],
-        owner_candidates: &[],
-        collaboration: None,
-        delegation_channels: &[],
-    });
-
-    // Verify token stats
-    assert!(pane_html.contains("120"));
-    assert!(pane_html.contains("80"));
-    assert!(pane_html.contains("40"));
-
-    // Verify latest execution card data fields
-    assert!(pane_html.contains("Provider"));
-    assert!(pane_html.contains("anthropic"));
-    assert!(pane_html.contains("Model"));
-    assert!(pane_html.contains("claude-3-5-sonnet"));
-    assert!(pane_html.contains("Agent"));
-    assert!(pane_html.contains("Summary Agent"));
-    assert!(pane_html.contains("1.50 s"));
-    assert!(pane_html.contains("end_turn"));
-    assert!(pane_html.contains("reply-msg-456"));
-
-    // Verify execution attempts
-    assert!(pane_html.contains("120 tokens"));
-    assert!(pane_html.contains("Completed"));
-
-    // Verify task thread link
-    assert!(pane_html.contains("Open Thread"));
-}
-
-#[test]
-fn task_filter_clamps_paging_and_probes_for_a_next_page() {
-    let filter = TaskFilter::new(None, None, false, Some(0), Some(1000));
-    assert_eq!(filter.page(), 1);
-    assert_eq!(filter.limit(), TaskFilter::MAX_PAGE_SIZE);
-    assert_eq!(filter.offset(), 0);
-
-    let third = TaskFilter::new(None, None, false, Some(3), Some(25));
-    assert_eq!(third.offset(), 50);
-    assert_eq!(third.probe_limit(), 26);
-    assert_eq!(third.on_page(0).page(), 1);
-
-    let company_id = Uuid::new_v4();
-    let channel_id = Uuid::new_v4();
-    let probed: Vec<BackgroundTask> = (0..26)
-        .map(|_| monitored_task(company_id, channel_id, TaskStatus::Completed))
-        .collect();
-    let (page, has_next) = third.split_probe(probed);
-    assert_eq!(page.len(), 25);
-    assert!(has_next);
-
-    let (short_page, no_next) = third.split_probe(vec![monitored_task(
-        company_id,
-        channel_id,
-        TaskStatus::Completed,
-    )]);
-    assert_eq!(short_page.len(), 1);
-    assert!(!no_next);
 }
 
 fn settings_company(name: &str, slug: &str) -> Company {
@@ -4573,7 +2857,7 @@ fn company_settings_page_without_a_company_still_offers_the_create_form() {
 
 #[test]
 fn legacy_company_form_does_not_collect_ignored_model_credentials() {
-    let html = companies_page(&[], &ConfiguredMemoryProviders::default());
+    let html = companies_page(&[]);
 
     assert!(!html.contains("company_api_key"));
     assert!(!html.contains("company_provider"));
@@ -4807,7 +3091,6 @@ fn a_rejected_company_save_keeps_the_picture_that_was_picked() {
     // `<img src>` the bubble draws.
     let tampered = CompanyDraft {
         avatar_url: "javascript:alert(1)",
-        memory_provider: "",
         ..CompanyDraft::default()
     };
     let refused = company_create_pane(&CompanyCreatePane {
@@ -4824,7 +3107,6 @@ fn company_edit_pane_keeps_a_rejected_save_in_the_form() {
         name: "Acme Renamed",
         slug: "acme-renamed",
         avatar_url: "",
-        memory_provider: "",
         model_connections: Vec::new(),
         ..CompanyDraft::default()
     };
@@ -5042,7 +3324,6 @@ fn the_member_pane_offers_remove_to_the_owner_and_never_for_the_owner() {
         role: TeamRole::Owner,
         viewer_id: Uuid::new_v4(),
         avatar_draft: None,
-        work_at_stake: None,
         error: None,
     });
     assert!(removable.contains(&removal_endpoint));
@@ -5062,7 +3343,6 @@ fn the_member_pane_offers_remove_to_the_owner_and_never_for_the_owner() {
         role: TeamRole::Owner,
         viewer_id: Uuid::new_v4(),
         avatar_draft: None,
-        work_at_stake: None,
         error: None,
     });
     assert!(!owner_pane.contains("/removal"));
@@ -5078,186 +3358,11 @@ fn the_member_pane_offers_remove_to_the_owner_and_never_for_the_owner() {
         role: TeamRole::Member,
         viewer_id: Uuid::new_v4(),
         avatar_draft: None,
-        work_at_stake: None,
         error: None,
     });
     assert!(!read_only.contains("/removal"));
     assert!(!read_only.contains("Access Role"));
     assert!(read_only.contains("Only the company owner"));
-
-    // An empty pre-check is the common case and must read exactly like no pre-check at all.
-    let nothing_live = member_pane(&MemberPane {
-        company: &company,
-        member: &sam,
-        role: TeamRole::Owner,
-        viewer_id: Uuid::new_v4(),
-        avatar_draft: None,
-        work_at_stake: Some(&MemberWorkAtStake::default()),
-        error: None,
-    });
-    assert!(nothing_live.contains(&removal_endpoint));
-    assert!(!nothing_live.contains("Live work to hand over"));
-    assert!(
-        !nothing_live.contains(r#"name="owner""#),
-        "nothing to decide, so no decision is offered"
-    );
-}
-
-/// Live work makes the removal carry one decision — not a form per item.
-///
-/// One owner picker for every item, one shared handoff field, and the asks listed as what the same
-/// click re-asks at that owner. Every option names somebody: there is no "unassign all", so an
-/// empty candidate list is a dead end the pane explains rather than a third option. The Remove
-/// button stays: it is the thing that applies the choice, so there is no state where the admin has
-/// resolved some items and is waiting for a button to unlock.
-#[test]
-fn the_member_pane_asks_one_question_and_removes_in_one_click() {
-    let company = mailbox_company();
-    let sam = team_member(company.id, Uuid::new_v4(), "sam", "member");
-    let colleague = PrincipalId::new(Uuid::new_v4());
-    let task = OwnedTaskAtStake {
-        task_id: Uuid::new_v4(),
-        channel_id: Uuid::new_v4(),
-        correlation_id: Uuid::new_v4(),
-        task_type: "agent_run".into(),
-        status: TaskStatus::Processing,
-        ownership_version: 4,
-    };
-    let ask = DelegatedAskAtStake {
-        task_id: Uuid::new_v4(),
-        channel_id: Uuid::new_v4(),
-        outreach_id: Uuid::new_v4(),
-        target_id: Uuid::new_v4(),
-        outreach_version: 2,
-        subject: "Can you confirm the invoice?".into(),
-        asked_address: "sam@example.com".into(),
-        expires_at: Utc::now(),
-    };
-    let at_stake = MemberWorkAtStake {
-        owned_tasks: vec![task.clone()],
-        delegated_asks: vec![ask.clone()],
-        owner_candidates: vec![TaskOwnerCandidate {
-            owner: TaskOwner::Human(colleague),
-            label: "Dana".into(),
-        }],
-        truncated: false,
-    };
-
-    let pane = member_pane(&MemberPane {
-        company: &company,
-        member: &sam,
-        role: TeamRole::Owner,
-        viewer_id: Uuid::new_v4(),
-        avatar_draft: None,
-        work_at_stake: Some(&at_stake),
-        error: None,
-    });
-
-    // One submission, carrying the decision and doing the removal.
-    assert!(pane.contains(&format!(
-        r##"hx-post="/ui/companies/{}/team/members/{}/removal""##,
-        company.id, sam.user_id
-    )));
-    assert_eq!(
-        pane.matches("<form").count(),
-        2,
-        "the access-role form and the removal form, and no per-item form: {pane}"
-    );
-    assert!(pane.contains("Live work to hand over (2)"));
-    assert!(pane.contains("Remove from Team"));
-    assert!(
-        pane.contains("1 active task(s) and 1 pending ask(s) to them move to your chosen owner"),
-        "the confirm says what the one click does: {pane}"
-    );
-
-    // One owner picker for everything at stake, and every option in it names somebody.
-    assert_eq!(
-        pane.matches(r#"name="owner""#).count(),
-        1,
-        "exactly one decision point"
-    );
-    assert!(pane.contains("New owner for all 2 of sam's live item(s)"));
-    assert!(
-        !pane.contains(r#"value="unassigned""#),
-        "there is no unassign option left: {pane}"
-    );
-    assert!(pane.contains(&format!(
-        r#"<option value="human:{}">Dana</option>"#,
-        colleague.as_uuid()
-    )));
-    assert_eq!(
-        pane.matches(r#"name="handoff_instruction""#).count(),
-        1,
-        "one handoff instruction, shared by every task"
-    );
-
-    // The items themselves are listed for reading, with no control of their own.
-    assert!(pane.contains("agent_run"));
-    assert!(
-        pane.contains("1 pending ask(s) to this person will be redirected to the chosen owner.")
-    );
-    assert!(pane.contains("Can you confirm the invoice?"));
-    assert!(!pane.contains("Stop waiting on them"));
-    assert!(!pane.contains("will be cancelled"));
-    assert!(!pane.contains("/work/task/transfer"));
-    assert!(!pane.contains("/work/delegation"));
-
-    // Only asks at stake: still one decision, because an ask now needs a taker too.
-    let asks_only = MemberWorkAtStake {
-        owned_tasks: Vec::new(),
-        delegated_asks: vec![ask.clone()],
-        owner_candidates: at_stake.owner_candidates.clone(),
-        truncated: false,
-    };
-    let redirects_only = member_pane(&MemberPane {
-        company: &company,
-        member: &sam,
-        role: TeamRole::Owner,
-        viewer_id: Uuid::new_v4(),
-        avatar_draft: None,
-        work_at_stake: Some(&asks_only),
-        error: None,
-    });
-    assert_eq!(redirects_only.matches(r#"name="owner""#).count(), 1);
-    assert!(redirects_only.contains("New owner for all 1 of sam's live item(s)"));
-    assert!(
-        redirects_only
-            .contains("1 pending ask(s) to this person will be redirected to the chosen owner.")
-    );
-    assert!(redirects_only.contains("Remove from Team"));
-
-    // No eligible owner on every affected channel: no picker at all, and the pane says why the
-    // removal cannot go ahead rather than offering to leave the work to nobody.
-    let no_candidates = MemberWorkAtStake {
-        owner_candidates: Vec::new(),
-        ..at_stake.clone()
-    };
-    let blocked = member_pane(&MemberPane {
-        company: &company,
-        member: &sam,
-        role: TeamRole::Owner,
-        viewer_id: Uuid::new_v4(),
-        avatar_draft: None,
-        work_at_stake: Some(&no_candidates),
-        error: None,
-    });
-    assert!(!blocked.contains(r#"name="owner""#), "{blocked}");
-    assert!(!blocked.contains(r#"value="unassigned""#));
-    assert!(blocked.contains("cannot be removed yet"), "{blocked}");
-
-    // A member with no authority to remove anybody is shown none of it.
-    let read_only = member_pane(&MemberPane {
-        company: &company,
-        member: &sam,
-        role: TeamRole::Member,
-        viewer_id: Uuid::new_v4(),
-        avatar_draft: None,
-        work_at_stake: Some(&at_stake),
-        error: None,
-    });
-    assert!(!read_only.contains("Live work to hand over"));
-    assert!(!read_only.contains(r#"name="owner""#));
-    assert!(!read_only.contains("Remove from Team"));
 }
 
 #[test]
@@ -5336,7 +3441,6 @@ fn each_agent_form_owns_its_own_picker() {
     assert!(!create.contains(r#"type="url" name="avatar_url""#));
 
     let agent = Agent {
-        memory_enabled: false,
         avatar_url: Some(AvatarUrl::from("https://cdn.example.com/bot.png")),
         ..settings_agent(company.id, "Triage", "triage")
     };
@@ -5345,11 +3449,9 @@ fn each_agent_form_owns_its_own_picker() {
         app_domain_name: "mail.test",
         model_connections: &[],
         agent: &agent,
-        used_by: &[],
         draft: None,
         error: None,
         capability_options: AgentCapabilityOptions::default(),
-        body: AgentPaneBody::Settings,
     });
     assert!(edit.contains(&format!(r#"id="agent-avatar-{}""#, agent.id)));
     assert!(edit.contains(
@@ -5373,7 +3475,6 @@ fn only_your_own_member_pane_offers_the_avatar_field() {
         role: TeamRole::Member,
         viewer_id: dana.user_id,
         avatar_draft: None,
-        work_at_stake: None,
         error: None,
     });
     assert!(own.contains(&format!(
@@ -5396,7 +3497,6 @@ fn only_your_own_member_pane_offers_the_avatar_field() {
         role: TeamRole::Owner,
         viewer_id: company.user_id,
         avatar_draft: None,
-        work_at_stake: None,
         error: None,
     });
     assert!(!someone_else.contains("/avatar\""));
@@ -5409,7 +3509,6 @@ fn only_your_own_member_pane_offers_the_avatar_field() {
         role: TeamRole::Member,
         viewer_id: dana.user_id,
         avatar_draft: Some("javascript:alert(1)"),
-        work_at_stake: None,
         error: Some("An avatar URL must start with http:// or https://."),
     });
     // ...but never as something a page would render: a draft that is not an `http` URL is shown
@@ -5506,80 +3605,13 @@ fn the_invite_forms_keep_a_rejected_submit_in_the_form() {
     )));
 }
 
-#[test]
-fn task_pane_surfaces_a_dead_lettered_delivery_against_a_completed_task() {
-    let company = mailbox_company();
-    let channel = mailbox_channel(company.id);
-    let task = BackgroundTask {
-        ..monitored_task(company.id, channel.id, TaskStatus::Completed)
-    };
-
-    let failed = DeliveryEntry {
-        status: DeliveryStatus::DeadLetter,
-        attempt_count: 5,
-        last_error_class: Some(FailureClass::Network),
-        last_error_detail: Some("connection refused".to_string()),
-        ..queued_delivery(company.id, channel.id, Some(task.id))
-    };
-
-    let html = task_detail_pane(&TaskDetailPane {
-        harness_diagnostics: None,
-        harness_diagnostics_error: None,
-        deliveries: std::slice::from_ref(&failed),
-        delivery_error: None,
-        attempts: &[],
-        attempts_error: None,
-        company_id: company.id,
-        task: &task,
-        channel: Some(&channel),
-        error: None,
-        ownership_events: &[],
-        owner_candidates: &[],
-        collaboration: None,
-        delegation_channels: &[],
-    });
-
-    // The task reads as completed, so the delivery section is the only thing that can tell an
-    // operator the reply never actually went out.
-    assert!(html.contains("Delivery"));
-    assert!(html.contains("badge-error"));
-    assert!(html.contains("gave up after every attempt"));
-    assert!(html.contains("connection refused"));
-    assert!(html.contains("5 of 5 attempts spent"));
-    // And it is a way in, not just a report: the row opens it in the Deliveries workspace.
-    assert!(html.contains(&format!(
-        r##"href="/ui/deliveries?company_id={}&entry_id={}""##,
-        company.id, failed.id
-    )));
-
-    // A task that sent nothing must not grow an empty section.
-    let quiet = task_detail_pane(&TaskDetailPane {
-        harness_diagnostics: None,
-        harness_diagnostics_error: None,
-        deliveries: &[],
-        delivery_error: None,
-        attempts: &[],
-        attempts_error: None,
-        company_id: company.id,
-        task: &task,
-        channel: Some(&channel),
-        error: None,
-        ownership_events: &[],
-        owner_candidates: &[],
-        collaboration: None,
-        delegation_channels: &[],
-    });
-    assert!(!quiet.contains("Delivery"));
-}
-
 /// One queued delivery, as the producer would have written it.
-fn queued_delivery(company_id: Uuid, channel_id: Uuid, task_id: Option<Uuid>) -> DeliveryEntry {
+fn queued_delivery(company_id: Uuid, channel_id: Uuid) -> DeliveryEntry {
     DeliveryEntry {
         id: DeliveryId::random(),
         company_id,
         channel_id,
         message_id: CanonicalMessageId::random(),
-        task_id,
         correlation_id: CorrelationId::new(),
         transport: TransportKind::Email,
         purpose: DeliveryPurpose::Reply,
@@ -5608,7 +3640,7 @@ fn delivery_filter() -> DeliveryFilter {
 fn deliveries_page_lists_queued_work_and_escapes_its_subject() {
     let company = mailbox_company();
     let channel = mailbox_channel(company.id);
-    let entry = queued_delivery(company.id, channel.id, None);
+    let entry = queued_delivery(company.id, channel.id);
     let email = mailbox_account_email();
     let filter = delivery_filter();
 
@@ -5654,30 +3686,6 @@ fn deliveries_page_lists_queued_work_and_escapes_its_subject() {
     assert!(html.contains(r##"<option value="slack">Slack</option>"##));
 }
 
-#[test]
-fn delivery_pane_links_to_the_task_that_produced_it() {
-    let company = mailbox_company();
-    let channel = mailbox_channel(company.id);
-    let task = monitored_task(company.id, channel.id, TaskStatus::Completed);
-    let entry = queued_delivery(company.id, channel.id, Some(task.id));
-
-    let html = delivery_detail_pane(&DeliveryDetailPane {
-        company_id: company.id,
-        entry: &entry,
-        task: Some(&task),
-        channel: Some(&channel),
-    });
-
-    let task_url = format!("/ui/tasks?company_id={}&task_id={}", company.id, task.id);
-    assert!(html.contains(&task_url));
-    assert!(html.contains("Open Task"));
-    // The task completed; the message has still not gone out, which is the point of the join.
-    assert!(html.contains(task_status_label(TaskStatus::Completed)));
-    assert!(html.contains("Queued · next attempt"));
-    assert!(html.contains(">Inbox<"));
-    assert!(html.contains(&entry.idempotency_key));
-}
-
 /// An ambiguous outcome is not a failure and not a success, and the pane has to say which -- a
 /// reader who treats it as a failure will re-send it by hand, which is the duplicate the whole
 /// state exists to prevent.
@@ -5689,13 +3697,12 @@ fn delivery_pane_distinguishes_an_unconfirmed_outcome_from_a_dead_letter() {
         status: DeliveryStatus::OutcomeUnknown,
         last_error_class: Some(FailureClass::Timeout),
         last_error_detail: Some("the relay never acknowledged".to_string()),
-        ..queued_delivery(company.id, channel.id, None)
+        ..queued_delivery(company.id, channel.id)
     };
 
     let html = delivery_detail_pane(&DeliveryDetailPane {
         company_id: company.id,
         entry: &entry,
-        task: None,
         channel: Some(&channel),
     });
 
@@ -5727,13 +3734,12 @@ fn delivery_pane_lists_every_part_and_its_provider_key() {
             part(0, DeliveryPartStatus::Delivered, Some("<one@example.com>")),
             part(1, DeliveryPartStatus::Prepared, None),
         ],
-        ..queued_delivery(company.id, channel.id, None)
+        ..queued_delivery(company.id, channel.id)
     };
 
     let html = delivery_detail_pane(&DeliveryDetailPane {
         company_id: company.id,
         entry: &entry,
-        task: None,
         channel: Some(&channel),
     });
 
@@ -5741,52 +3747,6 @@ fn delivery_pane_lists_every_part_and_its_provider_key() {
     assert!(html.contains("&lt;one@example.com&gt;"));
     assert!(html.contains("Part 0"));
     assert!(html.contains("Part 1"));
-}
-
-#[test]
-fn delivery_pane_without_a_task_offers_no_link_to_one() {
-    let company = mailbox_company();
-    let channel = mailbox_channel(company.id);
-    let entry = DeliveryEntry {
-        status: DeliveryStatus::Delivered,
-        delivered_at: Some(Utc::now()),
-        ..queued_delivery(company.id, channel.id, None)
-    };
-
-    let html = delivery_detail_pane(&DeliveryDetailPane {
-        company_id: company.id,
-        entry: &entry,
-        task: None,
-        channel: None,
-    });
-
-    assert!(!html.contains("Open Task"));
-    assert!(!html.contains("/ui/tasks?"));
-    assert!(html.contains("Delivered"));
-    assert!(html.contains("alert-success"));
-    // With no channel to resolve, the pane falls back to the interface's own label.
-    assert!(html.contains("support@acme"));
-}
-
-#[test]
-fn delivery_pane_names_a_task_it_cannot_read() {
-    let company = mailbox_company();
-    let channel = mailbox_channel(company.id);
-    let task_id = Uuid::new_v4();
-    let entry = queued_delivery(company.id, channel.id, Some(task_id));
-
-    // The row points at a task, but the caller could not load it — the pane says so rather than
-    // pretending the delivery came from nowhere.
-    let html = delivery_detail_pane(&DeliveryDetailPane {
-        company_id: company.id,
-        entry: &entry,
-        task: None,
-        channel: None,
-    });
-
-    assert!(html.contains("Open Task"));
-    assert!(html.contains("Unavailable"));
-    assert!(html.contains(&task_id.to_string()));
 }
 
 #[test]
@@ -5808,7 +3768,7 @@ fn delivery_list_says_when_nothing_matches_and_pages_only_when_there_is_more() {
     assert!(empty.contains("No delivery matches these filters."));
     assert!(!empty.contains("Older <svg"));
 
-    let entry = queued_delivery(company.id, channel.id, None);
+    let entry = queued_delivery(company.id, channel.id);
     let paged = delivery_list(
         &DeliveryList {
             company: &company,
@@ -5889,7 +3849,6 @@ fn the_ui_shell_carries_the_placeholder_machinery_for_its_swap_targets() {
         next_cursor: Some("next_cursor"),
         selected_thread_id: None,
         activity: no_activity(),
-        handoffs: no_handoffs(),
         detail_html: &detail,
     });
 
@@ -5945,7 +3904,6 @@ fn no_pane_leaks_a_placeholder_constant_into_its_markup() {
         channel_settings_empty_pane("Select a channel.", FragmentSwap::Inline),
         company_settings_empty_pane("Select a company.", FragmentSwap::Inline),
         team_settings_empty_pane("Select a member.", FragmentSwap::Inline),
-        task_monitor_empty_pane("Select a task.", FragmentSwap::Inline),
         delivery_empty_pane("Select a delivery.", FragmentSwap::Inline),
     ];
 
@@ -5982,7 +3940,6 @@ fn every_ui_workspace_first_column_renders_a_sidebar_header() {
         next_cursor: None,
         selected_thread_id: None,
         activity: no_activity(),
-        handoffs: no_handoffs(),
         detail_html: "",
     });
     assert!(mailbox_html.contains(
@@ -6010,7 +3967,6 @@ fn every_ui_workspace_first_column_renders_a_sidebar_header() {
         list: &AgentSettingsList {
             company: &company,
             app_domain_name: "mail.test",
-            channels: &[],
             agents: &[],
             selected_agent_id: None,
         },
@@ -6026,31 +3982,12 @@ fn every_ui_workspace_first_column_renders_a_sidebar_header() {
         companies: &companies,
         schedules: &[],
         selected_schedule_id: None,
-        run_as: &ScheduleRunAsChoices::default(),
+        bindings: &[],
         runs_html: "",
         pane_html: "",
     });
     assert!(schedules_html.contains(
         r##"<h2 class="min-w-0 flex-1 text-base font-semibold leading-tight">Schedules</h2>"##
-    ));
-
-    let tasks_filter = TaskFilter::new(None, None, false, None, None);
-    let tasks_html = task_monitor_page(&TaskMonitorPage {
-        user: &user,
-        companies: &companies,
-        channels: &[],
-        owner_candidates: &[],
-        list: &TaskMonitorList {
-            company: &company,
-            tasks: &[],
-            filter: &tasks_filter,
-            has_next: false,
-            selected_task_id: None,
-        },
-        pane_html: "",
-    });
-    assert!(tasks_html.contains(
-        r##"<h2 class="min-w-0 flex-1 text-base font-semibold leading-tight">Tasks</h2>"##
     ));
 
     let deliveries_filter = delivery_filter();
@@ -6156,6 +4093,54 @@ fn the_profile_pane_offers_the_account_its_own_details_and_never_its_password() 
     assert!(html.contains(r#"name="current_password""#));
     assert!(!html.contains("irrelevant"));
     assert!(!html.contains(r#"name="current_password" value"#));
+}
+
+/// P08-Q8: the profile offers exactly two email toggles, each showing its stored value.
+#[test]
+fn the_profile_offers_the_decision_and_delivery_failure_email_toggles() {
+    let account = profile_account();
+    let render = |preferences| {
+        profile_pane(&ProfilePane {
+            user: &account,
+            draft: None,
+            pending: &[],
+            methods: &LoginMethods {
+                password: true,
+                google: false,
+                apple: false,
+            },
+            google_enabled: false,
+            apple_enabled: false,
+            notification_preferences: preferences,
+            outcome: ProfileOutcome::Untouched,
+        })
+    };
+    let toggle = |name: &str, checked: bool| {
+        format!(
+            r#"name="{name}" value="true" class="toggle toggle-primary"{}>"#,
+            if checked { " checked" } else { "" }
+        )
+    };
+
+    let html = render(NotificationPreferences {
+        delivery_failure_email_enabled: true,
+        decision_email_enabled: false,
+    });
+    assert_eq!(html.matches(r#"class="toggle toggle-primary""#).count(), 2);
+    assert!(html.contains("Email me when a workflow decision needs my review"));
+    assert!(html.contains(&toggle("decision_email_enabled", false)));
+    assert!(html.contains(&toggle("delivery_failure_email_enabled", true)));
+    for retired in [
+        "assignment_email_enabled",
+        "response_review_email_enabled",
+        "delegation_timeout_email_enabled",
+        "task_failure_email_enabled",
+    ] {
+        assert!(!html.contains(retired), "{retired}");
+    }
+
+    let html = render(NotificationPreferences::default());
+    assert!(html.contains(&toggle("decision_email_enabled", true)));
 }
 
 #[test]
@@ -6357,7 +4342,6 @@ fn the_agent_library_reaches_the_account_menu_only_for_an_operator() {
         next_cursor: None,
         selected_thread_id: None,
         activity: no_activity(),
-        handoffs: no_handoffs(),
         detail_html: &detail,
     });
     assert!(with_rail.contains(entry));
@@ -6477,18 +4461,12 @@ fn the_channel_form_offers_a_description_and_escapes_what_was_typed_into_it() {
     let html = channel_create_pane(&ChannelCreatePane {
         company: &company,
         app_domain_name: "mailagents.com",
-        agents: &[],
         spam_scan_enabled: true,
         draft: &draft,
-        easy: false,
         error: None,
     });
 
-    assert_eq!(
-        html.matches(r#"name="description""#).count(),
-        2,
-        "both the simple and the advanced tab collect a description"
-    );
+    assert_eq!(html.matches(r#"name="description""#).count(), 1);
     assert!(html.contains("Answers &lt;supplier&gt; capacity questions."));
     assert!(!html.contains("<supplier>"));
 }
@@ -6670,812 +4648,18 @@ fn dump_application_javascript() {
     .expect("write bundle");
 }
 
-#[test]
-fn a_chain_timeline_orders_by_kind_rather_than_by_a_synthetic_sequence_offset() {
-    // The timeline used to sort attempts at `10_000 + attempt_number`, chosen to sit above the
-    // real `task_status_events.sequence` space. A chain busy enough to reach sequence 10_000 walks
-    // into that offset and starts drawing its attempts before the events that caused them, which
-    // is the one thing a chronological pane must not do.
-    let company = mailbox_company();
-    let task = monitored_task(company.id, Uuid::new_v4(), TaskStatus::Processing);
-    let at = Utc::now();
-
-    let event = TaskStatusEvent {
-        id: Uuid::new_v4(),
-        company_id: company.id,
-        task_id: task.id,
-        correlation_id: task.correlation_id,
-        sequence: 10_500,
-        from_status: Some(TaskStatus::Pending),
-        to_status: TaskStatus::Processing,
-        reason: TaskTransitionReason::Claimed,
-        actor_kind: TaskTransitionActorKind::Worker,
-        actor_id: Some(Uuid::new_v4()),
-        related_approval_id: None,
-        related_outreach_id: None,
-        retry_count: 0,
-        run_at: at,
-        execution_generation: None,
-        transitioned_at: at,
-    };
-    let attempt = TaskAttemptRecord {
-        attempt_number: 1,
-        status: TaskAttemptRecordStatus::Processing,
-        error: None,
-        stop_reason: None,
-        prompt_tokens: None,
-        completion_tokens: None,
-        result: None,
-        started_at: at,
-        finished_at: Some(at),
-        execution_generation: Uuid::new_v4(),
-        worker_id: Uuid::new_v4(),
-        machine: rendered_machine(),
-    };
-
-    let detail = TaskChainDetail {
-        company_id: company.id,
-        correlation_id: task.correlation_id,
-        title: "Busy chain".into(),
-        channel_names: vec!["Inbox".into()],
-        agent_names: vec!["Triage".into()],
-        tasks: vec![TaskChainTaskDetail {
-            task: task.clone(),
-            attempts: vec![attempt],
-            deliveries: Vec::new(),
+fn test_thread_runs(activity: ThreadActivity) -> crate::application::thread_activity::ThreadRuns {
+    crate::application::thread_activity::ThreadRuns {
+        inspectable: Default::default(),
+        items: vec![crate::application::thread_activity::ThreadRunActivity {
+            run_id: Uuid::new_v4(),
+            title: "Workflow".into(),
+            activity,
         }],
-        events: vec![event],
-        ownership_events: Vec::new(),
-        approvals: Vec::new(),
-        outreaches: Vec::new(),
-        collaboration: Some(CollaborationSummary {
-            task_id: task.id,
-            outreach_id: Some(Uuid::new_v4()),
-            outreach_version: Some(1),
-            correlation_id: task.correlation_id,
-            owner: CollaborationOwner {
-                kind: CollaborationOwnerKind::Agent,
-                principal_id: Some(PrincipalId::random()),
-                label: "Triage <lead>".into(),
-                available: true,
-            },
-            status: OutreachBusinessStatus::Waiting,
-            progress: Some(CollaborationProgress {
-                responded: 1,
-                required: 2,
-                total: 3,
-            }),
-            expires_at: Some(at),
-            next_action: Some(CollaborationNextAction {
-                actor: NextActionActor::ExternalTarget,
-                action: NextActionKind::ProvideResponse,
-                due_at: Some(at),
-                href: None,
-            }),
-            children: vec![CollaborationTargetSummary {
-                id: Uuid::new_v4(),
-                target: CollaborationTarget::RestrictedInternal,
-                label: "Internal specialist".into(),
-                status: TargetBusinessStatus::Waiting,
-                responded_at: None,
-                next_action: None,
-                child: None,
-            }],
-            as_of: at,
-            truncated: false,
-            detail_href: None,
-        }),
-        truncated: false,
-    };
-
-    let html = task_chain_detail_pane(&detail, None);
-    let transition = html.find("claimed").expect("the status event is drawn");
-    let attempt_started = html.find("Attempt started").expect("the attempt is drawn");
-    assert!(
-        transition < attempt_started,
-        "the status event must precede the attempt it caused, whatever its sequence number"
-    );
-    assert!(html.contains("Collaboration status"));
-    assert!(html.contains("1 / 3 replies · 2 needed"));
-    assert!(html.contains("Internal specialist"));
-    assert!(html.contains("Triage &lt;lead&gt;"));
-    assert!(!html.contains("Triage <lead>"));
-}
-
-#[test]
-fn a_truncated_chain_pane_says_so_and_a_complete_one_does_not() {
-    // A partial timeline that looks complete is the failure worth guarding against: an operator
-    // reading it would conclude the chain simply stopped where the pane ran out of room.
-    let company = mailbox_company();
-    let detail = TaskChainDetail {
-        company_id: company.id,
-        correlation_id: CorrelationId::new(),
-        title: "Long chain".into(),
-        channel_names: vec!["Inbox".into()],
-        agent_names: vec!["Triage".into()],
-        tasks: Vec::new(),
-        events: Vec::new(),
-        ownership_events: Vec::new(),
-        approvals: Vec::new(),
-        outreaches: Vec::new(),
-        collaboration: None,
-        truncated: true,
-    };
-
-    let notice = "This chain is larger than the pane shows.";
-    assert!(task_chain_detail_pane(&detail, None).contains(notice));
-    assert!(
-        !task_chain_detail_pane(
-            &TaskChainDetail {
-                truncated: false,
-                ..detail
-            },
-            None
-        )
-        .contains(notice)
-    );
-}
-
-/// One held reply on the open thread, in the state under test.
-fn held_reply(
-    company_id: Uuid,
-    channel_id: Uuid,
-    thread_id: Uuid,
-    state: ThreadHandoffState,
-    responsible: Option<PrincipalId>,
-) -> ThreadHandoff {
-    let now = chrono::Utc::now();
-    ThreadHandoff {
-        id: Uuid::new_v4(),
-        company_id,
-        channel_id,
-        thread_id,
-        generation: Uuid::new_v4(),
-        state,
-        source_message_id: crate::entities::message::CanonicalMessageId::new(Uuid::new_v4()),
-        responsible_principal_id: responsible,
-        priority: crate::entities::attention::BusinessPriority::Normal,
-        due_at: None,
-        version: 4,
-        generation_opened_at: now,
-        created_at: now,
-        updated_at: now,
+        has_more: false,
+        message_runs: vec![],
     }
 }
 
-/// A held reply's banner view, fixed at a known instant so the age it states is an assertion
-/// rather than a race with the clock.
-fn banner_view<'a>(
-    handoff: &'a ThreadHandoff,
-    viewer_principal_id: Option<PrincipalId>,
-    viewer_manages_tasks: bool,
-) -> ThreadHandoffBannerView<'a> {
-    ThreadHandoffBannerView {
-        company_id: handoff.company_id,
-        channel_id: handoff.channel_id,
-        thread_id: handoff.thread_id,
-        handoff,
-        responsible_label: None,
-        viewer_principal_id,
-        viewer_manages_tasks,
-        draft: None,
-        reassign_candidates: &[],
-        as_of: handoff.generation_opened_at + chrono::Duration::minutes(17),
-        error: None,
-    }
-}
-
-/// Just the handoff banner out of the rendered pane: the composer below it has a Send button of
-/// its own, and this banner's rules are about *its* buttons.
-fn handoff_pane_html(view: &ThreadHandoffBannerView<'_>) -> String {
-    let company = mailbox_company();
-    // The pane's own ids, so the banner the pane renders is addressed exactly as a banner built
-    // straight from this view would be -- which is what case 9 compares.
-    let channel = Channel {
-        id: view.channel_id,
-        ..mailbox_channel(company.id)
-    };
-    let thread = Thread {
-        id: view.thread_id,
-        ..mailbox_thread(channel.id)
-    };
-    banner_out_of(&message_pane(&MessagePane {
-        company_id: view.company_id,
-        channel: &channel,
-        thread: &thread,
-        messages: &[],
-        agent: None,
-        viewer_email: &mailbox_account_email(),
-        activity: None,
-        work: None,
-        viewer_principal_id: view.viewer_principal_id,
-        viewer_manages_tasks: view.viewer_manages_tasks,
-        private_handoff: None,
-        ownership_error: None,
-        owner_candidates: &[],
-        collaboration: None,
-        handoff: Some(copy_view(view)),
-    }))
-}
-
-/// The banner as it sits inside the rendered pane, container excluded.
-fn banner_out_of(pane: &str) -> String {
-    let after = pane
-        .split_once(
-            r#"<div id="thread-handoff" sse-swap="handoff" hx-target="this" hx-swap="innerHTML">"#,
-        )
-        .expect("the pane always carries the banner's container")
-        .1;
-    after
-        .split_once(r#"<div id="thread-activity""#)
-        .expect("the activity strip follows it")
-        .0
-        .trim_end()
-        .trim_end_matches("</div>")
-        .to_string()
-}
-
-/// `ThreadHandoffBannerView` is deliberately not `Clone` -- it is built once, at its call site --
-/// so the tests restate it field by field.
-fn copy_view<'a>(view: &ThreadHandoffBannerView<'a>) -> ThreadHandoffBannerView<'a> {
-    ThreadHandoffBannerView {
-        company_id: view.company_id,
-        channel_id: view.channel_id,
-        thread_id: view.thread_id,
-        handoff: view.handoff,
-        responsible_label: view.responsible_label,
-        viewer_principal_id: view.viewer_principal_id,
-        viewer_manages_tasks: view.viewer_manages_tasks,
-        draft: view.draft,
-        reassign_candidates: view.reassign_candidates,
-        as_of: view.as_of,
-        error: view.error,
-    }
-}
-
-/// Case 5 and case 22's rendering half: the state machine the banner's buttons are driven by.
-///
-/// Send is offered to the assigned reviewer -- the responsible principal -- and to nobody else,
-/// because the review machinery answers a manager who is not the reviewer with `NotFound`. A
-/// button that can only produce an error must not be drawn.
-#[test]
-fn the_handoff_banner_follows_the_state_and_offers_send_only_to_the_reviewer() {
-    let company_id = mailbox_company().id;
-    let channel = mailbox_channel(company_id);
-    let thread = mailbox_thread(channel.id);
-    let bo = PrincipalId::random();
-    let manager = PrincipalId::random();
-    let draft = ThreadHandoffDraft {
-        task_id: Uuid::new_v4(),
-        draft_id: Uuid::new_v4(),
-        draft_version: 2,
-    };
-
-    // Unclaimed: the channel team owns it, the next step is claiming it, and Generate draft is not
-    // rendered at all because the command behind it refuses an unclaimed handoff.
-    let unclaimed = held_reply(
-        company_id,
-        channel.id,
-        thread.id,
-        ThreadHandoffState::NeedsInstruction,
-        None,
-    );
-    let html = handoff_pane_html(&banner_view(&unclaimed, Some(bo), false));
-    assert!(html.contains("Channel team"));
-    assert!(html.contains("Age 17m"));
-    // The queue's own word for the priority, so the two surfaces read as one thing.
-    assert!(html.contains(">normal<"));
-    assert!(html.contains("No due time"));
-    assert!(html.contains(">Claim<"));
-    assert!(html.contains(">Dismiss<"));
-    assert!(html.contains("Claim this reply before drafting an answer."));
-    assert!(!html.contains(">Generate draft<"));
-
-    // Claimed by the viewer: draft or dismiss.
-    let claimed = held_reply(
-        company_id,
-        channel.id,
-        thread.id,
-        ThreadHandoffState::NeedsInstruction,
-        Some(bo),
-    );
-    let html = handoff_pane_html(&banner_view(&claimed, Some(bo), false));
-    assert!(html.contains(">Generate draft<"));
-    assert!(html.contains(">Dismiss<"));
-    assert!(!html.contains(">Claim<"));
-
-    // Drafting: visible progress, the quietest of the three state words, and nothing to press.
-    let drafting = held_reply(
-        company_id,
-        channel.id,
-        thread.id,
-        ThreadHandoffState::Drafting,
-        Some(bo),
-    );
-    let html = handoff_pane_html(&banner_view(&drafting, Some(bo), false));
-    assert!(html.contains("Drafting…"));
-    assert!(!html.contains("<button"));
-
-    // Draft ready, viewed by its reviewer: send, edit and send, dismiss.
-    let ready = held_reply(
-        company_id,
-        channel.id,
-        thread.id,
-        ThreadHandoffState::DraftReady,
-        Some(bo),
-    );
-    let html = handoff_pane_html(&ThreadHandoffBannerView {
-        draft: Some(draft),
-        ..banner_view(&ready, Some(bo), false)
-    });
-    assert!(html.contains(">Send<"));
-    assert!(html.contains(">Edit and send<"));
-    assert!(html.contains(">Dismiss<"));
-    assert!(
-        html.contains(r#"data-handoff-draft-version="2""#),
-        "the draft's own version is the fence Send carries"
-    );
-
-    // The same draft, viewed by a manager who is not the reviewer: no Send, no Edit and send.
-    let html = handoff_pane_html(&ThreadHandoffBannerView {
-        draft: Some(draft),
-        ..banner_view(&ready, Some(manager), true)
-    });
-    assert!(
-        !html.contains(">Send<"),
-        "only the assigned reviewer can publish, so only they are offered the button"
-    );
-    assert!(!html.contains(">Edit and send<"));
-    assert!(
-        html.contains(">Dismiss<"),
-        "a manager can still close the reply"
-    );
-}
-
-/// Case 6. A teammate who is neither responsible nor a manager would be answered `NotFound` by
-/// every one of these commands, so the banner tells them what is happening and offers nothing.
-#[test]
-fn a_reply_claimed_by_somebody_else_is_read_only_unless_the_reader_manages_the_company() {
-    let company_id = mailbox_company().id;
-    let channel = mailbox_channel(company_id);
-    let thread = mailbox_thread(channel.id);
-    let bo = PrincipalId::random();
-    let ana = PrincipalId::random();
-    let claimed = held_reply(
-        company_id,
-        channel.id,
-        thread.id,
-        ThreadHandoffState::NeedsInstruction,
-        Some(bo),
-    );
-
-    let onlooker = handoff_pane_html(&ThreadHandoffBannerView {
-        responsible_label: Some("Bo Diaz"),
-        ..banner_view(&claimed, Some(ana), false)
-    });
-    assert!(onlooker.contains("Bo Diaz"), "who has it is still stated");
-    assert!(onlooker.contains("Needs instruction"));
-    assert!(onlooker.contains("Age 17m"));
-    assert!(
-        !onlooker.contains("<button"),
-        "every command would answer this reader NotFound"
-    );
-
-    let roster = [
-        TaskOwnerCandidate {
-            owner: TaskOwner::Human(ana),
-            label: "Ana Reyes".to_string(),
-        },
-        // An agent is not somebody a reply can be handed to.
-        TaskOwnerCandidate {
-            owner: TaskOwner::Agent(PrincipalId::random()),
-            label: "Support agent".to_string(),
-        },
-    ];
-    let manager = handoff_pane_html(&ThreadHandoffBannerView {
-        responsible_label: Some("Bo Diaz"),
-        reassign_candidates: &roster,
-        ..banner_view(&claimed, Some(PrincipalId::random()), true)
-    });
-    assert!(manager.contains(">Reassign<"));
-    assert!(manager.contains("Ana Reyes"));
-    assert!(
-        !manager.contains("Support agent"),
-        "a reply is handed to a person, never to an agent"
-    );
-    assert!(!manager.contains(">Send<"));
-    assert!(!manager.contains(">Generate draft<"));
-}
-
-/// Case 7. The assertion that fails if somebody "simplifies" the request the buttons build.
-#[test]
-fn every_handoff_button_carries_both_fences_and_the_whole_attribute_pair() {
-    let company_id = mailbox_company().id;
-    let channel = mailbox_channel(company_id);
-    let thread = mailbox_thread(channel.id);
-    let bo = PrincipalId::random();
-    let due = chrono::Utc::now() + chrono::Duration::hours(6);
-    let handoff = ThreadHandoff {
-        priority: crate::entities::attention::BusinessPriority::High,
-        due_at: Some(due),
-        version: 9,
-        ..held_reply(
-            company_id,
-            channel.id,
-            thread.id,
-            ThreadHandoffState::NeedsInstruction,
-            Some(bo),
-        )
-    };
-
-    let html = handoff_pane_html(&banner_view(&handoff, Some(bo), false));
-    assert!(html.contains(r#"data-handoff-version="9""#));
-    assert!(html.contains(&format!(
-        r#"data-handoff-generation="{}""#,
-        handoff.generation
-    )));
-    // Restated on every command, so a claim cannot silently drop what somebody else set.
-    assert!(html.contains(r#"data-handoff-priority="high""#));
-    assert!(html.contains(&format!(r#"data-handoff-due-at="{}""#, due.to_rfc3339())));
-    assert!(html.contains(&format!(r#"data-handoff-id="{}""#, handoff.id)));
-    assert!(html.contains(&format!("/thread-handoffs/{}", handoff.id)));
-    assert!(html.contains("badge-warning"), "High is a warning badge");
-    assert!(html.contains(&format!("Due {}", due.format("%Y-%m-%d %H:%M UTC"))));
-}
-
-/// Case 8. The container is present whether or not there is a banner in it, and it sits outside
-/// the scroll area.
-#[test]
-fn the_message_pane_has_a_slot_for_the_held_reply_banner() {
-    let company = mailbox_company();
-    let channel = mailbox_channel(company.id);
-    let thread = mailbox_thread(channel.id);
-    let html = message_pane(&MessagePane {
-        company_id: company.id,
-        channel: &channel,
-        thread: &thread,
-        messages: &[],
-        agent: None,
-        viewer_email: &mailbox_account_email(),
-        activity: None,
-        work: None,
-        viewer_principal_id: None,
-        viewer_manages_tasks: false,
-        private_handoff: None,
-        ownership_error: None,
-        owner_candidates: &[],
-        collaboration: None,
-        handoff: None,
-    });
-
-    assert!(html.contains(
-        r#"<div id="thread-handoff" sse-swap="handoff" hx-target="this" hx-swap="innerHTML"></div>"#
-    ));
-    assert!(!html.contains("Held customer reply"));
-
-    // `#message-scroll` appends with `beforeend`, so a banner inside it would end up above every
-    // later message instead of below all of them -- and it must precede the activity strip, which
-    // is the order the two are read in.
-    let scroll_start = html.find(r#"id="message-scroll""#).unwrap();
-    let banner = html.find(r#"id="thread-handoff""#).unwrap();
-    let activity = html.find(r#"id="thread-activity""#).unwrap();
-    assert!(scroll_start < banner);
-    assert!(banner < activity);
-    assert!(html[scroll_start..banner].contains("</div>"));
-}
-
-/// Case 9. A banner that streams in is indistinguishable from one that came with the page, which
-/// is the rule `message_bubble_chat` established for bubbles and this banner inherits.
-#[test]
-fn the_streamed_banner_and_the_rendered_banner_are_one_string() {
-    let company_id = mailbox_company().id;
-    let channel = mailbox_channel(company_id);
-    let thread = mailbox_thread(channel.id);
-    let bo = PrincipalId::random();
-    let handoff = held_reply(
-        company_id,
-        channel.id,
-        thread.id,
-        ThreadHandoffState::NeedsInstruction,
-        Some(bo),
-    );
-    let view = ThreadHandoffBannerView {
-        channel_id: channel.id,
-        thread_id: thread.id,
-        ..banner_view(&handoff, Some(bo), false)
-    };
-
-    assert_eq!(handoff_pane_html(&view), thread_handoff_banner(&view));
-}
-
-/// Case 10. The queue and the banner say the same thing about the same handoff, because they call
-/// the same two functions. This fails the moment somebody writes a second age formatter.
-#[test]
-fn the_queue_and_the_banner_word_age_priority_and_due_time_identically() {
-    let company_id = mailbox_company().id;
-    let channel = mailbox_channel(company_id);
-    let thread = mailbox_thread(channel.id);
-    let due = chrono::Utc::now() + chrono::Duration::hours(30);
-    let handoff = ThreadHandoff {
-        priority: crate::entities::attention::BusinessPriority::Urgent,
-        due_at: Some(due),
-        ..held_reply(
-            company_id,
-            channel.id,
-            thread.id,
-            ThreadHandoffState::NeedsInstruction,
-            None,
-        )
-    };
-    let as_of = handoff.generation_opened_at + chrono::Duration::hours(5);
-
-    let item = crate::entities::attention::AttentionItem {
-        company_id,
-        channel_id: channel.id,
-        source_kind: crate::entities::attention::AttentionSourceKind::ThreadHandoff,
-        source_id: handoff.id,
-        thread_id: Some(thread.id),
-        task_id: None,
-        correlation_id: None,
-        state: "needs_instruction".to_string(),
-        responsibility: crate::entities::attention::AttentionResponsibility::ChannelTeam,
-        version: handoff.version,
-        title: thread.subject.clone(),
-        next_action: "Tell the agent what to do".to_string(),
-        responsibility_label: "Channel team".to_string(),
-        priority: handoff.priority,
-        due_at: handoff.due_at,
-        expires_at: None,
-        created_at: handoff.generation_opened_at,
-        updated_at: handoff.updated_at,
-        href: None,
-    };
-    let email = mailbox_account_email();
-    let company = mailbox_company();
-    let queue = attention_page(&AttentionPageView {
-        user: &mailbox_user(&email),
-        companies: std::slice::from_ref(&company),
-        company: &company,
-        view: crate::entities::attention::AttentionView::Unassigned,
-        all_owned: false,
-        page: &crate::entities::attention::AttentionPage {
-            items: vec![item],
-            next_cursor: None,
-            as_of,
-            working_set_size: 1,
-            truncated: false,
-        },
-        manager: false,
-    });
-    let banner = thread_handoff_banner(&ThreadHandoffBannerView {
-        as_of,
-        ..banner_view(&handoff, None, false)
-    });
-
-    for fact in [
-        "Age 5h".to_string(),
-        ">urgent<".to_string(),
-        format!("Due {}", due.format("%Y-%m-%d %H:%M UTC")),
-        "badge-error".to_string(),
-        "Channel team".to_string(),
-    ] {
-        assert!(queue.contains(&fact), "the queue says {fact}");
-        assert!(banner.contains(&fact), "the banner says {fact}");
-    }
-}
-
-/// A thread with no held reply renders exactly as it did before this banner existed.
-#[test]
-fn a_thread_without_a_held_reply_renders_no_handoff_actions() {
-    let company = mailbox_company();
-    let channel = mailbox_channel(company.id);
-    let thread = mailbox_thread(channel.id);
-    let html = message_pane(&MessagePane {
-        company_id: company.id,
-        channel: &channel,
-        thread: &thread,
-        messages: &[],
-        agent: None,
-        viewer_email: &mailbox_account_email(),
-        activity: None,
-        work: None,
-        viewer_principal_id: None,
-        viewer_manages_tasks: false,
-        private_handoff: None,
-        ownership_error: None,
-        owner_candidates: &[],
-        collaboration: None,
-        handoff: None,
-    });
-    assert!(!html.contains("thread-handoff-actions"));
-    assert!(!html.contains("Held customer reply"));
-}
-
-/// Case 1. The one mark that carries a word rather than a glyph, because it is the only one that
-/// asks the reader to do something.
-#[test]
-fn the_row_badge_says_which_of_the_three_states_a_held_reply_is_in() {
-    assert_eq!(thread_handoff_mark(None), "");
-
-    let needs = thread_handoff_mark(Some(ThreadHandoffMark {
-        state: ThreadHandoffState::NeedsInstruction,
-        claimed: false,
-    }));
-    assert!(needs.contains("badge-warning"));
-    assert!(needs.contains(">Needs input<"), "{needs}");
-    assert!(
-        needs.contains(r#"title="Needs instruction""#),
-        "the long form survives a narrow column as the tooltip"
-    );
-
-    let ready = thread_handoff_mark(Some(ThreadHandoffMark {
-        state: ThreadHandoffState::DraftReady,
-        claimed: true,
-    }));
-    assert!(ready.contains("badge-info"));
-    assert!(ready.contains(">Draft ready<"));
-
-    // Out of the attention queue and waiting on nobody: the quietest of the three, and it never
-    // pulses -- a handoff is durable, and a badge that pulses forever is noise.
-    let drafting = thread_handoff_mark(Some(ThreadHandoffMark {
-        state: ThreadHandoffState::Drafting,
-        claimed: true,
-    }));
-    assert!(drafting.contains("badge-ghost"));
-    assert!(drafting.contains(">Drafting<"));
-    assert!(!drafting.contains("animate-pulse"));
-    assert!(!needs.contains("animate-pulse"));
-    assert!(!ready.contains("animate-pulse"));
-
-    // A closed handoff never reaches a row, and renders nothing if one ever did.
-    for state in [ThreadHandoffState::Resolved, ThreadHandoffState::Dismissed] {
-        assert_eq!(
-            thread_handoff_mark(Some(ThreadHandoffMark {
-                state,
-                claimed: true
-            })),
-            ""
-        );
-    }
-}
-
-/// Case 2. Its own event name, its own slot, and no mention of any other thread.
-#[test]
-fn the_handoff_slot_names_only_its_own_thread() {
-    let thread_id = Uuid::new_v4();
-    let other = Uuid::new_v4();
-    let slot = thread_handoff_slot(
-        thread_id,
-        Some(ThreadHandoffMark {
-            state: ThreadHandoffState::NeedsInstruction,
-            claimed: false,
-        }),
-    );
-
-    assert!(slot.contains(&format!(r#"sse-swap="handoff-{thread_id}""#)));
-    assert_eq!(
-        thread_handoff_event(thread_id),
-        format!("handoff-{thread_id}")
-    );
-    assert!(slot.contains(r#"hx-target="this""#));
-    assert!(slot.contains(r#"hx-swap="innerHTML""#));
-    assert!(!slot.contains(&other.to_string()));
-
-    // An empty slot is still a slot: it is where the first streamed badge lands.
-    let cleared = thread_handoff_slot(thread_id, None);
-    assert!(cleared.contains(&format!(r#"sse-swap="handoff-{thread_id}""#)));
-    assert!(!cleared.contains("badge"));
-}
-
-/// Case 3. Both marks, in the order they are read: what the team must do, then what the machine is
-/// doing, then the timestamp.
-#[test]
-fn a_thread_row_carries_the_handoff_mark_before_the_activity_mark() {
-    let company_id = mailbox_company().id;
-    let channel = mailbox_channel(company_id);
-    let thread = mailbox_thread(channel.id);
-
-    let both = thread_row_fragment(
-        company_id,
-        &channel,
-        &thread,
-        false,
-        ThreadRowMarks {
-            activity: Some(ThreadActivity::Working),
-            handoff: Some(ThreadHandoffMark {
-                state: ThreadHandoffState::NeedsInstruction,
-                claimed: false,
-            }),
-            ..ThreadRowMarks::default()
-        },
-    );
-    let handoff_at = both.find("thread-handoff-mark").expect("the handoff slot");
-    let activity_at = both.find("thread-activity").expect("the activity slot");
-    assert!(handoff_at < activity_at);
-    assert!(both.contains(">Needs input<"));
-
-    // Either one absent still renders the row and the other slot.
-    let held_only = thread_row_fragment(
-        company_id,
-        &channel,
-        &thread,
-        false,
-        ThreadRowMarks {
-            handoff: Some(ThreadHandoffMark {
-                state: ThreadHandoffState::DraftReady,
-                claimed: true,
-            }),
-            ..ThreadRowMarks::default()
-        },
-    );
-    assert!(held_only.contains(">Draft ready<"));
-    assert!(held_only.contains("thread-activity"));
-
-    let plain = thread_row_fragment(
-        company_id,
-        &channel,
-        &thread,
-        false,
-        ThreadRowMarks::default(),
-    );
-    assert!(plain.contains("thread-handoff-mark"));
-    assert!(!plain.contains("badge-warning"));
-}
-
-/// Case 4. A thread in the map gets the badge; one absent from it gets an empty slot.
-#[test]
-fn the_column_and_the_page_badge_only_the_threads_the_map_names() {
-    let email = mailbox_account_email();
-    let company = mailbox_company();
-    let channel = mailbox_channel(company.id);
-    let held = mailbox_thread(channel.id);
-    let quiet = mailbox_thread(channel.id);
-    let threads = vec![held.clone(), quiet.clone()];
-    let handoffs: HashMap<Uuid, ThreadHandoffMark> = [(
-        held.id,
-        ThreadHandoffMark {
-            state: ThreadHandoffState::NeedsInstruction,
-            claimed: false,
-        },
-    )]
-    .into_iter()
-    .collect();
-
-    for html in [
-        thread_column(&ThreadColumn {
-            company_id: company.id,
-            channel: &channel,
-            app_domain_name: "example.com",
-            threads: &threads,
-            next_cursor: None,
-            selected_thread_id: None,
-            activity: no_activity(),
-            handoffs: &handoffs,
-        }),
-        mailbox_page(&MailboxPage {
-            user: &mailbox_user(&email),
-            company: &company,
-            companies: std::slice::from_ref(&company),
-            app_domain_name: "example.com",
-            channels: std::slice::from_ref(&channel),
-            selected_channel: Some(&channel),
-            threads: &threads,
-            next_cursor: None,
-            selected_thread_id: None,
-            activity: no_activity(),
-            handoffs: &handoffs,
-            detail_html: "",
-        }),
-    ] {
-        assert_eq!(
-            html.matches(">Needs input<").count(),
-            1,
-            "exactly the one held thread is badged"
-        );
-        assert!(html.contains(&format!(r#"sse-swap="handoff-{}""#, held.id)));
-        assert!(
-            html.contains(&format!(r#"sse-swap="handoff-{}""#, quiet.id)),
-            "a thread with nothing held still has the slot a badge would land in"
-        );
-    }
-}
+#[path = "workflow_conversation_tests.rs"]
+mod workflow_conversation_tests;

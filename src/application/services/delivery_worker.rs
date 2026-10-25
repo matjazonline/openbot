@@ -309,6 +309,40 @@ impl DeliveryWorker {
             ),
             Err(error) => warn!(%error, "Could not sweep stranded deliveries"),
         }
+        self.report_stuck_deliveries().await;
+    }
+
+    /// Publish how many deliveries are stuck, and say so in the log when any are.
+    ///
+    /// Every figure goes out as a gauge on every sweep, zeroes included, so an alert on "> 0" can
+    /// clear. Failing to take the census is not worth failing the sweep over.
+    async fn report_stuck_deliveries(&self) {
+        let census = match self
+            .queue
+            .census_stuck_deliveries(crate::entities::stuck_work::DELIVERY_OVERDUE_AFTER)
+            .await
+        {
+            Ok(census) => census,
+            Err(error) => {
+                warn!(%error, "Could not take the stuck-delivery census");
+                return;
+            }
+        };
+        if let Some(monitoring) = &self.monitoring {
+            for (kind, count) in census.gauges() {
+                monitoring.record_gauge("stuck_work", count as f64, &[("kind", kind.as_str())]);
+            }
+        }
+        // A healthy system stays silent; the log line keeps the shape the task census used.
+        for (kind, count) in census.alerts() {
+            warn!(
+                target: "monitoring::stuck_work",
+                kind = %kind.as_str(),
+                count = count,
+                detail = %kind.description(),
+                "Work is stuck"
+            );
+        }
     }
 
     fn record_settled(&self, record: &DeliveryRecord, status: DeliveryStatus) {

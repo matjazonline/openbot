@@ -12,6 +12,7 @@ use crate::{
 };
 use async_trait::async_trait;
 use serde_json::{Value, json};
+use uuid::Uuid;
 
 /// The most workflow tools one company registers (bounded like HTTP operations).
 pub const MAX_WORKFLOW_TOOLS: usize = 256;
@@ -19,6 +20,8 @@ pub const MAX_WORKFLOW_TOOLS: usize = 256;
 pub const MAX_TOOL_RESULT_BYTES: usize = 131_072;
 /// Static child parameters stored with a registration.
 pub const MAX_TOOL_PARAMS_BYTES: usize = 65_536;
+/// The most tool names one agent grants (`valid_workflow_type_names`).
+pub const MAX_AGENT_TOOL_GRANTS: usize = 32;
 
 pub const TOOL_REVOKED: &str = "workflow.tool_revoked";
 pub const TOOL_LIMIT: &str = "workflow.tool_limit";
@@ -71,6 +74,16 @@ pub trait WorkflowTools: Send + Sync {
         company: CompanyId,
         actor: WorkflowActor,
     ) -> AppResult<Vec<WorkflowToolRegistration>>;
+    /// Replace the company agent's ordered tool grants, only while they are still `expected`
+    /// (the list the caller saw). Grants are names; publication resolves them (07-D2 §D2.2).
+    async fn grant_agent_tools(
+        &self,
+        company: CompanyId,
+        actor: WorkflowActor,
+        agent: Uuid,
+        expected: &[TypeName],
+        tools: &[TypeName],
+    ) -> AppResult<Vec<TypeName>>;
 }
 
 /// One saved model call of a workflow tool: the frozen pin and the call's identity.

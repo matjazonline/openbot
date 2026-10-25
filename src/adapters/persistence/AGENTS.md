@@ -38,12 +38,12 @@ support composite constraints; derivability alone is not a reason to drop them.
 
 # Carry the discriminator; never re-assert it as a literal
 
-The same rule one column over. The memory tables are keyed on a discriminator plus an id:
-`(company_id, provider)` on `memory_provider_connections`, `(provider, remote_database_id)` on
-`memory_remote_resource_lifecycles` and `memory_cleanup_jobs`. A query that already has the
-discriminator in scope — returned by a CTE, read off the job row, held in
-`companies.memory_provider` — and then filters on the literal `'hydradb'` instead compiles, passes
-every test, and is wrong the moment a second value exists.
+The same rule one column over. The memory tables (removed in p08; the lesson stands) were keyed on
+a discriminator plus an id: `(company_id, provider)` on `memory_provider_connections`,
+`(provider, remote_database_id)` on `memory_remote_resource_lifecycles` and `memory_cleanup_jobs`.
+A query that already has the discriminator in scope — returned by a CTE, read off the job row, held
+in `companies.memory_provider` — and then filters on the literal `'hydradb'` instead compiles,
+passes every test, and is wrong the moment a second value exists.
 
 Three shapes, all found in one sweep:
 
@@ -107,9 +107,8 @@ cleanup may accept `404` only after the bounded provider-operation quiescence de
 
 Status and lease columns are one state machine. Add database checks that make incoherent states
 impossible: an in-flight row has an owner and expiry, while pending/terminal rows do not retain
-lease data. Recovery and dashboard queries must temporarily classify legacy in-flight rows with
-missing lease data as stalled; a predicate such as `lock_expires_at <= CURRENT_TIMESTAMP` does not
-match `NULL`.
+lease data. Recovery and dashboard queries must classify an in-flight row with missing lease data
+as stalled; a predicate such as `lock_expires_at <= CURRENT_TIMESTAMP` does not match `NULL`.
 
 Audit and repair existing rows before validating a new constraint. Mirror the strongest existing
 queue constraint rather than inventing subtly different semantics for each queue.
@@ -130,7 +129,7 @@ Do not weaken these patterns while refactoring adjacent persistence code:
 - completion, failure, payload replacement, and lease renewal stay conditional on the current
   worker owning a live lease;
 - approval consumption stays atomic, status-checked, and expiry-checked;
-- approval, outreach, task, and delivery changes that must agree stay transactionally grouped;
+- workflow run, job, decision and delivery changes that must agree stay transactionally grouped;
 - message deduplication verifies the canonical content hash before reusing an existing message id;
 - dynamic list filters remain bound parameters (for example through `QueryBuilder`), never string
   interpolation; and
@@ -232,7 +231,7 @@ delivery rather than of the message and add it to the versioned payload delibera
 
 For the table's file in this directory, all five of these change or the column is silently dropped:
 
-- the `*Db` struct (`ChannelDb`, `ThreadDb`, `BackgroundTaskDb`, …) — `sqlx::FromRow`, DB-shaped types
+- the `*Db` struct (`ChannelDb`, `ThreadDb`, `AgentDb`, …) — `sqlx::FromRow`, DB-shaped types
   (`String`, `Vec<String>`), not the newtypes;
 - the `From<*Db> for <Entity>` impl, which is where newtype conversion belongs;
 - the shared `SELECT` const where one exists (`CHANNEL_SELECT`, `THREAD_SELECT`, `MESSAGE_SELECT`) —
@@ -265,9 +264,8 @@ in test modules elsewhere. Find them before you start, so the size of the change
 grep -rn "impl ChannelPersistence for" src/
 ```
 
-`ChannelPersistence` has seven, `CompanyPersistence` nine. They are spread across
-`adapters/smtp/server.rs`, `adapters/http/routes/webhooks/sendgrid.rs`,
-`application/services/{task_worker,outreach_tool}.rs` and the various `mod tests`.
+`ChannelPersistence` has five, `CompanyPersistence` seven. Besides the Postgres ones they are in
+`adapters/smtp/server.rs`, `application/services/test_support.rs` and the various `mod tests`.
 
 # 6. Struct literals in fixtures
 
@@ -286,14 +284,14 @@ DATABASE_URL="postgres://$(whoami)@localhost:5432/mail_agents" \
 Run it after any SQL change and commit the result, per `src/AGENTS.md`. But know what it does and
 does not verify here, because this directory is split:
 
-- **Compile-time macros** (`query!`, `query_as!`) — `agent.rs`, `company.rs`, `company_invite.rs`,
-  `user.rs`. These are checked against the live schema, produce `.sqlx/` entries, and will fail the
-  build on a stale cache.
-- **Runtime queries** (`sqlx::query`, `sqlx::query_as::<_, T>`) — `approval.rs`, `channel.rs`,
-  `task.rs`, `thread.rs`. These are **plain strings**. Nothing checks them at compile time, they
-  generate no `.sqlx/` entries, and a wrong column name is a runtime error only.
+- **Compile-time macros** (`query!`, `query_as!`, `query_scalar!`) — `agent.rs`,
+  `company_invite.rs`, `user.rs`. These are checked against the live schema, produce `.sqlx/`
+  entries, and will fail the build on a stale cache.
+- **Runtime queries** (`sqlx::query`, `sqlx::query_as::<_, T>`) — everything else, `channel.rs`,
+  `thread/` and `workflow/` included. These are **plain strings**. Nothing checks them at compile
+  time, they generate no `.sqlx/` entries, and a wrong column name is a runtime error only.
 
-So an empty `.sqlx/` diff after touching `channel.rs` or `task.rs` is expected and proves nothing.
+So an empty `.sqlx/` diff after touching `channel.rs` or `workflow/` is expected and proves nothing.
 Run the command anyway — the macro files share the database and a stale cache there either fails the
 Fly.io build or, worse, keeps building the old query shape.
 
@@ -404,16 +402,17 @@ written to tolerate that — and this runs parallel and should stay that way:
   from inherited flake, and "this suite is just flaky" is the wrong conclusion almost every time.
   `git stash` and run the same filter three or four times before attributing anything to anyone.
   A deterministic green baseline means the flake is yours, and the cause is usually the residue
-  rule above: a new test left one `pending` `memory_provisioning_jobs` row, `claim_provisioning_job`
-  is table-wide, and three unrelated tests failed intermittently because of it.
+  rule above: a new test left one `pending` `memory_provisioning_jobs` row (a table since removed),
+  `claim_provisioning_job` was table-wide, and three unrelated tests failed intermittently because
+  of it.
 
 A test that cannot be written to any of these rules is the case `own_database` exists for; prefer it
 over `--test-threads=1`, and if a test still cannot be isolated, run just that test rather than
 serialising the whole suite — that hides the next isolation bug instead of surfacing it.
 
-This blind spot is not hypothetical: `find_outbound_reply_excludes_outreach_messages` in
-`thread.rs` had three INSERTs naming columns that no migration creates (`task_outreaches.target_count`,
-the outbox's `channel_id`, `task_outreach_targets.id`) and failed unnoticed because CI never sets
+This blind spot is not hypothetical: a thread test (since removed with the outreach tables) had
+three INSERTs naming columns that no migration created (`task_outreaches.target_count`, the
+outbox's `channel_id`, `task_outreach_targets.id`) and failed unnoticed because CI never set
 `DATABASE_URL`.
 
 Finally, extend the round-trip assertion rather than only adding the field. A model change is not
@@ -435,20 +434,20 @@ the same treatment.
 
 **Alias to a word, not an initial.** `FROM threads t` / `JOIN email_messages em ON em.id =
 tm.email_message_id` forces the reader to hold a decoder ring for the length of the query, and the
-ring is per-query — `a` is `agents` in `agent.rs:100` and `accepted` in `company_invite.rs:196`. The
-anti-examples are `t`/`tm` (`thread.rs:129,138`), `ch`/`cs`/`cp`/`ca` (`channel.rs:57-83`) and
-`i`/`a`/`m` (`company_invite.rs`). The model to copy is `task.rs`: `task_outreaches AS outreach`,
-`message_deliveries AS delivery`, `task_outreach_targets AS target`.
+ring is per-query. The anti-examples are `ch`/`cs` (`CHANNEL_SELECT` in `channel.rs`) and
+`i`/`a`/`m` (`company_invite.rs`). The model to copy is `workflow/message_intents.rs`:
+`workflow_bindings AS binding`, `workflow_binding_revisions AS configuration`,
+`workflow_message_intents AS intent`.
 
 These aliases leak. The shared `SELECT` consts from step 3 are `format!`ed into a `WHERE`/`JOIN`
 clause at thirteen call sites that spell the alias themselves —
 `format!("{CHANNEL_SELECT} WHERE ch.id = $1")` — so renaming one is a cross-file edit. Do it when
 you're already changing that query, not as a sweep.
 
-**Name the columns instead of `SELECT *`.** `SELECT * FROM human_approvals` (`approval.rs:244, 269,
-321, 477`) feeds a `query_as::<_, ApprovalDb>`, so the row struct and the table are coupled by column
-name and order with nothing stating either. A shared column const is the fix — `task.rs` already does
-this with `OUTBOX_COLUMNS`, and step 3 makes that const the one place you edit per model change.
+**Name the columns instead of `SELECT *`.** A `SELECT *` feeding a `query_as::<_, RowDb>` (the
+removed `approval.rs` had four) couples the row struct and the table by column name and order with
+nothing stating either. A shared column const is the fix — `agent.rs` does this with
+`AGENT_COLUMNS`, and step 3 makes that const the one place you edit per model change.
 
 None of this is licence to reformat a query you aren't otherwise touching, and it is not an argument
 against genuinely dense SQL: a `CASE` expression or a window function that carries real logic stays.

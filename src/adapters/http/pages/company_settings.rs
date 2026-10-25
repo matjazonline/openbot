@@ -87,15 +87,7 @@ pub struct CompanyDraft<'a> {
     /// submitted text so a rejected save comes back showing what was picked -- see
     /// [`company_fields`], which is where it becomes an [`AvatarUrl`] again.
     pub avatar_url: &'a str,
-    pub memory_provider: &'a str,
     pub default_add_3rd_party: bool,
-    pub default_participant_emails: String,
-    pub default_retrieve_company_memory: bool,
-    pub default_retrieve_agent_memory: bool,
-    pub default_retrieve_user_memory: bool,
-    pub default_persist_company_memory: bool,
-    pub default_persist_agent_memory: bool,
-    pub default_persist_user_memory: bool,
     pub model_connections: Vec<CompanyModelConnectionDraft>,
 }
 
@@ -116,15 +108,7 @@ impl Default for CompanyDraft<'_> {
             name: "",
             slug: "",
             avatar_url: "",
-            memory_provider: "",
             default_add_3rd_party: true,
-            default_participant_emails: String::new(),
-            default_retrieve_company_memory: false,
-            default_retrieve_agent_memory: false,
-            default_retrieve_user_memory: false,
-            default_persist_company_memory: false,
-            default_persist_agent_memory: false,
-            default_persist_user_memory: false,
             model_connections: Vec::new(),
         }
     }
@@ -256,14 +240,6 @@ pub fn company_settings_empty_pane(message: &str, swap: FragmentSwap) -> String 
 }
 
 pub fn company_edit_pane(pane: &CompanyEditPane<'_>) -> String {
-    company_edit_pane_with_memory(pane, None, &ConfiguredMemoryProviders::default())
-}
-
-pub fn company_edit_pane_with_memory(
-    pane: &CompanyEditPane<'_>,
-    memory: Option<&MemoryConnection>,
-    configured: &ConfiguredMemoryProviders,
-) -> String {
     let company_id = pane.company.id;
 
     format!(
@@ -288,7 +264,7 @@ pub fn company_edit_pane_with_memory(
         created_at = super::format_date(pane.company.created_at),
         tabs = company_tabs(company_id, pane.body.tab()),
         body = match pane.body {
-            CompanyPaneBody::Settings => company_settings_body(pane, memory, configured),
+            CompanyPaneBody::Settings => company_settings_body(pane),
             CompanyPaneBody::Team(html) => html.to_string(),
             CompanyPaneBody::Skills(html) => html.to_string(),
         },
@@ -329,11 +305,7 @@ fn company_tabs(company_id: Uuid, tab: CompanyTab) -> String {
 }
 
 /// The Settings tab: what the company holds, and the form that changes it.
-fn company_settings_body(
-    pane: &CompanyEditPane<'_>,
-    memory: Option<&MemoryConnection>,
-    configured: &ConfiguredMemoryProviders,
-) -> String {
+fn company_settings_body(pane: &CompanyEditPane<'_>) -> String {
     if !pane.editable {
         return r##"
             <div class="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
@@ -364,7 +336,6 @@ fn company_settings_body(
                 {workspace_links}
                 <form hx-put="/ui/companies/{company_id}" hx-target="#company-pane" hx-swap="outerHTML" class="space-y-4">
                     {fields}
-                    {memory_status}
                     <div class="flex items-center gap-3 border-t border-base-300 pt-4">
                         <button type="submit" class="btn btn-primary">
                             <span class="loading loading-spinner loading-sm hidden [.htmx-request_&]:inline-block"></span>
@@ -389,19 +360,11 @@ fn company_settings_body(
         error_html = form_error_banner(pane.error),
         resend_api_section = pane.resend_api_section,
         workspace_links = workspace_links(company_id, pane.counts),
-        fields = company_fields(&draft, configured),
-        memory_status = memory_status(pane.company.id, memory, configured),
+        fields = company_fields(&draft),
     )
 }
 
 pub fn company_create_pane(pane: &CompanyCreatePane<'_>) -> String {
-    company_create_pane_with_memory(pane, &ConfiguredMemoryProviders::default())
-}
-
-pub fn company_create_pane_with_memory(
-    pane: &CompanyCreatePane<'_>,
-    configured: &ConfiguredMemoryProviders,
-) -> String {
     format!(
         r##"
         <section id="company-pane"{PANE_SKELETON} class="ui-pane-detail flex min-w-0 flex-1 flex-col bg-base-100">
@@ -430,7 +393,7 @@ pub fn company_create_pane_with_memory(
         </section>
         "##,
         error_html = form_error_banner(pane.error),
-        fields = company_fields(pane.draft, configured),
+        fields = company_fields(pane.draft),
     )
 }
 
@@ -455,9 +418,9 @@ fn workspace_links(company_id: Uuid, counts: CompanyCounts) -> String {
                         <span class="text-[11px] font-normal opacity-60">Skills</span>
                     </a>
                     <a href="/ui/companies/{company_id}/usage" class="btn btn-ghost h-auto flex-col gap-0 py-2">Model usage</a>
-                    <a href="/ui/tasks?company_id={company_id}" class="btn btn-ghost h-auto flex-col gap-0 py-2">
-                        <span class="text-lg font-bold">{tasks_glyph}</span>
-                        <span class="text-[11px] font-normal opacity-60">Tasks</span>
+                    <a href="/ui/work?company_id={company_id}" class="btn btn-ghost h-auto flex-col gap-0 py-2">
+                        <span class="text-lg font-bold">{work_glyph}</span>
+                        <span class="text-[11px] font-normal opacity-60">Work</span>
                     </a>
                     <a href="/ui?company_id={company_id}" class="btn btn-ghost h-auto flex-col gap-0 py-2">
                         <span class="text-lg font-bold">{mailbox_glyph}</span>
@@ -468,13 +431,13 @@ fn workspace_links(company_id: Uuid, counts: CompanyCounts) -> String {
         channels = counts.channels,
         agents = counts.agents,
         skills = counts.skills,
-        tasks_glyph = icon(Icon::Gear, "h-5 w-5"),
+        work_glyph = icon(Icon::Gear, "h-5 w-5"),
         mailbox_glyph = icon(Icon::Mail, "h-5 w-5"),
     )
 }
 
 /// Everything about a company except which URL its form submits to.
-fn company_fields(draft: &CompanyDraft<'_>, configured: &ConfiguredMemoryProviders) -> String {
+fn company_fields(draft: &CompanyDraft<'_>) -> String {
     let overrides_open = if draft.model_connections.is_empty() {
         ""
     } else {
@@ -502,33 +465,12 @@ fn company_fields(draft: &CompanyDraft<'_>, configured: &ConfiguredMemoryProvide
                                 class="input w-full font-mono">
                         </label>
                     </div>
-                    <label class="form-control w-full">
-                        <div class="label"><span class="text-xs opacity-70">Long-term memory</span></div>
-                        <select name="memory_provider" class="select w-full">
-                            <option value="" {memory_disabled_selected}>Disabled</option>
-                            {memory_provider_options}
-                        </select>
-                        <div class="label"><span class="text-[11px] opacity-60">Disabling suspends memory immediately but retains the provider connection and channel memory choices. Company deletion removes the remote memory. Hindsight extracts facts in the background, so a memory becomes recallable shortly after the reply rather than at once.</span></div>
-                    </label>
                     <details class="collapse-arrow collapse border border-base-300 bg-base-200">
-                        <summary class="collapse-title text-sm font-medium">New agent channel defaults</summary>
+                        <summary class="collapse-title text-sm font-medium">New assistant channel defaults</summary>
                         <div class="collapse-content space-y-4">
-                            <label class="form-control"><span class="text-xs opacity-70">Participants / access</span>
-                                <textarea name="default_participant_emails" rows="2" class="textarea w-full" placeholder="person@example.com, or @public">{default_participants}</textarea>
-                                <span class="text-[11px] opacity-60">Blank is team-only. @public requires spam scanning.</span>
-                            </label>
                             <label class="form-control"><span class="text-xs opacity-70">Allow trusted senders to add third parties</span>
                                 <select name="default_add_3rd_party" class="select w-full"><option value="true"{default_third_party_yes}>Yes</option><option value="false"{default_third_party_no}>No</option></select>
                             </label>
-                            <div class="grid grid-cols-1 gap-2 md:grid-cols-2">
-                                <label class="label cursor-pointer justify-start gap-2"><input type="checkbox" name="default_retrieve_company_memory" value="true" class="checkbox checkbox-sm"{drc}><span>Read company memory</span></label>
-                                <label class="label cursor-pointer justify-start gap-2"><input type="checkbox" name="default_persist_company_memory" value="true" class="checkbox checkbox-sm"{dpc}><span>Write company memory</span></label>
-                                <label class="label cursor-pointer justify-start gap-2"><input type="checkbox" name="default_retrieve_agent_memory" value="true" class="checkbox checkbox-sm"{dra}><span>Read agent memory</span></label>
-                                <label class="label cursor-pointer justify-start gap-2"><input type="checkbox" name="default_persist_agent_memory" value="true" class="checkbox checkbox-sm"{dpa}><span>Write agent memory</span></label>
-                                <label class="label cursor-pointer justify-start gap-2"><input type="checkbox" name="default_retrieve_user_memory" value="true" class="checkbox checkbox-sm"{dru}><span>Read user memory</span></label>
-                                <label class="label cursor-pointer justify-start gap-2"><input type="checkbox" name="default_persist_user_memory" value="true" class="checkbox checkbox-sm"{dpu}><span>Write user memory</span></label>
-                            </div>
-                            <p class="text-[11px] opacity-60">User memory includes authorized external participants and is isolated to this company. Grants may be saved before the selected provider is ready; they become effective only when infrastructure and agent policy allow them.</p>
                         </div>
                     </details>
                     <details class="collapse-arrow collapse border border-base-300 bg-base-200"{overrides_open}>
@@ -548,13 +490,6 @@ fn company_fields(draft: &CompanyDraft<'_>, configured: &ConfiguredMemoryProvide
         }),
         name = escape_html_text(draft.name),
         slug = escape_html_text(draft.slug),
-        memory_disabled_selected = if draft.memory_provider.is_empty() {
-            "selected"
-        } else {
-            ""
-        },
-        memory_provider_options = memory_provider_options(draft.memory_provider, configured),
-        default_participants = escape_html_text(&draft.default_participant_emails),
         default_third_party_yes = if draft.default_add_3rd_party {
             " selected"
         } else {
@@ -565,12 +500,6 @@ fn company_fields(draft: &CompanyDraft<'_>, configured: &ConfiguredMemoryProvide
         } else {
             " selected"
         },
-        drc = checked(draft.default_retrieve_company_memory),
-        dra = checked(draft.default_retrieve_agent_memory),
-        dru = checked(draft.default_retrieve_user_memory),
-        dpc = checked(draft.default_persist_company_memory),
-        dpa = checked(draft.default_persist_agent_memory),
-        dpu = checked(draft.default_persist_user_memory),
     )
 }
 
@@ -639,96 +568,6 @@ fn company_model_connections(draft: &CompanyDraft<'_>) -> String {
         .collect()
 }
 
-/// One option per known provider, disabled unless this deployment can actually run it. Rendering
-/// from `MemoryProviderKind::ALL` is what keeps the form and the enum from drifting apart.
-pub(super) fn memory_provider_options(
-    selected: &str,
-    configured: &ConfiguredMemoryProviders,
-) -> String {
-    MemoryProviderKind::ALL
-        .into_iter()
-        .map(|kind| {
-            format!(
-                r#"<option value="{value}" {selected} {disabled}>{label}</option>"#,
-                value = kind.as_str(),
-                selected = if selected == kind.as_str() {
-                    "selected"
-                } else {
-                    ""
-                },
-                disabled = if configured.contains(kind) {
-                    ""
-                } else {
-                    "disabled"
-                },
-                label = escape_html_text(kind.label()),
-            )
-        })
-        .collect()
-}
-
-fn memory_status(
-    company_id: Uuid,
-    memory: Option<&MemoryConnection>,
-    configured: &ConfiguredMemoryProviders,
-) -> String {
-    let Some(memory) = memory else {
-        let detail = if configured.is_empty() {
-            "Long-term memory is unavailable because this deployment configures no provider."
-                .to_string()
-        } else {
-            "Long-term memory is disabled.".to_string()
-        };
-        return format!(
-            r#"<div class="alert"><span>{}</span></div>"#,
-            escape_html_text(&detail),
-        );
-    };
-    let readiness = match (
-        memory.readiness,
-        memory.provisioning_phase,
-        memory.last_error.as_deref(),
-    ) {
-        (MemoryConnectionReadiness::Ready, _, _) => "ready",
-        (MemoryConnectionReadiness::Failed, _, Some(MEMORY_READINESS_TIMEOUT_ERROR)) => "timed out",
-        (MemoryConnectionReadiness::Failed, _, _) => "provider failed",
-        (_, _, Some(_)) => "retrying a provider error",
-        (_, Some(MemoryProvisioningPhase::CreatePending), _) => "creating",
-        (_, Some(MemoryProvisioningPhase::WaitingReady), _) => "waiting for readiness",
-        _ => memory.readiness.as_str(),
-    };
-    let retry = if memory.readiness == MemoryConnectionReadiness::Failed
-        && configured.contains(memory.provider)
-    {
-        format!(
-            r##"<button type="button" class="btn btn-sm" hx-post="/ui/companies/{company_id}/memory/retry" hx-target="#company-pane" hx-swap="outerHTML" hx-disabled-elt="this"><span class="loading loading-spinner loading-xs hidden [.htmx-request_&]:inline-block"></span>Retry provisioning</button>"##
-        )
-    } else {
-        String::new()
-    };
-    let error = memory
-        .last_error
-        .as_deref()
-        .map(|error| {
-            format!(
-                r#"<p class="text-xs opacity-70">{}</p>"#,
-                escape_html_text(error)
-            )
-        })
-        .unwrap_or_default();
-    format!(
-        r#"<div class="alert flex items-center justify-between"><div><span class="badge badge-outline">{}: {}</span>{}</div>{}</div>"#,
-        escape_html_text(memory.provider.label()),
-        escape_html_text(readiness),
-        error,
-        retry,
-    )
-}
-
-fn checked(value: bool) -> &'static str {
-    if value { " checked" } else { "" }
-}
-
 /// A stored company as the form sees it.
 fn stored_draft<'a>(
     company: &'a Company,
@@ -738,29 +577,7 @@ fn stored_draft<'a>(
         name: &company.name,
         slug: &company.slug,
         avatar_url: company.avatar_url.as_deref().unwrap_or(""),
-        memory_provider: company
-            .memory_provider
-            .map(MemoryProviderKind::as_str)
-            .unwrap_or(""),
         default_add_3rd_party: company.channel_defaults.add_3rd_party,
-        default_participant_emails: company
-            .channel_defaults
-            .participant_emails
-            .as_ref()
-            .map(|values| {
-                values
-                    .iter()
-                    .map(ToString::to_string)
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            })
-            .unwrap_or_default(),
-        default_retrieve_company_memory: company.channel_defaults.retrieve_company_memory,
-        default_retrieve_agent_memory: company.channel_defaults.retrieve_agent_memory,
-        default_retrieve_user_memory: company.channel_defaults.retrieve_user_memory,
-        default_persist_company_memory: company.channel_defaults.persist_company_memory,
-        default_persist_agent_memory: company.channel_defaults.persist_agent_memory,
-        default_persist_user_memory: company.channel_defaults.persist_user_memory,
         model_connections: connections
             .iter()
             .map(|connection| CompanyModelConnectionDraft {

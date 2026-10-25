@@ -1,4 +1,5 @@
 use super::{RunId, StepId};
+use chrono::{DateTime, SecondsFormat, Utc};
 use serde_json::{Map, Value};
 use std::borrow::Cow;
 use std::collections::BTreeMap;
@@ -102,6 +103,7 @@ enum ReferenceRoot {
     Step(StepId),
     RunId,
     ParentRunId,
+    RunDeadline,
 }
 
 impl ContextReference {
@@ -117,6 +119,7 @@ impl ContextReference {
             ),
             Some("run") if path.len() == 2 && path[1] == "id" => ReferenceRoot::RunId,
             Some("run") if path.len() == 2 && path[1] == "parent_id" => ReferenceRoot::ParentRunId,
+            Some("run") if path.len() == 2 && path[1] == "deadline" => ReferenceRoot::RunDeadline,
             _ => return Err(ContextError::InvalidReference(pointer.into())),
         };
         Ok(Self {
@@ -141,7 +144,7 @@ impl ContextReference {
         match self.root {
             ReferenceRoot::Input | ReferenceRoot::Params => &self.path[1..],
             ReferenceRoot::Step(_) => &self.path[3..],
-            ReferenceRoot::RunId | ReferenceRoot::ParentRunId => &[],
+            ReferenceRoot::RunId | ReferenceRoot::ParentRunId | ReferenceRoot::RunDeadline => &[],
         }
     }
 
@@ -152,6 +155,7 @@ impl ContextReference {
             ReferenceRoot::Step(_) => "steps",
             ReferenceRoot::RunId => "run.id",
             ReferenceRoot::ParentRunId => "run.parent_id",
+            ReferenceRoot::RunDeadline => "run.deadline",
         }
     }
 }
@@ -176,6 +180,14 @@ impl Default for ContextLimits {
 pub struct RunMetadata {
     pub run_id: RunId,
     pub parent_run_id: Option<RunId>,
+    /// The run's own admission deadline (children inherit it); absent only while admitting.
+    pub deadline: Option<DateTime<Utc>>,
+}
+
+/// `/run/deadline` in its one canonical form: UTC RFC3339 at the microsecond precision the run
+/// row stores, so a replayed step input digests identically (p08 D2.5).
+pub fn render_deadline(deadline: DateTime<Utc>) -> String {
+    deadline.to_rfc3339_opts(SecondsFormat::Micros, true)
 }
 
 pub struct Context<'a> {
@@ -281,6 +293,13 @@ fn reference<'a>(
                     .parent_run_id
                     .map_or(Value::Null, |id| Value::String(id.to_string())),
             ));
+        }
+        ReferenceRoot::RunDeadline => {
+            let deadline = context
+                .run
+                .deadline
+                .ok_or_else(|| ContextError::Missing(pointer.as_str().into()))?;
+            return Ok(Cow::Owned(Value::String(render_deadline(deadline))));
         }
     };
     Ok(Cow::Borrowed(value))

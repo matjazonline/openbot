@@ -37,10 +37,7 @@
 //! rows a claim took cannot tolerate a neighbour's rows, and a test that leaves a claimable row
 //! behind breaks whichever test claims it next. [`own_database`] hands one test a database of its
 //! own, migrated, and drops it when the handle goes out of scope — on a panic too.
-//! `task/claim_tests.rs` runs on it, which is why those tests assert exact claim results instead of
-//! working around whatever else is in the queue.
 
-use chrono::{DateTime, Utc};
 use sqlx::postgres::PgPoolOptions;
 use sqlx::{Connection, PgConnection, PgPool};
 use tokio::sync::OnceCell;
@@ -49,14 +46,10 @@ use uuid::Uuid;
 use crate::{
     adapters::persistence::PostgresPersistence,
     entities::{
-        attention::BusinessPriority,
         correlation::CorrelationId,
         message::{CanonicalMessageId, MessageDirection, MessageRole},
-        runtime_metrics::{MachineId, MachineIdentity, MachineRegion},
-        thread_handoff::ThreadHandoffState,
         transport::{
-            ChannelBindingId, DeliveryId, DeliveryPurpose, ExternalDestination, PrincipalId,
-            TransportKind,
+            ChannelBindingId, DeliveryId, DeliveryPurpose, ExternalDestination, TransportKind,
         },
         value_objects::EmailAddress,
     },
@@ -72,16 +65,6 @@ use crate::{
 
 /// The suffix that separates the tests' database from the one you develop against.
 const TEST_DB_SUFFIX: &str = "_test";
-
-/// A fixed machine for the attempt ledger, so a test asserting on what was recorded has something
-/// to compare against. The real one is [`MachineIdentity::process`], which is boot-local off Fly
-/// and would differ from run to run.
-pub fn test_machine() -> MachineIdentity {
-    MachineIdentity {
-        id: MachineId::new("test-machine"),
-        region: Some(MachineRegion::new("tst")),
-    }
-}
 
 /// Migrations run once per test binary, not once per test.
 static MIGRATED: OnceCell<()> = OnceCell::const_new();
@@ -208,13 +191,19 @@ async fn purge_fixtures(pool: &PgPool) {
     .expect("the test database can be cleared between runs");
 }
 
+/// Options for every test pool: the production pool's guard, so tests run on the connection
+/// hygiene production has (WF-C004).
+pub fn pool_options() -> PgPoolOptions {
+    crate::infra::db::discard_leaked_transactions(PgPoolOptions::new())
+}
+
 /// A pool against the test database, with migrations applied, or `None` when unconfigured.
 ///
 /// Panics if a database was configured but cannot be reached — see the module docs.
 pub async fn test_pool() -> Option<PgPool> {
     let url = test_database_url()?;
 
-    let pool = match PgPool::connect(&url).await {
+    let pool = match pool_options().connect(&url).await {
         Ok(pool) => pool,
         Err(error) => panic!(
             "DATABASE_URL is set, so these tests are meant to run, but the test database could not \
@@ -301,7 +290,7 @@ async fn migrated_own_database() -> Option<OwnDatabase> {
     // Every isolated test holds a pool of its own and `cargo test` runs them in parallel, so these
     // are kept small: the default of ten would put a busy machine's worth of tests within reach of
     // the server's `max_connections`. A test that needs more fan-out than this opens its own pool.
-    let pool = PgPoolOptions::new()
+    let pool = pool_options()
         .max_connections(5)
         .connect(&with_database_name(&url, &name))
         .await
@@ -365,7 +354,6 @@ pub struct DeliveryFixtureRequest<'a> {
     pub company_id: Uuid,
     pub channel_id: Uuid,
     pub thread_id: Uuid,
-    pub task_id: Option<Uuid>,
     /// Distinguishes one fixture delivery from another within the same interface, which is what
     /// the unique index is over.
     pub source_key: &'a str,
@@ -385,7 +373,6 @@ impl<'a> DeliveryFixtureRequest<'a> {
             company_id,
             channel_id,
             thread_id,
-            task_id: None,
             source_key,
             recipient: "customer@example.com",
             subject: "Re: order",
@@ -451,7 +438,6 @@ pub async fn delivery_fixture(
             source_binding_id: binding.id,
             destination_binding_id: binding.id,
             external_destination: Some(destination),
-            task_id: request.task_id,
             depends_on_delivery_id: request.depends_on,
             correlation_id: CorrelationId::new(),
             transport: TransportKind::Email,
@@ -483,95 +469,6 @@ fn fixture_part(key: &DeliveryKey, index: u16, body: &str) -> RenderedPart {
         .expect("a small object encodes"),
         digest: ContentDigest::sha256_of(body.as_bytes()),
     }
-}
-
-/// One `thread_handoffs` row and the canonical message it names.
-///
-/// Shared because three test modules need the same two rows -- the projection tests, the command
-/// tests and the route tests -- and because the handoff's foreign keys make "just insert a row"
-/// impossible: its source message has to be a real, same-company message.
-pub struct ThreadHandoffFixture {
-    pub handoff_id: Uuid,
-    pub generation: Uuid,
-    pub message_id: CanonicalMessageId,
-}
-
-/// What a fixture handoff should look like. Defaults to a freshly held reply nobody has claimed.
-pub struct ThreadHandoffFixtureRequest {
-    pub company_id: Uuid,
-    pub channel_id: Uuid,
-    pub thread_id: Uuid,
-    pub state: ThreadHandoffState,
-    pub responsible_principal_id: Option<PrincipalId>,
-    pub priority: BusinessPriority,
-    pub due_at: Option<DateTime<Utc>>,
-}
-
-impl ThreadHandoffFixtureRequest {
-    pub const fn new(company_id: Uuid, channel_id: Uuid, thread_id: Uuid) -> Self {
-        Self {
-            company_id,
-            channel_id,
-            thread_id,
-            state: ThreadHandoffState::NeedsInstruction,
-            responsible_principal_id: None,
-            priority: BusinessPriority::Normal,
-            due_at: None,
-        }
-    }
-}
-
-/// Write the message and the handoff row that names it, at version 1.
-///
-/// Written directly rather than through `open_handoff_generation_on`, because a projection or
-/// command test needs to state a state, a responsibility and a priority that the opening path
-/// deliberately cannot produce. `closed_at` follows the state, so `thread_handoffs_closure_check`
-/// accepts a terminal fixture as readily as an open one.
-pub async fn thread_handoff_fixture(
-    persistence: &PostgresPersistence,
-    request: ThreadHandoffFixtureRequest,
-) -> ThreadHandoffFixture {
-    let write = MessageWrite::internal(
-        request.thread_id,
-        MessageAuthorWrite::Platform,
-        "Invoice 4471".to_string(),
-        "Any news on this?".to_string(),
-        MessageDirection::Inbound,
-        MessageRole::Human,
-        CorrelationId::new(),
-    )
-    .external_conversation();
-    let message_id = write.id;
-    ThreadPersistence::create_message(persistence, &write)
-        .await
-        .expect("the fixture message is stored");
-
-    let fixture = ThreadHandoffFixture {
-        handoff_id: Uuid::new_v4(),
-        generation: Uuid::new_v4(),
-        message_id,
-    };
-    sqlx::query(
-        r#"INSERT INTO thread_handoffs (
-               id, company_id, channel_id, thread_id, generation, state, source_message_id,
-               responsible_principal_id, business_priority, business_due_at, closed_at
-           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-                     CASE WHEN $6 IN ('resolved', 'dismissed') THEN CURRENT_TIMESTAMP END)"#,
-    )
-    .bind(fixture.handoff_id)
-    .bind(request.company_id)
-    .bind(request.channel_id)
-    .bind(request.thread_id)
-    .bind(fixture.generation)
-    .bind(request.state.as_str())
-    .bind(message_id.as_uuid())
-    .bind(request.responsible_principal_id.map(PrincipalId::as_uuid))
-    .bind(request.priority.as_str())
-    .bind(request.due_at)
-    .execute(persistence.pool())
-    .await
-    .expect("the fixture handoff is stored");
-    fixture
 }
 
 /// Wait until some backend of this test's database is blocked on a lock.

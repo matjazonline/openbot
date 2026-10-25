@@ -23,7 +23,11 @@ impl WorkflowAdmission for PostgresPersistence {
             tx.commit().await?;
             return Ok(result);
         }
-        verify_current(&mut tx, command).await?;
+        if !verify_current(&mut tx, command).await? {
+            // Nothing was written; the caller re-reads the binding and decides again.
+            tx.rollback().await?;
+            return Ok(AdmissionResult::Stale);
+        }
         authorize_token_reviewers(&mut tx, command).await?;
         resources::check_readiness(&mut tx, command.binding()).await?;
         admission_write::create(&mut tx, command, &source).await?;
@@ -61,34 +65,49 @@ fn token_reviewers(command: &PreparedAdmission) -> Vec<Uuid> {
         .unwrap_or_default()
 }
 
+/// `false` when the binding's current configuration is not the one this admission prepared
+/// against or the caller evaluated: a concurrent reconfiguration, deactivation or re-selection
+/// (p08 D1.4.5 `Stale`). A binding narrower than the run's association is a caller error.
 async fn verify_current(
     tx: &mut Transaction<'_, Postgres>,
     command: &PreparedAdmission,
-) -> AppResult<()> {
+) -> AppResult<bool> {
     // The company lock serializes lifecycle edits; the row lock additionally
     // closes direct head deletion/update races until this admission commits.
-    sqlx::query_scalar::<_, Uuid>(
+    let exists = sqlx::query_scalar::<_, Uuid>(
         "SELECT id FROM workflow_bindings WHERE company_id = $1 AND id = $2 FOR SHARE",
     )
     .bind(command.company_id().as_uuid())
     .bind(command.binding().id().as_uuid())
     .fetch_optional(&mut **tx)
-    .await?
-    .ok_or_else(conflict)?;
-    let current = binding_rows::read_binding(tx, command.company_id(), command.binding().id())
-        .await?
-        .ok_or_else(conflict)?;
+    .await?;
+    if exists.is_none() {
+        return Ok(false);
+    }
+    let Some(current) =
+        binding_rows::read_binding(tx, command.company_id(), command.binding().id()).await?
+    else {
+        return Ok(false);
+    };
     let selected = command.binding();
+    if !within_association(current.association, command.association()) {
+        return Err(conflict());
+    }
     if !current.active
-        || !within_association(current.association, command.association())
+        || command
+            .expected_binding_revision()
+            .is_some_and(|expected| expected != current.configuration.revision())
         || current.configuration.revision() != selected.revision()
         || current.configuration.params() != selected.params()
         || current.configuration.resources() != selected.resources()
+        || current.configuration.run_as() != selected.run_as()
+        || current.configuration.message_trigger() != selected.message_trigger()
         || store_bundle(current.configuration.bundle())? != store_bundle(selected.bundle())?
     {
-        return Err(conflict());
+        return Ok(false);
     }
-    bindings::verify_selection(tx, selected).await
+    bindings::verify_selection(tx, selected).await?;
+    Ok(true)
 }
 
 fn within_association(binding: RelatedAssociation, run: RelatedAssociation) -> bool {

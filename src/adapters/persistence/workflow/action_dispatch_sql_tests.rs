@@ -93,7 +93,10 @@ async fn workflow_action_dispatch_sql_deferred_run_deadline_rejects_effect_and_r
     Dispatch::insert(&mut tx, &request, marker, "local", policy)
         .await
         .unwrap();
-    Effect(0).apply(&mut tx, &action).await.unwrap();
+    Effect(0)
+        .apply(&mut tx, &action, &request.subject)
+        .await
+        .unwrap();
     receipt(&mut tx, &request, marker, "local").await.unwrap();
     sqlx::query(
         "UPDATE workflow_runs SET created_at=clock_timestamp()-interval '10 seconds', deadline=clock_timestamp()-interval '1 second' WHERE id=$1",
@@ -127,8 +130,9 @@ impl SqlLocalAction for BlockedEffect<'_> {
         &self,
         tx: &mut Transaction<'_, Postgres>,
         action: &FrozenAction,
+        subject: &ApprovalSubject,
     ) -> AppResult<Value> {
-        let result = Effect(0).apply(tx, action).await?;
+        let result = Effect(0).apply(tx, action, subject).await?;
         self.entered.notify_one();
         self.release.notified().await;
         Ok(result)

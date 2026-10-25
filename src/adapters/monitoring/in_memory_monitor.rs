@@ -1,13 +1,13 @@
 use crate::domain::monitoring::{
-    AiExecutionMetrics, MonitoringService, SmtpConnectionMetrics, SmtpStatus, TaskExecutionMetrics,
-    TaskStatusMetric,
+    AiExecutionMetrics, MonitoringService, SmtpConnectionMetrics, SmtpStatus,
 };
 use std::collections::HashMap;
 use std::sync::RwLock;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 /// A gauge's identity is its name *and* its labels. Folding the labels into the key keeps
-/// `stuck_work{kind="dead_lettered"}` from overwriting `stuck_work{kind="delivery_overdue"}`.
+/// `stuck_work{kind="delivery_dead_lettered"}` from overwriting
+/// `stuck_work{kind="delivery_overdue"}`.
 fn gauge_key(name: &str, labels: &[(&str, &str)]) -> String {
     if labels.is_empty() {
         return name.to_string();
@@ -69,13 +69,6 @@ pub struct InMemoryMonitor {
     smtp_rejected_ptr: AtomicU64,
     smtp_errors: AtomicU64,
 
-    // Task Worker Metrics
-    task_total_executions: AtomicU64,
-    task_completed: AtomicU64,
-    task_failed: AtomicU64,
-    task_retried: AtomicU64,
-    task_total_duration_ms: AtomicU64,
-
     // Custom Counters
     custom_counters: RwLock<HashMap<String, u64>>,
     histograms: RwLock<HashMap<String, Histogram>>,
@@ -106,12 +99,6 @@ impl InMemoryMonitor {
             smtp_rejected_helo: AtomicU64::new(0),
             smtp_rejected_ptr: AtomicU64::new(0),
             smtp_errors: AtomicU64::new(0),
-
-            task_total_executions: AtomicU64::new(0),
-            task_completed: AtomicU64::new(0),
-            task_failed: AtomicU64::new(0),
-            task_retried: AtomicU64::new(0),
-            task_total_duration_ms: AtomicU64::new(0),
 
             custom_counters: RwLock::new(HashMap::new()),
             histograms: RwLock::new(HashMap::new()),
@@ -166,17 +153,6 @@ impl MonitoringService for InMemoryMonitor {
         };
     }
 
-    fn record_task_execution(&self, metrics: &TaskExecutionMetrics) {
-        self.task_total_executions.fetch_add(1, Ordering::Relaxed);
-        match metrics.status {
-            TaskStatusMetric::Completed => self.task_completed.fetch_add(1, Ordering::Relaxed),
-            TaskStatusMetric::Failed => self.task_failed.fetch_add(1, Ordering::Relaxed),
-            TaskStatusMetric::Retried => self.task_retried.fetch_add(1, Ordering::Relaxed),
-        };
-        self.task_total_duration_ms
-            .fetch_add(metrics.duration_ms, Ordering::Relaxed);
-    }
-
     fn increment_counter(&self, name: &str, value: u64, labels: &[(&str, &str)]) {
         if let Ok(mut lock) = self.custom_counters.write() {
             *lock.entry(name.to_string()).or_insert(0) += value;
@@ -209,14 +185,6 @@ impl MonitoringService for InMemoryMonitor {
         let ai_duration = self.ai_total_duration_ms.load(Ordering::Relaxed);
         let ai_avg_latency_ms = if ai_total > 0 {
             ai_duration as f64 / ai_total as f64
-        } else {
-            0.0
-        };
-
-        let task_total = self.task_total_executions.load(Ordering::Relaxed);
-        let task_duration = self.task_total_duration_ms.load(Ordering::Relaxed);
-        let task_avg_latency_ms = if task_total > 0 {
-            task_duration as f64 / task_total as f64
         } else {
             0.0
         };
@@ -264,13 +232,6 @@ impl MonitoringService for InMemoryMonitor {
                 "rejected_helo": self.smtp_rejected_helo.load(Ordering::Relaxed),
                 "rejected_ptr": self.smtp_rejected_ptr.load(Ordering::Relaxed),
                 "errors": self.smtp_errors.load(Ordering::Relaxed)
-            },
-            "tasks": {
-                "total": task_total,
-                "completed": self.task_completed.load(Ordering::Relaxed),
-                "failed": self.task_failed.load(Ordering::Relaxed),
-                "retried": self.task_retried.load(Ordering::Relaxed),
-                "avg_latency_ms": task_avg_latency_ms
             },
             "custom_counters": custom,
             "gauges": gauges,

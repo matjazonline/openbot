@@ -15,7 +15,6 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use lettre::message::Mailbox;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use tracing::warn;
@@ -30,16 +29,14 @@ use crate::{
     },
     transport::{
         CanonicalContentV1, ContentDigest, ConversationAnchor, DeliveryEnvelope, DeliveryRecord,
-        EmailDeliveryContext, EmailThreading, ExternalDestinationClassification, FailureDetail,
-        InternalMailRelay, InternalRelayMail, PartIndex, PartKey, ProviderSendOutcome,
-        RelayDisposition, RenderedPart, StandaloneDeliveryEnvelope, TransportPayload,
-        TransportRenderer, TransportSender,
+        EmailDeliveryContext, EmailThreading, FailureDetail, InternalMailRelay, InternalRelayMail,
+        PartIndex, PartKey, ProviderSendOutcome, RelayDisposition, RenderedPart,
+        StandaloneDeliveryEnvelope, TransportPayload, TransportRenderer, TransportSender,
     },
 };
 
 use super::{
-    CompanyMailTransports, EmailChannelSelectorParser, EmailRecipientDestination, MailHeader,
-    MailMessage, MailSendOutcome,
+    CompanyMailTransports, EmailChannelSelectorParser, MailHeader, MailMessage, MailSendOutcome,
 };
 
 /// The version of the frozen email payload. Bumping it makes every already-queued part fail to
@@ -281,24 +278,6 @@ impl EmailRenderer {
 impl TransportRenderer for EmailRenderer {
     fn transport(&self) -> TransportKind {
         TransportKind::Email
-    }
-
-    fn classify_external_destination(&self, value: &str) -> ExternalDestinationClassification {
-        let Ok(mailbox) = value.trim().parse::<Mailbox>() else {
-            return ExternalDestinationClassification::InvalidSyntax;
-        };
-        let email = EmailAddress::from(mailbox.email.to_string().to_lowercase());
-        match EmailChannelSelectorParser::new(&self.app_domain_name).classify(email) {
-            EmailRecipientDestination::External(destination) => {
-                ExternalDestinationClassification::External(destination)
-            }
-            EmailRecipientDestination::Channel(_) => {
-                ExternalDestinationClassification::InternalEndpoint
-            }
-            EmailRecipientDestination::InvalidPlatformAddress => {
-                ExternalDestinationClassification::InvalidInternalEndpoint
-            }
-        }
     }
 
     fn render(&self, envelope: &DeliveryEnvelope) -> AppResult<Vec<RenderedPart>> {

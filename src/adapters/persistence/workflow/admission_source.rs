@@ -100,22 +100,26 @@ async fn schedule(
     schedule: Uuid,
     occurrence: Uuid,
 ) -> AppResult<()> {
-    let (channel, thread) = binding_rows::association_columns(command.association());
+    // A scheduled run is associated with its schedule's channel (p08 D1.9).
+    let RelatedAssociation::Channel(channel) = command.association() else {
+        return Err(missing());
+    };
     // A schedule's channel is immutable. Lock schedule before occurrence, matching
-    // the capture/materialization owner; the occurrence supplies its saved scope.
+    // the capture/materialization owner; the occurrence supplies its captured binding,
+    // so retargeting the schedule later never changes what an occurrence admits.
     sqlx::query_scalar::<_, Uuid>(
         "SELECT id FROM channel_schedules WHERE company_id = $1 AND id = $2 AND channel_id = $3 FOR SHARE",
-    ).bind(command.company_id().as_uuid()).bind(schedule).bind(channel)
+    ).bind(command.company_id().as_uuid()).bind(schedule).bind(channel.as_uuid())
         .fetch_optional(&mut **tx).await?.ok_or_else(missing)?;
     sqlx::query_scalar::<_, Uuid>(
         "SELECT id FROM schedule_runs WHERE company_id = $1 AND schedule_id = $2 AND id = $3 \
-         AND channel_id = $4 AND thread_id IS NOT DISTINCT FROM $5 FOR SHARE",
+         AND channel_id = $4 AND binding_id = $5 FOR SHARE",
     )
     .bind(command.company_id().as_uuid())
     .bind(schedule)
     .bind(occurrence)
-    .bind(channel)
-    .bind(thread)
+    .bind(channel.as_uuid())
+    .bind(command.binding().id().as_uuid())
     .fetch_optional(&mut **tx)
     .await?
     .ok_or_else(missing)?;

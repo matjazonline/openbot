@@ -1,56 +1,21 @@
 use std::{env, time::Duration as StdDuration};
 
 use p256::{ecdsa::VerifyingKey, pkcs8::DecodePublicKey};
-use secrecy::SecretString;
 use time::Duration;
 
-use crate::{
-    adapters::http::session::MIN_SECRET_BYTES,
-    entities::{
-        agent::MAX_AGENT_RUN_TIMEOUT_SECS,
-        memory::{
-            MAX_MEMORY_PROVIDER_BASE_URL_BYTES, MAX_MEMORY_PROVIDER_CREDENTIAL_BYTES,
-            MAX_MEMORY_PROVIDER_REQUEST_SECONDS, MemoryProviderKind,
-        },
-        value_objects::EmailAddress,
-    },
-    services::memory_provider::ConfiguredMemoryProviders,
-};
-
-pub const DEFAULT_TASK_WORKER_CONCURRENCY: usize = 4;
-pub const MAX_TASK_WORKER_CONCURRENCY: usize = 64;
-pub const DEFAULT_AGENT_RUN_TIMEOUT_SECS: u64 = 300;
+use crate::{adapters::http::session::MIN_SECRET_BYTES, entities::value_objects::EmailAddress};
 
 /// Stack size for the async runtime's worker and blocking threads.
 ///
-/// Tokio's 2 MiB default is not enough for this process. A background task descends through
-/// `run_task_loop` -> `while_leased` -> `run_claimed_dispatch` -> `AgentRunner::execute` ->
-/// `AgentBuilder::from_yaml`, and every level is an `async fn` whose unoptimized poll frame runs
-/// to a few hundred KiB; measured on an aborted `email_agent_dispatch` run, that one chain used
-/// 2,069 KiB and hit the guard page inside serde_yaml while parsing the agent config. Reserve
-/// enough that the depth is not the thing that decides whether a task completes.
+/// Tokio's 2 MiB default is not enough for this process. A background job descends through several
+/// levels of `async fn` whose unoptimized poll frames run to a few hundred KiB each; the agent
+/// dispatch chain the workflow runtime replaced measured 2,069 KiB on one aborted run and hit the
+/// guard page. Reserve enough that the depth is not the thing that decides whether a job
+/// completes; `scripts/stack-budget.sh` is what notices the chain growing.
 pub const DEFAULT_RUNTIME_THREAD_STACK_BYTES: usize = 16 * 1024 * 1024;
 /// Below Tokio's own default the process would be less stable than leaving this unset.
 pub const MIN_RUNTIME_THREAD_STACK_BYTES: usize = 2 * 1024 * 1024;
 pub const MAX_RUNTIME_THREAD_STACK_BYTES: usize = 256 * 1024 * 1024;
-
-/// Load the bounded background-task parallelism once during process startup.
-pub fn task_worker_concurrency_from_env() -> usize {
-    parse_task_worker_concurrency(env::var("TASK_WORKER_CONCURRENCY").ok().as_deref())
-}
-
-fn parse_task_worker_concurrency(value: Option<&str>) -> usize {
-    let concurrency = value.map_or(DEFAULT_TASK_WORKER_CONCURRENCY, |value| {
-        value
-            .parse::<usize>()
-            .expect("TASK_WORKER_CONCURRENCY must be a positive integer")
-    });
-    assert!(
-        (1..=MAX_TASK_WORKER_CONCURRENCY).contains(&concurrency),
-        "TASK_WORKER_CONCURRENCY must be between 1 and {MAX_TASK_WORKER_CONCURRENCY}"
-    );
-    concurrency
-}
 
 /// Load the async runtime's per-thread stack reservation once during process startup.
 pub fn runtime_thread_stack_bytes_from_env() -> usize {
@@ -71,10 +36,6 @@ fn parse_runtime_thread_stack_bytes(value: Option<&str>) -> usize {
     bytes
 }
 
-pub fn agent_run_timeout_from_env() -> StdDuration {
-    parse_agent_run_timeout(env::var("AGENT_RUN_TIMEOUT_SECS").ok().as_deref())
-}
-
 pub fn smtp_allow_plaintext_local_from_env() -> bool {
     parse_smtp_allow_plaintext_local(env::var("SMTP_ALLOW_PLAINTEXT_LOCAL").ok().as_deref())
 }
@@ -84,19 +45,6 @@ fn parse_smtp_allow_plaintext_local(value: Option<&str>) -> bool {
         .unwrap_or("false")
         .parse::<bool>()
         .expect("SMTP_ALLOW_PLAINTEXT_LOCAL must be true or false")
-}
-
-fn parse_agent_run_timeout(value: Option<&str>) -> StdDuration {
-    let seconds = value.map_or(DEFAULT_AGENT_RUN_TIMEOUT_SECS, |value| {
-        value
-            .parse::<u64>()
-            .expect("AGENT_RUN_TIMEOUT_SECS must be a positive integer")
-    });
-    assert!(
-        (1..=u64::from(MAX_AGENT_RUN_TIMEOUT_SECS)).contains(&seconds),
-        "AGENT_RUN_TIMEOUT_SECS must be between 1 and {MAX_AGENT_RUN_TIMEOUT_SECS}"
-    );
-    StdDuration::from_secs(seconds)
 }
 
 pub struct AppConfig {
@@ -140,109 +88,6 @@ pub struct AppConfig {
     pub sendgrid_inbound: Option<SendGridInboundConfig>,
     /// How this deployment reaches Resend, for the companies that have configured an account.
     pub resend_api: ResendApiConfig,
-    /// Deployment-wide provider credentials. A provider absent here cannot be selected by any
-    /// company, and a company already pointing at it degrades to no-memory rather than failing.
-    pub hydradb: Option<MemoryProviderHttpConfig>,
-    pub hindsight: Option<MemoryProviderHttpConfig>,
-}
-
-impl AppConfig {
-    /// The memory providers this deployment carries credentials for. Derived from the config
-    /// rather than stored, so it cannot fall out of step with what `infra::setup` registers.
-    pub fn configured_memory_providers(&self) -> ConfiguredMemoryProviders {
-        MemoryProviderKind::ALL
-            .into_iter()
-            .filter(|kind| match kind {
-                MemoryProviderKind::Hydradb => self.hydradb.is_some(),
-                MemoryProviderKind::Hindsight => self.hindsight.is_some(),
-            })
-            .collect()
-    }
-}
-
-/// Every HTTP memory provider is configured the same way: a base URL, a credential, and the two
-/// request deadlines `MemoryRecallMode` selects between. One shape and one validation, keyed by
-/// the env-var prefix, so a new provider adds four documented variables and no new rules.
-#[derive(Clone)]
-pub struct MemoryProviderHttpConfig {
-    pub api_key: SecretString,
-    pub base_url: String,
-    pub fast_timeout: StdDuration,
-    pub thinking_timeout: StdDuration,
-}
-
-impl MemoryProviderHttpConfig {
-    fn from_env(prefix: &str) -> Option<Self> {
-        Self::from_values(
-            prefix,
-            non_empty_var(&format!("{prefix}_API_KEY")),
-            non_empty_var(&format!("{prefix}_BASE_URL")),
-            non_empty_var(&format!("{prefix}_FAST_TIMEOUT_SECS")),
-            non_empty_var(&format!("{prefix}_THINKING_TIMEOUT_SECS")),
-        )
-    }
-
-    fn from_values(
-        prefix: &str,
-        api_key: Option<String>,
-        base_url: Option<String>,
-        fast_timeout: Option<String>,
-        thinking_timeout: Option<String>,
-    ) -> Option<Self> {
-        if api_key.is_none()
-            && base_url.is_none()
-            && fast_timeout.is_none()
-            && thinking_timeout.is_none()
-        {
-            return None;
-        }
-        let all_or_nothing = format!(
-            "{prefix}_API_KEY, {prefix}_BASE_URL, {prefix}_FAST_TIMEOUT_SECS and \
-             {prefix}_THINKING_TIMEOUT_SECS must either all be set or all be absent"
-        );
-        let api_key = api_key.unwrap_or_else(|| panic!("{all_or_nothing}"));
-        let base_url = base_url.unwrap_or_else(|| panic!("{all_or_nothing}"));
-        assert!(
-            api_key.len() <= MAX_MEMORY_PROVIDER_CREDENTIAL_BYTES,
-            "{prefix}_API_KEY exceeds the maximum supported credential length"
-        );
-        assert!(
-            base_url.len() <= MAX_MEMORY_PROVIDER_BASE_URL_BYTES,
-            "{prefix}_BASE_URL exceeds the maximum supported URL length"
-        );
-        let fast_timeout = parse_positive_seconds(
-            &format!("{prefix}_FAST_TIMEOUT_SECS"),
-            fast_timeout.unwrap_or_else(|| panic!("{all_or_nothing}")),
-        );
-        let thinking_timeout = parse_positive_seconds(
-            &format!("{prefix}_THINKING_TIMEOUT_SECS"),
-            thinking_timeout.unwrap_or_else(|| panic!("{all_or_nothing}")),
-        );
-        assert!(
-            fast_timeout.as_secs() <= MAX_MEMORY_PROVIDER_REQUEST_SECONDS,
-            "{prefix}_FAST_TIMEOUT_SECS must be at most {MAX_MEMORY_PROVIDER_REQUEST_SECONDS}"
-        );
-        assert!(
-            thinking_timeout.as_secs() <= MAX_MEMORY_PROVIDER_REQUEST_SECONDS,
-            "{prefix}_THINKING_TIMEOUT_SECS must be at most {MAX_MEMORY_PROVIDER_REQUEST_SECONDS}"
-        );
-        let parsed_url = url::Url::parse(&base_url)
-            .unwrap_or_else(|_| panic!("{prefix}_BASE_URL must be an absolute http or https URL"));
-        assert!(
-            matches!(parsed_url.scheme(), "http" | "https") && parsed_url.host().is_some(),
-            "{prefix}_BASE_URL must be an absolute http or https URL"
-        );
-        assert!(
-            thinking_timeout >= fast_timeout,
-            "{prefix}_THINKING_TIMEOUT_SECS must be at least {prefix}_FAST_TIMEOUT_SECS"
-        );
-        Some(Self {
-            api_key: SecretString::from(api_key),
-            base_url: base_url.trim_end_matches('/').to_string(),
-            fast_timeout,
-            thinking_timeout,
-        })
-    }
 }
 
 fn parse_positive_seconds(name: &str, value: String) -> StdDuration {
@@ -303,7 +148,7 @@ impl ResendApiConfig {
     }
 
     /// Split out from [`Self::from_env`] so the validation is testable without mutating the
-    /// process environment, the way `MemoryProviderHttpConfig::from_values` is.
+    /// process environment.
     fn from_values(
         base_url: Option<String>,
         request_timeout: Option<String>,
@@ -691,8 +536,6 @@ impl AppConfig {
             .unwrap_or_else(|_| "http://localhost:11333/checkv2".to_string());
 
         let gcs = GcsConfig::from_env(&app_domain_name);
-        let hydradb = MemoryProviderHttpConfig::from_env("HYDRA_DB");
-        let hindsight = MemoryProviderHttpConfig::from_env("HINDSIGHT");
 
         Self {
             jwt_secret,
@@ -721,8 +564,6 @@ impl AppConfig {
             operator_emails,
             sendgrid_inbound,
             resend_api,
-            hydradb,
-            hindsight,
         }
     }
 
@@ -765,8 +606,6 @@ impl AppConfig {
             operator_emails: Vec::new(),
             sendgrid_inbound: None,
             resend_api: ResendApiConfig::default(),
-            hydradb: None,
-            hindsight: None,
         }
     }
 }
@@ -777,12 +616,6 @@ mod tests {
 
     /// Long enough to pass the startup check, which is itself part of what is under test.
     const TEST_SECRET: &str = "a-test-secret-long-enough-to-sign-with-01";
-
-    #[test]
-    fn task_worker_concurrency_is_bounded_and_defaults_to_four() {
-        assert_eq!(parse_task_worker_concurrency(None), 4);
-        assert_eq!(parse_task_worker_concurrency(Some("8")), 8);
-    }
 
     #[test]
     fn runtime_thread_stack_is_bounded_and_defaults_to_sixteen_mebibytes() {
@@ -800,24 +633,9 @@ mod tests {
     }
 
     #[test]
-    fn agent_run_timeout_is_bounded_and_defaults_to_five_minutes() {
-        assert_eq!(parse_agent_run_timeout(None), StdDuration::from_secs(300));
-        assert_eq!(
-            parse_agent_run_timeout(Some("45")),
-            StdDuration::from_secs(45)
-        );
-    }
-
-    #[test]
     fn smtp_plaintext_local_is_an_explicit_opt_in() {
         assert!(!parse_smtp_allow_plaintext_local(None));
         assert!(parse_smtp_allow_plaintext_local(Some("true")));
-    }
-
-    #[test]
-    #[should_panic(expected = "AGENT_RUN_TIMEOUT_SECS must be between 1 and 3600")]
-    fn agent_run_timeout_rejects_zero() {
-        parse_agent_run_timeout(Some("0"));
     }
 
     #[test]
@@ -826,12 +644,6 @@ mod tests {
             default_attachments_folder("mail.example.com"),
             "mail.example.com/mail-attachments"
         );
-    }
-
-    #[test]
-    #[should_panic(expected = "TASK_WORKER_CONCURRENCY must be between 1 and 64")]
-    fn task_worker_concurrency_rejects_zero() {
-        parse_task_worker_concurrency(Some("0"));
     }
 
     #[test]
@@ -859,94 +671,5 @@ mod tests {
 
         assert!(!is_local_domain("example.com"));
         assert!(!is_local_domain("mail.example.com"));
-    }
-
-    #[test]
-    fn memory_provider_config_is_all_or_nothing_and_validated() {
-        assert!(
-            MemoryProviderHttpConfig::from_values("HYDRA_DB", None, None, None, None).is_none()
-        );
-        let config = MemoryProviderHttpConfig::from_values(
-            "HYDRA_DB",
-            Some("secret".into()),
-            Some("https://hydra.example/v2/".into()),
-            Some("5".into()),
-            Some("30".into()),
-        )
-        .unwrap();
-        assert_eq!(config.base_url, "https://hydra.example/v2");
-        assert_eq!(config.fast_timeout, StdDuration::from_secs(5));
-    }
-
-    #[test]
-    fn hindsight_config_is_all_or_nothing_and_validated() {
-        assert!(
-            MemoryProviderHttpConfig::from_values("HINDSIGHT", None, None, None, None).is_none()
-        );
-        // The org path segment lives in the base URL, so cloud and self-hosted differ by
-        // configuration alone.
-        let config = MemoryProviderHttpConfig::from_values(
-            "HINDSIGHT",
-            Some("secret".into()),
-            Some("https://api.hindsight.vectorize.io/v1/default/".into()),
-            Some("15".into()),
-            Some("60".into()),
-        )
-        .unwrap();
-        assert_eq!(
-            config.base_url,
-            "https://api.hindsight.vectorize.io/v1/default"
-        );
-        assert_eq!(config.thinking_timeout, StdDuration::from_secs(60));
-    }
-
-    #[test]
-    #[should_panic(
-        expected = "HINDSIGHT_API_KEY, HINDSIGHT_BASE_URL, HINDSIGHT_FAST_TIMEOUT_SECS and \
-                    HINDSIGHT_THINKING_TIMEOUT_SECS must either all be set or all be absent"
-    )]
-    fn partial_memory_provider_config_names_its_own_variables() {
-        MemoryProviderHttpConfig::from_values("HINDSIGHT", Some("secret".into()), None, None, None);
-    }
-
-    #[test]
-    fn memory_provider_request_timeouts_accept_the_safe_upper_boundary() {
-        let config = MemoryProviderHttpConfig::from_values(
-            "HYDRA_DB",
-            Some("secret".into()),
-            Some("https://hydra.example/v2".into()),
-            Some(MAX_MEMORY_PROVIDER_REQUEST_SECONDS.to_string()),
-            Some(MAX_MEMORY_PROVIDER_REQUEST_SECONDS.to_string()),
-        )
-        .expect("bounded memory provider config");
-
-        assert_eq!(
-            config.thinking_timeout,
-            StdDuration::from_secs(MAX_MEMORY_PROVIDER_REQUEST_SECONDS)
-        );
-    }
-
-    #[test]
-    #[should_panic(expected = "HYDRA_DB_THINKING_TIMEOUT_SECS must be at most 110")]
-    fn memory_provider_request_timeouts_reject_values_beyond_the_worker_deadline() {
-        MemoryProviderHttpConfig::from_values(
-            "HYDRA_DB",
-            Some("secret".into()),
-            Some("https://hydra.example/v2".into()),
-            Some("110".into()),
-            Some("111".into()),
-        );
-    }
-
-    #[test]
-    #[should_panic(expected = "HINDSIGHT_API_KEY exceeds the maximum supported credential length")]
-    fn memory_provider_rejects_oversized_credentials_without_echoing_them() {
-        MemoryProviderHttpConfig::from_values(
-            "HINDSIGHT",
-            Some("x".repeat(MAX_MEMORY_PROVIDER_CREDENTIAL_BYTES + 1)),
-            Some("https://api.hindsight.vectorize.io/v1/default".into()),
-            Some("10".into()),
-            Some("60".into()),
-        );
     }
 }

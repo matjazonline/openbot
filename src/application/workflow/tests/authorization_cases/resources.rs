@@ -23,6 +23,11 @@ fn unresolved_resources_cannot_enter_admission_configuration() {
         company_id,
         params: json!({}),
         resources: BTreeMap::new(),
+        run_as: crate::application::workflow::WorkflowActor::authenticated(uuid::Uuid::from_u128(
+            0xA5,
+        ))
+        .unwrap(),
+        message_trigger: None,
     };
     assert!(binding::ConfiguredBinding::new(config, bundle.clone()).is_err());
     config = binding::BindingConfiguration {
@@ -34,6 +39,11 @@ fn unresolved_resources_cannot_enter_admission_configuration() {
             ResourceName::parse("wrong").unwrap(),
             RuntimeResourceId::new(Uuid::new_v4()),
         )]),
+        run_as: crate::application::workflow::WorkflowActor::authenticated(uuid::Uuid::from_u128(
+            0xA5,
+        ))
+        .unwrap(),
+        message_trigger: None,
     };
     assert!(binding::ConfiguredBinding::new(config, bundle).is_err());
 }

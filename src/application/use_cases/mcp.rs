@@ -90,12 +90,6 @@ pub trait McpCredentialPersistence: Send + Sync {
 #[async_trait]
 pub trait McpPersistence: Send + Sync {
     async fn list_mcp_connections(&self, company_id: Uuid) -> AppResult<Vec<CompanyMcpConnection>>;
-    /// At most MAX_MCP_CONNECTIONS IDs; missing/deleted rows are omitted.
-    async fn mcp_connections_by_ids(
-        &self,
-        company_id: Uuid,
-        connection_ids: &[Uuid],
-    ) -> AppResult<Vec<CompanyMcpConnection>>;
     async fn create_mcp_connection(
         &self,
         company_id: Uuid,

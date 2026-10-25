@@ -2,7 +2,11 @@ format_version: 1
 workflow_id: 00000000-0000-0000-0000-000000000003
 input_schema:
   type: object
-  properties: {message: {type: string, maxLength: 16384}}
+  properties:
+    message: {type: string, maxLength: 16384}
+    source_message: {type: string, maxLength: 128}
+    subject: {type: string, maxLength: 998}
+    sender: {type: string, maxLength: 320}
   required: [message]
   additionalProperties: false
 parameter_schema: {type: object, additionalProperties: false}

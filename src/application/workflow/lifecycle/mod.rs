@@ -4,8 +4,11 @@ mod bindings;
 mod contracts;
 mod definitions;
 mod ports;
+mod provisioned;
 pub use contracts::*;
+pub use definitions::compile_bundle;
 pub use ports::*;
+pub use provisioned::*;
 
 use super::IdempotencyKey;
 use super::binding::{BindingConfiguration, ConfiguredBinding, ResourceDirectory};
@@ -27,6 +30,7 @@ pub struct DefinitionService<A, P, D, C> {
     persistence: P,
     decoder: D,
     directory: C,
+    refused_kinds: &'static [&'static str],
 }
 impl<A, P, D, C> DefinitionService<A, P, D, C> {
     pub fn new(authorization: A, persistence: P, decoder: D, directory: C) -> Self {
@@ -35,7 +39,15 @@ impl<A, P, D, C> DefinitionService<A, P, D, C> {
             persistence,
             decoder,
             directory,
+            refused_kinds: &[],
         }
+    }
+
+    /// Step kinds this deployment registers but cannot run: a version using one is refused at
+    /// validation and publication, so no run can stall on an unsupported step (p08 D1.8).
+    pub fn with_refused_kinds(mut self, kinds: &'static [&'static str]) -> Self {
+        self.refused_kinds = kinds;
+        self
     }
 }
 

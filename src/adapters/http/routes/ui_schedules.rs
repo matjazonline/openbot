@@ -1,22 +1,18 @@
 //! `/ui/schedules` — the Schedules workspace:
 //! 1st column: Schedule name items
-//! 2nd column: Paginated schedule runs (threads)
-//! 3rd column: Thread messages and interactive chat / review
+//! 2nd column: Paginated schedule occurrences and the workflow runs they started
+//! 3rd column: The schedule form
 
-use std::{convert::Infallible, sync::Arc};
+use std::sync::Arc;
 
 use axum::{
     Form, Router,
-    extract::{FromRequestParts, Path, Query, State},
+    extract::{FromRequestParts, Path, Query},
     http::request::Parts,
-    response::{
-        Html, IntoResponse, Response,
-        sse::{Event, KeepAlive, Sse},
-    },
+    response::{Html, IntoResponse, Response},
     routing::get,
 };
 use serde::Deserialize;
-use tokio_stream::{Stream, StreamExt};
 use tracing::instrument;
 use uuid::Uuid;
 
@@ -26,30 +22,17 @@ use crate::{
         auth::{AuthError, AuthenticatedUser},
         pages,
         routes::{
-            live_updates::channel_wake_ups,
-            schedule::UiScheduleForm,
+            schedule::{UiScheduleForm, run_now_key},
             ui::{load_account, load_managed_company, managed_company_membership, workspace_user},
         },
     },
     app_error::{AppError, AppResult},
-    entities::{
-        company::Company,
-        message::CanonicalMessageId,
-        schedule::{ScheduleRun, ScheduleRunAsChoices},
-        value_objects::EmailAddress,
-    },
+    entities::{company::Company, schedule::ScheduleRun, value_objects::EmailAddress},
     infra::config::AppConfig,
-    infra::events::MailboxEvents,
-    transport::MessageDisposition,
     use_cases::{
-        agent::AgentUseCases,
         channel::ChannelUseCases,
         company::CompanyUseCases,
-        schedule::ScheduleUseCases,
-        thread::{
-            CanonicalMessageIngress, IngressOrigin, ReplyDelivery, ThreadUseCases,
-            qualified_email_identity,
-        },
+        schedule::{ScheduleBindingChoice, ScheduleUseCases},
         user::UserUseCases,
     },
 };
@@ -68,9 +51,6 @@ pub(crate) const SCHEDULE_UI_PATHS: &[&str] = &[
     "/ui/schedules/{id}/edit",
     "/ui/schedules/{id}/run-now",
     "/ui/schedules/{id}/toggle",
-    "/ui/schedules/{id}/events",
-    "/ui/schedules/thread/{thread_id}",
-    "/ui/schedules/thread/{thread_id}/reply",
 ];
 
 pub fn router() -> Router<AppState> {
@@ -91,16 +71,12 @@ pub fn router() -> Router<AppState> {
         .route(SCHEDULE_UI_PATHS[5], get(edit_schedule_pane))
         .route(SCHEDULE_UI_PATHS[6], axum::routing::post(run_schedule_now))
         .route(SCHEDULE_UI_PATHS[7], axum::routing::post(toggle_schedule))
-        .route(SCHEDULE_UI_PATHS[8], get(schedule_runs_stream))
-        .route(SCHEDULE_UI_PATHS[9], get(thread_pane))
-        .route(SCHEDULE_UI_PATHS[10], axum::routing::post(reply_in_thread))
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct SchedulesQuery {
     pub company_id: Option<Uuid>,
     pub schedule_id: Option<Uuid>,
-    pub thread_id: Option<Uuid>,
     pub page: Option<usize>,
     pub new: Option<String>,
 }
@@ -112,18 +88,10 @@ pub struct CompanyScopedQuery {
     pub page: Option<usize>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
-pub struct ReplyForm {
-    pub reply_text: String,
-    pub reply_to_message_id: Option<Uuid>,
-}
-
 struct SchedulesWorkspace {
     company_use_cases: Arc<CompanyUseCases>,
     channel_use_cases: Arc<ChannelUseCases>,
     schedule_use_cases: Arc<ScheduleUseCases>,
-    agent_use_cases: Arc<AgentUseCases>,
-    thread_use_cases: Arc<ThreadUseCases>,
     user_use_cases: Arc<UserUseCases>,
     config: Arc<AppConfig>,
     user_id: Uuid,
@@ -148,8 +116,6 @@ impl FromRequestParts<AppState> for SchedulesWorkspace {
             company_use_cases: state.company_use_cases.clone(),
             channel_use_cases: state.channel_use_cases.clone(),
             schedule_use_cases: state.schedule_use_cases.clone(),
-            agent_use_cases: state.agent_use_cases.clone(),
-            thread_use_cases: state.thread_use_cases.clone(),
             user_use_cases: state.user_use_cases.clone(),
             config: state.config.clone(),
             user_id: user.id,
@@ -165,10 +131,10 @@ impl SchedulesWorkspace {
         load_managed_company(&self.company_use_cases, self.user_id, company_id).await
     }
 
-    /// Whom this caller may make a schedule run as, and who the listed ones already run as.
-    async fn run_as_choices(&self, company_id: Uuid) -> AppResult<ScheduleRunAsChoices> {
+    /// The workflow bindings a schedule may name, and the listed ones already do.
+    async fn bindings(&self, company_id: Uuid) -> AppResult<Vec<ScheduleBindingChoice>> {
         self.schedule_use_cases
-            .run_as_choices(self.user_id, company_id)
+            .binding_choices(self.user_id, company_id, None)
             .await
     }
 
@@ -246,7 +212,6 @@ impl SchedulesWorkspace {
             schedule: &schedule,
             channel: channel.as_ref(),
             runs: &runs,
-            selected_thread_id: runs.first().map(|run| run.thread_id),
             page,
             has_next,
         };
@@ -262,15 +227,6 @@ impl SchedulesWorkspace {
 }
 
 const PAGE_SIZE: i64 = 15;
-
-/// `Re:` a subject without stacking a second prefix on a reply to a reply.
-fn reply_subject(subject: &str) -> String {
-    if subject.trim_start().to_lowercase().starts_with("re:") {
-        subject.to_string()
-    } else {
-        format!("Re: {subject}")
-    }
-}
 
 #[instrument(skip(workspace, headers))]
 async fn schedules_page(
@@ -299,7 +255,7 @@ async fn schedules_page(
         .list_company_channels(workspace.user_id, company.id)
         .await?;
 
-    let run_as = workspace.run_as_choices(company.id).await?;
+    let bindings = workspace.bindings(company.id).await?;
 
     let selected_schedule = query
         .schedule_id
@@ -316,7 +272,7 @@ async fn schedules_page(
             company_id: company.id,
             channels: &channels,
             schedule: None,
-            run_as: &run_as,
+            bindings: &bindings,
             error: None,
         });
         (String::new(), form_pane)
@@ -336,65 +292,27 @@ async fn schedules_page(
         let has_next = runs.len() as i64 > PAGE_SIZE;
         let display_runs: Vec<ScheduleRun> = runs.into_iter().take(PAGE_SIZE as usize).collect();
 
-        let selected_thread_id = query
-            .thread_id
-            .or_else(|| display_runs.first().map(|r| r.thread_id));
-
         let runs_col = pages::schedule_runs_column(
             &pages::ScheduleRunsColumnProps {
                 company_id: company.id,
                 schedule,
                 channel,
                 runs: &display_runs,
-                selected_thread_id,
                 page: page_num,
                 has_next,
             },
             pages::FragmentSwap::Inline,
         );
-
-        let thread_pane = if let Some(thread_id) = selected_thread_id {
-            let messages = workspace
-                .thread_use_cases
-                .get_thread_history(thread_id)
-                .await?;
-
-            let subject = display_runs
-                .iter()
-                .find(|r| r.thread_id == thread_id)
-                .map(|r| r.subject.as_str())
-                .unwrap_or(&schedule.subject_template);
-
-            let first_agent = if let Some(ch) = channel {
-                if let Some(&first_id) = ch.agent_ids.as_ref().and_then(|ids| ids.first()) {
-                    workspace
-                        .agent_use_cases
-                        .get_company_agent(workspace.user_id, company.id, first_id)
-                        .await?
-                } else {
-                    None
-                }
+        let pane = pages::schedules_empty_pane(
+            if display_runs.is_empty() {
+                "No runs yet. Click 'Run Now' to start one."
             } else {
-                None
-            };
+                "Each occurrence lists the workflow run it started. Click 'Edit' to change the schedule."
+            },
+            pages::FragmentSwap::Inline,
+        );
 
-            pages::schedule_thread_pane(&pages::ScheduleThreadPaneProps {
-                company_id: company.id,
-                schedule,
-                channel,
-                agent: first_agent.as_ref(),
-                thread_id,
-                subject,
-                messages: &messages,
-            })
-        } else {
-            pages::schedules_empty_pane(
-                "No execution runs found for this schedule. Click 'Run Now' to trigger a run.",
-                pages::FragmentSwap::Inline,
-            )
-        };
-
-        (runs_col, thread_pane)
+        (runs_col, pane)
     } else {
         (
             String::new(),
@@ -415,7 +333,7 @@ async fn schedules_page(
         company: &company,
         schedules: &schedules,
         selected_schedule_id: selected_schedule.map(|s| s.id),
-        run_as: &run_as,
+        bindings: &bindings,
         runs_html: &runs_html,
         pane_html: &pane_html,
     })))
@@ -430,230 +348,10 @@ async fn schedule_runs_fragment(
         return Ok(Html(String::new()));
     };
 
+    // The live region polls this for its column, so it answers with the column alone.
     workspace
-        .runs_column(query.company_id, schedule_id, query.page)
+        .runs_column_fragment(query.company_id, schedule_id, query.page)
         .await
-}
-
-/// Keep the schedule-specific run list current using the same committed-message and activity
-/// notifications as the inbox. The database remains the source of truth: an event is only a
-/// prompt to re-render the current page, so lagged/coalesced notifications are harmless.
-#[instrument(skip(workspace, events))]
-async fn schedule_runs_stream(
-    workspace: SchedulesWorkspace,
-    State(events): State<MailboxEvents>,
-    Path(schedule_id): Path<Uuid>,
-    Query(query): Query<CompanyScopedQuery>,
-) -> AppResult<Sse<impl Stream<Item = Result<Event, Infallible>>>> {
-    let schedule = workspace
-        .schedule_use_cases
-        .get_schedule(workspace.user_id, query.company_id, schedule_id)
-        .await?
-        .ok_or_else(|| AppError::NotFound("Schedule not found".into()))?;
-    let channel_id = schedule.channel_id;
-    let page = query.page;
-    let mut changes = Box::pin(channel_wake_ups(&events, "schedule-runs", channel_id));
-
-    let stream = async_stream::stream! {
-        loop {
-            // Reconcile immediately on connect. This closes the page-render/connect race and also
-            // makes a reconnect recover an activity notification missed while the socket was down.
-            match workspace.runs_column_fragment(query.company_id, schedule_id, page).await {
-                Ok(Html(column)) => yield Ok(Event::default().event("schedule-runs").data(column)),
-                Err(error) => {
-                    tracing::warn!(%error, %schedule_id, "Schedule runs stream query failed");
-                    return;
-                }
-            }
-
-            if changes.next().await.is_none() {
-                return;
-            }
-        }
-    };
-
-    Ok(Sse::new(stream).keep_alive(KeepAlive::default()))
-}
-
-#[instrument(skip(workspace))]
-async fn thread_pane(
-    workspace: SchedulesWorkspace,
-    Path(thread_id): Path<Uuid>,
-    Query(query): Query<CompanyScopedQuery>,
-) -> AppResult<Html<String>> {
-    let (_, company) = workspace.scoped_company(Some(query.company_id)).await?;
-    let Some(company) = company else {
-        return Ok(Html(String::new()));
-    };
-
-    let Some(schedule_id) = query.schedule_id else {
-        return Ok(Html(String::new()));
-    };
-
-    let schedule = workspace
-        .schedule_use_cases
-        .get_schedule(workspace.user_id, company.id, schedule_id)
-        .await?
-        .ok_or_else(|| AppError::NotFound("Schedule not found".into()))?;
-
-    workspace
-        .schedule_use_cases
-        .authorize_schedule_run_thread(workspace.user_id, company.id, schedule_id, thread_id)
-        .await?;
-
-    let channel = workspace
-        .channel_use_cases
-        .get_company_channel(workspace.user_id, company.id, schedule.channel_id)
-        .await?;
-
-    let messages = workspace
-        .thread_use_cases
-        .get_thread_history(thread_id)
-        .await?;
-
-    let subject = messages
-        .first()
-        .map(|m| m.subject.as_str())
-        .unwrap_or(&schedule.subject_template);
-
-    let first_agent = if let Some(ref ch) = channel {
-        if let Some(&first_id) = ch.agent_ids.as_ref().and_then(|ids| ids.first()) {
-            workspace
-                .agent_use_cases
-                .get_company_agent(workspace.user_id, company.id, first_id)
-                .await?
-        } else {
-            None
-        }
-    } else {
-        None
-    };
-
-    Ok(Html(pages::schedule_thread_pane(
-        &pages::ScheduleThreadPaneProps {
-            company_id: company.id,
-            schedule: &schedule,
-            channel: channel.as_ref(),
-            agent: first_agent.as_ref(),
-            thread_id,
-            subject,
-            messages: &messages,
-        },
-    )))
-}
-
-#[instrument(skip(workspace, form))]
-async fn reply_in_thread(
-    workspace: SchedulesWorkspace,
-    Path(thread_id): Path<Uuid>,
-    Query(query): Query<CompanyScopedQuery>,
-    Form(form): Form<ReplyForm>,
-) -> AppResult<Html<String>> {
-    let (_, company) = workspace.scoped_company(Some(query.company_id)).await?;
-    let Some(company) = company else {
-        return Ok(Html(String::new()));
-    };
-
-    let Some(schedule_id) = query.schedule_id else {
-        return Ok(Html(String::new()));
-    };
-
-    let schedule = workspace
-        .schedule_use_cases
-        .get_schedule(workspace.user_id, company.id, schedule_id)
-        .await?
-        .ok_or_else(|| AppError::NotFound("Schedule not found".into()))?;
-
-    workspace
-        .schedule_use_cases
-        .authorize_schedule_run_thread(workspace.user_id, company.id, schedule_id, thread_id)
-        .await?;
-
-    let channel = workspace
-        .channel_use_cases
-        .get_company_channel(workspace.user_id, company.id, schedule.channel_id)
-        .await?
-        .ok_or_else(|| AppError::NotFound("Channel not found".into()))?;
-
-    if form.reply_text.trim().is_empty() {
-        return Err(AppError::BadRequest("A message is required.".into()));
-    }
-
-    let account = load_account(&workspace.user_use_cases, workspace.user_id).await?;
-    let sender = EmailAddress::from(account.email.as_str());
-
-    let reply_to_message_id = match form.reply_to_message_id {
-        Some(id) => Some(CanonicalMessageId::new(id)),
-        None => {
-            workspace
-                .thread_use_cases
-                .latest_thread_message_id(thread_id)
-                .await?
-        }
-    };
-
-    let history = workspace
-        .thread_use_cases
-        .get_thread_history(thread_id)
-        .await?;
-    let subject = history
-        .first()
-        .map(|message| reply_subject(&message.subject))
-        .unwrap_or_else(|| reply_subject(&schedule.subject_template));
-
-    let author = qualified_email_identity(sender.as_str())?;
-    let mut ingress = CanonicalMessageIngress::new(
-        company.id,
-        channel.id,
-        author,
-        form.reply_text,
-        IngressOrigin::TrustedApplication,
-    )
-    .with_target_thread(thread_id)
-    .with_subject(&subject)
-    .with_reply_delivery(ReplyDelivery::InAppOnly)
-    .with_disposition(MessageDisposition::Answer);
-
-    if let Some(reply_to) = reply_to_message_id {
-        ingress = ingress.with_reply_to_message(reply_to);
-    }
-
-    let ingest = workspace.thread_use_cases.ingest_canonical(ingress).await?;
-
-    if ingest.thread.is_none() {
-        let reason = ingest
-            .reason()
-            .unwrap_or("The channel rejected this message.");
-        return Err(AppError::BadRequest(reason.to_string()));
-    }
-
-    // Load full messages
-    let messages = workspace
-        .thread_use_cases
-        .get_thread_history(thread_id)
-        .await?;
-
-    let first_agent =
-        if let Some(&first_id) = channel.agent_ids.as_ref().and_then(|ids| ids.first()) {
-            workspace
-                .agent_use_cases
-                .get_company_agent(workspace.user_id, company.id, first_id)
-                .await?
-        } else {
-            None
-        };
-
-    Ok(Html(pages::schedule_thread_pane(
-        &pages::ScheduleThreadPaneProps {
-            company_id: company.id,
-            schedule: &schedule,
-            channel: Some(&channel),
-            agent: first_agent.as_ref(),
-            thread_id,
-            subject: &subject,
-            messages: &messages,
-        },
-    )))
 }
 
 #[instrument(skip(workspace))]
@@ -671,14 +369,14 @@ async fn create_pane(
         .list_company_channels(workspace.user_id, company.id)
         .await?;
 
-    let run_as = workspace.run_as_choices(company.id).await?;
+    let bindings = workspace.bindings(company.id).await?;
 
     Ok(Html(pages::schedule_form_pane(
         &pages::ScheduleFormPaneProps {
             company_id: company.id,
             channels: &channels,
             schedule: None,
-            run_as: &run_as,
+            bindings: &bindings,
             error: None,
         },
     )))
@@ -706,26 +404,27 @@ async fn edit_schedule_pane(
         .list_company_channels(workspace.user_id, company.id)
         .await?;
 
-    let run_as = workspace.run_as_choices(company.id).await?;
+    let bindings = workspace.bindings(company.id).await?;
 
     Ok(Html(pages::schedule_form_pane(
         &pages::ScheduleFormPaneProps {
             company_id: company.id,
             channels: &channels,
             schedule: Some(&schedule),
-            run_as: &run_as,
+            bindings: &bindings,
             error: None,
         },
     )))
 }
 
 /// What the Run Now and Pause buttons submit: the company scope, plus the state Pause is asking
-/// for. Both re-render the runs column they live in.
+/// for or Run Now's command key. Both re-render the runs column they live in.
 #[derive(Debug, Deserialize)]
 pub struct ScheduleActionForm {
     pub company_id: Uuid,
     pub page: Option<usize>,
     pub enabled: Option<String>,
+    pub command_key: Option<String>,
 }
 
 impl ScheduleActionForm {
@@ -743,7 +442,12 @@ async fn run_schedule_now(
 ) -> AppResult<Html<String>> {
     workspace
         .schedule_use_cases
-        .trigger_schedule_now(workspace.user_id, form.company_id, id)
+        .trigger_schedule_now(
+            workspace.user_id,
+            form.company_id,
+            id,
+            &run_now_key(form.command_key),
+        )
         .await?;
 
     workspace.runs_column(form.company_id, id, form.page).await
@@ -767,12 +471,12 @@ async fn toggle_schedule(
         .schedule_use_cases
         .list_company_schedules(workspace.user_id, form.company_id)
         .await?;
-    let run_as = workspace.run_as_choices(form.company_id).await?;
+    let bindings = workspace.bindings(form.company_id).await?;
     let sidebar = pages::schedules_sidebar_list(
         form.company_id,
         &schedules,
         Some(id),
-        &run_as,
+        &bindings,
         pages::FragmentSwap::OutOfBand,
     );
 
@@ -786,7 +490,7 @@ async fn close_pane(
     Query(_query): Query<CompanyScopedQuery>,
 ) -> AppResult<Html<String>> {
     Ok(Html(pages::schedules_empty_pane(
-        "Select a schedule or run on the left.",
+        "Select a schedule on the left.",
         pages::FragmentSwap::Inline,
     )))
 }
@@ -900,20 +604,16 @@ async fn schedule_page_redirect(
 mod tests {
     use super::*;
     use crate::adapters::http::pages::{
-        FragmentSwap, MailboxUser, ScheduleRunsColumnProps, ScheduleThreadPaneProps, SchedulesPage,
-        schedule_runs_column, schedule_runs_column_fragment, schedule_thread_pane, schedules_page,
+        FragmentSwap, MailboxUser, ScheduleRunsColumnProps, SchedulesPage, schedule_runs_column,
+        schedule_runs_column_fragment, schedules_page,
     };
     use crate::entities::{
-        company::{Company, CompanyTeamAccount},
+        company::Company,
         company_member::CompanyMembership,
-        message::{MessageDirection, MessageRole},
         schedule::{
-            ChannelSchedule, ScheduleDeliveryMode, ScheduleRun, ScheduleTimezone, ScheduleType,
+            ChannelSchedule, OccurrenceStatus, ScheduleRun, ScheduleTimezone, ScheduleType,
         },
-        task::TaskStatus,
-        value_objects::MessageId,
     };
-    use crate::use_cases::thread::test_support::{EmailMessageDraft, stored_email_view};
     use chrono::Utc;
 
     fn test_company() -> Company {
@@ -924,7 +624,6 @@ mod tests {
             name: "Schedule Corp".into(),
             slug: "sched".into(),
             avatar_url: None,
-            memory_provider: None,
             created_at: Utc::now(),
         }
     }
@@ -934,21 +633,52 @@ mod tests {
             id: Uuid::new_v4(),
             company_id,
             channel_id,
+            binding_id: Uuid::new_v4(),
             name: "Morning Report".into(),
             schedule_type: ScheduleType::Interval,
             interval_seconds: Some(3600),
-            subject_template: "[Daily] Morning Report - {{date}}".into(),
-            prompt_template: "Analyze tickets".into(),
-            delivery_mode: ScheduleDeliveryMode::MailboxOnly,
-            recipient_emails: vec![],
             timezone: ScheduleTimezone::utc(),
-            run_as_user_id: None,
             enabled: true,
             last_run_at: None,
             next_run_at: Some(Utc::now()),
             last_error: None,
             created_at: Utc::now(),
             updated_at: Utc::now(),
+        }
+    }
+
+    fn binding_of(schedule: &ChannelSchedule) -> ScheduleBindingChoice {
+        ScheduleBindingChoice {
+            binding_id: schedule.binding_id,
+            channel_id: None,
+            title: "Daily digest".into(),
+            active: true,
+        }
+    }
+
+    fn occurrence(status: OccurrenceStatus) -> ScheduleRun {
+        ScheduleRun {
+            id: Uuid::new_v4(),
+            scheduled_for: Utc::now(),
+            manual: false,
+            status,
+            run_id: None,
+            run_state: None,
+            refusal: None,
+            last_error: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
+    }
+
+    fn admin(email: &EmailAddress) -> MailboxUser<'_> {
+        MailboxUser {
+            id: Uuid::new_v4(),
+            username: "admin",
+            email,
+            avatar_url: None,
+            is_operator: false,
+            company_membership: CompanyMembership::Admin,
         }
     }
 
@@ -971,28 +701,10 @@ mod tests {
         let company_id = Uuid::new_v4();
         let channel_id = Uuid::new_v4();
         let schedule = test_schedule(company_id, channel_id);
+        let bindings = [binding_of(&schedule)];
         let user_email = EmailAddress::from("admin@example.com");
-        let user = MailboxUser {
-            id: Uuid::new_v4(),
-            username: "admin",
-            email: &user_email,
-            avatar_url: None,
-            is_operator: false,
-            company_membership: CompanyMembership::Admin,
-        };
-
-        let run = ScheduleRun {
-            thread_id: Uuid::new_v4(),
-            task_id: Uuid::new_v4(),
-            channel_id,
-            subject: "[Daily] Report".into(),
-            task_status: TaskStatus::Completed,
-            lock_expires_at: None,
-            latest_response: Some("Done.".into()),
-            message_count: 2,
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
-        };
+        let user = admin(&user_email);
+        let run = occurrence(OccurrenceStatus::Materialized);
 
         // Every surface of the workspace, so a button on any of them is covered.
         let rendered = [
@@ -1002,7 +714,7 @@ mod tests {
                 company: &test_company(),
                 schedules: std::slice::from_ref(&schedule),
                 selected_schedule_id: Some(schedule.id),
-                run_as: &ScheduleRunAsChoices::default(),
+                bindings: &bindings,
                 runs_html: "",
                 pane_html: "",
             }),
@@ -1012,26 +724,16 @@ mod tests {
                     schedule: &schedule,
                     channel: None,
                     runs: std::slice::from_ref(&run),
-                    selected_thread_id: Some(run.thread_id),
                     page: 1,
                     has_next: true,
                 },
                 FragmentSwap::Inline,
             ),
-            schedule_thread_pane(&ScheduleThreadPaneProps {
-                company_id,
-                schedule: &schedule,
-                channel: None,
-                agent: None,
-                thread_id: run.thread_id,
-                subject: "Daily Report",
-                messages: &[],
-            }),
             pages::schedule_form_pane(&pages::ScheduleFormPaneProps {
                 company_id,
                 channels: &[],
                 schedule: Some(&schedule),
-                run_as: &ScheduleRunAsChoices::default(),
+                bindings: &bindings,
                 error: None,
             }),
         ]
@@ -1059,18 +761,9 @@ mod tests {
     #[test]
     fn schedules_page_renders_3_columns_and_sidebar_items() {
         let company = test_company();
-        let channel_id = Uuid::new_v4();
-        let schedule = test_schedule(company.id, channel_id);
+        let schedule = test_schedule(company.id, Uuid::new_v4());
         let user_email = EmailAddress::from("admin@example.com");
-
-        let user = MailboxUser {
-            id: Uuid::new_v4(),
-            username: "admin",
-            email: &user_email,
-            avatar_url: None,
-            is_operator: false,
-            company_membership: CompanyMembership::Admin,
-        };
+        let user = admin(&user_email);
 
         let html = schedules_page(&SchedulesPage {
             user: &user,
@@ -1078,7 +771,7 @@ mod tests {
             company: &company,
             schedules: std::slice::from_ref(&schedule),
             selected_schedule_id: Some(schedule.id),
-            run_as: &ScheduleRunAsChoices::default(),
+            bindings: &[binding_of(&schedule)],
             runs_html: r#"<div id="schedule-runs-column">Runs Column</div>"#,
             pane_html: r#"<div id="schedule-pane">Detail Pane</div>"#,
         });
@@ -1087,10 +780,10 @@ mod tests {
         assert!(html.contains("href=\"/ui/schedules?company_id="));
         assert!(html.contains("btn-primary\" title=\"Schedules\""));
 
-        // Column 1: Sidebar list with schedule name and cadence
+        // Column 1: Sidebar list with schedule name, cadence and the workflow it runs
         assert!(html.contains("Morning Report"));
         assert!(html.contains("Every hour"));
-        assert!(!html.contains(r#"class="text-primary font-mono"#));
+        assert!(html.contains("Daily digest"));
 
         // Column 2 & 3 wrapped in workspace
         assert!(html.contains("id=\"schedules-workspace\""));
@@ -1099,175 +792,65 @@ mod tests {
     }
 
     #[test]
-    fn schedule_runs_column_renders_run_items_with_activity_badges() {
+    fn schedule_runs_column_renders_occurrences_with_their_runs() {
         let company_id = Uuid::new_v4();
-        let channel_id = Uuid::new_v4();
-        let schedule = test_schedule(company_id, channel_id);
-
-        let run = ScheduleRun {
-            thread_id: Uuid::new_v4(),
-            task_id: Uuid::new_v4(),
-            channel_id,
-            subject: "[Daily] Morning Report - 2026-08-25".into(),
-            task_status: TaskStatus::Processing,
-            lock_expires_at: Some(Utc::now() + chrono::Duration::minutes(5)),
-            latest_response: Some("All systems operational.".into()),
-            message_count: 2,
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
-        };
+        let schedule = test_schedule(company_id, Uuid::new_v4());
+        let mut started = occurrence(OccurrenceStatus::Materialized);
+        let run_id = Uuid::new_v4();
+        started.run_id = Some(run_id);
+        started.run_state = Some("running".into());
+        let mut refused = occurrence(OccurrenceStatus::Failed);
+        refused.manual = true;
+        refused.refusal = Some("unavailable".into());
+        refused.last_error =
+            Some("The workflow binding refused this occurrence (unavailable)".into());
+        let runs = [started, refused];
 
         let html = schedule_runs_column(
             &ScheduleRunsColumnProps {
                 company_id,
                 schedule: &schedule,
                 channel: None,
-                runs: std::slice::from_ref(&run),
-                selected_thread_id: Some(run.thread_id),
+                runs: &runs,
                 page: 1,
                 has_next: false,
             },
             FragmentSwap::Inline,
         );
 
-        assert!(html.contains("[Daily] Morning Report - 2026-08-25"));
-        assert!(html.contains("All systems operational."));
-        assert!(html.contains("2 msgs"));
-        assert!(html.contains("Running")); // Processing with active lease
+        assert!(html.contains("Started"));
+        assert!(html.contains(&run_id.simple().to_string()[..8]));
+        assert!(html.contains("running"));
+        assert!(html.contains("Failed"));
+        assert!(html.contains("run now"));
+        assert!(html.contains("refused this occurrence (unavailable)"));
         assert!(html.contains("Run Now"));
+        assert!(html.contains(r#"name="command_key""#));
         assert!(html.contains(r#"id="schedule-runs-live" class="contents""#));
         assert!(html.contains(&format!(
-            r#"sse-connect="/ui/schedules/{}/events?company_id={company_id}&page=1""#,
+            r#"hx-get="/ui/schedules/runs?company_id={company_id}&schedule_id={}&page=1""#,
             schedule.id
         )));
-        assert!(html.contains(r#"sse-swap="schedule-runs""#));
+        assert!(html.contains(r#"hx-trigger="every 15s""#));
         assert!(html.contains(r##"hx-target="#schedule-runs-column""##));
-        assert!(html.contains(r##"hx-sync="#schedule-pane:replace""##));
 
         let refresh = schedule_runs_column_fragment(&ScheduleRunsColumnProps {
             company_id,
             schedule: &schedule,
             channel: None,
-            runs: std::slice::from_ref(&run),
-            selected_thread_id: Some(run.thread_id),
+            runs: &runs,
             page: 1,
             has_next: false,
         });
         assert!(refresh.contains(r#"id="schedule-runs-column""#));
-        assert!(!refresh.contains("sse-connect"));
+        assert!(!refresh.contains("hx-trigger"));
         assert!(!refresh.contains(r#"id="schedule-runs-live""#));
-    }
-
-    #[test]
-    fn schedule_run_badges_do_not_call_suspended_tasks_done() {
-        let company_id = Uuid::new_v4();
-        let channel_id = Uuid::new_v4();
-        let schedule = test_schedule(company_id, channel_id);
-        let mut run = ScheduleRun {
-            thread_id: Uuid::new_v4(),
-            task_id: Uuid::new_v4(),
-            channel_id,
-            subject: "Suspended run".into(),
-            task_status: TaskStatus::PendingApproval,
-            lock_expires_at: None,
-            latest_response: None,
-            message_count: 1,
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
-        };
-
-        let render = |run: &ScheduleRun| {
-            schedule_runs_column_fragment(&ScheduleRunsColumnProps {
-                company_id,
-                schedule: &schedule,
-                channel: None,
-                runs: std::slice::from_ref(run),
-                selected_thread_id: None,
-                page: 1,
-                has_next: false,
-            })
-        };
-
-        assert!(render(&run).contains("Waiting for approval"));
-        run.task_status = TaskStatus::WaitingForThirdPartyReply;
-        assert!(render(&run).contains("Waiting for reply"));
-    }
-
-    #[test]
-    fn schedule_thread_pane_renders_messages_and_reply_form() {
-        let company_id = Uuid::new_v4();
-        let channel_id = Uuid::new_v4();
-        let schedule = test_schedule(company_id, channel_id);
-        let thread_id = Uuid::new_v4();
-
-        let prompt_msg = stored_email_view(EmailMessageDraft {
-            id: Uuid::new_v4(),
-            thread_id,
-            message_id: MessageId::new("<prompt1@domain.com>"),
-            in_reply_to: None,
-            references_list: vec![],
-            sender: EmailAddress::from("system@domain.com"),
-            recipients_to: vec![],
-            recipients_cc: vec![],
-            subject: "Daily Audit".into(),
-            clean_text_body: "Please run morning audit.".into(),
-            raw_text_body: None,
-            raw_html_body: None,
-            attachments: None,
-            direction: MessageDirection::Inbound,
-            role: MessageRole::System,
-            thread_index: None,
-            created_at: Utc::now(),
-        });
-
-        let agent_reply_msg = stored_email_view(EmailMessageDraft {
-            id: Uuid::new_v4(),
-            thread_id,
-            message_id: MessageId::new("<reply1@domain.com>"),
-            in_reply_to: Some(MessageId::new("<prompt1@domain.com>")),
-            references_list: vec![MessageId::new("<prompt1@domain.com>")],
-            sender: EmailAddress::from("agent@domain.com"),
-            recipients_to: vec![],
-            recipients_cc: vec![],
-            subject: "Re: Daily Audit".into(),
-            clean_text_body: "Audit completed: **0 errors found**.".into(),
-            raw_text_body: None,
-            raw_html_body: None,
-            attachments: None,
-            direction: MessageDirection::Outbound,
-            role: MessageRole::Agent,
-            thread_index: None,
-            created_at: Utc::now(),
-        });
-
-        let html = schedule_thread_pane(&ScheduleThreadPaneProps {
-            company_id,
-            schedule: &schedule,
-            channel: None,
-            agent: None,
-            thread_id,
-            subject: "Daily Audit",
-            messages: &[prompt_msg, agent_reply_msg],
-        });
-
-        assert!(html.contains("Daily Audit"));
-        assert!(html.contains("Please run morning audit."));
-        assert!(html.contains("0 errors found")); // Markdown rendered
-        assert!(html.contains(r#"hx-ext="sse""#));
-        assert!(html.contains(&format!(
-            r#"sse-connect="/ui/events?company_id={company_id}&channel_id={}&thread_id={thread_id}&after="#,
-            Uuid::nil()
-        )));
-        assert!(html.contains(r#"sse-swap="message""#));
-        assert!(html.contains(r#"sse-swap="activity""#));
-        assert!(html.contains("hx-post=\"/ui/schedules/thread/"));
-        assert!(html.contains("Reply</button>"));
     }
 
     /// The browser's Create Schedule submission, field for field, must reach the handler.
     /// The pane posts every control in the form — including the ones its show/hide boxes have
-    /// hidden — so the empty `scheduled_at` and `recipient_emails` are part of a normal interval
-    /// create, and the numeric cadence arrives as a string like every urlencoded value.
+    /// hidden — so the empty `scheduled_at` is part of a normal interval create, and the numeric
+    /// cadence arrives as a string like every urlencoded value.
     #[tokio::test]
     async fn create_schedule_form_deserializes_browser_submission() {
         use axum::body::Body;
@@ -1276,11 +859,11 @@ mod tests {
 
         let company_id = Uuid::new_v4();
         let channel_id = Uuid::new_v4();
+        let binding_id = Uuid::new_v4();
         let body = format!(
             "company_id={company_id}&name=Daily+Operations+Report&channel_id={channel_id}\
              &schedule_type=interval&interval_seconds=3600&scheduled_at=\
-             &subject_template=%5BDaily%5D+Report&prompt_template=Summarise+the+day\
-             &timezone=UTC&run_as_user_id=&delivery_mode=mailbox_only&recipient_emails="
+             &timezone=UTC&binding_id={binding_id}"
         )
         .replace(['\n', ' '], "");
 
@@ -1305,13 +888,8 @@ mod tests {
             .into_write()
             .expect("form must map to a write");
         assert_eq!(write.schedule_type, ScheduleType::Interval);
-        assert_eq!(write.delivery_mode, ScheduleDeliveryMode::MailboxOnly);
         assert_eq!(write.scheduled_at, None);
-        assert!(write.recipient_emails.is_empty());
-        assert_eq!(
-            write.run_as_user_id, None,
-            "the picker's own \"nobody\" option submits an empty value, not a bad uuid"
-        );
+        assert_eq!(write.binding_id, binding_id);
     }
 
     /// The one-off half of the same pane: the cadence select is hidden but still submits, and the
@@ -1324,13 +902,11 @@ mod tests {
 
         let company_id = Uuid::new_v4();
         let channel_id = Uuid::new_v4();
-        let member_id = Uuid::new_v4();
+        let binding_id = Uuid::new_v4();
         let body = format!(
             "company_id={company_id}&name=Quarter+Close&channel_id={channel_id}\
              &schedule_type=one_off&interval_seconds=&scheduled_at=2026-08-25T14%3A30\
-             &subject_template=Close&prompt_template=Close+the+quarter&timezone=UTC\
-             &run_as_user_id={member_id}&delivery_mode=email_custom\
-             &recipient_emails=a%40x.com%2C+b%40x.com"
+             &timezone=UTC&binding_id={binding_id}"
         )
         .replace(['\n', ' '], "");
 
@@ -1356,30 +932,19 @@ mod tests {
             write.scheduled_at.map(|at| at.to_rfc3339()),
             Some("2026-08-25T14:30:00+00:00".to_string())
         );
-        assert_eq!(write.recipient_emails.len(), 2);
-        assert_eq!(
-            write.run_as_user_id,
-            Some(member_id),
-            "a picked member has to reach the write as the account the picker names"
-        );
+        assert_eq!(write.binding_id, binding_id);
     }
 
-    /// One team, two viewers: the picker offers the owner everybody and the admin only
-    /// themselves, and the schedule the owner already attributed comes back to the admin as a
-    /// locked value rather than as a choice they could quietly re-point.
     #[test]
     fn schedule_editor_keeps_channel_fixed_and_creation_keeps_selector() {
         let company = test_company();
         let schedule = test_schedule(company.id, Uuid::new_v4());
-        let run_as = ScheduleRunAsChoices {
-            team: vec![],
-            restricted_to: None,
-        };
+        let bindings = [binding_of(&schedule)];
         let mut props = pages::ScheduleFormPaneProps {
             company_id: company.id,
             channels: &[],
             schedule: Some(&schedule),
-            run_as: &run_as,
+            bindings: &bindings,
             error: None,
         };
         let edit = pages::schedule_form_pane(&props);
@@ -1394,169 +959,36 @@ mod tests {
         assert!(!create.contains(r#"<input type="hidden" name="channel_id""#));
     }
 
+    /// The form names the workflow binding, and no field the binding now owns.
     #[test]
-    fn the_run_as_picker_offers_only_what_the_viewer_may_choose() {
+    fn the_schedule_form_picks_a_binding_and_nothing_it_replaced() {
         let company = test_company();
-        let channel_id = Uuid::new_v4();
-        let owner = CompanyTeamAccount {
-            principal_id: None,
-            user_id: company.user_id,
-            email: EmailAddress::from("owner@example.com"),
-            username: Some("owner".into()),
-            membership: CompanyMembership::Owner,
+        let schedule = test_schedule(company.id, Uuid::new_v4());
+        let other = ScheduleBindingChoice {
+            binding_id: Uuid::new_v4(),
+            channel_id: Some(schedule.channel_id),
+            title: "Weekly audit".into(),
+            active: false,
         };
-        let admin = CompanyTeamAccount {
-            principal_id: None,
-            user_id: Uuid::new_v4(),
-            email: EmailAddress::from("admin@example.com"),
-            username: Some("admin".into()),
-            membership: CompanyMembership::Admin,
-        };
-        let team = vec![owner.clone(), admin.clone()];
-
-        let mut schedule = test_schedule(company.id, channel_id);
-        schedule.run_as_user_id = Some(owner.user_id);
-
-        let owners_form = pages::schedule_form_pane(&pages::ScheduleFormPaneProps {
+        let bindings = [binding_of(&schedule), other.clone()];
+        let form = pages::schedule_form_pane(&pages::ScheduleFormPaneProps {
             company_id: company.id,
             channels: &[],
             schedule: Some(&schedule),
-            run_as: &ScheduleRunAsChoices {
-                team: team.clone(),
-                restricted_to: None,
-            },
+            bindings: &bindings,
             error: None,
         });
-        assert!(owners_form.contains(r#"<select name="run_as_user_id""#));
-        assert!(owners_form.contains(&format!(r#"value="{}" selected"#, owner.user_id)));
-        assert!(owners_form.contains(&format!(r#"value="{}" "#, admin.user_id)));
-
-        let admins_form = pages::schedule_form_pane(&pages::ScheduleFormPaneProps {
-            company_id: company.id,
-            channels: &[],
-            schedule: Some(&schedule),
-            run_as: &ScheduleRunAsChoices {
-                team,
-                restricted_to: Some(admin.user_id),
-            },
-            error: None,
-        });
-        assert!(
-            admins_form.contains(&format!(
-                r#"<input type="hidden" name="run_as_user_id" value="{}">"#,
-                owner.user_id
-            )),
-            "an admin's save has to hand the owner's attribution back unchanged"
-        );
-        assert!(
-            !admins_form.contains(r#"<select name="run_as_user_id""#),
-            "an admin must not be offered a member they may not choose"
-        );
-    }
-
-    /// Verifies the full UI flow of creating a schedule and viewing its workspace:
-    /// 1. Form input parses properly into a valid ScheduleWrite
-    /// 2. The created schedule id is targeted by the UI redirect
-    /// 3. GET /ui/schedules?company_id=...&schedule_id=... renders workspace with runs and responses
-    #[test]
-    fn newly_created_schedule_workspace_renders_runs_and_details() {
-        let company = test_company();
-        let channel_id = Uuid::new_v4();
-        let user_email = EmailAddress::from("admin@example.com");
-        let user = MailboxUser {
-            id: Uuid::new_v4(),
-            username: "admin",
-            email: &user_email,
-            avatar_url: None,
-            is_operator: false,
-            company_membership: CompanyMembership::Admin,
-        };
-
-        let form = UiScheduleForm {
-            company_id: company.id,
-            name: "cas".into(),
-            schedule_type: "interval".into(),
-            interval_seconds: Some(900),
-            scheduled_at: None,
-            subject_template: "cas {{date}}".into(),
-            prompt_template: "trenutni datum".into(),
-            delivery_mode: "mailbox_only".into(),
-            recipient_emails: None,
-            timezone: Some("Europe/Ljubljana".into()),
-            run_as_user_id: None,
-        };
-
-        let write = form.into_write().expect("must produce valid write");
-        assert_eq!(write.name, "cas");
-        assert_eq!(write.interval_seconds, Some(900));
-
-        let created_schedule = ChannelSchedule {
-            id: Uuid::new_v4(),
-            company_id: company.id,
-            channel_id,
-            name: write.name.clone(),
-            schedule_type: write.schedule_type,
-            interval_seconds: write.interval_seconds,
-            subject_template: write.subject_template.clone(),
-            prompt_template: write.prompt_template.clone(),
-            delivery_mode: write.delivery_mode,
-            recipient_emails: write.recipient_emails.clone(),
-            timezone: write.timezone,
-            run_as_user_id: write.run_as_user_id,
-            enabled: write.enabled,
-            last_run_at: None,
-            next_run_at: Some(Utc::now()),
-            last_error: None,
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
-        };
-
-        let redirect_url = format!(
-            "/ui/schedules?company_id={}&schedule_id={}",
-            company.id, created_schedule.id
-        );
-        assert!(redirect_url.contains(&created_schedule.id.to_string()));
-
-        let run = ScheduleRun {
-            thread_id: Uuid::new_v4(),
-            task_id: Uuid::new_v4(),
-            channel_id,
-            subject: "cas 2026-09-04".into(),
-            task_status: TaskStatus::Completed,
-            lock_expires_at: None,
-            latest_response: Some("Danes je petek, 4. september 2026.".into()),
-            message_count: 2,
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
-        };
-
-        let runs_html = schedule_runs_column(
-            &ScheduleRunsColumnProps {
-                company_id: company.id,
-                schedule: &created_schedule,
-                channel: None,
-                runs: std::slice::from_ref(&run),
-                selected_thread_id: Some(run.thread_id),
-                page: 1,
-                has_next: false,
-            },
-            FragmentSwap::Inline,
-        );
-
-        let html = schedules_page(&SchedulesPage {
-            user: &user,
-            companies: std::slice::from_ref(&company),
-            company: &company,
-            schedules: std::slice::from_ref(&created_schedule),
-            selected_schedule_id: Some(created_schedule.id),
-            run_as: &ScheduleRunAsChoices::default(),
-            runs_html: &runs_html,
-            pane_html: r#"<div id="schedule-pane">Pane Content</div>"#,
-        });
-
-        assert!(html.contains("cas"));
-        assert!(html.contains("Every 15 min"));
-        assert!(html.contains("Danes je petek, 4. september 2026."));
-        assert!(html.contains("2 msgs"));
+        assert!(form.contains(r#"<select name="binding_id" required"#));
+        assert!(form.contains(&format!(r#"value="{}" selected"#, schedule.binding_id)));
+        assert!(form.contains("Weekly audit (inactive)"));
+        for removed in [
+            "subject_template",
+            "prompt_template",
+            "delivery_mode",
+            "recipient_emails",
+            "run_as_user_id",
+        ] {
+            assert!(!form.contains(removed), "the form still renders {removed}");
+        }
     }
 }

@@ -28,31 +28,48 @@ impl BindingLifecycle for PostgresPersistence {
     }
 
     async fn save_binding(&self, command: PreparedBinding) -> AppResult<()> {
-        let state = command.state();
-        let configuration = &state.configuration;
-        let company = configuration.company_id();
         let mut tx = self.pool.begin().await?;
-        authority::authorize_company(&mut tx, company, command.actor()).await?;
-        association::authorize_association(&mut tx, company, command.actor(), state.association)
-            .await?;
-        // All workflow lifecycle mutations serialize on company before their heads.
-        let current = read_binding(&mut tx, company, configuration.id()).await?;
-        let change = validate_change(&command, current.as_ref())?;
-        if !matches!(change, Change::Deactivate) {
-            verify_selection(&mut tx, configuration).await?;
-            resources::check_readiness(&mut tx, configuration).await?;
-        }
-        write_head(&mut tx, &command).await?;
-        if matches!(change, Change::Configuration) {
-            insert_configuration(&mut tx, &command).await?;
-        }
-        sqlx::query("INSERT INTO workflow_binding_events (company_id, binding_id, state_revision, configuration_revision, event_kind, actor_id) VALUES ($1, $2, $3, $4, $5, $6)")
-            .bind(company.as_uuid()).bind(configuration.id().as_uuid()).bind(revision(state.revision.get())?)
-            .bind(revision(configuration.revision().get())?).bind(change.event()).bind(command.actor().user_id())
-            .execute(&mut *tx).await.map_err(write_error)?;
+        save_binding_on(&mut tx, &command).await?;
         tx.commit().await?;
         Ok(())
     }
+}
+
+/// One binding change on the caller's transaction: company lock and association access, then the
+/// change's checks, head, revision and event. `save_binding` and assistant provisioning (p08
+/// D2.3) both write through it.
+pub(super) async fn save_binding_on(
+    tx: &mut Transaction<'_, Postgres>,
+    command: &PreparedBinding,
+) -> AppResult<()> {
+    let state = command.state();
+    let configuration = &state.configuration;
+    let company = configuration.company_id();
+    authority::authorize_company(tx, company, command.actor()).await?;
+    association::authorize_association(tx, company, command.actor(), state.association).await?;
+    // All workflow lifecycle mutations serialize on company before their heads.
+    let current = read_binding(tx, company, configuration.id()).await?;
+    let change = validate_change(command, current.as_ref())?;
+    if !matches!(change, Change::Deactivate) {
+        verify_selection(tx, configuration).await?;
+        resources::check_readiness(tx, configuration).await?;
+        check_run_as(tx, command, current.as_ref()).await?;
+        if state.active && configuration.message_trigger().is_some() {
+            check_message_binding_cap(tx, command).await?;
+        }
+    }
+    if current.is_some() && matches!(change, Change::Configuration) {
+        schedules::revalidate_schedules(tx, configuration, state.association).await?;
+    }
+    write_head(tx, command).await?;
+    if matches!(change, Change::Configuration) {
+        insert_configuration(tx, command).await?;
+    }
+    sqlx::query("INSERT INTO workflow_binding_events (company_id, binding_id, state_revision, configuration_revision, event_kind, actor_id) VALUES ($1, $2, $3, $4, $5, $6)")
+        .bind(company.as_uuid()).bind(configuration.id().as_uuid()).bind(revision(state.revision.get())?)
+        .bind(revision(configuration.revision().get())?).bind(change.event()).bind(command.actor().user_id())
+        .execute(&mut **tx).await.map_err(write_error)?;
+    Ok(())
 }
 
 fn validate_change(command: &PreparedBinding, current: Option<&BindingState>) -> AppResult<Change> {
@@ -82,6 +99,8 @@ fn validate_change(command: &PreparedBinding, current: Option<&BindingState>) ->
     if new.revision() != old.revision()
         || new.params() != old.params()
         || new.resources() != old.resources()
+        || new.run_as() != old.run_as()
+        || new.message_trigger() != old.message_trigger()
         || store_bundle(new.bundle())? != store_bundle(old.bundle())?
     {
         return Err(conflict());
@@ -129,7 +148,9 @@ async fn write_head(
             .bind(configuration.company_id().as_uuid()).bind(configuration.id().as_uuid()).bind(revision(state.revision.get())?)
             .bind(revision(configuration.revision().get())?).bind(state.active).bind(channel).bind(thread)
             .execute(&mut **tx).await.map_err(write_error)?.rows_affected(),
-        Some(expected) => sqlx::query("UPDATE workflow_bindings SET state_revision = $3, configuration_revision = $4, active = $5 WHERE company_id = $1 AND id = $2 AND state_revision = $6")
+        // `activated_at` marks when the current activation began; configuring an active binding
+        // keeps it, so message eligibility (`activated_at <= accepted`) is unchanged (p08 D1.2).
+        Some(expected) => sqlx::query("UPDATE workflow_bindings SET state_revision = $3, configuration_revision = $4, active = $5, activated_at = CASE WHEN $5 THEN COALESCE(activated_at, clock_timestamp()) END WHERE company_id = $1 AND id = $2 AND state_revision = $6")
             .bind(configuration.company_id().as_uuid()).bind(configuration.id().as_uuid()).bind(revision(state.revision.get())?)
             .bind(revision(configuration.revision().get())?).bind(state.active).bind(revision(expected.get())?)
             .execute(&mut **tx).await?.rows_affected(),
@@ -145,10 +166,87 @@ async fn insert_configuration(
     command: &PreparedBinding,
 ) -> AppResult<()> {
     let configuration = &command.state().configuration;
-    sqlx::query("INSERT INTO workflow_binding_revisions (company_id, binding_id, revision, version_id, params, resources, actor_id) VALUES ($1, $2, $3, $4, $5, $6, $7)")
+    sqlx::query("INSERT INTO workflow_binding_revisions (company_id, binding_id, revision, version_id, params, resources, actor_id, run_as_user_id, message_trigger) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)")
         .bind(configuration.company_id().as_uuid()).bind(configuration.id().as_uuid()).bind(revision(configuration.revision().get())?)
         .bind(configuration.bundle().compiled().graph().definition().version_id.as_uuid()).bind(configuration.params())
         .bind(serde_json::to_value(configuration.resources()).map_err(|_| invalid())?).bind(command.actor().user_id())
+        .bind(configuration.run_as().user_id()).bind(configuration.message_trigger().map(MessageTrigger::as_str))
         .execute(&mut **tx).await.map_err(write_error)?;
+    Ok(())
+}
+
+/// The run-as must be a current owner/admin who can see the association, and only the company
+/// owner may name somebody other than themselves; keeping the stored run-as is not a choice
+/// (p08 D1.1, the legacy schedule attribution rule).
+async fn check_run_as(
+    tx: &mut Transaction<'_, Postgres>,
+    command: &PreparedBinding,
+    current: Option<&BindingState>,
+) -> AppResult<()> {
+    let state = command.state();
+    let company = state.configuration.company_id();
+    let run_as = state.configuration.run_as();
+    let refused = |error: AppError| match error {
+        AppError::NotFound(_) => AppError::BadRequest(
+            "The binding's run-as must be a current owner or admin who can see its channel".into(),
+        ),
+        other => other,
+    };
+    authority::authorize_company(tx, company, run_as)
+        .await
+        .map_err(refused)?;
+    association::authorize_association(&mut *tx, company, run_as, state.association)
+        .await
+        .map_err(refused)?;
+    let chosen = current.is_none_or(|previous| previous.configuration.run_as() != run_as);
+    if !chosen || run_as == command.actor() {
+        return Ok(());
+    }
+    let owner: bool = sqlx::query_scalar("SELECT user_id = $2 FROM companies WHERE id = $1")
+        .bind(company.as_uuid())
+        .bind(command.actor().user_id())
+        .fetch_one(&mut **tx)
+        .await?;
+    if !owner {
+        return Err(AppError::BadRequest(
+            "Only the company owner may make a binding run as somebody else".into(),
+        ));
+    }
+    Ok(())
+}
+
+/// One channel admits at most `MAX_MESSAGE_BINDINGS_PER_CHANNEL` message-triggered bindings at
+/// once, checked for every change that leaves one active (p08 D1.2). The channel lock follows
+/// the company lock `authorize_company` already holds.
+async fn check_message_binding_cap(
+    tx: &mut Transaction<'_, Postgres>,
+    command: &PreparedBinding,
+) -> AppResult<()> {
+    let state = command.state();
+    let company = state.configuration.company_id();
+    let (Some(channel), _) = association_columns(state.association) else {
+        return Err(AppError::BadRequest(
+            "A message trigger needs a channel or thread association".into(),
+        ));
+    };
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended('workflow_message_bindings:' || $1::text || ':' || $2::text, 0))")
+        .bind(company.as_uuid()).bind(channel).execute(&mut **tx).await?;
+    let others: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM workflow_bindings AS binding \
+         JOIN workflow_binding_revisions AS configuration ON configuration.company_id = binding.company_id \
+           AND configuration.binding_id = binding.id AND configuration.revision = binding.configuration_revision \
+         WHERE binding.company_id = $1 AND binding.channel_id = $2 AND binding.active \
+           AND configuration.message_trigger IS NOT NULL AND binding.id <> $3",
+    )
+    .bind(company.as_uuid())
+    .bind(channel)
+    .bind(state.configuration.id().as_uuid())
+    .fetch_one(&mut **tx)
+    .await?;
+    if others >= MAX_MESSAGE_BINDINGS_PER_CHANNEL {
+        return Err(AppError::BadRequest(format!(
+            "A channel can have at most {MAX_MESSAGE_BINDINGS_PER_CHANNEL} active message-triggered bindings"
+        )));
+    }
     Ok(())
 }

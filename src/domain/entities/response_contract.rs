@@ -68,18 +68,3 @@ impl ResponseContract {
         ))
     }
 }
-
-/// Omission preserves a stored contract; explicit null clears it.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[serde(transparent)]
-pub struct ContractUpdate(
-    #[serde(deserialize_with = "present")] pub Option<Option<ResponseContract>>,
-);
-fn present<'de, D: serde::Deserializer<'de>>(
-    d: D,
-) -> Result<Option<Option<ResponseContract>>, D::Error> {
-    let raw = Option::<Box<serde_json::value::RawValue>>::deserialize(d)?;
-    raw.map(|raw| ResponseContract::parse(raw.get()).map_err(serde::de::Error::custom))
-        .transpose()
-        .map(Some)
-}

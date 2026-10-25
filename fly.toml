@@ -18,10 +18,6 @@ kill_timeout = "30s"
   INCOMING_SMTP_PORT = "2525"
   ENABLE_HEURISTIC_SCANNER = "true"
   ENABLE_SPAM_SCANNER = "false"
-  # API-bound agent executions; four is conservative for one shared CPU.
-  TASK_WORKER_CONCURRENCY = "4"
-  # Fallback per provider run; an agent may override it (valid range: 1-3600 seconds).
-  AGENT_RUN_TIMEOUT_SECS = "300"
   # Production relays use certificate-validated TLS. Never enable this local-only escape hatch
   # on Fly; startup also rejects it when SMTP credentials are configured.
   SMTP_ALLOW_PLAINTEXT_LOCAL = "false"

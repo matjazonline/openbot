@@ -21,7 +21,7 @@ pub(super) fn assert_preparation(before: &Value, after: &Value, preparation: Pre
                 .iter_mut()
                 .find(|row| row["id"] == json!(scope.job.0))
                 .unwrap();
-            assert_eq!(row["status"], "stopped");
+            assert_eq!(row["status"], "completed");
             row["status"] = json!("pending");
             assert_eq!(after["workflow_runs"][0]["state"], "waiting");
             assert_eq!(

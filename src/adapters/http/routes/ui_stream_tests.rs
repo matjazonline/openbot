@@ -1,4 +1,5 @@
-//! Live-stream tests for the two mailbox streams, on a real database.
+//! Live-stream tests for the two mailbox streams, on a real database. The thread activity comes
+//! from a scripted reader: its query is tested against real runs in the persistence tests.
 //!
 //! The handlers are called directly with the extractors axum would build -- this repo has no
 //! HTTP-level harness -- and their `Sse` response is read frame by frame off the body. Every
@@ -14,20 +15,14 @@ use std::time::Duration;
 
 use axum::response::IntoResponse;
 
+use std::sync::Mutex;
+
 use super::*;
 use crate::{
-    adapters::persistence::{
-        PostgresPersistence,
-        test_support::{ThreadHandoffFixtureRequest, test_pool, thread_handoff_fixture},
-    },
-    entities::{
-        attention::BusinessPriority,
-        thread_handoff::{ThreadHandoffCommand, ThreadHandoffOperation},
-        transport::PrincipalId,
-    },
-    infra::events::{AttentionScope, AttentionWakeSource},
+    adapters::persistence::{PostgresPersistence, test_support::test_pool},
+    entities::thread_activity::ThreadWorkSummary,
+    infra::events::{AttentionScope, AttentionWakeSource, ThreadScope},
     use_cases::{
-        agent::SpamScanning,
         channel::{ChannelPersistence, ChannelWrite},
         company::{CompanyPersistence, CompanyWrite},
         thread::{InboundIngestPorts, ThreadPersistence, ThreadStores},
@@ -139,14 +134,12 @@ impl Frames {
     }
 }
 
-/// A deployment with no memory providers and no spam scanning, which is all these streams need.
+/// A deployment with no spam scanning, which is all these streams need.
 pub(in crate::adapters::http::routes) fn test_config() -> Arc<AppConfig> {
     Arc::new(AppConfig {
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
         resend_api: crate::infra::config::ResendApiConfig::default(),
-        hydradb: None,
-        hindsight: None,
         refresh_token_ttl: time::Duration::days(30),
         app_domain_name: "mailagents.com".to_string(),
         cors_allowed_origins: vec![],
@@ -173,27 +166,89 @@ pub(in crate::adapters::http::routes) fn test_config() -> Arc<AppConfig> {
     })
 }
 
+/// Each thread's run activity, as the test sets it.
+#[derive(Default)]
+struct ScriptedActivity {
+    summaries: Mutex<HashMap<Uuid, ThreadWorkSummary>>,
+    runs: Mutex<HashMap<Uuid, crate::application::thread_activity::ThreadRuns>>,
+}
+
+#[async_trait::async_trait]
+impl ThreadActivityReader for ScriptedActivity {
+    async fn inspectable_runs(
+        &self,
+        _company: Uuid,
+        _viewer: Uuid,
+        ids: &[Uuid],
+    ) -> AppResult<HashSet<Uuid>> {
+        Ok(ids.iter().copied().collect())
+    }
+
+    async fn thread_runs(
+        &self,
+        _company_id: Uuid,
+        thread_id: Uuid,
+        _viewer: Uuid,
+    ) -> AppResult<crate::application::thread_activity::ThreadRuns> {
+        if let Some(runs) = self.runs.lock().unwrap().get(&thread_id) {
+            return Ok(runs.clone());
+        }
+        let items = self
+            .summaries
+            .lock()
+            .unwrap()
+            .get(&thread_id)
+            .and_then(|row| {
+                row.activity.map(|activity| {
+                    crate::application::thread_activity::ThreadRunActivity {
+                        run_id: row.run_id,
+                        title: "Workflow".into(),
+                        activity,
+                    }
+                })
+            })
+            .into_iter()
+            .collect();
+        Ok(crate::application::thread_activity::ThreadRuns {
+            inspectable: Default::default(),
+            items,
+            has_more: false,
+            message_runs: vec![],
+        })
+    }
+
+    async fn thread_activity(
+        &self,
+        _company_id: Uuid,
+        thread_ids: &[Uuid],
+    ) -> AppResult<HashMap<Uuid, ThreadWorkSummary>> {
+        let activity = self.summaries.lock().unwrap();
+        Ok(thread_ids
+            .iter()
+            .filter_map(|id| activity.get(id).map(|summary| (*id, *summary)))
+            .collect())
+    }
+}
+
 struct Harness {
     persistence: Arc<PostgresPersistence>,
     channels: Arc<ChannelUseCases>,
     threads: Arc<ThreadUseCases>,
-    handoffs: Arc<ThreadHandoffUseCases>,
-    agents: Arc<AgentUseCases>,
+    activity: Arc<ScriptedActivity>,
     events: MailboxEvents,
     config: Arc<AppConfig>,
     company_id: Uuid,
     channel_id: Uuid,
     owner: Viewer,
-    owner_principal_id: PrincipalId,
 }
 
 impl Harness {
     async fn new() -> Option<Self> {
         let persistence = Arc::new(PostgresPersistence::new(test_pool().await?));
         let suffix = Uuid::new_v4().simple().to_string();
-        let email = format!("handoff-stream-{suffix}@example.com");
+        let email = format!("activity-stream-{suffix}@example.com");
         persistence
-            .create_user(&format!("handoff-stream-{suffix}"), &email, "hash")
+            .create_user(&format!("activity-stream-{suffix}"), &email, "hash")
             .await
             .unwrap();
         let owner = UserPersistence::get_by_email(persistence.as_ref(), &email)
@@ -204,8 +259,8 @@ impl Harness {
             persistence.as_ref(),
             owner.id,
             CompanyWrite {
-                name: "Handoff Streams".into(),
-                slug: format!("handoff-stream-{suffix}"),
+                name: "Activity Streams".into(),
+                slug: format!("activity-stream-{suffix}"),
                 ..CompanyWrite::default()
             },
         )
@@ -216,19 +271,12 @@ impl Harness {
             company.id,
             ChannelWrite {
                 name: "Support".into(),
-                slug: format!("handoff-stream-support-{suffix}"),
+                slug: format!("activity-stream-support-{suffix}"),
                 ..ChannelWrite::default()
             },
         )
         .await
         .unwrap();
-        let owner_principal_id: Uuid =
-            sqlx::query_scalar("SELECT id FROM principals WHERE company_id = $1 AND user_id = $2")
-                .bind(company.id)
-                .bind(owner.id)
-                .fetch_one(persistence.pool())
-                .await
-                .unwrap();
 
         let config = test_config();
         let renderers = Arc::new(
@@ -251,8 +299,6 @@ impl Harness {
                     channels: persistence.clone(),
                     companies: persistence.clone(),
                     participants: persistence.clone(),
-                    tasks: persistence.clone(),
-                    handoff_policy: persistence.clone(),
                 },
                 InboundIngestPorts {
                     committer: persistence.clone(),
@@ -263,13 +309,7 @@ impl Harness {
                 renderers,
                 config.clone(),
             )),
-            handoffs: Arc::new(ThreadHandoffUseCases::new(persistence.clone())),
-            agents: Arc::new(AgentUseCases::new(
-                persistence.clone(),
-                persistence.clone(),
-                persistence.clone(),
-                SpamScanning::Unavailable,
-            )),
+            activity: Arc::new(ScriptedActivity::default()),
             events: MailboxEvents::new(),
             config,
             persistence,
@@ -279,7 +319,6 @@ impl Harness {
                 user_id: owner.id,
                 email: EmailAddress::from(email.as_str()),
             },
-            owner_principal_id: PrincipalId::from(owner_principal_id),
         })
     }
 
@@ -290,25 +329,29 @@ impl Harness {
             .id
     }
 
-    /// One held reply on `thread_id`, at version 1, nobody's yet.
-    async fn hold(&self, thread_id: Uuid) -> (Uuid, Uuid) {
-        let held = thread_handoff_fixture(
-            self.persistence.as_ref(),
-            ThreadHandoffFixtureRequest::new(self.company_id, self.channel_id, thread_id),
-        )
-        .await;
-        (held.handoff_id, held.generation)
+    /// Set what a thread's newest run is doing; `None` is a thread with no run, or a finished one.
+    fn set_activity(&self, thread_id: Uuid, activity: Option<ThreadActivity>) {
+        self.activity.summaries.lock().unwrap().insert(
+            thread_id,
+            ThreadWorkSummary {
+                run_id: Uuid::new_v4(),
+                activity,
+            },
+        );
     }
 
-    /// What the Phase 3 trigger publishes when a handoff row changes.
-    fn publish_handoff_change(&self, handoff_id: Uuid) {
+    /// What the `workflow_runs` activity trigger publishes when a thread's run changes state.
+    fn publish_activity_change(&self, thread_id: Uuid) {
         self.events
-            .publish(MailboxEvent::AttentionChanged(AttentionScope {
-                company_id: self.company_id,
+            .publish(MailboxEvent::ActivityChanged(ThreadScope {
+                thread_id,
                 channel_id: self.channel_id,
-                source_kind: AttentionWakeSource::ThreadHandoff,
-                source_id: handoff_id,
+                company_id: self.company_id,
             }));
+    }
+
+    fn reader(&self) -> Arc<dyn ThreadActivityReader> {
+        self.activity.clone()
     }
 
     async fn column_stream(&self) -> Frames {
@@ -316,7 +359,7 @@ impl Harness {
             thread_column_stream(
                 State(self.channels.clone()),
                 State(self.threads.clone()),
-                State(self.handoffs.clone()),
+                State(self.reader()),
                 State(self.events.clone()),
                 State(self.config.clone()),
                 self.owner.clone(),
@@ -338,8 +381,7 @@ impl Harness {
             thread_message_stream(
                 State(self.channels.clone()),
                 State(self.threads.clone()),
-                State(self.handoffs.clone()),
-                State(self.agents.clone()),
+                State(self.reader()),
                 State(self.events.clone()),
                 self.owner.clone(),
                 HeaderMap::new(),
@@ -355,74 +397,39 @@ impl Harness {
             .into_response(),
         )
     }
-
-    /// The owner claims a held reply, exactly as the banner's Claim button does.
-    async fn claim(&self, handoff_id: Uuid, generation: Uuid, expected_version: u64) {
-        self.handoffs
-            .change_thread_handoff(ThreadHandoffCommand {
-                company_id: self.company_id,
-                handoff_id,
-                command_id: Uuid::new_v4(),
-                expected_version,
-                expected_generation: generation,
-                operation: ThreadHandoffOperation::Claim,
-                priority: BusinessPriority::Normal,
-                due_at: None,
-                actor_principal_id: self.owner_principal_id,
-                visible_channel_ids: vec![self.channel_id],
-            })
-            .await
-            .expect("the owner may claim an unclaimed reply");
-    }
-
-    /// Close a held reply the way a send does: resolved, and out of every open-handoff read.
-    async fn resolve(&self, handoff_id: Uuid) {
-        sqlx::query(
-            r#"UPDATE thread_handoffs
-               SET state = 'resolved', closed_at = CURRENT_TIMESTAMP, version = version + 1
-               WHERE company_id = $1 AND id = $2"#,
-        )
-        .bind(self.company_id)
-        .bind(handoff_id)
-        .execute(self.persistence.pool())
-        .await
-        .unwrap();
-    }
 }
 
-/// Cases 13 and 15. A connect seeds every first-page badge, and a held thread's row arrives with
-/// its badge already on it.
+/// p08 D4.6. A connect seeds every first-page badge from the runs, and a working thread's row
+/// arrives with its badge already on it.
 #[tokio::test]
-async fn the_column_stream_badges_the_held_thread_and_clears_the_others() {
+async fn the_column_stream_badges_each_thread_by_its_newest_run() {
     let Some(harness) = Harness::new().await else {
         return;
     };
-    let held_thread = harness.thread("Invoice 4471").await;
-    let quiet_thread = harness.thread("Nothing held here").await;
-    let (handoff_id, _) = harness.hold(held_thread).await;
+    let working = harness.thread("Invoice 4471").await;
+    let quiet = harness.thread("Nothing running here").await;
+    harness.set_activity(working, Some(ThreadActivity::Working));
 
     let mut frames = harness.column_stream().await;
 
     // The subscribe-then-snapshot seeding: one badge event per first-page thread, before any row.
-    let mut badges = std::collections::HashMap::new();
+    let mut badges = HashMap::new();
     while badges.len() < 2 {
         let frame = frames.next().await;
-        if let Some(id) = frame.event.strip_prefix("handoff-") {
+        if let Some(id) = frame.event.strip_prefix("activity-") {
             badges.insert(id.to_string(), frame.data);
         }
     }
     assert!(
-        badges[&held_thread.to_string()].contains("Needs input"),
-        "the held thread's badge is seeded on connect"
+        badges[&working.to_string()].contains("Agent working"),
+        "the working thread's badge is seeded on connect"
     );
     assert_eq!(
-        badges[&quiet_thread.to_string()],
+        badges[&quiet.to_string()],
         "",
-        "a thread with nothing held gets the empty payload that clears its slot"
+        "a thread with no run gets the empty payload that clears its slot"
     );
 
-    // Case 15: the row itself streams in already carrying the badge, so it cannot blink from held
-    // to plain between arriving and the next handoff change.
     let mut rows = Vec::new();
     while rows.len() < 2 {
         let frame = frames.next().await;
@@ -430,155 +437,96 @@ async fn the_column_stream_badges_the_held_thread_and_clears_the_others() {
             rows.push(frame.data);
         }
     }
-    let held_row = rows
+    let working_row = rows
         .iter()
-        .find(|row| row.contains(&held_thread.to_string()))
-        .expect("the held thread's row streams in");
-    assert!(held_row.contains("Needs input"), "{held_row}");
-    assert!(held_row.contains(&format!(r#"sse-swap="handoff-{held_thread}""#)));
-
+        .find(|row| row.contains(&working.to_string()))
+        .expect("the working thread's row streams in");
+    assert!(working_row.contains("Agent working"), "{working_row}");
+    assert!(working_row.contains(&format!(r#"sse-swap="activity-{working}""#)));
     let quiet_row = rows
         .iter()
-        .find(|row| row.contains(&quiet_thread.to_string()))
+        .find(|row| row.contains(&quiet.to_string()))
         .expect("the quiet thread's row streams in");
-    assert!(!quiet_row.contains("Needs input"));
-
-    // And a later change re-sends every first-page badge, held one included.
-    harness.publish_handoff_change(handoff_id);
-    let frame = frames.next_named(&format!("handoff-{held_thread}")).await;
-    assert!(frame.data.contains("Needs input"));
+    assert!(!quiet_row.contains("Agent working"));
 }
 
-/// Case 14. The general file's manual step 7 as an automated test: sending the reply clears the
-/// badge without a page reload.
+/// A run changing state redraws that thread's badge, and a finished run clears it.
 #[tokio::test]
-async fn a_resolved_handoff_clears_its_badge_over_the_stream() {
+async fn a_run_change_redraws_its_threads_badge() {
     let Some(harness) = Harness::new().await else {
         return;
     };
-    let thread_id = harness.thread("Invoice 4471").await;
-    let (handoff_id, _) = harness.hold(thread_id).await;
-
+    let thread_id = harness.thread("Refund").await;
+    harness.set_activity(thread_id, Some(ThreadActivity::Queued));
     let mut frames = harness.column_stream().await;
-    let seeded = frames.next_named(&format!("handoff-{thread_id}")).await;
-    assert!(seeded.data.contains("Needs input"));
+    let seeded = frames.next_named(&format!("activity-{thread_id}")).await;
+    assert!(seeded.data.contains("Queued"), "{}", seeded.data);
 
-    harness.resolve(handoff_id).await;
-    harness.publish_handoff_change(handoff_id);
+    harness.set_activity(thread_id, Some(ThreadActivity::AwaitingReview));
+    harness.publish_activity_change(thread_id);
+    let review = frames.next_named(&format!("activity-{thread_id}")).await;
+    assert!(review.data.contains("Awaiting review"), "{}", review.data);
 
-    let cleared = frames.next_named(&format!("handoff-{thread_id}")).await;
+    harness.set_activity(thread_id, None);
+    harness.publish_activity_change(thread_id);
+    let cleared = frames.next_named(&format!("activity-{thread_id}")).await;
+    assert_eq!(cleared.data, "", "a succeeded run leaves nothing to show");
+}
+
+/// A listener reconnect may have lost notifications: the column re-sends every first-page badge.
+#[tokio::test]
+async fn a_resync_re_sends_the_columns_badges() {
+    let Some(harness) = Harness::new().await else {
+        return;
+    };
+    let thread_id = harness.thread("Lagged").await;
+    let mut frames = harness.column_stream().await;
     assert_eq!(
-        cleared.data, "",
-        "a resolved handoff is absent from the read, and an empty payload is what clears the badge"
-    );
-}
-
-/// Case 16. A lag reconciles both sets, so nothing is left showing a badge it no longer has.
-#[tokio::test]
-async fn a_lagged_column_re_sends_both_the_activity_and_the_handoff_badges() {
-    let Some(harness) = Harness::new().await else {
-        return;
-    };
-    let thread_id = harness.thread("Invoice 4471").await;
-    let (handoff_id, _) = harness.hold(thread_id).await;
-
-    let mut frames = harness.column_stream().await;
-    assert!(
         frames
-            .next_named(&format!("handoff-{thread_id}"))
+            .next_named(&format!("activity-{thread_id}"))
             .await
-            .data
-            .contains("Needs input")
+            .data,
+        ""
     );
-    // Drain the seeded activity badge and the row, so what follows is the lag's own work.
-    frames.next_named("thread").await;
 
-    // A lag is what the broadcast reports when a subscriber falls further behind than the channel
-    // holds, which one burst past its capacity produces.
-    for _ in 0..(crate::infra::events::broadcast_capacity_for_tests() + 8) {
-        harness.publish_handoff_change(handoff_id);
-    }
-
-    let handoff = frames.next_named(&format!("handoff-{thread_id}")).await;
-    assert!(handoff.data.contains("Needs input"));
-    let activity = frames
-        .next_named(&pages::thread_activity_event(thread_id))
-        .await;
-    assert_eq!(
-        activity.data, "",
-        "the activity set is re-seeded by the same catch-up, and this thread has no task"
-    );
+    // Changed with no notification for it, as across a dropped listener connection.
+    harness.set_activity(thread_id, Some(ThreadActivity::NeedsAttention));
+    harness.events.publish(MailboxEvent::Resync);
+    let resent = frames.next_named(&format!("activity-{thread_id}")).await;
+    assert!(resent.data.contains("Needs attention"), "{}", resent.data);
 }
 
-/// Case 17. The open thread gets its banner on connect, and again after a claim -- with the
-/// responsibility changed.
+/// The open thread streams its activity strip on connect and after its run changes; an attention
+/// change is not its news.
 #[tokio::test]
-async fn the_open_thread_streams_its_banner_on_connect_and_after_a_claim() {
+async fn the_open_thread_streams_its_activity_strip() {
     let Some(harness) = Harness::new().await else {
         return;
     };
-    let thread_id = harness.thread("Invoice 4471").await;
-    let (handoff_id, generation) = harness.hold(thread_id).await;
-
+    let thread_id = harness.thread("Open").await;
     let mut frames = harness.message_stream(thread_id).await;
-    let connected = frames.next_named("handoff").await;
-    assert!(
-        connected.data.contains("Channel team"),
-        "an unclaimed reply is the channel team's: {}",
-        connected.data
-    );
-    assert!(connected.data.contains("Needs instruction"));
-    assert!(connected.data.contains(">Claim<"));
-
-    harness.claim(handoff_id, generation, 1).await;
-    harness.publish_handoff_change(handoff_id);
-
-    let claimed = frames.next_named("handoff").await;
-    assert!(
-        !claimed.data.contains("Channel team"),
-        "somebody has it now: {}",
-        claimed.data
-    );
-    assert!(claimed.data.contains(">Generate draft<"));
-    assert!(
-        claimed.data.contains(r#"data-handoff-version="2""#),
-        "the banner's fence moves with the row it describes"
-    );
-}
-
-/// Case 18. The accepted cost of the channel-scoped term, asserted rather than pretended away: a
-/// handoff change on another thread re-renders this banner, identically.
-#[tokio::test]
-async fn a_handoff_change_on_another_thread_re_renders_this_banner_unchanged() {
-    let Some(harness) = Harness::new().await else {
-        return;
-    };
-    let open_thread = harness.thread("Invoice 4471").await;
-    let other_thread = harness.thread("Invoice 4472").await;
-    let (_, _) = harness.hold(open_thread).await;
-    let (other_handoff, _) = harness.hold(other_thread).await;
-
-    let mut frames = harness.message_stream(open_thread).await;
-    let first = frames.next_named("handoff").await;
-
-    harness.publish_handoff_change(other_handoff);
-    let second = frames.next_named("handoff").await;
-
     assert_eq!(
-        first.data, second.data,
-        "the re-read costs one query and produces an identical swap"
+        frames.next_named("activity").await.data,
+        "",
+        "a thread with no run streams an empty strip"
     );
+
+    harness.set_activity(thread_id, Some(ThreadActivity::Failed));
+    harness
+        .events
+        .publish(MailboxEvent::AttentionChanged(AttentionScope {
+            company_id: harness.company_id,
+            channel_id: harness.channel_id,
+            source_kind: AttentionWakeSource::Delivery,
+            source_id: Uuid::new_v4(),
+        }));
+    harness.publish_activity_change(thread_id);
+    let failed = frames.next_named("activity").await;
+    assert!(failed.data.contains("Run failed"), "{}", failed.data);
 }
 
-/// A thread with no held reply still gets the banner event on connect, carrying nothing -- which
-/// is what clears a banner left over from a previous connection.
-#[tokio::test]
-async fn a_thread_with_no_held_reply_streams_an_empty_banner() {
-    let Some(harness) = Harness::new().await else {
-        return;
-    };
-    let thread_id = harness.thread("Nothing held here").await;
+#[path = "ui_conversation_stream_tests.rs"]
+mod conversation_stream_tests;
 
-    let mut frames = harness.message_stream(thread_id).await;
-    assert_eq!(frames.next_named("handoff").await.data, "");
-}
+#[path = "ui_message_tests.rs"]
+mod message_source_tests;

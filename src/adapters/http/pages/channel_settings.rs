@@ -6,30 +6,13 @@
 //! sends the sidebar list along out of band, so a rename or a delete shows up immediately.
 
 use super::*;
-use crate::entities::{
-    channel::PUBLIC_PARTICIPANT,
-    schedule::{ChannelSchedule, ScheduleDeliveryMode, ScheduleRunAsChoices},
-};
+use crate::entities::{channel::PUBLIC_PARTICIPANT, schedule::ChannelSchedule};
+use crate::use_cases::schedule::ScheduleBindingChoice;
 
 /// Client-side behaviour this workspace adds on top of [`MAILBOX_SCRIPT`].
 ///
 /// Kept out of the `format!` blocks below so its braces need no escaping.
-pub(crate) const CHANNEL_SETTINGS_SCRIPT: &str = r##"        function showChannelTab(mode) {
-            var easy = document.getElementById('channel-tab-easy');
-            var simple = document.getElementById('channel-tab-simple');
-            var advancedForm = document.getElementById('channel-tab-advanced');
-            var easyBtn = document.getElementById('channel-tab-easy-btn');
-            var simpleBtn = document.getElementById('channel-tab-simple-btn');
-            var advancedBtn = document.getElementById('channel-tab-advanced-btn');
-            if (easy) easy.classList.toggle('hidden', mode !== 'easy');
-            if (simple) simple.classList.toggle('hidden', mode !== 'simple');
-            if (advancedForm) advancedForm.classList.toggle('hidden', mode !== 'advanced');
-            if (easyBtn) easyBtn.classList.toggle('tab-active', mode === 'easy');
-            if (simpleBtn) simpleBtn.classList.toggle('tab-active', mode === 'simple');
-            if (advancedBtn) advancedBtn.classList.toggle('tab-active', mode === 'advanced');
-        }
-
-        // The spam interlock only applies to a channel anyone can write to, so the confirmation
+pub(crate) const CHANNEL_SETTINGS_SCRIPT: &str = r##"        // The spam interlock only applies to a channel anyone can write to, so the confirmation
         // stays inert until the participants field actually names @public.
         function toggleChannelSpamConfirm(input) {
             var form = input.closest('form');
@@ -45,52 +28,7 @@ pub(crate) const CHANNEL_SETTINGS_SCRIPT: &str = r##"        function showChanne
                 if (!isPublic) checkbox.checked = false;
             }
         }
-
-        // A channel can run several agents in order, but a urlencoded form keeps only the last
-        // value of a repeated name — so the options feed one hidden comma-separated field.
-        //
-        // Library definitions are picked from a modal of cards and land in a hidden field; custom
-        // company definitions remain compact radios. Both feed the same field the server reads.
-        function syncChannelAgents(el) {
-            var form = el.closest('form');
-            if (!form) return;
-            var fromLibrary = el.classList.contains('channel-library-agent-field');
-            var options = form.querySelectorAll('.channel-agent-option');
-            Array.prototype.forEach.call(options, function (option) {
-                if (fromLibrary || option !== el) option.checked = false;
-            });
-            if (!fromLibrary) setChannelLibraryAgent(form, '', '');
-            var target = form.querySelector('input[name="agent_ids"]');
-            if (!target) return;
-            var checked = form.querySelector('.channel-agent-option:checked');
-            target.value = fromLibrary ? el.value : (checked ? checked.value : '');
-        }
-
-        // The library choice lives in a hidden field, so the button that opens the modal and the
-        // card inside it are what has to be kept in step with the value.
-        function setChannelLibraryAgent(form, id, name) {
-            var field = form.querySelector('.channel-library-agent-field');
-            if (!field) return;
-            field.value = id;
-            var label = form.querySelector('.channel-library-agent-label');
-            if (label) label.textContent = name || label.dataset.placeholder;
-            var cards = form.querySelectorAll('.channel-library-agent-card');
-            Array.prototype.forEach.call(cards, function (card) {
-                card.classList.toggle('border-primary', !!id && card.dataset.agentId === id);
-            });
-        }
-
-        // Picking a card is the whole modal: it fills the hidden field, clears any radio through
-        // the shared sync, and closes.
-        function pickChannelLibraryAgent(card) {
-            var form = card.closest('form');
-            if (!form) return;
-            setChannelLibraryAgent(form, card.dataset.agentId, card.dataset.agentName);
-            var field = form.querySelector('.channel-library-agent-field');
-            if (field) syncChannelAgents(field);
-            var dialog = card.closest('dialog');
-            if (dialog) dialog.close();
-        }"##;
+"##;
 
 /// The channel list in the sidebar — the only part of the workspace a write has to refresh.
 pub struct ChannelSettingsList<'a> {
@@ -112,8 +50,8 @@ pub struct ChannelSettingsPage<'a> {
 
 /// What a channel form was last submitted with, so a rejected submit comes back filled in.
 ///
-/// The Advanced create form and the edit form take exactly these fields, which is why they share
-/// one renderer; only the URL they submit to differs.
+/// The create form and the edit form take exactly these fields, which is why they share one
+/// renderer; only the URL they submit to differs.
 #[derive(Debug)]
 pub struct ChannelDraft<'a> {
     pub name: &'a str,
@@ -122,24 +60,12 @@ pub struct ChannelDraft<'a> {
     pub slug: &'a str,
     /// Extra addresses the channel answers on, as the comma-separated list the form submits.
     pub alias_slugs: &'a str,
-    /// Simple mode only: the instructions the server expands into an agent.
-    pub system_prompt: &'a str,
     pub participant_emails: &'a str,
-    pub agent_ids: &'a [Uuid],
-    /// Whether the create pane should open on the Advanced tab.
-    pub advanced: bool,
     /// Whether the channel takes traffic. A new channel starts enabled, which is why this type
     /// hand-writes `Default` instead of deriving it.
     pub enabled: bool,
     /// Whether CC'd outsiders may join this channel's threads. Starts on, like `enabled`.
     pub add_3rd_party: bool,
-    pub response_trigger: crate::entities::channel::ChannelResponseTrigger,
-    pub retrieve_company_memory: bool,
-    pub retrieve_agent_memory: bool,
-    pub retrieve_user_memory: bool,
-    pub persist_company_memory: bool,
-    pub persist_agent_memory: bool,
-    pub persist_user_memory: bool,
 }
 
 impl Default for ChannelDraft<'_> {
@@ -149,19 +75,9 @@ impl Default for ChannelDraft<'_> {
             description: "",
             slug: "",
             alias_slugs: "",
-            system_prompt: "",
             participant_emails: "",
-            agent_ids: &[],
-            advanced: false,
             enabled: true,
             add_3rd_party: true,
-            response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
-            retrieve_company_memory: false,
-            retrieve_agent_memory: false,
-            retrieve_user_memory: false,
-            persist_company_memory: false,
-            persist_agent_memory: false,
-            persist_user_memory: false,
         }
     }
 }
@@ -184,40 +100,21 @@ pub struct ChannelEditPane<'a> {
     pub company: &'a Company,
     pub app_domain_name: &'a str,
     pub channel: &'a Channel,
-    pub agents: &'a [Agent],
     pub schedules: &'a [ChannelSchedule],
-    /// Who this channel's scheduled runs may be attributed to.
-    pub run_as: &'a ScheduleRunAsChoices,
+    /// The workflow bindings this channel's schedules may name.
+    pub schedule_bindings: &'a [ScheduleBindingChoice],
     pub spam_scan_enabled: bool,
     /// What the user last typed, when a save was rejected; `None` shows the stored channel.
     pub draft: Option<&'a ChannelDraft<'a>>,
     pub error: Option<&'a str>,
-    /// What a successful save changed beyond the form itself -- today, the work removing an agent
-    /// stopped. `None` shows nothing.
-    pub notice: Option<&'a str>,
-}
-
-/// A success banner for a saved pane, the counterpart of `form_error_banner`.
-fn form_notice_banner(notice: Option<&str>) -> String {
-    notice
-        .map(|message| {
-            format!(
-                r##"<div class="alert alert-success mb-4 text-sm" role="status">{}</div>"##,
-                escape_html_text(message)
-            )
-        })
-        .unwrap_or_default()
 }
 
 /// The pane for a channel that does not exist yet.
 pub struct ChannelCreatePane<'a> {
     pub company: &'a Company,
     pub app_domain_name: &'a str,
-    pub agents: &'a [Agent],
     pub spam_scan_enabled: bool,
     pub draft: &'a ChannelDraft<'a>,
-    /// Easy is activated explicitly after an Easy submission is rejected.
-    pub easy: bool,
     pub error: Option<&'a str>,
 }
 
@@ -227,7 +124,7 @@ pub fn channel_settings_page(page: &ChannelSettingsPage<'_>) -> String {
         r##"
         <aside class="ui-pane-list flex w-64 shrink-0 flex-col border-r border-base-300 bg-base-200">
             {header}
-            {task_counts}
+            {run_counts}
             {list_html}
         </aside>
         {pane_html}
@@ -244,7 +141,7 @@ pub fn channel_settings_page(page: &ChannelSettingsPage<'_>) -> String {
                 plus_glyph = icon(Icon::Plus, BUTTON_ICON),
             ),
         ),
-        task_counts = super::task_counts::task_counts_bar(company.id),
+        run_counts = super::run_counts::run_counts_bar(company.id),
         list_html = channel_settings_list(page.list, FragmentSwap::Inline),
         pane_html = page.pane_html,
     );
@@ -306,13 +203,13 @@ fn channel_settings_entry(
                         hx-push-url="/ui/channels?company_id={company_id}&channel_id={channel_id}"
                         data-action="select-sidebar-item">
                         <span class="flex w-full min-w-0 flex-wrap items-center gap-2">
-                            <span class="min-w-0 truncate">{name}</span>{task_counts}{disabled_badge}
+                            <span class="min-w-0 truncate">{name}</span>{run_counts}{disabled_badge}
                         </span>
                         <span class="w-full truncate font-mono text-[11px] opacity-60">{address}</span>
                     </a>
                 </li>
         "##,
-        task_counts = super::task_counts_slot(super::TaskCountKey::Channel(channel.id)),
+        run_counts = super::run_counts_slot(super::RunCountKey::Channel(channel.id)),
         active = if selected { "menu-active" } else { "" },
         channel_id = channel.id,
         name = escape_html_text(&channel.name),
@@ -344,33 +241,20 @@ pub fn channel_settings_empty_pane(message: &str, swap: FragmentSwap) -> String 
 }
 
 pub fn channel_edit_pane(pane: &ChannelEditPane<'_>) -> String {
-    channel_edit_pane_with_memory(pane, pane.company.memory_provider.is_some())
-}
-
-pub fn channel_edit_pane_with_memory(pane: &ChannelEditPane<'_>, memory_ready: bool) -> String {
     let participants = stored_participants(pane.channel);
     let aliases = stored_alias_slugs(pane.channel);
     let stored = stored_channel_draft(pane.channel, &participants, &aliases);
     let draft = pane.draft.unwrap_or(&stored);
     let company_id = pane.company.id;
     let channel_id = pane.channel.id;
-    let owner = pane
-        .channel
-        .owner_agent_id
-        .and_then(|owner_id| pane.agents.iter().find(|agent| agent.id == owner_id))
-        .map_or(ChannelOwner::None, ChannelOwner::Existing);
-    let delete_action = if pane.channel.owner_agent_id.is_some() {
-        String::new()
-    } else {
-        format!(
-            r##"<button type="button" class="btn btn-error btn-outline ml-auto"
+    let delete_action = format!(
+        r##"<button type="button" class="btn btn-error btn-outline ml-auto"
                             hx-delete="/ui/channels/{channel_id}?company_id={company_id}"
                             hx-target="#channel-pane" hx-swap="outerHTML"
-                            hx-confirm="Delete channel '{name}'? Its threads and tasks go with it."
+                            hx-confirm="Delete channel '{name}'? Its threads go with it."
                             hx-push-url="/ui/channels?company_id={company_id}">Delete Channel</button>"##,
-            name = escape_html_attr(&pane.channel.name),
-        )
-    };
+        name = escape_html_attr(&pane.channel.name),
+    );
 
     format!(
         r##"
@@ -389,7 +273,6 @@ pub fn channel_edit_pane_with_memory(pane: &ChannelEditPane<'_>, memory_ready: b
             <div class="flex-1 overflow-y-auto px-4 py-4 sm:px-6 space-y-6">
                 {error_html}
                 <form hx-put="/ui/channels/{channel_id}?company_id={company_id}" hx-target="#channel-pane" hx-swap="outerHTML" class="space-y-4">
-                    <input type="hidden" name="form_mode" value="advanced">
                     {fields}
                     <div class="flex items-center gap-3 border-t border-base-300 pt-4">
                         <button type="submit" class="btn btn-primary">
@@ -406,6 +289,7 @@ pub fn channel_edit_pane_with_memory(pane: &ChannelEditPane<'_>, memory_ready: b
                 </form>
 
                 {schedules_html}
+                {workflows_html}
             </div>
         </section>
         "##,
@@ -416,115 +300,41 @@ pub fn channel_edit_pane_with_memory(pane: &ChannelEditPane<'_>, memory_ready: b
             pane.app_domain_name
         )),
         creator = escape_html_text(&pane.channel.created_by.label()),
-        error_html = form_error_banner(pane.error) + &form_notice_banner(pane.notice),
+        error_html = form_error_banner(pane.error),
         fields = channel_fields(&ChannelFields {
             company: pane.company,
             app_domain_name: pane.app_domain_name,
-            agents: pane.agents,
-            id_prefix: &channel_id.to_string(),
             draft,
             spam_scan_enabled: pane.spam_scan_enabled,
-            memory_ready,
-            owner,
         }),
         delete_action = delete_action,
+        workflows_html = super::lazy_card(
+            &format!("/ui/workflows/channels/{channel_id}/bindings?company_id={company_id}"),
+            "Loading the workflows on this channel…",
+            "The workflows on this channel could not be loaded.",
+        ),
         schedules_html = channel_schedules_card(&ChannelSchedulesCard {
             company_id,
             channel_id,
             schedules: pane.schedules,
-            run_as: pane.run_as,
+            bindings: pane.schedule_bindings,
         }),
     )
 }
 
 pub fn channel_create_pane(pane: &ChannelCreatePane<'_>) -> String {
-    channel_create_pane_with_memory(pane, pane.company.memory_provider.is_some())
-}
-
-pub fn channel_create_pane_with_memory(pane: &ChannelCreatePane<'_>, memory_ready: bool) -> String {
-    let (easy_hidden, simple_hidden, advanced_hidden) = if pane.easy {
-        ("", "hidden", "hidden")
-    } else if pane.draft.advanced {
-        ("hidden", "hidden", "")
-    } else {
-        ("hidden", "", "hidden")
-    };
-    let active = |lit: bool| if lit { "tab-active" } else { "" };
-
     format!(
         r##"
         <section id="channel-pane"{PANE_SKELETON} class="ui-pane-detail flex min-w-0 flex-1 flex-col bg-base-100">
             <div class="border-b border-base-300 px-4 py-4 sm:px-6">
                 <h2 class="text-xl font-bold">New channel in {company_name}</h2>
-                <p class="text-xs opacity-70">A channel is an inbound address at <span class="font-mono">@{company_slug}.{app_domain_name}</span> plus the agents that answer it.</p>
+                <p class="text-xs opacity-70">A channel is an inbound address at <span class="font-mono">@{company_slug}.{app_domain_name}</span>. An agent answers it through a workflow: create an assistant channel from the agent's page.</p>
             </div>
             <div class="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
                 {error_html}
-                <div role="tablist" class="tabs tabs-box mb-4 w-fit">
-                    <button type="button" role="tab" id="channel-tab-easy-btn" class="tab {easy_active}"
-                        data-action="show-channel-tab" data-tab="easy">Easy</button>
-                    <button type="button" role="tab" id="channel-tab-simple-btn" class="tab {simple_active}"
-                        data-action="show-channel-tab" data-tab="simple">Simple</button>
-                    <button type="button" role="tab" id="channel-tab-advanced-btn" class="tab {advanced_active}"
-                        data-action="show-channel-tab" data-tab="advanced">Advanced</button>
-                </div>
-                <form id="channel-tab-easy" class="{easy_hidden} space-y-4"
-                    hx-post="/ui/channels/easy?company_id={company_id}" hx-target="#channel-pane" hx-swap="outerHTML"
-                    hx-disabled-elt="find button[type='submit']">
-                    {library_picker}
-                    <div class="flex items-center gap-3">
-                        <button type="submit" class="btn btn-primary">
-                            <span class="loading loading-spinner loading-sm hidden [.htmx-request_&]:inline-block"></span>
-                            <span class="[.htmx-request_&]:hidden">Create Channels</span>
-                            <span class="hidden [.htmx-request_&]:inline">Creating...</span>
-                        </button>
-                        <button type="button" class="btn btn-ghost"
-                            hx-get="/ui/channels/close?company_id={company_id}"
-                            hx-target="#channel-pane" hx-swap="outerHTML" hx-sync="#channel-pane:replace"
-                            hx-push-url="/ui/channels?company_id={company_id}">Cancel</button>
-                    </div>
-                </form>
-                <form id="channel-tab-simple" class="{simple_hidden} space-y-4"
+                <form id="channel-create-form" class="space-y-4"
                     hx-post="/ui/channels?company_id={company_id}" hx-target="#channel-pane" hx-swap="outerHTML"
                     hx-disabled-elt="find button[type='submit']">
-                    <input type="hidden" name="form_mode" value="simple">
-                    <!-- Simple mode has no on/off controls, and an absent checkbox reads as "off". -->
-                    <input type="hidden" name="enabled" value="true">
-                    <input type="hidden" name="add_3rd_party" value="true">
-                    <label class="form-control w-full">
-                        <div class="label"><span class="text-xs opacity-70">Channel Name</span></div>
-                        <input type="text" name="name" required value="{name}" placeholder="Inbound Email Handler"
-                            class="input w-full">
-                    </label>
-                    <label class="form-control w-full">
-                        <div class="label"><span class="text-xs opacity-70">Description</span></div>
-                        <input type="text" name="description" value="{description}" autocomplete="off"
-                            placeholder="Answers supplier capacity and delivery-date questions."
-                            class="input w-full">
-                        <div class="label"><span class="text-[11px] opacity-60">One line, shown to teammates who mail an address that does not exist.</span></div>
-                    </label>
-                    <label class="form-control w-full">
-                        <div class="label"><span class="text-xs opacity-70">Agent Instructions</span></div>
-                        <textarea name="system_prompt" rows="6" required
-                            placeholder="Describe the agent's role, responsibilities, rules and tone. A full system prompt is generated when the channel is created."
-                            class="textarea w-full font-mono text-xs">{system_prompt}</textarea>
-                    </label>
-                    <div class="flex items-center gap-3">
-                        <button type="submit" class="btn btn-primary">
-                            <span class="loading loading-spinner loading-sm hidden [.htmx-request_&]:inline-block"></span>
-                            <span class="[.htmx-request_&]:hidden">Create Channel</span>
-                            <span class="hidden [.htmx-request_&]:inline">Creating...</span>
-                        </button>
-                        <button type="button" class="btn btn-ghost"
-                            hx-get="/ui/channels/close?company_id={company_id}"
-                            hx-target="#channel-pane" hx-swap="outerHTML" hx-sync="#channel-pane:replace"
-                            hx-push-url="/ui/channels?company_id={company_id}">Cancel</button>
-                    </div>
-                </form>
-                <form id="channel-tab-advanced" class="{advanced_hidden} space-y-4"
-                    hx-post="/ui/channels?company_id={company_id}" hx-target="#channel-pane" hx-swap="outerHTML"
-                    hx-disabled-elt="find button[type='submit']">
-                    <input type="hidden" name="form_mode" value="advanced">
                     {fields}
                     <div class="flex items-center gap-3">
                         <button type="submit" class="btn btn-primary">
@@ -546,134 +356,41 @@ pub fn channel_create_pane_with_memory(pane: &ChannelCreatePane<'_>, memory_read
         app_domain_name = escape_html_text(pane.app_domain_name),
         company_id = pane.company.id,
         error_html = form_error_banner(pane.error),
-        easy_active = active(pane.easy),
-        simple_active = active(!pane.easy && !pane.draft.advanced),
-        advanced_active = active(!pane.easy && pane.draft.advanced),
-        easy_hidden = easy_hidden,
-        name = escape_html_text(pane.draft.name),
-        description = escape_html_text(pane.draft.description),
-        system_prompt = escape_html_text(pane.draft.system_prompt),
-        library_picker =
-            agent_library_multi_select(pane.agents, pane.draft.agent_ids, "library_agent_ids",),
         fields = channel_fields(&ChannelFields {
             company: pane.company,
             app_domain_name: pane.app_domain_name,
-            agents: pane.agents,
-            id_prefix: "new",
             draft: pane.draft,
             spam_scan_enabled: pane.spam_scan_enabled,
-            memory_ready,
-            owner: ChannelOwner::None,
         }),
     )
 }
 
 /// Everything about a channel except which URL its form submits to.
-pub(super) struct ChannelFields<'a> {
-    pub company: &'a Company,
-    pub app_domain_name: &'a str,
-    pub agents: &'a [Agent],
-    /// Namespaces the element ids, so the create pane's two forms do not collide.
-    pub id_prefix: &'a str,
-    pub draft: &'a ChannelDraft<'a>,
-    pub spam_scan_enabled: bool,
-    pub memory_ready: bool,
-    pub owner: ChannelOwner<'a>,
+struct ChannelFields<'a> {
+    company: &'a Company,
+    app_domain_name: &'a str,
+    draft: &'a ChannelDraft<'a>,
+    spam_scan_enabled: bool,
 }
 
-/// Whose personal channel this form is, if it is one at all.
-///
-/// An owned channel's primary address and position-zero assignment are lifecycle state rather than
-/// settings, so the form shows them instead of offering them. The agent owning it may not exist
-/// yet -- the Agents workspace's create form configures the channel before either row is written --
-/// which is why the owner is named by what the form needs of it rather than by an [`Agent`].
-#[derive(Clone, Copy)]
-pub(super) enum ChannelOwner<'a> {
-    /// A channel that picks its agents from the company's list.
-    None,
-    /// An agent-owned personal channel whose owner is already stored.
-    Existing(&'a Agent),
-    /// The agent from the create form's first step, not yet written.
-    Pending { name: &'a str, slug: &'a str },
-}
-
-impl<'a> ChannelOwner<'a> {
-    /// The owner's name and handle, for the parts of the form that only need to say who it is.
-    fn identity(self) -> Option<(&'a str, &'a str)> {
-        match self {
-            Self::None => None,
-            Self::Existing(agent) => Some((agent.name.as_str(), agent.slug.as_str())),
-            Self::Pending { name, slug } => Some((name, slug)),
-        }
-    }
-}
-
-pub(super) fn channel_fields(fields: &ChannelFields<'_>) -> String {
+fn channel_fields(fields: &ChannelFields<'_>) -> String {
     let draft = fields.draft;
-    let owner = fields.owner.identity();
-    let name_slug_behavior = if owner.is_some() {
-        ""
-    } else {
-        r#" data-input="slugify""#
-    };
-    let slug_field = if owner.is_some() {
-        format!(
-            r##"<label class="form-control w-full">
-                            <div class="label"><span class="text-xs opacity-70">Primary address (@{company_slug}.{app_domain_name})</span></div>
-                            <input type="text" name="slug" required readonly value="{slug}"
-                                class="input w-full cursor-not-allowed bg-base-200 font-mono">
-                            <div class="label"><span class="text-[11px] opacity-60">{address_help}</span></div>
-                        </label>"##,
-            company_slug = escape_html_text(&fields.company.slug),
-            app_domain_name = escape_html_text(fields.app_domain_name),
-            slug = escape_html_attr(draft.slug),
-            address_help = owned_address_help(fields.company.id, fields.owner),
-        )
-    } else {
-        format!(
-            r##"<label class="form-control w-full">
+    let slug_field = format!(
+        r##"<label class="form-control w-full">
                             <div class="label"><span class="text-xs opacity-70">Address (@{company_slug}.{app_domain_name})</span></div>
                             <input type="text" name="slug" required value="{slug}" placeholder="inbound-email-handler"
                                 class="input w-full font-mono">
                         </label>"##,
-            company_slug = escape_html_text(&fields.company.slug),
-            app_domain_name = escape_html_text(fields.app_domain_name),
-            slug = escape_html_attr(draft.slug),
-        )
-    };
-    let agents_html = match owner {
-        // A pending owner has no id to assign, and needs none: the agent and its channel are
-        // written in one transaction that puts the agent at position 0 itself.
-        Some((owner_name, owner_slug)) => format!(
-            r##"{assignment}
-                        <div class="rounded-box border border-base-300 bg-base-200 px-3 py-3">
-                            <span class="text-sm font-medium">{owner_name}</span>
-                            <span class="ml-2 font-mono text-xs opacity-60">@{owner_slug}</span>
-                            <span class="block text-[11px] opacity-60">The owner always remains the position-0 agent, including while this channel is disabled.</span>
-                        </div>"##,
-            assignment = match fields.owner {
-                ChannelOwner::Existing(agent) => format!(
-                    r##"<input type="hidden" name="agent_ids" value="{}">"##,
-                    agent.id
-                ),
-                _ => String::new(),
-            },
-            owner_name = escape_html_text(owner_name),
-            owner_slug = escape_html_text(owner_slug),
-        ),
-        None => agent_radios(
-            fields.company.id,
-            fields.agents,
-            draft.agent_ids,
-            fields.id_prefix,
-        ),
-    };
+        company_slug = escape_html_text(&fields.company.slug),
+        app_domain_name = escape_html_text(fields.app_domain_name),
+        slug = escape_html_attr(draft.slug),
+    );
     format!(
         r##"
                     <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
                         <label class="form-control w-full">
                             <div class="label"><span class="text-xs opacity-70">Channel Name</span></div>
-                            <input type="text" name="name" required value="{name}" placeholder="Inbound Email Handler"{name_slug_behavior}
+                            <input type="text" name="name" required value="{name}" placeholder="Inbound Email Handler" data-input="slugify"
                                 class="input w-full">
                         </label>
                         {slug_field}
@@ -692,10 +409,6 @@ pub(super) fn channel_fields(fields: &ChannelFields<'_>) -> String {
                             class="input w-full font-mono">
                         <div class="label"><span class="text-[11px] opacity-60">Comma-separated. Mail to any of these reaches this channel, and replies go back out from the address it arrived on.</span></div>
                     </label>
-                    <div class="form-control w-full">
-                        <div class="label"><span class="text-xs opacity-70">Agents</span></div>
-                        {agents_html}
-                    </div>
                     <label class="form-control w-full">
                         <div class="label"><span class="text-xs opacity-70">Participant Emails</span></div>
                         <input type="text" name="participant_emails" value="{participant_emails}" autocomplete="off"
@@ -704,7 +417,6 @@ pub(super) fn channel_fields(fields: &ChannelFields<'_>) -> String {
                             class="input w-full">
                         <div class="label"><span class="text-[11px] opacity-60">Blank means the company team. Use <code class="font-mono">@public</code> to let anyone write in.</span></div>
                     </label>
-                    {memory_fields}
                     <div class="form-control w-full">
                         <label class="flex cursor-pointer items-start gap-3 rounded-lg border border-base-300 bg-base-200 p-3">
                             <input type="checkbox" name="enabled" value="true" class="checkbox checkbox-sm mt-0.5"{enabled_checked}>
@@ -723,209 +435,18 @@ pub(super) fn channel_fields(fields: &ChannelFields<'_>) -> String {
                             </span>
                         </label>
                     </div>
-                    {response_trigger_field}
                     {spam_html}
         "##,
         name = escape_html_text(draft.name),
-        name_slug_behavior = name_slug_behavior,
         description = escape_html_text(draft.description),
         company_slug = escape_html_text(&fields.company.slug),
         app_domain_name = escape_html_text(fields.app_domain_name),
         slug_field = slug_field,
         alias_slugs = escape_html_text(draft.alias_slugs),
-        agents_html = agents_html,
         participant_emails = escape_html_text(draft.participant_emails),
-        memory_fields = memory_fields(fields.memory_ready, draft),
         enabled_checked = if draft.enabled { " checked" } else { "" },
         add_3rd_party_checked = if draft.add_3rd_party { " checked" } else { "" },
-        response_trigger_field = response_trigger_field(draft.response_trigger),
         spam_html = spam_disabled_confirmation(fields.spam_scan_enabled, draft.is_public()),
-    )
-}
-
-/// Why the address under an owned channel cannot be typed here, and where it can be changed.
-///
-/// A stored owner is a link into its settings; a pending one is still on the form's first step,
-/// which is a button away rather than a page away.
-fn owned_address_help(company_id: Uuid, owner: ChannelOwner<'_>) -> String {
-    match owner {
-        ChannelOwner::None => String::new(),
-        ChannelOwner::Existing(agent) => format!(
-            r##"This address follows the agent handle. <a class="link" href="/ui/agents?company_id={company_id}&amp;agent_id={agent_id}">Rename {name} in Agents</a>."##,
-            agent_id = agent.id,
-            name = escape_html_text(&agent.name),
-        ),
-        ChannelOwner::Pending { .. } => {
-            "This address follows the agent handle. Go back to the agent step to change it."
-                .to_string()
-        }
-    }
-}
-
-/// The company's agents as radios feeding one hidden `agent_ids` field.
-///
-/// Order matters — a channel runs its agents in sequence — so the hidden field is the source of
-/// truth and `syncChannelAgents` keeps it in the order the options are listed. A channel stored
-/// with several agents still renders them all selected; picking one collapses the field to it.
-fn agent_radios(company_id: Uuid, agents: &[Agent], selected: &[Uuid], id_prefix: &str) -> String {
-    if agents.is_empty() {
-        return format!(
-            r##"<div class="rounded-box border border-dashed border-base-300 p-4 text-center text-xs opacity-70">
-                            <input type="hidden" name="agent_ids" value="">
-                            This company has no agents yet. Create an agent before enabling this channel —
-                            <a href="/ui/agents?company_id={company_id}&amp;new=1" class="link">create an agent</a>.
-                        </div>"##
-        );
-    }
-
-    let render_options = |group: &[&Agent]| -> String {
-        group
-        .iter()
-        .map(|agent| {
-            format!(
-                r##"
-                            <label class="label cursor-pointer justify-start gap-3 rounded-box px-3 py-2 hover:bg-base-300" for="agent-{id_prefix}-{agent_id}">
-                                <input type="radio" id="agent-{id_prefix}-{agent_id}" value="{agent_id}" {checked}
-                                    class="channel-agent-option radio radio-sm radio-primary"
-                                    data-action="sync-channel-agents">
-                                <span class="flex min-w-0 flex-col items-start">
-                                    <span class="truncate text-sm">{name}</span>
-                                    <span class="truncate font-mono text-[11px] opacity-60">@{slug}</span>
-                                </span>
-                            </label>
-                "##,
-                agent_id = agent.id,
-                checked = if selected.contains(&agent.id) {
-                    "checked"
-                } else {
-                    ""
-                },
-                name = escape_html_text(&agent.name),
-                slug = escape_html_text(&agent.slug),
-            )
-        })
-        .collect()
-    };
-    let library = agents
-        .iter()
-        .filter(|agent| agent.is_library())
-        .collect::<Vec<_>>();
-    let custom = agents
-        .iter()
-        .filter(|agent| !agent.is_library())
-        .collect::<Vec<_>>();
-    let library_options = if library.is_empty() {
-        r#"<p class="px-3 py-2 text-xs opacity-60">No library agents are available.</p>"#
-            .to_string()
-    } else {
-        library_agent_picker(&library, selected, id_prefix)
-    };
-    let custom_options = if custom.is_empty() {
-        format!(
-            r#"<p class="px-3 py-2 text-xs opacity-60">No custom agents yet. <a class="link" href="/ui/agents?company_id={company_id}&amp;new=1">Create one</a>.</p>"#
-        )
-    } else {
-        render_options(&custom)
-    };
-    let options = format!(
-        r#"<div class="px-3 pt-2 text-[11px] font-bold uppercase opacity-60">Agent library</div>{library_options}<div class="mt-2 px-3 pt-2 text-[11px] font-bold uppercase opacity-60">Custom company agents</div>{custom_options}"#
-    );
-
-    format!(
-        r##"<div class="rounded-box border border-base-300 bg-base-200 p-1">
-                            <input type="hidden" name="agent_ids" value="{initial}">
-                            <div class="grid grid-cols-1 gap-1 sm:grid-cols-2">
-                                {options}
-                            </div>
-                        </div>"##,
-        initial = selected
-            .iter()
-            .map(Uuid::to_string)
-            .collect::<Vec<_>>()
-            .join(","),
-    )
-}
-
-/// The agent library as a modal of cards, opened from the button that shows the current pick.
-///
-/// A `<select>` can only carry a name, and a library definition is chosen on what it *does* — so
-/// the choice is made against cards carrying the avatar, the handle and the description, and it
-/// lands in a hidden field the shared `syncChannelAgents` treats like any other option.
-fn library_agent_picker(library: &[&Agent], selected: &[Uuid], id_prefix: &str) -> String {
-    const PLACEHOLDER: &str = "Choose a library agent…";
-
-    let picked = library.iter().find(|agent| selected.contains(&agent.id));
-    let label = picked.map_or_else(
-        || PLACEHOLDER.to_string(),
-        |agent| escape_html_text(&agent.name),
-    );
-    let cards = library
-        .iter()
-        .map(|agent| library_agent_card(agent, picked.is_some_and(|p| p.id == agent.id)))
-        .collect::<String>();
-
-    format!(
-        r##"<div class="mx-3 my-2">
-                                    <input type="hidden" class="channel-library-agent-field" value="{picked_id}">
-                                    <button type="button" class="btn btn-block justify-start font-normal"
-                                        data-action="open-dialog" data-dialog="library-agents-{id_prefix}">
-                                        <span class="channel-library-agent-label truncate" data-placeholder="{PLACEHOLDER}">{label}</span>
-                                    </button>
-                                    <dialog id="library-agents-{id_prefix}" class="modal">
-                                        <div class="modal-box max-w-3xl">
-                                            <h3 class="text-lg font-bold">Agent library</h3>
-                                            <p class="pt-1 pb-4 text-sm opacity-70">Ready-made agents this channel can run.</p>
-                                            <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                                                {cards}
-                                            </div>
-                                            <div class="modal-action">
-                                                <button type="button" class="btn btn-ghost btn-sm"
-                                                    data-agent-id="" data-agent-name=""
-                                                    data-action="pick-channel-library-agent">Clear</button>
-                                                <button type="button" class="btn btn-sm"
-                                                    data-action="close-dialog">Close</button>
-                                            </div>
-                                        </div>
-                                        <button type="button" class="modal-backdrop"
-                                            data-action="close-dialog">close</button>
-                                    </dialog>
-                                </div>"##,
-        picked_id = picked.map(|agent| agent.id.to_string()).unwrap_or_default(),
-    )
-}
-
-/// One library definition as a card: what it is called, what it answers as, and what it is for.
-fn library_agent_card(agent: &Agent, picked: bool) -> String {
-    let description = agent.description.as_deref().unwrap_or_default().trim();
-    let description_html = if description.is_empty() {
-        String::new()
-    } else {
-        format!(
-            r#"<span class="line-clamp-2 text-xs opacity-70">{}</span>"#,
-            escape_html_text(description)
-        )
-    };
-
-    format!(
-        r##"<button type="button" data-agent-id="{id}" data-agent-name="{name}"
-                                                    data-action="pick-channel-library-agent"
-                                                    class="channel-library-agent-card flex items-start gap-3 rounded-box border-2 {border} bg-base-200 p-3 text-left hover:border-primary">
-                                                    {avatar}
-                                                    <span class="flex min-w-0 flex-col gap-0.5">
-                                                        <span class="truncate text-sm font-semibold">{name}</span>
-                                                        <span class="truncate font-mono text-[11px] opacity-60">@{slug}</span>
-                                                        {description_html}
-                                                    </span>
-                                                </button>"##,
-        id = agent.id,
-        border = if picked {
-            "border-primary"
-        } else {
-            "border-base-300"
-        },
-        avatar = avatar_bubble(agent.avatar_url.as_ref(), &agent.name, AvatarSize::Row),
-        name = escape_html_text(&agent.name),
-        slug = escape_html_text(&agent.slug),
     )
 }
 
@@ -961,16 +482,11 @@ fn spam_disabled_confirmation(spam_scan_enabled: bool, is_public: bool) -> Strin
     )
 }
 
-/// A stored channel as the form sees it.
+/// A stored channel as its own form will accept it.
 ///
 /// The channel's list-valued fields are rendered as form text and passed in so the draft can stay
 /// a pure set of borrows.
-/// A stored channel as its own form will accept it.
-///
-/// `pub(super)` because the Agents workspace's Channel tab renders the very same form for an
-/// agent's personal channel: one filler for one form, so the two panes cannot disagree about what
-/// a stored channel looks like.
-pub(super) fn stored_channel_draft<'a>(
+fn stored_channel_draft<'a>(
     channel: &'a Channel,
     participant_emails: &'a str,
     alias_slugs: &'a str,
@@ -980,87 +496,10 @@ pub(super) fn stored_channel_draft<'a>(
         description: channel.description.as_deref().unwrap_or(""),
         slug: &channel.slug,
         alias_slugs,
-        system_prompt: "",
         participant_emails,
-        agent_ids: channel.agent_ids.as_deref().unwrap_or(&[]),
-        advanced: true,
         enabled: channel.enabled,
         add_3rd_party: channel.add_3rd_party,
-        response_trigger: channel.response_trigger,
-        retrieve_company_memory: channel.retrieve_company_memory,
-        retrieve_agent_memory: channel.retrieve_agent_memory,
-        retrieve_user_memory: channel.retrieve_user_memory,
-        persist_company_memory: channel.persist_company_memory,
-        persist_agent_memory: channel.persist_agent_memory,
-        persist_user_memory: channel.persist_user_memory,
     }
-}
-
-fn response_trigger_field(selected: crate::entities::channel::ChannelResponseTrigger) -> String {
-    use crate::entities::channel::ChannelResponseTrigger;
-    let options: String = [
-        (
-            ChannelResponseTrigger::Always,
-            "Always (To, or when mentioned in Cc)",
-        ),
-        (ChannelResponseTrigger::Mentioned, "Only when @mentioned"),
-        (
-            ChannelResponseTrigger::MentionedOrReplyToAgent,
-            "When @mentioned or replying to an agent message",
-        ),
-    ]
-    .into_iter()
-    .map(|(trigger, label)| {
-        format!(
-            "<option value=\"{}\"{}>{label}</option>",
-            trigger.as_str(),
-            if trigger == selected { " selected" } else { "" },
-        )
-    })
-    .collect();
-    format!(
-        r#"<label class="form-control w-full">
-        <div class="label"><span class="text-xs opacity-70">When the agent responds</span></div>
-        <select name="response_trigger" class="select w-full">{options}</select>
-        <div class="label"><span class="text-[11px] opacity-60">This rule also applies to messages from other agents. Reply mode requires a direct reply to an agent message in this channel's thread.</span></div>
-    </label>"#
-    )
-}
-
-fn memory_fields(memory_ready: bool, draft: &ChannelDraft<'_>) -> String {
-    let state_notice = if memory_ready {
-        "The selected provider is ready; these grants are currently effective when agent policy also permits memory."
-    } else {
-        "You can save these grants now. They remain inactive until the company's selected provider is ready."
-    };
-    let checked = |value: bool| if value { " checked" } else { "" };
-    format!(
-        r##"<fieldset class="rounded-lg border border-base-300 bg-base-200 p-4">
-                        <legend class="px-1 text-xs font-semibold">Memory</legend>
-                        <p class="mb-3 text-[11px] opacity-60">{state_notice} User memory includes authorized external senders and stays isolated to this company.</p>
-                        <div class="grid max-w-sm grid-cols-4 items-center gap-x-2 gap-y-2 text-xs">
-                            <span></span>
-                            <span class="text-center opacity-70">Company</span>
-                            <span class="text-center opacity-70">Agent</span>
-                            <span class="text-center opacity-70">User</span>
-                            <span class="opacity-70">Retrieve</span>
-                            <input aria-label="Retrieve company memory" type="checkbox" name="retrieve_company_memory" value="true" class="checkbox checkbox-sm justify-self-center"{retrieve_company}>
-                            <input aria-label="Retrieve agent memory" type="checkbox" name="retrieve_agent_memory" value="true" class="checkbox checkbox-sm justify-self-center"{retrieve_agent}>
-                            <input aria-label="Retrieve user memory" type="checkbox" name="retrieve_user_memory" value="true" class="checkbox checkbox-sm justify-self-center"{retrieve_user}>
-                            <span class="opacity-70">Persist</span>
-                            <input aria-label="Persist company memory" type="checkbox" name="persist_company_memory" value="true" class="checkbox checkbox-sm justify-self-center"{persist_company}>
-                            <input aria-label="Persist agent memory" type="checkbox" name="persist_agent_memory" value="true" class="checkbox checkbox-sm justify-self-center"{persist_agent}>
-                            <input aria-label="Persist user memory" type="checkbox" name="persist_user_memory" value="true" class="checkbox checkbox-sm justify-self-center"{persist_user}>
-                        </div>
-                    </fieldset>"##,
-        retrieve_company = checked(draft.retrieve_company_memory),
-        retrieve_agent = checked(draft.retrieve_agent_memory),
-        retrieve_user = checked(draft.retrieve_user_memory),
-        persist_company = checked(draft.persist_company_memory),
-        persist_agent = checked(draft.persist_agent_memory),
-        persist_user = checked(draft.persist_user_memory),
-        state_notice = state_notice,
-    )
 }
 
 /// Every address the channel answers on, canonical first, for the pane's identity line.
@@ -1096,8 +535,8 @@ pub struct ChannelSchedulesCard<'a> {
     pub company_id: Uuid,
     pub channel_id: Uuid,
     pub schedules: &'a [ChannelSchedule],
-    /// Who the channel's runs may be attributed to, and who the listed ones already are.
-    pub run_as: &'a ScheduleRunAsChoices,
+    /// The workflow bindings the channel's schedules may name, and the listed ones already do.
+    pub bindings: &'a [ScheduleBindingChoice],
 }
 
 pub fn channel_schedules_card(card: &ChannelSchedulesCard<'_>) -> String {
@@ -1105,7 +544,7 @@ pub fn channel_schedules_card(card: &ChannelSchedulesCard<'_>) -> String {
         company_id,
         channel_id,
         schedules,
-        run_as,
+        bindings,
     } = *card;
     let rows_html: String = if schedules.is_empty() {
         r#"<div class="rounded-lg border border-dashed border-base-300 p-4 text-center text-xs opacity-60">No automated schedules configured for this channel yet.</div>"#.to_string()
@@ -1117,17 +556,6 @@ pub fn channel_schedules_card(card: &ChannelSchedulesCard<'_>) -> String {
                     r#"<span class="badge badge-success badge-sm">Active</span>"#
                 } else {
                     r#"<span class="badge badge-ghost badge-sm opacity-60">Paused</span>"#
-                };
-                let delivery_badge = match s.delivery_mode {
-                    ScheduleDeliveryMode::MailboxOnly => {
-                        r#"<span class="badge badge-neutral badge-sm">Mailbox Only</span>"#
-                    }
-                    ScheduleDeliveryMode::EmailParticipants => {
-                        r#"<span class="badge badge-info badge-sm">Email: Participants</span>"#
-                    }
-                    ScheduleDeliveryMode::EmailCustom => {
-                        r#"<span class="badge badge-primary badge-sm">Email: Custom</span>"#
-                    }
                 };
                 let next_run_info = match s.next_run_at {
                     Some(next) => format!("Next run: {}", s.in_zone(next, "%b %d, %H:%M %Z")),
@@ -1144,19 +572,19 @@ pub fn channel_schedules_card(card: &ChannelSchedulesCard<'_>) -> String {
                                 <div class="flex items-center gap-2 flex-wrap">
                                     <span class="font-semibold text-sm truncate">{name}</span>
                                     {status_badge}
-                                    {delivery_badge}
                                 </div>
                                 <div class="mt-1 flex flex-wrap items-center gap-2 text-xs opacity-70">
                                     <span class="font-medium text-primary">{cadence}</span>
                                     <span>•</span>
                                     <span>{next_run_info}</span>
-                                    {run_as_badge}
+                                    {binding_badge}
                                 </div>
                             </div>
                             <div class="flex shrink-0 items-center gap-1">
                                 <form hx-post="/ui/channels/{channel_id}/schedules/{schedule_id}/run-now"
                                     hx-target="#channel-schedules-card" hx-swap="outerHTML" class="inline">
                                     <input type="hidden" name="company_id" value="{company_id}">
+                                    <input type="hidden" name="command_key" value="{command_key}">
                                     <button type="submit" class="btn btn-outline btn-xs" title="Trigger this schedule immediately">
                                         Run Now
                                     </button>
@@ -1179,25 +607,26 @@ pub fn channel_schedules_card(card: &ChannelSchedulesCard<'_>) -> String {
                                 </form>
                             </div>
                         </div>
-                        <div class="rounded bg-base-200 p-2 text-xs font-mono opacity-80 truncate" title="{subject}">
-                            <span class="font-semibold text-base-content/70">Subject:</span> {subject}
-                        </div>
-                        <div class="rounded bg-base-200 p-2 text-xs font-mono opacity-80 line-clamp-2" title="{prompt}">
-                            <span class="font-semibold text-base-content/70">Prompt:</span> {prompt}
-                        </div>
+                        {error}
                     </div>
                     "##,
                     name = escape_html_text(&s.name),
                     cadence = escape_html_text(&s.cadence_label()),
-                    subject = escape_html_text(&s.subject_template),
-                    prompt = escape_html_text(&s.prompt_template),
+                    error = s
+                        .last_error
+                        .as_deref()
+                        .map(|error| format!(
+                            r#"<p class="rounded bg-error/10 px-2 py-1 text-xs text-error">Last trigger failed: {}</p>"#,
+                            escape_html_text(error)
+                        ))
+                        .unwrap_or_default(),
+                    command_key = Uuid::new_v4(),
                     schedule_id = s.id,
                     channel_id = channel_id,
                     company_id = company_id,
                     status_badge = status_badge,
-                    delivery_badge = delivery_badge,
                     next_run_info = next_run_info,
-                    run_as_badge = schedule_run_as_row(s, run_as),
+                    binding_badge = schedule_binding_row(s, bindings),
                     toggle_label = toggle_label,
                     toggle_value = toggle_value,
                 )
@@ -1211,7 +640,7 @@ pub fn channel_schedules_card(card: &ChannelSchedulesCard<'_>) -> String {
             <div class="flex items-center justify-between">
                 <div>
                     <h3 class="text-sm font-bold">Automated Schedules &amp; Triggers</h3>
-                    <p class="text-xs opacity-60">Run this channel's agents on a recurring interval or as a one-off scheduled report.</p>
+                    <p class="text-xs opacity-60">Start a workflow run on this channel on a recurring interval or once.</p>
                 </div>
             </div>
 
@@ -1261,34 +690,7 @@ pub fn channel_schedules_card(card: &ChannelSchedulesCard<'_>) -> String {
                             </label>
                         </div>
 
-                        <label class="form-control w-full">
-                            <div class="label py-1"><span class="text-xs opacity-70">Thread Subject (supports <code class="font-mono">{{date}}</code>, <code class="font-mono">{{time}}</code>)</span></div>
-                            <input type="text" name="subject_template" required value="[Scheduled Report] {{date}}" class="input input-sm w-full font-mono text-xs">
-                        </label>
-
-                        <label class="form-control w-full">
-                            <div class="label py-1"><span class="text-xs opacity-70">Agent Prompt / Task Instructions</span></div>
-                            <textarea name="prompt_template" required rows="3" placeholder="Describe what the agent should analyze or generate for this scheduled run..." class="textarea textarea-sm w-full font-mono text-xs"></textarea>
-                        </label>
-
-                        {run_as_field}
-
-                        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                            <label class="form-control w-full">
-                                <div class="label py-1"><span class="text-xs opacity-70">Output Delivery Mode</span></div>
-                                <select name="delivery_mode" class="select select-sm w-full" data-action="toggle-schedule-delivery">
-                                    <option value="mailbox_only" selected>Mailbox Only (In-App Review)</option>
-                                    <option value="email_participants">Post to Mailbox &amp; Email Participants</option>
-                                    <option value="email_custom">Post to Mailbox &amp; Email Custom List</option>
-                                </select>
-                            </label>
-                            <div class="schedule-custom-recipients-box hidden">
-                                <label class="form-control w-full">
-                                    <div class="label py-1"><span class="text-xs opacity-70">Recipient Emails (comma-separated)</span></div>
-                                    <input type="text" name="recipient_emails" placeholder="team@company.com, client@example.com" class="input input-sm w-full">
-                                </label>
-                            </div>
-                        </div>
+                        {binding_field}
 
                         <div class="flex items-center gap-2 pt-2">
                             <button type="submit" class="btn btn-primary btn-sm">Create Schedule</button>
@@ -1301,14 +703,14 @@ pub fn channel_schedules_card(card: &ChannelSchedulesCard<'_>) -> String {
         rows_html = rows_html,
         channel_id = channel_id,
         company_id = company_id,
-        run_as_field = run_as_field(run_as, None, FieldScale::Compact),
+        binding_field = binding_field(bindings, None, FieldScale::Compact),
     )
 }
 
-/// The card's own wording for a schedule's attribution: the same badge the workspace sidebar
+/// The card's own wording for a schedule's workflow: the same badge the workspace sidebar
 /// shows, with the separator that only belongs on a row that has one.
-fn schedule_run_as_row(schedule: &ChannelSchedule, run_as: &ScheduleRunAsChoices) -> String {
-    match run_as_badge(schedule, run_as).as_str() {
+fn schedule_binding_row(schedule: &ChannelSchedule, bindings: &[ScheduleBindingChoice]) -> String {
+    match binding_badge(schedule, bindings).as_str() {
         "" => String::new(),
         badge => format!("<span>•</span>{badge}"),
     }

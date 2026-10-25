@@ -40,6 +40,65 @@ pub enum EventIngress {
 }
 /// Unconsumed events one run may hold; producers serialize per run, so the bound is exact.
 pub const MAX_UNCONSUMED_EVENTS: i64 = 128;
+
+/// An accepted message that directly answers a message a workflow run published (p08 D1.5).
+/// Ingress asks the run whether one of its `message.reply` waits awaits exactly this answer.
+#[derive(Debug, Clone, PartialEq)]
+pub struct IngressReply {
+    pub company: CompanyId,
+    /// The thread the reply was accepted into; the answered message must have been published there.
+    pub thread: Uuid,
+    /// The workflow-published message the reply answers (its resolved direct parent).
+    pub answers: crate::domain::entities::message::CanonicalMessageId,
+    /// The stored reply's author principal.
+    pub responder: Option<Uuid>,
+    /// Posted in-app by a member (`IngressOrigin::TrustedApplication`), not received as mail.
+    pub in_app: bool,
+    /// Producer identity, stable across redelivery of the same intent.
+    pub event: WorkflowEventId,
+    /// The reply as `MessageTriggerInput`.
+    pub payload: Value,
+    /// Until when a not-yet-parked wait may still be awaited (event before park).
+    pub park_grace_until: DateTime<Utc>,
+}
+
+/// What became of a [`IngressReply`]. Only `Recorded`/`Duplicate` consume the message: the
+/// run resumes and ingress admits nothing for it. `NotYet` asks to try again shortly.
+/// `Undeliverable` is permanent and `Unmatched` is ordinary ingress; an `Err` from the port is
+/// always worth retrying, including running out of time (p08 D1.5.5, F028).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReplyIngress {
+    Recorded(RunId),
+    Duplicate(RunId),
+    NotYet,
+    Unmatched,
+    /// The run awaits this answer but can never take it: its event id was reused for different
+    /// content, the run's event inbox is full, or the payload fails the wait's schema. The reply
+    /// is ordinary ingress, and the cause is logged.
+    Undeliverable(&'static str),
+}
+
+/// The `message.reply` waits that can receive answers to messages `publishing` sent: those whose
+/// correlation references that step's output (the registry admits no other shape).
+pub fn awaited_reply_steps(
+    definition: &crate::domain::workflow::WorkflowDefinition,
+    publishing: &crate::domain::workflow::StepId,
+) -> Vec<crate::domain::workflow::StepId> {
+    use crate::application::workflow::triggers::MESSAGE_REPLY_EVENT;
+    use crate::domain::workflow::Binding;
+    let reply = Value::String(MESSAGE_REPLY_EVENT.into());
+    definition
+        .steps
+        .iter()
+        .filter(|(_, step)| {
+            step.step_type.as_str() == "wait.event"
+                && matches!(step.inputs.get("event"), Some(Binding::Literal(event)) if *event == reply)
+                && matches!(step.inputs.get("correlation"),
+                    Some(Binding::Reference(reference)) if reference.step_id() == Some(publishing))
+        })
+        .map(|(id, _)| id.clone())
+        .collect()
+}
 #[derive(Debug, Clone, PartialEq)]
 pub struct ParkedWorkflow {
     pub wait: WaitId,
@@ -76,6 +135,9 @@ pub trait WorkflowWaits: Send + Sync {
     /// Internal producer port. Never matches a human decision or a protected action
     /// (BRIEF-03.6), and authorizes no public ingress.
     async fn record_event(&self, event: WorkflowEvent) -> AppResult<EventIngress>;
+    /// Ingress's reply producer (p08 D1.5): records the reply only for an open `message.reply`
+    /// wait on its correlation whose expected responder sent it, one response per wait.
+    async fn deliver_reply(&self, delivery: IngressReply) -> AppResult<ReplyIngress>;
     async fn resume_wait(&self, scope: ActivationRequest) -> AppResult<WaitProgress>;
     /// Bounded database scan; transitions each selected run independently in run-first order.
     async fn sweep_waits(&self, limit: u16) -> AppResult<u16>;

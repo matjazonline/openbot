@@ -87,8 +87,14 @@ fn stale() -> AppError {
     AppError::Conflict("Workflow decision revision or artifact is stale".into())
 }
 
-#[derive(sqlx::FromRow)]
+/// An eligible reviewer, and whether they take decision email (P08-Q8).
 struct Reviewer {
+    principal_id: Uuid,
+    email: String,
+    decision_email: bool,
+}
+#[derive(sqlx::FromRow)]
+struct ReviewerRow {
     principal_id: Uuid,
     email: String,
 }
@@ -194,25 +200,34 @@ async fn insert_reviewers(
     company: CompanyId,
     decision: Uuid,
     reviewers: &[Reviewer],
-    composed: &[crate::transport::NewStandaloneDelivery],
+    composed: &[Option<crate::transport::NewStandaloneDelivery>],
 ) -> AppResult<()> {
     for (ordinal, (reviewer, delivery)) in reviewers.iter().zip(composed.iter()).enumerate() {
-        // The delivery first, then the immutable reviewer row that carries its id (05-D3 §3.1).
-        let crate::transport::DeliveryCreation::Created(notice) =
-            crate::adapters::persistence::delivery::enqueue::insert_standalone_delivery_on(
-                tx, delivery,
-            )
-            .await?
-        else {
-            return Err(invalid());
+        // The delivery first, then the immutable reviewer row that carries its id (05-D3 §3.1);
+        // an opted-out reviewer's row records the opt-out instead, which the guard checks against
+        // the preference row this transaction holds `FOR SHARE` (P08-D4 F076).
+        let notice = match delivery {
+            Some(delivery) => {
+                let crate::transport::DeliveryCreation::Created(notice) =
+                    crate::adapters::persistence::delivery::enqueue::insert_standalone_delivery_on(
+                        tx, delivery,
+                    )
+                    .await?
+                else {
+                    return Err(invalid());
+                };
+                Some(notice.as_uuid())
+            }
+            None => None,
         };
-        sqlx::query("INSERT INTO workflow_decision_reviewers(company_id,decision_id,ordinal,principal_id,notice_delivery_id) VALUES($1,$2,$3,$4,$5)")
-            .bind(company.as_uuid()).bind(decision).bind(i16::try_from(ordinal).map_err(|_| invalid())?).bind(reviewer.principal_id).bind(notice.as_uuid()).execute(&mut **tx).await?;
+        sqlx::query("INSERT INTO workflow_decision_reviewers(company_id,decision_id,ordinal,principal_id,notice_delivery_id,notice_opted_out) VALUES($1,$2,$3,$4,$5,$6)")
+            .bind(company.as_uuid()).bind(decision).bind(i16::try_from(ordinal).map_err(|_| invalid())?).bind(reviewer.principal_id).bind(notice).bind(notice.is_none()).execute(&mut **tx).await?;
     }
     Ok(())
 }
 
 /// Compose all notices before writing anything, so deterministic errors settle without a park.
+/// A reviewer who opted out of decision email gets none (P08-Q8): `None` in their place.
 fn compose_notices(
     notices: &DecisionNotices,
     reviewers: &[Reviewer],
@@ -220,20 +235,25 @@ fn compose_notices(
     step: &StepId,
     decision: Uuid,
     deadline: DateTime<Utc>,
-) -> AppResult<Vec<crate::transport::NewStandaloneDelivery>> {
+) -> AppResult<Vec<Option<crate::transport::NewStandaloneDelivery>>> {
     reviewers
         .iter()
         .map(|reviewer| {
-            notices.compose(&DecisionNotice {
-                decision,
-                principal: reviewer.principal_id,
-                recipient: reviewer.email.clone().into(),
-                correlation: context.correlation_id,
-                workflow_title: &context.title,
-                step,
-                company_label: &context.company_label,
-                deadline,
-            })
+            if !reviewer.decision_email {
+                return Ok(None);
+            }
+            notices
+                .compose(&DecisionNotice {
+                    decision,
+                    principal: reviewer.principal_id,
+                    recipient: reviewer.email.clone().into(),
+                    correlation: context.correlation_id,
+                    workflow_title: &context.title,
+                    step,
+                    company_label: &context.company_label,
+                    deadline,
+                })
+                .map(Some)
         })
         .collect()
 }
@@ -255,11 +275,32 @@ async fn unavailable(
 /// Park-time assignment check, configuration validation without locks (05-D2 §9.3): a company
 /// member's person principal who can see the run's association; owner or admin on a
 /// channel-less run. Submission rechecks the same rules under the §8 locks.
+///
+/// The reviewer's decision-email preference is read `FOR SHARE` after the member and principal
+/// (P08-Q8): an opt-out recorded on the reviewer row stays true until the park commits. No row
+/// is the default, email on.
 async fn eligible_reviewer(
     db: &mut PgConnection,
     scope: ActivationRequest,
     user: Uuid,
 ) -> AppResult<Option<Reviewer>> {
+    let Some(row) = eligible_reviewer_row(db, scope, user).await? else {
+        return Ok(None);
+    };
+    let decision_email: Option<bool> = sqlx::query_scalar("SELECT decision_email_enabled FROM user_notification_preferences WHERE user_id=$1 FOR SHARE")
+        .bind(user).fetch_optional(&mut *db).await?;
+    Ok(Some(Reviewer {
+        principal_id: row.principal_id,
+        email: row.email,
+        decision_email: decision_email.unwrap_or(true),
+    }))
+}
+
+async fn eligible_reviewer_row(
+    db: &mut PgConnection,
+    scope: ActivationRequest,
+    user: Uuid,
+) -> AppResult<Option<ReviewerRow>> {
     Ok(sqlx::query_as("SELECT principal.id AS principal_id,account.email::text AS email FROM principals AS principal \
         JOIN company_members AS member ON member.company_id=principal.company_id AND member.user_id=principal.user_id \
         JOIN users AS account ON account.id=principal.user_id \
@@ -568,91 +609,8 @@ async fn comment_on(
     })
 }
 
-#[derive(sqlx::FromRow)]
-struct ViewRow {
-    subject_kind: String,
-    step_id: String,
-    revision: i64,
-    proposal_digest: String,
-    proposal: Value,
-    deadline: DateTime<Utc>,
-    state: String,
-    submitted_by: Option<Uuid>,
-    submitted_at: Option<DateTime<Utc>>,
-    choice: Option<String>,
-    feedback: Option<String>,
-    data: Option<Value>,
-}
-
-async fn read_on(
-    tx: &mut Transaction<'_, Postgres>,
-    company: CompanyId,
-    actor: WorkflowActor,
-    decision: DecisionId,
-) -> AppResult<DecisionView> {
-    let Locked { scope, .. } = lock_decision(tx, company, actor, decision).await?;
-    let row: ViewRow = sqlx::query_as("SELECT decision.subject_kind,execution.step_id,decision.revision,decision.proposal_digest,COALESCE(execution.frozen_inputs->'proposal','null'::jsonb) AS proposal,wait.deadline,wait.state,decision.submitted_by,decision.submitted_at,decision.choice,decision.feedback,decision.data FROM workflow_decisions AS decision JOIN workflow_executions AS execution ON execution.company_id=decision.company_id AND execution.id=decision.execution_id JOIN workflow_waits AS wait ON wait.company_id=decision.company_id AND wait.id=decision.wait_id WHERE decision.company_id=$1 AND decision.id=$2")
-        .bind(company.as_uuid()).bind(decision.0).fetch_one(&mut **tx).await?;
-    let reviewers: Vec<Uuid> = sqlx::query_scalar("SELECT reviewer.user_id FROM workflow_decision_reviewers AS reviewer WHERE reviewer.company_id=$1 AND reviewer.decision_id=$2 ORDER BY reviewer.ordinal")
-        .bind(company.as_uuid()).bind(decision.0).fetch_all(&mut **tx).await?;
-    let comments: Vec<(i64, Uuid, String, DateTime<Utc>)> = sqlx::query_as("SELECT sequence,author_principal_id,body,created_at FROM workflow_decision_comments WHERE company_id=$1 AND decision_id=$2 ORDER BY sequence")
-        .bind(company.as_uuid()).bind(decision.0).fetch_all(&mut **tx).await?;
-    let submission = match (
-        row.submitted_by,
-        row.submitted_at,
-        row.choice,
-        row.feedback,
-        row.data,
-    ) {
-        (Some(submitted_by), Some(submitted_at), Some(choice), Some(feedback), Some(data)) => {
-            Some(DecisionSubmissionView {
-                submitted_by,
-                submitted_at,
-                choice,
-                feedback,
-                data,
-            })
-        }
-        (None, None, None, None, None) => None,
-        _ => return Err(invalid()),
-    };
-    Ok(DecisionView {
-        decision,
-        run: scope.run,
-        execution: scope.execution,
-        step: StepId::parse(row.step_id).map_err(|_| invalid())?,
-        revision: row.revision,
-        artifact_digest: row.proposal_digest,
-        proposal: if row.subject_kind == "action_approval" {
-            approvals::view_proposal(tx, company, decision).await?
-        } else if row.subject_kind == "token_allowance" {
-            sqlx::query_scalar(
-                "SELECT token_proposal FROM workflow_decisions WHERE company_id=$1 AND id=$2",
-            )
-            .bind(company.as_uuid())
-            .bind(decision.0)
-            .fetch_one(&mut **tx)
-            .await?
-        } else {
-            row.proposal
-        },
-        deadline: row.deadline,
-        state: row.state,
-        reviewers,
-        submission,
-        comments: comments
-            .into_iter()
-            .map(
-                |(sequence, author_principal, body, created_at)| DecisionCommentView {
-                    sequence,
-                    author_principal,
-                    body,
-                    created_at,
-                },
-            )
-            .collect(),
-    })
-}
+mod read;
+use read::read_on;
 
 #[path = "decision_approvals.rs"]
 pub(super) mod approvals;

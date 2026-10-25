@@ -217,6 +217,7 @@ async fn workflow_revision_rounds_with_human_decisions_keep_old_rounds_and_load_
         worker: WorkflowWorkerId(Uuid::new_v4()),
         lease: LeasePolicy::new(std::time::Duration::from_secs(30)).unwrap(),
         poll: PollPolicy::new(std::time::Duration::from_millis(50), 16).unwrap(),
+        active_jobs: None,
     };
     let actor = WorkflowActor::authenticated(reviewer).unwrap();
     let read = |decision| async move { p.read_decision(company, actor, decision).await.unwrap() };

@@ -23,6 +23,14 @@ where
     Matches: Fn(&MailboxEvent) -> bool + Send + 'static,
 {
     BroadcastStream::new(events.subscribe()).filter_map(move |event| match event {
+        // A listener reconnect may have lost notifications: reconcile in full, as on lag.
+        Ok(event) if event.is_resync() => {
+            debug!(
+                stream = label,
+                "Live stream resync after a listener reconnect"
+            );
+            Some(Wake::Lagged)
+        }
         Ok(event) => matches(&event).then_some(Wake::Event(event)),
         Err(BroadcastStreamRecvError::Lagged(missed)) => {
             debug!(missed, stream = label, "Live stream lagged, catching up");
@@ -41,6 +49,21 @@ pub(super) fn thread_wake_ups(
     })
 }
 
+/// The simulation's wake-ups (p08 D4.6): the thread's messages and activity, and any run of the
+/// thread changing state. A resync arrives as `Lagged`, which re-renders the view like any wake.
+pub(super) fn simulation_wake_ups(
+    events: &MailboxEvents,
+    label: &'static str,
+    thread_id: Uuid,
+) -> impl Stream<Item = Wake> + Send + use<> {
+    wake_ups(events, label, move |event| {
+        event.is_message_in_thread(thread_id)
+            || event.is_activity_in_thread(thread_id)
+            || matches!(event, MailboxEvent::WorkflowRunChanged(scope) if scope.thread_id == Some(thread_id))
+    })
+}
+
+/// The mailbox column's wake-ups: a message or a run's activity on any of the channel's threads.
 pub(super) fn channel_wake_ups(
     events: &MailboxEvents,
     label: &'static str,
@@ -51,66 +74,15 @@ pub(super) fn channel_wake_ups(
     })
 }
 
-/// The open thread's wake-ups: its messages, its activity, and its channel's held replies.
-///
-/// The handoff term is **channel**-scoped even here, and deliberately so. [`AttentionScope`]'s
-/// `source_id` is the handoff's own id, not the thread's, so this stream cannot tell whether a
-/// change was on its own thread without querying -- and narrowing the payload would mean editing
-/// `notify_attention_changed`, a trigger shared by six other sources, for a latency optimisation.
-/// The cost is one handoff re-read per handoff change in the channel while a thread is open, and
-/// its result is an identical `innerHTML` swap when nothing relevant moved. That is the
-/// "SSE is a wake-up only, readers re-query" contract; do not "fix" it with a thread-scoped
-/// notification channel.
-///
-/// [`AttentionScope`]: crate::infra::events::AttentionScope
-pub(super) fn mailbox_thread_wake_ups(
-    events: &MailboxEvents,
-    label: &'static str,
-    thread_id: Uuid,
-    channel_id: Uuid,
-) -> impl Stream<Item = Wake> + Send + use<> {
-    wake_ups(events, label, move |event| {
-        event.is_message_in_thread(thread_id)
-            || event.is_activity_in_thread(thread_id)
-            || event.is_thread_handoff_in_channel(channel_id)
-    })
-}
-
-/// The mailbox column's wake-ups: messages, activity, and held replies.
-///
-/// A separate function rather than a widened [`channel_wake_ups`]: that one is also the
-/// schedule-run stream's, and [`thread_wake_ups`] is also the simulation stream's. Neither of those
-/// renders a handoff, so widening them would wake two unrelated streams into a pointless re-query
-/// on every claim.
-pub(super) fn mailbox_channel_wake_ups(
-    events: &MailboxEvents,
-    label: &'static str,
-    channel_id: Uuid,
-) -> impl Stream<Item = Wake> + Send + use<> {
-    wake_ups(events, label, move |event| {
-        event.is_message_in_channel(channel_id)
-            || event.is_activity_in_channel(channel_id)
-            || event.is_thread_handoff_in_channel(channel_id)
-    })
-}
-
-pub(super) fn task_chain_wake_ups(
+/// The run counts' wake-ups: any run of the company changing state. The counts are re-read for
+/// the viewer's channels, so a change elsewhere costs one unchanged, suppressed pass.
+pub(super) fn run_count_wake_ups(
     events: &MailboxEvents,
     label: &'static str,
     company_id: Uuid,
 ) -> impl Stream<Item = Wake> + Send + use<> {
     wake_ups(events, label, move |event| {
-        event.is_task_chain_in_company(company_id)
-    })
-}
-
-pub(super) fn task_count_wake_ups(
-    events: &MailboxEvents,
-    label: &'static str,
-    company_id: Uuid,
-) -> impl Stream<Item = Wake> + Send + use<> {
-    wake_ups(events, label, move |event| {
-        event.is_task_attention_in_company(company_id)
+        event.run_scope(company_id).is_some()
     })
 }
 
@@ -119,50 +91,69 @@ mod tests {
     use super::*;
     use crate::infra::events::{AttentionScope, AttentionWakeSource, ThreadScope};
 
-    #[test]
-    fn counts_only_wake_for_task_attention_in_the_same_company() {
-        let company_id = Uuid::new_v4();
-        for source_kind in [
-            AttentionWakeSource::Task,
-            AttentionWakeSource::ThreadHandoff,
-            AttentionWakeSource::Handoff,
-            AttentionWakeSource::Delivery,
-            AttentionWakeSource::ResponseReview,
-            AttentionWakeSource::Delegation,
-        ] {
-            let event = MailboxEvent::AttentionChanged(AttentionScope {
-                company_id,
-                channel_id: Uuid::new_v4(),
-                source_kind,
-                source_id: Uuid::new_v4(),
-            });
-            assert_eq!(
-                event.is_task_attention_in_company(company_id),
-                source_kind == AttentionWakeSource::Task
-            );
-            assert!(!event.is_task_attention_in_company(Uuid::new_v4()));
-        }
-    }
-
-    fn held_reply_changed(company_id: Uuid, channel_id: Uuid) -> MailboxEvent {
-        MailboxEvent::AttentionChanged(AttentionScope {
-            company_id,
-            channel_id,
-            source_kind: AttentionWakeSource::ThreadHandoff,
-            source_id: Uuid::new_v4(),
-        })
-    }
-
-    /// Case 19. The regression guard for "add new predicates, do not widen the existing ones".
-    ///
-    /// [`thread_wake_ups`] is the simulation stream's and [`channel_wake_ups`] is the schedule-run
-    /// stream's. Neither renders a held reply, so a claim must not wake either of them -- and the
-    /// mailbox's own two must wake for exactly the same event. The message published after the
-    /// handoff change is what makes "did not wake" an assertion rather than a timeout: the old
-    /// predicates' first wake-up is the message, so the handoff change was skipped, not merely
-    /// slow.
+    /// p08 D4.4: the counts wake for a run of their company, and for a resync, and for nothing
+    /// else.
     #[tokio::test]
-    async fn a_held_reply_change_wakes_the_mailbox_streams_and_neither_of_the_other_two() {
+    async fn counts_wake_for_a_run_of_their_company_and_a_resync() {
+        let events = MailboxEvents::new();
+        let company_id = Uuid::new_v4();
+        let mut wakes = Box::pin(run_count_wake_ups(&events, "run-counts", company_id));
+        let run = |company_id| {
+            MailboxEvent::WorkflowRunChanged(crate::infra::events::RunScope {
+                company_id,
+                channel_id: None,
+                thread_id: None,
+                run_id: Uuid::new_v4(),
+            })
+        };
+        events.publish(run(Uuid::new_v4()));
+        events.publish(MailboxEvent::AttentionChanged(AttentionScope {
+            company_id,
+            channel_id: Uuid::new_v4(),
+            source_kind: AttentionWakeSource::Delivery,
+            source_id: Uuid::new_v4(),
+        }));
+        events.publish(run(company_id));
+        events.publish(MailboxEvent::Resync);
+        assert!(matches!(
+            wakes.next().await,
+            Some(Wake::Event(MailboxEvent::WorkflowRunChanged(scope))) if scope.company_id == company_id
+        ));
+        assert!(matches!(wakes.next().await, Some(Wake::Lagged)));
+    }
+
+    /// p08 D4.6: the simulation wakes for a run of its own thread, and for a resync; another
+    /// thread's run, or a run with no thread, is not its news.
+    #[tokio::test]
+    async fn the_simulation_wakes_for_its_threads_runs_and_a_resync() {
+        let events = MailboxEvents::new();
+        let company_id = Uuid::new_v4();
+        let thread_id = Uuid::new_v4();
+        let mut wakes = Box::pin(simulation_wake_ups(&events, "simulation", thread_id));
+        let run = |thread_id| {
+            MailboxEvent::WorkflowRunChanged(crate::infra::events::RunScope {
+                company_id,
+                channel_id: Some(Uuid::new_v4()),
+                thread_id,
+                run_id: Uuid::new_v4(),
+            })
+        };
+        events.publish(run(Some(Uuid::new_v4())));
+        events.publish(run(None));
+        events.publish(run(Some(thread_id)));
+        events.publish(MailboxEvent::Resync);
+        assert!(matches!(
+            wakes.next().await,
+            Some(Wake::Event(MailboxEvent::WorkflowRunChanged(scope))) if scope.thread_id == Some(thread_id)
+        ));
+        assert!(matches!(wakes.next().await, Some(Wake::Lagged)));
+    }
+
+    /// The mailbox streams wake for their own thread's and channel's messages and run activity;
+    /// an attention change -- a decision opening, say -- is the attention page's news, not theirs.
+    /// The message published last is what makes "did not wake" an assertion rather than a timeout.
+    #[tokio::test]
+    async fn the_mailbox_streams_wake_for_messages_and_activity_and_not_for_attention() {
         let events = MailboxEvents::new();
         let company_id = Uuid::new_v4();
         let channel_id = Uuid::new_v4();
@@ -173,55 +164,30 @@ mod tests {
             company_id,
         };
 
-        let mut simulation = Box::pin(thread_wake_ups(&events, "test", thread_id));
-        let mut schedule_runs = Box::pin(channel_wake_ups(&events, "test", channel_id));
-        let mut mailbox_thread = Box::pin(mailbox_thread_wake_ups(
-            &events, "test", thread_id, channel_id,
-        ));
-        let mut mailbox_column = Box::pin(mailbox_channel_wake_ups(&events, "test", channel_id));
+        let mut thread = Box::pin(thread_wake_ups(&events, "test", thread_id));
+        let mut column = Box::pin(channel_wake_ups(&events, "test", channel_id));
 
-        let handoff = held_reply_changed(company_id, channel_id);
-        events.publish(handoff);
-        events.publish(MailboxEvent::MessageCommitted(scope));
-
-        for woken in [mailbox_thread.next().await, mailbox_column.next().await] {
-            assert!(
-                matches!(woken, Some(Wake::Event(event)) if event == handoff),
-                "the mailbox redraws its badge and banner on a held-reply change"
-            );
-        }
-        for skipped in [simulation.next().await, schedule_runs.next().await] {
-            assert!(
-                matches!(
-                    skipped,
-                    Some(Wake::Event(MailboxEvent::MessageCommitted(_)))
-                ),
-                "a held-reply change was filtered out before it reached this stream"
-            );
-        }
-    }
-
-    /// A handoff change in another channel is nobody's news, including the mailbox's.
-    #[tokio::test]
-    async fn a_held_reply_change_in_another_channel_wakes_nothing() {
-        let events = MailboxEvents::new();
-        let company_id = Uuid::new_v4();
-        let channel_id = Uuid::new_v4();
-        let thread_id = Uuid::new_v4();
-
-        let mut mailbox_thread = Box::pin(mailbox_thread_wake_ups(
-            &events, "test", thread_id, channel_id,
-        ));
-        let mut mailbox_column = Box::pin(mailbox_channel_wake_ups(&events, "test", channel_id));
-
-        events.publish(held_reply_changed(company_id, Uuid::new_v4()));
-        events.publish(MailboxEvent::MessageCommitted(ThreadScope {
-            thread_id,
+        events.publish(MailboxEvent::AttentionChanged(AttentionScope {
+            company_id,
             channel_id,
+            source_kind: AttentionWakeSource::Delivery,
+            source_id: Uuid::new_v4(),
+        }));
+        events.publish(MailboxEvent::ActivityChanged(ThreadScope {
+            thread_id: Uuid::new_v4(),
+            channel_id: Uuid::new_v4(),
             company_id,
         }));
+        events.publish(MailboxEvent::ActivityChanged(scope));
+        events.publish(MailboxEvent::MessageCommitted(scope));
 
-        for woken in [mailbox_thread.next().await, mailbox_column.next().await] {
+        for woken in [thread.next().await, column.next().await] {
+            assert!(
+                matches!(woken, Some(Wake::Event(MailboxEvent::ActivityChanged(woken))) if woken == scope),
+                "the first wake-up is this thread's run activity"
+            );
+        }
+        for woken in [thread.next().await, column.next().await] {
             assert!(matches!(
                 woken,
                 Some(Wake::Event(MailboxEvent::MessageCommitted(_)))

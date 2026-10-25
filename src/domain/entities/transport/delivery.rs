@@ -239,10 +239,6 @@ stored_enum! {
     /// flight when it is cancelled keeps the intent through whatever its provider says, so no retry,
     /// release or lease sweep can hand it back to the queue.
     DeliveryCancellationReason as "delivery cancellation reason" {
-        /// The owning agent was removed from the channel its task belongs to.
-        ChannelAgentRemoved => "channel_agent_removed",
-        /// The task that produced the delivery was stopped.
-        TaskStopped => "task_stopped",
         /// The workflow run that produced the delivery was cancelled.
         WorkflowCancelled => "workflow_cancelled",
         /// The workflow run reached its deadline or ended before the delivery went out.

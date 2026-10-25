@@ -15,6 +15,15 @@ struct BindingRow {
     version_id: Uuid,
     params: Value,
     resources: Value,
+    run_as_user_id: Uuid,
+    message_trigger: Option<String>,
+}
+
+/// The stored message trigger column, refused rather than guessed when unreadable.
+pub(super) fn message_trigger(stored: Option<&str>) -> AppResult<Option<MessageTrigger>> {
+    stored
+        .map(|name| name.parse::<MessageTrigger>().map_err(|_| invalid()))
+        .transpose()
 }
 
 pub(super) async fn read_binding(
@@ -25,7 +34,8 @@ pub(super) async fn read_binding(
     let row = sqlx::query_as::<_, BindingRow>(
         "SELECT binding.company_id, binding.id, binding.state_revision, \
          binding.configuration_revision, binding.active, binding.channel_id, binding.thread_id, \
-         configuration.version_id, configuration.params, configuration.resources \
+         configuration.version_id, configuration.params, configuration.resources, \
+         configuration.run_as_user_id, configuration.message_trigger \
          FROM workflow_bindings AS binding JOIN workflow_binding_revisions AS configuration \
            ON configuration.company_id = binding.company_id AND configuration.binding_id = binding.id \
            AND configuration.revision = binding.configuration_revision \
@@ -44,6 +54,8 @@ pub(super) async fn read_binding(
             .ok_or_else(invalid)?,
             params: row.params,
             resources: serde_json::from_value(row.resources).map_err(|_| invalid())?,
+            run_as: WorkflowActor::authenticated(row.run_as_user_id).map_err(|_| invalid())?,
+            message_trigger: message_trigger(row.message_trigger.as_deref())?,
         },
         bundle,
     )

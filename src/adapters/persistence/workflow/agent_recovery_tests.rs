@@ -546,6 +546,8 @@ async fn workflow_agent_run_dynamic_selection_runs_the_bound_agent() {
             version: publication.version,
             params: json!({"agent":"support"}),
             resources: BTreeMap::new(),
+            run_as: None,
+            message_trigger: None,
         })
         .await
         .unwrap();
@@ -556,7 +558,7 @@ async fn workflow_agent_run_dynamic_selection_runs_the_bound_agent() {
         })
         .await
         .unwrap();
-    let claim = Box::pin(claimed(&fixture, target)).await;
+    let claim = Box::pin(claimed(&fixture, target, RelatedAssociation::Company)).await;
     let mut llm = scripted_llm(vec![LlmTurn::text("\"supported\"")]).await;
     // Only the selected agent has a provider endpoint; selecting `sales` would fail.
     register_scripted_agent_base_url(agents[1], &llm.base_url);

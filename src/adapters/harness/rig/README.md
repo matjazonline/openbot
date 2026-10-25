@@ -1,10 +1,10 @@
 # Rig adapter maintenance
 
-Rig is the only agent runtime (06C removed ai-agents). Production tasks use the application-owned
-conversation ledger, structured-answer validation and shared delivery/review path; workflow
-`agent.run`, `ai.classify` and `decision.agent` steps use the shared durable driver in
-`execution.rs`/`workflow.rs`. This directory owns provider construction and the runtime bridge,
-not company credentials or task policy.
+Rig is the only agent runtime (06C removed ai-agents). Every model call is a workflow step:
+`agent.run`, `ai.classify` and `decision.agent` use the shared durable driver in
+`execution.rs`/`workflow.rs`, with structured-answer validation against the step's
+`output_schema` (p08). This directory owns provider construction and the runtime bridge, not
+company credentials or workflow policy.
 
 See the [operator guide](../../../../docs/rig.md) for supported behavior, API examples and limits,
 and the [fresh-database rollout](../../../../docs/deploy.md#rig-rollout-on-a-fresh-database) for
@@ -36,9 +36,9 @@ shared reqwest dependency enables features needed by other adapters. Rig bodies 
 off content telemetry; application tracing exposes structural IDs, counts, usage and safe reasons.
 
 Rig's automatic MCP integration is disabled; MCP calls are workflow actions dispatched through the
-application, not runtime tools. The only runtime tool is `read_resource` for attached skills
-(`tools.rs`, `skills.rs`). There is no upstream tool registry, host-tool access or alternate
-delegation executor.
+application, not runtime tools. An `agent.run` step declares the agent's workflow tools to the
+model and dispatches each call as a workflow action; attached skills are prompt text. There is no
+upstream tool registry, host-tool access or alternate delegation executor.
 
 ## Upgrade evidence
 

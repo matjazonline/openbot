@@ -37,14 +37,12 @@ use crate::{
         value_objects::{AvatarUrl, EmailAddress},
     },
     infra::config::AppConfig,
-    services::memory_provider::{ConfiguredMemoryProviders, SelectedMemoryProvider},
     use_cases::{
         agent::AgentUseCases,
         channel::ChannelUseCases,
         company::{CompanyModelConnectionWrite, CompanyUseCases, CompanyWrite},
         company_invite::CompanyInviteUseCases,
         company_resend_api::{CompanyResendApiUseCases, SubmittedResendApiIntegration},
-        memory::MemoryUseCases,
         skill::{MAX_SKILL_PAGE_SIZE, SkillPage, SkillPageRequest, SkillUseCases},
         user::UserUseCases,
     },
@@ -64,10 +62,6 @@ pub fn router() -> Router<AppState> {
         .route(
             "/ui/companies/{company_id}",
             get(edit_pane).put(update_company).delete(delete_company),
-        )
-        .route(
-            "/ui/companies/{company_id}/memory/retry",
-            post(retry_memory),
         )
         .route(
             "/ui/companies/{company_id}/resend_api",
@@ -101,20 +95,9 @@ pub struct WorkspaceQuery {
 pub struct CompanyForm {
     pub name: String,
     pub slug: Option<String>,
-    pub external_response_review: Option<crate::entities::response_draft::ExternalResponseReview>,
-    /// The company's reply-handling default. Absent preserves the stored value.
-    pub external_reply_handling: Option<crate::entities::thread_handoff::ExternalReplyHandling>,
     /// What the pane's picker is holding: an uploaded picture's URL, or blank for the letter.
     pub avatar_url: Option<String>,
-    pub memory_provider: Option<String>,
     pub default_add_3rd_party: Option<bool>,
-    pub default_participant_emails: Option<String>,
-    pub default_retrieve_company_memory: Option<bool>,
-    pub default_retrieve_agent_memory: Option<bool>,
-    pub default_retrieve_user_memory: Option<bool>,
-    pub default_persist_company_memory: Option<bool>,
-    pub default_persist_agent_memory: Option<bool>,
-    pub default_persist_user_memory: Option<bool>,
     pub default_model_provider: Option<usize>,
     #[serde(flatten)]
     pub connection_fields: HashMap<String, String>,
@@ -146,7 +129,6 @@ struct Workspace {
     invite_use_cases: Arc<CompanyInviteUseCases>,
     resend_api_use_cases: Arc<CompanyResendApiUseCases>,
     user_use_cases: Arc<UserUseCases>,
-    memory_use_cases: Arc<MemoryUseCases>,
     skill_use_cases: Arc<SkillUseCases>,
     config: Arc<AppConfig>,
     user_id: Uuid,
@@ -168,7 +150,6 @@ impl FromRequestParts<AppState> for Workspace {
             invite_use_cases: state.company_invite_use_cases.clone(),
             resend_api_use_cases: state.company_resend_api_use_cases.clone(),
             user_use_cases: state.user_use_cases.clone(),
-            memory_use_cases: state.memory_use_cases.clone(),
             skill_use_cases: state.skill_use_cases.clone(),
             config: state.config.clone(),
             user_id: user.id,
@@ -231,13 +212,6 @@ impl Workspace {
         error: Option<&str>,
         editable: bool,
     ) -> AppResult<String> {
-        let memory = if editable {
-            self.memory_use_cases
-                .status(self.user_id, company.id)
-                .await?
-        } else {
-            None
-        };
         let model_connections = if editable {
             self.company_use_cases
                 .list_model_connections(self.user_id, company.id)
@@ -253,21 +227,17 @@ impl Workspace {
         } else {
             String::new()
         };
-        Ok(pages::company_edit_pane_with_memory(
-            &pages::CompanyEditPane {
-                company,
-                model_connections: &model_connections,
-                app_domain_name: &self.config.app_domain_name,
-                counts,
-                draft,
-                error,
-                editable,
-                resend_api_section: &resend_api_section,
-                body: pages::CompanyPaneBody::Settings,
-            },
-            memory.as_ref(),
-            self.memory_use_cases.configured(),
-        ))
+        Ok(pages::company_edit_pane(&pages::CompanyEditPane {
+            company,
+            model_connections: &model_connections,
+            app_domain_name: &self.config.app_domain_name,
+            counts,
+            draft,
+            error,
+            editable,
+            resend_api_section: &resend_api_section,
+            body: pages::CompanyPaneBody::Settings,
+        }))
     }
 
     /// The Resend panel as it stands right now, with whatever the last write left to say.
@@ -481,13 +451,10 @@ async fn companies_page(
                 .settings_pane(company, counts, None, None, editable)
                 .await?
         }
-        None if creating_company => pages::company_create_pane_with_memory(
-            &pages::CompanyCreatePane {
-                draft: &pages::CompanyDraft::default(),
-                error: None,
-            },
-            workspace.memory_use_cases.configured(),
-        ),
+        None if creating_company => pages::company_create_pane(&pages::CompanyCreatePane {
+            draft: &pages::CompanyDraft::default(),
+            error: None,
+        }),
         None => pages::company_settings_empty_pane(NO_SELECTION, pages::FragmentSwap::Inline),
     };
 
@@ -512,13 +479,10 @@ async fn companies_page(
 /// that was open before it lit would say the pane is showing a company it is not.
 #[instrument(skip(workspace))]
 async fn create_pane(workspace: Workspace) -> AppResult<Response> {
-    let pane = pages::company_create_pane_with_memory(
-        &pages::CompanyCreatePane {
-            draft: &pages::CompanyDraft::default(),
-            error: None,
-        },
-        workspace.memory_use_cases.configured(),
-    );
+    let pane = pages::company_create_pane(&pages::CompanyCreatePane {
+        draft: &pages::CompanyDraft::default(),
+        error: None,
+    });
     let list = workspace.deselected_list().await?;
 
     Ok(Html(format!("{pane}{list}")).into_response())
@@ -553,30 +517,27 @@ async fn edit_pane(workspace: Workspace, Path(company_id): Path<Uuid>) -> AppRes
 async fn create_company(workspace: Workspace, Form(form): Form<CompanyForm>) -> Response {
     let submitted = SubmittedCompany::new(form);
 
-    let created = match submitted
-        .write(workspace.config.is_spam_scan_enabled())
-        .and_then(|write| {
-            submitted.selected_memory(workspace.memory_use_cases.configured())?;
-            let connections = submitted
-                .model_connections()
+    let created = match submitted.write().and_then(|write| {
+        let connections = submitted
+            .model_connections()
+            .map_err(|error| error.to_string())?;
+        // A company may be created before any provider is configured. Only an *update* to an
+        // empty set is a wipe, and `validate_model_connections` refuses that one.
+        if !connections.is_empty() {
+            CompanyUseCases::validate_model_connections(&connections)
                 .map_err(|error| error.to_string())?;
-            // A company may be created before any provider is configured. Only an *update* to an
-            // empty set is a wipe, and `validate_model_connections` refuses that one.
-            if !connections.is_empty() {
-                CompanyUseCases::validate_model_connections(&connections)
-                    .map_err(|error| error.to_string())?;
-                if connections
-                    .iter()
-                    .any(|connection| connection.api_key.is_none())
-                {
-                    return Err(
-                        "An API key is required for every provider when creating a company."
-                            .to_string(),
-                    );
-                }
+            if connections
+                .iter()
+                .any(|connection| connection.api_key.is_none())
+            {
+                return Err(
+                    "An API key is required for every provider when creating a company."
+                        .to_string(),
+                );
             }
-            Ok(write)
-        }) {
+        }
+        Ok(write)
+    }) {
         Ok(write) => {
             workspace
                 .company_use_cases
@@ -588,13 +549,9 @@ async fn create_company(workspace: Workspace, Form(form): Form<CompanyForm>) -> 
 
     match created {
         Ok(company) => {
-            let applied = match workspace
+            let applied = workspace
                 .apply_submitted_model_connections(&submitted, company.id)
-                .await
-            {
-                Ok(()) => workspace.apply_memory(&submitted, company.id).await,
-                Err(err) => Err(err),
-            };
+                .await;
             let response = match applied {
                 Ok(()) => {
                     workspace
@@ -605,13 +562,10 @@ async fn create_company(workspace: Workspace, Form(form): Form<CompanyForm>) -> 
             };
             response.unwrap_or_else(IntoResponse::into_response)
         }
-        Err(err) => Html(pages::company_create_pane_with_memory(
-            &pages::CompanyCreatePane {
-                draft: &submitted.draft(),
-                error: Some(&format!("Failed to create company: {err}")),
-            },
-            workspace.memory_use_cases.configured(),
-        ))
+        Err(err) => Html(pages::company_create_pane(&pages::CompanyCreatePane {
+            draft: &submitted.draft(),
+            error: Some(&format!("Failed to create company: {err}")),
+        }))
         .into_response(),
     }
 }
@@ -630,17 +584,14 @@ async fn update_company(
     let counts = workspace.counts(company_id, true).await?;
     let submitted = SubmittedCompany::new(form);
 
-    let saved = match submitted
-        .write(workspace.config.is_spam_scan_enabled())
-        .and_then(|write| {
-            submitted.selected_memory(workspace.memory_use_cases.configured())?;
-            let connections = submitted
-                .model_connections()
-                .map_err(|error| error.to_string())?;
-            CompanyUseCases::validate_model_connections(&connections)
-                .map_err(|error| error.to_string())?;
-            Ok(write)
-        }) {
+    let saved = match submitted.write().and_then(|write| {
+        let connections = submitted
+            .model_connections()
+            .map_err(|error| error.to_string())?;
+        CompanyUseCases::validate_model_connections(&connections)
+            .map_err(|error| error.to_string())?;
+        Ok(write)
+    }) {
         Ok(write) => {
             workspace
                 .company_use_cases
@@ -654,16 +605,10 @@ async fn update_company(
     // out of step. Everything that could be checked before that write already has been, so what
     // is left is reported through the pane the way a rejected save is -- not as a bare 500.
     let saved = match saved {
-        Ok(company) => match workspace
+        Ok(company) => workspace
             .apply_model_connections(&submitted, company.id)
             .await
-        {
-            Ok(()) => workspace
-                .apply_memory(&submitted, company.id)
-                .await
-                .map(|()| company),
-            Err(err) => Err(err),
-        },
+            .map(|()| company),
         Err(err) => Err(err),
     };
 
@@ -686,27 +631,6 @@ async fn update_company(
         )
         .into_response()),
     }
-}
-
-#[instrument(skip(workspace))]
-async fn retry_memory(
-    workspace: Workspace,
-    Path(company_id): Path<Uuid>,
-) -> AppResult<Html<String>> {
-    workspace
-        .memory_use_cases
-        .retry(workspace.user_id, company_id)
-        .await?;
-    let company = workspace
-        .company_use_cases
-        .owned_company(workspace.user_id, company_id)
-        .await?;
-    let counts = workspace.counts(company_id, true).await?;
-    Ok(Html(
-        workspace
-            .settings_pane(&company, counts, None, None, true)
-            .await?,
-    ))
 }
 
 /// What the Resend panel submits. Both secrets are optional because blank means "keep the stored
@@ -851,25 +775,7 @@ impl SubmittedCompany {
             name: &self.form.name,
             slug: &self.slug,
             avatar_url: self.form.avatar_url.as_deref().unwrap_or(""),
-            memory_provider: self.form.memory_provider.as_deref().unwrap_or(""),
             default_add_3rd_party: self.form.default_add_3rd_party.unwrap_or(false),
-            default_participant_emails: self
-                .form
-                .default_participant_emails
-                .clone()
-                .unwrap_or_default(),
-            default_retrieve_company_memory: self
-                .form
-                .default_retrieve_company_memory
-                .unwrap_or(false),
-            default_retrieve_agent_memory: self.form.default_retrieve_agent_memory.unwrap_or(false),
-            default_retrieve_user_memory: self.form.default_retrieve_user_memory.unwrap_or(false),
-            default_persist_company_memory: self
-                .form
-                .default_persist_company_memory
-                .unwrap_or(false),
-            default_persist_agent_memory: self.form.default_persist_agent_memory.unwrap_or(false),
-            default_persist_user_memory: self.form.default_persist_user_memory.unwrap_or(false),
             // This view model deliberately has no credential field. Preserve only safe submitted
             // metadata so even a rejected request cannot echo its API key into the response.
             model_connections: self.model_connection_drafts(),
@@ -912,48 +818,12 @@ impl SubmittedCompany {
 
     /// The submitted company as a write. The picture is parsed rather than taken as typed: it
     /// ends up in an `<img src>` on the rail of every page this company scopes.
-    fn write(&self, spam_scanning: bool) -> Result<CompanyWrite, String> {
-        if !spam_scanning
-            && self
-                .form
-                .default_participant_emails
-                .as_deref()
-                .is_some_and(|values| {
-                    values.split([',', '\n']).any(|value| {
-                        value
-                            .trim()
-                            .eq_ignore_ascii_case(crate::entities::channel::PUBLIC_PARTICIPANT)
-                    })
-                })
-        {
-            return Err(
-                "Public new-agent channel defaults require spam scanning to be enabled.".into(),
-            );
-        }
+    fn write(&self) -> Result<CompanyWrite, String> {
         Ok(CompanyWrite {
             name: self.form.name.clone(),
             slug: self.slug.clone(),
-            external_response_review: self.form.external_response_review,
-            external_reply_handling: self.form.external_reply_handling,
-            memory_provider: None,
             channel_defaults: crate::entities::company::CompanyChannelDefaults {
                 add_3rd_party: self.form.default_add_3rd_party.unwrap_or(false),
-                participant_emails: self
-                    .form
-                    .default_participant_emails
-                    .as_deref()
-                    .map(|values| {
-                        values
-                            .split([',', '\n'])
-                            .map(crate::entities::value_objects::EmailAddress::from)
-                            .collect()
-                    }),
-                retrieve_company_memory: self.form.default_retrieve_company_memory.unwrap_or(false),
-                retrieve_agent_memory: self.form.default_retrieve_agent_memory.unwrap_or(false),
-                retrieve_user_memory: self.form.default_retrieve_user_memory.unwrap_or(false),
-                persist_company_memory: self.form.default_persist_company_memory.unwrap_or(false),
-                persist_agent_memory: self.form.default_persist_agent_memory.unwrap_or(false),
-                persist_user_memory: self.form.default_persist_user_memory.unwrap_or(false),
             },
             avatar_url: AvatarUrl::parse(self.form.avatar_url.as_deref().unwrap_or(""))?,
         })
@@ -1019,13 +889,6 @@ impl SubmittedCompany {
         }
         Ok(connections)
     }
-
-    fn selected_memory(
-        &self,
-        configured: &ConfiguredMemoryProviders,
-    ) -> Result<SelectedMemoryProvider, String> {
-        configured.select(self.form.memory_provider.as_deref())
-    }
 }
 
 impl Workspace {
@@ -1054,25 +917,6 @@ impl Workspace {
             .replace_model_connections(self.user_id, company_id, connections)
             .await
     }
-
-    async fn apply_memory(&self, submitted: &SubmittedCompany, company_id: Uuid) -> AppResult<()> {
-        match submitted
-            .selected_memory(self.memory_use_cases.configured())
-            .map_err(AppError::BadRequest)?
-        {
-            SelectedMemoryProvider::Provider(kind) => {
-                self.memory_use_cases
-                    .select_provider(self.user_id, company_id, kind)
-                    .await?;
-            }
-            SelectedMemoryProvider::Disabled => {
-                self.memory_use_cases
-                    .disable(self.user_id, company_id)
-                    .await?
-            }
-        }
-        Ok(())
-    }
 }
 
 #[cfg(test)]
@@ -1084,7 +928,6 @@ mod tests {
             name: "Acme".into(),
             slug: Some("acme".into()),
             avatar_url: None,
-            memory_provider: None,
             default_model_provider,
             connection_fields: fields
                 .iter()

@@ -1,9 +1,9 @@
 use super::contracts::AdmissionSnapshots;
 use super::{
-    AdmissionResult, AdmitWorkflowRequest, CancelCommand, CancelResult, CancelWorkflowRequest,
-    PreparedAdmission, RetryCommand, RetryResult, RetryWorkflowRequest, WorkflowAdmission,
-    WorkflowAuthorization, WorkflowBindings, WorkflowInspection, WorkflowOperation,
-    WorkflowRunTransitions, binding::ConfiguredBinding,
+    AdmissionBinding, AdmissionResult, AdmitWorkflowRequest, CancelCommand, CancelResult,
+    CancelWorkflowRequest, PreparedAdmission, RetryCommand, RetryResult, RetryWorkflowRequest,
+    WorkflowAdmission, WorkflowAuthorization, WorkflowBindings, WorkflowInspection,
+    WorkflowOperation, WorkflowRunTransitions, binding::ConfiguredBinding,
 };
 use crate::application::app_error::{AppError, AppResult};
 use crate::domain::workflow::{
@@ -52,7 +52,7 @@ where
                 WorkflowOperation::Admit,
             )
             .await?;
-        let binding = self
+        let AdmissionBinding { binding, saved } = self
             .bindings
             .admission_binding(
                 request.company_id,
@@ -62,6 +62,15 @@ where
             )
             .await?
             .ok_or_else(|| AppError::NotFound("workflow binding".into()))?;
+        // Before validating input against it: the caller evaluated another configuration, and a
+        // refusal by this one would be the wrong answer to a question it never asked.
+        if !saved
+            && request
+                .expected_binding_revision
+                .is_some_and(|expected| expected != binding.revision())
+        {
+            return Ok(AdmissionResult::Stale);
+        }
         verify_binding(&binding, &request)?;
         let proposed_run = RunId::new(Uuid::new_v4());
         let snapshots = bounded_snapshots(&request, &binding, proposed_run)?;
@@ -197,6 +206,7 @@ fn bounded_snapshots(
         run: RunMetadata {
             run_id,
             parent_run_id: None,
+            deadline: None,
         },
     };
     let limits = binding.bundle().compiled().graph().context_limits();

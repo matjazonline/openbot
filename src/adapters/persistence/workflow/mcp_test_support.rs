@@ -293,15 +293,26 @@ impl McpSetup {
         self.fixture.target.actor
     }
     pub(super) async fn current(&self) -> CompanyMcpConnection {
-        McpPersistence::mcp_connections_by_ids(
+        connection_on(
             &self.fixture.persistence,
             self.company().as_uuid(),
-            &[self.connection.id],
+            self.connection.id,
         )
         .await
-        .unwrap()
-        .remove(0)
     }
+}
+/// One live connection, read the way the catalog is.
+pub(super) async fn connection_on(
+    p: &PostgresPersistence,
+    company: Uuid,
+    id: Uuid,
+) -> CompanyMcpConnection {
+    McpPersistence::list_mcp_connections(p, company)
+        .await
+        .unwrap()
+        .into_iter()
+        .find(|connection| connection.id == id)
+        .expect("the connection is live")
 }
 pub(super) fn guarded_client(url: &str) -> Arc<HttpMcpClient> {
     Arc::new(HttpMcpClient::new(
@@ -346,10 +357,7 @@ pub(super) async fn configured(fixture: &Fixture, url: &str) -> (CompanyMcpConne
     )
     .await
     .unwrap();
-    let connection = McpPersistence::mcp_connections_by_ids(p, company.as_uuid(), &[connection.id])
-        .await
-        .unwrap()
-        .remove(0);
+    let connection = connection_on(p, company.as_uuid(), connection.id).await;
     let version = p
         .register_mcp_operation(
             company,
@@ -444,6 +452,8 @@ pub(super) async fn bound(
                 ResourceName::parse("service").unwrap(),
                 RuntimeResourceId::new(connection),
             )]),
+            run_as: None,
+            message_trigger: None,
         })
         .await
         .unwrap();
@@ -477,6 +487,8 @@ pub(super) async fn admitted(setup: &McpSetup, key: &str) -> ActivationRequest {
             idempotency_key: IdempotencyKey::parse(key).unwrap(),
             input: json!({"customer_id":"c-42"}),
             rerun_of: None,
+            delivery_policy: crate::application::workflow::DeliveryPolicy::Deliver,
+            expected_binding_revision: None,
         })
         .await
         .unwrap();

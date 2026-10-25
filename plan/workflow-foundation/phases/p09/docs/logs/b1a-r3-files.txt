@@ -1,0 +1,12 @@
+src/adapters/http/pages/workflow_authoring/editor.rs
+src/adapters/http/pages/workflow_authoring/preview.rs
+src/adapters/http/routes/workflows/ui/authoring/access_tests.rs
+src/adapters/http/routes/workflows/ui/authoring/editor_tests.rs
+src/adapters/http/routes/workflows/ui/authoring/editor.rs
+src/adapters/http/routes/workflows/ui/authoring/library.rs
+src/adapters/http/routes/workflows/ui/authoring/mod.rs
+src/adapters/http/routes/workflows/ui/authoring/publish_tests.rs
+src/adapters/http/routes/workflows/ui/authoring/tests.rs
+src/adapters/http/routes/workflows/ui/authoring/versions.rs
+src/adapters/http/routes/workflows/ui/authoring_tests.rs
+src/adapters/http/routes/workflows/ui/authoring.rs

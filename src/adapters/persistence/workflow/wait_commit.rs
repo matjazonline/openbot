@@ -48,7 +48,16 @@ pub(super) async fn resume_on(
     if run.deadline <= now && maintenance::expire_on(db, scope).await? {
         return Ok(WaitProgress::Expired(CommitDisposition::Committed));
     }
-    if run.state != "waiting" || (wait.reason == "event" && wait.deadline <= now) {
+    // An event recorded at or before an event wait's deadline still completes it, even when this
+    // resume runs after the deadline; only a wait with no such event expires (p08 D1.5.6).
+    let event_due = wait.reason == "event" && wait.deadline <= now;
+    let answered_in_time = event_due
+        && {
+            sqlx::query_scalar::<_, bool>("SELECT EXISTS(SELECT 1 FROM workflow_wait_events WHERE company_id=$1 AND run_id=$2 AND event_name=$3 AND correlation=$4 AND consumed_execution_id IS NULL AND created_at<=$5)")
+            .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(&wait.event_name)
+            .bind(&wait.correlation).bind(wait.deadline).fetch_one(&mut *db).await?
+        };
+    if run.state != "waiting" || (event_due && !answered_in_time) {
         return expire(db, scope, &run.state).await;
     }
     if wait.reason == "child_run" {
@@ -93,8 +102,10 @@ pub(super) async fn resume_on(
     } else {
         // Run-scoped: the oldest unconsumed event with this name and correlation, whenever it
         // arrived (05-D2 §11). Decision waits have no name, so they never match.
-        let event:Option<ReceivedEvent>=sqlx::query_as("SELECT id,payload FROM workflow_wait_events WHERE company_id=$1 AND run_id=$2 AND event_name=$3 AND correlation=$4 AND consumed_execution_id IS NULL ORDER BY created_at,id LIMIT 1 FOR UPDATE")
-            .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(&wait.event_name).bind(&wait.correlation).fetch_optional(&mut *db).await?;
+        // Past the deadline only an event recorded in time may complete it (checked above).
+        let recorded_by = event_due.then_some(wait.deadline);
+        let event:Option<ReceivedEvent>=sqlx::query_as("SELECT id,payload FROM workflow_wait_events WHERE company_id=$1 AND run_id=$2 AND event_name=$3 AND correlation=$4 AND consumed_execution_id IS NULL AND ($5::timestamptz IS NULL OR created_at<=$5) ORDER BY created_at,id LIMIT 1 FOR UPDATE")
+            .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(&wait.event_name).bind(&wait.correlation).bind(recorded_by).fetch_optional(&mut *db).await?;
         let Some(event) = event else {
             return Ok(WaitProgress::Pending);
         };

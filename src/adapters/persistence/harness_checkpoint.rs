@@ -24,8 +24,6 @@ pub(super) fn state_name(state: &RunState) -> &'static str {
         RunState::Active => "active",
         RunState::InvalidOutput => "invalid_output",
         RunState::BudgetExceeded => "budget_exceeded",
-        RunState::Waiting => "waiting",
         RunState::Completed => "completed",
-        RunState::Superseded => "superseded",
     }
 }

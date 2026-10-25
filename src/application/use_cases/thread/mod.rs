@@ -1,8 +1,8 @@
 //! Thread use cases: everything that happens to a message between arriving at the platform and
-//! the agent's reply going back out.
+//! being filed in its threads, and the messages people write back.
 //!
-//! This module owns the types and the [`ThreadUseCases`] handle; the two pipelines live next to
-//! it in [`ingest`] and [`dispatch`], with their shared helpers in [`support`].
+//! This module owns the types and the [`ThreadUseCases`] handle; the ingest pipeline lives next to
+//! it in [`ingest`], with its shared helpers in [`support`].
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -11,7 +11,6 @@ use async_trait::async_trait;
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
-use crate::services::harness::HarnessRegistry;
 use crate::{
     app_error::{AppError, AppResult},
     domain::monitoring::MonitoringService,
@@ -20,18 +19,11 @@ use crate::{
         company::Company,
         correlation::CorrelationId,
         cursor::{MessageCursor, ThreadCursor},
-        delegation::{DelegationCommand, DelegationCommandResult, DelegationOperation},
         email_message::EmailMessageMetadata,
-        internal_note::{
-            AddInternalNote, AskOwnerOutcome, AskOwnerToAct, InternalNoteView, StartAgentTask,
-            TombstoneInternalNote,
-        },
+        internal_note::{AddInternalNote, InternalNoteView, TombstoneInternalNote},
         message::{CanonicalMessageId, Message, MessageRole, ThreadEntryKind},
         message_view::{
             AgentHistoryMessage, EmailReplyContext, MessageAuditView, ThreadMessageView,
-        },
-        task::{
-            BackgroundTask, TaskOwnershipCommand, TaskOwnershipEvent, ThreadWorkSummary, TokenUsage,
         },
         thread::Thread,
         transport::{
@@ -41,37 +33,26 @@ use crate::{
         value_objects::{ChannelSlug, CompanySlug, EmailAddress, MessageId, ThreadIndex},
     },
     infra::config::AppConfig,
-    services::memory_coordinator::MemoryCoordinator,
-    task_queue::{
-        DelegationCommandRequest, OutreachTargetIdentity, OutreachTargetRequest, TaskPersistence,
-    },
     transport::{
         AddressedIdentity, AddressedRecipient, AddressedTarget, BoundedVec, CanonicalContent,
-        ComposedDelivery, DeliveryComposer, DeliveryContext, DeliveryCreation, DeliveryPurpose,
-        DeliveryRequest, EmailDeliveryContext, EmailThreading, ExternalCorrelationStore,
-        InboundDraft, InboundEnvelope, InboundMessageCommitter, InboundRouting, IngressDirectives,
-        IngressPolicyFacts, InternalMailRelay, InternalRelayMail, MessageDisposition, NewDelivery,
-        ProtocolExtension, RelayDisposition, StandaloneDeliveryEnqueuer, StandaloneDeliveryRequest,
+        DeliveryComposer, ExternalCorrelationStore, InboundDraft, InboundEnvelope,
+        InboundMessageCommitter, InboundRouting, IngressDirectives, IngressPolicyFacts,
+        InternalMailRelay, InternalRelayMail, MessageDisposition, ProtocolExtension,
+        RelayDisposition, StandaloneDeliveryEnqueuer, StandaloneDeliveryRequest,
         ports::TransportRenderers,
     },
     use_cases::{
-        agent::AgentPersistence, approval::ApprovalUseCases, channel::ChannelPersistence,
-        company::CompanyPersistence, integration::ChannelBindingPersistence,
-        participant::ParticipantPersistence,
+        channel::ChannelPersistence, company::CompanyPersistence,
+        integration::ChannelBindingPersistence, participant::ParticipantPersistence,
     },
 };
 
-mod dispatch;
-pub use dispatch::{AgentReply, DispatchOutcome};
-mod human_completion;
-pub use human_completion::{HumanCompletionDraft, ResponseReviewEditDraft};
 mod ingest;
 pub use ingest::{
     CanonicalMessageIngress, InboundMessage, InboundPreflight, IngestRejection, IngressOrigin,
     PreparedInbound, UnusableHint,
 };
 mod message_write;
-mod reload;
 pub use message_write::{
     AgentAuthor, MessageAuthorWrite, MessageCorrelation, MessageParticipantWrite, MessageWrite,
 };
@@ -120,31 +101,7 @@ pub mod test_support;
 #[cfg(test)]
 mod tests;
 
-#[cfg(test)]
-#[path = "inter_channel_tests.rs"]
-mod inter_channel_tests;
-
-#[cfg(test)]
-#[path = "external_reply_tests.rs"]
-mod external_reply_tests;
-
 pub const MAX_THREAD_MESSAGES_PER_HOUR: usize = 60;
-
-/// Apply the product footer shared by agent replies before they become canonical content.
-pub fn agent_response_body(response: &str) -> String {
-    format!("{response}\n\nDone by openbots.net")
-}
-
-/// One channel an already-queued agent run drives.
-///
-/// Written by the commit that created the task and read back when the run starts, so the worker
-/// walks the channels the ingest actually authorized rather than a list re-derived from a payload.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct TaskChannelTarget {
-    pub channel_id: Uuid,
-    pub thread_id: Uuid,
-    pub recipient_role: RecipientRole,
-}
 
 pub fn qualified_email_identity(address: impl Into<String>) -> AppResult<QualifiedIdentity> {
     let subject = IdentitySubject::parse(address.into().trim().to_ascii_lowercase())
@@ -191,19 +148,6 @@ pub trait ThreadPersistence: Send + Sync {
         subject: &str,
         participant_emails: &[EmailAddress],
     ) -> AppResult<Thread>;
-
-    /// Creates the thread for a durable schedule run and records that identity atomically.
-    /// Test doubles may use the ordinary creation path; PostgreSQL provides the crash-safe form.
-    async fn ensure_schedule_run_thread(
-        &self,
-        _run_id: Uuid,
-        channel_id: Uuid,
-        subject: &str,
-        participant_emails: &[EmailAddress],
-    ) -> AppResult<Thread> {
-        self.create_thread(channel_id, subject, participant_emails)
-            .await
-    }
 
     async fn get_thread_by_id(&self, id: Uuid) -> AppResult<Option<Thread>>;
 
@@ -283,22 +227,6 @@ pub trait ThreadPersistence: Send + Sync {
     /// stored. A redelivery whose content changed is refused rather than allowed to rewrite a
     /// message agents have already read -- see `ExternalMessageCollision`.
     async fn create_message(&self, write: &MessageWrite) -> AppResult<Message>;
-
-    /// Store one canonical message together with every delivery it is owed.
-    ///
-    /// One transaction, because a message visible in a thread but never queued for delivery -- or
-    /// queued but invisible -- is worse than neither. This is the shape for producers with no task
-    /// row to fence on: a schedule's answer, a stop notice, a direct ingest's reply. Work driven
-    /// by a task commits through `TaskPersistence::commit_agent_dispatch` instead, which fences
-    /// the same pair on the run's lease.
-    ///
-    /// Not defaulted: a double that stored the message and quietly dropped the deliveries would
-    /// let a test assert the reply exists while nothing would ever send it.
-    async fn create_message_with_deliveries(
-        &self,
-        write: &MessageWrite,
-        deliveries: &[NewDelivery],
-    ) -> AppResult<(Message, Vec<DeliveryCreation>)>;
 
     /// The newest outbound message this thread gained *after* the message named here, if any.
     ///
@@ -400,21 +328,10 @@ pub trait ThreadPersistence: Send + Sync {
 
 #[derive(Clone)]
 pub struct ThreadUseCases {
-    response_validator:
-        Option<Arc<dyn crate::services::response_contract::ResponseContractValidator>>,
-    harness_run_store: Option<Arc<dyn crate::services::harness::runs::HarnessRunStore>>,
     thread_persistence: Arc<dyn ThreadPersistence>,
     channel_persistence: Arc<dyn ChannelPersistence>,
     company_persistence: Arc<dyn CompanyPersistence>,
     participant_persistence: Arc<dyn ParticipantPersistence>,
-    task_persistence: Arc<dyn TaskPersistence>,
-    /// Whether a channel answers an outside reply itself or waits for the team.
-    ///
-    /// Required rather than optional, for the reason `deliveries` below is: a deployment that
-    /// forgot to wire it would answer every held customer immediately, which is the one failure
-    /// this feature exists to prevent.
-    thread_handoff_policy:
-        Arc<dyn crate::application::thread_handoff::ThreadHandoffPolicyPersistence>,
     committer: Arc<dyn InboundMessageCommitter>,
     correlation_store: Arc<dyn ExternalCorrelationStore>,
     binding_persistence: Arc<dyn ChannelBindingPersistence>,
@@ -423,24 +340,15 @@ pub struct ThreadUseCases {
     /// transaction that records it. Required rather than optional: a deployment that forgot to
     /// wire it would answer every customer in the thread and mail nobody.
     deliveries: DeliveryComposer,
-    agent_persistence: Option<Arc<dyn AgentPersistence>>,
-    agent_capability_reader: Option<Arc<dyn crate::use_cases::skill::AgentCapabilityReader>>,
-    approval_use_cases: Option<Arc<ApprovalUseCases>>,
     monitoring: Option<Arc<dyn MonitoringService>>,
-    memory: Option<Arc<MemoryCoordinator>>,
-    /// Which runtimes this deployment can execute an agent on.
-    ///
-    /// Optional in the same way `approval_use_cases` is -- most of this module runs without
-    /// touching an agent at all. A dispatch that reaches an agent without it fails the run rather
-    /// than choosing a harness for itself.
-    harnesses: Option<Arc<HarnessRegistry>>,
+    /// Woken after a commit wrote workflow-admission intents (p08 D1.4); the worker also polls.
+    intent_wakeups: Option<Arc<tokio::sync::Notify>>,
     config: Arc<AppConfig>,
-    agent_run_timeout: std::time::Duration,
 }
 
 /// The stores one [`ThreadUseCases`] reads and writes.
 ///
-/// A named struct rather than five positional `Arc<dyn ...>` parameters: they are all the same
+/// A named struct rather than four positional `Arc<dyn ...>` parameters: they are all the same
 /// shape at the call site, so a transposed pair compiles and then reads companies out of the
 /// channel store. `src/adapters/persistence/AGENTS.md` names this exact fix.
 #[derive(Clone)]
@@ -449,9 +357,6 @@ pub struct ThreadStores {
     pub channels: Arc<dyn ChannelPersistence>,
     pub companies: Arc<dyn CompanyPersistence>,
     pub participants: Arc<dyn ParticipantPersistence>,
-    pub tasks: Arc<dyn TaskPersistence>,
-    /// The effective reply-handling policy of a channel, resolved live at ingest.
-    pub handoff_policy: Arc<dyn crate::application::thread_handoff::ThreadHandoffPolicyPersistence>,
 }
 
 impl ThreadUseCases {
@@ -464,122 +369,28 @@ impl ThreadUseCases {
         let deliveries = DeliveryComposer::new(renderers, ingest.bindings.clone());
 
         Self {
-            response_validator: None,
-            harness_run_store: None,
             thread_persistence: stores.threads,
             channel_persistence: stores.channels,
             company_persistence: stores.companies,
             participant_persistence: stores.participants,
-            task_persistence: stores.tasks,
-            thread_handoff_policy: stores.handoff_policy,
             committer: ingest.committer,
             correlation_store: ingest.correlation,
             standalone_deliveries: ingest.standalone_deliveries,
             binding_persistence: ingest.bindings,
             deliveries,
-            agent_persistence: None,
-            agent_capability_reader: None,
-            approval_use_cases: None,
             monitoring: None,
-            memory: None,
-            harnesses: None,
+            intent_wakeups: None,
             config,
-            agent_run_timeout: std::time::Duration::from_secs(300),
         }
     }
 
-    pub(crate) async fn preferred_email_for_principal(
-        &self,
-        company_id: Uuid,
-        principal_id: crate::entities::transport::PrincipalId,
-    ) -> AppResult<Option<EmailAddress>> {
-        let identities = self
-            .participant_persistence
-            .identities_for_principals(company_id, &[principal_id], TransportKind::Email)
-            .await?;
-        Ok(identities
-            .into_iter()
-            .next()
-            .map(|identity| EmailAddress::from(identity.subject.into_string())))
-    }
-
-    /// The caller first authorizes access to the task; the store independently scopes its read.
-    pub async fn harness_run_diagnostics(
-        &self,
-        company_id: Uuid,
-        task_id: Uuid,
-    ) -> AppResult<Option<crate::services::harness::runs::RunDiagnostics>> {
-        self.harness_run_store
-            .as_ref()
-            .ok_or_else(|| AppError::Internal("Harness run storage unavailable".into()))?
-            .diagnostics(company_id, task_id)
-            .await
-    }
-
-    pub fn with_response_validator(
-        mut self,
-        validator: Arc<dyn crate::services::response_contract::ResponseContractValidator>,
-    ) -> Self {
-        self.response_validator = Some(validator);
+    pub fn with_intent_wakeups(mut self, wakeups: Arc<tokio::sync::Notify>) -> Self {
+        self.intent_wakeups = Some(wakeups);
         self
-    }
-
-    pub fn with_harness_run_store(
-        mut self,
-        store: Arc<dyn crate::services::harness::runs::HarnessRunStore>,
-    ) -> Self {
-        self.harness_run_store = Some(store);
-        self
-    }
-
-    pub fn with_agent_run_timeout(mut self, timeout: std::time::Duration) -> Self {
-        assert!(!timeout.is_zero(), "agent run timeout must be positive");
-        self.agent_run_timeout = timeout;
-        self
-    }
-
-    pub fn with_agent_persistence(mut self, agent_persistence: Arc<dyn AgentPersistence>) -> Self {
-        self.agent_persistence = Some(agent_persistence);
-        self
-    }
-
-    pub fn with_agent_capability_reader(
-        mut self,
-        reader: Arc<dyn crate::use_cases::skill::AgentCapabilityReader>,
-    ) -> Self {
-        self.agent_capability_reader = Some(reader);
-        self
-    }
-
-    /// Wire the harnesses an agent may run on, a deployment fact settled at boot.
-    pub fn with_harnesses(mut self, harnesses: Arc<HarnessRegistry>) -> Self {
-        self.harnesses = Some(harnesses);
-        self
-    }
-
-    /// What an [`AgentRunner`] is given to execute with, when this deployment wired any.
-    ///
-    /// [`AgentRunner`]: crate::services::agent_runner::AgentRunner
-    pub(crate) fn agent_harnesses(&self) -> Option<Arc<HarnessRegistry>> {
-        self.harnesses.clone()
-    }
-
-    pub fn with_approval_use_cases(mut self, approval_use_cases: Arc<ApprovalUseCases>) -> Self {
-        self.approval_use_cases = Some(approval_use_cases);
-        self
-    }
-
-    pub fn get_approval_use_cases(&self) -> Option<Arc<ApprovalUseCases>> {
-        self.approval_use_cases.clone()
     }
 
     pub fn with_monitoring(mut self, monitoring: Arc<dyn MonitoringService>) -> Self {
         self.monitoring = Some(monitoring);
-        self
-    }
-
-    pub fn with_memory(mut self, memory: Arc<MemoryCoordinator>) -> Self {
-        self.memory = Some(memory);
         self
     }
 
@@ -599,20 +410,8 @@ impl ThreadUseCases {
         &self.thread_persistence
     }
 
-    pub fn task_persistence(&self) -> &Arc<dyn TaskPersistence> {
-        &self.task_persistence
-    }
-
-    pub fn agent_persistence(&self) -> Option<&Arc<dyn AgentPersistence>> {
-        self.agent_persistence.as_ref()
-    }
-
     pub fn config(&self) -> &Arc<AppConfig> {
         &self.config
-    }
-
-    pub fn memory_coordinator(&self) -> Option<&Arc<MemoryCoordinator>> {
-        self.memory.as_ref()
     }
 
     async fn resolve_internal_destination(
@@ -654,12 +453,6 @@ impl ThreadUseCases {
         if !target.enabled {
             return Err(AppError::Internal(format!(
                 "Target channel '{}' is disabled",
-                target.slug
-            )));
-        }
-        if target.agent_ids.as_ref().is_none_or(Vec::is_empty) {
-            return Err(AppError::Internal(format!(
-                "Target channel '{}' has no configured agent",
                 target.slug
             )));
         }
@@ -913,11 +706,6 @@ impl ThreadUseCases {
         self.thread_persistence
             .list_thread_message_views(thread_id)
             .await
-    }
-
-    /// The thread so far, as an agent prompt reads it.
-    pub async fn get_agent_history(&self, thread_id: Uuid) -> AppResult<Vec<AgentHistoryMessage>> {
-        self.thread_persistence.list_agent_history(thread_id).await
     }
 
     /// What the mail renderer needs to answer this thread's newest turn.
@@ -1183,6 +971,17 @@ impl ThreadUseCases {
             .await
     }
 
+    /// One exact message after the caller authorizes the containing thread.
+    pub async fn get_thread_message_view(
+        &self,
+        thread_id: Uuid,
+        message_id: CanonicalMessageId,
+    ) -> AppResult<Option<ThreadMessageView>> {
+        self.thread_persistence
+            .get_thread_message_view(thread_id, message_id)
+            .await
+    }
+
     /// The messages a live reader is missing, oldest first.
     ///
     /// Driving the message stream off a cursor rather than off the notification payload means one
@@ -1207,42 +1006,6 @@ impl ThreadUseCases {
         self.thread_persistence
             .find_outbound_reply_after(thread_id, answering)
             .await
-    }
-
-    /// Store one message together with every delivery it is owed, in one transaction.
-    ///
-    /// The shape for a producer with no task lease to fence on. A caller that wrote the two
-    /// separately would leave a thread showing an answer nobody will be sent, or a delivery
-    /// pointing at a message that is not there.
-    pub async fn save_message_with_deliveries(
-        &self,
-        message: &MessageWrite,
-        deliveries: &[NewDelivery],
-    ) -> AppResult<Message> {
-        let (stored, created) = self
-            .thread_persistence
-            .create_message_with_deliveries(message, deliveries)
-            .await?;
-        for delivery in created {
-            if !delivery.was_created() {
-                tracing::info!(
-                    delivery_id = %delivery.delivery_id(),
-                    "An equivalent delivery was already queued; not queueing it again"
-                );
-            }
-        }
-        Ok(stored)
-    }
-
-    /// Resolve an interface and freeze what a delivery will be sent as, without writing anything.
-    ///
-    /// The caller commits the result inside whichever transaction creates the state the delivery
-    /// answers for.
-    pub async fn compose_delivery(
-        &self,
-        request: DeliveryRequest<'_>,
-    ) -> AppResult<ComposedDelivery> {
-        self.deliveries.compose(request).await
     }
 
     pub async fn save_message(&self, message: &MessageWrite) -> AppResult<Message> {
@@ -1308,73 +1071,6 @@ impl ThreadUseCases {
             .await
     }
 
-    pub async fn ask_owner_to_act(
-        &self,
-        command: AskOwnerToAct,
-        actor: crate::entities::participant::PrincipalAccessContext,
-    ) -> AppResult<AskOwnerOutcome> {
-        command.validate().map_err(AppError::BadRequest)?;
-        let principal_id = actor
-            .principal_id
-            .ok_or_else(|| AppError::NotFound("Thread not found.".into()))?;
-        let channel = self
-            .channel_persistence
-            .get_by_id(command.channel_id)
-            .await?
-            .filter(|channel| channel.company_id == command.company_id)
-            .ok_or_else(|| AppError::NotFound("Thread not found.".into()))?;
-        if !channel.viewer_access(actor) {
-            return Err(AppError::NotFound("Thread not found.".into()));
-        }
-        self.thread_persistence
-            .get_thread_by_id(command.thread_id)
-            .await?
-            .filter(|thread| thread.channel_id == command.channel_id)
-            .ok_or_else(|| AppError::NotFound("Thread not found.".into()))?;
-        let task = self
-            .task_persistence
-            .get_task_by_id(command.task_id)
-            .await?
-            .filter(|task| {
-                task.company_id == command.company_id
-                    && task.channel_id == command.channel_id
-                    && task.thread_id == Some(command.thread_id)
-            })
-            .ok_or_else(|| AppError::NotFound("Active task not found.".into()))?;
-        debug_assert_eq!(task.id, command.task_id);
-        self.task_persistence
-            .ask_owner_to_act(&command, principal_id)
-            .await
-    }
-
-    pub async fn start_agent_task(
-        &self,
-        command: StartAgentTask,
-        actor: crate::entities::participant::PrincipalAccessContext,
-    ) -> AppResult<BackgroundTask> {
-        command.validate().map_err(AppError::BadRequest)?;
-        let principal_id = actor
-            .principal_id
-            .ok_or_else(|| AppError::NotFound("Thread not found.".into()))?;
-        let channel = self
-            .channel_persistence
-            .get_by_id(command.channel_id)
-            .await?
-            .filter(|channel| channel.company_id == command.company_id)
-            .ok_or_else(|| AppError::NotFound("Thread not found.".into()))?;
-        if !channel.viewer_access(actor) {
-            return Err(AppError::NotFound("Thread not found.".into()));
-        }
-        self.thread_persistence
-            .get_thread_by_id(command.thread_id)
-            .await?
-            .filter(|thread| thread.channel_id == command.channel_id)
-            .ok_or_else(|| AppError::NotFound("Thread not found.".into()))?;
-        self.task_persistence
-            .start_agent_task(&command, principal_id)
-            .await
-    }
-
     /// Attach a message that is already stored to another of its company's threads.
     pub async fn associate_message(
         &self,
@@ -1387,145 +1083,6 @@ impl ThreadUseCases {
             .await
     }
 
-    pub async fn hydrate_ingest_configuration(
-        &self,
-        ingest: &mut InboundIngestResult,
-    ) -> AppResult<()> {
-        if let Some(company) = ingest.company.as_mut() {
-            *company = self
-                .company_persistence
-                .get_by_id(company.id)
-                .await?
-                .ok_or_else(|| {
-                    crate::app_error::AppError::Internal("Task company no longer exists".into())
-                })?;
-        }
-        if let Some(channel) = ingest.channel.as_mut() {
-            let current = self
-                .channel_persistence
-                .get_by_id(channel.id)
-                .await?
-                .ok_or_else(|| {
-                    crate::app_error::AppError::Internal("Task channel no longer exists".into())
-                })?;
-            if ingest
-                .company
-                .as_ref()
-                .is_some_and(|company| company.id != current.company_id)
-            {
-                return Err(crate::app_error::AppError::Internal(
-                    "Task channel does not belong to its company".into(),
-                ));
-            }
-            *channel = current;
-        }
-        for channel_match in &mut ingest.channel_matches {
-            let company = self
-                .company_persistence
-                .get_by_id(channel_match.company.id)
-                .await?
-                .ok_or_else(|| {
-                    crate::app_error::AppError::Internal(
-                        "Task target company no longer exists".into(),
-                    )
-                })?;
-            let channel = self
-                .channel_persistence
-                .get_by_id(channel_match.channel.id)
-                .await?
-                .ok_or_else(|| {
-                    crate::app_error::AppError::Internal(
-                        "Task target channel no longer exists".into(),
-                    )
-                })?;
-            if channel.company_id != company.id {
-                return Err(crate::app_error::AppError::Internal(
-                    "Task target channel does not belong to its company".into(),
-                ));
-            }
-            let thread = self
-                .thread_persistence
-                .get_thread_by_id(channel_match.thread.id)
-                .await?
-                .ok_or_else(|| {
-                    crate::app_error::AppError::Internal(
-                        "Task target thread no longer exists".into(),
-                    )
-                })?;
-            if thread.channel_id != channel.id {
-                return Err(crate::app_error::AppError::Internal(
-                    "Task target thread does not belong to its channel".into(),
-                ));
-            }
-            channel_match.company = company;
-            channel_match.channel = channel;
-            channel_match.thread = thread;
-        }
-        Ok(())
-    }
-
-    pub async fn list_company_tasks(
-        &self,
-        company_id: Uuid,
-        channel_id: Option<Uuid>,
-        status: Option<crate::entities::task::TaskStatus>,
-        sort_asc: bool,
-    ) -> AppResult<Vec<crate::entities::task::BackgroundTask>> {
-        self.task_persistence
-            .list_company_tasks(company_id, channel_id, status, sort_asc)
-            .await
-    }
-
-    pub async fn list_company_tasks_page(
-        &self,
-        company_id: Uuid,
-        channel_id: Option<Uuid>,
-        status: Option<crate::entities::task::TaskStatus>,
-        sort_asc: bool,
-        offset: i64,
-        limit: i64,
-    ) -> AppResult<Vec<crate::entities::task::BackgroundTask>> {
-        self.task_persistence
-            .list_company_tasks_page(company_id, channel_id, status, sort_asc, offset, limit)
-            .await
-    }
-
-    pub async fn list_company_tasks_filtered_page(
-        &self,
-        company_id: Uuid,
-        filter: &crate::entities::task::TaskFilter,
-        visible_channel_ids: &[Uuid],
-        offset: i64,
-        limit: i64,
-    ) -> AppResult<Vec<crate::entities::task::BackgroundTask>> {
-        self.task_persistence
-            .list_company_tasks_filtered_page(
-                company_id,
-                filter,
-                visible_channel_ids,
-                offset,
-                limit,
-            )
-            .await
-    }
-
-    pub async fn get_task_persistence(&self) -> Arc<dyn TaskPersistence> {
-        self.task_persistence.clone()
-    }
-
-    /// What each of these threads is currently doing, for the mailbox's activity indicators.
-    ///
-    /// Threads with nothing in flight are absent from the map rather than present-and-idle, so a
-    /// caller renders "no badge" by finding nothing.
-    pub async fn thread_work_summary(
-        &self,
-        thread_ids: &[Uuid],
-    ) -> AppResult<HashMap<Uuid, ThreadWorkSummary>> {
-        self.task_persistence
-            .list_thread_work_summary(thread_ids)
-            .await
-    }
-
     pub async fn principal_access_for_user(
         &self,
         company_id: Uuid,
@@ -1535,244 +1092,6 @@ impl ThreadUseCases {
             .access_context_for_user(company_id, user_id)
             .await
     }
-
-    pub async fn change_task_ownership(
-        &self,
-        command: TaskOwnershipCommand,
-    ) -> AppResult<TaskOwnershipEvent> {
-        self.task_persistence.change_task_ownership(command).await
-    }
-
-    /// Execute a recovery command, composing a replacement request first when the operation is one
-    /// of the two reassignments. Persistence still commits the old target, new question and new
-    /// delivery atomically.
-    ///
-    /// The two arms differ only in resolving *where* the replacement goes — an internal channel's
-    /// inbound address, or the address a person principal actually holds. Both then go through the
-    /// one composer, so a redirected question is the same shape of question as the original.
-    pub async fn execute_delegation_command(
-        &self,
-        company: &Company,
-        task: &BackgroundTask,
-        command: DelegationCommand,
-    ) -> AppResult<DelegationCommandResult> {
-        let replacement = match command.operation {
-            DelegationOperation::ReassignInternalTarget {
-                outreach_id,
-                target_id,
-                new_channel_id,
-            } => {
-                let destination = self
-                    .internal_replacement_destination(company, task, new_channel_id, &command)
-                    .await?;
-                Some(
-                    self.compose_replacement_target(
-                        company,
-                        task,
-                        outreach_id,
-                        target_id,
-                        destination,
-                    )
-                    .await?,
-                )
-            }
-            DelegationOperation::ReassignPersonTarget {
-                outreach_id,
-                target_id,
-                new_principal_id,
-            } => {
-                let destination = self
-                    .person_replacement_destination(company, task, new_principal_id, &command)
-                    .await?;
-                Some(
-                    self.compose_replacement_target(
-                        company,
-                        task,
-                        outreach_id,
-                        target_id,
-                        destination,
-                    )
-                    .await?,
-                )
-            }
-            _ => None,
-        };
-        self.task_persistence
-            .execute_delegation_command(DelegationCommandRequest {
-                command,
-                replacement,
-            })
-            .await
-    }
-
-    /// Where the replacement question goes, once the command's own name for it is an address.
-    async fn internal_replacement_destination(
-        &self,
-        company: &Company,
-        task: &BackgroundTask,
-        new_channel_id: Uuid,
-        command: &DelegationCommand,
-    ) -> AppResult<ReplacementDestination> {
-        let target = self
-            .channel_persistence
-            .get_by_id(new_channel_id)
-            .await?
-            .filter(|channel| channel.company_id == company.id && channel.enabled)
-            .ok_or_else(|| AppError::BadRequest("Choose an enabled internal channel.".into()))?;
-        Ok(ReplacementDestination {
-            recipient: target.inbound_address(&company.slug, &self.config.app_domain_name),
-            identity: OutreachTargetIdentity::InternalChannel {
-                channel_id: new_channel_id,
-            },
-            source_key: format!("task:{}:reassign:{}", task.id, command.command_id),
-        })
-    }
-
-    /// The address a redirected ask is re-asked at: one the new owner's principal actually holds.
-    ///
-    /// Built from the `participant_identities` row rather than from a formatted address, because
-    /// the adapter proves the replacement against that same row before it supersedes anything —
-    /// deriving the identity twice by two routes is how the two would one day disagree. A verified
-    /// claim wins over a merely observed one; a principal with no email identity at all is a
-    /// refusal, which is also what an agent principal produces.
-    async fn person_replacement_destination(
-        &self,
-        company: &Company,
-        task: &BackgroundTask,
-        new_principal_id: crate::entities::transport::PrincipalId,
-        command: &DelegationCommand,
-    ) -> AppResult<ReplacementDestination> {
-        let identities = self
-            .participant_persistence
-            .identities_for_principals(company.id, &[new_principal_id], TransportKind::Email)
-            .await?;
-        let held = identities
-            .iter()
-            .find(|identity| {
-                identity.status == crate::entities::participant::IdentityStatus::Verified
-            })
-            .or_else(|| identities.first())
-            .ok_or_else(|| {
-                AppError::BadRequest(
-                    "The chosen owner has no email address this question could be re-asked at."
-                        .into(),
-                )
-            })?;
-        Ok(ReplacementDestination {
-            recipient: EmailAddress::new(held.subject.as_str().to_string()),
-            identity: OutreachTargetIdentity::External {
-                identity: QualifiedIdentity::new(
-                    held.transport,
-                    held.namespace.clone(),
-                    held.subject.clone(),
-                ),
-            },
-            source_key: format!("task:{}:redirect:{}", task.id, command.command_id),
-        })
-    }
-
-    async fn compose_replacement_target(
-        &self,
-        company: &Company,
-        task: &BackgroundTask,
-        outreach_id: Uuid,
-        target_id: Uuid,
-        destination: ReplacementDestination,
-    ) -> AppResult<OutreachTargetRequest> {
-        let context = self
-            .task_persistence
-            .outreach_reassignment_context(company.id, task.id, outreach_id, target_id)
-            .await?
-            .ok_or_else(|| AppError::Conflict("This target can no longer be reassigned.".into()))?;
-        let source = self
-            .channel_persistence
-            .get_by_id(task.channel_id)
-            .await?
-            .filter(|channel| channel.company_id == company.id)
-            .ok_or_else(|| AppError::NotFound("Delegated work not found.".into()))?;
-        let ReplacementDestination {
-            recipient,
-            identity,
-            source_key,
-        } = destination;
-        let from = Channel::address_for(&source.slug, &company.slug, &self.config.app_domain_name);
-        let content = CanonicalContent::parse(&context.subject, &context.body)?;
-        let message_id = CanonicalMessageId::random();
-        let composed = self
-            .deliveries
-            .compose(DeliveryRequest {
-                company_id: company.id,
-                channel_id: source.id,
-                message_id,
-                task_id: Some(task.id),
-                correlation_id: context.correlation_id,
-                purpose: DeliveryPurpose::Outreach,
-                source_key,
-                content: &content,
-                context: DeliveryContext::Email(EmailDeliveryContext {
-                    from: from.clone(),
-                    from_name: Some(source.name.clone()),
-                    recipient_to: recipient.clone(),
-                    recipients_cc: Vec::new(),
-                    threading: EmailThreading::Standalone,
-                    relay: Some(crate::transport::EmailRelayTrace {
-                        source_channel_id: source.id,
-                        hop_count: 1,
-                        trace_channels: vec![source.id],
-                    }),
-                }),
-            })
-            .await?;
-        let mut message = MessageWrite {
-            id: message_id,
-            ..MessageWrite::internal(
-                context.thread_id,
-                MessageAuthorWrite::Platform,
-                context.subject,
-                context.body.clone(),
-                crate::entities::message::MessageDirection::Outbound,
-                MessageRole::Agent,
-                context.correlation_id,
-            )
-        }
-        .external_conversation()
-        .with_entry_kind(ThreadEntryKind::Delegation)
-        .with_participants(vec![
-            MessageParticipantWrite::new(
-                crate::entities::message::MessageParticipantKind::Sender,
-                qualified_email_identity(from.as_str())?,
-            ),
-            MessageParticipantWrite::new(
-                crate::entities::message::MessageParticipantKind::To,
-                qualified_email_identity(recipient.as_str())?,
-            ),
-        ]);
-        if let Some(provider_key) = composed.provider_key.as_ref() {
-            message = message.with_correlation(MessageCorrelation::Email(
-                EmailMessageMetadata::new(MessageId::from(provider_key.as_str().to_string()))
-                    .raw_bodies(Some(context.body), None),
-            ));
-        }
-        Ok(OutreachTargetRequest {
-            target: identity,
-            request: message,
-            delivery: composed.delivery,
-        })
-    }
-}
-
-/// Where one replacement outreach target points, and what makes its delivery key its own.
-///
-/// Named rather than three positional arguments: `recipient` and the address inside `identity`
-/// are both addresses, so a transposed pair would compose a question to one party and record it as
-/// asked of another — exactly what `outreach_target_columns` then refuses, one layer too late to
-/// be a good error.
-struct ReplacementDestination {
-    recipient: EmailAddress,
-    identity: OutreachTargetIdentity,
-    /// The task and the command that asked for this replacement, so a retried command re-derives
-    /// the key the first attempt used and mails the new owner once.
-    source_key: String,
 }
 
 use serde::{Deserialize, Serialize};
@@ -1802,45 +1121,6 @@ impl ChannelMatch {
         self.matched_slug
             .clone()
             .unwrap_or_else(|| self.channel.slug.clone())
-    }
-}
-
-fn scrub_json_secrets(value: Option<&mut serde_json::Value>) {
-    let Some(value) = value else {
-        return;
-    };
-    match value {
-        serde_json::Value::Object(map) => {
-            for (key, value) in map {
-                let normalized = key.to_ascii_lowercase();
-                if matches!(
-                    normalized.as_str(),
-                    "api_key"
-                        | "apikey"
-                        | "access_token"
-                        | "token"
-                        | "secret"
-                        | "secret_key"
-                        | "private_key"
-                        | "app_key"
-                        | "app_secret"
-                        | "auth"
-                        | "authorization"
-                        | "password"
-                        | "bearer"
-                ) {
-                    *value = serde_json::Value::Null;
-                } else {
-                    scrub_json_secrets(Some(value));
-                }
-            }
-        }
-        serde_json::Value::Array(values) => {
-            for value in values {
-                scrub_json_secrets(Some(value));
-            }
-        }
-        _ => {}
     }
 }
 
@@ -2025,12 +1305,9 @@ pub fn bounce_cause(bounce: &BounceInfo) -> &'static str {
 
 /// What one inbound message became.
 ///
-/// Deliberately **not** serializable. The pre-canonical shape was written straight into
-/// `background_tasks.payload`, which made every queued row a snapshot of the domain model: a field
-/// rename broke rows already in flight, stale configuration was replayed hours later, and raw
-/// provider content sat inside the task protocol. A durable task now carries
-/// [`InboundTaskPayloadV1`](crate::transport::InboundTaskPayloadV1) -- identifiers only -- and this
-/// is the in-process handoff to whatever runs the agent next.
+/// Deliberately **not** serializable: it holds resolved entities and provider-derived content, and
+/// is only the in-process result of one ingest. What outlives the request is the stored message and
+/// the admission intents the commit wrote, which carry identifiers only.
 #[derive(Debug, Clone)]
 pub struct InboundIngestResult {
     pub accepted: bool,
@@ -2045,8 +1322,8 @@ pub struct InboundIngestResult {
     /// Shared rather than cloned: the dispatch pipeline passes it through several frames, and the
     /// envelope holds the whole message body.
     pub envelope: Option<Arc<InboundEnvelope>>,
-    /// Tasks created or recognised by this ingest; reload enqueues nothing.
-    pub task_ids: Vec<Uuid>,
+    /// Admission intents created or recognised by this ingest, in association order (p08 D1.3).
+    pub intent_ids: Vec<Uuid>,
     /// Whether the agent's reply should actually leave the building. Real inbound mail always gets
     /// a real answer; a mailbox send can ask to stay in-app.
     pub reply_delivery: ReplyDelivery,
@@ -2082,31 +1359,6 @@ impl InboundIngestResult {
             .is_some_and(|envelope| envelope.directives.disposition.answers())
     }
 
-    /// The durable payload this ingest's task carries, for the audit record a run appends to it.
-    ///
-    /// Rebuilt rather than kept: the run holds resolved entities, and the payload holds the ids
-    /// they were loaded from, so one shape is derived from the other rather than the two being
-    /// maintained in parallel.
-    pub fn durable_task_payload(&self) -> serde_json::Value {
-        let Some((envelope, primary)) = self.envelope.as_deref().zip(self.channel_matches.first())
-        else {
-            return serde_json::Value::Null;
-        };
-        crate::transport::InboundTaskPayload::v1(crate::transport::InboundTaskPayloadV1 {
-            company_id: primary.company.id,
-            channel_id: primary.channel.id,
-            thread_id: primary.thread.id,
-            source_message_id: primary.inbound_message.canonical_id,
-            correlation_id: envelope.correlation_id,
-            hop_count: envelope.directives.hop_count,
-            trace_channels: envelope.directives.trace_channels.clone(),
-            is_forwarded: envelope.directives.is_forwarded,
-            reply_delivery: self.reply_delivery,
-        })
-        .encode()
-        .unwrap_or(serde_json::Value::Null)
-    }
-
     pub fn rejected(rejection: IngestRejection) -> Self {
         Self {
             accepted: false,
@@ -2116,7 +1368,7 @@ impl InboundIngestResult {
             company: None,
             channel: None,
             envelope: None,
-            task_ids: Vec::new(),
+            intent_ids: Vec::new(),
             reply_delivery: ReplyDelivery::Send,
             channel_matches: Vec::new(),
         }
@@ -2128,18 +1380,4 @@ pub enum SimulationMode {
     Verify,
     RunTest,
     Run,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AgentExecutionResult {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub response_contract: Option<crate::entities::response_contract::ResponseContract>,
-    /// The canonical reply this run produced, named by its own id rather than by the RFC header of
-    /// whichever mail happened to carry it.
-    pub reply_message_id: Option<CanonicalMessageId>,
-    pub agent_response: String,
-    pub email_sent: bool,
-    pub token_usage: Option<TokenUsage>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub metadata: Option<serde_json::Value>,
 }

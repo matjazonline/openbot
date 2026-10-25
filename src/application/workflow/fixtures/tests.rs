@@ -42,6 +42,7 @@ fn context<'a>(
         run: RunMetadata {
             run_id: RunId::new(Uuid::from_u128(91)),
             parent_run_id: None,
+            deadline: Some("2030-01-01T00:00:00Z".parse().unwrap()),
         },
     }
 }
@@ -52,6 +53,8 @@ fn prepare(
 ) -> PreparedInputs {
     let params = if bundle.compiled().source() == Fixture::AutonomousResponse.source() {
         json!({})
+    } else if bundle.compiled().source() == Fixture::ReviewedSupport.source() {
+        json!({"reviewer":"00000000-0000-0000-0000-0000000000b1"})
     } else {
         json!({"reviewer":"00000000-0000-0000-0000-0000000000b1","deadline":"2030-01-01T00:00:00Z"})
     };
@@ -77,6 +80,32 @@ fn workflow_fixtures_all_compile_and_freeze_with_real_child_content() {
             usize::from(fixture.child().is_some())
         );
         assert!(!bundle.content_hash().as_str().is_empty());
+    }
+}
+
+/// p08 D1.2: every shipped workflow started by a message (its input names the source message)
+/// accepts the standard message input, so binding it to a channel's messages is never refused
+/// for its own schema. Child rounds take their input from their parent instead.
+#[test]
+fn workflow_fixtures_taking_a_message_accept_the_standard_message_input() {
+    use crate::application::workflow::triggers::MessageTriggerInput;
+    let representative = MessageTriggerInput::representative();
+    for fixture in ALL {
+        let bundle = bundle(fixture);
+        let message_started = bundle
+            .compiled()
+            .graph()
+            .definition()
+            .input_schema
+            .as_ref()
+            .is_some_and(|schema| schema.pointer("/properties/source_message").is_some());
+        if !message_started {
+            continue;
+        }
+        assert!(
+            bundle.compiled().validate_input(&representative).is_ok(),
+            "{fixture:?} refuses the standard message input"
+        );
     }
 }
 

@@ -122,7 +122,7 @@ async fn workflow_completion_mixed_existing_id_refusal_before_and_after_commit()
 }
 
 #[tokio::test]
-async fn workflow_completion_unclaimed_pure_and_legacy_refuse() {
+async fn workflow_completion_unclaimed_pure_and_unknown_job_refuse() {
     for kind in ["context.history", "data.map"] {
         let source = serde_json::from_str(&registry::example(kind).unwrap().source).unwrap();
         let (f, scope) = fixture_source(source).await;
@@ -143,26 +143,12 @@ async fn workflow_completion_unclaimed_pure_and_legacy_refuse() {
         );
         assert_eq!(state(&f).await, before);
     }
+    // A claimed execution's fence, but naming a job the queue does not hold.
     let (f, claim) = claimed(chain()).await;
-    use crate::application::use_cases::channel::{ChannelPersistence, ChannelWrite};
-    let channel = ChannelPersistence::create(
-        f.persistence(),
-        claim.fence.scope.company.as_uuid(),
-        ChannelWrite {
-            name: "Legacy completion fixture".into(),
-            slug: "legacy-completion".into(),
-            ..Default::default()
-        },
-    )
-    .await
-    .unwrap();
-    let legacy = Uuid::new_v4();
-    sqlx::query("INSERT INTO background_tasks (id,company_id,channel_id,thread_id,correlation_id,task_type,payload) SELECT $2,company_id,$3,thread_id,correlation_id,'reply','{}' FROM background_tasks WHERE id=$1")
-        .bind(claim.fence.scope.job.0).bind(legacy).bind(channel.id).execute(f.persistence().pool()).await.unwrap();
     let before = state(&f).await;
     let fence = WorkflowFence {
         scope: ActivationRequest {
-            job: WorkflowJobId(legacy),
+            job: WorkflowJobId(Uuid::new_v4()),
             ..claim.fence.scope
         },
         ..claim.fence

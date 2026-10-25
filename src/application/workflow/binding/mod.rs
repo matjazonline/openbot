@@ -7,10 +7,11 @@ pub(crate) use resources::validate as validate_resource;
 pub use resources::{ResourceDirectory, ResourceReadiness, ResourceStatus};
 
 use super::publication::PublishedBundle;
-use super::{WorkflowActor, compiler};
+use super::triggers::MessageTriggerInput;
+use super::{RelatedAssociation, WorkflowActor, compiler};
 use crate::app_error::{AppError, AppResult};
 use crate::domain::workflow::{
-    BindingRevision, CompanyId, ResourceName, RuntimeResourceId, WorkflowBindingId,
+    BindingRevision, CompanyId, MessageTrigger, ResourceName, RuntimeResourceId, WorkflowBindingId,
 };
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -24,6 +25,10 @@ pub struct BindingConfiguration {
     pub company_id: CompanyId,
     pub params: Value,
     pub resources: BTreeMap<ResourceName, RuntimeResourceId>,
+    /// Whose authority automatic (message/schedule) runs of this revision act with (p08 D1.1).
+    pub run_as: WorkflowActor,
+    /// Which accepted messages admit a run; `None` admits none (p08 D1.2).
+    pub message_trigger: Option<MessageTrigger>,
 }
 
 /// Validated configuration. Replacing the selected revision cannot mutate this value
@@ -69,8 +74,46 @@ impl ConfiguredBinding {
     pub fn resources(&self) -> &BTreeMap<ResourceName, RuntimeResourceId> {
         &self.configuration.resources
     }
+    pub fn run_as(&self) -> WorkflowActor {
+        self.configuration.run_as
+    }
+    pub fn message_trigger(&self) -> Option<MessageTrigger> {
+        self.configuration.message_trigger
+    }
     pub fn bundle(&self) -> &Arc<PublishedBundle> {
         &self.bundle
+    }
+
+    /// A message trigger needs a channel or thread association, and the pinned input schema
+    /// must accept the standard message input, so a bad pairing fails at configuration rather
+    /// than refusing every message (p08 D1.2).
+    pub fn check_message_trigger(
+        &self,
+        association: RelatedAssociation,
+    ) -> Result<(), compiler::Diagnostic> {
+        if self.configuration.message_trigger.is_none() {
+            return Ok(());
+        }
+        if matches!(association, RelatedAssociation::Company) {
+            return Err(configuration_error(
+                &self.bundle,
+                "binding.message_trigger",
+                "/message_trigger",
+                "A message trigger needs a channel or thread association",
+            ));
+        }
+        self.bundle
+            .compiled()
+            .validate_input(&MessageTriggerInput::representative())
+            .map_err(|_| {
+                configuration_error(
+                    &self.bundle,
+                    "binding.message_trigger",
+                    "/input_schema",
+                    "The workflow input schema must accept the standard message input \
+                     (source_message, message, subject, sender)",
+                )
+            })
     }
 
     /// Recheck every selected resource against current trusted directory facts.

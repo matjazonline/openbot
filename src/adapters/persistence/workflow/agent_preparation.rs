@@ -7,6 +7,7 @@ use crate::application::workflow::{
     lease::ClaimedWorkflow,
     message::{MessageKind, is_trusted_message_snapshot},
     polling::WorkflowStepKind,
+    provisioning::is_trusted_provisioning_snapshot,
     registry::ModelStep,
 };
 use crate::entities::value_objects::ModelProvider;
@@ -139,6 +140,14 @@ async fn targets(
                     return Err(unsupported());
                 }
                 AgentToolTarget::Mcp { slot: slot.clone() }
+            }
+            ToolKind::Provisioning => {
+                if !is_trusted_provisioning_snapshot(tool)? {
+                    return Err(unsupported());
+                }
+                AgentToolTarget::Provisioning {
+                    name: tool.contract.name.clone(),
+                }
             }
             ToolKind::Http => AgentToolTarget::Http {
                 connection: registered_on(tx, company, tool).await?,

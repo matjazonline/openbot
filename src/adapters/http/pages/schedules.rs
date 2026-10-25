@@ -1,13 +1,10 @@
 use super::*;
 use crate::entities::{
-    agent::Agent,
     channel::Channel,
     company::Company,
-    schedule::{
-        ChannelSchedule, RunAsSelection, ScheduleDeliveryMode, ScheduleRun, ScheduleRunAsChoices,
-        ScheduleType,
-    },
+    schedule::{ChannelSchedule, OccurrenceStatus, ScheduleRun, ScheduleType},
 };
+use crate::use_cases::schedule::ScheduleBindingChoice;
 
 pub struct SchedulesPage<'a> {
     pub user: &'a MailboxUser<'a>,
@@ -15,8 +12,8 @@ pub struct SchedulesPage<'a> {
     pub company: &'a Company,
     pub schedules: &'a [ChannelSchedule],
     pub selected_schedule_id: Option<Uuid>,
-    /// The team, so a row can name whoever its schedule runs as.
-    pub run_as: &'a ScheduleRunAsChoices,
+    /// The bindings the listed schedules may name, so a row can name the workflow it runs.
+    pub bindings: &'a [ScheduleBindingChoice],
     pub runs_html: &'a str,
     pub pane_html: &'a str,
 }
@@ -26,26 +23,16 @@ pub struct ScheduleRunsColumnProps<'a> {
     pub schedule: &'a ChannelSchedule,
     pub channel: Option<&'a Channel>,
     pub runs: &'a [ScheduleRun],
-    pub selected_thread_id: Option<Uuid>,
     pub page: usize,
     pub has_next: bool,
-}
-
-pub struct ScheduleThreadPaneProps<'a> {
-    pub company_id: Uuid,
-    pub schedule: &'a ChannelSchedule,
-    pub channel: Option<&'a Channel>,
-    pub agent: Option<&'a Agent>,
-    pub thread_id: Uuid,
-    pub subject: &'a str,
-    pub messages: &'a [ThreadMessageView],
 }
 
 pub struct ScheduleFormPaneProps<'a> {
     pub company_id: Uuid,
     pub channels: &'a [Channel],
     pub schedule: Option<&'a ChannelSchedule>,
-    pub run_as: &'a ScheduleRunAsChoices,
+    /// The bindings the caller may name: the company's and those of the offered channels.
+    pub bindings: &'a [ScheduleBindingChoice],
     pub error: Option<&'a str>,
 }
 
@@ -55,7 +42,7 @@ pub fn schedules_page(page: &SchedulesPage<'_>) -> String {
         company.id,
         page.schedules,
         page.selected_schedule_id,
-        page.run_as,
+        page.bindings,
         FragmentSwap::Inline,
     );
 
@@ -72,7 +59,7 @@ pub fn schedules_page(page: &SchedulesPage<'_>) -> String {
         "##,
         header = sidebar_header_with_action(
             "Schedules",
-            "Cron triggers and automated agent runs.",
+            "Recurring and one-off workflow runs.",
             &format!(
                 r##"<button type="button" class="btn btn-primary btn-xs shrink-0"
                     hx-get="/ui/schedules/new?company_id={company_id}"
@@ -108,7 +95,7 @@ pub fn schedules_sidebar_list(
     company_id: Uuid,
     schedules: &[ChannelSchedule],
     selected_id: Option<Uuid>,
-    run_as: &ScheduleRunAsChoices,
+    bindings: &[ScheduleBindingChoice],
     swap: FragmentSwap,
 ) -> String {
     let entries: String = schedules
@@ -140,7 +127,7 @@ pub fn schedules_sidebar_list(
                         </div>
                         <div class="flex w-full items-center justify-between gap-1 text-[11px] opacity-70">
                             <span class="font-mono">{cadence}</span>
-                            {run_as_badge}
+                            {binding_badge}
                         </div>
                     </a>
                 </li>
@@ -151,7 +138,7 @@ pub fn schedules_sidebar_list(
                 name = escape_html_text(&schedule.name),
                 cadence = escape_html_text(&schedule.cadence_label()),
                 status_badge = status_badge,
-                run_as_badge = run_as_badge(schedule, run_as),
+                binding_badge = binding_badge(schedule, bindings),
             )
         })
         .collect();
@@ -205,16 +192,17 @@ fn truncate_chars(value: &str, limit: usize) -> String {
     format!("{kept}…")
 }
 
-/// The live owner stays mounted while SSE replaces its child column.
+/// The live owner stays mounted and polls for its child column every 15 seconds.
 ///
-/// Replacing the element that owns `sse-connect` opens a disconnect/reconnect window in which a
-/// task-completion notification can be lost. HTTP responses replace this whole region; live
-/// events replace only [`schedule_runs_column_fragment`].
+/// An occurrence's status changes in the schedule materializer and the workflow engine, which
+/// publish no mailbox events, so this region re-reads rather than waiting to be woken. HTTP
+/// responses replace this whole region; the poll replaces only
+/// [`schedule_runs_column_fragment`].
 pub fn schedule_runs_column(props: &ScheduleRunsColumnProps<'_>, swap: FragmentSwap) -> String {
     format!(
         r##"<div id="schedule-runs-live" class="contents"{oob}
-            hx-ext="sse" sse-connect="/ui/schedules/{schedule_id}/events?company_id={company_id}&page={page}"
-            sse-swap="schedule-runs" hx-target="#schedule-runs-column" hx-swap="outerHTML">{column}</div>"##,
+            hx-get="/ui/schedules/runs?company_id={company_id}&schedule_id={schedule_id}&page={page}"
+            hx-trigger="every 15s" hx-target="#schedule-runs-column" hx-swap="outerHTML">{column}</div>"##,
         oob = swap.oob_attribute(),
         schedule_id = props.schedule.id,
         company_id = props.company_id,
@@ -231,64 +219,13 @@ pub(crate) fn schedule_runs_column_fragment(props: &ScheduleRunsColumnProps<'_>)
     let toggle_label = if schedule.enabled { "Pause" } else { "Resume" };
     let toggle_val = if schedule.enabled { "false" } else { "true" };
 
-    let delivery_label = match schedule.delivery_mode {
-        ScheduleDeliveryMode::MailboxOnly => "Mailbox Only",
-        ScheduleDeliveryMode::EmailParticipants => "Email: Participants",
-        ScheduleDeliveryMode::EmailCustom => "Email: Custom",
-    };
-
     let rows: String = if props.runs.is_empty() {
         r#"<div class="p-8 text-center text-xs opacity-60">No execution runs yet. Click "Run Now" to trigger the first run.</div>"#.to_string()
     } else {
         props
             .runs
             .iter()
-            .map(|run| {
-                let active = if props.selected_thread_id == Some(run.thread_id) {
-                    "bg-base-300"
-                } else {
-                    ""
-                };
-
-                let now = Utc::now();
-                let activity = run.activity(now);
-                let badge = schedule_run_activity_badge(activity);
-
-                let snippet = run
-                    .latest_response
-                    .as_deref()
-                    .unwrap_or("Waiting for agent reply...");
-
-                format!(
-                    r##"
-                    <a class="thread-row block border-b border-base-300 px-4 py-3 hover:bg-base-200 transition-colors cursor-pointer {active}"
-                        hx-get="/ui/schedules/thread/{thread_id}?company_id={company_id}&schedule_id={schedule_id}"
-                        hx-target="#schedule-pane" hx-swap="outerHTML"
-                        hx-sync="#schedule-pane:replace"
-                        data-thread-id="{thread_id}"
-                        data-action="select-thread-row">
-                        <div class="flex items-center justify-between gap-1">
-                            <span class="text-xs font-semibold truncate text-base-content">{subject}</span>
-                            {badge}
-                        </div>
-                        <p class="mt-1 line-clamp-2 text-xs opacity-70">{snippet}</p>
-                        <div class="mt-2 flex items-center justify-between text-[11px] opacity-50 font-mono">
-                            <span>{time}</span>
-                            <span>{msg_count} msgs</span>
-                        </div>
-                    </a>
-                    "##,
-                    thread_id = run.thread_id,
-                    company_id = company_id,
-                    schedule_id = schedule.id,
-                    subject = escape_html_text(&run.subject),
-                    badge = badge,
-                    snippet = escape_html_text(snippet),
-                    time = super::format_date_time(run.created_at),
-                    msg_count = run.message_count,
-                    active = active,
-                )
-            })
+            .map(|run| occurrence_row(run, props.company_id))
             .collect()
     };
 
@@ -319,6 +256,7 @@ pub(crate) fn schedule_runs_column_fragment(props: &ScheduleRunsColumnProps<'_>)
                             hx-target="#schedule-runs-live" hx-swap="outerHTML" class="inline">
                             <input type="hidden" name="company_id" value="{company_id}">
                             <input type="hidden" name="page" value="{page}">
+                            <input type="hidden" name="command_key" value="{command_key}">
                             <button type="submit" class="btn btn-outline btn-xs" title="Run schedule immediately">
                                 Run Now
                             </button>
@@ -341,13 +279,12 @@ pub(crate) fn schedule_runs_column_fragment(props: &ScheduleRunsColumnProps<'_>)
                 </div>
                 <div class="flex items-center justify-between text-xs pt-1">
                     <span class="badge badge-sm badge-neutral">{cadence}</span>
-                    <span class="badge badge-sm badge-ghost opacity-70">{delivery}</span>
                 </div>
                 <p class="text-xs opacity-60">{next_run}</p>
                 {error_banner}
             </div>
 
-            <div id="schedule-runs-list" data-thread-list class="flex-1 overflow-y-auto">
+            <div id="schedule-runs-list" class="flex-1 overflow-y-auto">
                 {rows}
             </div>
 
@@ -367,7 +304,7 @@ pub(crate) fn schedule_runs_column_fragment(props: &ScheduleRunsColumnProps<'_>)
         channel_name = escape_html_text(channel_name),
         company_id = company_id,
         cadence = escape_html_text(&schedule.cadence_label()),
-        delivery = delivery_label,
+        command_key = Uuid::new_v4(),
         next_run = escape_html_text(&next_run_label(schedule)),
         error_banner = schedule_error_banner(schedule),
         rows = rows,
@@ -379,73 +316,50 @@ pub(crate) fn schedule_runs_column_fragment(props: &ScheduleRunsColumnProps<'_>)
     )
 }
 
-pub fn schedule_thread_pane(props: &ScheduleThreadPaneProps<'_>) -> String {
-    let bubbles: String = props
-        .messages
-        .iter()
-        .map(|msg| {
-            message_bubble_chat(
-                msg,
-                props.agent,
-                None,
-                MessageScope {
-                    company_id: props.company_id,
-                    channel_id: props.channel.map(|channel| channel.id).unwrap_or_default(),
-                },
-            )
-        })
-        .collect();
-
-    let channel_name = props.channel.map(|c| c.name.as_str()).unwrap_or("Channel");
-    let channel_id = props.channel.map(|channel| channel.id).unwrap_or_default();
-    // Reuse the mailbox's live thread stream. Starting after the newest rendered message closes
-    // the snapshot/subscribe race without replaying bubbles already present in this pane.
-    let after = props
-        .messages
-        .last()
-        .map(|message| format!("&after={}", message.cursor()))
-        .unwrap_or_default();
-
+/// One occurrence: when it was due, how it was started, and the run it admitted or why not.
+fn occurrence_row(run: &ScheduleRun, company_id: Uuid) -> String {
+    let (badge_class, status) = match run.status {
+        OccurrenceStatus::Pending => ("badge-ghost", "Pending"),
+        OccurrenceStatus::Materializing => ("badge-info", "Starting"),
+        OccurrenceStatus::Materialized => ("badge-success", "Started"),
+        OccurrenceStatus::Failed => ("badge-error", "Failed"),
+    };
+    let run_line = match (run.run_id, run.run_state.as_deref()) {
+        (Some(id), Some(state)) => format!(
+            r#"{chip} · {state}"#,
+            chip = run_chip(company_id, id, RunLinkAccess::Inspect),
+            state = escape_html_text(state),
+        ),
+        _ => String::new(),
+    };
+    let problem = match (run.refusal.as_deref(), run.last_error.as_deref()) {
+        (_, Some(error)) => format!(
+            r#"<p class="mt-1 line-clamp-2 text-xs text-error" title="{full}">{short}</p>"#,
+            full = escape_html_text(error),
+            short = escape_html_text(&truncate_chars(error, 120)),
+        ),
+        (Some(refusal), None) => format!(
+            r#"<p class="mt-1 text-xs text-error">Refused: {}</p>"#,
+            escape_html_text(refusal)
+        ),
+        (None, None) => String::new(),
+    };
     format!(
         r##"
-        <section id="schedule-pane"{PANE_SKELETON} class="flex flex-1 flex-col bg-base-100" data-thread-id="{thread_id}"
-            hx-ext="sse"
-            sse-connect="/ui/events?company_id={company_id}&channel_id={channel_id}&thread_id={thread_id}{after}">
-            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-base-300 px-4 py-4 sm:px-6">
-                <div class="min-w-0 grow basis-48">
-                    <h2 class="truncate text-lg font-bold">{subject}</h2>
-                    <p class="text-xs opacity-60">Generated by <span class="font-semibold">{schedule_name}</span> in <span class="font-mono">#{channel_name}</span></p>
-                </div>
+        <div class="block border-b border-base-300 px-4 py-3" data-occurrence-id="{id}">
+            <div class="flex items-center justify-between gap-1">
+                <span class="text-xs font-semibold">{due}{manual}</span>
+                <span class="badge badge-xs {badge_class}">{status}</span>
             </div>
-
-            <div id="message-scroll" class="flex-1 overflow-y-auto px-4 py-4 sm:px-6 space-y-4"
-                sse-swap="message" hx-swap="beforeend">
-                {bubbles}
+            {problem}
+            <div class="mt-2 flex items-center justify-between text-[11px] opacity-50">
+                {run_line}
             </div>
-
-            <div id="thread-activity" sse-swap="activity" hx-target="this" hx-swap="innerHTML"></div>
-
-            <div class="border-t border-base-300 p-4">
-                <form hx-post="/ui/schedules/thread/{thread_id}/reply?company_id={company_id}&schedule_id={schedule_id}"
-                    hx-target="#schedule-pane" hx-swap="outerHTML" class="flex items-end gap-2">
-                    <textarea name="reply_text" rows="1" required
-                        placeholder="Reply to agent in this run thread (Enter to send, Shift+Enter for new line)..."
-                        class="textarea textarea-sm flex-1 font-mono text-xs max-h-40"
-                        data-keydown="composer" data-input="auto-grow-composer"></textarea>
-                    <button type="submit" class="btn btn-primary btn-sm">Reply</button>
-                </form>
-            </div>
-        </section>
+        </div>
         "##,
-        thread_id = props.thread_id,
-        subject = escape_html_text(props.subject),
-        schedule_id = props.schedule.id,
-        schedule_name = escape_html_text(&props.schedule.name),
-        channel_name = escape_html_text(channel_name),
-        company_id = props.company_id,
-        channel_id = channel_id,
-        after = after,
-        bubbles = bubbles,
+        id = run.id,
+        due = super::format_date_time(run.scheduled_for),
+        manual = if run.manual { " · run now" } else { "" },
     )
 }
 
@@ -488,25 +402,25 @@ fn timezone_options(selected: &str) -> String {
         .collect()
 }
 
-/// Who a schedule runs as, in one line beside its cadence.
-///
-/// A run that acts as nobody says nothing: that is what every schedule did before the attribution
-/// existed, so naming it would be noise on most rows.
-pub(crate) fn run_as_badge(schedule: &ChannelSchedule, choices: &ScheduleRunAsChoices) -> String {
-    match choices.selection(schedule.run_as_user_id) {
-        RunAsSelection::System => String::new(),
-        RunAsSelection::Choosable(account) | RunAsSelection::Locked(account) => format!(
-            r#"<span class="truncate" title="Runs as {full}">as {label}</span>"#,
-            full = escape_html_text(account.email.as_str()),
-            label = escape_html_text(account.label()),
+/// The workflow a schedule runs, in one line beside its cadence.
+pub(crate) fn binding_badge(
+    schedule: &ChannelSchedule,
+    bindings: &[ScheduleBindingChoice],
+) -> String {
+    match bindings
+        .iter()
+        .find(|binding| binding.binding_id == schedule.binding_id)
+    {
+        Some(binding) => format!(
+            r#"<span class="truncate" title="Runs {title}">{title}{inactive}</span>"#,
+            title = escape_html_text(&binding.title),
+            inactive = if binding.active { "" } else { " (inactive)" },
         ),
-        RunAsSelection::Departed => {
-            r#"<span class="text-error">member has left the team</span>"#.to_string()
-        }
+        None => String::new(),
     }
 }
 
-/// How much room a form has for the run-as control: the channel card's compact fields, or the
+/// How much room a form has for the binding control: the channel card's compact fields, or the
 /// full-width workspace form.
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum FieldScale {
@@ -522,13 +436,6 @@ impl FieldScale {
         }
     }
 
-    fn input_class(self) -> &'static str {
-        match self {
-            Self::Compact => "input input-sm w-full",
-            Self::Full => "input w-full",
-        }
-    }
-
     fn label_class(self) -> &'static str {
         match self {
             Self::Compact => "label py-1",
@@ -537,87 +444,45 @@ impl FieldScale {
     }
 }
 
-/// The "Run as" control.
-///
-/// Usually a picker of the members this caller may attribute runs to. A schedule the *owner*
-/// attributed to somebody else renders locked instead, resubmitting the stored id, so an admin
-/// saving an unrelated edit cannot silently re-point the run at themselves — the one case where
-/// leaving a value alone is allowed but choosing it is not.
-pub(crate) fn run_as_field(
-    choices: &ScheduleRunAsChoices,
-    stored: Option<Uuid>,
+/// The workflow binding control. Each run acts as the binding's run-as member; saving checks
+/// that the binding accepts the schedule input and that its run-as can see the channel.
+pub(crate) fn binding_field(
+    bindings: &[ScheduleBindingChoice],
+    selected: Option<Uuid>,
     scale: FieldScale,
 ) -> String {
-    let selection = choices.selection(stored);
-
-    if let RunAsSelection::Locked(account) = selection {
-        return format!(
-            r#"
-            <div class="form-control w-full">
-                <div class="{label_class}">
-                    <span class="text-xs opacity-70">Run as</span>
-                    <span class="text-xs opacity-50">Only the company owner can change this</span>
-                </div>
-                <input type="hidden" name="run_as_user_id" value="{user_id}">
-                <input type="text" class="{input_class}" value="{label}" disabled>
-            </div>
-            "#,
-            label_class = scale.label_class(),
-            input_class = scale.input_class(),
-            user_id = account.user_id,
-            label = escape_html_text(account.label()),
-        );
-    }
-
-    let selected_id = match selection {
-        RunAsSelection::Choosable(account) => Some(account.user_id),
-        _ => None,
-    };
-    let options: String = choices
-        .choosable()
-        .map(|account| {
+    let options: String = bindings
+        .iter()
+        .map(|binding| {
             format!(
-                r#"<option value="{value}" {selected}>{label} ({email})</option>"#,
-                value = account.user_id,
-                selected = if selected_id == Some(account.user_id) {
+                r#"<option value="{value}" {selected}>{title}{inactive}</option>"#,
+                value = binding.binding_id,
+                selected = if selected == Some(binding.binding_id) {
                     "selected"
                 } else {
                     ""
                 },
-                label = escape_html_text(account.label()),
-                email = escape_html_text(account.email.as_str()),
+                title = escape_html_text(&binding.title),
+                inactive = if binding.active { "" } else { " (inactive)" },
             )
         })
         .collect();
-    let note = match selection {
-        RunAsSelection::Departed => {
-            r#"<span class="text-xs text-error">The member this ran as has left the team; pick another to start it running again.</span>"#
-        }
-        _ => r#"<span class="text-xs opacity-50">Their memory, their name on the thread</span>"#,
-    };
-
     format!(
         r#"
         <label class="form-control w-full">
             <div class="{label_class}">
-                <span class="text-xs opacity-70">Run as</span>
-                {note}
+                <span class="text-xs opacity-70">Workflow</span>
+                <span class="text-xs opacity-50">Runs as the binding's run-as member</span>
             </div>
-            <select name="run_as_user_id" class="{select_class}">
-                <option value="" {system_selected}>Nobody — an unattributed system run</option>
+            <select name="binding_id" required class="{select_class}">
+                <option value="" disabled {none_selected}>Choose a workflow binding</option>
                 {options}
             </select>
         </label>
         "#,
         label_class = scale.label_class(),
         select_class = scale.select_class(),
-        system_selected = if selected_id.is_none() {
-            "selected"
-        } else {
-            ""
-        },
-        note = note,
-        options = options,
+        none_selected = if selected.is_none() { "selected" } else { "" },
     )
 }
 
@@ -629,7 +494,7 @@ fn delete_schedule_button(schedule_id: Option<Uuid>, company_id: Uuid) -> String
             r##"<button type="button" class="btn btn-ghost btn-sm text-error ml-auto"
                 hx-delete="/ui/schedules/{id}"
                 hx-vals='{{"company_id": "{company_id}"}}'
-                hx-confirm="Delete this schedule? Runs already recorded stay in the mailbox."
+                hx-confirm="Delete this schedule? Workflow runs it already started are kept."
                 hx-target="#schedules-workspace">Delete</button>"##
         ),
         None => String::new(),
@@ -693,39 +558,12 @@ pub fn schedule_form_pane(props: &ScheduleFormPaneProps<'_>) -> String {
         .schedule
         .and_then(|s| s.interval_seconds)
         .unwrap_or(3600);
-    let subject_template = props
-        .schedule
-        .map(|s| s.subject_template.as_str())
-        .unwrap_or("[Scheduled Report] {{date}}");
-    let prompt_template = props
-        .schedule
-        .map(|s| s.prompt_template.as_str())
-        .unwrap_or("");
-    let delivery_mode = props
-        .schedule
-        .map(|s| s.delivery_mode.as_str())
-        .unwrap_or("mailbox_only");
     let selected_timezone = props.schedule.map(|s| s.timezone.name()).unwrap_or("UTC");
-    let recipients_str = props
-        .schedule
-        .map(|s| {
-            s.recipient_emails
-                .iter()
-                .map(|e| e.to_string())
-                .collect::<Vec<_>>()
-                .join(", ")
-        })
-        .unwrap_or_default();
 
     let (interval_hidden, oneoff_hidden) = if is_oneoff {
         ("hidden", "")
     } else {
         ("", "hidden")
-    };
-    let custom_recipients_hidden = if delivery_mode == "email_custom" {
-        ""
-    } else {
-        "hidden"
     };
 
     format!(
@@ -733,7 +571,7 @@ pub fn schedule_form_pane(props: &ScheduleFormPaneProps<'_>) -> String {
         <section id="schedule-pane"{PANE_SKELETON} class="flex flex-1 flex-col bg-base-100">
             <div class="border-b border-base-300 px-4 py-4 sm:px-6">
                 <h2 class="text-xl font-bold">{title}</h2>
-                <p class="text-xs opacity-70">Automate your channel agents to run periodically or at an exact date and time.</p>
+                <p class="text-xs opacity-70">Start a workflow run periodically or at an exact date and time.</p>
             </div>
             <div class="flex-1 overflow-y-auto px-4 py-4 sm:px-6 space-y-4">
                 {error_html}
@@ -783,44 +621,17 @@ pub fn schedule_form_pane(props: &ScheduleFormPaneProps<'_>) -> String {
                         </div>
                     </div>
 
-                    <label class="form-control w-full">
-                        <div class="label"><span class="text-xs opacity-70">Thread Subject (supports <code class="font-mono">{{date}}</code>, <code class="font-mono">{{time}}</code>)</span></div>
-                        <input type="text" name="subject_template" required value="{subject_template}" class="input w-full font-mono text-xs">
-                    </label>
-
-                    <label class="form-control w-full">
-                        <div class="label"><span class="text-xs opacity-70">Agent Prompt / Task Instructions</span></div>
-                        <textarea name="prompt_template" required rows="4" placeholder="Describe the task or report the agent should generate for this scheduled run..." class="textarea w-full font-mono text-xs">{prompt_template}</textarea>
-                    </label>
-
                     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <label class="form-control w-full">
                             <div class="label">
                                 <span class="text-xs opacity-70">Timezone</span>
-                                <span class="text-xs opacity-50">Templates and the cadence follow this zone</span>
+                                <span class="text-xs opacity-50">The cadence follows this zone</span>
                             </div>
                             <select name="timezone" class="select w-full">
                                 {timezone_options}
                             </select>
                         </label>
-                        {run_as_field}
-                    </div>
-
-                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <label class="form-control w-full">
-                            <div class="label"><span class="text-xs opacity-70">Output Delivery Mode</span></div>
-                            <select name="delivery_mode" class="select w-full" data-action="toggle-schedule-delivery">
-                                <option value="mailbox_only" {d_mailbox}>Mailbox Only (In-App Review)</option>
-                                <option value="email_participants" {d_participants}>Post to Mailbox &amp; Email Participants</option>
-                                <option value="email_custom" {d_custom}>Post to Mailbox &amp; Email Custom List</option>
-                            </select>
-                        </label>
-                        <div class="schedule-custom-recipients-box {custom_recipients_hidden}">
-                            <label class="form-control w-full">
-                                <div class="label"><span class="text-xs opacity-70">Recipient Emails (comma-separated)</span></div>
-                                <input type="text" name="recipient_emails" value="{recipients_str}" placeholder="team@company.com, client@example.com" class="input w-full">
-                            </label>
-                        </div>
+                        {binding_field}
                     </div>
 
                     <div class="flex items-center gap-3 pt-4 border-t border-base-300">
@@ -870,30 +681,11 @@ pub fn schedule_form_pane(props: &ScheduleFormPaneProps<'_>) -> String {
             ""
         },
         timezone_options = timezone_options(selected_timezone),
-        run_as_field = run_as_field(
-            props.run_as,
-            props.schedule.and_then(|schedule| schedule.run_as_user_id),
+        binding_field = binding_field(
+            props.bindings,
+            props.schedule.map(|schedule| schedule.binding_id),
             FieldScale::Full,
         ),
-        subject_template = escape_html_text(subject_template),
-        prompt_template = escape_html_text(prompt_template),
-        d_mailbox = if delivery_mode == "mailbox_only" {
-            "selected"
-        } else {
-            ""
-        },
-        d_participants = if delivery_mode == "email_participants" {
-            "selected"
-        } else {
-            ""
-        },
-        d_custom = if delivery_mode == "email_custom" {
-            "selected"
-        } else {
-            ""
-        },
-        custom_recipients_hidden = custom_recipients_hidden,
-        recipients_str = escape_html_text(&recipients_str),
         delete_button = delete_schedule_button(props.schedule.map(|s| s.id), company_id),
         submit_label = if is_edit {
             "Save Changes"
@@ -926,19 +718,4 @@ pub(crate) const SCHEDULES_SCRIPT: &str = r##"        function toggleScheduleTyp
             if (intervalBox) intervalBox.classList.toggle('hidden', !isInterval);
             if (oneoffBox) oneoffBox.classList.toggle('hidden', isInterval);
         }
-
-        function toggleScheduleDelivery(select) {
-            var form = select.closest('form');
-            if (!form) return;
-            var isCustom = select.value === 'email_custom';
-            var customBox = form.querySelector('.schedule-custom-recipients-box');
-            if (customBox) customBox.classList.toggle('hidden', !isCustom);
-        }
-
-        document.body.addEventListener('htmx:afterSettle', function (event) {
-            if (!event.target || (event.target.id !== 'schedule-runs-column' && event.target.id !== 'schedule-runs-live' && event.target.id !== 'schedule-pane')) return;
-            var pane = document.getElementById('schedule-pane');
-            if (!pane || !pane.dataset.threadId) return;
-            var selected = document.querySelector('#schedule-runs-list .thread-row[data-thread-id="' + pane.dataset.threadId + '"]');
-            if (selected) selectThreadRow(selected);
-        });"##;
+"##;

@@ -2,13 +2,11 @@
 //! conversation, and existing thread consumers keep their meaning.
 use super::*;
 use crate::application::transport::ExternalCorrelationStore;
-use crate::application::transport::bounded::BoundedVec;
-use crate::application::transport::ingress::ReplyDelivery;
-use crate::application::transport::task_payload::{InboundTaskPayload, InboundTaskPayloadV1};
 use crate::application::use_cases::thread::{
     MessageAuthorWrite, MessageCorrelation, MessageParticipantWrite, MessageWrite,
     ThreadPersistence, qualified_email_identity,
 };
+use crate::application::workflow::DeliveryPolicy;
 use crate::application::workflow::lease::ClaimedWorkflow;
 use crate::domain::entities::correlation::CorrelationId;
 use crate::entities::email_message::EmailMessageMetadata;
@@ -25,7 +23,7 @@ use crate::use_cases::participant::IdentityObservation;
 
 const CUSTOMER: &str = "customer@partner.test";
 
-fn inbound(thread: Uuid, rfc: &str, references: &[&str], body: &str) -> MessageWrite {
+pub(super) fn inbound(thread: Uuid, rfc: &str, references: &[&str], body: &str) -> MessageWrite {
     let identity = qualified_email_identity(CUSTOMER).unwrap();
     MessageWrite::internal(
         thread,
@@ -80,6 +78,15 @@ enum Source {
 async fn conversation(
     step: impl FnOnce(Uuid, Uuid, CanonicalMessageId, Uuid, Uuid) -> (&'static str, Value),
     kind: Source,
+) -> Conversation {
+    conversation_with(step, kind, DeliveryPolicy::Deliver).await
+}
+
+/// `conversation` with the run admitted under `policy`.
+async fn conversation_with(
+    step: impl FnOnce(Uuid, Uuid, CanonicalMessageId, Uuid, Uuid) -> (&'static str, Value),
+    kind: Source,
+    policy: DeliveryPolicy,
 ) -> Conversation {
     let fixture = Fixture::new().await;
     let channel = new_channel(&fixture, "runs").await;
@@ -213,7 +220,7 @@ async fn conversation(
     let (kind, with) = step(channel, thread.id, source, other, user);
     let version = Box::pin(published(&fixture, kind, with)).await;
     let target = Box::pin(bound(&fixture, version)).await;
-    let scope = admitted_as(
+    let scope = admitted_with(
         &fixture,
         target,
         RelatedAssociation::Thread {
@@ -221,6 +228,7 @@ async fn conversation(
             thread_id: RelatedThreadId::new(thread.id),
         },
         "message-thread-run",
+        policy,
     )
     .await;
     let claim: ClaimedWorkflow = fixture
@@ -527,8 +535,8 @@ async fn reply_relay(setup: &Setup) -> Value {
     .unwrap()
 }
 
-/// D2 §1.3 (R006 F015): an external reply continues the relay trace its source arrived with, as
-/// recorded by the source's inbound task, exactly as an agent answer does; a source with none
+/// D2 §1.3 (R006 F015), p08 D1.6: an external reply continues the relay trace its source arrived
+/// with, as the source's admission intent recorded it, with no legacy task; a source with none
 /// recorded starts a chain at hop 0.
 #[tokio::test]
 async fn workflow_message_thread_external_reply_continues_the_source_relay_trace() {
@@ -541,30 +549,18 @@ async fn workflow_message_thread_external_reply_continues_the_source_relay_trace
         let setup = &conversation.setup;
         let trace = vec![Uuid::new_v4(), Uuid::new_v4()];
         if recorded {
-            let payload = InboundTaskPayload::v1(InboundTaskPayloadV1 {
-                company_id: setup.scope().company.as_uuid(),
-                channel_id: setup.channel,
-                thread_id: conversation.thread,
-                source_message_id: conversation.question,
-                correlation_id: CorrelationId::new(),
-                hop_count: 2,
-                trace_channels: BoundedVec::parse("trace channels", trace.clone()).unwrap(),
-                is_forwarded: false,
-                reply_delivery: ReplyDelivery::Send,
-            })
-            .encode()
-            .unwrap();
             sqlx::query(
-                "INSERT INTO background_tasks (id,company_id,correlation_id,task_type,status,payload,channel_id,thread_id,source_message_uuid) \
-                 VALUES ($1,$2,$3,'agent_response','completed',$4,$5,$6,$7)",
+                "INSERT INTO workflow_message_intents (company_id, id, message_id, channel_id, \
+                   thread_id, role, mentioned, admissible, origin, hop_count, trace_channels, \
+                   delivery_policy, correlation_id) \
+                 VALUES ($1, $2, $3, $4, $5, 'to', false, true, 'internal', 2, $6, 'deliver', $2)",
             )
-            .bind(Uuid::new_v4())
             .bind(setup.scope().company.as_uuid())
             .bind(Uuid::new_v4())
-            .bind(payload)
+            .bind(conversation.question.as_uuid())
             .bind(setup.channel)
             .bind(conversation.thread)
-            .bind(conversation.question.as_uuid())
+            .bind(&trace)
             .execute(setup.pool())
             .await
             .unwrap();
@@ -584,4 +580,154 @@ async fn workflow_message_thread_external_reply_continues_the_source_relay_trace
             "recorded={recorded}"
         );
     }
+}
+
+/// One destination row of the run, as stored.
+#[derive(Debug, sqlx::FromRow)]
+struct StoredDestination {
+    kind: String,
+    thread_id: Uuid,
+    message_id: Uuid,
+    delivery_id: Option<Uuid>,
+    principal_id: Option<Uuid>,
+    recipient_address: Option<String>,
+    in_app: bool,
+}
+
+async fn destination(setup: &Setup) -> StoredDestination {
+    sqlx::query_as(
+        "SELECT kind, thread_id, message_id, delivery_id, principal_id, recipient_address, in_app \
+         FROM workflow_message_destinations WHERE run_id = $1",
+    )
+    .bind(setup.scope().run.as_uuid())
+    .fetch_one(setup.pool())
+    .await
+    .unwrap()
+}
+
+/// The members recorded as participants of `thread`, by principal.
+async fn participants(setup: &Setup, thread: Uuid) -> Vec<Uuid> {
+    sqlx::query_scalar(
+        "SELECT principal_id FROM thread_principals WHERE thread_id = $1 AND role = 'participant' \
+         ORDER BY principal_id",
+    )
+    .bind(thread)
+    .fetch_all(setup.pool())
+    .await
+    .unwrap()
+}
+
+fn send_to_user(user: Uuid) -> (&'static str, Value) {
+    (
+        "message.send",
+        json!({"content":{"literal":{"subject":"Status","body":"The run finished."}},
+               "destinations":{"literal":[{"kind":"user","id":user.to_string()}]}}),
+    )
+}
+
+/// p08 D1.5.4/D1.7: a member's send opens its own thread in the run channel with the member as
+/// its participant, emailed under `deliver` and published with no delivery under `in_app_only`,
+/// where the step completes at once with a valid result. A member destination without a
+/// delivery is refused for a `deliver` run.
+#[tokio::test]
+async fn workflow_message_thread_user_send_opens_a_thread_the_member_takes_part_in() {
+    for policy in [DeliveryPolicy::Deliver, DeliveryPolicy::InAppOnly] {
+        let conversation = Box::pin(conversation_with(
+            |_, _, _, _, user| send_to_user(user),
+            Source::Question,
+            policy,
+        ))
+        .await;
+        let setup = &conversation.setup;
+        let outcome = setup.runtime().execute(&setup.kind, &setup.claim).await;
+        let stored = destination(setup).await;
+        let member: Uuid = sqlx::query_scalar("SELECT id FROM principals WHERE user_id = $1")
+            .bind(setup.user)
+            .fetch_one(setup.pool())
+            .await
+            .unwrap();
+        assert_eq!(stored.kind, "user");
+        assert_eq!(stored.principal_id, Some(member));
+        assert_ne!(
+            stored.thread_id, conversation.thread,
+            "never the customer thread"
+        );
+        assert_eq!(participants(setup, stored.thread_id).await, vec![member]);
+        let deliveries = rows(setup.pool(), setup.scope().run).await.deliveries;
+        if policy == DeliveryPolicy::InAppOnly {
+            let result = completed(outcome).unwrap();
+            assert_eq!(result["status"], "accepted");
+            assert_eq!(
+                result["messages"][0]["message_id"],
+                stored.message_id.to_string()
+            );
+            assert!(stored.in_app);
+            assert_eq!((stored.delivery_id, stored.recipient_address), (None, None));
+            assert_eq!(deliveries, 0);
+            continue;
+        }
+        assert!(matches!(outcome, WorkflowHandlerOutcome::Suspended(_)));
+        assert!(!stored.in_app);
+        assert!(stored.delivery_id.is_some() && stored.recipient_address.is_some());
+        assert_eq!(deliveries, 1);
+        // The guard, not only the planner: a deliver run's member destination has a delivery.
+        let refused = sqlx::query(
+            "INSERT INTO workflow_message_destinations (company_id, run_id, invocation_id, ordinal, \
+               kind, destination_id, thread_id, message_id, principal_id) \
+             SELECT company_id, run_id, invocation_id, ordinal + 1, kind, destination_id, thread_id, \
+               message_id, principal_id FROM workflow_message_destinations WHERE run_id = $1",
+        )
+        .bind(setup.scope().run.as_uuid())
+        .execute(setup.pool())
+        .await
+        .unwrap_err();
+        assert!(
+            refused.to_string().contains("requires a delivery"),
+            "{refused}"
+        );
+        // And the shape check: a delivery always names its address.
+        let shapeless = sqlx::query(
+            "INSERT INTO workflow_message_destinations (company_id, run_id, invocation_id, ordinal, \
+               kind, destination_id, thread_id, message_id, delivery_id, principal_id) \
+             SELECT company_id, run_id, invocation_id, ordinal + 1, kind, destination_id, thread_id, \
+               message_id, delivery_id, principal_id FROM workflow_message_destinations WHERE run_id = $1",
+        )
+        .bind(setup.scope().run.as_uuid())
+        .execute(setup.pool())
+        .await
+        .unwrap_err();
+        assert!(
+            shapeless
+                .to_string()
+                .contains("workflow_message_destinations_check"),
+            "{shapeless}"
+        );
+    }
+}
+
+/// p08 D1.7: under `in_app_only` an email reply becomes an in-app reply in the source thread,
+/// with no delivery and a valid result.
+#[tokio::test]
+async fn workflow_message_thread_in_app_reply_stays_in_the_source_thread() {
+    let conversation = Box::pin(conversation_with(
+        |_, _, source, _, _| reply(source),
+        Source::Question,
+        DeliveryPolicy::InAppOnly,
+    ))
+    .await;
+    let setup = &conversation.setup;
+    let result = completed(setup.runtime().execute(&setup.kind, &setup.claim).await).unwrap();
+    assert_eq!(result["status"], "accepted");
+    let stored = destination(setup).await;
+    assert_eq!(
+        (
+            stored.kind.as_str(),
+            stored.thread_id,
+            stored.in_app,
+            stored.delivery_id,
+            stored.recipient_address,
+        ),
+        ("reply", conversation.thread, true, None, None)
+    );
+    assert_eq!(rows(setup.pool(), setup.scope().run).await.deliveries, 0);
 }

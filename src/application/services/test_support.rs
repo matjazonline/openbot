@@ -2,27 +2,19 @@
 //!
 //! # Why a socket rather than a stub harness
 //!
-//! There is a trait to swap now -- [`StubHarness`] below is it -- and for a test about *dispatch*
-//! that is the right double. It is the wrong one for a test about what the agent actually does:
-//! swapping the harness out swaps out the compiler, the tool grant, the skill steps and the
-//! runtime, which is most of what these tests exist to check.
-//!
-//! What the real harness offers instead is an HTTP seam: this test module registers a trusted
-//! provider endpoint for a fixture agent id, and connection resolution carries it separately from
-//! agent configuration. Pointing that at a localhost listener means the real runner,
-//! the real prompt assembly, the real `UntrustedFence`, the real compiled configuration and the
-//! real tool registry all run -- only the model is scripted.
+//! A stub in place of the harness would swap out the request assembly, the tool grant and the
+//! provider protocol, which is most of what these tests exist to check. What the real harness
+//! offers instead is an HTTP seam: this test module registers a trusted provider endpoint for a
+//! fixture agent id, and connection resolution carries it separately from agent configuration.
+//! Pointing that at a localhost listener means everything but the model runs for real.
 //!
 //! `scripted_llm` is the short OpenAI Chat Completions API. Request-checked scenarios use the
 //! same supervised listener; `provider` supplies native Gemini, Anthropic, xAI Responses, and
 //! OpenAI/Groq wire fixtures. Unsupported protocols fail explicitly.
 //!
-//! # Why not [`crate::adapters::memory::test_support`]
-//!
-//! Those helpers read one request with a single `stream.read()` into a fixed buffer. That is fine
-//! for a memory-provider call and wrong here: an agent prompt plus the JSON schema of every
-//! registered tool runs to tens of kilobytes and arrives across several segments, so a single read
-//! truncates the body and the test sees a parse error instead of a request. This one frames the
+//! An agent prompt plus the JSON schema of every registered tool runs to tens of kilobytes and
+//! arrives across several segments, so a single `stream.read()` into a fixed buffer would truncate
+//! the body and the test would see a parse error instead of a request. This listener frames the
 //! request properly -- headers, then `Content-Length` bytes -- and bounds what it will accept.
 
 use std::{
@@ -30,20 +22,13 @@ use std::{
     sync::{Mutex, OnceLock},
 };
 
-use chrono::Utc;
 use serde_json::{Value, json};
 use uuid::Uuid;
 
 use crate::app_error::AppResult;
 use crate::entities::{
-    channel::{Channel, ChannelAccessMode},
-    creation::CreationProvenance,
-    harness::HarnessKind,
-    task::TokenUsage,
+    channel::Channel,
     value_objects::{ChannelSlug, CompanySlug},
-};
-use crate::services::harness::{
-    AgentExecutionDisposition, AgentExecutionOutput, AgentHarness, AgentRun,
 };
 
 static SCRIPTED_AGENT_BASE_URLS: OnceLock<Mutex<HashMap<Uuid, String>>> = OnceLock::new();
@@ -280,103 +265,11 @@ impl ChannelPersistence for ChannelDirectoryStub {
     async fn update(
         &self,
         _request: crate::use_cases::channel::ChannelUpdate,
-    ) -> AppResult<crate::use_cases::channel::ChannelUpdateOutcome> {
+    ) -> AppResult<crate::entities::channel::Channel> {
         unimplemented!()
     }
 
     async fn delete(&self, _id: Uuid) -> AppResult<()> {
         unimplemented!()
-    }
-}
-
-/// A channel an agent answers on: enough of a [`Channel`] for a directory or delegation lookup to
-/// classify it as a callable sibling.
-pub fn agent_channel(company_id: Uuid, slug: &str) -> Channel {
-    Channel {
-        response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
-        owner_agent_id: None,
-        id: Uuid::new_v4(),
-        company_id,
-        name: slug.to_string(),
-        description: None,
-        slug: slug.into(),
-        alias_slugs: Vec::new(),
-        participant_emails: None,
-        access_mode: ChannelAccessMode::Team,
-        principal_grants: Vec::new(),
-        agent_ids: Some(vec![Uuid::new_v4()]),
-        enabled: true,
-        add_3rd_party: true,
-        retrieve_company_memory: false,
-        retrieve_agent_memory: false,
-        retrieve_user_memory: false,
-        persist_company_memory: false,
-        persist_agent_memory: false,
-        persist_user_memory: false,
-        created_by: CreationProvenance::system(),
-        created_at: Utc::now(),
-    }
-}
-
-/// An [`AgentHarness`] that answers without running anything.
-///
-/// For the tests that need a harness to *exist* -- registry wiring, dispatch resolution -- rather
-/// than one that thinks. Tests that need a real run register a trusted fixture endpoint with
-/// [`register_scripted_agent_base_url`] and drive the actual harness.
-pub struct StubHarness {
-    kind: HarnessKind,
-    reply: String,
-    disposition: AgentExecutionDisposition,
-    /// When set, the run fails with this message instead of answering.
-    failure: Option<String>,
-}
-
-impl StubHarness {
-    /// A harness of `kind` that completes with a fixed reply.
-    pub fn new(kind: HarnessKind) -> Self {
-        Self {
-            kind,
-            reply: "stub reply".to_string(),
-            disposition: AgentExecutionDisposition::Completed,
-            failure: None,
-        }
-    }
-
-    /// A harness whose run fails, for the caller-side error paths -- recording the failure,
-    /// redacting it, and refusing to commit a reply.
-    pub fn failing(mut self, message: impl Into<String>) -> Self {
-        self.failure = Some(message.into());
-        self
-    }
-
-    pub fn replying(mut self, reply: impl Into<String>) -> Self {
-        self.reply = reply.into();
-        self
-    }
-
-    /// A harness that parks instead of answering, for the caller-side suspension paths.
-    pub fn suspending(mut self) -> Self {
-        self.disposition = AgentExecutionDisposition::Suspended;
-        self
-    }
-}
-
-#[async_trait::async_trait]
-impl AgentHarness for StubHarness {
-    fn kind(&self) -> HarnessKind {
-        self.kind
-    }
-
-    async fn run(&self, _run: AgentRun<'_>) -> AppResult<AgentExecutionOutput> {
-        if let Some(failure) = self.failure.as_ref() {
-            return Err(crate::app_error::AppError::Internal(failure.clone()));
-        }
-        Ok(AgentExecutionOutput {
-            structured: None,
-            content: self.reply.clone(),
-            token_usage: TokenUsage::default(),
-            disposition: self.disposition,
-            metadata: None,
-        })
     }
 }

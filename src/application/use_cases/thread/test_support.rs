@@ -4,7 +4,7 @@
 //! canonical store has behaviour a naive `Vec<Message>` cannot stand in for: a payload is stored
 //! once and associated with many threads, a redelivered provider key resolves to the message
 //! already stored, and a *changed* redelivery is refused. A double that got any of those wrong
-//! would let the ingest and dispatch tests pass over bugs the real store rejects.
+//! would let the ingest tests pass over bugs the real store rejects.
 //!
 //! Principal ids are derived from the handle rather than allocated, matching
 //! [`crate::use_cases::participant::test_support`], so a fixture can name an actor before anything
@@ -22,9 +22,7 @@ use uuid::Uuid;
 
 use crate::{
     app_error::{AppError, AppResult},
-    application::thread_handoff::ThreadHandoffPolicyPersistence,
     entities::participant::{IdentityClaimMetadata, IdentityProvenance},
-    entities::thread_handoff::{ExternalReplyHandling, ExternalReplyHandlingPolicy},
     entities::{
         correlation::CorrelationId,
         creation::CreationProvenance,
@@ -39,7 +37,6 @@ use crate::{
             AgentHistoryMessage, AuthorView, EmailReplyContext, MessageAuditView,
             THREAD_HISTORY_LIMIT, ThreadMessageView,
         },
-        task::{NewTask, TaskSource, TaskTarget},
         thread::{Thread, ThreadParticipantProjection},
         transport::{
             BindingAccessPolicy, BindingAccessSnapshot, BindingAuditEvent, BindingDeliveryPolicy,
@@ -50,12 +47,10 @@ use crate::{
         value_objects::{EmailAddress, MessageId, ThreadIndex},
     },
     infra::config::AppConfig,
-    task_queue::TaskPersistence,
     transport::{
         CommitDisposition, DeliveryCreation, ExternalCorrelationStore, InboundCommitOutcome,
-        InboundCommitRequest, InboundEnvelope, InboundMessageCommitter, InboundTaskPayload,
-        InboundTaskPayloadV1, NewDelivery, NewStandaloneDelivery, StandaloneDeliveryEnqueuer,
-        ThreadTarget,
+        InboundCommitRequest, InboundEnvelope, InboundMessageCommitter, NewStandaloneDelivery,
+        StandaloneDeliveryEnqueuer, ThreadTarget,
     },
     use_cases::{
         channel::ChannelPersistence,
@@ -78,13 +73,9 @@ impl ThreadUseCases {
         channel_persistence: Arc<dyn ChannelPersistence>,
         company_persistence: Arc<dyn CompanyPersistence>,
         participant_persistence: Arc<dyn ParticipantPersistence>,
-        task_persistence: Arc<dyn TaskPersistence>,
         config: Arc<AppConfig>,
     ) -> Self {
-        let ingest = InMemoryIngress::ports(thread_persistence.clone(), task_persistence.clone());
-        // The same double answers the reply-handling policy, so a fixture that already holds the
-        // thread store can put one of its channels on `ManualHandoff` without a second handle.
-        let handoff_policy: Arc<dyn ThreadHandoffPolicyPersistence> = thread_persistence.clone();
+        let ingest = InMemoryIngress::ports(thread_persistence.clone());
         let renderers = Arc::new(
             crate::transport::ports::TransportRenderers::new()
                 .register(Arc::new(
@@ -98,22 +89,12 @@ impl ThreadUseCases {
                 channels: channel_persistence,
                 companies: company_persistence,
                 participants: participant_persistence,
-                tasks: task_persistence,
-                handoff_policy: handoff_policy.clone(),
             },
             ingest,
             renderers,
             config,
         )
-        .with_harnesses(harness_registry())
     }
-}
-
-/// No runtime: these in-memory fixtures have no capability store or checkpoint store, so a
-/// run that reaches a harness fails closed. Agent execution is proven against PostgreSQL with
-/// the real Rig harness (`inter_channel_tests`, `external_reply_tests`).
-pub fn harness_registry() -> Arc<crate::services::harness::HarnessRegistry> {
-    Arc::new(crate::services::harness::HarnessRegistry::new())
 }
 
 /// One stored canonical payload.
@@ -174,20 +155,12 @@ struct Store {
     associations: Vec<Association>,
     external_messages: HashMap<ProviderKey, CanonicalMessageId>,
     external_threads: HashMap<ProviderKey, Uuid>,
-    /// Association ids whose outbound message an outreach sent, so the idempotency guard can skip
-    /// them the way the real query does.
-    outreach_sent: Vec<CanonicalMessageId>,
     /// Deliveries queued alongside a message, so a test can assert that an answer was not only
     /// recorded but actually handed to a transport.
-    deliveries: Vec<NewDelivery>,
     standalone_deliveries: Vec<NewStandaloneDelivery>,
     notes: HashMap<Uuid, (CanonicalMessageId, InternalNoteView)>,
     note_commands: HashMap<Uuid, (String, CanonicalMessageId)>,
     tombstone_commands: HashMap<Uuid, (String, Uuid)>,
-    /// Company reply-handling defaults; absent means the migration default, `Automatic`.
-    company_reply_handling: HashMap<Uuid, ExternalReplyHandling>,
-    /// Channel overrides. An absent key inherits; `Some(None)` is an override cleared back to it.
-    channel_reply_handling: HashMap<Uuid, Option<ExternalReplyHandling>>,
     /// Every commit request handed to the double, so a test can assert what the plan asked for
     /// rather than only what the double chose to make of it.
     commits: Vec<InboundCommitRequest>,
@@ -201,11 +174,6 @@ pub struct InMemoryThreads {
 }
 
 impl InMemoryThreads {
-    /// Every delivery queued through [`ThreadPersistence::create_message_with_deliveries`].
-    pub fn queued_deliveries(&self) -> Vec<NewDelivery> {
-        self.store.lock().unwrap().deliveries.clone()
-    }
-
     pub fn queued_standalone_deliveries(&self) -> Vec<NewStandaloneDelivery> {
         self.store.lock().unwrap().standalone_deliveries.clone()
     }
@@ -223,29 +191,6 @@ impl InMemoryThreads {
             store: Arc::new(Mutex::new(Store::default())),
             company_id,
         }
-    }
-
-    /// Seed a thread without going through creation, for a fixture that starts mid-conversation.
-    pub fn insert_thread(&self, thread: Thread) {
-        self.store.lock().unwrap().threads.push(thread);
-    }
-
-    /// Put one channel on a reply-handling policy of its own.
-    pub fn set_channel_reply_handling(&self, channel_id: Uuid, policy: ExternalReplyHandling) {
-        self.store
-            .lock()
-            .unwrap()
-            .channel_reply_handling
-            .insert(channel_id, Some(policy));
-    }
-
-    /// Change the company default every inheriting channel follows.
-    pub fn set_company_reply_handling(&self, company_id: Uuid, policy: ExternalReplyHandling) {
-        self.store
-            .lock()
-            .unwrap()
-            .company_reply_handling
-            .insert(company_id, policy);
     }
 
     /// Every commit request this double was handed, in order.
@@ -267,11 +212,6 @@ impl InMemoryThreads {
             .collect();
         messages.sort_by_key(Message::cursor);
         messages
-    }
-
-    /// Mark a stored outbound message as one an outreach sent, so the reply guard ignores it.
-    pub fn mark_sent_by_outreach(&self, message: CanonicalMessageId) {
-        self.store.lock().unwrap().outreach_sent.push(message);
     }
 
     /// The stable ids policy reads, derived from the addresses a fixture states -- the mirror of
@@ -697,46 +637,6 @@ impl ThreadPersistence for InMemoryThreads {
         Ok(message)
     }
 
-    async fn create_message_with_deliveries(
-        &self,
-        write: &MessageWrite,
-        deliveries: &[NewDelivery],
-    ) -> AppResult<(Message, Vec<DeliveryCreation>)> {
-        let stored = self.create_message(write).await?;
-        let mut created = Vec::with_capacity(deliveries.len());
-        {
-            let mut store = self.store.lock().unwrap();
-            for delivery in deliveries {
-                if delivery.message_id != stored.canonical_id {
-                    return Err(AppError::Internal(format!(
-                        "Delivery '{}' names message {} but this transaction stored {}",
-                        delivery.idempotency_key, delivery.message_id, stored.canonical_id
-                    )));
-                }
-                // The real store's unique index, in one line: whoever gets there first owns the
-                // key, and a second call with the same key is absorbed onto the first delivery
-                // rather than queueing a second send.
-                let key = (
-                    delivery.destination_binding_id,
-                    delivery.idempotency_key.clone(),
-                );
-                match store.deliveries.iter().find(|queued| {
-                    (
-                        queued.destination_binding_id,
-                        queued.idempotency_key.clone(),
-                    ) == key
-                }) {
-                    Some(existing) => created.push(DeliveryCreation::Absorbed(existing.id)),
-                    None => {
-                        created.push(DeliveryCreation::Created(delivery.id));
-                        store.deliveries.push(delivery.clone());
-                    }
-                }
-            }
-        }
-        Ok((stored, created))
-    }
-
     async fn associate_message(
         &self,
         thread_id: Uuid,
@@ -785,7 +685,6 @@ impl ThreadPersistence for InMemoryThreads {
             .filter(|association| {
                 (association.created_at, association.id) > (answered.created_at, answered.id)
             })
-            .filter(|association| !store.outreach_sent.contains(&association.message_id))
             .filter_map(|association| self.read(&store, association))
             .filter(|message| message.direction == MessageDirection::Outbound)
             .collect();
@@ -1041,7 +940,7 @@ fn thread_message_view(message: &Message) -> ThreadMessageView {
         id: message.id,
         canonical_id: message.canonical_id,
         thread_id: message.thread_id,
-        task_id: None,
+        run_ids: Vec::new(),
         author: AuthorView {
             principal_id: message.author.principal_id,
             label: message.author.label.clone(),
@@ -1236,70 +1135,6 @@ pub fn stored_email_view(draft: EmailMessageDraft) -> ThreadMessageView {
     thread_message_view(&stored_email(draft))
 }
 
-/// The stored message a draft describes, as an agent prompt reads it.
-pub fn stored_email_history(draft: EmailMessageDraft) -> AgentHistoryMessage {
-    let message = stored_email(draft);
-    AgentHistoryMessage {
-        role: message.role,
-        audience: message.audience,
-        entry_kind: message.entry_kind,
-        author_display: message.author.display().to_string(),
-        subject: message.subject.clone(),
-        body: message.clean_text_body,
-    }
-}
-
-/// The write a draft describes: what a producer hands to `create_message`.
-pub fn email_write(draft: EmailMessageDraft) -> MessageWrite {
-    let sender = super::qualified_email_identity(draft.sender.as_str())
-        .expect("test fixture sender address is parseable");
-    let mut participants = vec![MessageParticipantWrite::new(
-        MessageParticipantKind::Sender,
-        sender.clone(),
-    )];
-    for (kind, addresses) in [
-        (MessageParticipantKind::To, &draft.recipients_to),
-        (MessageParticipantKind::Cc, &draft.recipients_cc),
-    ] {
-        for address in addresses {
-            participants.push(MessageParticipantWrite::new(
-                kind,
-                super::qualified_email_identity(address.as_str())
-                    .expect("test fixture recipient address is parseable"),
-            ));
-        }
-    }
-
-    MessageWrite {
-        structured: None,
-        id: CanonicalMessageId::random(),
-        thread_id: draft.thread_id,
-        author: MessageAuthorWrite::Observed(IdentityObservation {
-            identity: sender,
-            display_label: None,
-            claim_metadata: IdentityClaimMetadata::observation(),
-            provenance: IdentityProvenance::TransportIngress,
-        }),
-        subject: draft.subject,
-        clean_text_body: draft.clean_text_body,
-        attachments: draft.attachments.unwrap_or_default(),
-        direction: draft.direction,
-        role: draft.role,
-        audience: crate::entities::message::MessageAudience::ExternalConversation,
-        entry_kind: crate::entities::message::ThreadEntryKind::Conversation,
-        correlation_id: CorrelationId::new(),
-        participants,
-        correlation: MessageCorrelation::Email(
-            EmailMessageMetadata::new(draft.message_id)
-                .in_reply_to(draft.in_reply_to)
-                .references(draft.references_list)
-                .thread_index(draft.thread_index)
-                .raw_bodies(draft.raw_text_body, draft.raw_html_body),
-        ),
-        created_at: draft.created_at,
-    }
-}
-
 impl InMemoryThreads {
     /// Which conversation these provider keys belong to, through the external maps.
     ///
@@ -1372,20 +1207,16 @@ impl InMemoryThreads {
 #[derive(Clone)]
 pub struct InMemoryIngress {
     threads: Arc<InMemoryThreads>,
-    tasks: Arc<dyn TaskPersistence>,
 }
 
 impl InMemoryIngress {
-    pub fn new(threads: Arc<InMemoryThreads>, tasks: Arc<dyn TaskPersistence>) -> Self {
-        Self { threads, tasks }
+    pub fn new(threads: Arc<InMemoryThreads>) -> Self {
+        Self { threads }
     }
 
-    /// The ports [`ThreadUseCases::for_test`] wires, all reading the stores given here.
-    pub fn ports(
-        threads: Arc<InMemoryThreads>,
-        tasks: Arc<dyn TaskPersistence>,
-    ) -> InboundIngestPorts {
-        let ingress = Arc::new(Self::new(threads, tasks));
+    /// The ports [`ThreadUseCases::for_test`] wires, all reading the store given here.
+    pub fn ports(threads: Arc<InMemoryThreads>) -> InboundIngestPorts {
+        let ingress = Arc::new(Self::new(threads));
         InboundIngestPorts {
             committer: ingress.clone(),
             correlation: ingress.clone(),
@@ -1537,141 +1368,12 @@ impl ExternalCorrelationStore for InMemoryIngress {
     }
 }
 
-/// The reply-handling policy, as the ingest path reads it.
-///
-/// No default arm hides a missing channel: an unknown one resolves to the migration default, which
-/// is what a channel created before this feature existed genuinely has.
-#[async_trait]
-impl ThreadHandoffPolicyPersistence for InMemoryThreads {
-    async fn reply_handling_policy(
-        &self,
-        company_id: Uuid,
-        channel_id: Uuid,
-    ) -> AppResult<Option<ExternalReplyHandlingPolicy>> {
-        let store = self.store.lock().unwrap();
-        let company_default = store
-            .company_reply_handling
-            .get(&company_id)
-            .copied()
-            .unwrap_or_default();
-        let channel_override = store
-            .channel_reply_handling
-            .get(&channel_id)
-            .copied()
-            .flatten();
-        Ok(Some(ExternalReplyHandlingPolicy::resolve(
-            company_default,
-            channel_override,
-        )))
-    }
-
-    async fn set_company_reply_handling(
-        &self,
-        company_id: Uuid,
-        policy: ExternalReplyHandling,
-    ) -> AppResult<()> {
-        self.store
-            .lock()
-            .unwrap()
-            .company_reply_handling
-            .insert(company_id, policy);
-        Ok(())
-    }
-
-    async fn set_channel_reply_handling_override(
-        &self,
-        _company_id: Uuid,
-        channel_id: Uuid,
-        policy_override: Option<ExternalReplyHandling>,
-    ) -> AppResult<()> {
-        self.store
-            .lock()
-            .unwrap()
-            .channel_reply_handling
-            .insert(channel_id, policy_override);
-        Ok(())
-    }
-
-    /// The responsibility commands have no in-memory model: nothing in the application-layer ingest
-    /// suite drives a handoff through claim/release/reassign/set-attributes, and their locking,
-    /// fencing and idempotency are exercised against the real database in
-    /// `adapters::persistence::thread_handoff_tests`. An `Internal` error here, rather than a
-    /// silently-successful stub, is what makes a future test that *does* call this fail loudly
-    /// instead of asserting against fabricated state.
-    async fn change_thread_handoff(
-        &self,
-        _command: crate::entities::thread_handoff::ThreadHandoffCommand,
-    ) -> AppResult<u64> {
-        Err(AppError::Internal(
-            "InMemoryThreads does not model thread handoff responsibility commands".into(),
-        ))
-    }
-
-    /// Dismissal, the drafted answer and a run's failure are the same story as the commands above:
-    /// modelled against the real database, and loudly absent here.
-    async fn dismiss_thread_handoff(
-        &self,
-        _command: crate::entities::thread_handoff::ThreadHandoffDismiss,
-    ) -> AppResult<u64> {
-        Err(AppError::Internal(
-            "InMemoryThreads does not model thread handoff dismissal".into(),
-        ))
-    }
-
-    async fn thread_handoff_draft(
-        &self,
-        _company_id: Uuid,
-        _handoff_id: Uuid,
-        _generation: Uuid,
-        _visible_channel_ids: &[Uuid],
-    ) -> AppResult<Option<crate::entities::thread_handoff::ThreadHandoffDraft>> {
-        Err(AppError::Internal(
-            "InMemoryThreads does not model thread handoff drafting runs".into(),
-        ))
-    }
-
-    async fn expire_thread_handoff_draft(
-        &self,
-        _company_id: Uuid,
-        _task_id: Uuid,
-        _reason: &str,
-    ) -> AppResult<()> {
-        Err(AppError::Internal(
-            "InMemoryThreads does not model thread handoff drafting runs".into(),
-        ))
-    }
-
-    async fn get_thread_handoff(
-        &self,
-        _company_id: Uuid,
-        _handoff_id: Uuid,
-        _visible_channel_ids: &[Uuid],
-    ) -> AppResult<Option<crate::entities::thread_handoff::ThreadHandoff>> {
-        Err(AppError::Internal(
-            "InMemoryThreads does not model thread handoff responsibility commands".into(),
-        ))
-    }
-
-    async fn thread_handoffs_for_threads(
-        &self,
-        _company_id: Uuid,
-        _thread_ids: &[Uuid],
-        _visible_channel_ids: &[Uuid],
-    ) -> AppResult<std::collections::HashMap<Uuid, crate::entities::thread_handoff::ThreadHandoff>>
-    {
-        Err(AppError::Internal(
-            "InMemoryThreads does not model thread handoff responsibility commands".into(),
-        ))
-    }
-}
-
 #[async_trait]
 impl InboundMessageCommitter for InMemoryIngress {
     async fn commit_inbound(
         &self,
         request: InboundCommitRequest,
     ) -> AppResult<InboundCommitOutcome> {
-        crate::transport::each_channel_in_one_task(&request.tasks)?;
         self.threads
             .store
             .lock()
@@ -1750,73 +1452,18 @@ impl InboundMessageCommitter for InMemoryIngress {
                 .await?;
             association_by_channel.insert(association.channel_id, message.id);
         }
-        if !already_stored {
-            for transition in &request.outreach_transitions {
-                let response_id = *association_by_channel
-                    .get(&transition.channel_id)
-                    .ok_or_else(|| {
-                        AppError::BadRequest(
-                            "An outreach transition has no message association".into(),
-                        )
-                    })?;
-                self.tasks
-                    .record_outreach_reply(&transition.matched, response_id)
-                    .await?;
-            }
-        }
-
-        let thread_of: std::collections::HashMap<Uuid, Uuid> = request
-            .associations
+        // The double stores no intent rows. It names each association's intent the same way on
+        // every delivery, so a redelivery reports the first delivery's intents, as the SQL
+        // committer does (p08 D1.3).
+        let intent_ids = request
+            .intents
             .iter()
-            .map(|association| association.channel_id)
-            .zip(thread_ids.iter().copied())
-            .collect();
-        let mut task_ids = Vec::with_capacity(request.tasks.len());
-        for task in &request.tasks {
-            let targets: Vec<TaskTarget> = task
-                .targets
-                .iter()
-                .map(|target| {
-                    Ok(TaskTarget {
-                        channel_id: target.channel_id,
-                        thread_id: *thread_of.get(&target.channel_id).ok_or_else(|| {
-                            AppError::Internal("A task target has no association".into())
-                        })?,
-                        recipient_role: target.role,
-                    })
-                })
-                .collect::<AppResult<_>>()?;
-            let primary = *targets
-                .first()
-                .ok_or_else(|| AppError::Internal("An inbound task names no channel".into()))?;
-            let payload = InboundTaskPayload::v1(InboundTaskPayloadV1 {
-                company_id: request.company_id,
-                channel_id: primary.channel_id,
-                thread_id: primary.thread_id,
-                source_message_id: stored.canonical_id,
-                correlation_id: envelope.correlation_id,
-                hop_count: envelope.directives.hop_count,
-                trace_channels: envelope.directives.trace_channels.clone(),
-                is_forwarded: envelope.directives.is_forwarded,
-                reply_delivery: request.reply_delivery,
+            .map(|intent| {
+                Uuid::from_u128(
+                    stored.canonical_id.as_uuid().as_u128() ^ intent.channel_id.as_u128(),
+                )
             })
-            .encode()?;
-            let created = self
-                .tasks
-                .enqueue_task(NewTask {
-                    company_id: request.company_id,
-                    channel_id: primary.channel_id,
-                    thread_id: Some(primary.thread_id),
-                    task_type: task.task_type.clone(),
-                    payload,
-                    targets,
-                    source: TaskSource::Message(stored.canonical_id),
-                    correlation_id: envelope.correlation_id,
-                })
-                .await?;
-            task_ids.push(created.id);
-        }
-
+            .collect();
         Ok(InboundCommitOutcome {
             disposition: if already_stored {
                 CommitDisposition::Duplicate
@@ -1825,14 +1472,7 @@ impl InboundMessageCommitter for InMemoryIngress {
             },
             message_id: stored.canonical_id,
             thread_ids,
-            task_ids,
-            // The double stores no handoff rows; it reports the ids the plan asked for, which is
-            // what the application-layer tests assert against.
-            handoff_ids: if already_stored {
-                Vec::new()
-            } else {
-                request.holds.iter().map(|hold| hold.handoff_id).collect()
-            },
+            intent_ids,
             delivery_ids: Vec::new(),
         })
     }

@@ -1,6 +1,6 @@
 use super::*;
 use crate::domain::entities::{
-    channel::{ChannelAccessMode, ChannelResponseTrigger},
+    channel::ChannelAccessMode,
     creation::CreationProvenance,
     participant::{ChannelPrincipalGrant, GrantProvenance, PrincipalCapability},
     thread::ThreadParticipantProjection,
@@ -12,7 +12,6 @@ fn channel(company_id: CompanyId, mode: ChannelAccessMode) -> Channel {
     Channel {
         id: Uuid::new_v4(),
         company_id: company_id.as_uuid(),
-        owner_agent_id: None,
         name: "Related".into(),
         description: None,
         slug: ChannelSlug::from("related"),
@@ -20,18 +19,11 @@ fn channel(company_id: CompanyId, mode: ChannelAccessMode) -> Channel {
         participant_emails: None,
         access_mode: mode,
         principal_grants: vec![],
-        agent_ids: None,
         enabled: true,
         add_3rd_party: false,
-        response_trigger: ChannelResponseTrigger::Always,
-        retrieve_company_memory: false,
-        retrieve_agent_memory: false,
-        retrieve_user_memory: false,
-        persist_company_memory: false,
-        persist_agent_memory: false,
-        persist_user_memory: false,
         created_by: CreationProvenance::system(),
         created_at: chrono::Utc::now(),
+        settings_revision: 0,
     }
 }
 

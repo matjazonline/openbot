@@ -16,6 +16,7 @@ fn context<'a>(
         run: RunMetadata {
             run_id: RunId::new(Uuid::nil()),
             parent_run_id: None,
+            deadline: None,
         },
     }
 }
@@ -441,4 +442,32 @@ fn binding_reference_walk_covers_every_recursive_variant() {
             .references()
             .is_empty()
     );
+}
+
+/// p08 D2.5: `/run/deadline` renders the run's deadline in one canonical UTC form, and is
+/// missing only where no run exists yet (admission).
+#[test]
+fn run_deadline_renders_canonically_and_is_missing_without_a_run() {
+    let input = json!({});
+    let outputs = BTreeMap::new();
+    let mut context = context(&input, &input, &outputs);
+    let limits = ContextLimits::default();
+    let deadline = reference("/run/deadline");
+    assert_eq!(
+        resolve(&deadline, &context, limits),
+        Err(ContextError::Missing("/run/deadline".into()))
+    );
+    let at: chrono::DateTime<chrono::FixedOffset> = "2030-01-01T02:00:00.5+02:00".parse().unwrap();
+    context.run.deadline = Some(at.with_timezone(&chrono::Utc));
+    assert_eq!(
+        resolve(&deadline, &context, limits).unwrap(),
+        json!("2030-01-01T00:00:00.500000Z")
+    );
+    assert_eq!(
+        ContextReference::parse("/run/deadline")
+            .unwrap()
+            .root_name(),
+        "run.deadline"
+    );
+    assert!(ContextReference::parse("/run/deadline/x").is_err());
 }

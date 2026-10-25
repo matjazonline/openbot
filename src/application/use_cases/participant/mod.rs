@@ -18,7 +18,7 @@ use crate::{
             IdentityClaimMetadata, IdentityProvenance, Principal, PrincipalAccessContext,
             PrincipalIdentity,
         },
-        transport::{PrincipalId, QualifiedIdentity, TransportKind},
+        transport::QualifiedIdentity,
     },
 };
 
@@ -53,14 +53,6 @@ pub trait IdentityDirectory: Send + Sync {
         company_id: Uuid,
         observation: IdentityObservation,
     ) -> AppResult<IdentityResolution>;
-
-    /// The usable handles these principals can be reached on over one transport, oldest first.
-    async fn identities_for_principals(
-        &self,
-        company_id: Uuid,
-        principal_ids: &[PrincipalId],
-        transport: TransportKind,
-    ) -> AppResult<Vec<PrincipalIdentity>>;
 }
 
 /// The actor facts channel policy needs, looked up by whichever handle the caller arrived with.

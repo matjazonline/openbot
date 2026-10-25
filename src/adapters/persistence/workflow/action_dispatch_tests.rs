@@ -49,6 +49,7 @@ impl SqlLocalAction for Effect {
         &self,
         tx: &mut Transaction<'_, Postgres>,
         action: &FrozenAction,
+        _: &ApprovalSubject,
     ) -> AppResult<Value> {
         sqlx::query("INSERT INTO fixture_action_effects VALUES ($1)")
             .bind(action.scope().execution.as_uuid())
@@ -439,7 +440,10 @@ async fn workflow_action_dispatch_sql_commit_expiry_and_append_only_facts() {
     PostgresActionDispatch::<Authority, Effect>::insert(&mut tx, &request, marker, "local", policy)
         .await
         .unwrap();
-    let output = Effect(0).apply(&mut tx, &action).await.unwrap();
+    let output = Effect(0)
+        .apply(&mut tx, &action, &request.subject)
+        .await
+        .unwrap();
     sqlx::query("INSERT INTO workflow_action_receipts (company_id,run_id,execution_id,invocation_id,argument_digest,dispatch_id,effect_kind,result) VALUES ($1,$2,$3,$4,$5,$6,'local',$7)")
         .bind(request.scope().company.as_uuid()).bind(request.scope().run.as_uuid()).bind(request.scope().execution.as_uuid())
         .bind(request.subject.invocation.as_uuid()).bind(request.subject.argument_digest.as_str()).bind(marker).bind(output).execute(&mut *tx).await.unwrap();

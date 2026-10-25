@@ -9,6 +9,7 @@ pub struct HttpPublicationDirectory {
     pub persistence: PostgresPersistence,
     pub selections: Vec<HttpPublicationSelection>,
 }
+#[derive(Clone)]
 pub struct HttpPublicationSelection {
     pub connection: Uuid,
     pub slot: Option<ResourceName>,

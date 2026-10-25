@@ -963,6 +963,12 @@ mod answer_tests {
         );
         assert!(!outage.is_permanent());
 
+        // Routed against channel settings an edit replaced: the sender's retry routes it again.
+        let superseded =
+            SmtpAnswer::for_error(&AppError::Superseded("channel settings changed".into()));
+        assert!(superseded.line().starts_with("451 "));
+        assert!(!superseded.is_permanent());
+
         let malformed = SmtpAnswer::for_error(&AppError::BadRequest("unusable sender".into()));
         assert!(malformed.line().starts_with("550 "));
         assert!(malformed.is_permanent());
@@ -972,7 +978,6 @@ mod answer_tests {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::entities::task::NewTask;
     use crate::use_cases::thread::test_support::InMemoryThreads;
 
     #[tokio::test]
@@ -1084,16 +1089,6 @@ mod tests {
         async fn delete(&self, _id: Uuid) -> AppResult<()> {
             unimplemented!()
         }
-        async fn list_company_team_emails(&self, _company_id: Uuid) -> AppResult<Vec<String>> {
-            Ok(vec![])
-        }
-
-        async fn list_company_team_accounts(
-            &self,
-            _company_id: Uuid,
-        ) -> AppResult<Vec<crate::entities::company::CompanyTeamAccount>> {
-            unimplemented!("this double is not exercised on the team-account path")
-        }
 
         /// This double never reaches a provider call: the tests around it assert on ingestion and
         /// threading, and an agent run that gets this far fails at parameter resolution by design.
@@ -1153,191 +1148,11 @@ mod tests {
         async fn update(
             &self,
             _request: crate::use_cases::channel::ChannelUpdate,
-        ) -> AppResult<crate::use_cases::channel::ChannelUpdateOutcome> {
+        ) -> AppResult<crate::entities::channel::Channel> {
             unimplemented!()
         }
         async fn delete(&self, _id: Uuid) -> AppResult<()> {
             unimplemented!()
-        }
-    }
-
-    struct MockTaskPersistence;
-
-    use crate::entities::task::{ResumeActor, StopActor, TaskFailure, TaskLeaseRef};
-    use crate::task_queue::{AgentDispatchCommit, DispatchCommit};
-
-    #[async_trait]
-    impl crate::task_queue::TaskPersistence for MockTaskPersistence {
-        async fn execute_delegation_command(
-            &self,
-            _request: crate::task_queue::DelegationCommandRequest,
-        ) -> AppResult<crate::entities::delegation::DelegationCommandResult> {
-            unreachable!("SMTP fixture does not execute delegation controls")
-        }
-
-        async fn outreach_reassignment_context(
-            &self,
-            _company_id: Uuid,
-            _task_id: Uuid,
-            _outreach_id: Uuid,
-            _target_id: Uuid,
-        ) -> AppResult<Option<crate::task_queue::OutreachReassignmentContext>> {
-            unreachable!("SMTP fixture does not reassign delegation targets")
-        }
-
-        async fn ask_owner_to_act(
-            &self,
-            _command: &crate::entities::internal_note::AskOwnerToAct,
-            _actor: crate::entities::transport::PrincipalId,
-        ) -> AppResult<crate::entities::internal_note::AskOwnerOutcome> {
-            Err(crate::app_error::AppError::Internal(
-                "agent instructions are not used by this SMTP double".into(),
-            ))
-        }
-
-        async fn start_agent_task(
-            &self,
-            _command: &crate::entities::internal_note::StartAgentTask,
-            _actor: crate::entities::transport::PrincipalId,
-        ) -> AppResult<crate::entities::task::BackgroundTask> {
-            Err(crate::app_error::AppError::Internal(
-                "agent task starts are not used by this SMTP double".into(),
-            ))
-        }
-
-        async fn claim_agent_instruction_notes(
-            &self,
-            _company_id: Uuid,
-            _thread_id: Uuid,
-            _lease: crate::entities::task::TaskLeaseRef,
-        ) -> AppResult<Vec<crate::entities::internal_note::AgentInstructionNote>> {
-            Ok(Vec::new())
-        }
-
-        /// No fixture here sends an outreach, so nothing ever asks one to be recorded.
-        async fn record_outreach_request_message(
-            &self,
-            _delivery_id: crate::entities::transport::DeliveryId,
-            _write: &crate::use_cases::thread::MessageWrite,
-        ) -> AppResult<crate::entities::message::CanonicalMessageId> {
-            unreachable!("no fixture here sends an outreach")
-        }
-
-        /// This fixture enqueues no task, so a run that asked for targets would be a bug in the
-        /// test rather than an empty conversation.
-        async fn list_task_channel_targets(
-            &self,
-            _company_id: Uuid,
-            _task_id: Uuid,
-        ) -> AppResult<Vec<crate::use_cases::thread::TaskChannelTarget>> {
-            Ok(Vec::new())
-        }
-
-        async fn commit_agent_dispatch(
-            &self,
-            commit: AgentDispatchCommit<'_>,
-        ) -> AppResult<DispatchCommit> {
-            let _ = commit;
-            Ok(DispatchCommit::Committed {
-                deliveries: Vec::new(),
-            })
-        }
-
-        async fn renew_task_lease(
-            &self,
-            _lease: TaskLeaseRef,
-            _lock_expires_at: chrono::DateTime<chrono::Utc>,
-        ) -> AppResult<bool> {
-            Ok(true)
-        }
-        async fn enqueue_task(
-            &self,
-            NewTask {
-                company_id,
-                channel_id,
-                thread_id,
-                targets: _,
-                task_type,
-                payload,
-                source: _,
-                correlation_id,
-            }: NewTask,
-        ) -> AppResult<crate::entities::task::BackgroundTask> {
-            Ok(crate::entities::task::BackgroundTask {
-                id: Uuid::new_v4(),
-                company_id,
-                channel_id,
-                thread_id,
-                correlation_id,
-                task_type,
-                status: crate::entities::task::TaskStatus::Pending,
-                payload,
-                retry_count: 0,
-                max_retries: 3,
-                last_error: None,
-                business_priority: Default::default(),
-                business_due_at: None,
-                attention_version: 1,
-                ownership: Default::default(),
-                worker_id: None,
-                execution_generation: None,
-                locked_at: None,
-                lock_expires_at: None,
-                run_at: Utc::now(),
-                created_at: Utc::now(),
-                updated_at: Utc::now(),
-            })
-        }
-        async fn get_task_by_id(
-            &self,
-            _id: Uuid,
-        ) -> AppResult<Option<crate::entities::task::BackgroundTask>> {
-            Ok(None)
-        }
-        async fn claim_pending_tasks(
-            &self,
-            _worker_id: Uuid,
-            _lock_expires_at: chrono::DateTime<chrono::Utc>,
-            _limit: i64,
-        ) -> AppResult<Vec<crate::entities::task::BackgroundTask>> {
-            Ok(vec![])
-        }
-        async fn claim_task(
-            &self,
-            _id: Uuid,
-            _worker_id: Uuid,
-            _lock_expires_at: chrono::DateTime<chrono::Utc>,
-        ) -> AppResult<bool> {
-            Ok(true)
-        }
-        async fn mark_task_completed(&self, _lease: TaskLeaseRef) -> AppResult<bool> {
-            Ok(true)
-        }
-        async fn mark_task_failed(&self, _failure: TaskFailure<'_>) -> AppResult<bool> {
-            Ok(true)
-        }
-        async fn stop_task(
-            &self,
-            _id: Uuid,
-            _actor: StopActor,
-        ) -> AppResult<crate::entities::task::BackgroundTask> {
-            unimplemented!()
-        }
-        async fn resume_task(
-            &self,
-            _id: Uuid,
-            _actor: ResumeActor,
-        ) -> AppResult<crate::entities::task::BackgroundTask> {
-            unimplemented!()
-        }
-        async fn list_company_tasks(
-            &self,
-            _company_id: Uuid,
-            _channel_id: Option<Uuid>,
-            _status: Option<crate::entities::task::TaskStatus>,
-            _sort_asc: bool,
-        ) -> AppResult<Vec<crate::entities::task::BackgroundTask>> {
-            Ok(vec![])
         }
     }
 
@@ -1388,15 +1203,12 @@ mod tests {
                 name: "Acme Corp".to_string(),
                 slug: "acme".into(),
                 avatar_url: None,
-                memory_provider: None,
                 created_at: Utc::now(),
             }]),
         });
 
         let channel_persistence = Arc::new(MockChannelPersistence {
             channels: Mutex::new(vec![Channel {
-                response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
-                owner_agent_id: None,
                 enabled: true,
                 add_3rd_party: true,
                 id: Uuid::new_v4(),
@@ -1408,28 +1220,18 @@ mod tests {
                 participant_emails: None,
                 access_mode: crate::entities::channel::ChannelAccessMode::Team,
                 principal_grants: Vec::new(),
-                agent_ids: None,
-                retrieve_company_memory: false,
-                retrieve_agent_memory: false,
-                retrieve_user_memory: false,
-                persist_company_memory: false,
-                persist_agent_memory: false,
-                persist_user_memory: false,
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
+                settings_revision: 0,
             }]),
         });
 
         let thread_persistence = Arc::new(InMemoryThreads::new());
 
-        let task_persistence = Arc::new(MockTaskPersistence);
-
         let config = Arc::new(AppConfig {
             jwt_secret: "secret".to_string(),
             sendgrid_inbound: None,
             resend_api: crate::infra::config::ResendApiConfig::default(),
-            hydradb: None,
-            hindsight: None,
             refresh_token_ttl: time::Duration::days(30),
             app_domain_name: "mailagents.com".to_string(),
             cors_allowed_origins: vec![],
@@ -1460,7 +1262,6 @@ mod tests {
             channel_persistence,
             company_persistence.clone(),
             Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
-            task_persistence,
             config.clone(),
         ));
 
@@ -1622,15 +1423,12 @@ regis";
                 name: "Populus Network".to_string(),
                 slug: "populus".into(),
                 avatar_url: None,
-                memory_provider: None,
                 created_at: Utc::now(),
             }]),
         });
 
         let channel_persistence = Arc::new(MockChannelPersistence {
             channels: Mutex::new(vec![Channel {
-                response_trigger: crate::entities::channel::ChannelResponseTrigger::Always,
-                owner_agent_id: None,
                 enabled: true,
                 add_3rd_party: true,
                 id: Uuid::new_v4(),
@@ -1642,28 +1440,18 @@ regis";
                 participant_emails: None,
                 access_mode: crate::entities::channel::ChannelAccessMode::Team,
                 principal_grants: Vec::new(),
-                agent_ids: None,
-                retrieve_company_memory: false,
-                retrieve_agent_memory: false,
-                retrieve_user_memory: false,
-                persist_company_memory: false,
-                persist_agent_memory: false,
-                persist_user_memory: false,
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
+                settings_revision: 0,
             }]),
         });
 
         let thread_persistence = Arc::new(InMemoryThreads::new());
 
-        let task_persistence = Arc::new(MockTaskPersistence);
-
         let config = Arc::new(AppConfig {
             jwt_secret: "secret".to_string(),
             sendgrid_inbound: None,
             resend_api: crate::infra::config::ResendApiConfig::default(),
-            hydradb: None,
-            hindsight: None,
             refresh_token_ttl: time::Duration::days(30),
             app_domain_name: "mailagents.com".to_string(),
             cors_allowed_origins: vec![],
@@ -1694,7 +1482,6 @@ regis";
             channel_persistence,
             company_persistence.clone(),
             Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
-            task_persistence,
             config.clone(),
         ));
 
@@ -1783,14 +1570,10 @@ Message-ID: <CAGj=2VKEn_MHfovWkBCqn4sp3AXPR=ZTLMso=mPjWtnMDStiRw@mail.gmail.com>
             channels: Mutex::new(Vec::new()),
         });
         let thread_persistence = Arc::new(InMemoryThreads::new());
-        let task_persistence = Arc::new(MockTaskPersistence);
-
         let config = Arc::new(AppConfig {
             jwt_secret: "secret".to_string(),
             sendgrid_inbound: None,
             resend_api: crate::infra::config::ResendApiConfig::default(),
-            hydradb: None,
-            hindsight: None,
             refresh_token_ttl: time::Duration::days(30),
             app_domain_name: "mailagents.com".to_string(),
             cors_allowed_origins: vec![],
@@ -1823,7 +1606,6 @@ Message-ID: <CAGj=2VKEn_MHfovWkBCqn4sp3AXPR=ZTLMso=mPjWtnMDStiRw@mail.gmail.com>
             channel_persistence,
             company_persistence.clone(),
             Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
-            task_persistence,
             config.clone(),
         ));
 

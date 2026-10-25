@@ -115,7 +115,7 @@ async fn workflow_activation_abort_and_lost_ack_reuse_snapshot_across_attempts()
         .await
         .unwrap();
     let options = f.persistence().pool().connect_options();
-    let pool = sqlx::postgres::PgPoolOptions::new()
+    let pool = crate::adapters::persistence::test_support::pool_options()
         .max_connections(1)
         .connect_with((*options).clone())
         .await

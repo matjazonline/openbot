@@ -9,6 +9,9 @@ mod capacity_tests;
 #[path = "action_dispatch_tests.rs"]
 mod action_dispatch_tests;
 
+#[path = "provisioning_dispatch_tests.rs"]
+mod provisioning_dispatch_tests;
+
 fn policy() -> LeasePolicy {
     LeasePolicy::new(Duration::from_secs(3)).unwrap()
 }

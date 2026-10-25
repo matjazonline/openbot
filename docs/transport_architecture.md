@@ -529,13 +529,14 @@ shows that a human was asked.
 **A producer says what it answers; only the email adapter writes a header.** `EmailThreading` has
 three arms -- `Standalone`, `Received { in_reply_to, references }`, and
 `Anchored(ConversationAnchor)` -- and `EmailRenderer` turns whichever one it is handed into
-`In-Reply-To:` and `References:`. `Anchored` is the arm that was missing: a schedule firing answers
-nothing that was ever received, and producers in that position used to build their own
-`<schedule-run-...>` id. That put a value no mail was ever sent under into a live `In-Reply-To:`,
-which threads onto nothing in a recipient's client and which no inbound reply can resolve back
-here. The anchor is an opaque durable key -- a schedule's run slot -- so a retry of one firing
-files under the first, two schedules never share a conversation, and a schedule that later
-delivers over Slack hands the same key to a renderer with no use for it.
+`In-Reply-To:` and `References:`. `Anchored` is the arm for a producer that answers nothing that
+was ever received. The legacy scheduled dispatch was the one such producer and used to build its
+own `<schedule-run-...>` id, which put a value no mail was ever sent under into a live
+`In-Reply-To:`: it threads onto nothing in a recipient's client, and no inbound reply can resolve
+it back here. An anchor is instead an opaque durable key, so a retry files under the first
+attempt, two producers never share a conversation, and a producer that later delivers over Slack
+hands the same key to a renderer with no use for it. Since p08 schedules start workflow runs, which
+send through `message.send`/`message.reply`; nothing produces an anchor today.
 
 ## The abstraction gate
 

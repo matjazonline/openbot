@@ -87,7 +87,7 @@ async fn workflow_budget_activation_rollback_and_fresh_handle_replay() {
     tx.rollback().await.unwrap();
     assert_eq!(accounting(&f).await, before);
     let options = f.persistence().pool().connect_options();
-    let pool = sqlx::postgres::PgPoolOptions::new()
+    let pool = crate::adapters::persistence::test_support::pool_options()
         .max_connections(1)
         .connect_with((*options).clone())
         .await

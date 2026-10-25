@@ -2,7 +2,7 @@
 
 use super::*;
 
-pub fn companies_page(companies: &[Company], configured: &ConfiguredMemoryProviders) -> String {
+pub fn companies_page(companies: &[Company]) -> String {
     let list_html = company_list_fragment(companies);
 
     let content = format!(
@@ -43,15 +43,6 @@ pub fn companies_page(companies: &[Company], configured: &ConfiguredMemoryProvid
                             placeholder="acme-corporation">
                     </div>
                 </div>
-                <div>
-                    <label for="company_memory_provider" class="block text-xs font-medium text-base-content/80 mb-1">Long-term Memory</label>
-                    <select id="company_memory_provider" name="memory_provider"
-                        class="w-full px-3.5 py-2 bg-base-200 border border-base-300 rounded-lg text-base-content text-sm">
-                        <option value="">Disabled</option>
-                        {memory_provider_options}
-                    </select>
-                    <p class="mt-1 text-[11px] text-base-content/70">Disabling suspends memory but retains the connection and channel choices. Deleting the company removes its remote memory.</p>
-                </div>
                 <div class="flex justify-end">
                     <button type="submit"
                         class="px-5 py-2 bg-primary hover:bg-primary/90 text-primary-content text-sm font-semibold rounded-lg shadow-md shadow-primary/20 transition cursor-pointer">
@@ -69,7 +60,6 @@ pub fn companies_page(companies: &[Company], configured: &ConfiguredMemoryProvid
             </div>
         </div>
     "##,
-        memory_provider_options = memory_provider_options("", configured),
     );
 
     base_layout("Companies", &content)
@@ -102,10 +92,6 @@ pub fn company_row_fragment(company: &Company) -> String {
                 <p class="text-xs text-base-content/70 mt-1">Added {created_at_str}</p>
             </div>
             <div class="flex items-center gap-2">
-                <a href="/companies/{id}/tasks" data-action="select-company" data-company-id="{id}"
-                    class="px-3 py-1.5 text-xs font-medium bg-warning/10 hover:bg-warning/20 text-base-content border border-warning/40 rounded-lg transition">
-                    Tasks
-                </a>
                 <a href="/companies/{id}/agents" data-action="select-company" data-company-id="{id}"
                     class="px-3 py-1.5 text-xs font-medium bg-info/10 hover:bg-info/20 text-base-content border border-info/40 rounded-lg transition">
                     Agents
@@ -137,12 +123,7 @@ pub fn company_row_fragment(company: &Company) -> String {
     )
 }
 
-pub fn company_edit_fragment(company: &Company, configured: &ConfiguredMemoryProviders) -> String {
-    let memory_disabled_selected = if company.memory_provider.is_none() {
-        "selected"
-    } else {
-        ""
-    };
+pub fn company_edit_fragment(company: &Company) -> String {
     format!(
         r##"
         <form id="company-{id}" hx-put="/companies/{id}" hx-target="#company-{id}" hx-swap="outerHTML"
@@ -163,14 +144,6 @@ pub fn company_edit_fragment(company: &Company, configured: &ConfiguredMemoryPro
                         class="w-full px-3.5 py-2 bg-base-200 border border-base-300 rounded-lg text-base-content text-sm focus:outline-none focus:ring-2 focus:ring-primary font-mono">
                 </div>
             </div>
-            <div>
-                <label class="block text-xs font-medium text-base-content/80 mb-1">Long-term Memory</label>
-                <select name="memory_provider" class="w-full px-3.5 py-2 bg-base-200 border border-base-300 rounded-lg text-base-content text-sm">
-                    <option value="" {memory_disabled_selected}>Disabled</option>
-                    {memory_provider_options}
-                </select>
-                <p class="mt-1 text-[11px] text-base-content/70">Disabling suspends memory but retains the connection and channel choices. Deleting the company removes its remote memory.</p>
-            </div>
             <div class="flex items-center justify-end gap-2">
                 <button type="button" hx-get="/companies/{id}/cancel" hx-target="#company-{id}" hx-swap="outerHTML"
                     class="px-3 py-1.5 text-xs font-medium bg-base-300 hover:bg-base-content/15 text-base-content rounded-lg transition cursor-pointer">
@@ -187,14 +160,6 @@ pub fn company_edit_fragment(company: &Company, configured: &ConfiguredMemoryPro
         name = escape_html_attr(&company.name),
         slug = escape_html_attr(&company.slug),
         avatar_url = escape_html_attr(company.avatar_url.as_deref().unwrap_or("")),
-        memory_disabled_selected = memory_disabled_selected,
-        memory_provider_options = memory_provider_options(
-            company
-                .memory_provider
-                .map(MemoryProviderKind::as_str)
-                .unwrap_or_default(),
-            configured,
-        ),
     )
 }
 

@@ -89,3 +89,82 @@ fn message_registry_built_in_names_cannot_be_registered_tools() {
     });
     assert!(compile_example(&example).is_err());
 }
+
+/// A `message.send` whose first message is awaited by a `message.reply` wait, edited by `edit`.
+fn reply_wait(edit: impl FnOnce(&mut Value)) -> Result<CompiledWorkflow, Diagnostic> {
+    use crate::application::workflow::triggers::MessageTriggerInput;
+    let mut example = example("message.send").unwrap();
+    changed(&mut example, |v| {
+        v["steps"]["start"]["routes"]["success"] = json!("answer");
+        v["steps"]["answer"] = json!({"type":"wait.event","with":{
+            "event":{"literal":"message.reply"},
+            "correlation":{"ref":"/steps/start/output/messages/0/message_id"},
+            "deadline":{"literal":"2030-01-01T00:00:00Z"},
+            "payload_schema":{"literal":MessageTriggerInput::schema()}},
+            "routes":{"success":"$end"}});
+        edit(&mut v["steps"]["answer"]["with"]);
+    });
+    compile_example(&example)
+}
+
+/// p08 D1.5.1 (F004.3, F018): a reply wait receives exactly the standard message payload, and
+/// correlates on a message step's outbound message, the only correlation a reply can carry.
+#[test]
+fn message_registry_reply_wait_takes_the_standard_payload_and_a_message_correlation() {
+    reply_wait(|_| {}).unwrap();
+    let schema = reply_wait(|with| with["payload_schema"] = json!({"literal":{"type":"object"}}));
+    assert_eq!(
+        schema.err().map(|error| error.code),
+        Some("registry.message_reply_schema")
+    );
+    for correlation in [
+        json!({"literal":"request-1"}),
+        json!({"ref":"/steps/start/output/status"}),
+        json!({"ref":"/steps/start/output/messages/first/message_id"}),
+        json!({"ref":"/input"}),
+    ] {
+        let error = reply_wait(|with| with["correlation"] = correlation.clone());
+        assert_eq!(
+            error.err().map(|error| error.code),
+            Some("registry.message_reply_correlation"),
+            "{correlation}"
+        );
+    }
+    // Any other event keeps its own payload schema and correlation.
+    reply_wait(|with| {
+        with["event"] = json!({"literal":"review.completed"});
+        with["correlation"] = json!({"literal":"request-1"});
+        with["payload_schema"] = json!({"literal":{"type":"object"}});
+    })
+    .unwrap();
+}
+
+/// p08 D2.1: a `tool.call` step cannot select a built-in provisioning tool, even when the facts
+/// supply a contract of that name; an `mcp.call` of that name is the server's own tool.
+#[test]
+fn provisioning_names_are_not_step_tools() {
+    use crate::application::workflow::provisioning::{CREATE_AGENT_CHANNEL, LIST_COMPANY_AGENTS};
+    let renamed = |kind: &str, name: &str| {
+        let mut example = example(kind).unwrap();
+        changed(&mut example, |v| {
+            let tool = &mut v["steps"]["start"]["with"]["tool"];
+            match tool.get_mut("literal") {
+                Some(literal) => *literal = json!(name),
+                None => *tool = json!(name),
+            }
+        });
+        for tool in &mut example.facts.tools {
+            if tool.name.as_str() == "lookup" {
+                tool.name = crate::domain::workflow::TypeName::parse(name).unwrap();
+            }
+        }
+        compile_example(&example)
+    };
+    for name in [LIST_COMPANY_AGENTS, CREATE_AGENT_CHANNEL] {
+        assert_eq!(
+            renamed("tool.call", name).err().unwrap().code,
+            "registry.tool"
+        );
+        assert!(renamed("mcp.call", name).is_ok(), "{name}");
+    }
+}

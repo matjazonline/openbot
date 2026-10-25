@@ -4,7 +4,7 @@ The deployment is **two Fly apps in the same organization**:
 
 | App | Config | Role |
 | --- | --- | --- |
-| `openbots` | `fly.toml` | axum API (3001) + inbound SMTP listener (2525) + task worker |
+| `openbots` | `fly.toml` | axum API (3001) + inbound SMTP listener (2525) + workflow workers |
 | `openbots-db` | `deploy/postgres/fly.toml` | self-hosted Postgres on a volume, no public IP |
 
 They talk over Fly's private 6PN network, so the database is never exposed to
@@ -136,8 +136,6 @@ Secrets — set with `fly secrets set`, never in `fly.toml`:
 | `APPLE_OAUTH_CLIENT_ID` / `APPLE_OAUTH_TEAM_ID` / `APPLE_OAUTH_KEY_ID` / `APPLE_OAUTH_PRIVATE_KEY_BASE64` | Optional Sign in with Apple. Set all four, use the Services ID as the client ID, base64-encode the `.p8` private key, and register `https://<APP_DOMAIN_NAME>/auth/apple/callback` as the return URL. Apple requires a real HTTPS domain and does not accept localhost. Register the outbound mail domain and sender with Apple's private email relay so confirmation codes reach relay addresses. |
 | `CREDENTIAL_ENCRYPTION_KEYS` | Versioned AES-256-GCM keys (`1:<base64-32-bytes>,2:<base64-32-bytes>`). This is the read key ring; keep prior versions during rotation. |
 | `CREDENTIAL_ENCRYPTION_ACTIVE_VERSION` | Positive version in `CREDENTIAL_ENCRYPTION_KEYS` used for new writes. It is intentionally independent of the highest readable version. |
-| `HYDRA_DB_API_KEY` | Optional deployment-wide HydraDB credential. Set with all three `HYDRA_DB_*` settings below or leave all four absent. |
-| `HINDSIGHT_API_KEY` | Optional deployment-wide Hindsight credential. Set with all three `HINDSIGHT_*` settings below or leave all four absent. |
 | `GCS_SERVICE_ACCOUNT_JSON_BASE64` | The Cloud Storage service account key, base64-encoded — see [Picture uploads](#picture-uploads) |
 
 Startup validates both credential-encryption settings but never mutates stored credentials. Use the
@@ -160,25 +158,25 @@ runtime privileges. This procedure describes the operator's reset; it is not a s
    a previous process attached to it.
 2. Build/deploy the same release to every web/worker instance. Startup applies migrations under
    the existing advisory lock; verify completion before allowing company setup. The fresh database
-   must have the baseline applied before response-contract or MCP configuration is saved.
+   must have the baseline applied before MCP configuration is saved.
    Configure the existing encryption key ring and active version for company model and MCP secrets.
 3. Every agent runs on Rig; there is no runtime selection. Verify successful registry
    construction at startup. Startup checks local configuration and coverage, not company
    credentials or remote models. Recreate a controlled company, its model connection and enabled
    model, and an agent using the [tested request](rig.md#configure-an-agent).
 4. Keep access restricted to the pilot operators. Run the pilot below against controlled recipients,
-   a captured delivery target and a controlled MCP endpoint. Capture release/model/task/run IDs and
+   a captured delivery target and a controlled MCP endpoint. Capture release/model/run IDs and
    pass/fail evidence without secrets or candidate/schema contents in operational logs.
 5. Open ordinary ingress and configuration access only after the release gates and pilot pass on
-   the deployed release. There is no dedicated Rig, response-contract or MCP admission feature flag:
+   the deployed release. There is no dedicated Rig or MCP admission feature flag:
    use the coordinated access restriction above.
 
 | Pilot | Required evidence before opening access |
 | --- | --- |
 | Ordinary execution | Text completion; usage and elapsed duration visible; controlled timeout terminates within budget |
-| Skill | Attached skill loads through `read_resource` and its saved result survives continuation |
-| Structured response | Valid JSON; one/two repairs; exhausted repair terminal failure with no answer delivery; invalid review edit rejected; valid edit delivered as exact JSON without footer |
-| MCP | Save separate credentials, refresh/test and review grants; schema/revision change rejects stale grants. Agents no longer call MCP, and workflow MCP actions only run once phase 08 wires workflow execution, so remote-call receipt and disconnect evidence belong to that release's pilot |
+| Skill | A controlled `agent.run` step whose agent has an attached skill answers by the skill's instructions |
+| Structured response | A model step with an `output_schema`: valid JSON; one/two repairs; an exhausted repair fails the step and delivers no reply |
+| MCP | Save separate credentials, refresh/test and review grants; schema/revision change rejects stale grants. Run one workflow `mcp.call` step against the controlled endpoint and keep its receipt |
 
 Use the deterministic scenarios in the [release verification matrix](rig-verification.md) for
 invalid outputs, timeout and disconnect cases; live model prompts alone cannot reliably force them.
@@ -190,9 +188,10 @@ Relevant deployment settings:
 | Setting | Behavior |
 | --- | --- |
 | `MCP_INTERNAL_ENDPOINTS` | Optional comma-separated exact IP-literal URL exceptions to public HTTPS; startup validates syntax, not endpoint readiness |
-| `AGENT_RUN_TIMEOUT_SECS` | Run fallback, default 300 seconds (1–3,600); Rig additionally caps each active claim at 300 seconds |
-| `TASK_WORKER_CONCURRENCY` | Default 4, range 1–64 per process |
 | `RUNTIME_THREAD_STACK_BYTES` | Runtime threads, default 16 MiB; separate from libtest's `RUST_MIN_STACK` |
+
+Workflow `http.request` steps reach public HTTPS origins only. Unlike MCP, there is no operator
+exception list for private or internal addresses.
 
 Model keys and enabled models belong in company model connections. Upstream Rig SDK example
 environment keys do not configure this application's agent credentials. MCP bearer tokens are
@@ -202,44 +201,45 @@ See [Rig configuration](rig.md) for supported providers, endpoint restrictions a
 #### Monitor and recover
 
 Compare completion, suspension, retry, terminal failure, timeout, latency and usage by
-harness/provider/model on representative workloads. Task details expose run/wait IDs, reserved
-budgets, replay counts and indeterminate effects. Track structured validation outcomes,
+provider/model on representative workloads. Start from the run (`GET
+/api/companies/{company_id}/workflow-runs/{run_id}`); the paths below are under the same company
+prefix. Track structured validation outcomes,
 `repair_call_count`, `terminal_invalid_output_reason` and aggregate token usage (which includes
 repairs); there is no separate repair-only token total. Estimated/mixed usage is not a bill.
 System-prompt generation is not metered and does not appear in usage.
 Use safe diagnostics, not prompts, schemas, candidates or tool payloads, for alerts.
 
-- **Approval/outreach wait:** inspect the task's linked wait and use its normal decision flow.
-  Restart uses saved call IDs, arguments and results. Do not switch runtime/configuration mid-run
-  or delete receipts. Rejection/expiry stops the run; ordinary task recovery preserves its budgets.
-- **Provider timeout/crash:** let the existing task retry/lease path recover the checkpoint.
+- **Decision wait:** a `decision.human` step parks the run on a workflow decision. Settle it on
+  the decision page or with `POST …/workflow-decisions/{decision_id}/submit`. Restart uses saved
+  call IDs, arguments and results. Do not change configuration mid-run or delete receipts.
+- **Provider timeout/crash:** let the job's retry and lease path recover the checkpoint.
   Unknown model requests remain charged. Diagnostics failures must not trigger manual paid-call
   replay. An exhausted budget is not repaired by clearing its ledger.
-- **Indeterminate MCP effect:** stop the affected task through task controls and retain its run,
-  invocation and connection IDs. Inspect the controlled remote service's audit trail to determine
-  whether the effect committed. Keep it stopped while uncertain. If committed, reconcile the
-  business result without issuing the call again; if confirmed absent, an operator may authorize
-  fresh work after checking that doing so is safe. There is no automated journal reset or
-  reconciliation endpoint. Never clear an invocation receipt to force redispatch; cancellation
-  cannot undo an accepted remote request.
+- **Indeterminate MCP effect:** the run waits on reconciliation. Retain its run, invocation and
+  connection IDs, and inspect the controlled remote service's audit trail to determine whether the
+  effect committed. `POST …/workflow-runs/{run_id}/reconciliations` records an operator note on
+  the action; it verifies no evidence and resumes nothing. If the effect committed, reconcile the
+  business result without issuing the call again; if it is confirmed absent, an operator may start
+  fresh work after checking that doing so is safe. Never clear an invocation receipt to force
+  redispatch; cancelling the run (`POST …/workflow-runs/{run_id}/cancel`) cannot undo an accepted
+  remote request.
 - **Invalid structured output:** inspect the bounded failure reason and repair count; no completed
-  answer was published. Correct the task instructions/model/schema through validated configuration
-  writes once the fence permits, then create fresh work if appropriate. Do not reset repair counters
-  or publish the rejected candidate. Existing review drafts keep their original contract.
+  answer was published. Correct the agent, the model or the step's `output_schema` by publishing a
+  new workflow version, then start fresh work if appropriate. Do not reset repair counters or
+  publish the rejected candidate.
 
 #### Roll back after new work exists
 
 Keep access restricted while rolling back. Prefer a compatible release that still reads the current
 Rig checkpoints, MCP receipts and response snapshots and enforces their contracts. Stop new
-configuration/task admission through the routing/deployment controls, inventory active/queued and
-parked tasks plus review drafts in the task workspace, and drain or explicitly reconcile them.
-Retain applied migrations and receipts. A default-harness change does not move these runs or stop
-explicit choices.
+admissions through the routing/deployment controls and by deactivating bindings (`POST
+…/workflow-bindings/{binding_id}/deactivate`), inventory queued, running and waiting runs (`GET
+…/workflow-runs`), and drain, cancel or reconcile them. Retain applied migrations and receipts.
 
-For structured-response rollback, keep enforcement for saved runs and review snapshots until they
-finish or are reconciled. Clear an agent's contract only with a validated `response_contract: null`
-write after the active-run fence allows it; clearing the agent cannot change an existing draft's
-contract. Do not deploy workers that ignore snapshots or reset repair reservations. If no compatible
+For structured-response rollback, keep enforcement for saved runs until they finish or are
+reconciled. A step's contract is its published version's `output_schema`, and a run keeps the
+version it started on, so publishing a new version does not change a run in flight. Do not deploy
+workers that ignore snapshots or reset repair reservations. If no compatible
 rollback artifact exists, keep affected work stopped and fix forward; this runbook does not promise
 an incompatible binary can safely consume the new database.
 
@@ -334,9 +334,9 @@ documents the full set.
 
 | Setting | Requirement |
 | --- | --- |
-| `TASK_WORKER_CONCURRENCY` | Concurrent durable agent tasks per process; 1–64, default 4 |
-| `AGENT_RUN_TIMEOUT_SECS` | Fallback wall-clock deadline for one agent/provider run; 1–3600 seconds, default 300. An agent's optional `run_timeout_secs` overrides it; a timeout consumes an attempt and cancels the provider future. |
-| `RUNTIME_THREAD_STACK_BYTES` | Stack reserved per async runtime thread; 2 MiB–256 MiB, default 16 MiB. The task-worker → dispatch → agent-runner chain of `async fn` frames overruns Tokio's 2 MiB default in an unoptimized build. |
+| `DATABASE_MAX_CONNECTIONS` | Database pool size, default 20. Startup refuses a pool smaller than `8 + 2 × WORKFLOW_WORKER_SLOTS`, naming both keys. |
+| `WORKFLOW_WORKER_SLOTS` | Concurrent workflow workers per process; 1–16, default 2. Each slot needs two pool connections (its claim or handler transaction and its lease renewal). |
+| `RUNTIME_THREAD_STACK_BYTES` | Stack reserved per async runtime thread; 2 MiB–256 MiB, default 16 MiB. A background job's chain of `async fn` frames can overrun Tokio's 2 MiB default in an unoptimized build; `scripts/stack-budget.sh` is what notices it growing. |
 | `SMTP_ALLOW_PLAINTEXT_LOCAL` | Development-only, default `false`; plaintext is accepted only with no credentials and a host that resolves exclusively to loopback. Never enable it for a deployed relay. |
 
 `RUNTIME_THREAD_STACK_BYTES` does not reach threads the process did not spawn itself, which means
@@ -369,86 +369,6 @@ ROLLBACK;
 Record the PostgreSQL version, statistics reset time, parameter classes (never sensitive values),
 row counts/selectivity, and candidate index definition with the plan. Capture multiple executions
 to distinguish cold and warm cache behavior.
-
-### Long-term memory providers
-
-Two memory backends are supported, HydraDB and Hindsight. Each is disabled unless all four of its
-settings are present. A deployment may configure either, both, or neither; company owners pick one
-per company in company settings, and switching retires the connection to the provider being left
-so its remote data is torn down rather than orphaned.
-
-#### HydraDB
-
-HydraDB is disabled unless all four settings below are present. Startup validates the group; it
-does not make a network call or promise that the credential is accepted. Company owners select
-HydraDB in company settings, after which a durable worker provisions the remote database. Channel
-memory controls remain unavailable until that connection reports `ready`.
-
-| Setting | Requirement |
-| --- | --- |
-| `HYDRA_DB_API_KEY` | Secret bearer credential; never stored in PostgreSQL or logged |
-| `HYDRA_DB_BASE_URL` | Absolute `http` or `https` API base URL |
-| `HYDRA_DB_FAST_TIMEOUT_SECS` | Request timeout for fast calls; 1–110 seconds |
-| `HYDRA_DB_THINKING_TIMEOUT_SECS` | Request timeout for thinking calls; 1–110 seconds and at least the fast timeout |
-
-#### Hindsight
-
-Hindsight partitions memory only by *bank*, so each company scope gets its own bank named
-`{remote_database_id}--{scope}`. Provisioning creates the company bank; the agent and user banks
-are created on first write, because their names are not knowable until a message arrives. Recall
-issues one call per enabled scope and ranks the results by the scope weights the channel
-configured. Retain runs asynchronously — Hindsight extracts facts with an LLM pass — so a memory
-becomes recallable shortly after the reply rather than at once.
-
-| Setting | Requirement |
-| --- | --- |
-| `HINDSIGHT_API_KEY` | Secret bearer credential; never stored in PostgreSQL or logged |
-| `HINDSIGHT_BASE_URL` | Absolute `http` or `https` base URL **including the API version and organization path segment** — `https://api.hindsight.vectorize.io/v1/default` for Hindsight Cloud, `http://localhost:8888/v1/default` self-hosted |
-| `HINDSIGHT_FAST_TIMEOUT_SECS` | Request timeout for fast calls; 1–110 seconds |
-| `HINDSIGHT_THINKING_TIMEOUT_SECS` | Request timeout for thinking calls; 1–110 seconds and at least the fast timeout |
-
-Scope-specific persistence is passed to Hindsight as per-item extraction context rather than as an
-enforced filter, because its own extraction instructions are bank-level while the channel's
-persistence mode can change between messages.
-
-Memory traffic also has fixed, provider-neutral application bounds. They are intentionally not
-deployment settings, so increasing a provider timeout or changing a deployment cannot remove the
-safety envelope:
-
-| Boundary | Limit and behavior |
-| --- | --- |
-| Connect / request / worker operation | 10 seconds maximum connect time; configured 1–110 second request time; 120 second total background-provider operation |
-| Recall query / additional context | 16,000 / 512 Unicode characters; safely truncated with an explicit marker |
-| Persistence user context / assistant answer | 32,000 Unicode characters each; safely truncated with an explicit marker |
-| Multi-channel upstream context | 24,000 Unicode characters across all preceding steps; safely truncated with an explicit marker |
-| Target collections | At most 3 per operation; larger operations are rejected |
-| Request / successful response body | 384 KiB total request envelope (376 KiB body plus 8 KiB reserved for validated URL, credential, and headers) / 512 KiB response; checked before send and while streaming before JSON parsing |
-| Provider URL / credential | 2,048 / 4,096 UTF-8 bytes; oversized startup configuration is rejected without logging the credential |
-| Recall results | At most the requested count and never more than 20 rows |
-| Chunk / final formatted memory context | 16,000 Unicode characters, including truncation marker and final context framing |
-
-Metrics `memory_truncations_total` and `memory_bound_rejections_total` report the operation and
-boundary without recording query, conversation, or response content.
-
-Provider selection, provisioning state, retry attempts, and cleanup jobs are durable. Disabling
-memory is suspension: runtime recall returns no memory, persistence is skipped immediately, and
-the connection plus channel memory choices are retained. Re-enabling a previously ready connection
-queues a readiness check before runtime memory resumes. If provider configuration disappears from
-a deployment, runtime memory degrades to the same safe no-memory behavior and emits structured
-state metrics. Deleting a company is different: it queues remote cleanup before the company row is
-removed, and cleanup jobs deliberately survive the company cascade.
-
-Each channel's Company, Agent, and User recall and persistence choices are independent. Missing
-agent or sender identities skip only the unavailable scope; they never fall back to Company.
-Company recall is available only to company members and system runs, while selected Agent and User
-recall can still serve external channel participants. User collections use a stable digest of the
-normalized sender address rather than embedding the address in collection names or logs.
-
-The default `audience_only` persistence mode sends the same conversation to each selected target
-for normal provider inference. The optional `scope_specific_facts` mode supplies fixed extraction
-instructions per target: durable user-attributable facts for User, reusable agent/workflow lessons
-for Agent, and durable organization-wide policies and processes for Company. Empty extraction is a
-successful no-op.
 
 ### Picture uploads
 
@@ -540,7 +460,7 @@ DNS to set up on the domain in `APP_DOMAIN_NAME`:
 ## Operational notes
 
 **Machines must not auto-stop.** `auto_stop_machines = false` and
-`min_machines_running = 1` are deliberate. The task worker poll loop and the
+`min_machines_running = 1` are deliberate. The workflow workers' poll loops and the
 SMTP listener have to keep running with zero HTTP traffic; letting Fly suspend
 the machine on idle would silently stall both.
 
@@ -557,9 +477,9 @@ anything you care about.
 two different behaviours, worth keeping straight:
 
 - *Already running.* The process stays up. sqlx's pool reconnects when Postgres
-  returns. Requests touching the database return 500s meanwhile, each of the
-  task worker's loops logs a warning and backs off for 5s before polling again
-  (`ERROR_BACKOFF` in `task_worker.rs`), and the SMTP listener keeps accepting —
+  returns. Requests touching the database return 500s meanwhile, each background
+  worker logs a warning and polls again on its own interval (a workflow worker
+  after one second, `WorkflowWorker::run`), and the SMTP listener keeps accepting —
   failed messages are logged and remote senders retry, so inbound mail is
   deferred rather than lost. No intervention needed.
 - *Booting.* `init_db` connects and runs migrations once at startup, and `main`

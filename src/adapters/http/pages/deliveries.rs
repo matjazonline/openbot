@@ -1,17 +1,16 @@
 //! The `/ui` Deliveries workspace: every message the company has handed to a transport, and what
 //! became of it.
 //!
-//! Built like the Tasks workspace next door — a filtered sidebar, one entry's detail swapped into
-//! `#delivery-pane` over htmx — because it answers the other half of the same question. Tasks says
-//! what the agent decided; this says whether the answer it wrote ever left the building.
+//! A filtered sidebar, with one entry's detail swapped into `#delivery-pane` over htmx: it says
+//! whether an answer ever left the building.
 //!
 //! It replaces an Outbox that could only be an email outbox. What a reader sees now is the
 //! transport, the purpose and the interface as columns of their own, and one row per provider
 //! message rather than one opaque payload blob: a chat answer sent as three posts has three
 //! provider keys, and the shape this replaces had room for one.
 //!
-//! Nothing here writes. The delivery worker owns these rows, so an entry offers a link to the task
-//! that produced it rather than buttons that would race the transport.
+//! Nothing here writes. The delivery worker owns these rows, so an entry offers no buttons that
+//! would race the transport.
 
 use super::*;
 
@@ -36,14 +35,10 @@ pub struct DeliveriesPage<'a> {
     pub pane_html: &'a str,
 }
 
-/// The pane for one delivery: where it stands, what it is carrying, and the way back to the task
-/// that wrote it.
+/// The pane for one delivery: where it stands and what it is carrying.
 pub struct DeliveryDetailPane<'a> {
     pub company_id: Uuid,
     pub entry: &'a DeliveryEntry,
-    /// The task this delivery came out of, when it is still one of the company's. Absent for a
-    /// delivery queued outside a task, or whose task has since been cleared.
-    pub task: Option<&'a BackgroundTask>,
     /// The channel it goes out as, when that channel still exists.
     pub channel: Option<&'a Channel>,
 }
@@ -389,7 +384,6 @@ pub fn delivery_detail_pane(pane: &DeliveryDetailPane<'_>) -> String {
                     <p class="truncate font-mono text-xs opacity-60">{entry_id}</p>
                 </div>
                 <div class="flex shrink-0 flex-wrap items-center gap-2">
-                    {task_link}
                     <button type="button" class="btn btn-ghost btn-sm btn-square text-xl leading-none" title="Reload this delivery"
                         hx-get="/ui/deliveries/{entry_id}?company_id={company_id}"
                         hx-target="#delivery-pane" hx-swap="outerHTML" hx-sync="#delivery-pane:replace">{reload_glyph}</button>
@@ -399,7 +393,6 @@ pub fn delivery_detail_pane(pane: &DeliveryDetailPane<'_>) -> String {
                 {state}
                 {facts}
                 {parts}
-                {task_summary}
                 {last_error}
             </div>
         </section>
@@ -409,34 +402,17 @@ pub fn delivery_detail_pane(pane: &DeliveryDetailPane<'_>) -> String {
         subject = escape_html_text(&entry.subject),
         entry_id = entry.id,
         reload_glyph = icon(Icon::Sync, BUTTON_ICON),
-        task_link = delivery_task_link(pane),
         state = delivery_state(entry),
         facts = delivery_facts(pane),
         parts = delivery_parts(entry),
-        task_summary = delivery_task_summary(pane),
         last_error = delivery_last_error(entry),
-    )
-}
-
-/// The task that produced this delivery is where its story starts, so the pane opens it in the
-/// Tasks workspace rather than only naming its id.
-fn delivery_task_link(pane: &DeliveryDetailPane<'_>) -> String {
-    let Some(task_id) = pane.entry.task_id else {
-        return String::new();
-    };
-
-    format!(
-        r##"<a href="/ui/tasks?company_id={company_id}&task_id={task_id}"
-                        class="btn btn-outline btn-sm">Open Task</a>"##,
-        company_id = pane.company_id,
     )
 }
 
 /// The one line that says where this delivery stands, in the words the status actually means.
 ///
-/// The two states that need a human are called out loudly: nothing retries either, and the task
-/// that wrote the message completed successfully, so this pane is the only place they become
-/// visible.
+/// The two states that need a human are called out loudly: nothing retries either, and whatever
+/// wrote the message has moved on, so this pane is the only place they become visible.
 fn delivery_state(entry: &DeliveryEntry) -> String {
     let (style, detail) = match entry.status {
         DeliveryStatus::Delivered => (
@@ -587,42 +563,6 @@ fn delivery_parts(entry: &DeliveryEntry) -> String {
     )
 }
 
-/// What the task behind this delivery is doing now — the reason a delivery is still queued is
-/// often the task, not the transport.
-fn delivery_task_summary(pane: &DeliveryDetailPane<'_>) -> String {
-    let Some(task_id) = pane.entry.task_id else {
-        return String::new();
-    };
-
-    let (badge, task_type) = match pane.task {
-        Some(task) => (
-            format!(
-                r##"<span class="badge badge-sm {style}">{label}</span>"##,
-                style = task_status_style(task.status),
-                label = task_status_label(task.status),
-            ),
-            escape_html_text(&task.task_type),
-        ),
-        None => (
-            r##"<span class="badge badge-sm badge-ghost">Unavailable</span>"##.to_string(),
-            "This delivery's task is no longer readable here.".to_string(),
-        ),
-    };
-
-    format!(
-        r##"<div class="space-y-2">
-                    <h3 class="text-xs font-semibold uppercase opacity-60">Task</h3>
-                    <a class="flex items-center gap-2 rounded-box border border-base-300 bg-base-200 px-4 py-2 text-xs hover:border-primary"
-                        href="/ui/tasks?company_id={company_id}&task_id={task_id}">
-                        {badge}
-                        <span class="min-w-0 truncate">{task_type}</span>
-                        <span class="ml-auto shrink-0 font-mono opacity-60">{task_id}</span>
-                    </a>
-                </div>"##,
-        company_id = pane.company_id,
-    )
-}
-
 /// The classified reason the last attempt ended, and the provider's own words about it.
 fn delivery_last_error(entry: &DeliveryEntry) -> String {
     let Some(class) = entry.last_error_class else {
@@ -639,9 +579,8 @@ fn delivery_last_error(entry: &DeliveryEntry) -> String {
     )
 }
 
-/// One badge style per delivery status, shared with the Tasks pane so a delivery reads the same
-/// in both workspaces.
-pub(crate) fn delivery_status_style(status: DeliveryStatus) -> &'static str {
+/// One badge style per delivery status.
+fn delivery_status_style(status: DeliveryStatus) -> &'static str {
     match status {
         DeliveryStatus::Pending => "badge-warning",
         DeliveryStatus::Retryable => "badge-warning",

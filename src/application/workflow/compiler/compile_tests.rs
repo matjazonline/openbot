@@ -31,6 +31,7 @@ fn workflow_compiler_round_trip_identity_and_runtime_snapshot() {
         run: RunMetadata {
             run_id: RunId::new(Uuid::nil()),
             parent_run_id: None,
+            deadline: None,
         },
     };
     let prepared = compiled

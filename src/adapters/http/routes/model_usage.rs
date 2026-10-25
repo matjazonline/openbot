@@ -28,15 +28,9 @@ pub fn router() -> Router<AppState> {
 struct Filters {
     days: Option<u16>,
     group: Option<String>,
-    #[serde(
-        default,
-        deserialize_with = "super::task::deserialize_empty_string_as_none"
-    )]
+    #[serde(default, deserialize_with = "super::deserialize_empty_string_as_none")]
     agent: Option<Uuid>,
-    #[serde(
-        default,
-        deserialize_with = "super::task::deserialize_empty_string_as_none"
-    )]
+    #[serde(default, deserialize_with = "super::deserialize_empty_string_as_none")]
     workflow: Option<Uuid>,
 }
 impl Filters {
@@ -99,10 +93,7 @@ async fn json_report(
 struct PriceForm {
     provider: String,
     model: String,
-    #[serde(
-        default,
-        deserialize_with = "super::task::deserialize_empty_string_as_none"
-    )]
+    #[serde(default, deserialize_with = "super::deserialize_empty_string_as_none")]
     revision: Option<i64>,
     input: String,
     output: String,

@@ -7,12 +7,8 @@ use uuid::Uuid;
 use crate::{
     app_error::{AppError, AppResult},
     entities::{
-        company::{
-            Company, CompanyAccess, CompanyChannelDefaults, CompanyModelConnection,
-            CompanyTeamAccount,
-        },
+        company::{Company, CompanyAccess, CompanyChannelDefaults, CompanyModelConnection},
         company_member::CompanyMembership,
-        memory::MemoryProviderKind,
         value_objects::{AvatarUrl, ModelName, ModelProvider},
     },
     model_providers::is_supported_model_provider,
@@ -104,11 +100,6 @@ impl CompanyModelConnectionWrite {
 pub struct CompanyWrite {
     pub name: String,
     pub slug: String,
-    /// `None` preserves the current value on update and chooses autonomous on create.
-    pub external_response_review: Option<crate::entities::response_draft::ExternalResponseReview>,
-    /// `None` preserves the current value on update and chooses automatic on create.
-    pub external_reply_handling: Option<crate::entities::thread_handoff::ExternalReplyHandling>,
-    pub memory_provider: Option<MemoryProviderKind>,
     pub channel_defaults: CompanyChannelDefaults,
     /// The company's picture, already parsed as a URL a page may render.
     pub avatar_url: Option<AvatarUrl>,
@@ -127,90 +118,8 @@ impl CompanyWrite {
             ));
         }
 
-        let submitted_participants = self
-            .channel_defaults
-            .participant_emails
-            .take()
-            .unwrap_or_default();
-        if submitted_participants.len() > 64 {
-            return Err(AppError::BadRequest(
-                "A company may configure at most 64 default channel participants.".into(),
-            ));
-        }
-
-        let mut seen = std::collections::HashSet::new();
-        let mut participants = Vec::new();
-        for participant in submitted_participants {
-            let normalized = participant.trim().to_ascii_lowercase();
-            if normalized.is_empty() || !seen.insert(normalized.clone()) {
-                continue;
-            }
-            if normalized != crate::entities::channel::PUBLIC_PARTICIPANT
-                && !email_shaped(&normalized)
-            {
-                return Err(AppError::BadRequest(format!(
-                    "Invalid default channel participant '{normalized}'."
-                )));
-            }
-            participants.push(normalized.into());
-        }
-        self.channel_defaults.participant_emails =
-            (!participants.is_empty()).then_some(participants);
-
         Ok(())
     }
-}
-
-fn email_shaped(value: &str) -> bool {
-    if value.chars().any(char::is_whitespace) {
-        return false;
-    }
-    let mut parts = value.split('@');
-    let (Some(local), Some(domain), None) = (parts.next(), parts.next(), parts.next()) else {
-        return false;
-    };
-    if local.is_empty()
-        || local.starts_with('.')
-        || local.ends_with('.')
-        || local.contains("..")
-        || !local.chars().all(|character| {
-            character.is_ascii_alphanumeric()
-                || matches!(
-                    character,
-                    '.' | '!'
-                        | '#'
-                        | '$'
-                        | '%'
-                        | '&'
-                        | '\''
-                        | '*'
-                        | '+'
-                        | '-'
-                        | '/'
-                        | '='
-                        | '?'
-                        | '^'
-                        | '_'
-                        | '`'
-                        | '{'
-                        | '|'
-                        | '}'
-                        | '~'
-                )
-        })
-    {
-        return false;
-    }
-    let labels = domain.split('.').collect::<Vec<_>>();
-    labels.len() >= 2
-        && labels.iter().all(|label| {
-            !label.is_empty()
-                && !label.starts_with('-')
-                && !label.ends_with('-')
-                && label
-                    .chars()
-                    .all(|character| character.is_ascii_alphanumeric() || character == '-')
-        })
 }
 
 #[async_trait]
@@ -267,19 +176,6 @@ pub trait CompanyPersistence: Send + Sync {
             .into_iter()
             .find(|access| access.company.id == company_id))
     }
-    async fn list_company_team_emails(&self, company_id: Uuid) -> AppResult<Vec<String>>;
-
-    /// The same team as one identity per account, owner first.
-    ///
-    /// [`CompanyPersistence::list_company_team_emails`] answers only "which addresses belong to
-    /// this team", which is enough to decide delivery but not to *choose* a person: attributing a
-    /// scheduled run to a colleague needs their account id and what they are to the company as
-    /// well. Required rather than defaulted for that reason -- an empty list would read as "this
-    /// company has no team", and the choice it feeds is an authorization decision.
-    async fn list_company_team_accounts(
-        &self,
-        company_id: Uuid,
-    ) -> AppResult<Vec<CompanyTeamAccount>>;
 
     /// Required rather than defaulted, like the two below it. A default returning an empty list
     /// reads as "this company has configured no providers", which is a real state with real
@@ -559,7 +455,6 @@ mod tests {
                 name: write.name,
                 slug: write.slug.into(),
                 avatar_url: write.avatar_url,
-                memory_provider: None,
                 created_at: Utc::now(),
             };
             self.companies.lock().unwrap().push(company.clone());
@@ -638,17 +533,6 @@ mod tests {
         async fn delete(&self, id: Uuid) -> AppResult<()> {
             self.companies.lock().unwrap().retain(|c| c.id != id);
             Ok(())
-        }
-
-        async fn list_company_team_emails(&self, _company_id: Uuid) -> AppResult<Vec<String>> {
-            Ok(vec![])
-        }
-
-        async fn list_company_team_accounts(
-            &self,
-            _company_id: Uuid,
-        ) -> AppResult<Vec<crate::entities::company::CompanyTeamAccount>> {
-            unimplemented!("this double is not exercised on the team-account path")
         }
 
         /// Model connections are not part of what these tests drive; a call here is a wiring mistake
@@ -733,51 +617,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn channel_defaults_normalize_and_validate_participants() {
-        let mut write = CompanyWrite {
-            name: "Acme".into(),
-            slug: "acme".into(),
-            channel_defaults: CompanyChannelDefaults {
-                participant_emails: Some(vec![
-                    "  Partner@Example.COM  ".into(),
-                    "partner@example.com".into(),
-                    " ".into(),
-                    "@PUBLIC".into(),
-                ]),
-                ..CompanyChannelDefaults::default()
-            },
-            ..CompanyWrite::default()
-        };
-        write.normalize().unwrap();
-        assert_eq!(
-            write.channel_defaults.participant_emails,
-            Some(vec!["partner@example.com".into(), "@public".into()])
-        );
-
-        let mut invalid = CompanyWrite {
-            name: "Acme".into(),
-            slug: "acme".into(),
-            channel_defaults: CompanyChannelDefaults {
-                participant_emails: Some(vec!["not-an-email".into()]),
-                ..CompanyChannelDefaults::default()
-            },
-            ..CompanyWrite::default()
-        };
-        assert!(matches!(invalid.normalize(), Err(AppError::BadRequest(_))));
-
-        let mut too_many = CompanyWrite {
-            name: "Acme".into(),
-            slug: "acme".into(),
-            channel_defaults: CompanyChannelDefaults {
-                participant_emails: Some(vec!["same@example.com".into(); 65]),
-                ..CompanyChannelDefaults::default()
-            },
-            ..CompanyWrite::default()
-        };
-        assert!(matches!(too_many.normalize(), Err(AppError::BadRequest(_))));
-    }
-
     #[tokio::test]
     async fn company_crud_flow_works() {
         let persistence = Arc::new(MockCompanyPersistence {
@@ -794,11 +633,6 @@ mod tests {
                 CompanyWrite {
                     name: "Acme Corp".to_string(),
                     slug: "acme-corp".to_string(),
-                    external_response_review: Some(
-                        crate::entities::response_draft::ExternalResponseReview::ReviewAllExternal,
-                    ),
-                    external_reply_handling: None,
-                    memory_provider: None,
                     channel_defaults: crate::entities::company::CompanyChannelDefaults::default(),
                     avatar_url: Some(AvatarUrl::from("https://cdn.example.com/acme.png")),
                 },
@@ -851,7 +685,6 @@ mod tests {
             name: "Acme".into(),
             slug: "acme".into(),
             avatar_url: None,
-            memory_provider: None,
             created_at: Utc::now(),
         };
         let persistence = MockCompanyPersistence {
@@ -890,7 +723,6 @@ mod tests {
             name: "Acme".into(),
             slug: "acme".into(),
             avatar_url: None,
-            memory_provider: None,
             created_at: Utc::now(),
         };
         let persistence = Arc::new(MockCompanyPersistence {

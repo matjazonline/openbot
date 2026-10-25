@@ -5,14 +5,17 @@ use crate::application::transport::{DeliveryComposer, TransportRenderers};
 use crate::application::workflow::{activation::*, decisions::*, waits::*};
 use tokio::sync::Barrier;
 
-struct DecisionFixture {
-    admission: AdmissionFixture,
-    scope: ActivationRequest,
-    users: Vec<Uuid>,
-    notices: DecisionNotices,
+pub(super) struct DecisionFixture {
+    pub(super) admission: AdmissionFixture,
+    pub(super) scope: ActivationRequest,
+    pub(super) users: Vec<Uuid>,
+    pub(super) notices: DecisionNotices,
 }
 impl DecisionFixture {
-    fn new(count: usize, error_route: Option<&str>) -> impl std::future::Future<Output = Self> {
+    pub(super) fn new(
+        count: usize,
+        error_route: Option<&str>,
+    ) -> impl std::future::Future<Output = Self> {
         Self::configured(count, move |source| {
             if let Some(route) = error_route {
                 source["steps"]["start"]["routes"]["error"] = json!(route);
@@ -72,13 +75,13 @@ impl DecisionFixture {
             notices,
         }
     }
-    fn persistence(&self) -> &PostgresPersistence {
+    pub(super) fn persistence(&self) -> &PostgresPersistence {
         self.admission.persistence()
     }
     fn actor(&self, index: usize) -> WorkflowActor {
         WorkflowActor::authenticated(self.users[index]).unwrap()
     }
-    async fn park(&self) -> DecisionView {
+    pub(super) async fn park(&self) -> DecisionView {
         self.persistence()
             .park_decision(self.scope, &self.notices)
             .await
@@ -97,7 +100,7 @@ impl DecisionFixture {
             .await
             .unwrap()
     }
-    fn submit(&self, view: &DecisionView, index: usize, key: &str) -> SubmitDecision {
+    pub(super) fn submit(&self, view: &DecisionView, index: usize, key: &str) -> SubmitDecision {
         SubmitDecision {
             company: self.scope.company,
             actor: self.actor(index),
@@ -486,3 +489,127 @@ mod boundary_tests;
 
 #[path = "decision_provenance_tests.rs"]
 mod provenance_tests;
+
+async fn reviewer_rows(
+    f: &DecisionFixture,
+    decision: DecisionId,
+) -> Vec<(Uuid, Option<Uuid>, bool)> {
+    sqlx::query_as("SELECT user_id, notice_delivery_id, notice_opted_out FROM workflow_decision_reviewers WHERE company_id=$1 AND decision_id=$2 ORDER BY ordinal")
+        .bind(f.scope.company.as_uuid()).bind(decision.0).fetch_all(f.persistence().pool()).await.unwrap()
+}
+
+fn check_violation(result: Result<sqlx::postgres::PgQueryResult, sqlx::Error>) -> bool {
+    result
+        .err()
+        .and_then(|error| {
+            error
+                .as_database_error()?
+                .code()
+                .map(|code| code == "23514")
+        })
+        .unwrap_or(false)
+}
+
+/// P08-Q8: an opted-out reviewer gets no notice, a reviewer row that records the opt-out, and can
+/// still submit; the other reviewer still gets theirs. The guard refuses an opt-out the
+/// preference does not back, and a row with neither a notice nor an opt-out.
+#[tokio::test]
+async fn workflow_decision_opted_out_reviewer_gets_no_notice_and_still_reviews() {
+    let f = Box::pin(DecisionFixture::new(2, None)).await;
+    let pool = f.persistence().pool();
+    sqlx::query("INSERT INTO user_notification_preferences(user_id, decision_email_enabled) VALUES($1, false)")
+        .bind(f.users[1]).execute(pool).await.unwrap();
+
+    let view = f.park().await;
+    assert_eq!(view.reviewers.len(), 2);
+    let rows = reviewer_rows(&f, view.decision).await;
+    assert_eq!(rows[0].0, f.users[0]);
+    assert!(
+        rows[0].1.is_some() && !rows[0].2,
+        "the opted-in reviewer is noticed"
+    );
+    assert_eq!(rows[1].0, f.users[1]);
+    assert!(
+        rows[1].1.is_none() && rows[1].2,
+        "the opted-out reviewer is recorded as such"
+    );
+    assert_eq!(f.counts().await["deliveries"], 1);
+
+    // A person principal of the company who is not a reviewer and has no preference row.
+    let other: Uuid = sqlx::query_scalar("SELECT principal.id FROM principals AS principal WHERE principal.company_id=$1 AND principal.kind='person' AND NOT EXISTS (SELECT 1 FROM workflow_decision_reviewers AS reviewer WHERE reviewer.decision_id=$2 AND reviewer.principal_id=principal.id) LIMIT 1")
+        .bind(f.scope.company.as_uuid()).bind(view.decision.0).fetch_one(pool).await.unwrap();
+    let forge = |opted_out: bool| {
+        sqlx::query("INSERT INTO workflow_decision_reviewers(company_id,decision_id,ordinal,principal_id,notice_delivery_id,notice_opted_out) VALUES($1,$2,2,$3,NULL,$4)")
+            .bind(f.scope.company.as_uuid()).bind(view.decision.0).bind(other).bind(opted_out)
+            .execute(pool)
+    };
+    assert!(
+        check_violation(forge(true).await),
+        "an opt-out the preference does not back"
+    );
+    assert!(
+        check_violation(forge(false).await),
+        "neither a notice nor an opt-out"
+    );
+
+    let applied = f
+        .persistence()
+        .submit_decision(f.submit(&view, 1, "opted-out"))
+        .await
+        .unwrap();
+    assert_eq!(applied.disposition, DecisionDisposition::Applied);
+}
+
+/// P08-Q8 under contention: a park reads the reviewer's preference `FOR SHARE`, so a toggle in
+/// flight is waited for rather than read around, and the park records what it committed to.
+#[tokio::test]
+async fn workflow_decision_park_waits_for_a_preference_toggle_in_flight() {
+    let f = Box::pin(DecisionFixture::new(1, None)).await;
+    let pool = f.persistence().pool().clone();
+    sqlx::query("INSERT INTO user_notification_preferences(user_id, decision_email_enabled) VALUES($1, false)")
+        .bind(f.users[0]).execute(&pool).await.unwrap();
+    // The toggle back on: its row locked and changed, not yet committed.
+    let mut toggle = pool.begin().await.unwrap();
+    sqlx::query(
+        "UPDATE user_notification_preferences SET decision_email_enabled = true WHERE user_id = $1",
+    )
+    .bind(f.users[0])
+    .execute(&mut *toggle)
+    .await
+    .unwrap();
+
+    let watch_then_commit = async {
+        let deadline = tokio::time::Instant::now() + std::time::Duration::from_millis(1500);
+        let mut waited = false;
+        while tokio::time::Instant::now() < deadline {
+            waited = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock' AND query LIKE '%FROM user_notification_preferences WHERE user_id=$1 FOR SHARE%')")
+                .fetch_one(&pool).await.unwrap();
+            if waited {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+        toggle.commit().await.unwrap();
+        waited
+    };
+    let (parked, waited) = tokio::join!(
+        f.persistence().park_decision(f.scope, &f.notices),
+        watch_then_commit
+    );
+    parked.unwrap().expect("the decision parks");
+    assert!(waited, "the park waited on the toggle's row lock");
+
+    let decision: Uuid = sqlx::query_scalar(
+        "SELECT id FROM workflow_decisions WHERE company_id=$1 AND execution_id=$2",
+    )
+    .bind(f.scope.company.as_uuid())
+    .bind(f.scope.execution.as_uuid())
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let rows = reviewer_rows(&f, DecisionId(decision)).await;
+    assert!(
+        rows[0].1.is_some() && !rows[0].2,
+        "the park saw the committed opt-in and sent the notice"
+    );
+}

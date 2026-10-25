@@ -1,4 +1,4 @@
-//! Operator-only machine panels kept separate from the already substantial task dashboard.
+//! Operator-only machine panels kept separate from the already substantial job dashboard.
 
 use super::{
     chart::{self, ChartKind, Series, TimeChart, YUnit},
@@ -8,9 +8,7 @@ use super::{
 };
 use crate::entities::{
     dashboard::DashboardWindow,
-    runtime_metrics::{
-        RuntimeMetricBucket, RuntimeMetricSnapshot, TASK_WORKER_RECOMMENDATION_POLICY,
-    },
+    runtime_metrics::{RuntimeMetricSnapshot, WORKFLOW_SLOTS_RECOMMENDATION_POLICY},
 };
 
 /// Deployment-wide information is rendered only when the route supplied an operator-authorized
@@ -45,10 +43,9 @@ pub(super) fn machine_section(page: &DashboardPage<'_>) -> String {
             <div class="flex flex-col gap-3">
                 {identity}
                 {memory}
-                {task_workers}
+                {workflow_workers}
                 {cpu}
                 {database}
-                {memory_provider}
                 {process}
             </div>
         </div>"##,
@@ -82,57 +79,56 @@ pub(super) fn machine_section(page: &DashboardPage<'_>) -> String {
                 )),
             ),
         ),
-        task_workers = task_worker_capacity(runtime),
+        workflow_workers = workflow_worker_capacity(runtime),
         cpu = runtime_cpu_panel(runtime, page.window),
         database = runtime_database_panel(runtime, page.window),
-        memory_provider = memory_provider_panel(runtime, page.window),
     )
 }
 
-fn task_worker_capacity(runtime: &RuntimeMetricSnapshot) -> String {
+fn workflow_worker_capacity(runtime: &RuntimeMetricSnapshot) -> String {
     let current = runtime.current.as_ref();
     let active = current
-        .map(|sample| sample.active_task_executions.to_string())
+        .map(|sample| sample.active_workflow_jobs.to_string())
         .unwrap_or_else(|| "—".to_string());
     let configured = current
-        .map(|sample| sample.task_worker_concurrency_limit.to_string())
+        .map(|sample| sample.workflow_worker_slots.to_string())
         .unwrap_or_else(|| "—".to_string());
     let suggested = runtime
-        .suggested_task_worker_concurrency
+        .suggested_workflow_worker_slots
         .as_ref()
         .map(|recommendation| recommendation.maximum.to_string())
         .unwrap_or_else(|| "—".to_string());
     let supporting_samples = runtime
-        .suggested_task_worker_concurrency
+        .suggested_workflow_worker_slots
         .as_ref()
         .map(|recommendation| recommendation.supporting_samples.to_string())
         .unwrap_or_else(|| "—".to_string());
-    let evidence_caption = if runtime.suggested_task_worker_concurrency.is_some() {
+    let evidence_caption = if runtime.suggested_workflow_worker_slots.is_some() {
         "complete samples at that level".to_string()
     } else {
         format!(
             "needs {}h and {} samples per level",
-            TASK_WORKER_RECOMMENDATION_POLICY.window_hours,
-            TASK_WORKER_RECOMMENDATION_POLICY.minimum_samples_per_level,
+            WORKFLOW_SLOTS_RECOMMENDATION_POLICY.window_hours,
+            WORKFLOW_SLOTS_RECOMMENDATION_POLICY.minimum_samples_per_level,
         )
     };
 
     format!(
         "{row}{criteria}",
         row = stat_row(
-            "Task worker capacity",
+            "Workflow worker capacity",
             &format!(
                 "{active}{configured}{suggested}{evidence}",
-                active = stat(Stat::new("Active tasks", &active, "executing now")),
+                active = stat(Stat::new("Active jobs", &active, "executing now")),
                 configured = stat(Stat::new(
-                    "Configured limit",
+                    "Configured slots",
                     &configured,
-                    "TASK_WORKER_CONCURRENCY",
+                    "WORKFLOW_WORKER_SLOTS",
                 )),
                 suggested = stat(Stat::new(
                     "Suggested maximum",
                     &suggested,
-                    "safe observed TASK_WORKER_CONCURRENCY",
+                    "safe observed WORKFLOW_WORKER_SLOTS",
                 )),
                 evidence = stat(Stat::new(
                     "Evidence",
@@ -143,12 +139,12 @@ fn task_worker_capacity(runtime: &RuntimeMetricSnapshot) -> String {
         ),
         criteria = chart_footer(&format!(
             "Uses {hours}h p95: CPU <{cpu:.0}%, steal + throttle <{pressure:.0}%, RSS <{rss:.0}% of limit, database acquire <{database:.0}ms, and {reserved} pool connections reserved",
-            hours = TASK_WORKER_RECOMMENDATION_POLICY.window_hours,
-            cpu = TASK_WORKER_RECOMMENDATION_POLICY.cpu_p95_percent,
-            pressure = TASK_WORKER_RECOMMENDATION_POLICY.cpu_pressure_p95_percent,
-            rss = TASK_WORKER_RECOMMENDATION_POLICY.rss_p95_percent,
-            database = TASK_WORKER_RECOMMENDATION_POLICY.database_acquire_p95_ms,
-            reserved = TASK_WORKER_RECOMMENDATION_POLICY.reserved_pool_connections,
+            hours = WORKFLOW_SLOTS_RECOMMENDATION_POLICY.window_hours,
+            cpu = WORKFLOW_SLOTS_RECOMMENDATION_POLICY.cpu_p95_percent,
+            pressure = WORKFLOW_SLOTS_RECOMMENDATION_POLICY.cpu_pressure_p95_percent,
+            rss = WORKFLOW_SLOTS_RECOMMENDATION_POLICY.rss_p95_percent,
+            database = WORKFLOW_SLOTS_RECOMMENDATION_POLICY.database_acquire_p95_ms,
+            reserved = WORKFLOW_SLOTS_RECOMMENDATION_POLICY.reserved_pool_connections,
         )),
     )
 }
@@ -296,98 +292,6 @@ fn runtime_database_panel(runtime: &RuntimeMetricSnapshot, window: DashboardWind
     )
 }
 
-/// Calls, failures and total time across the rendered range, summed from the same buckets the
-/// chart draws so the figures and the line can never disagree.
-#[derive(Default)]
-struct MemoryProviderRange {
-    calls: i64,
-    failures: i64,
-    total_ms: f64,
-}
-
-impl MemoryProviderRange {
-    fn summed(buckets: &[RuntimeMetricBucket]) -> Self {
-        buckets.iter().fold(Self::default(), |range, bucket| {
-            let calls = bucket.hydradb_calls.unwrap_or_default();
-            Self {
-                calls: range.calls + calls,
-                failures: range.failures + bucket.hydradb_failures.unwrap_or_default(),
-                total_ms: range.total_ms
-                    + bucket.hydradb_mean_ms.unwrap_or_default() * calls as f64,
-            }
-        })
-    }
-
-    fn mean_ms(&self) -> Option<f64> {
-        (self.calls > 0).then(|| self.total_ms / self.calls as f64)
-    }
-}
-
-/// Memory provider health as the application experienced it. Every provision, readiness check,
-/// recall and ingestion is counted where it completes, so this is call latency rather than a
-/// synthetic probe, and a range with no calls says so instead of showing a zero.
-fn memory_provider_panel(runtime: &RuntimeMetricSnapshot, window: DashboardWindow) -> String {
-    let range = MemoryProviderRange::summed(&runtime.buckets);
-    if range.calls == 0 {
-        return panel(
-            "Memory provider calls",
-            r##"<div class="px-4 py-6 text-sm opacity-60">— No memory provider calls were made in this range.</div>"##,
-        );
-    }
-
-    let failure_caption = format!(
-        "{:.1}% of calls",
-        range.failures as f64 * 100.0 / range.calls as f64
-    );
-    let mean = range
-        .mean_ms()
-        .map_or_else(|| "—".to_string(), |mean| format!("{mean:.0} ms"));
-    let summary = stat_row(
-        "Memory provider calls",
-        &format!(
-            "{calls}{failures}{latency}",
-            calls = stat(Stat::new("Calls", &range.calls.to_string(), window.label())),
-            failures = stat(Stat::new(
-                "Failed",
-                &range.failures.to_string(),
-                &failure_caption,
-            )),
-            latency = stat(Stat::new("Mean latency", &mean, "per call, end to end")),
-        ),
-    );
-
-    let series = [Series {
-        label: "mean",
-        color: "var(--color-primary)",
-        values: runtime
-            .buckets
-            .iter()
-            .map(|bucket| bucket.hydradb_mean_ms)
-            .collect(),
-    }];
-    let buckets: Vec<_> = runtime.buckets.iter().map(|bucket| bucket.bucket).collect();
-    format!(
-        "{summary}{}",
-        panel(
-            "Memory provider call latency",
-            &format!(
-                "{chart}{footer}",
-                chart = chart::time_chart(&TimeChart {
-                    buckets: &buckets,
-                    series: &series,
-                    kind: ChartKind::Line,
-                    unit: YUnit::Millis,
-                    tick_format: window.tick_format(),
-                }),
-                footer = chart_footer(
-                    "Recall, ingestion, provisioning and readiness calls made by this machine; \
-                     an empty segment is a period with no memory traffic",
-                ),
-            ),
-        )
-    )
-}
-
 fn bytes(value: Option<i64>) -> String {
     let Some(value) = value else {
         return "—".to_string();
@@ -405,67 +309,9 @@ fn bytes(value: Option<i64>) -> String {
 mod tests {
     use super::*;
     use crate::entities::runtime_metrics::{
-        MachineId, MachineIdentity, MemoryProviderInterval, RuntimeMetricSample,
-        TaskWorkerConcurrencyRecommendation,
+        MachineId, MachineIdentity, RuntimeMetricSample, WorkflowWorkerSlotsRecommendation,
     };
     use chrono::Utc;
-
-    fn bucket(
-        calls: Option<i64>,
-        failures: Option<i64>,
-        mean_ms: Option<f64>,
-    ) -> RuntimeMetricBucket {
-        RuntimeMetricBucket {
-            bucket: Utc::now(),
-            cpu_utilization_percent: None,
-            cpu_steal_percent: None,
-            cpu_throttle_percent: None,
-            database_acquire_p50_ms: None,
-            database_acquire_p95_ms: None,
-            hydradb_calls: calls,
-            hydradb_failures: failures,
-            hydradb_mean_ms: mean_ms,
-        }
-    }
-
-    #[test]
-    fn memory_provider_panel_weights_latency_by_the_calls_each_bucket_carries() {
-        let snapshot = RuntimeMetricSnapshot {
-            buckets: vec![
-                bucket(Some(1), Some(0), Some(100.0)),
-                bucket(None, None, None),
-                bucket(Some(3), Some(1), Some(200.0)),
-            ],
-            ..RuntimeMetricSnapshot::default()
-        };
-
-        let html = memory_provider_panel(&snapshot, DashboardWindow::last_hour());
-        assert!(
-            html.contains(">4<"),
-            "every call in the range is counted: {html}"
-        );
-        assert!(html.contains(">1<"), "failures are counted: {html}");
-        assert!(
-            html.contains("25.0% of calls"),
-            "the failure rate is per call, not per bucket: {html}"
-        );
-        assert!(
-            html.contains(">175 ms<"),
-            "latency is weighted by calls, not a mean of bucket means: {html}"
-        );
-    }
-
-    #[test]
-    fn memory_provider_panel_distinguishes_an_idle_range_from_a_zero() {
-        let snapshot = RuntimeMetricSnapshot {
-            buckets: vec![bucket(Some(0), Some(0), None), bucket(None, None, None)],
-            ..RuntimeMetricSnapshot::default()
-        };
-
-        let html = memory_provider_panel(&snapshot, DashboardWindow::last_hour());
-        assert!(html.contains("No memory provider calls"), "{html}");
-        assert!(!html.contains("Mean latency"), "{html}");
-    }
 
     #[test]
     fn worker_capacity_outputs_the_configured_and_safe_observed_maximum() {
@@ -481,24 +327,23 @@ mod tests {
                 cpu_utilization_percent: Some(10.0),
                 cpu_steal_percent: Some(1.0),
                 cpu_throttle_percent: Some(1.0),
-                active_task_executions: 2,
-                task_worker_concurrency_limit: 4,
+                active_workflow_jobs: 2,
+                workflow_worker_slots: 4,
                 database_acquire_duration_ms: 5.0,
                 database_acquire_succeeded: true,
                 pool_size: 10,
                 pool_idle: 7,
                 pool_active: 3,
-                hydradb: MemoryProviderInterval::default(),
             }),
-            suggested_task_worker_concurrency: Some(TaskWorkerConcurrencyRecommendation {
+            suggested_workflow_worker_slots: Some(WorkflowWorkerSlotsRecommendation {
                 maximum: 3,
                 supporting_samples: 120,
             }),
             ..RuntimeMetricSnapshot::default()
         };
 
-        let html = task_worker_capacity(&snapshot);
-        assert!(html.contains("Configured limit"), "{html}");
+        let html = workflow_worker_capacity(&snapshot);
+        assert!(html.contains("Configured slots"), "{html}");
         assert!(html.contains(">4<"), "{html}");
         assert!(html.contains("Suggested maximum"), "{html}");
         assert!(html.contains(">3<"), "{html}");

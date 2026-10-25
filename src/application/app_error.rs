@@ -10,8 +10,8 @@ pub enum AppError {
     Database(String),
     /// PostgreSQL cancelled a statement at its `lock_timeout` or `statement_timeout`. Transient:
     /// the same work can succeed once the contention clears. Kept apart from [`Self::Timeout`],
-    /// which is an execution deadline the task worker treats as final, so a busy database never
-    /// ends a task for good. A caller that bounded its own transaction turns this into a
+    /// which is an execution deadline, so a busy database is never mistaken for work that ran out of
+    /// time. A caller that bounded its own transaction turns this into a
     /// `Timeout` that says what did not happen. A workflow persistence bound that elapses
     /// before COMMIT was sent is this class too: definitely not applied, safe to retry.
     #[error("Database timed out: {0}")]
@@ -28,6 +28,12 @@ pub enum AppError {
 
     #[error("Conflict: {0}")]
     Conflict(String),
+
+    /// The state this work was planned against changed before it could apply, so nothing was
+    /// applied. Transient, unlike [`Self::Conflict`]: planning again against the current state can
+    /// succeed, and a caller that can replan -- an inbound transport's retry -- should.
+    #[error("Superseded: {0}")]
+    Superseded(String),
 
     #[error("Execution timed out: {0}")]
     Timeout(String),

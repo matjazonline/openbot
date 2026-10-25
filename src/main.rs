@@ -20,21 +20,15 @@ use mail_agents::{
     adapters::{persistence::PostgresPersistence, smtp::SmtpServer},
     infra::{
         app::create_app,
-        config::{
-            agent_run_timeout_from_env, runtime_thread_stack_bytes_from_env,
-            task_worker_concurrency_from_env,
-        },
+        config::runtime_thread_stack_bytes_from_env,
         events::run_mailbox_event_listener,
         postgres_persistence,
         runtime_metrics::LinuxRuntimeMetricSource,
         setup::{init_app_state, init_tracing},
     },
     services::{
-        delivery_worker::DeliveryWorker,
-        inbound_event_worker::InboundEventWorker,
-        notification_worker::NotificationWorker,
-        runtime_metrics::{ActiveTaskExecutions, RuntimeMetricSampler},
-        task_worker::TaskWorker,
+        delivery_worker::DeliveryWorker, inbound_event_worker::InboundEventWorker,
+        notification_worker::NotificationWorker, runtime_metrics::RuntimeMetricSampler,
     },
 };
 
@@ -194,52 +188,44 @@ async fn serve() -> anyhow::Result<()> {
          freeze the init schema, reinstate follow-up migrations, and remove this warning and the \
          listed notes."
     );
-    let task_worker_concurrency = task_worker_concurrency_from_env();
     let app_state = init_app_state().await?;
-    let memory_worker = app_state.memory_worker.clone();
     let mcp_use_cases = app_state.mcp_use_cases.clone();
     let inbound_event_worker: Arc<InboundEventWorker> = app_state.inbound_event_worker.clone();
     let notification_worker: Arc<NotificationWorker> = app_state.notification_worker.clone();
+    let workflow = app_state.workflow.clone();
 
     // Create broadcast channel for background worker graceful shutdown
     let (shutdown_tx, shutdown_rx) = tokio::sync::broadcast::channel(1);
+    // The workflow loops take a cancellation token; one bridge turns the broadcast into it.
+    let workflow_shutdown = tokio_util::sync::CancellationToken::new();
+    let mut workflow_bridge_handle = {
+        let token = workflow_shutdown.clone();
+        let mut stop = shutdown_tx.subscribe();
+        tokio::spawn(async move {
+            let _ = stop.recv().await;
+            token.cancel();
+        })
+    };
+    let mut workflow_handles = workflow.spawn(&workflow_shutdown);
 
-    let active_task_executions = ActiveTaskExecutions::default();
+    // The runtime panel samples the workflow worker slots and the jobs they hold (p08 D4.8).
     let runtime_source = LinuxRuntimeMetricSource::new(
         app_state.runtime_identity.clone(),
-        active_task_executions.clone(),
-        task_worker_concurrency,
-        app_state.memory_provider_activity.clone(),
+        workflow.active_jobs(),
+        workflow.slots(),
     );
     let runtime_sampler =
         RuntimeMetricSampler::new(app_state.runtime_metrics.clone(), runtime_source);
     let mut runtime_sampler_handle = tokio::spawn(runtime_sampler.run(shutdown_rx.resubscribe()));
 
-    // Initialize Task Worker poller loop
-    let task_worker = Arc::new(
-        TaskWorker::new(
-            app_state.thread_use_cases.get_task_persistence().await,
-            app_state.thread_use_cases.clone(),
-            app_state.config.clone(),
-        )
-        .with_task_concurrency(task_worker_concurrency)
-        .with_agent_run_timeout(agent_run_timeout_from_env())
-        .with_active_task_executions(active_task_executions)
-        .with_task_wakeups(app_state.task_wakeups.clone())
-        .with_schedules(app_state.schedule_use_cases.clone())
-        .with_monitoring(app_state.monitoring.clone()),
-    );
-
-    let task_worker_handle = tokio::spawn(task_worker.start_worker_loop(shutdown_rx.resubscribe()));
-    let mut memory_worker_handle = tokio::spawn(memory_worker.run(shutdown_rx.resubscribe()));
     let mut inbound_event_worker_handle =
         tokio::spawn(inbound_event_worker.run(shutdown_rx.resubscribe()));
     let mut notification_worker_handle =
         tokio::spawn(notification_worker.run(shutdown_rx.resubscribe()));
 
-    // The delivery queue is drained by its own worker rather than by the task loop. A delivery
-    // outlives the task that produced it, plenty of deliveries have no task behind them at all,
-    // and a long agent run must not hold up a queued reply.
+    // The delivery queue is drained by its own worker: a delivery outlives the run that produced
+    // it, plenty of deliveries have no run behind them at all, and a long agent run must not hold
+    // up a queued reply.
     let delivery_worker = Arc::new(
         DeliveryWorker::new(
             app_state.delivery_queue.clone(),
@@ -259,12 +245,11 @@ async fn serve() -> anyhow::Result<()> {
     let smtp_handle = tokio::spawn(smtp_server.start_server_loop(shutdown_rx.resubscribe()));
 
     // Republish committed messages to open mailboxes. It listens on the database rather than
-    // in-process because the writer is usually the task worker or the SMTP loop above.
+    // in-process because the writer is usually a workflow worker or the SMTP loop above.
     let mailbox_listener_handle = tokio::spawn(run_mailbox_event_listener(
         app_state.db.clone(),
         app_state.events.clone(),
         app_state.inbound_event_wakeups.clone(),
-        app_state.task_wakeups.clone(),
         shutdown_rx.resubscribe(),
     ));
 
@@ -307,18 +292,21 @@ async fn serve() -> anyhow::Result<()> {
     if let Err(error) = mcp_use_cases.shutdown().await {
         warn!(error = %error, "MCP shutdown failed");
     }
-    let mut task_worker_handle = task_worker_handle;
     let mut smtp_handle = smtp_handle;
     let mut mailbox_listener_handle = mailbox_listener_handle;
     tokio::join!(
         join_background("runtime metric sampler", &mut runtime_sampler_handle),
-        join_background("memory worker", &mut memory_worker_handle),
         join_background("inbound event worker", &mut inbound_event_worker_handle),
         join_background("notification projector", &mut notification_worker_handle),
-        join_background("task worker", &mut task_worker_handle),
         join_background("delivery worker", &mut delivery_worker_handle),
         join_background("SMTP listener", &mut smtp_handle),
         join_background("mailbox listener", &mut mailbox_listener_handle),
+        join_background("workflow shutdown bridge", &mut workflow_bridge_handle),
+        futures::future::join_all(
+            workflow_handles
+                .iter_mut()
+                .map(|(name, handle)| join_background(name, handle)),
+        ),
     );
 
     Ok(())

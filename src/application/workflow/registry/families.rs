@@ -132,6 +132,7 @@ impl Registration<'_> {
         }
         let schema = self.declared_schema("payload_schema")?;
         self.event_identity(&schema)?;
+        self.message_reply_wait(&schema)?;
         Ok(contract(
             json!({"event":identifier(),"correlation":text(MAX_CORRELATION),"deadline":text(MAX_DEADLINE),"payload_schema":{"const":schema}}),
             &["event", "correlation", "deadline", "payload_schema"],

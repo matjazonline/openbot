@@ -120,7 +120,6 @@ pub struct NewDelivery {
     /// The recipient named within the destination interface's namespace, or `None` when the
     /// interface itself is the destination.
     pub external_destination: Option<ExternalDestination>,
-    pub task_id: Option<Uuid>,
     /// The delivery that must land first. The claim refuses this row until that one is delivered.
     pub depends_on_delivery_id: Option<DeliveryId>,
     pub correlation_id: CorrelationId,
@@ -196,7 +195,6 @@ pub struct DeliveryRecord {
     pub id: DeliveryId,
     pub attribution: Option<DeliveryAttribution>,
     pub external_destination: Option<ExternalDestination>,
-    pub task_id: Option<Uuid>,
     pub correlation_id: CorrelationId,
     pub transport: TransportKind,
     pub purpose: DeliveryPurpose,
@@ -408,6 +406,13 @@ pub trait DeliveryQueue: Send + Sync {
     /// rather than retryable: the provider may hold it, and an automatic resend is where a
     /// duplicate comes from.
     async fn reap_expired_deliveries(&self) -> AppResult<DeliveryReaping>;
+
+    /// How many deliveries are stuck right now: dead-lettered, queued more than `overdue_after`
+    /// past their send time, or awaiting reconciliation of an unknown outcome.
+    async fn census_stuck_deliveries(
+        &self,
+        overdue_after: std::time::Duration,
+    ) -> AppResult<crate::entities::stuck_work::StuckWorkCensus>;
 }
 
 /// Producer-side creation of a standalone notification on the generic delivery queue.
@@ -476,7 +481,6 @@ mod tests {
                 destination_binding_id: ChannelBindingId::random(),
             }),
             external_destination: None,
-            task_id: None,
             correlation_id: CorrelationId::new(),
             transport: TransportKind::Email,
             purpose: DeliveryPurpose::Notification,

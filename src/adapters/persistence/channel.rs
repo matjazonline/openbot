@@ -23,8 +23,8 @@ use crate::{
         value_objects::{ChannelSlug, CompanySlug, EmailAddress},
     },
     use_cases::{
-        agent::{AgentPersistence, AgentWrite, OwnedAgentChannelPersistence},
-        channel::{ChannelPersistence, ChannelUpdate, ChannelUpdateOutcome, ChannelWrite},
+        agent::{AgentPersistence, AgentWrite, LibraryAgentCopyPersistence},
+        channel::{ChannelPersistence, ChannelUpdate, ChannelWrite},
         participant::{IdentityObservation, IdentityResolution},
     },
 };
@@ -33,7 +33,6 @@ use crate::{
 pub struct ChannelDb {
     pub id: Uuid,
     pub company_id: Uuid,
-    pub owner_agent_id: Option<Uuid>,
     pub name: String,
     pub description: Option<String>,
     pub slug: String,
@@ -41,16 +40,9 @@ pub struct ChannelDb {
     pub participant_emails: Option<Vec<String>>,
     pub access_mode: String,
     pub principal_grants: serde_json::Value,
-    pub agent_ids: Option<Vec<Uuid>>,
     pub enabled: bool,
     pub add_3rd_party: bool,
-    pub response_trigger: String,
-    pub retrieve_company_memory: bool,
-    pub retrieve_agent_memory: bool,
-    pub retrieve_user_memory: bool,
-    pub persist_company_memory: bool,
-    pub persist_agent_memory: bool,
-    pub persist_user_memory: bool,
+    pub settings_revision: i64,
     pub created_by: serde_json::Value,
     pub created_at: DateTime<Utc>,
 }
@@ -62,7 +54,6 @@ impl TryFrom<ChannelDb> for Channel {
         Ok(Channel {
             id: db.id,
             company_id: db.company_id,
-            owner_agent_id: db.owner_agent_id,
             name: db.name,
             description: db.description,
             slug: ChannelSlug::from(db.slug),
@@ -78,16 +69,9 @@ impl TryFrom<ChannelDb> for Channel {
                     db.id
                 ))
             })?,
-            agent_ids: db.agent_ids,
             enabled: db.enabled,
             add_3rd_party: db.add_3rd_party,
-            response_trigger: db.response_trigger.parse().map_err(AppError::Internal)?,
-            retrieve_company_memory: db.retrieve_company_memory,
-            retrieve_agent_memory: db.retrieve_agent_memory,
-            retrieve_user_memory: db.retrieve_user_memory,
-            persist_company_memory: db.persist_company_memory,
-            persist_agent_memory: db.persist_agent_memory,
-            persist_user_memory: db.persist_user_memory,
+            settings_revision: db.settings_revision,
             created_by: serde_json::from_value(db.created_by).map_err(|err| {
                 AppError::Internal(format!("Invalid channels.created_by provenance: {err}"))
             })?,
@@ -97,7 +81,7 @@ impl TryFrom<ChannelDb> for Channel {
 }
 
 const CHANNEL_SELECT: &str = r#"
-    SELECT ch.id, ch.company_id, ch.owner_agent_id, ch.name, ch.description,
+    SELECT ch.id, ch.company_id, ch.name, ch.description,
            (SELECT cs.slug::text FROM channel_slugs cs
             WHERE cs.channel_id = ch.id AND cs.is_primary) AS slug,
            COALESCE(
@@ -141,12 +125,7 @@ const CHANNEL_SELECT: &str = r#"
                 FROM channel_principal_grants AS channel_grant
                 WHERE channel_grant.company_id = ch.company_id AND channel_grant.channel_id = ch.id),
                '[]'::jsonb) AS principal_grants,
-           (SELECT array_agg(ca.agent_id ORDER BY ca.position)
-            FROM channel_agents ca WHERE ca.channel_id = ch.id) AS agent_ids,
-           ch.enabled, ch.add_3rd_party, ch.response_trigger,
-           ch.retrieve_company_memory, ch.retrieve_agent_memory, ch.retrieve_user_memory,
-           ch.persist_company_memory, ch.persist_agent_memory, ch.persist_user_memory,
-           ch.created_by, ch.created_at
+           ch.enabled, ch.add_3rd_party, ch.settings_revision, ch.created_by, ch.created_at
     FROM channels ch
 "#;
 
@@ -307,57 +286,49 @@ pub(super) async fn write_channel_email_binding(
     .await
 }
 
+/// The `channels` row of a new channel, with its stored access mode; every creation path writes
+/// it here, then its slugs, email binding and allowlist grants through their own helpers. Returns
+/// the participants that become allowlist grants.
+pub(crate) async fn insert_channel_row_on(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    company_id: Uuid,
+    channel_id: Uuid,
+    write: &ChannelWrite,
+) -> AppResult<Vec<String>> {
+    let (access_mode, participants) = channel_access(write.participant_emails.clone());
+    let created_by = serde_json::to_value(
+        write
+            .created_by
+            .clone()
+            .unwrap_or_else(CreationProvenance::system),
+    )
+    .map_err(|error| AppError::Internal(error.to_string()))?;
+    sqlx::query(
+        r#"INSERT INTO channels (
+                id, company_id, name, description, access_mode, enabled, add_3rd_party,
+                created_by)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)"#,
+    )
+    .bind(channel_id)
+    .bind(company_id)
+    .bind(&write.name)
+    .bind(&write.description)
+    .bind(access_mode.as_str())
+    .bind(write.enabled)
+    .bind(write.add_3rd_party)
+    .bind(created_by)
+    .execute(&mut **tx)
+    .await
+    .map_err(AppError::from)?;
+    Ok(participants)
+}
+
 #[async_trait]
 impl ChannelPersistence for PostgresPersistence {
     async fn create(&self, company_id: Uuid, write: ChannelWrite) -> AppResult<Channel> {
         let uuid = Uuid::new_v4();
-        let (access_mode, participants) = channel_access(write.participant_emails.clone());
-        let created_by = serde_json::to_value(
-            write
-                .created_by
-                .clone()
-                .unwrap_or_else(CreationProvenance::system),
-        )
-        .map_err(|error| AppError::Internal(error.to_string()))?;
         let mut tx = self.pool.begin().await.map_err(AppError::from)?;
-
-        sqlx::query(
-            r#"INSERT INTO channels (
-                    id, company_id, name, description, access_mode, enabled, add_3rd_party, created_by,
-                    retrieve_company_memory, retrieve_agent_memory, retrieve_user_memory,
-                    persist_company_memory, persist_agent_memory, persist_user_memory,
-                    external_response_review_override, preferred_reviewer_principal_id, response_trigger
-               ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8,
-                         $9, $10, $11, $12, $13, $14, $15, $16, $17)"#,
-        )
-        .bind(uuid)
-        .bind(company_id)
-        .bind(&write.name)
-        .bind(&write.description)
-        .bind(access_mode.as_str())
-        .bind(write.enabled)
-        .bind(write.add_3rd_party)
-        .bind(created_by)
-        .bind(write.retrieve_company_memory)
-        .bind(write.retrieve_agent_memory)
-        .bind(write.retrieve_user_memory)
-        .bind(write.persist_company_memory)
-        .bind(write.persist_agent_memory)
-        .bind(write.persist_user_memory)
-        .bind(
-            write
-                .external_response_review_override
-                .map(|policy| policy.as_str()),
-        )
-        .bind(
-            write
-                .preferred_reviewer_principal_id
-                .map(crate::entities::transport::PrincipalId::as_uuid),
-        )
-        .bind(write.response_trigger.as_str())
-        .execute(&mut *tx)
-        .await
-        .map_err(AppError::from)?;
+        let participants = insert_channel_row_on(&mut tx, company_id, uuid, &write).await?;
 
         insert_channel_slugs(&mut tx, company_id, uuid, &write.slug, &write.alias_slugs).await?;
 
@@ -365,126 +336,10 @@ impl ChannelPersistence for PostgresPersistence {
 
         insert_email_allowlist_grants(&mut tx, company_id, uuid, participants).await?;
 
-        for (position, agent_id) in write.agent_ids.unwrap_or_default().into_iter().enumerate() {
-            sqlx::query(
-                r#"INSERT INTO channel_agents (company_id, channel_id, agent_id, position)
-                   VALUES ($1, $2, $3, $4)"#,
-            )
-            .bind(company_id)
-            .bind(uuid)
-            .bind(agent_id)
-            .bind(position as i32)
-            .execute(&mut *tx)
-            .await
-            .map_err(AppError::from)?;
-        }
-
         tx.commit().await.map_err(AppError::from)?;
         load_channel(self, uuid)
             .await?
             .ok_or_else(|| AppError::Internal("Created channel was not found".into()))
-    }
-
-    async fn create_with_agent(
-        &self,
-        company_id: Uuid,
-        agent: AgentWrite,
-        channel: ChannelWrite,
-    ) -> AppResult<(Agent, Channel)> {
-        let agent_id = Uuid::new_v4();
-        let channel_id = Uuid::new_v4();
-        let channel_created_by = serde_json::to_value(
-            channel
-                .created_by
-                .clone()
-                .unwrap_or_else(CreationProvenance::system),
-        )
-        .map_err(|error| AppError::Internal(error.to_string()))?;
-        let (access_mode, participants) = channel_access(channel.participant_emails.clone());
-        let mut tx = self.pool.begin().await.map_err(AppError::from)?;
-
-        insert_agent_on(&mut tx, agent_id, Some(company_id), &agent).await?;
-
-        create_agent_principal_on(&mut tx, company_id, agent_id, &agent.name).await?;
-
-        sqlx::query(
-            r#"INSERT INTO channels (
-                    id, company_id, name, description, access_mode, enabled, add_3rd_party,
-                    created_by, retrieve_company_memory, retrieve_agent_memory,
-                    retrieve_user_memory, persist_company_memory, persist_agent_memory,
-                    persist_user_memory, external_response_review_override,
-                    preferred_reviewer_principal_id, response_trigger)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
-                       $15, $16, $17)"#,
-        )
-        .bind(channel_id)
-        .bind(company_id)
-        .bind(&channel.name)
-        .bind(&channel.description)
-        .bind(access_mode.as_str())
-        .bind(channel.enabled)
-        .bind(channel.add_3rd_party)
-        .bind(channel_created_by)
-        .bind(channel.retrieve_company_memory)
-        .bind(channel.retrieve_agent_memory)
-        .bind(channel.retrieve_user_memory)
-        .bind(channel.persist_company_memory)
-        .bind(channel.persist_agent_memory)
-        .bind(channel.persist_user_memory)
-        .bind(
-            channel
-                .external_response_review_override
-                .map(|policy| policy.as_str()),
-        )
-        .bind(
-            channel
-                .preferred_reviewer_principal_id
-                .map(crate::entities::transport::PrincipalId::as_uuid),
-        )
-        .bind(channel.response_trigger.as_str())
-        .execute(&mut *tx)
-        .await
-        .map_err(AppError::from)?;
-
-        insert_channel_slugs(
-            &mut tx,
-            company_id,
-            channel_id,
-            &channel.slug,
-            &channel.alias_slugs,
-        )
-        .await?;
-        write_channel_email_binding(&mut tx, company_id, channel_id, &channel).await?;
-        insert_email_allowlist_grants(&mut tx, company_id, channel_id, participants).await?;
-        let mut assigned = vec![agent_id];
-        assigned.extend(
-            channel
-                .agent_ids
-                .unwrap_or_default()
-                .into_iter()
-                .filter(|id| *id != agent_id),
-        );
-        for (position, assigned_agent_id) in assigned.into_iter().enumerate() {
-            sqlx::query(
-                "INSERT INTO channel_agents (company_id, channel_id, agent_id, position) VALUES ($1, $2, $3, $4)",
-            )
-            .bind(company_id)
-            .bind(channel_id)
-            .bind(assigned_agent_id)
-            .bind(position as i32)
-            .execute(&mut *tx)
-            .await
-            .map_err(AppError::from)?;
-        }
-        tx.commit().await.map_err(AppError::from)?;
-
-        let agent = AgentPersistence::get_by_id(self, agent_id)
-            .await?
-            .ok_or_else(|| AppError::Internal("Created agent was not found".into()))?;
-        let channel = load_channel(self, channel_id)
-            .await?
-            .ok_or_else(|| AppError::Internal("Created channel was not found".into()))?;
-        Ok((agent, channel))
     }
 
     async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Channel>> {
@@ -524,18 +379,17 @@ impl ChannelPersistence for PostgresPersistence {
         db_list.into_iter().map(TryInto::try_into).collect()
     }
 
-    async fn update(&self, request: ChannelUpdate) -> AppResult<ChannelUpdateOutcome> {
+    async fn update(&self, request: ChannelUpdate) -> AppResult<Channel> {
         let channel_id = request.channel_id;
-        let removal = crate::adapters::persistence::channel_assignment::update_channel_within(
+        crate::adapters::persistence::channel_edit::update_channel_within(
             &self.pool,
             request,
-            crate::adapters::persistence::channel_assignment::RemovalBudget::DEFAULT,
+            crate::adapters::persistence::channel_edit::EditBudget::DEFAULT,
         )
         .await?;
-        let channel = load_channel(self, channel_id)
+        load_channel(self, channel_id)
             .await?
-            .ok_or_else(|| AppError::Internal("Updated channel was not found".into()))?;
-        Ok(ChannelUpdateOutcome { channel, removal })
+            .ok_or_else(|| AppError::Internal("Updated channel was not found".into()))
     }
 
     async fn delete(&self, id: Uuid) -> AppResult<()> {
@@ -543,80 +397,38 @@ impl ChannelPersistence for PostgresPersistence {
             .bind(id)
             .execute(&self.pool)
             .await
-            .map_err(|error| {
-                if error
-                    .as_database_error()
-                    .and_then(|db| db.code())
-                    .as_deref()
-                    == Some("23503")
-                {
-                    AppError::Conflict(
-                        "This is an agent-owned personal channel. Delete the owning agent instead."
-                            .into(),
-                    )
-                } else {
-                    AppError::from(error)
-                }
-            })?;
+            .map_err(AppError::from)?;
         Ok(())
     }
 }
 
-/// Every setting one channel edit writes except its agent assignments, on the caller's transaction.
+/// Every setting one channel edit writes, on the caller's transaction.
 ///
-/// The caller holds the channel's row lock and has checked its tenant; assignments are
-/// `channel_assignment`'s, because changing them can stop work and this cannot.
+/// The caller holds the channel's gate and row lock and has checked its tenant
+/// (`channel_edit`).
 pub(super) async fn write_channel_settings_on(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     company_id: Uuid,
     id: Uuid,
     write: &ChannelWrite,
 ) -> AppResult<()> {
-    // The `COALESCE` on the two override columns below makes `None` mean "leave it alone", so
-    // neither override can be cleared back to "inherit" through this statement. The sibling
-    // reply-handling override deliberately does not join them: it is written only through
-    // `ThreadHandoffPolicyPersistence::set_channel_reply_handling_override`, which binds its
-    // `Option` directly. See `plan/manual_handoff/phase1.md` §1.5 before editing this.
     let (access_mode, participants) = channel_access(write.participant_emails.clone());
     let result = sqlx::query(
-            r#"UPDATE channels
+        r#"UPDATE channels
                SET name = $1, description = $2, access_mode = $3, enabled = $4,
-                   add_3rd_party = $5, retrieve_company_memory = $6,
-                   retrieve_agent_memory = $7, retrieve_user_memory = $8,
-                   persist_company_memory = $9, persist_agent_memory = $10,
-                   persist_user_memory = $11,
-                   external_response_review_override = COALESCE($12, external_response_review_override),
-                   preferred_reviewer_principal_id = COALESCE($13, preferred_reviewer_principal_id),
-                   response_trigger = $16
-               WHERE id = $14 AND company_id = $15"#,
-        )
-        .bind(&write.name)
-        .bind(&write.description)
-        .bind(access_mode.as_str())
-        .bind(write.enabled)
-        .bind(write.add_3rd_party)
-        .bind(write.retrieve_company_memory)
-        .bind(write.retrieve_agent_memory)
-        .bind(write.retrieve_user_memory)
-        .bind(write.persist_company_memory)
-        .bind(write.persist_agent_memory)
-        .bind(write.persist_user_memory)
-        .bind(
-            write
-                .external_response_review_override
-                .map(|policy| policy.as_str()),
-        )
-        .bind(
-            write
-                .preferred_reviewer_principal_id
-                .map(crate::entities::transport::PrincipalId::as_uuid),
-        )
-        .bind(id)
-        .bind(company_id)
-        .bind(write.response_trigger.as_str())
-        .execute(&mut **tx)
-        .await
-        .map_err(AppError::from)?;
+                   add_3rd_party = $5, settings_revision = settings_revision + 1
+               WHERE id = $6 AND company_id = $7"#,
+    )
+    .bind(&write.name)
+    .bind(&write.description)
+    .bind(access_mode.as_str())
+    .bind(write.enabled)
+    .bind(write.add_3rd_party)
+    .bind(id)
+    .bind(company_id)
+    .execute(&mut **tx)
+    .await
+    .map_err(AppError::from)?;
 
     if result.rows_affected() == 0 {
         return Err(AppError::Internal("Channel not found".into()));
@@ -648,184 +460,122 @@ pub(super) async fn write_channel_settings_on(
 }
 
 #[async_trait]
-impl OwnedAgentChannelPersistence for PostgresPersistence {
-    async fn create_owned_agent_channel(
-        &self,
-        company_id: Uuid,
-        agent: AgentWrite,
-        channel: ChannelWrite,
-    ) -> AppResult<(Agent, Channel)> {
-        create_owned_agent_channel(self, company_id, agent, channel, None).await
-    }
-
-    async fn create_owned_agent_channel_from_library(
+impl LibraryAgentCopyPersistence for PostgresPersistence {
+    async fn create_agent_from_library(
         &self,
         company_id: Uuid,
         library_agent_id: Uuid,
-        agent: AgentWrite,
-        channel: ChannelWrite,
-    ) -> AppResult<(Agent, Channel)> {
-        create_owned_agent_channel(self, company_id, agent, channel, Some(library_agent_id)).await
-    }
-
-    async fn update_agent_and_owned_address(
-        &self,
-        agent_id: Uuid,
-        write: AgentWrite,
+        mut agent: AgentWrite,
     ) -> AppResult<Agent> {
-        crate::adapters::persistence::agent::update_agent_and_owned_address(self, agent_id, write)
-            .await
+        let agent_id = Uuid::new_v4();
+        let mut tx = self.pool.begin().await.map_err(AppError::from)?;
+        prepare_library_agent_on(&mut tx, company_id, library_agent_id, &mut agent).await?;
+        insert_agent_on(&mut tx, agent_id, Some(company_id), &agent).await?;
+        create_agent_principal_on(&mut tx, company_id, agent_id, &agent.name).await?;
+        tx.commit().await.map_err(AppError::from)?;
+        AgentPersistence::get_by_id(self, agent_id)
+            .await?
+            .ok_or_else(|| AppError::Internal("Created agent was not found".into()))
     }
 }
 
-/// Atomically provision the agent, its capabilities, its principal, and its personal channel.
-/// When the source is a library agent, its global skills are copied into the tenant first, within
-/// this same transaction, and the new agent is attached only to those tenant-owned copies.
-async fn create_owned_agent_channel(
-    persistence: &PostgresPersistence,
+/// Copy a library definition into the company inside `tx`: its global skills become tenant-owned
+/// copies the agent is attached to, and its workflow tool grants come with it. A copy that grants
+/// tools and would inherit its model gets the company default connection's first model, because a
+/// workflow runs an agent only on an explicit model (p08 D2.6).
+async fn prepare_library_agent_on(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     company_id: Uuid,
-    mut agent: AgentWrite,
-    channel: ChannelWrite,
-    library_agent_id: Option<Uuid>,
-) -> AppResult<(Agent, Channel)> {
-    let agent_id = Uuid::new_v4();
-    let channel_id = Uuid::new_v4();
-    let channel_created_by = serde_json::to_value(
-        channel
-            .created_by
-            .clone()
-            .unwrap_or_else(CreationProvenance::system),
+    library_agent_id: Uuid,
+    agent: &mut AgentWrite,
+) -> AppResult<()> {
+    let source_exists = sqlx::query_scalar::<_, Uuid>(
+        "SELECT id FROM agents \
+             WHERE id = $1 AND company_id IS NULL FOR KEY SHARE",
     )
-    .map_err(|error| AppError::Internal(error.to_string()))?;
-    let (access_mode, participants) = channel_access(channel.participant_emails.clone());
-    let mut tx = persistence.pool.begin().await.map_err(AppError::from)?;
-
-    if let Some(library_agent_id) = library_agent_id {
-        let source_exists = sqlx::query_scalar::<_, Uuid>(
-            "SELECT id FROM agents \
-                 WHERE id = $1 AND company_id IS NULL FOR KEY SHARE",
-        )
-        .bind(library_agent_id)
-        .fetch_optional(&mut *tx)
-        .await
-        .map_err(AppError::from)?
-        .is_some();
-        if !source_exists {
-            return Err(AppError::NotFound("Library agent not found.".into()));
-        }
-
-        let source_skill_ids = sqlx::query_scalar::<_, Uuid>(
-            "SELECT skill_id FROM agent_skills \
-                 WHERE agent_id = $1 ORDER BY position",
-        )
-        .bind(library_agent_id)
-        .fetch_all(&mut *tx)
-        .await
-        .map_err(AppError::from)?;
-        let created_by = agent
-            .created_by
-            .clone()
-            .unwrap_or_else(CreationProvenance::system);
-        let mut copied_skill_ids = Vec::with_capacity(source_skill_ids.len());
-        for source_skill_id in source_skill_ids {
-            let copied =
-                copy_library_skill_on(&mut tx, company_id, source_skill_id, &created_by).await?;
-            copied_skill_ids.push(copied.id);
-        }
-        agent.skill_ids = copied_skill_ids;
+    .bind(library_agent_id)
+    .fetch_optional(&mut **tx)
+    .await
+    .map_err(AppError::from)?
+    .is_some();
+    if !source_exists {
+        return Err(AppError::NotFound("Library agent not found.".into()));
     }
 
-    let company_slug: String = sqlx::query_scalar("SELECT slug::text FROM companies WHERE id = $1")
-        .bind(company_id)
-        .fetch_one(&mut *tx)
-        .await
-        .map_err(AppError::from)?;
-    let address = format!("{}@{}", channel.slug, company_slug);
-    insert_agent_on(&mut tx, agent_id, Some(company_id), &agent)
-        .await
-        .map_err(|error| match error {
-            AppError::Conflict(_) => AppError::BadRequest(format!(
-                "Address '{address}' is already in use; no agent was created."
-            )),
-            other => other,
-        })?;
-
-    create_agent_principal_on(&mut tx, company_id, agent_id, &agent.name).await?;
-
-    sqlx::query(
-        r#"INSERT INTO channels (
-                    id, company_id, owner_agent_id, name, description, access_mode, enabled,
-                    add_3rd_party, created_by, retrieve_company_memory, retrieve_agent_memory,
-                    retrieve_user_memory, persist_company_memory, persist_agent_memory,
-                    persist_user_memory, external_response_review_override,
-                    preferred_reviewer_principal_id, response_trigger)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
-                       $16, $17, $18)"#,
+    let source_skill_ids = sqlx::query_scalar::<_, Uuid>(
+        "SELECT skill_id FROM agent_skills \
+             WHERE agent_id = $1 ORDER BY position",
     )
-    .bind(channel_id)
-    .bind(company_id)
-    .bind(agent_id)
-    .bind(&channel.name)
-    .bind(&channel.description)
-    .bind(access_mode.as_str())
-    .bind(channel.enabled)
-    .bind(channel.add_3rd_party)
-    .bind(channel_created_by)
-    .bind(channel.retrieve_company_memory)
-    .bind(channel.retrieve_agent_memory)
-    .bind(channel.retrieve_user_memory)
-    .bind(channel.persist_company_memory)
-    .bind(channel.persist_agent_memory)
-    .bind(channel.persist_user_memory)
-    .bind(
-        channel
-            .external_response_review_override
-            .map(|policy| policy.as_str()),
-    )
-    .bind(
-        channel
-            .preferred_reviewer_principal_id
-            .map(crate::entities::transport::PrincipalId::as_uuid),
-    )
-    .bind(channel.response_trigger.as_str())
-    .execute(&mut *tx)
+    .bind(library_agent_id)
+    .fetch_all(&mut **tx)
     .await
     .map_err(AppError::from)?;
+    let created_by = agent
+        .created_by
+        .clone()
+        .unwrap_or_else(CreationProvenance::system);
+    let mut copied_skill_ids = Vec::with_capacity(source_skill_ids.len());
+    for source_skill_id in source_skill_ids {
+        let copied = copy_library_skill_on(tx, company_id, source_skill_id, &created_by).await?;
+        copied_skill_ids.push(copied.id);
+    }
+    agent.skill_ids = copied_skill_ids;
 
-    insert_channel_slugs(
-        &mut tx,
-        company_id,
-        channel_id,
-        &channel.slug,
-        &channel.alias_slugs,
-    )
-    .await
-    .map_err(|error| match error {
-        AppError::BadRequest(_) => AppError::BadRequest(format!(
-            "Address '{address}' is already in use; no agent was created."
-        )),
-        other => other,
-    })?;
-    write_channel_email_binding(&mut tx, company_id, channel_id, &channel).await?;
-    insert_email_allowlist_grants(&mut tx, company_id, channel_id, participants).await?;
-    sqlx::query(
-            "INSERT INTO channel_agents (company_id, channel_id, agent_id, position) VALUES ($1, $2, $3, 0)",
-        )
-        .bind(company_id)
-        .bind(channel_id)
-        .bind(agent_id)
-        .execute(&mut *tx)
-        .await
-        .map_err(AppError::from)?;
-    tx.commit().await.map_err(AppError::from)?;
+    // The definition's workflow tool grants come with it (p08 D2.6). A workflow runs an agent
+    // only on an explicit model, so a copy that grants tools and would inherit gets the
+    // company's default connection's first model, when it has a key.
+    let workflow_tools: Vec<String> =
+        sqlx::query_scalar("SELECT workflow_tools FROM agents WHERE id = $1")
+            .bind(library_agent_id)
+            .fetch_one(&mut **tx)
+            .await
+            .map_err(AppError::from)?;
+    if !workflow_tools.is_empty() {
+        if agent.provider.is_none() && agent.model.is_none() {
+            let default: Option<(String, String)> = sqlx::query_as(
+                "SELECT provider, models[1] FROM company_model_connections \
+                 WHERE company_id = $1 AND is_default AND api_key IS NOT NULL \
+                   AND cardinality(models) > 0",
+            )
+            .bind(company_id)
+            .fetch_optional(&mut **tx)
+            .await
+            .map_err(AppError::from)?;
+            if let Some((provider, model)) = default {
+                agent.provider = Some(provider);
+                agent.model = Some(model);
+            }
+        }
+        agent.workflow_tools = Some(
+            workflow_tools
+                .iter()
+                .map(|name| {
+                    crate::domain::workflow::TypeName::parse(name).map_err(|_| {
+                        AppError::Internal("Stored workflow tool grant is invalid".into())
+                    })
+                })
+                .collect::<AppResult<_>>()?,
+        );
+    }
+    Ok(())
+}
 
-    let agent = AgentPersistence::get_by_id(persistence, agent_id)
-        .await?
-        .ok_or_else(|| AppError::Internal("Created agent was not found".into()))?;
-    let channel = load_channel(persistence, channel_id)
-        .await?
-        .ok_or_else(|| AppError::Internal("Created channel was not found".into()))?;
-    Ok((agent, channel))
+/// Visibility inputs for a requested run set; never loads unrelated company channels.
+pub(super) async fn channels_by_ids(
+    p: &PostgresPersistence,
+    company: Uuid,
+    ids: &[Uuid],
+) -> AppResult<Vec<Channel>> {
+    if ids.is_empty() {
+        return Ok(Vec::new());
+    }
+    let query = format!("{CHANNEL_SELECT} WHERE ch.company_id=$1 AND ch.id=ANY($2)");
+    let rows = sqlx::query_as::<_, ChannelDb>(&query)
+        .bind(company)
+        .bind(ids)
+        .fetch_all(p.pool())
+        .await?;
+    rows.into_iter().map(TryInto::try_into).collect()
 }
 
 #[cfg(test)]
@@ -842,7 +592,6 @@ mod tests {
         ChannelUpdate {
             company_id,
             channel_id,
-            actor_user_id: Uuid::new_v4(),
             write,
         }
     }
@@ -884,55 +633,19 @@ mod tests {
         // 1. Create Channel
         let emails = vec!["a@example.com".to_string(), "b@example.com".to_string()];
 
-        let agent1 = AgentPersistence::create(
-            &persistence,
-            company.id,
-            AgentWrite {
-                name: "Primary Agent".to_string(),
-                slug: "primary-agent".to_string(),
-                ..Default::default()
-            },
-        )
-        .await
-        .unwrap();
-        let agent2 = AgentPersistence::create(
-            &persistence,
-            company.id,
-            AgentWrite {
-                name: "Secondary Agent".to_string(),
-                slug: "secondary-agent".to_string(),
-                ..Default::default()
-            },
-        )
-        .await
-        .unwrap();
-        let agent_ids = vec![agent1.id, agent2.id];
-
         let channel = ChannelPersistence::create(
             &persistence,
             company.id,
             ChannelWrite {
-                response_trigger: crate::entities::channel::ChannelResponseTrigger::Mentioned,
                 name: "Inbound Email".into(),
                 description: Some("Takes support mail from the website form.".into()),
                 slug: "inbound-email".into(),
                 alias_slugs: Vec::new(),
                 participant_emails: Some(emails.clone()),
-                agent_ids: Some(agent_ids.clone()),
                 enabled: true,
                 // Deliberately the opposite of `enabled`, so a swapped pair of same-typed binds
                 // cannot pass this test.
                 add_3rd_party: false,
-                external_response_review_override: Some(
-                    crate::entities::response_draft::ExternalResponseReview::ReviewAllExternal,
-                ),
-                preferred_reviewer_principal_id: None,
-                retrieve_company_memory: false,
-                retrieve_agent_memory: false,
-                retrieve_user_memory: false,
-                persist_company_memory: false,
-                persist_agent_memory: false,
-                persist_user_memory: false,
                 created_by: None,
             },
         )
@@ -954,7 +667,6 @@ mod tests {
                     .collect::<Vec<_>>()
             )
         );
-        assert_eq!(channel.agent_ids, Some(agent_ids));
         assert!(channel.enabled);
         assert!(!channel.add_3rd_party);
 
@@ -964,10 +676,6 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(fetched.id, channel.id);
-        assert_eq!(
-            fetched.response_trigger,
-            crate::entities::channel::ChannelResponseTrigger::Mentioned
-        );
 
         // 3. List by company ID
         let list = ChannelPersistence::list_by_company_id(&persistence, company.id)
@@ -983,26 +691,17 @@ mod tests {
                 channel.id,
                 ChannelWrite {
                     name: "Inbound Email V2".into(),
-                    response_trigger:
-                        crate::entities::channel::ChannelResponseTrigger::MentionedOrReplyToAgent,
                     description: Some("Now also handles refund requests.".into()),
                     slug: "inbound-email-v2".into(),
                     enabled: false,
                     add_3rd_party: true,
-                    retrieve_company_memory: false,
-                    retrieve_agent_memory: false,
-                    retrieve_user_memory: false,
-                    persist_company_memory: false,
-                    persist_agent_memory: false,
-                    persist_user_memory: false,
                     created_by: None,
                     ..ChannelWrite::default()
                 },
             ),
         )
         .await
-        .unwrap()
-        .channel;
+        .unwrap();
         assert_eq!(updated.name, "Inbound Email V2");
         assert_eq!(
             updated.description.as_deref(),
@@ -1021,10 +720,6 @@ mod tests {
             .unwrap()
             .unwrap();
         assert!(!reread.enabled);
-        assert_eq!(
-            reread.response_trigger,
-            crate::entities::channel::ChannelResponseTrigger::MentionedOrReplyToAgent
-        );
         assert!(reread.add_3rd_party);
         assert_eq!(
             reread.description.as_deref(),
@@ -1044,94 +739,6 @@ mod tests {
         let _ = CompanyPersistence::delete(&persistence, company.id).await;
     }
 
-    #[tokio::test]
-    async fn agent_and_enabled_channel_creation_is_atomic() {
-        let Some(pool) = test_pool().await else {
-            return;
-        };
-        let persistence = PostgresPersistence::new(pool);
-        let suffix = Uuid::new_v4().simple().to_string();
-        let email = format!("atomic-channel-{suffix}@example.com");
-        let user = persistence
-            .create_user(&format!("atomic-channel-{suffix}"), &email, "hash")
-            .await
-            .unwrap();
-        let company = CompanyPersistence::create(
-            &persistence,
-            user.id,
-            CompanyWrite {
-                name: "Atomic Channel Corp".into(),
-                slug: format!("atomic-channel-{suffix}"),
-                ..CompanyWrite::default()
-            },
-        )
-        .await
-        .unwrap();
-
-        ChannelPersistence::create(
-            &persistence,
-            company.id,
-            ChannelWrite {
-                name: "Taken".into(),
-                slug: "taken".into(),
-                enabled: false,
-                ..ChannelWrite::default()
-            },
-        )
-        .await
-        .unwrap();
-        let before = AgentPersistence::list_by_company_id(&persistence, company.id)
-            .await
-            .unwrap()
-            .len();
-        let failed = ChannelPersistence::create_with_agent(
-            &persistence,
-            company.id,
-            AgentWrite {
-                name: "Rolled back".into(),
-                slug: "rolled-back".into(),
-                ..Default::default()
-            },
-            ChannelWrite {
-                name: "Collision".into(),
-                slug: "taken".into(),
-                enabled: true,
-                ..ChannelWrite::default()
-            },
-        )
-        .await;
-        assert!(failed.is_err());
-        assert_eq!(
-            AgentPersistence::list_by_company_id(&persistence, company.id)
-                .await
-                .unwrap()
-                .len(),
-            before,
-            "a failed channel insert must roll its new agent back"
-        );
-
-        let (agent, channel) = ChannelPersistence::create_with_agent(
-            &persistence,
-            company.id,
-            AgentWrite {
-                name: "Atomic agent".into(),
-                slug: "atomic-agent".into(),
-                ..Default::default()
-            },
-            ChannelWrite {
-                name: "Atomic channel".into(),
-                slug: "atomic".into(),
-                enabled: true,
-                ..ChannelWrite::default()
-            },
-        )
-        .await
-        .unwrap();
-        assert!(channel.enabled);
-        assert_eq!(channel.agent_ids, Some(vec![agent.id]));
-    }
-
-    /// Aliases and canonical slugs share one namespace per company, enforced by the database.
     #[tokio::test]
     async fn alias_slugs_are_unique_within_a_company_and_free_across_companies() {
         let Some(pool) = test_pool().await else {
@@ -1237,8 +844,7 @@ mod tests {
             test_update(company.id, support.id, write("support", &["contact"])),
         )
         .await
-        .unwrap()
-        .channel;
+        .unwrap();
         assert_eq!(updated.alias_slugs, ["contact"]);
         ChannelPersistence::create(&persistence, company.id, write("sales", &[]))
             .await
@@ -1249,276 +855,73 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn owned_agent_channel_lifecycle_is_atomic_guarded_and_cascades() {
+    async fn an_enabled_channel_needs_no_agent() {
         let Some(pool) = test_pool().await else {
             return;
         };
         let persistence = PostgresPersistence::new(pool);
         let suffix = Uuid::new_v4().simple().to_string();
-        let email = format!("owned-{suffix}@example.com");
-        let user = persistence
-            .create_user(&format!("owned-{suffix}"), &email, "hash")
+        let owner = persistence
+            .create_user(&suffix, &format!("{suffix}@example.com"), "hash")
             .await
-            .unwrap();
+            .unwrap()
+            .id;
         let company = CompanyPersistence::create(
             &persistence,
-            user.id,
+            owner,
             CompanyWrite {
-                name: "Owned channels".into(),
-                slug: format!("owned-{suffix}"),
+                name: "Plain".into(),
+                slug: format!("plain-{suffix}"),
                 ..CompanyWrite::default()
             },
         )
         .await
         .unwrap();
-        let (agent, channel) = OwnedAgentChannelPersistence::create_owned_agent_channel(
+        let plain = ChannelPersistence::create(
             &persistence,
             company.id,
-            AgentWrite {
-                name: "Personal agent".into(),
-                slug: "personal-agent".into(),
-                memory_enabled: true,
-                created_by: Some(CreationProvenance::user(user.id)),
-                ..Default::default()
-            },
             ChannelWrite {
-                name: "Personal agent".into(),
-                slug: "personal-agent".into(),
-                response_trigger: crate::entities::channel::ChannelResponseTrigger::Mentioned,
-                participant_emails: Some(vec!["outside@example.com".into()]),
+                name: "Plain".into(),
+                slug: "plain".into(),
                 enabled: true,
-                add_3rd_party: false,
-                retrieve_user_memory: true,
-                persist_user_memory: true,
-                created_by: Some(CreationProvenance::user(user.id)),
                 ..ChannelWrite::default()
             },
         )
         .await
-        .unwrap();
+        .expect("an enabled plain channel is creatable");
+        assert!(plain.enabled);
 
-        assert_eq!(
-            channel.response_trigger,
-            crate::entities::channel::ChannelResponseTrigger::Mentioned
-        );
-        let fetched = ChannelPersistence::get_by_id(&persistence, channel.id)
-            .await
-            .unwrap()
-            .unwrap();
-        assert_eq!(fetched.response_trigger, channel.response_trigger);
-        ChannelPersistence::update(
+        let agent = AgentPersistence::create(
             &persistence,
-            test_update(
-                company.id,
-                channel.id,
-                ChannelWrite {
-                    name: channel.name.clone(),
-                    slug: channel.slug.to_string(),
-                    enabled: true,
-                    participant_emails: Some(vec!["outside@example.com".into()]),
-                    retrieve_user_memory: true,
-                    persist_user_memory: true,
-                    response_trigger:
-                        crate::entities::channel::ChannelResponseTrigger::MentionedOrReplyToAgent,
-                    ..Default::default()
-                },
-            ),
-        )
-        .await
-        .unwrap();
-        assert_eq!(
-            ChannelPersistence::get_by_id(&persistence, channel.id)
-                .await
-                .unwrap()
-                .unwrap()
-                .response_trigger,
-            crate::entities::channel::ChannelResponseTrigger::MentionedOrReplyToAgent
-        );
-
-        assert_eq!(channel.owner_agent_id, Some(agent.id));
-        assert_eq!(channel.agent_ids, Some(vec![agent.id]));
-        assert_eq!(channel.participant_emails.as_ref().map(Vec::len), Some(1));
-        assert!(channel.retrieve_user_memory && channel.persist_user_memory);
-
-        let contender_agent = AgentWrite {
-            name: "Contended".into(),
-            slug: "contended".into(),
-            ..Default::default()
-        };
-        let contender_channel = ChannelWrite {
-            name: "Contended".into(),
-            slug: "contended".into(),
-            enabled: true,
-            ..ChannelWrite::default()
-        };
-        let (left, right) = tokio::join!(
-            OwnedAgentChannelPersistence::create_owned_agent_channel(
-                &persistence,
-                company.id,
-                contender_agent.clone(),
-                contender_channel.clone(),
-            ),
-            OwnedAgentChannelPersistence::create_owned_agent_channel(
-                &persistence,
-                company.id,
-                contender_agent,
-                contender_channel,
-            ),
-        );
-        let outcomes = [left, right];
-        assert_eq!(outcomes.iter().filter(|result| result.is_ok()).count(), 1);
-        let loser = outcomes
-            .iter()
-            .find_map(|result| result.as_ref().err())
-            .expect("one competing address claimant must lose");
-        assert!(
-            matches!(loser, AppError::BadRequest(message) if message.contains(&format!("contended@{}", company.slug)))
-        );
-        let contender_agents: i64 =
-            sqlx::query_scalar("SELECT COUNT(*) FROM agents WHERE company_id = $1 AND slug = $2")
-                .bind(company.id)
-                .bind("contended")
-                .fetch_one(persistence.pool())
-                .await
-                .unwrap();
-        assert_eq!(contender_agents, 1, "the losing transaction left no agent");
-
-        let collision = OwnedAgentChannelPersistence::update_agent_and_owned_address(
-            &persistence,
-            agent.id,
+            company.id,
             AgentWrite {
-                name: agent.name.clone(),
-                slug: "contended".into(),
-                memory_enabled: true,
-                created_by: Some(agent.created_by.clone()),
-                ..Default::default()
-            },
-        )
-        .await;
-        assert!(
-            matches!(collision, Err(AppError::BadRequest(message)) if message.contains(&format!("contended@{}", company.slug)))
-        );
-        assert_eq!(
-            AgentPersistence::get_by_id(&persistence, agent.id)
-                .await
-                .unwrap()
-                .unwrap()
-                .slug,
-            "personal-agent",
-            "an address collision must roll back the agent update"
-        );
-
-        assert!(matches!(
-            ChannelPersistence::delete(&persistence, channel.id).await,
-            Err(AppError::Conflict(_))
-        ));
-
-        let renamed = OwnedAgentChannelPersistence::update_agent_and_owned_address(
-            &persistence,
-            agent.id,
-            AgentWrite {
-                name: agent.name.clone(),
-                slug: "renamed-agent".into(),
-                memory_enabled: true,
-                created_by: Some(agent.created_by.clone()),
-                ..Default::default()
+                name: "Only".into(),
+                slug: "only".into(),
+                ..AgentWrite::default()
             },
         )
         .await
         .unwrap();
-        assert_eq!(renamed.slug, "renamed-agent");
-        OwnedAgentChannelPersistence::update_agent_and_owned_address(
-            &persistence,
-            agent.id,
-            AgentWrite {
-                name: renamed.name.clone(),
-                slug: renamed.slug.clone(),
-                memory_enabled: true,
-                created_by: Some(renamed.created_by.clone()),
-                ..Default::default()
-            },
-        )
-        .await
-        .expect("retrying the same rename is idempotent");
-        let addresses: Vec<(String, bool)> = sqlx::query_as(
-            "SELECT slug::text, is_primary FROM channel_slugs WHERE channel_id = $1 ORDER BY slug",
-        )
-        .bind(channel.id)
-        .fetch_all(persistence.pool())
-        .await
-        .unwrap();
-        assert_eq!(
-            addresses,
-            vec![
-                ("personal-agent".into(), false),
-                ("renamed-agent".into(), true)
-            ]
-        );
-
-        let blocker = ChannelPersistence::create(
+        let assigned = ChannelPersistence::create(
             &persistence,
             company.id,
             ChannelWrite {
-                name: "Standalone blocker".into(),
-                slug: "standalone-blocker".into(),
-                agent_ids: Some(vec![agent.id]),
+                name: "Assigned".into(),
+                slug: "assigned".into(),
                 enabled: true,
                 ..ChannelWrite::default()
             },
         )
         .await
         .unwrap();
-        assert!(matches!(
-            AgentPersistence::delete(&persistence, agent.id).await,
-            Err(AppError::Conflict(_))
-        ));
-        assert!(
-            ChannelPersistence::get_by_id(&persistence, channel.id)
-                .await
-                .unwrap()
-                .is_some(),
-            "the blocked owner deletion must roll back its owned-channel cascade"
-        );
-        ChannelPersistence::delete(&persistence, blocker.id)
-            .await
-            .unwrap();
-
-        sqlx::query("UPDATE channels SET enabled = FALSE WHERE id = $1")
-            .bind(channel.id)
-            .execute(persistence.pool())
-            .await
-            .unwrap();
-        let mut invalid_assignment = persistence.pool().begin().await.unwrap();
-        sqlx::query("DELETE FROM channel_agents WHERE channel_id = $1 AND position = 0")
-            .bind(channel.id)
-            .execute(&mut *invalid_assignment)
-            .await
-            .unwrap();
-        assert!(
-            invalid_assignment.commit().await.is_err(),
-            "a disabled owned channel still requires its owner at position zero"
-        );
-        let disabled = ChannelPersistence::get_by_id(&persistence, channel.id)
-            .await
-            .unwrap()
-            .unwrap();
-        assert!(!disabled.enabled);
-        assert_eq!(disabled.agent_ids, Some(vec![agent.id]));
-        sqlx::query("UPDATE channels SET enabled = TRUE WHERE id = $1")
-            .bind(channel.id)
-            .execute(persistence.pool())
-            .await
-            .unwrap();
-
         AgentPersistence::delete(&persistence, agent.id)
             .await
-            .expect("deleting an owner cascades its personal channel");
-        assert!(
-            ChannelPersistence::get_by_id(&persistence, channel.id)
-                .await
-                .unwrap()
-                .is_none()
-        );
+            .expect("an enabled channel's only agent can be deleted");
+        let left = ChannelPersistence::get_by_id(&persistence, assigned.id)
+            .await
+            .unwrap()
+            .expect("the channel stays");
+        assert!(left.enabled);
         let _ = CompanyPersistence::delete(&persistence, company.id).await;
     }
 
@@ -1555,18 +958,6 @@ mod tests {
         )
         .await
         .unwrap();
-        let agent = AgentPersistence::create(
-            &persistence,
-            company.id,
-            AgentWrite {
-                name: "Desk Agent".to_string(),
-                slug: "desk-agent".to_string(),
-                ..Default::default()
-            },
-        )
-        .await
-        .unwrap();
-
         let channel = ChannelPersistence::create(
             &persistence,
             company.id,
@@ -1578,7 +969,6 @@ mod tests {
                     "  Dana@Partner.test ".to_string(),
                     "@public".to_string(),
                 ]),
-                agent_ids: Some(vec![agent.id]),
                 enabled: true,
                 ..ChannelWrite::default()
             },
@@ -1638,15 +1028,13 @@ mod tests {
                     name: "Front Desk".into(),
                     slug: "front-desk".into(),
                     participant_emails: Some(vec!["sam@partner.test".to_string()]),
-                    agent_ids: Some(vec![agent.id]),
                     enabled: true,
                     ..ChannelWrite::default()
                 },
             ),
         )
         .await
-        .unwrap()
-        .channel;
+        .unwrap();
         assert_eq!(updated.access_mode, ChannelAccessMode::Allowlist);
         assert_eq!(
             updated.participant_emails,
@@ -1664,7 +1052,6 @@ mod tests {
                     name: "Front Desk".into(),
                     slug: "front-desk".into(),
                     participant_emails: Some(vec!["not-an-address".to_string()]),
-                    agent_ids: Some(vec![agent.id]),
                     enabled: true,
                     ..ChannelWrite::default()
                 },

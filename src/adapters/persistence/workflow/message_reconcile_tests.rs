@@ -900,3 +900,69 @@ async fn workflow_message_sql_evidence_attribution_shape_rejects_forgeries() {
         );
     }
 }
+
+/// P08-D3 (F065, F069): the production composition annotates a message delivery whose outcome is
+/// unknown (`Local { messaging }` through `CompanyReconciliationResources`, no verifier): the note
+/// records, the delivery and the run stay as they were, and a verified reference is refused.
+#[tokio::test]
+async fn workflow_message_unknown_note_through_the_production_composition() {
+    let (setup, _, unknown) = Box::pin(uncertain()).await;
+    let p = setup.fixture.persistence.clone();
+    // §D3.4: the run detail names the message marker and its two delivery-backed destinations;
+    // only the one whose outcome is unknown is reconcilable.
+    use crate::application::workflow::reads::WorkflowReads;
+    let scope = setup.scope();
+    let detail = p
+        .run_detail(scope.company, scope.run)
+        .await
+        .unwrap()
+        .unwrap();
+    let [action] = detail.actions.as_slice() else {
+        panic!("{:?}", detail.actions);
+    };
+    assert_eq!(action.effect_kind, "message");
+    let unknown_destination = action
+        .destinations
+        .iter()
+        .find(|destination| destination.delivery == unknown)
+        .unwrap();
+    assert_eq!(
+        (
+            unknown_destination.status.as_str(),
+            unknown_destination.parts
+        ),
+        ("outcome_unknown", 1)
+    );
+    assert!(unknown_destination.reconcilable());
+    assert_eq!(
+        action
+            .destinations
+            .iter()
+            .filter(|destination| destination.reconcilable())
+            .count(),
+        1
+    );
+    let production = crate::infra::workflow::WorkflowEngine::for_tests(p.clone()).reconciliation();
+    let note = EvidenceInput::UnknownNote {
+        note: "the provider lost the response".into(),
+        claimed: ClaimedDisposition::Unknown,
+    };
+    let noted = command(&setup, unknown, "production-note", note).await;
+    let result =
+        Box::pin(production.reconcile(&noted, &CancellationToken::new(), Duration::from_secs(5)))
+            .await
+            .unwrap();
+    assert_eq!(result.outcome, ReconciliationOutcome::UnknownRecorded);
+    assert_eq!(
+        delivery_row(setup.pool(), unknown).await.status,
+        "outcome_unknown"
+    );
+    let without = command(&setup, unknown, "production-verified", verified()).await;
+    assert!(
+        Box::pin(
+            production.reconcile(&without, &CancellationToken::new(), Duration::from_secs(5),)
+        )
+        .await
+        .is_err()
+    );
+}

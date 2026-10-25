@@ -9,7 +9,6 @@ pub struct AttentionPageView<'a> {
     pub companies: &'a [Company],
     pub company: &'a Company,
     pub view: AttentionView,
-    pub all_owned: bool,
     pub page: &'a AttentionPage,
     pub manager: bool,
 }
@@ -38,21 +37,22 @@ pub fn attention_page(page: &AttentionPageView<'_>) -> String {
             )
         })
         .collect::<String>();
-    let all_owned = page.all_owned;
-    let filter = owned_tasks_filter(company_id, page.view, all_owned);
-    let list_url =
-        format!("/ui/work/list?company_id={company_id}&view={selected}&all_owned={all_owned}");
+    let list_url = format!("/ui/work/list?company_id={company_id}&view={selected}");
+    let freshness = if page.view == AttentionView::TeamWork {
+        r#"<p class="px-5 pt-4 text-xs opacity-60">Binding refusals are updated within 30 s; everything else as it changes.</p>"#
+    } else {
+        ""
+    };
     let content = format!(
         r##"<section class="flex min-w-0 flex-1 flex-col overflow-y-auto bg-base-100"
                 hx-ext="sse" sse-connect="/companies/{company_id}/attention/events">
             <header class="flex flex-wrap items-center justify-between gap-4 border-b border-base-300 p-5">
                 <div>
                     <h1 class="text-xl font-semibold">Operational work</h1>
-                    <p class="text-sm opacity-65">Human actions, independent of task leases and unread mail.</p>
+                    <p class="text-sm opacity-65">Decisions to make and workflow problems to look at.</p>
                 </div>
                 <form method="get" action="/ui/work">
                     <input type="hidden" name="view" value="{selected}">
-                    <input type="hidden" name="all_owned" value="{all_owned}">
                     <div class="join">
                         <select class="select select-sm join-item" name="company_id"
                                 aria-label="Company">{company_options}</select>
@@ -63,13 +63,13 @@ pub fn attention_page(page: &AttentionPageView<'_>) -> String {
             <nav class="tabs tabs-border px-5 pt-3" aria-label="Work queue views">
                 {my_tab}{unassigned_tab}{team_tab}
             </nav>
-            {filter}
+            {freshness}
             <div id="attention-list" hx-get="{list_url}" hx-trigger="sse:reconcile"
                  hx-sync="#attention-list:replace">{list}</div>
         </section>"##,
         my_tab = tab(company_id, AttentionView::MyWork, page.view),
         unassigned_tab = tab(company_id, AttentionView::Unassigned, page.view),
-        list = attention_list(company_id, page.view, page.page, all_owned),
+        list = attention_list(company_id, page.view, page.page),
     );
     ui_shell(&UiShell {
         title: "Operational work",
@@ -78,26 +78,6 @@ pub fn attention_page(page: &AttentionPageView<'_>) -> String {
         section: UiSection::Work,
         content: &content,
     })
-}
-
-fn owned_tasks_filter(company_id: Uuid, view: AttentionView, all_owned: bool) -> String {
-    if view != AttentionView::MyWork {
-        return String::new();
-    }
-    format!(
-        r#"<form method="get" action="/ui/work" class="px-5 pt-4"
-                 data-submit="busy-once">
-            <input type="hidden" name="company_id" value="{company_id}">
-            <input type="hidden" name="view" value="my_work">
-            <label class="flex items-center gap-2 text-sm">
-                <input type="checkbox" class="checkbox checkbox-sm" name="all_owned" value="true"
-                       data-action="submit-form"{checked}>
-                Show all owned tasks
-            </label>
-            <span data-progress role="status" class="hidden text-sm opacity-60">Loading tasks…</span>
-        </form>"#,
-        checked = if all_owned { " checked" } else { "" },
-    )
 }
 
 fn tab(company_id: Uuid, target: AttentionView, selected: AttentionView) -> String {
@@ -113,12 +93,7 @@ fn tab(company_id: Uuid, target: AttentionView, selected: AttentionView) -> Stri
     )
 }
 
-pub fn attention_list(
-    company_id: Uuid,
-    view: AttentionView,
-    page: &AttentionPage,
-    all_owned: bool,
-) -> String {
+pub fn attention_list(company_id: Uuid, view: AttentionView, page: &AttentionPage) -> String {
     let warning = if page.truncated {
         r#"<div class="alert alert-warning mx-5 mt-4 text-sm">The working set reached 1,000 items. Narrow or resolve work before relying on totals.</div>"#
     } else {
@@ -135,7 +110,7 @@ pub fn attention_list(
     };
     let next = page.next_cursor.as_ref().map_or_else(String::new, |cursor| {
         format!(
-            r#"<div class="p-5 text-center"><a class="btn btn-sm" href="/ui/work?company_id={company_id}&amp;view={}&amp;all_owned={all_owned}&amp;cursor={}">Next page</a></div>"#,
+            r#"<div class="p-5 text-center"><a class="btn btn-sm" href="/ui/work?company_id={company_id}&amp;view={}&amp;cursor={}">Next page</a></div>"#,
             view_name(view), escape_html_attr(cursor)
         )
     });
@@ -143,18 +118,20 @@ pub fn attention_list(
 }
 
 fn attention_card(item: &AttentionItem, as_of: chrono::DateTime<chrono::Utc>) -> String {
-    let href = item.href.as_deref().unwrap_or("#");
+    let link = item.href.as_deref().map_or_else(String::new, |href| {
+        format!(
+            r#"<a class="link link-primary font-medium" href="{}">Open source</a>"#,
+            escape_html_attr(href)
+        )
+    });
     let due = due_label(item.due_at);
+    // The work, not the table: this badge is read by somebody deciding whether to pick the item
+    // up.
     let source = match item.source_kind {
-        AttentionSourceKind::Task => "Task",
-        AttentionSourceKind::Handoff => "Handoff",
-        // The work, not the table: this badge is read by somebody deciding whether to pick the
-        // item up. The state is rendered separately below, so `needs_instruction` and
-        // `draft_ready` are still told apart.
-        AttentionSourceKind::ThreadHandoff => "Needs instruction",
-        AttentionSourceKind::Approval => "Approval",
-        AttentionSourceKind::ResponseReview => "Review",
-        AttentionSourceKind::DelegationDecision => "Delegation decision",
+        AttentionSourceKind::Decision => "Decision",
+        AttentionSourceKind::RunReconciliation => "Needs reconciliation",
+        AttentionSourceKind::RunFailure => "Failed run",
+        AttentionSourceKind::BindingRefusal => "Refused messages",
         AttentionSourceKind::DeliveryFailure => "Delivery failure",
     };
     let expiry = item.expires_at.map_or_else(String::new, |expires| {
@@ -173,7 +150,7 @@ fn attention_card(item: &AttentionItem, as_of: chrono::DateTime<chrono::Utc>) ->
                 <p class="text-sm">{action}</p>
                 <div class="flex flex-wrap items-center justify-between gap-3 text-xs opacity-70">
                     <span>{responsible} · {age} · {due}{expiry}</span>
-                    <a class="link link-primary font-medium" href="{href}">Open source</a>
+                    {link}
                 </div>
             </div>
         </article>"#,
@@ -186,16 +163,11 @@ fn attention_card(item: &AttentionItem, as_of: chrono::DateTime<chrono::Utc>) ->
         age = escape_html_text(&age),
         due = escape_html_text(&due),
         expiry = escape_html_text(&expiry),
-        href = escape_html_attr(href),
     )
 }
 
 /// When an item is due, in the queue's own words.
-///
-/// `pub(crate)` for the same reason as [`age_label`]: the thread-handoff banner says this about
-/// the very handoff the queue lists beside it, and two wordings for one fact is how a support
-/// conversation goes wrong.
-pub(crate) fn due_label(due_at: Option<chrono::DateTime<chrono::Utc>>) -> String {
+fn due_label(due_at: Option<chrono::DateTime<chrono::Utc>>) -> String {
     due_at.map_or_else(
         || "No due time".to_string(),
         |due| format!("Due {}", due.format("%Y-%m-%d %H:%M UTC")),
@@ -203,10 +175,7 @@ pub(crate) fn due_label(due_at: Option<chrono::DateTime<chrono::Utc>>) -> String
 }
 
 /// How long an item has waited, in the queue's own words.
-///
-/// `pub(crate)` because the thread-handoff banner says the same thing about the same handoff the
-/// queue is listing. A second formatter would drift from this one within a month.
-pub(crate) fn age_label(
+fn age_label(
     created_at: chrono::DateTime<chrono::Utc>,
     as_of: chrono::DateTime<chrono::Utc>,
 ) -> String {
@@ -250,16 +219,15 @@ mod tests {
     use super::*;
     use crate::entities::{attention::AttentionResponsibility, transport::PrincipalId};
 
-    #[test]
-    fn list_escapes_source_text_and_links() {
+    fn item(source_kind: AttentionSourceKind, href: Option<String>) -> AttentionItem {
         let now = Utc::now();
-        let item = AttentionItem {
-            source_kind: AttentionSourceKind::Handoff,
+        AttentionItem {
+            source_kind,
             source_id: Uuid::new_v4(),
             company_id: Uuid::new_v4(),
-            channel_id: Uuid::new_v4(),
+            channel_id: Some(Uuid::new_v4()),
             thread_id: None,
-            task_id: None,
+            run_id: Some(Uuid::new_v4()),
             correlation_id: None,
             state: "open<script>".into(),
             responsibility: AttentionResponsibility::Principal(PrincipalId::new(Uuid::new_v4())),
@@ -272,19 +240,30 @@ mod tests {
             version: 1,
             created_at: now,
             updated_at: now,
-            href: Some("/ui?x=\"&y=<unsafe>".into()),
-        };
+            href,
+        }
+    }
+
+    fn page(items: Vec<AttentionItem>, next_cursor: Option<String>) -> AttentionPage {
+        AttentionPage {
+            items,
+            next_cursor,
+            as_of: Utc::now(),
+            working_set_size: 1,
+            truncated: false,
+        }
+    }
+
+    #[test]
+    fn list_escapes_source_text_and_links() {
+        let item = item(
+            AttentionSourceKind::Decision,
+            Some("/ui?x=\"&y=<unsafe>".into()),
+        );
         let rendered = attention_list(
             item.company_id,
             AttentionView::MyWork,
-            &AttentionPage {
-                items: vec![item],
-                next_cursor: Some("cursor&next".into()),
-                as_of: now,
-                working_set_size: 1,
-                truncated: false,
-            },
-            false,
+            &page(vec![item], Some("cursor&next".into())),
         );
 
         assert!(!rendered.contains("<script>"));
@@ -293,52 +272,59 @@ mod tests {
         assert!(rendered.contains("Casey &amp; &lt;team&gt;"));
         assert!(rendered.contains("cursor&amp;next"));
         assert!(rendered.contains("href=\"/ui?x=&quot;&amp;y=&lt;unsafe&gt;\""));
+        assert!(rendered.contains(">Decision<"));
     }
 
+    /// The list subscribes to the attention stream and re-reads on every reconcile, and a newer
+    /// read replaces one still in flight, so two reads finishing out of order keep the latest.
     #[test]
-    fn list_identifies_external_approval_work() {
-        let now = Utc::now();
-        let company_id = Uuid::new_v4();
-        let approval_id = Uuid::new_v4();
-        let rendered = attention_list(
-            company_id,
-            AttentionView::TeamWork,
-            &AttentionPage {
-                items: vec![AttentionItem {
-                    source_kind: AttentionSourceKind::Approval,
-                    source_id: approval_id,
-                    company_id,
-                    channel_id: Uuid::new_v4(),
-                    thread_id: Some(Uuid::new_v4()),
-                    task_id: Some(Uuid::new_v4()),
-                    correlation_id: None,
-                    state: "pending".into(),
-                    responsibility: AttentionResponsibility::External,
-                    responsibility_label: "External approver".into(),
-                    title: "Approve deployment".into(),
-                    next_action: "Approve or reject the requested action".into(),
-                    priority: BusinessPriority::Normal,
-                    due_at: None,
-                    expires_at: None,
-                    version: 1,
-                    created_at: now,
-                    updated_at: now,
-                    href: Some(format!(
-                        "/ui/approvals/{approval_id}?company_id={company_id}"
-                    )),
-                }],
-                next_cursor: None,
-                as_of: now,
-                working_set_size: 1,
-                truncated: false,
-            },
-            false,
-        );
-
-        assert!(rendered.contains("Approval"));
-        assert!(rendered.contains("External approver"));
-        assert!(rendered.contains(&format!(
-            "/ui/approvals/{approval_id}?company_id={company_id}"
+    fn the_page_reconciles_its_list_live_and_in_order() {
+        let company = Company {
+            channel_defaults: Default::default(),
+            id: Uuid::new_v4(),
+            user_id: Uuid::new_v4(),
+            name: "Acme".into(),
+            slug: "acme".into(),
+            avatar_url: None,
+            created_at: Utc::now(),
+        };
+        let email = crate::entities::value_objects::EmailAddress::from("owner@example.com");
+        let user = MailboxUser {
+            id: company.user_id,
+            username: "owner",
+            email: &email,
+            avatar_url: None,
+            is_operator: false,
+            company_membership: crate::entities::company_member::CompanyMembership::Owner,
+        };
+        let html = attention_page(&AttentionPageView {
+            user: &user,
+            companies: std::slice::from_ref(&company),
+            company: &company,
+            view: AttentionView::TeamWork,
+            page: &page(Vec::new(), None),
+            manager: true,
+        });
+        assert!(html.contains(&format!(
+            r#"sse-connect="/companies/{}/attention/events""#,
+            company.id
         )));
+        assert!(html.contains(r#"hx-trigger="sse:reconcile""#));
+        assert!(html.contains(r##"hx-sync="#attention-list:replace""##));
+        assert!(html.contains("Binding refusals are updated within 30 s"));
+        assert!(!html.contains("all_owned"));
+    }
+
+    /// A run has no page until p09, so its card offers no link rather than a dead one.
+    #[test]
+    fn a_source_without_a_page_has_no_link() {
+        let failed = item(AttentionSourceKind::RunFailure, None);
+        let rendered = attention_list(
+            failed.company_id,
+            AttentionView::TeamWork,
+            &page(vec![failed], None),
+        );
+        assert!(rendered.contains("Failed run"));
+        assert!(!rendered.contains("Open source"));
     }
 }

@@ -92,9 +92,19 @@ impl CompanyWorkflowDraft {
         template: &WorkflowTemplate,
         source: String,
     ) -> Self {
+        Self::from_template(request.company, request.workflow, template, source)
+    }
+    /// A first-revision draft of `source`, derived from `template` and recording it as its
+    /// origin: a template copy, or a provisioned assistant workflow (p08 D2.3).
+    pub(crate) fn from_template(
+        company: CompanyId,
+        workflow: WorkflowId,
+        template: &WorkflowTemplate,
+        source: String,
+    ) -> Self {
         Self {
-            company: request.company,
-            workflow: request.workflow,
+            company,
+            workflow,
             revision: DraftRevision::new(1).expect("initial draft revision"),
             title: template.title().into(),
             description: template.description().into(),

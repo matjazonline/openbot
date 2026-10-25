@@ -1,7 +1,7 @@
 //! A closed projection of execution state. Provider responses and replay blocks never enter it.
 use crate::{
     entities::value_objects::ToolId,
-    services::harness::{AgentExecutionDisposition, AgentExecutionOutput, AgentRun, runs::*},
+    services::harness::{AgentExecutionOutput, runs::*},
 };
 use serde_json::json;
 
@@ -19,14 +19,6 @@ impl InputCounts {
         }
     }
 }
-impl From<&AgentRun<'_>> for InputCounts {
-    fn from(run: &AgentRun<'_>) -> Self {
-        Self {
-            prompt_characters: run.full_prompt.chars().count(),
-            history_message_count: run.history_message_count,
-        }
-    }
-}
 
 /// Used by the final-candidate gate as well as publication, so diagnostics count toward the same
 /// serialized output ceiling before a candidate is committed.
@@ -40,17 +32,14 @@ pub(super) fn output(
     inputs: InputCounts,
     supported_tools: Vec<ToolId>,
     content: String,
-    disposition: AgentExecutionDisposition,
 ) -> AgentExecutionOutput {
     let usage = RunUsage::from(checkpoint);
     let validation = if checkpoint.identity.response_contract.is_none() {
         "not_configured"
     } else if checkpoint.state == RunState::InvalidOutput {
         "invalid"
-    } else if disposition == AgentExecutionDisposition::Completed {
-        "validated"
     } else {
-        "pending"
+        "validated"
     };
     // Only identities from the compiled catalogue are allowed. Model-supplied names are content.
     let tool_names: std::collections::BTreeSet<_> = checkpoint
@@ -91,7 +80,6 @@ pub(super) fn output(
     AgentExecutionOutput {
         structured: None,
         content,
-        disposition,
         token_usage: usage.tokens,
         metadata: Some(metadata),
     }

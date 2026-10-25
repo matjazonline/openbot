@@ -4,9 +4,7 @@ use chrono::Utc;
 
 use crate::{
     entities::runtime_metrics::{MachineIdentity, RuntimeMetricObservation},
-    services::runtime_metrics::{
-        ActiveTaskExecutions, MemoryProviderActivity, RuntimeMetricSource,
-    },
+    services::runtime_metrics::{ActiveWorkflowJobs, RuntimeMetricSource},
 };
 
 const PROC_STATUS: &str = "/proc/self/status";
@@ -49,27 +47,24 @@ pub struct LinuxRuntimeMetricSource {
     paths: RuntimeMetricPaths,
     previous_cpu: Option<CpuCounters>,
     previous_throttle: Option<(u64, Instant)>,
-    active_task_executions: ActiveTaskExecutions,
-    task_worker_concurrency_limit: i32,
-    hydradb: MemoryProviderActivity,
+    active_workflow_jobs: ActiveWorkflowJobs,
+    workflow_worker_slots: i32,
 }
 
 impl LinuxRuntimeMetricSource {
     pub fn new(
         identity: MachineIdentity,
-        active_task_executions: ActiveTaskExecutions,
-        task_worker_concurrency_limit: usize,
-        hydradb: MemoryProviderActivity,
+        active_workflow_jobs: ActiveWorkflowJobs,
+        workflow_worker_slots: usize,
     ) -> Self {
         Self {
             identity,
             paths: RuntimeMetricPaths::default(),
             previous_cpu: None,
             previous_throttle: None,
-            active_task_executions,
-            hydradb,
-            task_worker_concurrency_limit: i32::try_from(task_worker_concurrency_limit)
-                .expect("task worker concurrency fits an i32"),
+            active_workflow_jobs,
+            workflow_worker_slots: i32::try_from(workflow_worker_slots)
+                .expect("workflow worker slots fit an i32"),
         }
     }
 
@@ -110,11 +105,10 @@ impl RuntimeMetricSource for LinuxRuntimeMetricSource {
             cpu_utilization_percent,
             cpu_steal_percent,
             cpu_throttle_percent,
-            active_task_executions: i32::try_from(self.active_task_executions.current())
-                .unwrap_or(self.task_worker_concurrency_limit)
-                .min(self.task_worker_concurrency_limit),
-            task_worker_concurrency_limit: self.task_worker_concurrency_limit,
-            hydradb: self.hydradb.drain(),
+            active_workflow_jobs: i32::try_from(self.active_workflow_jobs.current())
+                .unwrap_or(self.workflow_worker_slots)
+                .min(self.workflow_worker_slots),
+            workflow_worker_slots: self.workflow_worker_slots,
         }
     }
 }
@@ -290,21 +284,19 @@ mod tests {
             },
             previous_cpu: None,
             previous_throttle: None,
-            active_task_executions: ActiveTaskExecutions::default(),
-            task_worker_concurrency_limit: 4,
-            hydradb: MemoryProviderActivity::default(),
+            active_workflow_jobs: ActiveWorkflowJobs::default(),
+            workflow_worker_slots: 4,
         };
 
-        let gauge = source.active_task_executions.clone();
+        let gauge = source.active_workflow_jobs.clone();
         let _active = gauge.enter();
         let observation = source.observe();
         assert_eq!(observation.process_rss_bytes, None);
         assert_eq!(observation.memory_limit_bytes, None);
         assert_eq!(observation.cpu_utilization_percent, None);
         assert_eq!(observation.cpu_throttle_percent, None);
-        assert_eq!(observation.active_task_executions, 1);
-        assert_eq!(observation.task_worker_concurrency_limit, 4);
-        assert_eq!(observation.hydradb, Default::default());
+        assert_eq!(observation.active_workflow_jobs, 1);
+        assert_eq!(observation.workflow_worker_slots, 4);
 
         fs::remove_dir(missing).unwrap();
     }

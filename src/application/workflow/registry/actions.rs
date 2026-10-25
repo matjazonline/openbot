@@ -92,6 +92,15 @@ impl Registration<'_> {
                 "tool",
             ));
         }
+        // Provisioning runs only as an agent's tool, under its requester rule (p08 D2.1); an MCP
+        // tool of the same name is the server's own.
+        if !mcp && crate::application::workflow::provisioning::is_builtin_provisioning_tool(name) {
+            return Err(self.error(
+                "registry.tool",
+                "Built-in provisioning tools are agent tools, not step tools",
+                "tool",
+            ));
+        }
         let tool = self
             .facts
             .tools

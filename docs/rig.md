@@ -1,7 +1,7 @@
 # Rig agents: configuration and operations
 
 Rig is the only **in-process** agent runtime. It shares the server's privileges and is not a
-sandbox. The application owns credentials, authorization, durable tasks, memory, review and
+sandbox. The application owns credentials, authorization, durable workflow runs, decisions and
 delivery. The system-prompt generator makes one tool-free Rig completion (`RigTextClassifier`)
 with the credential it resolved. That call writes no model usage row, so usage analytics do not
 count it.
@@ -9,8 +9,8 @@ count it.
 ## Configure an agent
 
 In Agents, open an agent's settings (or create an agent) and save. Company and library forms use
-the same fields. Model connections, skills and the response format are separate settings. There
-is no runtime selector and no tool catalogue: the legacy native tools, built-in tools, agent MCP
+the same fields. Model connections and skills are separate settings. There is no runtime selector,
+no runtime configuration and no tool catalogue: the legacy native tools, built-in tools, agent MCP
 selections and executable skill tool steps were removed in phase 06C. Workflow tools an agent may
 use are named by its `workflow_tools` and dispatched by workflow actions, not by this runtime.
 
@@ -20,19 +20,14 @@ have a model connection and an enabled model; credentials are not part of this b
 ```json
 {
   "name": "Assistant",
-  "slug": "assistant",
-  "config_json": { "version": 1 }
+  "slug": "assistant"
 }
 ```
 
-Rig V1 accepts only `version` and optional `max_turns` (integer 1–16, default 8). For example,
-`{"version":1,"max_turns":4}` allows at most four model requests across the run, including repairs
-and continuations. Unknown fields fail validation. Advanced JSON cannot configure credentials,
-providers, URLs, tools or a response contract. Payloads naming the retired `harness_kind`,
-`granted_tool_ids` or `native_tool_policy` fields are rejected.
-
-API update omission preserves stored fields; an explicit `config_json: {"version":1}` resets
-advanced settings. Library installation preserves its definition's config and response contract.
+An agent carries no runtime settings of its own (p08 B4c): payloads naming `config_json`,
+`run_timeout_secs`, `response_contract`, `sub_agent_ids` or the retired `harness_kind`,
+`granted_tool_ids` and `native_tool_policy` fields are rejected. A run's deadline and its
+final-answer contract come from the workflow step that runs the agent.
 
 ## Verified compatibility
 
@@ -51,24 +46,22 @@ model and capabilities before production use.
 
 | Capability | Rig behavior |
 | --- | --- |
-| Tools | Only `read_resource`, for attached skills; no built-in, native or MCP tools |
-| Skills | Scoped catalog plus `read_resource`; the model follows the loaded prompt steps |
-| Context and memory | Application-composed history/memory and refreshed time, timezone, identity and recipient role |
+| Tools | The agent's `workflow_tools`, declared to the model and dispatched as workflow actions; the runtime has no built-in, native or MCP tools of its own |
+| Skills | Each attached skill's instructions are appended to the agent's prompt; the model follows them |
+| Context | The step's `context` input, whatever the workflow passes in (a `context.history` step's thread history, the trigger's input), fenced as untrusted JSON |
 | Structured final responses | Optional shared JSON Schema contract, enforced by the application |
 | Host access / delegation | No shell, filesystem, HTTP, provider-hosted tools, or Rig-managed sub-agent runtime |
 | Streaming / multipart completions | Unsupported |
 
-Skills are prompt steps, not deterministic recipes: loading a resource does not execute them.
-Supported references use `user_input`, `context` and earlier `steps[index].result`, with dotted
-fields and numeric indices. Filters, expressions, control blocks,
-forward references and unknown roots fail preflight. Missing runtime values require clarification.
-Limits are 16 attached skills, 32 steps/skill, 8,000 characters/prompt, a 32 KiB catalog and a
-16,384-character rendered resource. Resume revalidates access and uses saved resource/results.
+Skills are prompt steps, not deterministic recipes: appending one to the prompt executes nothing.
+An agent attaches at most 16 skills, and a skill has at most 32 steps of up to 8,000 characters
+each. Only `agent.run` steps use an agent's skills and tools.
 
 ## Structured final answers
 
-Select JSON Schema in the response-format setting and enter the schema, or submit this API patch
-to `PUT /api/companies/{company}/agents/{agent}`. `response_contract` is a sibling of `config_json`.
+A workflow model step's literal `output_schema` is its final-answer contract
+(`docs/workflow-language-v1.md`); the application wraps it in the envelope below. These examples
+are envelopes as the application parses them.
 
 ```json
 {
@@ -117,18 +110,14 @@ reference traversal. The envelope is limited to 65,792 input bytes. External/fil
 recursive schemas are rejected; regular expressions use a non-backtracking engine with a 64 KiB
 compiled-pattern limit. The JSON examples above are read by the application's parser tests in CI.
 
-Create omission or null means ordinary text. Update omission preserves the contract; explicit
-`response_contract: null`, or choosing ordinary text in the form, clears it. A run already
-prepared with a different contract fails closed rather than delivering under the new one.
-Structured delivery requires
-one answering agent, since concatenating constrained answers would change the payload.
+A run already prepared with a different contract fails closed rather than delivering under the
+new one.
 
 The final candidate must be exactly one JSON value. The application validates it **after
 sanitization and before completed-answer persistence**, then checks the frozen publication/delivery
 body again. Final response bodies are capped at 64 KiB; checkpoint and serialized-output limits
-also apply. Successful JSON delivery omits the product footer. The saved contract is immutable for
-review drafts: human edits must satisfy that original contract, cannot replace/remove it, and do
-not trigger model repairs. Provider-native structured generation cannot replace these checks.
+also apply. Successful JSON delivery omits the product footer. Provider-native structured
+generation cannot replace these checks.
 
 An invalid answer can use at most two additional repair calls within the original model, token and
 deadline budgets. Repair calls expose no tools. Exhaustion is terminal `invalid_output`, with no
@@ -137,14 +126,15 @@ contract, ordinary text remains the default.
 
 ## Execution and limits
 
-Production inbound, scheduled and simulated work uses the task-backed execution ledger. The full
-assistant tool batch (`read_resource` calls) is saved before execution; calls execute sequentially
-with their original arguments and IDs. Completed results are replayed after restart, and final
-output is consumed with the reply/review/outbox transaction.
+Every agent runs as a workflow model step, whatever started the run: an inbound message, a
+schedule, a manual start or a parent's child call (p08). A model turn's tool calls are saved in
+the checkpoint before they run, and execute one at a time with their original arguments and IDs.
+Completed results are replayed after a restart, and the final output is consumed once, with the
+step's completion.
 
 | Resource | Enforced ceiling |
 | --- | --- |
-| Model attempts | Default 8; `max_turns` 1–16, shared by continuations, skills and repairs |
+| Model attempts | 8 per model step, shared by continuations and repairs; not configurable per agent or step |
 | Tool attempts | 64/run; concurrency 1; individual deadline 30 seconds or remaining run time |
 | Input reservation | 131,072/request; 1,048,576/run |
 | Output reservation | 16,384/request; 262,144/run |
@@ -203,12 +193,13 @@ and four per exact endpoint.
 
 Remote intent is journaled before network dispatch. Completed receipts bypass the network;
 uncertain effects become `indeterminate` and are never automatically replayed. There is no automated
-reconciliation/reset interface or exactly-once remote-effect guarantee. See the recovery procedure
-in the deployment guide before retrying an uncertain operation.
+reset interface or exactly-once remote-effect guarantee; the run's reconciliation route records an
+operator note and resumes nothing. See the recovery procedure in the deployment guide before
+retrying an uncertain operation.
 
 ## Diagnostics and verification boundaries
 
-Task details expose safe run diagnostics. Output metadata's `execution_diagnostics` records
+A model step's output metadata carries safe run diagnostics: `execution_diagnostics` records
 `harness`, `provider`, `model`, `prompt_characters`, `response_characters`, `history_message_count`,
 `model_calls`, `tool_call_count`, `tool_names`, `supported_tool_ids`, `token_usage_source`,
 `unreported_usage_calls`, `unresolved_model_calls`, `structured_validation`, `repair_call_count`
@@ -224,8 +215,9 @@ Schemas, candidates, prompts, arguments/results, credentials and approval tokens
 
 Startup validates configuration, registry coverage and local transport construction; it does not
 authenticate company keys or probe model availability. Agent writes/preflight validate typed
-settings, response schemas and capabilities. CI uses local provider/MCP fixtures plus PostgreSQL
-for durable approval, competing claims, review and delivery tests. Live model authentication and a
+settings and capabilities; publishing a workflow validates its steps' `output_schema`s. CI uses
+local provider/MCP fixtures plus PostgreSQL for durable approval, competing claims, decision and
+delivery tests. Live model authentication and a
 controlled MCP endpoint pilot are separate operator checks, not startup guarantees.
 
 The [verification record](rig-verification.md) contains the release

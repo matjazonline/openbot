@@ -1,0 +1,490 @@
+--- a/scripts/tests/workflow-conversations.mjs
++++ b/scripts/tests/workflow-conversations.mjs
+@@ -60,3 +60,75 @@
+         server.closeAllConnections(); await new Promise(resolve => server.close(resolve));
+     }
+ });
++
++const historyScript = readFileSync(new URL('../../src/adapters/http/pages/thread_activity.rs', import.meta.url), 'utf8')
++    .split('const THREAD_HISTORY_SCRIPT: &str = r#"')[1].split('"#;')[0];
++
++test('a reconnect backlog keeps an explicit 200-message live window and the composer', async () => {
++    const streams = new Set();
++    let connections = 0;
++    const bubble = id => `<div class="chat" data-message-id="${id}"><p>Message ${id}</p><span id="message-runs-${id}"></span></div>`;
++    const server = createServer((req, res) => {
++        if (assets[req.url]) { res.setHeader('Content-Type','text/javascript'); return res.end(assets[req.url]); }
++        if (req.url === '/history.js') { res.setHeader('Content-Type','text/javascript'); return res.end(historyScript); }
++        if (req.url === '/events') {
++            res.writeHead(200, {'Content-Type':'text/event-stream'}); res.write('retry: 100\n\n');
++            connections++; streams.add(res); res.on('close', () => streams.delete(res));
++            if (connections > 1) {
++                // Admission happened while disconnected: question 2 is still mounted but outside
++                // the database window. Its run is visible; the backlog then advances the DOM window.
++                res.write('event: activity\ndata: <p>run old: queued</p>\n\n');
++                // The database now has more than 200 messages beyond the disconnected cursor.
++                // Each historical batch's own eligibility supplies its links before it is appended.
++                for (let id = 202; id <= 411; id++) {
++                    const content = bubble(id).replace(`id="message-runs-${id}">`,
++                        `id="message-runs-${id}">Written by <a href="/run/${id}">run ${id}</a>`);
++                    res.write(`id: ${id}\nevent: message\ndata: ${content}\n\n`);
++                }
++            }
++            return;
++        }
++        res.setHeader('Content-Type','text/html');
++        res.end(`<!doctype html><html><head><script src="/htmx-2.0.4.min.js"></script>
++            <script src="/htmx-ext-sse-2.2.3.js"></script><script src="/history.js"></script></head><body>
++            <section id="detail-pane" hx-ext="sse" sse-connect="/events">
++            <p>Showing up to 200 newest messages. Older messages leave this live view.</p>
++            <div id="message-scroll" data-history-limit="200" sse-swap="message" hx-swap="beforeend" style="height:200px;overflow:auto">
++                ${Array.from({length:200}, (_, i) => bubble(i + 1)).join('')}
++            </div><div id="thread-activity" sse-swap="activity" hx-swap="innerHTML"></div>
++            <textarea aria-label="Reply"></textarea></section></body></html>`);
++    });
++    await new Promise(resolve => server.listen(0,'127.0.0.1',resolve));
++    const browser = await chromium.launch(process.env.CHROME_PATH ? {executablePath:process.env.CHROME_PATH} : {});
++    const page = await browser.newPage(); const errors = []; page.on('pageerror', e => errors.push(e.message));
++    try {
++        await page.goto(`http://127.0.0.1:${server.address().port}/`);
++        await expect.poll(() => connections).toBe(1);
++        await page.getByRole('textbox',{name:'Reply'}).fill('Keep this unfinished response');
++        await page.locator('#detail-pane').evaluate(el => {el.dataset.retained='yes';});
++        await page.locator('#message-scroll').evaluate(el => { el.scrollTop = 1000; });
++        const retained = page.locator('[data-message-id="101"]');
++        const before = await retained.evaluate(el => el.getBoundingClientRect().top);
++        for (const stream of streams) stream.write(`id: 201\nevent: message\ndata: ${bubble(201)}\n\n`);
++        await expect(page.locator('[data-message-id="201"]')).toHaveCount(1);
++        assert.ok(Math.abs(await retained.evaluate(el => el.getBoundingClientRect().top) - before) < 1,
++            'trimming an earlier bubble retains the reading position');
++        // While disconnected question 2 remains mounted outside the newest DB window.
++        for (const stream of streams) stream.destroy();
++        await expect.poll(() => connections).toBe(2);
++        await expect(page.locator('.chat[data-message-id]')).toHaveCount(200);
++        await expect(page.locator('.chat').first()).toHaveAttribute('data-message-id','212');
++        await expect(page.locator('.chat').last()).toHaveAttribute('data-message-id','411');
++        await expect(page.locator('#message-scroll a')).toHaveCount(200);
++        // A delayed admission for the old question never resurrects it outside the bounded window.
++        for (const stream of streams) stream.write('event: activity\ndata: <p>run old: queued</p><span id="message-runs-2" hx-swap-oob="innerHTML">Started run old</span>\n\n');
++        await expect(page.locator('#thread-activity')).toContainText('run old: queued');
++        await expect(page.locator('[data-message-id="2"]')).toHaveCount(0);
++        await expect(page.locator('#detail-pane')).toHaveAttribute('data-retained','yes');
++        await expect(page.getByRole('textbox',{name:'Reply'})).toHaveValue('Keep this unfinished response');
++        assert.equal(connections,2); assert.deepEqual(errors,[]);
++    } finally {
++        await browser.close(); for (const stream of streams) stream.destroy();
++        server.closeAllConnections(); await new Promise(resolve => server.close(resolve));
++    }
++});
+--- a/src/adapters/http/pages/mailbox.rs
++++ b/src/adapters/http/pages/mailbox.rs
+@@ -817,7 +817,7 @@
+ 
+ pub(crate) fn application_javascript() -> String {
+     format!(
+-        "var CHIP_SELECTED_MARK = {selected:?};\nvar CHIP_ADD_MARK = {add:?};\nvar AGENT_REPLIED_MARK = {replied:?};\n{app}\n{legacy}\n{mailbox}\n{local}\n{skeletons}\n{schedules}\n{agents}\n{channels}\n{library}\n{delegation}\n{request_errors}\n{button_busy}\n{run_counts}\n{workflow_editor}\n{workflow_runs}",
++        "var CHIP_SELECTED_MARK = {selected:?};\nvar CHIP_ADD_MARK = {add:?};\nvar AGENT_REPLIED_MARK = {replied:?};\n{app}\n{legacy}\n{mailbox}\n{local}\n{skeletons}\n{schedules}\n{agents}\n{channels}\n{library}\n{delegation}\n{request_errors}\n{button_busy}\n{run_counts}\n{workflow_editor}\n{workflow_runs}\n{thread_history}",
+         selected = icon(Icon::Check, BUTTON_ICON),
+         add = icon(Icon::Plus, BUTTON_ICON),
+         replied = icon(Icon::Check, BUTTON_ICON),
+@@ -836,6 +836,7 @@
+         run_counts = super::run_counts::RUN_COUNTS_SCRIPT,
+         workflow_editor = super::workflow_authoring::WORKFLOW_EDITOR_SCRIPT,
+         workflow_runs = super::workflow_runs::WORKFLOW_RUNS_SCRIPT,
++        thread_history = super::thread_activity::THREAD_HISTORY_SCRIPT,
+     )
+ }
+ 
+@@ -2243,7 +2244,8 @@
+                 </div>
+             </div>
+             {pane_error}
+-            <div id="message-scroll" class="flex-1 space-y-1 overflow-y-auto px-4 py-4 sm:px-6"
++            <p class="px-4 text-xs opacity-60">Showing up to {history_limit} newest messages. Older messages leave this live view.</p>
++            <div id="message-scroll" data-history-limit="{history_limit}" class="flex-1 space-y-1 overflow-y-auto px-4 py-4 sm:px-6"
+                 sse-swap="message" hx-swap="beforeend">
+                 {messages_html}
+             </div>
+@@ -2253,6 +2255,7 @@
+             {diagnostics_dialog}
+         </section>
+         "##,
++        history_limit = crate::entities::message_view::THREAD_HISTORY_LIMIT,
+         pencil = icon(Icon::Pencil, BUTTON_ICON),
+         reload = icon(Icon::Sync, BUTTON_ICON),
+         simulator = simulator_link(pane),
+@@ -2448,7 +2451,7 @@
+     });
+     format!(
+         r##"
+-                <div class="chat {side}" data-role="{role}" data-audience="{audience}" data-entry-kind="{entry_kind}">
++                <div class="chat {side}" data-message-id="{message_id}" data-role="{role}" data-audience="{audience}" data-entry-kind="{entry_kind}">
+                     <div class="chat-image">{avatar}</div>
+                     <div class="chat-header gap-1 opacity-70">
+                         {channel_glyph}{writer}{transport_badge}
+@@ -2459,6 +2462,7 @@
+                     <div class="chat-footer font-mono text-[11px] opacity-50">{boundary} · {subject}{diagnostics}</div>{run_attribution}
+                 </div>
+         "##,
++        message_id = message.canonical_id.as_uuid(),
+         run_attribution = message_run_attribution(message, scope.company_id, run_access),
+         side = if is_viewer { "chat-end" } else { "chat-start" },
+         // Read by the column when a bubble streams in: only the agent's own reply answers the
+--- a/src/adapters/http/pages/thread_activity.rs
++++ b/src/adapters/http/pages/thread_activity.rs
+@@ -84,3 +84,22 @@
+         r#"<ul aria-label="Thread runs" class="space-y-1 border-t border-base-300 px-6 py-2 text-xs">{entries}{more}</ul>"#
+     )
+ }
++
++/// The live DOM retains the same newest-N window as initial reads and attribution reconciliation.
++/// Trimming only message bubbles preserves the stream owner and unsent composer/correction state
++/// on retained messages. Keep a retained anchor stationary even with browser scroll anchoring.
++pub const THREAD_HISTORY_SCRIPT: &str = r#"
++document.addEventListener('htmx:sseMessage', function (event) {
++    var pane = event.target;
++    if (!pane || pane.id !== 'message-scroll') return;
++    var limit = Number(pane.dataset.historyLimit);
++    if (!Number.isInteger(limit) || limit < 1) return;
++    var bubbles = pane.querySelectorAll(':scope > .chat[data-message-id]');
++    var excess = bubbles.length - limit;
++    if (excess <= 0) return;
++    var anchor = bubbles[excess];
++    var before = anchor.getBoundingClientRect().top;
++    for (var index = 0; index < excess; index++) bubbles[index].remove();
++    pane.scrollTop += anchor.getBoundingClientRect().top - before;
++});
++"#;
+--- a/src/adapters/http/routes/ui.rs
++++ b/src/adapters/http/routes/ui.rs
+@@ -590,7 +590,6 @@
+         // than leaving a freshly opened thread blank until something happens to change.
+         let mut pending_messages = true;
+         let mut pending_activity = true;
+-        let mut inspectable = HashSet::new();
+ 
+         loop {
+             if pending_activity {
+@@ -604,7 +603,6 @@
+                     Ok(activity) => {
+                         let run_access = pages::RunLinkAccess::Authorized(&activity.inspectable);
+                         let html = format!("{}{}", pages::thread_activity_strip(&activity, query.company_id, run_access), pages::thread_run_attribution_updates(&activity, query.company_id, run_access));
+-                        inspectable = activity.inspectable;
+                         yield Ok(Event::default()
+                             .event("activity")
+                             .data(html));
+@@ -622,6 +620,11 @@
+                     .await
+                 {
+                     Ok(messages) => {
++                        let ids: Vec<_> = messages.iter().flat_map(|message| message.run_ids.iter().copied()).collect();
++                        let inspectable = match activity_reader.inspectable_runs(query.company_id, viewer.user_id, &ids).await {
++                            Ok(ids) => ids,
++                            Err(error) => { warn!(%error, %thread_id, "Message run visibility query failed"); return; }
++                        };
+                         for message in &messages {
+                             cursor = Some(message.cursor());
+                             yield Ok(Event::default()
+--- a/src/adapters/http/routes/ui_stream_tests.rs
++++ b/src/adapters/http/routes/ui_stream_tests.rs
+@@ -175,6 +175,15 @@
+ 
+ #[async_trait::async_trait]
+ impl ThreadActivityReader for ScriptedActivity {
++    async fn inspectable_runs(
++        &self,
++        _company: Uuid,
++        _viewer: Uuid,
++        ids: &[Uuid],
++    ) -> AppResult<HashSet<Uuid>> {
++        Ok(ids.iter().copied().collect())
++    }
++
+     async fn thread_runs(
+         &self,
+         _company_id: Uuid,
+--- a/src/adapters/persistence/channel.rs
++++ b/src/adapters/persistence/channel.rs
+@@ -558,6 +558,24 @@
+         );
+     }
+     Ok(())
++}
++
++/// Visibility inputs for a requested run set; never loads unrelated company channels.
++pub(super) async fn channels_by_ids(
++    p: &PostgresPersistence,
++    company: Uuid,
++    ids: &[Uuid],
++) -> AppResult<Vec<Channel>> {
++    if ids.is_empty() {
++        return Ok(Vec::new());
++    }
++    let query = format!("{CHANNEL_SELECT} WHERE ch.company_id=$1 AND ch.id=ANY($2)");
++    let rows = sqlx::query_as::<_, ChannelDb>(&query)
++        .bind(company)
++        .bind(ids)
++        .fetch_all(p.pool())
++        .await?;
++    rows.into_iter().map(TryInto::try_into).collect()
+ }
+ 
+ #[cfg(test)]
+--- a/src/adapters/persistence/thread_activity.rs
++++ b/src/adapters/persistence/thread_activity.rs
+@@ -33,6 +33,52 @@
+ 
+ #[async_trait::async_trait]
+ impl ThreadActivityReader for PostgresPersistence {
++    async fn inspectable_runs(
++        &self,
++        company: Uuid,
++        viewer: Uuid,
++        ids: &[Uuid],
++    ) -> AppResult<std::collections::HashSet<Uuid>> {
++        use crate::use_cases::participant::PrincipalAccessPersistence;
++        if ids.len() > crate::application::thread_activity::MAX_THREAD_RUN_LINKS {
++            return Err(crate::app_error::AppError::BadRequest(
++                "Too many displayed run identities".into(),
++            ));
++        }
++        if ids.is_empty() {
++            return Ok(Default::default());
++        }
++        let Some(access) = self.access_context_for_user(company, viewer).await? else {
++            return Ok(Default::default());
++        };
++        if !access.membership.manages_company_operations() {
++            return Ok(Default::default());
++        }
++        let runs: Vec<(Uuid, Option<Uuid>)> = sqlx::query_as(
++            "SELECT id,channel_id FROM workflow_runs WHERE company_id=$1 AND id=ANY($2)",
++        )
++        .bind(company)
++        .bind(ids)
++        .fetch_all(self.pool())
++        .await?;
++        let source_ids: std::collections::HashSet<_> =
++            runs.iter().filter_map(|(_, channel)| *channel).collect();
++        let source_ids: Vec<_> = source_ids.into_iter().collect();
++        // Reuse the existing domain visibility policy, but read only the producing channels.
++        let channels: std::collections::HashSet<_> =
++            super::channel::channels_by_ids(self, company, &source_ids)
++                .await?
++                .into_iter()
++                .filter(|channel| channel.viewer_access(access))
++                .map(|channel| channel.id)
++                .collect();
++        Ok(runs
++            .into_iter()
++            .filter(|(_, channel)| channel.is_none_or(|id| channels.contains(&id)))
++            .map(|(id, _)| id)
++            .collect())
++    }
++
+     async fn thread_runs(
+         &self,
+         company_id: Uuid,
+@@ -71,7 +117,7 @@
+                     .flat_map(|row| row.run_ids.iter().copied()),
+             )
+             .collect();
+-        let inspectable = inspectable_runs(self, company_id, viewer, &ids).await?;
++        let inspectable = self.inspectable_runs(company_id, viewer, &ids).await?;
+         Ok(ThreadRuns {
+             inspectable,
+             items,
+@@ -115,8 +161,8 @@
+ // version titles describe what ran, even if the draft is renamed later.
+ pub(crate) const OPEN_THREAD_RUNS_SQL: &str = r#"
+ SELECT run.id AS run_id, version.title, run.state, run.waiting_reason
+-FROM workflow_runs run
+-JOIN workflow_versions version ON (version.company_id, version.id) = (run.company_id, run.version_id)
++FROM workflow_runs AS run
++JOIN workflow_versions AS version ON (version.company_id, version.id) = (run.company_id, run.version_id)
+ WHERE run.company_id = $1 AND run.thread_id = $2
+   AND run.state IN ('queued', 'running', 'waiting', 'failed')
+ ORDER BY run.created_at DESC, run.id DESC LIMIT $3
+@@ -136,8 +182,8 @@
+     thread: Uuid,
+ ) -> AppResult<Vec<crate::application::thread_activity::MessageRuns>> {
+     let messages: Vec<(Uuid, String)> = sqlx::query_as(
+-        "SELECT association.message_id, message.direction FROM thread_messages association \
+-         JOIN messages message ON (message.company_id,message.id)=(association.company_id,association.message_id) \
++        "SELECT association.message_id, message.direction FROM thread_messages AS association \
++         JOIN messages AS message ON (message.company_id,message.id)=(association.company_id,association.message_id) \
+          WHERE association.company_id=$1 AND association.thread_id=$2 \
+          ORDER BY association.created_at DESC, association.id DESC LIMIT $3")
+         .bind(company).bind(thread).bind(crate::entities::message_view::THREAD_HISTORY_LIMIT as i64)
+@@ -170,39 +216,3 @@
+         })
+         .collect()
+ }
+-
+-/// Apply the same channel policy used by the mailbox. A destination thread can contain a reply
+-/// produced on a different, private channel; its visible message does not grant run access.
+-async fn inspectable_runs(
+-    p: &PostgresPersistence,
+-    company: Uuid,
+-    viewer: Uuid,
+-    ids: &[Uuid],
+-) -> AppResult<std::collections::HashSet<Uuid>> {
+-    use crate::use_cases::{channel::ChannelPersistence, participant::PrincipalAccessPersistence};
+-    let Some(access) = p.access_context_for_user(company, viewer).await? else {
+-        return Ok(Default::default());
+-    };
+-    if !access.membership.manages_company_operations() {
+-        return Ok(Default::default());
+-    }
+-    let channels: std::collections::HashSet<_> = p
+-        .list_by_company_id(company)
+-        .await?
+-        .into_iter()
+-        .filter(|channel| channel.viewer_access(access))
+-        .map(|channel| channel.id)
+-        .collect();
+-    let runs: Vec<(Uuid, Option<Uuid>)> = sqlx::query_as(
+-        "SELECT id,channel_id FROM workflow_runs WHERE company_id=$1 AND id=ANY($2)",
+-    )
+-    .bind(company)
+-    .bind(ids)
+-    .fetch_all(p.pool())
+-    .await?;
+-    Ok(runs
+-        .into_iter()
+-        .filter(|(_, channel)| channel.is_none_or(|id| channels.contains(&id)))
+-        .map(|(id, _)| id)
+-        .collect())
+-}
+--- a/src/adapters/persistence/workflow/message_intent_tests.rs
++++ b/src/adapters/persistence/workflow/message_intent_tests.rs
+@@ -1663,5 +1663,102 @@
+             .unwrap()
+             .inspectable
+             .contains(&run)
++    );
++}
++
++#[tokio::test]
++async fn reconnect_batch_links_do_not_depend_on_the_newest_history_window() {
++    use crate::application::thread_activity::{THREAD_RUN_LIMIT, ThreadActivityReader};
++    let s = Intents::new().await;
++    let binding = s.binding(MessageTrigger::Any, None).await;
++    s.intent(TO).await;
++    s.drain(&s.admissions(admission(s.p()))).await;
++    let first = s.runs(binding).await[0];
++    for _ in 0..THREAD_RUN_LIMIT {
++        s.intent(TO).await;
++        s.drain(&s.admissions(admission(s.p()))).await;
++    }
++    for _ in 0..201 {
++        s.message().await;
++    }
++    let company = s.fixture.target.company.as_uuid();
++    let latest = s
++        .p()
++        .thread_runs(company, s.thread, s.owner().user_id())
++        .await
++        .unwrap();
++    assert!(
++        !latest.inspectable.contains(&first),
++        "outside both newest windows"
+     );
++    let backlog = s
++        .p()
++        .list_thread_message_views_after(s.thread, None, 50)
++        .await
++        .unwrap();
++    let ids: Vec<_> = backlog
++        .iter()
++        .flat_map(|message| message.run_ids.iter().copied())
++        .collect();
++    assert!(ids.contains(&first));
++    let inspectable = s
++        .p()
++        .inspectable_runs(company, s.owner().user_id(), &ids)
++        .await
++        .unwrap();
++    assert!(
++        inspectable.contains(&first),
++        "the real reconnect batch authorizes its own identities"
++    );
+ }
++
++#[tokio::test]
++async fn link_visibility_loads_only_requested_source_channels() {
++    use crate::application::thread_activity::ThreadActivityReader;
++    use crate::use_cases::channel::{ChannelPersistence, ChannelWrite};
++    let s = Intents::new().await;
++    let binding = s.binding(MessageTrigger::Any, None).await;
++    s.intent(TO).await;
++    s.drain(&s.admissions(admission(s.p()))).await;
++    let run = s.runs(binding).await[0];
++    let company = s.fixture.target.company.as_uuid();
++    for index in 0..64 {
++        ChannelPersistence::create(
++            s.p(),
++            company,
++            ChannelWrite {
++                name: "Unrelated".into(),
++                slug: format!("unrelated-{index}"),
++                ..Default::default()
++            },
++        )
++        .await
++        .unwrap();
++    }
++    let channels =
++        crate::adapters::persistence::channel::channels_by_ids(s.p(), company, &[s.channel])
++            .await
++            .unwrap();
++    assert_eq!(channels.len(), 1);
++    assert_eq!(channels[0].id, s.channel);
++    assert!(
++        crate::adapters::persistence::channel::channels_by_ids(s.p(), Uuid::new_v4(), &[s.channel])
++            .await
++            .unwrap()
++            .is_empty()
++    );
++    assert_eq!(
++        s.p()
++            .inspectable_runs(company, s.owner().user_id(), &[run])
++            .await
++            .unwrap(),
++        [run].into_iter().collect()
++    );
++    assert!(
++        s.p()
++            .inspectable_runs(company, s.owner().user_id(), &[])
++            .await
++            .unwrap()
++            .is_empty()
++    );
++}
+--- a/src/application/thread_activity.rs
++++ b/src/application/thread_activity.rs
+@@ -8,6 +8,14 @@
+ /// The callers have proved the threads visible; the company scopes the index.
+ #[async_trait::async_trait]
+ pub trait ThreadActivityReader: Send + Sync {
++    /// Inspector eligibility for the actual displayed batch, including a reconnect backlog.
++    async fn inspectable_runs(
++        &self,
++        company: Uuid,
++        viewer: Uuid,
++        runs: &[Uuid],
++    ) -> AppResult<std::collections::HashSet<Uuid>>;
++
+     async fn thread_runs(
+         &self,
+         company_id: Uuid,
+@@ -48,3 +56,9 @@
+     pub canonical_id: Uuid,
+     pub run_ids: Vec<Uuid>,
+ }
++
++/// At most one producer plus the admission binding cap for each retained message, and the
++/// independently displayed run strip. A caller cannot turn link eligibility into a catalogue.
++pub const MAX_THREAD_RUN_LINKS: usize = crate::entities::message_view::THREAD_HISTORY_LIMIT
++    * (crate::domain::workflow::MAX_MESSAGE_BINDINGS_PER_CHANNEL as usize + 1)
++    + THREAD_RUN_LIMIT;

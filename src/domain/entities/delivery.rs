@@ -35,9 +35,6 @@ pub struct DeliveryEntry {
     /// deleted with the channel, so this never dangles.
     pub channel_id: Uuid,
     pub message_id: CanonicalMessageId,
-    /// The task whose work produced this, when one did. Nothing writes back through it -- it is
-    /// the join that lets a queued delivery point at the work that created it.
-    pub task_id: Option<Uuid>,
     pub correlation_id: CorrelationId,
     pub transport: TransportKind,
     pub purpose: DeliveryPurpose,
@@ -110,9 +107,6 @@ pub struct DeliveryPartEntry {
 }
 
 /// Which page of the delivery queue a request means.
-///
-/// Mirrors [`crate::entities::task::TaskFilter`]: the same clamping, the same probe-for-next-page
-/// trick, so the two queue views cannot disagree about what `?page=2` contains.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DeliveryFilter {
     pub channel_id: Option<Uuid>,
@@ -208,7 +202,6 @@ mod tests {
             company_id: Uuid::new_v4(),
             channel_id: Uuid::new_v4(),
             message_id: CanonicalMessageId::random(),
-            task_id: None,
             correlation_id: CorrelationId::new(),
             transport: TransportKind::Email,
             purpose: DeliveryPurpose::Reply,

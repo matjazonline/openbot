@@ -2,8 +2,8 @@ use super::{RelatedAssociation, WorkflowActor, binding::ConfiguredBinding};
 use crate::application::app_error::{AppError, AppResult};
 use crate::domain::entities::correlation::CorrelationId;
 use crate::domain::workflow::{
-    ExecutionId, RunCausality, RunId, RunState, StepCausality, StepId, TriggerRef, VersionId,
-    WorkflowBindingId, WorkflowId,
+    BindingRevision, ExecutionId, RunCausality, RunId, RunState, StepCausality, StepId, TriggerRef,
+    VersionId, WorkflowBindingId, WorkflowId,
 };
 use serde_json::Value;
 use std::sync::Arc;
@@ -53,6 +53,33 @@ impl IdempotencyKey {
     }
 }
 
+/// Whether a run's message steps email their recipients or publish in-app only (p08 D1.7).
+/// Fixed at admission, inherited by every runtime child and part of replay equivalence.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum DeliveryPolicy {
+    #[default]
+    Deliver,
+    /// Channel simulation's test mode: canonical messages, no email delivery.
+    InAppOnly,
+}
+impl DeliveryPolicy {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Deliver => "deliver",
+            Self::InAppOnly => "in_app_only",
+        }
+    }
+    pub fn parse(value: &str) -> AppResult<Self> {
+        match value {
+            "deliver" => Ok(Self::Deliver),
+            "in_app_only" => Ok(Self::InAppOnly),
+            _ => Err(AppError::Internal(format!(
+                "Unknown workflow delivery policy {value}"
+            ))),
+        }
+    }
+}
+
 /// The idempotency key identifies a logical admission within one company;
 /// it is independent of correlation IDs and proposed random run IDs.
 pub struct AdmitWorkflowRequest {
@@ -68,6 +95,11 @@ pub struct AdmitWorkflowRequest {
     /// A manual start that reruns this top-level run of the same workflow with changed input or
     /// definition. The link is for inspection only (07-D1 §D1.7).
     pub rerun_of: Option<RunId>,
+    pub delivery_policy: DeliveryPolicy,
+    /// The binding configuration revision the caller evaluated (an automatic trigger's
+    /// eligibility). A fresh admission under any other current revision is `Stale`; a replay of
+    /// an existing run is unaffected (p08 D1.4.5).
+    pub expected_binding_revision: Option<BindingRevision>,
 }
 
 /// Input validated against the pinned bundle and aggregate input/parameter bound.
@@ -90,6 +122,8 @@ pub struct PreparedAdmission {
     first_step: StepCausality,
     input: Value,
     rerun_of: Option<RunId>,
+    delivery_policy: DeliveryPolicy,
+    expected_binding_revision: Option<BindingRevision>,
 }
 
 impl PreparedAdmission {
@@ -128,6 +162,8 @@ impl PreparedAdmission {
             first_step,
             input: snapshots.input,
             rerun_of: request.rerun_of,
+            delivery_policy: request.delivery_policy,
+            expected_binding_revision: request.expected_binding_revision,
         })
     }
     pub fn company_id(&self) -> CompanyId {
@@ -191,16 +227,34 @@ impl PreparedAdmission {
     pub fn rerun_of(&self) -> Option<RunId> {
         self.rerun_of
     }
+    /// Part of replay equivalence and inherited by runtime children.
+    pub fn delivery_policy(&self) -> DeliveryPolicy {
+        self.delivery_policy
+    }
+    pub fn expected_binding_revision(&self) -> Option<BindingRevision> {
+        self.expected_binding_revision
+    }
+}
+
+/// What the binding pre-read selected: the configuration a committed run already saved for
+/// this key or source (a replay), or the current active configuration.
+pub struct AdmissionBinding {
+    pub binding: Arc<ConfiguredBinding>,
+    pub saved: bool,
 }
 
 /// `Replayed` returns the originally committed run; `Conflict` means the same
 /// company/key was used with a different logical binding, related association,
-/// stable trigger identity/source, or input. Configuration changes alone are not conflicts.
+/// stable trigger identity/source, input or delivery policy. Configuration changes alone are not
+/// conflicts. `Stale` means a fresh admission found the binding's current configuration other
+/// than the one the caller evaluated or prepared against (reconfigured, deactivated or
+/// re-selected concurrently): nothing was written, and the caller re-reads and decides again.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AdmissionResult {
     Created(RunId),
     Replayed(RunId),
     Conflict,
+    Stale,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]

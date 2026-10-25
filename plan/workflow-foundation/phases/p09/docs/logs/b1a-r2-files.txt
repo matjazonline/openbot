@@ -1,0 +1,7 @@
+src/adapters/http/pages/workflow_authoring/catalogue.rs
+src/adapters/http/pages/workflow_authoring/editor.rs
+src/adapters/http/pages/workflow_authoring/preview.rs
+src/adapters/http/routes/workflows/ui/authoring.rs
+src/adapters/http/routes/workflows/ui/authoring_tests.rs
+src/adapters/persistence/workflow/authoring_reads.rs
+src/application/workflow/reads.rs

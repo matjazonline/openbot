@@ -165,6 +165,22 @@ async fn write_destinations_on(
             .bind(&thread.subject)
             .execute(&mut **tx)
             .await?;
+            // A member's send opens a thread of its own; its recipient is a party to exactly
+            // that thread, so their reply passes ingress there and nowhere else (p08 D1.5.4).
+            if let (DestinationKind::User, Some(principal)) =
+                (destination.kind, destination.principal_id)
+            {
+                sqlx::query(
+                    "INSERT INTO thread_principals (company_id, channel_id, thread_id, principal_id, role) \
+                     VALUES ($1,$2,$3,$4,'participant')",
+                )
+                .bind(scope.company.as_uuid())
+                .bind(thread.channel_id)
+                .bind(thread.id)
+                .bind(principal)
+                .execute(&mut **tx)
+                .await?;
+            }
         }
         let inserted = insert_message_on(tx, &destination.message).await?;
         if inserted.canonical_id != destination.message.id {

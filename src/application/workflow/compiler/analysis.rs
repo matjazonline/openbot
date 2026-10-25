@@ -194,7 +194,7 @@ fn check_reference(
             }
             schema
         }
-        "run.id" | "run.parent_id" => return Ok(()),
+        "run.id" | "run.parent_id" | "run.deadline" => return Ok(()),
         _ => unreachable!(),
     };
     let guarantee = schema.guarantees(reference.tail());

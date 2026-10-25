@@ -42,6 +42,10 @@ pub enum AgentToolTarget {
     Message {
         name: TypeName,
     },
+    /// A built-in provisioning tool (p08 D2.2), a local action under the company's authority.
+    Provisioning {
+        name: TypeName,
+    },
     /// A pinned child workflow (07-D2 §D2.3); dispatched without ActionService.
     Workflow {
         pin: WorkflowToolPin,
@@ -60,6 +64,16 @@ impl PreparedTool {
     pub fn message_kind(&self) -> Option<MessageKind> {
         match &self.target {
             AgentToolTarget::Message { name } => MessageKind::parse(name.as_str()),
+            _ => None,
+        }
+    }
+    pub fn provisioning_kind(
+        &self,
+    ) -> Option<crate::application::workflow::provisioning::ProvisioningKind> {
+        match &self.target {
+            AgentToolTarget::Provisioning { name } => {
+                crate::application::workflow::provisioning::ProvisioningKind::parse(name.as_str())
+            }
             _ => None,
         }
     }
@@ -246,6 +260,7 @@ fn prepared_tool(snapshot: &ToolSnapshot, target: AgentToolTarget) -> AppResult<
     let name = snapshot.contract.name.clone();
     let consistent = match (&target, snapshot.kind()) {
         (AgentToolTarget::Message { name: target }, ToolKind::Message) => target == &name,
+        (AgentToolTarget::Provisioning { name: target }, ToolKind::Provisioning) => target == &name,
         (AgentToolTarget::Mcp { slot }, ToolKind::Slot(frozen)) => frozen == slot,
         (AgentToolTarget::Http { .. }, ToolKind::Http) => true,
         (AgentToolTarget::Workflow { pin }, ToolKind::Workflow(frozen)) => frozen == pin,

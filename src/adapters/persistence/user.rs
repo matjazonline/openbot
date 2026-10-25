@@ -31,11 +31,8 @@ pub struct UserDb {
 
 #[derive(sqlx::FromRow)]
 struct NotificationPreferencesDb {
-    assignment_email_enabled: bool,
-    response_review_email_enabled: bool,
-    delegation_timeout_email_enabled: bool,
-    task_failure_email_enabled: bool,
     delivery_failure_email_enabled: bool,
+    decision_email_enabled: bool,
 }
 
 #[async_trait]
@@ -154,16 +151,10 @@ impl UserPersistence for PostgresPersistence {
     async fn notification_preferences(&self, id: Uuid) -> AppResult<NotificationPreferences> {
         let row = sqlx::query_as::<_, NotificationPreferencesDb>(
             r#"SELECT
-                   COALESCE(preference.assignment_email_enabled, TRUE)
-                       AS assignment_email_enabled,
-                   COALESCE(preference.response_review_email_enabled, TRUE)
-                       AS response_review_email_enabled,
-                   COALESCE(preference.delegation_timeout_email_enabled, TRUE)
-                       AS delegation_timeout_email_enabled,
-                   COALESCE(preference.task_failure_email_enabled, TRUE)
-                       AS task_failure_email_enabled,
                    COALESCE(preference.delivery_failure_email_enabled, TRUE)
-                       AS delivery_failure_email_enabled
+                       AS delivery_failure_email_enabled,
+                   COALESCE(preference.decision_email_enabled, TRUE)
+                       AS decision_email_enabled
                FROM users AS account
                LEFT JOIN user_notification_preferences AS preference
                  ON preference.user_id = account.id
@@ -174,11 +165,8 @@ impl UserPersistence for PostgresPersistence {
         .await
         .map_err(AppError::from)?;
         Ok(NotificationPreferences {
-            assignment_email_enabled: row.assignment_email_enabled,
-            response_review_email_enabled: row.response_review_email_enabled,
-            delegation_timeout_email_enabled: row.delegation_timeout_email_enabled,
-            task_failure_email_enabled: row.task_failure_email_enabled,
             delivery_failure_email_enabled: row.delivery_failure_email_enabled,
+            decision_email_enabled: row.decision_email_enabled,
         })
     }
 
@@ -199,24 +187,16 @@ impl UserPersistence for PostgresPersistence {
         }
         let result = sqlx::query(
             r#"INSERT INTO user_notification_preferences (
-                   user_id, assignment_email_enabled, response_review_email_enabled,
-                   delegation_timeout_email_enabled, task_failure_email_enabled,
-                   delivery_failure_email_enabled, updated_at
-               ) VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)
+                   user_id, delivery_failure_email_enabled, decision_email_enabled, updated_at
+               ) VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
                ON CONFLICT (user_id) DO UPDATE
-               SET assignment_email_enabled = EXCLUDED.assignment_email_enabled,
-                   response_review_email_enabled = EXCLUDED.response_review_email_enabled,
-                   delegation_timeout_email_enabled = EXCLUDED.delegation_timeout_email_enabled,
-                   task_failure_email_enabled = EXCLUDED.task_failure_email_enabled,
-                   delivery_failure_email_enabled = EXCLUDED.delivery_failure_email_enabled,
+               SET delivery_failure_email_enabled = EXCLUDED.delivery_failure_email_enabled,
+                   decision_email_enabled = EXCLUDED.decision_email_enabled,
                    updated_at = CURRENT_TIMESTAMP"#,
         )
         .bind(id)
-        .bind(preferences.assignment_email_enabled)
-        .bind(preferences.response_review_email_enabled)
-        .bind(preferences.delegation_timeout_email_enabled)
-        .bind(preferences.task_failure_email_enabled)
         .bind(preferences.delivery_failure_email_enabled)
+        .bind(preferences.decision_email_enabled)
         .execute(&mut *transaction)
         .await
         .map_err(AppError::from)?;
@@ -953,24 +933,29 @@ mod tests {
             NotificationPreferences::default()
         );
 
-        let expected = NotificationPreferences {
-            assignment_email_enabled: false,
-            response_review_email_enabled: true,
-            delegation_timeout_email_enabled: false,
-            task_failure_email_enabled: true,
-            delivery_failure_email_enabled: false,
-        };
-        persistence
-            .set_notification_preferences(user.id, expected)
-            .await
-            .expect("stored preferences");
-        assert_eq!(
+        // Each flag on its own, so a transposed column cannot pass (P08-Q8).
+        for expected in [
+            NotificationPreferences {
+                delivery_failure_email_enabled: false,
+                decision_email_enabled: true,
+            },
+            NotificationPreferences {
+                delivery_failure_email_enabled: true,
+                decision_email_enabled: false,
+            },
+        ] {
             persistence
-                .notification_preferences(user.id)
+                .set_notification_preferences(user.id, expected)
                 .await
-                .expect("updated preferences"),
-            expected
-        );
+                .expect("stored preferences");
+            assert_eq!(
+                persistence
+                    .notification_preferences(user.id)
+                    .await
+                    .expect("updated preferences"),
+                expected
+            );
+        }
     }
 
     #[tokio::test]

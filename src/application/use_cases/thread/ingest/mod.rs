@@ -54,9 +54,6 @@ use crate::{
 
 pub use policy::{IngestRejection, IngressOrigin};
 
-/// The one task type this pipeline produces.
-pub(super) const AGENT_DISPATCH_TASK: &str = "email_agent_dispatch";
-
 /// A protocol-agnostic, canonical message ingress intent.
 ///
 /// Direct application entry points (UI reply/compose, schedulers, internal tools,
@@ -297,7 +294,7 @@ impl ThreadUseCases {
             }
         };
 
-        let plan = CommitPlan::build(&draft, &resolved, prepared, reply_delivery)?;
+        let plan = CommitPlan::build(&draft, &resolved, prepared, reply_delivery, origin)?;
         Ok(InboundPreflight::Accepted(Box::new(PreparedInbound {
             plan,
             stored_attachment_count: 0,
@@ -348,6 +345,12 @@ impl ThreadUseCases {
                 return Err(error);
             }
         };
+        if !outcome.disposition.is_duplicate()
+            && !outcome.intent_ids.is_empty()
+            && let Some(wakeups) = &self.intent_wakeups
+        {
+            wakeups.notify_one();
+        }
         self.assemble_result(plan, outcome).await
     }
 
@@ -460,7 +463,7 @@ impl ThreadUseCases {
             company: Some(primary.company.clone()),
             channel: Some(primary.channel.clone()),
             envelope: Some(envelope),
-            task_ids: outcome.task_ids,
+            intent_ids: outcome.intent_ids,
             reply_delivery,
             channel_matches,
         })

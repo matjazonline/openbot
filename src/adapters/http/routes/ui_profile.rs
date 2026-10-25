@@ -95,11 +95,8 @@ pub struct CodeForm {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct NotificationPreferencesForm {
-    pub assignment_email_enabled: Option<String>,
-    pub response_review_email_enabled: Option<String>,
-    pub delegation_timeout_email_enabled: Option<String>,
-    pub task_failure_email_enabled: Option<String>,
     pub delivery_failure_email_enabled: Option<String>,
+    pub decision_email_enabled: Option<String>,
 }
 
 /// The account and everything waiting on a code for it, which is what any pane render needs.
@@ -171,17 +168,10 @@ async fn update_notification_preferences(
         .set_notification_preferences(
             user.id,
             NotificationPreferences {
-                assignment_email_enabled: enabled(form.assignment_email_enabled.as_deref()),
-                response_review_email_enabled: enabled(
-                    form.response_review_email_enabled.as_deref(),
-                ),
-                delegation_timeout_email_enabled: enabled(
-                    form.delegation_timeout_email_enabled.as_deref(),
-                ),
-                task_failure_email_enabled: enabled(form.task_failure_email_enabled.as_deref()),
                 delivery_failure_email_enabled: enabled(
                     form.delivery_failure_email_enabled.as_deref(),
                 ),
+                decision_email_enabled: enabled(form.decision_email_enabled.as_deref()),
             },
         )
         .await?;

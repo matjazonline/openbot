@@ -5,8 +5,8 @@
 //! process → a [`broadcast`] channel → one subscriber per open mailbox.
 //!
 //! Going through the database rather than a bare in-process channel is what makes this work at
-//! all in this deployment: the writes that a reader most needs to see come from the `TaskWorker`
-//! and the SMTP listener, which are separate tasks today and can be separate *machines* once more
+//! all in this deployment: the writes that a reader most needs to see come from the workflow
+//! worker and the SMTP listener, which are separate tasks today and can be separate *machines* once more
 //! than one is serving traffic. A process-local channel would only ever see a mailbox's own
 //! compose/reply, which is the one case that already updates without help.
 //!
@@ -17,7 +17,6 @@ use crate::services::inbound_event_worker::InboundEventWakeups;
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use sqlx::postgres::PgListener;
-use tokio::sync::Notify;
 use tokio::sync::broadcast;
 use tracing::{error, info, warn};
 use uuid::Uuid;
@@ -25,12 +24,9 @@ use uuid::Uuid;
 /// The Postgres channel the `thread_messages_notify` trigger publishes committed messages on.
 const MESSAGE_CHANNEL: &str = "thread_message";
 
-/// The Postgres channel the `background_tasks_notify_activity` trigger publishes task status
-/// changes on.
+/// The Postgres channel a workflow run on a thread announces its state changes on
+/// (`workflow_runs_notify_activity_*`, P08-D4 §D4.1).
 const ACTIVITY_CHANNEL: &str = "thread_activity";
-
-/// Correlation-chain changes used by the Tasks board.
-const TASK_CHAIN_CHANNEL: &str = "task_chain_changed";
 
 /// The channel the `inbound_events_notify_ready` trigger announces claimable inbox rows on.
 ///
@@ -38,9 +34,9 @@ const TASK_CHAIN_CHANNEL: &str = "task_chain_changed";
 /// duplicated notification costs at most one poll interval. It shares this connection rather than
 /// opening its own because a pure latency hint does not justify a second dedicated listener.
 const INBOUND_EVENT_CHANNEL: &str = "inbound_event_ready";
-const TASK_READY_CHANNEL: &str = "task_ready";
-const TASK_OWNERSHIP_CHANNEL: &str = "task_ownership_changed";
 const ATTENTION_CHANNEL: &str = "attention_changed";
+/// Run-level workflow transitions (`notify_workflow_run_changed`, P08-D4 §D4.1).
+const WORKFLOW_RUN_CHANNEL: &str = "workflow_run_changed";
 const ACTIONABLE_NOTIFICATION_CHANNEL: &str = "actionable_notification_changed";
 
 /// How many events a slow subscriber may fall behind before it is marked lagged. Lag is not data
@@ -67,18 +63,22 @@ pub struct ThreadScope {
     pub company_id: Uuid,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
-pub struct TaskChainScope {
-    pub company_id: Uuid,
-    pub correlation_id: Uuid,
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 pub struct AttentionScope {
     pub company_id: Uuid,
     pub channel_id: Uuid,
     pub source_kind: AttentionWakeSource,
     pub source_id: Uuid,
+}
+
+/// A workflow run whose state or waiting reason changed, or that was admitted. A run without a
+/// channel is company-wide.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+pub struct RunScope {
+    pub company_id: Uuid,
+    pub channel_id: Option<Uuid>,
+    pub thread_id: Option<Uuid>,
+    pub run_id: Uuid,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
@@ -91,58 +91,9 @@ pub struct NotificationScope {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AttentionWakeSource {
-    Task,
-    Handoff,
-    /// `thread_handoffs`, the inbound-triggered handoff -- a different feature from the
-    /// `Handoff` above, which is `manual_handoffs`.
-    ThreadHandoff,
-    ResponseReview,
-    Delegation,
+    /// `message_deliveries_notify_attention`, the one trigger that still raises the wake (p08
+    /// D4.3).
     Delivery,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
-struct TaskOwnershipScope {
-    task_id: Uuid,
-}
-
-/// Cross-process latency hints for task claims and revocation. PostgreSQL remains authoritative;
-/// a missed hint costs one poll interval, while every stale write is still ownership-fenced.
-#[derive(Clone)]
-pub struct TaskWakeups {
-    ready: std::sync::Arc<Notify>,
-    ownership: broadcast::Sender<Uuid>,
-}
-
-impl TaskWakeups {
-    pub fn new() -> Self {
-        Self {
-            ready: std::sync::Arc::new(Notify::new()),
-            ownership: broadcast::channel(BROADCAST_CAPACITY).0,
-        }
-    }
-
-    pub async fn ready(&self) {
-        self.ready.notified().await;
-    }
-
-    pub fn notify_ready(&self) {
-        self.ready.notify_waiters();
-    }
-
-    pub fn subscribe_ownership(&self) -> broadcast::Receiver<Uuid> {
-        self.ownership.subscribe()
-    }
-
-    fn ownership_changed(&self, task_id: Uuid) {
-        let _ = self.ownership.send(task_id);
-    }
-}
-
-impl Default for TaskWakeups {
-    fn default() -> Self {
-        Self::new()
-    }
 }
 
 /// Something a connected mailbox may need to redraw.
@@ -155,20 +106,37 @@ impl Default for TaskWakeups {
 pub enum MailboxEvent {
     MessageCommitted(ThreadScope),
     ActivityChanged(ThreadScope),
-    TaskChainChanged(TaskChainScope),
     AttentionChanged(AttentionScope),
     NotificationChanged(NotificationScope),
+    WorkflowRunChanged(RunScope),
+    /// The listener reconnected, so notifications may have been lost meanwhile: every view
+    /// reconciles in full, as on a broadcast lag (P08-D4 F077, F084).
+    Resync,
 }
 
 impl MailboxEvent {
+    /// Whether a view must reconcile in full regardless of scope.
+    pub fn is_resync(&self) -> bool {
+        matches!(self, MailboxEvent::Resync)
+    }
+
+    /// A workflow run change in `company_id`, for the views that follow runs.
+    pub fn run_scope(&self, company_id: Uuid) -> Option<RunScope> {
+        match self {
+            Self::WorkflowRunChanged(scope) if scope.company_id == company_id => Some(*scope),
+            _ => None,
+        }
+    }
+
     pub fn thread_scope(&self) -> Option<ThreadScope> {
         match self {
             MailboxEvent::MessageCommitted(scope) | MailboxEvent::ActivityChanged(scope) => {
                 Some(*scope)
             }
-            MailboxEvent::TaskChainChanged(_)
-            | MailboxEvent::AttentionChanged(_)
-            | MailboxEvent::NotificationChanged(_) => None,
+            MailboxEvent::AttentionChanged(_)
+            | MailboxEvent::NotificationChanged(_)
+            | MailboxEvent::WorkflowRunChanged(_)
+            | MailboxEvent::Resync => None,
         }
     }
 
@@ -177,7 +145,7 @@ impl MailboxEvent {
         matches!(self, MailboxEvent::MessageCommitted(scope) if scope.thread_id == thread_id)
     }
 
-    /// True for a task status change on `thread_id`.
+    /// True for a run's state change on `thread_id`.
     pub fn is_activity_in_thread(&self, thread_id: Uuid) -> bool {
         matches!(self, MailboxEvent::ActivityChanged(scope) if scope.thread_id == thread_id)
     }
@@ -187,35 +155,9 @@ impl MailboxEvent {
         matches!(self, MailboxEvent::MessageCommitted(scope) if scope.channel_id == channel_id)
     }
 
-    /// True for a task status change anywhere in `channel_id`.
+    /// True for a run's state change on any thread of `channel_id`.
     pub fn is_activity_in_channel(&self, channel_id: Uuid) -> bool {
         matches!(self, MailboxEvent::ActivityChanged(scope) if scope.channel_id == channel_id)
-    }
-
-    /// True for a thread-handoff change anywhere in `channel_id`.
-    ///
-    /// Matched on [`AttentionWakeSource::ThreadHandoff`] alone: [`AttentionWakeSource::Handoff`] is
-    /// `manual_handoffs`, a different feature that shares this channel, and a mailbox that redrew
-    /// its held-reply badges for one of those would be reading another feature's news.
-    pub fn is_thread_handoff_in_channel(&self, channel_id: Uuid) -> bool {
-        matches!(
-            self,
-            MailboxEvent::AttentionChanged(scope)
-                if scope.channel_id == channel_id
-                    && matches!(scope.source_kind, AttentionWakeSource::ThreadHandoff)
-        )
-    }
-
-    pub fn is_task_attention_in_company(&self, company_id: Uuid) -> bool {
-        matches!(self, Self::AttentionChanged(scope) if scope.company_id == company_id && scope.source_kind == AttentionWakeSource::Task)
-    }
-
-    pub fn is_task_chain_in_company(&self, company_id: Uuid) -> bool {
-        matches!(self, MailboxEvent::TaskChainChanged(scope) if scope.company_id == company_id)
-    }
-
-    pub fn is_task_chain(&self, correlation_id: Uuid) -> bool {
-        matches!(self, MailboxEvent::TaskChainChanged(scope) if scope.correlation_id == correlation_id)
     }
 
     pub fn attention_scope(&self, company_id: Uuid) -> Option<AttentionScope> {
@@ -271,7 +213,6 @@ pub async fn run_mailbox_event_listener(
     pool: PgPool,
     events: MailboxEvents,
     inbound_events: InboundEventWakeups,
-    task_wakeups: TaskWakeups,
     mut shutdown: broadcast::Receiver<()>,
 ) {
     loop {
@@ -280,7 +221,7 @@ pub async fn run_mailbox_event_listener(
                 info!("Thread message listener shutting down");
                 return;
             }
-            result = listen_until_error(&pool, &events, &inbound_events, &task_wakeups) => {
+            result = listen_until_error(&pool, &events, &inbound_events) => {
                 // `listen_until_error` only returns on failure; `PgListener` handles ordinary
                 // reconnects internally without surfacing them here.
                 if let Err(err) = result {
@@ -300,7 +241,6 @@ async fn listen_until_error(
     pool: &PgPool,
     events: &MailboxEvents,
     inbound_events: &InboundEventWakeups,
-    task_wakeups: &TaskWakeups,
 ) -> Result<(), sqlx::Error> {
     let mut listener = PgListener::connect_with(pool).await?;
     // One connection serves every channel; `PgListener` re-issues each LISTEN on reconnect.
@@ -308,33 +248,29 @@ async fn listen_until_error(
         .listen_all([
             MESSAGE_CHANNEL,
             ACTIVITY_CHANNEL,
-            TASK_CHAIN_CHANNEL,
             INBOUND_EVENT_CHANNEL,
-            TASK_READY_CHANNEL,
-            TASK_OWNERSHIP_CHANNEL,
             ATTENTION_CHANNEL,
             ACTIONABLE_NOTIFICATION_CHANNEL,
+            WORKFLOW_RUN_CHANNEL,
         ])
         .await?;
     info!("Listening for mailbox notifications");
+    // A new listener, first or rebuilt after a failure, may have missed notifications: views
+    // reconcile (F084).
+    events.publish(MailboxEvent::Resync);
 
     loop {
-        let notification = listener.recv().await?;
+        // `try_recv` surfaces the reconnect `recv` would hide; the notifications sent while the
+        // connection was down are lost, so views reconcile (F077).
+        let Some(notification) = listener.try_recv().await? else {
+            warn!("Mailbox listener reconnected; views resync");
+            events.publish(MailboxEvent::Resync);
+            continue;
+        };
         // The inbox wake-up is not a `MailboxEvent` and has no payload to parse: it only shortens
         // the idle poll of a worker that may be in another process entirely.
         if notification.channel() == INBOUND_EVENT_CHANNEL {
             inbound_events.notify();
-            continue;
-        }
-        if notification.channel() == TASK_READY_CHANNEL {
-            task_wakeups.notify_ready();
-            continue;
-        }
-        if notification.channel() == TASK_OWNERSHIP_CHANNEL {
-            match serde_json::from_str::<TaskOwnershipScope>(notification.payload()) {
-                Ok(scope) => task_wakeups.ownership_changed(scope.task_id),
-                Err(err) => warn!(error = %err, "Ignoring unparseable task ownership wake-up"),
-            }
             continue;
         }
         let parsed = match notification.channel() {
@@ -342,14 +278,14 @@ async fn listen_until_error(
                 .map(MailboxEvent::MessageCommitted),
             ACTIVITY_CHANNEL => serde_json::from_str::<ThreadScope>(notification.payload())
                 .map(MailboxEvent::ActivityChanged),
-            TASK_CHAIN_CHANNEL => serde_json::from_str::<TaskChainScope>(notification.payload())
-                .map(MailboxEvent::TaskChainChanged),
             ATTENTION_CHANNEL => serde_json::from_str::<AttentionScope>(notification.payload())
                 .map(MailboxEvent::AttentionChanged),
             ACTIONABLE_NOTIFICATION_CHANNEL => {
                 serde_json::from_str::<NotificationScope>(notification.payload())
                     .map(MailboxEvent::NotificationChanged)
             }
+            WORKFLOW_RUN_CHANNEL => serde_json::from_str::<RunScope>(notification.payload())
+                .map(MailboxEvent::WorkflowRunChanged),
             other => {
                 warn!(
                     channel = other,
@@ -400,30 +336,12 @@ mod tests {
             scope()
         );
 
-        let chain_payload = r#"{
-            "company_id": "0a8f5f5e-0000-4000-8000-000000000003",
-            "correlation_id": "0a8f5f5e-0000-4000-8000-000000000004"
-        }"#;
-        assert_eq!(
-            serde_json::from_str::<TaskChainScope>(chain_payload).unwrap(),
-            TaskChainScope {
-                company_id: id(3),
-                correlation_id: id(4),
-            }
-        );
-
-        let ownership_payload = r#"{
-            "task_id": "0a8f5f5e-0000-4000-8000-000000000005"
-        }"#;
-        assert_eq!(
-            serde_json::from_str::<TaskOwnershipScope>(ownership_payload).unwrap(),
-            TaskOwnershipScope { task_id: id(5) }
-        );
-
+        // The `message_deliveries_notify_attention` trigger's argument, which is the only thing
+        // standing between a renamed source kind and a queue that silently stops updating.
         let attention_payload = r#"{
             "company_id": "0a8f5f5e-0000-4000-8000-000000000003",
             "channel_id": "0a8f5f5e-0000-4000-8000-000000000002",
-            "source_kind": "handoff",
+            "source_kind": "delivery",
             "source_id": "0a8f5f5e-0000-4000-8000-000000000006"
         }"#;
         assert_eq!(
@@ -431,28 +349,24 @@ mod tests {
             AttentionScope {
                 company_id: id(3),
                 channel_id: id(2),
-                source_kind: AttentionWakeSource::Handoff,
+                source_kind: AttentionWakeSource::Delivery,
                 source_id: id(6),
             }
         );
-
-        // The `thread_handoffs_notify_attention` trigger's argument, which is the only thing
-        // standing between a renamed source kind and a queue that silently stops updating.
-        let thread_handoff_payload = r#"{
-            "company_id": "0a8f5f5e-0000-4000-8000-000000000003",
-            "channel_id": "0a8f5f5e-0000-4000-8000-000000000002",
-            "source_kind": "thread_handoff",
-            "source_id": "0a8f5f5e-0000-4000-8000-000000000007"
-        }"#;
-        assert_eq!(
-            serde_json::from_str::<AttentionScope>(thread_handoff_payload).unwrap(),
-            AttentionScope {
-                company_id: id(3),
-                channel_id: id(2),
-                source_kind: AttentionWakeSource::ThreadHandoff,
-                source_id: id(7),
-            }
-        );
+        // The legacy runtime's sources are gone with their triggers.
+        for retired in [
+            "task",
+            "handoff",
+            "thread_handoff",
+            "response_review",
+            "delegation",
+        ] {
+            let payload = attention_payload.replace("\"delivery\"", &format!("\"{retired}\""));
+            assert!(
+                serde_json::from_str::<AttentionScope>(&payload).is_err(),
+                "{retired}"
+            );
+        }
 
         let notification_payload = r#"{
             "company_id": "0a8f5f5e-0000-4000-8000-000000000003",
@@ -482,10 +396,6 @@ mod tests {
     fn the_two_event_kinds_are_matched_separately() {
         let message = MailboxEvent::MessageCommitted(scope());
         let activity = MailboxEvent::ActivityChanged(scope());
-        let chain = MailboxEvent::TaskChainChanged(TaskChainScope {
-            company_id: id(3),
-            correlation_id: id(4),
-        });
 
         assert!(message.is_message_in_thread(id(1)));
         assert!(!activity.is_message_in_thread(id(1)));
@@ -499,18 +409,11 @@ mod tests {
         // Another thread's or channel's event is never ours.
         assert!(!message.is_message_in_thread(id(9)));
         assert!(!activity.is_activity_in_channel(id(9)));
-        assert!(chain.is_task_chain_in_company(id(3)));
-        assert!(chain.is_task_chain(id(4)));
-        assert!(!chain.is_message_in_channel(id(2)));
 
-        // Case 12. A held reply is a third kind, and no predicate above may answer for it.
-        let handoff = MailboxEvent::AttentionChanged(attention(AttentionWakeSource::ThreadHandoff));
-        assert!(handoff.is_thread_handoff_in_channel(id(2)));
-        assert!(!handoff.is_message_in_channel(id(2)));
-        assert!(!handoff.is_activity_in_channel(id(2)));
-        assert!(!message.is_thread_handoff_in_channel(id(2)));
-        assert!(!activity.is_thread_handoff_in_channel(id(2)));
-        assert!(!chain.is_thread_handoff_in_channel(id(2)));
+        // An attention change is a third kind, and no predicate above may answer for it.
+        let attention = MailboxEvent::AttentionChanged(attention(AttentionWakeSource::Delivery));
+        assert!(!attention.is_message_in_channel(id(2)));
+        assert!(!attention.is_activity_in_channel(id(2)));
     }
 
     fn attention(source_kind: AttentionWakeSource) -> AttentionScope {
@@ -520,38 +423,6 @@ mod tests {
             source_kind,
             source_id: id(7),
         }
-    }
-
-    /// Case 11, including the collision the naming table warns about: `manual_handoffs` publishes
-    /// on this very channel as `handoff`, and the mailbox must not redraw a held-reply badge for
-    /// it.
-    #[test]
-    fn only_a_thread_handoff_change_in_this_channel_wakes_the_held_reply_badges() {
-        let event = MailboxEvent::AttentionChanged(attention(AttentionWakeSource::ThreadHandoff));
-        assert!(event.is_thread_handoff_in_channel(id(2)));
-        assert!(
-            !event.is_thread_handoff_in_channel(id(9)),
-            "another channel's held reply is not this mailbox's news"
-        );
-
-        for source_kind in [
-            AttentionWakeSource::Handoff,
-            AttentionWakeSource::Task,
-            AttentionWakeSource::ResponseReview,
-            AttentionWakeSource::Delegation,
-            AttentionWakeSource::Delivery,
-        ] {
-            assert!(
-                !MailboxEvent::AttentionChanged(attention(source_kind))
-                    .is_thread_handoff_in_channel(id(2)),
-                "{source_kind:?} is not this feature's source kind"
-            );
-        }
-
-        assert!(
-            !MailboxEvent::MessageCommitted(scope()).is_thread_handoff_in_channel(id(2)),
-            "a message in the same channel is not a handoff change"
-        );
     }
 
     #[tokio::test]
@@ -571,5 +442,76 @@ mod tests {
     fn publishing_with_no_subscribers_is_not_an_error() {
         // The common case: nobody has a mailbox open.
         MailboxEvents::new().publish(MailboxEvent::MessageCommitted(scope()));
+    }
+    async fn next_event(received: &mut broadcast::Receiver<MailboxEvent>) -> MailboxEvent {
+        tokio::time::timeout(std::time::Duration::from_secs(20), received.recv())
+            .await
+            .expect("an event arrives")
+            .unwrap()
+    }
+
+    /// p08 D4.1 (F077, F084) on a real database of the test's own: a new listener publishes
+    /// `Resync`; a malformed `workflow_run_changed` payload is dropped and the listener carries
+    /// on; and killing its backend makes it reconnect, which publishes `Resync` again -- through
+    /// `PgListener`'s own reconnect or the outer rebuild, whichever the failure takes.
+    #[tokio::test]
+    async fn the_listener_resyncs_on_start_and_reconnect_and_drops_a_bad_run_payload() {
+        let Some(db) = crate::adapters::persistence::test_support::own_database().await else {
+            return;
+        };
+        let pool = db.pool.clone();
+        let events = MailboxEvents::new();
+        let mut received = events.subscribe();
+        let (shutdown, shutdown_rx) = broadcast::channel(1);
+        let listener = tokio::spawn(run_mailbox_event_listener(
+            pool.clone(),
+            events.clone(),
+            InboundEventWakeups::new(),
+            shutdown_rx,
+        ));
+        assert_eq!(next_event(&mut received).await, MailboxEvent::Resync);
+
+        let run = RunScope {
+            company_id: id(3),
+            channel_id: None,
+            thread_id: None,
+            run_id: id(4),
+        };
+        sqlx::query("SELECT pg_notify('workflow_run_changed', 'not json')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("SELECT pg_notify('workflow_run_changed', $1)")
+            .bind(
+                serde_json::json!({"company_id": run.company_id, "channel_id": null,
+                    "thread_id": null, "run_id": run.run_id, "state": "queued",
+                    "waiting_reason": null})
+                .to_string(),
+            )
+            .execute(&pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            next_event(&mut received).await,
+            MailboxEvent::WorkflowRunChanged(run),
+            "the malformed payload was dropped and the next one still arrives"
+        );
+
+        let terminated: bool = sqlx::query_scalar(
+            "SELECT pg_terminate_backend(pid) FROM pg_stat_activity \
+             WHERE datname = current_database() AND pid <> pg_backend_pid() \
+               AND query LIKE '%LISTEN \"workflow_run_changed\"%'",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert!(
+            terminated,
+            "the listener's backend was found and terminated"
+        );
+        assert_eq!(next_event(&mut received).await, MailboxEvent::Resync);
+
+        shutdown.send(()).unwrap();
+        listener.await.unwrap();
     }
 }

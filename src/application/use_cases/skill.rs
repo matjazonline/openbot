@@ -12,7 +12,6 @@ use crate::{
     entities::{
         agent::Agent,
         creation::CreationProvenance,
-        harness::SubAgentScope,
         skill::{MAX_SKILL_INSTRUCTIONS_JSON_BYTES, Skill, SkillInstruction},
         value_objects::SkillSlug,
     },
@@ -150,14 +149,13 @@ pub trait SkillManagementPersistence: Send + Sync {
 pub struct StoredAgentCapabilities {
     pub agent: Agent,
     pub skills: Vec<Skill>,
-    pub sub_agent_scope: SubAgentScope,
 }
 
 #[async_trait]
 pub trait AgentCapabilityReader: Send + Sync {
-    async fn load_for_execution(
+    async fn load_capabilities(
         &self,
-        execution_company_id: Uuid,
+        company_id: Uuid,
         agent_id: Uuid,
     ) -> AppResult<Option<StoredAgentCapabilities>>;
 }
@@ -207,7 +205,7 @@ impl SkillUseCases {
         self.authorize_read(user_id, company_id).await?;
         Ok(self
             .capabilities
-            .load_for_execution(company_id, agent_id)
+            .load_capabilities(company_id, agent_id)
             .await?
             .filter(|stored| stored.agent.company_id == Some(company_id)))
     }
@@ -221,7 +219,7 @@ impl SkillUseCases {
     ) -> AppResult<Option<StoredAgentCapabilities>> {
         Ok(self
             .capabilities
-            .load_for_execution(Uuid::nil(), agent_id)
+            .load_capabilities(Uuid::nil(), agent_id)
             .await?
             .filter(|stored| stored.agent.is_library()))
     }

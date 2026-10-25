@@ -575,6 +575,7 @@ mod tests {
             run: RunMetadata {
                 run_id: RunId::new(Uuid::nil()),
                 parent_run_id: None,
+                deadline: None,
             },
         };
         let outcome = completed(

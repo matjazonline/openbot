@@ -43,23 +43,7 @@ impl HeadRow {
             source(company, self.trigger_id, &self.source_key)?,
         )
         .map_err(|_| invalid())?;
-        let state = match self.state.as_str() {
-            "queued" => RunState::Queued,
-            "running" => RunState::Running,
-            "succeeded" => RunState::Succeeded,
-            "failed" => RunState::Failed,
-            "cancelled" => RunState::Cancelled,
-            "waiting" => RunState::Waiting(match self.waiting_reason.as_deref() {
-                Some("decision") => WaitingReason::Decision,
-                Some("event") => WaitingReason::Event,
-                Some("timer") => WaitingReason::Timer,
-                Some("child_run") => WaitingReason::ChildRun,
-                Some("effect") => WaitingReason::Effect,
-                Some("reconciliation") => WaitingReason::Reconciliation,
-                _ => return Err(invalid()),
-            }),
-            _ => return Err(invalid()),
-        };
+        let state = run_state(&self.state, self.waiting_reason.as_deref())?;
         let association = binding_rows::association_from_columns(self.channel_id, self.thread_id)?;
         Ok(RunHead {
             causality: RunCausality::new(
@@ -76,6 +60,27 @@ impl HeadRow {
             rerun_of: self.rerun_of_run_id.map(RunId::new),
         })
     }
+}
+
+/// A run's stored `state` and `waiting_reason` columns as the engine's state.
+pub(super) fn run_state(state: &str, waiting_reason: Option<&str>) -> AppResult<RunState> {
+    Ok(match state {
+        "queued" => RunState::Queued,
+        "running" => RunState::Running,
+        "succeeded" => RunState::Succeeded,
+        "failed" => RunState::Failed,
+        "cancelled" => RunState::Cancelled,
+        "waiting" => RunState::Waiting(match waiting_reason {
+            Some("decision") => WaitingReason::Decision,
+            Some("event") => WaitingReason::Event,
+            Some("timer") => WaitingReason::Timer,
+            Some("child_run") => WaitingReason::ChildRun,
+            Some("effect") => WaitingReason::Effect,
+            Some("reconciliation") => WaitingReason::Reconciliation,
+            _ => return Err(invalid()),
+        }),
+        _ => return Err(invalid()),
+    })
 }
 
 fn source(company: CompanyId, trigger: Uuid, source: &str) -> AppResult<TriggerSource> {

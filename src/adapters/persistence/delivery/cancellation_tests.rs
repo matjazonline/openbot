@@ -5,32 +5,15 @@
 use super::*;
 use crate::{
     adapters::persistence::{
-        delivery::cancellation::{CancelledDeliveries, cancel_task_deliveries_on},
+        delivery::cancellation::{CancelledDeliveries, cancel_deliveries_on},
         test_support::wait_until_a_backend_is_blocked,
     },
-    entities::{task::NewTask, transport::DeliveryCancellationReason},
-    task_queue::TaskPersistence,
+    entities::transport::DeliveryCancellationReason,
 };
 
-/// A task to own the deliveries. Its channel has no agent, so the task itself is never claimable.
-async fn task_for(persistence: &PostgresPersistence, scope: &Scope) -> Uuid {
-    persistence
-        .enqueue_task(NewTask::starting_new_chain(
-            scope.company.id,
-            scope.channel.id,
-            None,
-            "cancellation_test",
-            serde_json::json!({}),
-        ))
-        .await
-        .unwrap()
-        .id
-}
-
-async fn queue_for_task(
+async fn queue_parts(
     persistence: &PostgresPersistence,
     scope: &Scope,
-    task_id: Uuid,
     key: &str,
     parts: u16,
 ) -> DeliveryFixture {
@@ -38,7 +21,6 @@ async fn queue_for_task(
         persistence,
         scope,
         DeliveryFixtureRequest {
-            task_id: Some(task_id),
             parts,
             ..DeliveryFixtureRequest::new(scope.company.id, scope.channel.id, scope.thread_id, key)
         },
@@ -56,14 +38,18 @@ async fn claim(persistence: &PostgresPersistence, delivery_id: DeliveryId) -> Cl
 async fn cancel(
     persistence: &PostgresPersistence,
     scope: &Scope,
-    task_id: Uuid,
+    deliveries: &[&DeliveryFixture],
 ) -> CancelledDeliveries {
+    let ids: Vec<Uuid> = deliveries
+        .iter()
+        .map(|fixture| fixture.delivery.id.as_uuid())
+        .collect();
     let mut tx = persistence.pool.begin().await.unwrap();
-    let cancelled = cancel_task_deliveries_on(
+    let cancelled = cancel_deliveries_on(
         &mut tx,
         scope.company.id,
-        &[task_id],
-        DeliveryCancellationReason::ChannelAgentRemoved,
+        &ids,
+        DeliveryCancellationReason::WorkflowCancelled,
     )
     .await
     .unwrap();
@@ -130,8 +116,7 @@ async fn a_queued_delivery_is_superseded_and_keeps_its_partial_send() {
     };
     let persistence = PostgresPersistence::new(database.pool.clone());
     let scope = scope(&persistence).await;
-    let task_id = task_for(&persistence, &scope).await;
-    let queued = queue_for_task(&persistence, &scope, task_id, "partial", 2).await;
+    let queued = queue_parts(&persistence, &scope, "partial", 2).await;
     let id = queued.delivery.id;
 
     let claimed = claim(&persistence, id).await;
@@ -145,7 +130,7 @@ async fn a_queued_delivery_is_superseded_and_keeps_its_partial_send() {
     );
     let attempts = attempts_of(&persistence, id).await;
 
-    let cancelled = cancel(&persistence, &scope, task_id).await;
+    let cancelled = cancel(&persistence, &scope, &[&queued]).await;
     assert_eq!(cancelled.superseded, 1);
     assert!(cancelled.potentially_sent.is_empty());
     assert_eq!(
@@ -158,7 +143,7 @@ async fn a_queued_delivery_is_superseded_and_keeps_its_partial_send() {
     );
     assert_eq!(
         reason_of(&persistence, id).await.as_deref(),
-        Some("channel_agent_removed")
+        Some("workflow_cancelled")
     );
     assert_eq!(
         attempts_of(&persistence, id).await,
@@ -172,7 +157,7 @@ async fn a_queued_delivery_is_superseded_and_keeps_its_partial_send() {
     );
 
     assert_eq!(
-        cancel(&persistence, &scope, task_id).await,
+        cancel(&persistence, &scope, &[&queued]).await,
         CancelledDeliveries::default(),
         "a repeated cancellation finds nothing left to cancel"
     );
@@ -184,8 +169,9 @@ async fn a_queued_delivery_is_superseded_and_keeps_its_partial_send() {
         requeued.is_err(),
         "a cancelled delivery can never be claimable"
     );
+    // A reason the check accepts, so only the cancellation's own immutability can refuse it.
     let rewritten = sqlx::query(
-        "UPDATE message_deliveries SET cancellation_reason = 'task_stopped' WHERE id = $1",
+        "UPDATE message_deliveries SET cancellation_reason = 'workflow_expired' WHERE id = $1",
     )
     .bind(id.as_uuid())
     .execute(&persistence.pool)
@@ -202,13 +188,12 @@ async fn a_held_delivery_starts_no_further_part_once_cancelled() {
     };
     let persistence = PostgresPersistence::new(database.pool.clone());
     let scope = scope(&persistence).await;
-    let task_id = task_for(&persistence, &scope).await;
-    let queued = queue_for_task(&persistence, &scope, task_id, "held", 2).await;
+    let queued = queue_parts(&persistence, &scope, "held", 2).await;
     let id = queued.delivery.id;
     let claimed = claim(&persistence, id).await;
     send(&persistence, &claimed, 0, &delivered()).await;
 
-    let cancelled = cancel(&persistence, &scope, task_id).await;
+    let cancelled = cancel(&persistence, &scope, &[&queued]).await;
     assert_eq!(cancelled.superseded, 0);
     assert_eq!(cancelled.potentially_sent, vec![id]);
     assert_eq!(
@@ -256,10 +241,9 @@ async fn a_request_already_made_keeps_its_real_outcome() {
     };
     let persistence = PostgresPersistence::new(database.pool.clone());
     let scope = scope(&persistence).await;
-    let task_id = task_for(&persistence, &scope).await;
-    let landed = queue_for_task(&persistence, &scope, task_id, "landed", 1).await;
-    let refused = queue_for_task(&persistence, &scope, task_id, "refused", 1).await;
-    let unclear = queue_for_task(&persistence, &scope, task_id, "unclear", 1).await;
+    let landed = queue_parts(&persistence, &scope, "landed", 1).await;
+    let refused = queue_parts(&persistence, &scope, "refused", 1).await;
+    let unclear = queue_parts(&persistence, &scope, "unclear", 1).await;
     let mut claims = Vec::new();
     for queued in [&landed, &refused, &unclear] {
         let claimed = claim(&persistence, queued.delivery.id).await;
@@ -270,7 +254,7 @@ async fn a_request_already_made_keeps_its_real_outcome() {
         claims.push(claimed);
     }
 
-    let cancelled = cancel(&persistence, &scope, task_id).await;
+    let cancelled = cancel(&persistence, &scope, &[&landed, &refused, &unclear]).await;
     assert_eq!(cancelled.potentially_sent.len(), 3);
 
     let complete = |claimed: &ClaimedDelivery, outcome: ProviderSendOutcome| {
@@ -316,7 +300,7 @@ async fn a_request_already_made_keeps_its_real_outcome() {
     for queued in [&landed, &refused, &unclear] {
         assert_eq!(
             reason_of(&persistence, queued.delivery.id).await.as_deref(),
-            Some("channel_agent_removed")
+            Some("workflow_cancelled")
         );
     }
 }
@@ -330,11 +314,10 @@ async fn release_failure_and_the_lease_sweep_settle_rather_than_requeue() {
     };
     let persistence = PostgresPersistence::new(database.pool.clone());
     let scope = scope(&persistence).await;
-    let task_id = task_for(&persistence, &scope).await;
-    let released = queue_for_task(&persistence, &scope, task_id, "released", 1).await;
-    let failed = queue_for_task(&persistence, &scope, task_id, "failed", 1).await;
-    let started = queue_for_task(&persistence, &scope, task_id, "started", 1).await;
-    let stranded = queue_for_task(&persistence, &scope, task_id, "stranded", 1).await;
+    let released = queue_parts(&persistence, &scope, "released", 1).await;
+    let failed = queue_parts(&persistence, &scope, "failed", 1).await;
+    let started = queue_parts(&persistence, &scope, "started", 1).await;
+    let stranded = queue_parts(&persistence, &scope, "stranded", 1).await;
     let released_claim = claim(&persistence, released.delivery.id).await;
     let failed_claim = claim(&persistence, failed.delivery.id).await;
     let started_claim = claim(&persistence, started.delivery.id).await;
@@ -344,7 +327,12 @@ async fn release_failure_and_the_lease_sweep_settle_rather_than_requeue() {
         .await
         .unwrap();
 
-    cancel(&persistence, &scope, task_id).await;
+    cancel(
+        &persistence,
+        &scope,
+        &[&released, &failed, &started, &stranded],
+    )
+    .await;
 
     assert_eq!(
         persistence
@@ -379,7 +367,7 @@ async fn release_failure_and_the_lease_sweep_settle_rather_than_requeue() {
         reason_of(&persistence, started.delivery.id)
             .await
             .as_deref(),
-        Some("channel_agent_removed")
+        Some("workflow_cancelled")
     );
     assert_eq!(
         status_of(&persistence, stranded.delivery.id).await,
@@ -407,16 +395,15 @@ async fn a_begin_part_that_loses_the_parent_lock_starts_no_request() {
     let pool = database.pool.clone();
     let persistence = PostgresPersistence::new(pool.clone());
     let scope = scope(&persistence).await;
-    let task_id = task_for(&persistence, &scope).await;
-    let queued = queue_for_task(&persistence, &scope, task_id, "race", 1).await;
+    let queued = queue_parts(&persistence, &scope, "race", 1).await;
     let claimed = claim(&persistence, queued.delivery.id).await;
 
     let mut tx = pool.begin().await.unwrap();
-    let cancelled = cancel_task_deliveries_on(
+    let cancelled = cancel_deliveries_on(
         &mut tx,
         scope.company.id,
-        &[task_id],
-        DeliveryCancellationReason::ChannelAgentRemoved,
+        &[queued.delivery.id.as_uuid()],
+        DeliveryCancellationReason::WorkflowCancelled,
     )
     .await
     .unwrap();

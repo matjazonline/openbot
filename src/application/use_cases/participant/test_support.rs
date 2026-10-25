@@ -282,29 +282,6 @@ impl IdentityDirectory for InMemoryParticipantDirectory {
             identity,
         })
     }
-
-    async fn identities_for_principals(
-        &self,
-        company_id: Uuid,
-        principal_ids: &[PrincipalId],
-        transport: TransportKind,
-    ) -> AppResult<Vec<PrincipalIdentity>> {
-        let state = self.state.lock().unwrap();
-        let mut found: Vec<PrincipalIdentity> = state
-            .identities
-            .values()
-            .filter(|identity| {
-                identity.company_id == company_id
-                    && identity.transport == transport
-                    && principal_ids.contains(&identity.principal_id)
-            })
-            .cloned()
-            .collect();
-        found.sort_by(|left, right| {
-            (left.created_at, left.id.as_uuid()).cmp(&(right.created_at, right.id.as_uuid()))
-        });
-        Ok(found)
-    }
 }
 
 #[async_trait]
@@ -389,15 +366,6 @@ impl IdentityDirectory for FailingParticipantDirectory {
         _company_id: Uuid,
         _observation: IdentityObservation,
     ) -> AppResult<IdentityResolution> {
-        Err(outage())
-    }
-
-    async fn identities_for_principals(
-        &self,
-        _company_id: Uuid,
-        _principal_ids: &[PrincipalId],
-        _transport: TransportKind,
-    ) -> AppResult<Vec<PrincipalIdentity>> {
         Err(outage())
     }
 }

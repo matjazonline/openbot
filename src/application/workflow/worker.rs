@@ -5,6 +5,7 @@ use super::{
     supervise::*, waits::*,
 };
 use crate::application::app_error::AppResult;
+use crate::application::services::runtime_metrics::ActiveWorkflowJobs;
 use async_trait::async_trait;
 use std::time::Duration;
 use tokio::{
@@ -37,6 +38,9 @@ pub struct WorkflowWorker<'a, P, H> {
     pub worker: WorkflowWorkerId,
     pub lease: LeasePolicy,
     pub poll: PollPolicy,
+    /// Counts this slot in the runtime panel's active jobs while it executes one. `None` where
+    /// nothing samples the process, as in tests.
+    pub active_jobs: Option<&'a ActiveWorkflowJobs>,
 }
 impl<P, H> WorkflowWorker<'_, P, H>
 where
@@ -134,6 +138,8 @@ where
             }
             PollWork::Job => {}
         }
+        // Held across the job and dropped on every way out of it, cancellation included.
+        let _active = self.active_jobs.map(ActiveWorkflowJobs::enter);
         let kind = self.port.step_kind(scope).await?;
         match kind.0.as_str() {
             "data.map" | "decision.rule" => {

@@ -10,9 +10,9 @@ use crate::{
     entities::{
         dashboard::DashboardWindow,
         runtime_metrics::{
-            MachineId, MachineIdentity, MachineRegion, MemoryProviderInterval, RuntimeMetricBucket,
+            MachineId, MachineIdentity, MachineRegion, RuntimeMetricBucket,
             RuntimeMetricObservation, RuntimeMetricSample, RuntimeMetricSnapshot,
-            TASK_WORKER_RECOMMENDATION_POLICY, TaskWorkerConcurrencyRecommendation,
+            WORKFLOW_SLOTS_RECOMMENDATION_POLICY, WorkflowWorkerSlotsRecommendation,
         },
     },
     services::runtime_metrics::{RuntimeMetricPersistence, RuntimeMetricProbeError},
@@ -27,16 +27,13 @@ const CURRENT_SQL: &str = r#"
            cpu_utilization_percent,
            cpu_steal_percent,
            cpu_throttle_percent,
-           active_task_executions,
-           task_worker_concurrency_limit,
+           active_workflow_jobs,
+           workflow_worker_slots,
            database_acquire_duration_ms,
            database_acquire_succeeded,
            pool_size,
            pool_idle,
-           pool_active,
-           hydradb_calls,
-           hydradb_failures,
-           hydradb_duration_ms
+           pool_active
       FROM runtime_metric_samples
      WHERE machine_id = $1
      ORDER BY sampled_at DESC
@@ -57,7 +54,7 @@ const PEAK_RSS_SQL: &str = r#"
 const RECOMMENDATION_SQL: &str = r#"
     WITH history AS (
         SELECT sampled_at,
-               active_task_executions,
+               active_workflow_jobs,
                cpu_utilization_percent,
                cpu_steal_percent + cpu_throttle_percent AS cpu_pressure_percent,
                process_rss_bytes::double precision * 100.0
@@ -74,7 +71,7 @@ const RECOMMENDATION_SQL: &str = r#"
           FROM history
     ),
     measured AS (
-        SELECT active_task_executions AS concurrency,
+        SELECT active_workflow_jobs AS concurrency,
                COUNT(*)::bigint AS supporting_samples,
                percentile_disc(0.95) WITHIN GROUP (
                    ORDER BY cpu_utilization_percent
@@ -91,11 +88,11 @@ const RECOMMENDATION_SQL: &str = r#"
                percentile_disc(0.95) WITHIN GROUP (ORDER BY pool_active) AS pool_active_p95,
                MIN(pool_size)::integer AS minimum_pool_size
           FROM history
-         WHERE active_task_executions > 0
+         WHERE active_workflow_jobs > 0
            AND cpu_utilization_percent IS NOT NULL
            AND cpu_pressure_percent IS NOT NULL
            AND rss_percent IS NOT NULL
-         GROUP BY active_task_executions
+         GROUP BY active_workflow_jobs
     )
     SELECT measured.concurrency,
            measured.supporting_samples
@@ -111,7 +108,7 @@ const RECOMMENDATION_SQL: &str = r#"
      ORDER BY measured.concurrency DESC
      LIMIT 1"#;
 
-/// Gap-filled to the same dashboard grid as task charts, so a database outage remains visible as
+/// Gap-filled to the same dashboard grid as the job charts, so a database outage remains visible as
 /// an absent segment instead of making neighbouring observations look adjacent.
 const BUCKETS_SQL: &str = r#"
     WITH slots AS (
@@ -134,11 +131,7 @@ const BUCKETS_SQL: &str = r#"
                ) AS database_acquire_p50_ms,
                percentile_disc(0.95) WITHIN GROUP (
                    ORDER BY database_acquire_duration_ms
-               ) AS database_acquire_p95_ms,
-               SUM(hydradb_calls)::bigint AS hydradb_calls,
-               SUM(hydradb_failures)::bigint AS hydradb_failures,
-               (SUM(hydradb_duration_ms) / NULLIF(SUM(hydradb_calls), 0))::double precision
-                   AS hydradb_mean_ms
+               ) AS database_acquire_p95_ms
           FROM runtime_metric_samples
          WHERE machine_id = $1
            AND sampled_at >= CURRENT_TIMESTAMP - make_interval(mins => $3)
@@ -149,10 +142,7 @@ const BUCKETS_SQL: &str = r#"
            measured.cpu_steal_percent,
            measured.cpu_throttle_percent,
            measured.database_acquire_p50_ms,
-           measured.database_acquire_p95_ms,
-           measured.hydradb_calls,
-           measured.hydradb_failures,
-           measured.hydradb_mean_ms
+           measured.database_acquire_p95_ms
       FROM slots
       LEFT JOIN measured ON measured.bucket = slots.bucket
      ORDER BY slots.bucket"#;
@@ -178,14 +168,13 @@ fn completed_sample(
         cpu_utilization_percent: observation.cpu_utilization_percent,
         cpu_steal_percent: observation.cpu_steal_percent,
         cpu_throttle_percent: observation.cpu_throttle_percent,
-        active_task_executions: observation.active_task_executions,
-        task_worker_concurrency_limit: observation.task_worker_concurrency_limit,
+        active_workflow_jobs: observation.active_workflow_jobs,
+        workflow_worker_slots: observation.workflow_worker_slots,
         database_acquire_duration_ms,
         database_acquire_succeeded,
         pool_size,
         pool_idle,
         pool_active,
-        hydradb: observation.hydradb,
     }
 }
 
@@ -196,9 +185,9 @@ async fn insert_samples(
     let mut query = QueryBuilder::<Postgres>::new(
         "INSERT INTO runtime_metric_samples (machine_id, machine_region, sampled_at, \
          process_rss_bytes, memory_limit_bytes, cpu_utilization_percent, cpu_steal_percent, \
-         cpu_throttle_percent, active_task_executions, task_worker_concurrency_limit, \
+         cpu_throttle_percent, active_workflow_jobs, workflow_worker_slots, \
          database_acquire_duration_ms, database_acquire_succeeded, pool_size, pool_idle, \
-         pool_active, hydradb_calls, hydradb_failures, hydradb_duration_ms) ",
+         pool_active) ",
     );
     query.push_values(samples, |mut row, sample| {
         row.push_bind(sample.identity.id.as_str())
@@ -209,16 +198,13 @@ async fn insert_samples(
             .push_bind(sample.cpu_utilization_percent)
             .push_bind(sample.cpu_steal_percent)
             .push_bind(sample.cpu_throttle_percent)
-            .push_bind(sample.active_task_executions)
-            .push_bind(sample.task_worker_concurrency_limit)
+            .push_bind(sample.active_workflow_jobs)
+            .push_bind(sample.workflow_worker_slots)
             .push_bind(sample.database_acquire_duration_ms)
             .push_bind(sample.database_acquire_succeeded)
             .push_bind(sample.pool_size)
             .push_bind(sample.pool_idle)
-            .push_bind(sample.pool_active)
-            .push_bind(sample.hydradb.calls)
-            .push_bind(sample.hydradb.failures)
-            .push_bind(sample.hydradb.total_duration_ms);
+            .push_bind(sample.pool_active);
     });
     query.push(
         " ON CONFLICT (machine_id, sampled_at) DO UPDATE SET \
@@ -228,14 +214,12 @@ async fn insert_samples(
          cpu_utilization_percent = EXCLUDED.cpu_utilization_percent, \
          cpu_steal_percent = EXCLUDED.cpu_steal_percent, \
          cpu_throttle_percent = EXCLUDED.cpu_throttle_percent, \
-         active_task_executions = EXCLUDED.active_task_executions, \
-         task_worker_concurrency_limit = EXCLUDED.task_worker_concurrency_limit, \
+         active_workflow_jobs = EXCLUDED.active_workflow_jobs, \
+         workflow_worker_slots = EXCLUDED.workflow_worker_slots, \
          database_acquire_duration_ms = EXCLUDED.database_acquire_duration_ms, \
          database_acquire_succeeded = EXCLUDED.database_acquire_succeeded, \
          pool_size = EXCLUDED.pool_size, pool_idle = EXCLUDED.pool_idle, \
-         pool_active = EXCLUDED.pool_active, hydradb_calls = EXCLUDED.hydradb_calls, \
-         hydradb_failures = EXCLUDED.hydradb_failures, \
-         hydradb_duration_ms = EXCLUDED.hydradb_duration_ms",
+         pool_active = EXCLUDED.pool_active",
     );
     query.build().execute(connection).await?;
     Ok(())
@@ -263,11 +247,11 @@ fn sample_from_row(row: &sqlx::postgres::PgRow) -> AppResult<RuntimeMetricSample
         cpu_throttle_percent: row
             .try_get("cpu_throttle_percent")
             .map_err(AppError::from)?,
-        active_task_executions: row
-            .try_get("active_task_executions")
+        active_workflow_jobs: row
+            .try_get("active_workflow_jobs")
             .map_err(AppError::from)?,
-        task_worker_concurrency_limit: row
-            .try_get("task_worker_concurrency_limit")
+        workflow_worker_slots: row
+            .try_get("workflow_worker_slots")
             .map_err(AppError::from)?,
         database_acquire_duration_ms: row
             .try_get("database_acquire_duration_ms")
@@ -278,11 +262,6 @@ fn sample_from_row(row: &sqlx::postgres::PgRow) -> AppResult<RuntimeMetricSample
         pool_size: row.try_get("pool_size").map_err(AppError::from)?,
         pool_idle: row.try_get("pool_idle").map_err(AppError::from)?,
         pool_active: row.try_get("pool_active").map_err(AppError::from)?,
-        hydradb: MemoryProviderInterval {
-            calls: row.try_get("hydradb_calls").map_err(AppError::from)?,
-            failures: row.try_get("hydradb_failures").map_err(AppError::from)?,
-            total_duration_ms: row.try_get("hydradb_duration_ms").map_err(AppError::from)?,
-        },
     })
 }
 
@@ -344,19 +323,19 @@ impl RuntimeMetricPersistence for PostgresPersistence {
             .map_err(AppError::from)?;
         let recommendation = sqlx::query(RECOMMENDATION_SQL)
             .bind(machine_id.as_str())
-            .bind(TASK_WORKER_RECOMMENDATION_POLICY.window_hours)
-            .bind(TASK_WORKER_RECOMMENDATION_POLICY.minimum_coverage_minutes)
-            .bind(TASK_WORKER_RECOMMENDATION_POLICY.minimum_samples_per_level)
-            .bind(TASK_WORKER_RECOMMENDATION_POLICY.cpu_p95_percent)
-            .bind(TASK_WORKER_RECOMMENDATION_POLICY.cpu_pressure_p95_percent)
-            .bind(TASK_WORKER_RECOMMENDATION_POLICY.rss_p95_percent)
-            .bind(TASK_WORKER_RECOMMENDATION_POLICY.database_acquire_p95_ms)
-            .bind(TASK_WORKER_RECOMMENDATION_POLICY.reserved_pool_connections)
+            .bind(WORKFLOW_SLOTS_RECOMMENDATION_POLICY.window_hours)
+            .bind(WORKFLOW_SLOTS_RECOMMENDATION_POLICY.minimum_coverage_minutes)
+            .bind(WORKFLOW_SLOTS_RECOMMENDATION_POLICY.minimum_samples_per_level)
+            .bind(WORKFLOW_SLOTS_RECOMMENDATION_POLICY.cpu_p95_percent)
+            .bind(WORKFLOW_SLOTS_RECOMMENDATION_POLICY.cpu_pressure_p95_percent)
+            .bind(WORKFLOW_SLOTS_RECOMMENDATION_POLICY.rss_p95_percent)
+            .bind(WORKFLOW_SLOTS_RECOMMENDATION_POLICY.database_acquire_p95_ms)
+            .bind(WORKFLOW_SLOTS_RECOMMENDATION_POLICY.reserved_pool_connections)
             .fetch_optional(&self.pool)
             .await
             .map_err(AppError::from)?
-            .map(|row| -> AppResult<TaskWorkerConcurrencyRecommendation> {
-                Ok(TaskWorkerConcurrencyRecommendation {
+            .map(|row| -> AppResult<WorkflowWorkerSlotsRecommendation> {
+                Ok(WorkflowWorkerSlotsRecommendation {
                     maximum: row.try_get("concurrency").map_err(AppError::from)?,
                     supporting_samples: row
                         .try_get("supporting_samples")
@@ -382,9 +361,6 @@ impl RuntimeMetricPersistence for PostgresPersistence {
                     database_acquire_p95_ms: row
                         .try_get("database_acquire_p95_ms")
                         .map_err(AppError::from)?,
-                    hydradb_calls: row.try_get("hydradb_calls").map_err(AppError::from)?,
-                    hydradb_failures: row.try_get("hydradb_failures").map_err(AppError::from)?,
-                    hydradb_mean_ms: row.try_get("hydradb_mean_ms").map_err(AppError::from)?,
                 })
             })
             .collect::<AppResult<Vec<_>>>()?;
@@ -393,7 +369,7 @@ impl RuntimeMetricPersistence for PostgresPersistence {
             current,
             peak_rss_bytes: peak_row.try_get("peak_rss_bytes").map_err(AppError::from)?,
             buckets,
-            suggested_task_worker_concurrency: recommendation,
+            suggested_workflow_worker_slots: recommendation,
         })
     }
 
@@ -451,13 +427,8 @@ mod tests {
             cpu_utilization_percent: Some(37.5),
             cpu_steal_percent: Some(2.5),
             cpu_throttle_percent: Some(1.25),
-            active_task_executions: 2,
-            task_worker_concurrency_limit: 4,
-            hydradb: MemoryProviderInterval {
-                calls: 4,
-                failures: 1,
-                total_duration_ms: 500.0,
-            },
+            active_workflow_jobs: 2,
+            workflow_worker_slots: 4,
         }
     }
 
@@ -490,24 +461,16 @@ mod tests {
         assert_eq!(current.process_rss_bytes, Some(64 * 1024 * 1024));
         assert_eq!(current.memory_limit_bytes, Some(512 * 1024 * 1024));
         assert!(current.database_acquire_succeeded);
-        assert_eq!(current.active_task_executions, 2);
-        assert_eq!(current.task_worker_concurrency_limit, 4);
-        assert_eq!(current.hydradb.calls, 4);
-        assert_eq!(current.hydradb.failures, 1);
-        assert_eq!(current.hydradb.mean_duration_ms(), Some(125.0));
+        assert_eq!(current.active_workflow_jobs, 2);
+        assert_eq!(current.workflow_worker_slots, 4);
         assert_eq!(snapshot.peak_rss_bytes, Some(64 * 1024 * 1024));
-        assert_eq!(snapshot.suggested_task_worker_concurrency, None);
+        assert_eq!(snapshot.suggested_workflow_worker_slots, None);
         assert_eq!(
             snapshot.buckets.len() as i64,
             DashboardWindow::last_hour().bucket_count()
         );
         assert!(snapshot.buckets.iter().any(|bucket| {
             bucket.cpu_utilization_percent == Some(37.5) && bucket.database_acquire_p50_ms.is_some()
-        }));
-        assert!(snapshot.buckets.iter().any(|bucket| {
-            bucket.hydradb_calls == Some(4)
-                && bucket.hydradb_failures == Some(1)
-                && bucket.hydradb_mean_ms == Some(125.0)
         }));
         for window in [
             DashboardWindow::last_six_hours(),
@@ -552,7 +515,7 @@ mod tests {
             r#"INSERT INTO runtime_metric_samples
                    (machine_id, machine_region, sampled_at, process_rss_bytes, memory_limit_bytes,
                     cpu_utilization_percent, cpu_steal_percent, cpu_throttle_percent,
-                    active_task_executions, task_worker_concurrency_limit,
+                    active_workflow_jobs, workflow_worker_slots,
                     database_acquire_duration_ms, database_acquire_succeeded,
                     pool_size, pool_idle, pool_active)
                SELECT $1, 'test', CURRENT_TIMESTAMP - INTERVAL '23 hours 59 minutes'
@@ -569,7 +532,7 @@ mod tests {
             r#"INSERT INTO runtime_metric_samples
                    (machine_id, machine_region, sampled_at, process_rss_bytes, memory_limit_bytes,
                     cpu_utilization_percent, cpu_steal_percent, cpu_throttle_percent,
-                    active_task_executions, task_worker_concurrency_limit,
+                    active_workflow_jobs, workflow_worker_slots,
                     database_acquire_duration_ms, database_acquire_succeeded,
                     pool_size, pool_idle, pool_active)
                SELECT $1, 'test', CURRENT_TIMESTAMP - INTERVAL '23 hours 58 minutes'
@@ -587,7 +550,7 @@ mod tests {
             .snapshot(&machine_id, DashboardWindow::last_day())
             .await
             .expect("the recommendation query runs")
-            .suggested_task_worker_concurrency
+            .suggested_workflow_worker_slots
             .expect("level two has enough safe evidence");
         assert_eq!(recommendation.maximum, 2);
         assert_eq!(recommendation.supporting_samples, 101);

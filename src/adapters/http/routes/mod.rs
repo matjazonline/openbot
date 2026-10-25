@@ -1,8 +1,8 @@
 pub mod agent;
 pub mod agent_library;
 pub mod apple_auth;
-pub mod approval;
 pub mod assets;
+pub mod assistant_channels;
 pub mod attention;
 pub mod channel;
 pub mod company;
@@ -16,8 +16,6 @@ pub mod notifications;
 pub mod onboarding;
 pub mod schedule;
 pub mod skill_library;
-pub mod task;
-pub mod thread_handoffs;
 pub mod ui;
 pub mod ui_agents;
 pub mod ui_attachments;
@@ -30,15 +28,13 @@ pub mod ui_invites;
 pub mod ui_mcp;
 pub mod ui_message_diagnostics;
 pub mod ui_profile;
-mod ui_response_reviews;
+mod ui_run_counts;
 pub mod ui_schedules;
-mod ui_task_counts;
-pub mod ui_tasks;
 pub mod ui_team;
-mod ui_thread_handoffs;
 pub mod ui_uploads;
 pub mod user;
 pub mod webhooks;
+pub mod workflows;
 
 use std::sync::Arc;
 
@@ -52,18 +48,23 @@ use axum::{
 };
 
 use crate::adapters::http::{app_state::AppState, auth, pages, session::SessionAuthority};
-use crate::app_error::AppError;
 
-/// What an htmx fragment shows when the company behind a request cannot be loaded.
-///
-/// These routes answer 200 with an alert body because htmx does not swap a 4xx response, so the
-/// status code cannot carry the distinction. The match is what keeps a database fault from being
-/// reported as a routine "not found" — which is what the `.ok().flatten()` these callers used to
-/// do would have done.
-pub(super) fn company_load_error(error: &AppError) -> String {
-    match error {
-        AppError::NotFound(message) => message.clone(),
-        other => format!("Failed to load company: {other}"),
+/// A query or form field where an empty string means "not given" rather than a value to parse.
+pub(super) fn deserialize_empty_string_as_none<'de, D, T>(
+    deserializer: D,
+) -> Result<Option<T>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: std::str::FromStr,
+    T::Err: std::fmt::Display,
+{
+    use serde::Deserialize;
+    match Option::<String>::deserialize(deserializer)? {
+        Some(value) if !value.trim().is_empty() => value
+            .parse::<T>()
+            .map(Some)
+            .map_err(serde::de::Error::custom),
+        _ => Ok(None),
     }
 }
 
@@ -80,15 +81,14 @@ pub fn router(sessions: Arc<SessionAuthority>) -> Router<AppState> {
         .merge(mcp::router())
         .merge(ui_mcp::router())
         .merge(company_invite::router())
-        .merge(task::router())
         .merge(channel::router())
         .merge(schedule::router())
         .merge(skill_library::router())
         .merge(agent::router())
         .merge(agent_library::router())
-        .merge(approval::router())
+        .merge(assistant_channels::router())
+        .merge(workflows::router())
         .merge(attention::router())
-        .merge(thread_handoffs::router())
         .merge(monitoring::router())
         .merge(model_usage::router())
         .merge(notifications::router())
@@ -104,11 +104,8 @@ pub fn router(sessions: Arc<SessionAuthority>) -> Router<AppState> {
         .merge(ui_invites::router())
         .merge(ui_deliveries::router())
         .merge(ui_profile::router())
-        .merge(ui_response_reviews::router())
-        .merge(ui_tasks::router())
-        .merge(ui_task_counts::router())
+        .merge(ui_run_counts::router())
         .merge(ui_team::router())
-        .merge(ui_thread_handoffs::router())
         .merge(ui_uploads::router())
         .route_layer(middleware::from_fn_with_state(sessions, auth::require_auth))
         .layer(middleware::from_fn(ui_error_feedback));

@@ -9,6 +9,8 @@ mod admission_history_tests;
 mod admission_source_tests;
 #[path = "admission_token_tests.rs"]
 mod admission_token_tests;
+#[path = "attention_decision_tests.rs"]
+mod attention_decision_tests;
 #[path = "batch_tests.rs"]
 mod batch_tests;
 #[path = "child_test_support.rs"]
@@ -93,6 +95,8 @@ impl AdmissionFixture {
             idempotency_key: IdempotencyKey::parse(key).unwrap(),
             input: json!({"value":1}),
             rerun_of: None,
+            delivery_policy: crate::application::workflow::DeliveryPolicy::Deliver,
+            expected_binding_revision: None,
         }
     }
     fn manual(&self) -> TriggerRef {
@@ -266,7 +270,8 @@ async fn workflow_admit_sql_stale_selection_conflicts_and_saved_replay_survives_
     let mut changed = f.binding.request(Some(state.revision));
     changed.params = json!({"later":true});
     f.binding.service().configure(changed).await.unwrap();
-    assert!(matches!(p.admit(&stale).await, Err(AppError::Conflict(_))));
+    // A fresh admission prepared against the replaced configuration writes nothing (p08 D1.4.5).
+    assert_eq!(p.admit(&stale).await.unwrap(), AdmissionResult::Stale);
     let mut wrong = f.request("changed-input", source.clone());
     wrong.input = json!({"value":2});
     let wrong = f.prepare(wrong).await;
@@ -321,4 +326,48 @@ async fn workflow_admit_sql_final_and_deferred_failure_roll_back_all_records() {
             .await
             .unwrap();
     }
+}
+
+/// p08 D4.1 over a real LISTEN connection, for a run with no channel or thread: its insert and
+/// its state changes notify `workflow_run_changed` with null association ids; it never notifies
+/// `thread_activity`; and an update of anything but state or waiting reason is silent.
+#[tokio::test]
+async fn workflow_run_triggers_notify_a_threadless_run_on_insert_and_state_changes_only() {
+    let f = AdmissionFixture::new().await;
+    let pool = f.persistence().pool().clone();
+    let mut listener = super::run_listener(&pool).await;
+    let command = f.prepare(f.request("notify", f.manual())).await;
+    f.persistence().admit(&command).await.unwrap();
+    let run = command.proposed_run_id().as_uuid();
+    let company = f.binding.target.company.as_uuid();
+    let expected = |state: &str| {
+        (
+            "workflow_run_changed".to_string(),
+            json!({"company_id":company,"channel_id":null,"thread_id":null,"run_id":run,
+                "state":state,"waiting_reason":null}),
+        )
+    };
+    assert_eq!(
+        super::next_notification(&mut listener).await,
+        expected("queued")
+    );
+
+    sqlx::query("UPDATE workflow_runs SET state = 'running' WHERE company_id = $1 AND id = $2")
+        .bind(company)
+        .bind(run)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        super::next_notification(&mut listener).await,
+        expected("running")
+    );
+
+    sqlx::query("UPDATE workflow_runs SET deadline = deadline - interval '1 second' WHERE company_id = $1 AND id = $2")
+        .bind(company)
+        .bind(run)
+        .execute(&pool)
+        .await
+        .unwrap();
+    super::assert_silent_until_marker(&pool, &mut listener).await;
 }

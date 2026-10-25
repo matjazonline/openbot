@@ -4,19 +4,10 @@ use serde::Serialize;
 use uuid::Uuid;
 
 use crate::{
-    adapters::persistence::{
-        PostgresPersistence,
-        integration::email_binding::{CanonicalEmailBinding, write_canonical_email_binding},
-        participant::create_agent_principal_on,
-    },
+    adapters::persistence::{PostgresPersistence, participant::create_agent_principal_on},
     app_error::{AppError, AppResult},
     entities::{
-        agent::Agent,
-        creation::CreationProvenance,
-        harness::{HarnessConfig, HarnessKind, SubAgentScope},
-        memory::{MemoryPersistenceMode, MemoryRecallMode},
-        skill::Skill,
-        value_objects::{AvatarUrl, ChannelSlug},
+        agent::Agent, creation::CreationProvenance, skill::Skill, value_objects::AvatarUrl,
     },
     use_cases::{
         agent::{AgentPersistence, AgentWrite},
@@ -29,10 +20,7 @@ use crate::{
 
 pub(crate) const AGENT_COLUMNS: &str = "\
     agent.id, agent.company_id, agent.name, agent.slug::text AS slug, agent.provider, agent.model, \
-    agent.system_prompt, agent.description, agent.config_json, agent.avatar_url, agent.created_by, \
-    agent.created_at, agent.run_timeout_secs, agent.memory_enabled, \
-    agent.memory_persistence_mode, agent.memory_recall_mode, agent.memory_max_results, \
-    agent.response_contract";
+    agent.system_prompt, agent.description, agent.avatar_url, agent.created_by, agent.created_at";
 
 #[derive(sqlx::FromRow, Debug, Serialize)]
 pub struct AgentDb {
@@ -42,16 +30,8 @@ pub struct AgentDb {
     pub slug: String,
     pub provider: Option<String>,
     pub model: Option<String>,
-    pub run_timeout_secs: Option<i32>,
     pub system_prompt: Option<String>,
     pub description: Option<String>,
-    pub config_json: Option<serde_json::Value>,
-    pub response_contract:
-        Option<sqlx::types::Json<crate::entities::response_contract::ResponseContract>>,
-    pub memory_enabled: bool,
-    pub memory_persistence_mode: String,
-    pub memory_recall_mode: String,
-    pub memory_max_results: i16,
     pub avatar_url: Option<String>,
     pub created_by: serde_json::Value,
     pub created_at: DateTime<Utc>,
@@ -61,9 +41,6 @@ impl TryFrom<AgentDb> for Agent {
     type Error = AppError;
 
     fn try_from(db: AgentDb) -> AppResult<Self> {
-        HarnessConfig::parse(HarnessKind::Rig, db.config_json.as_ref()).map_err(|error| {
-            AppError::Internal(format!("Invalid agent {} harness config: {error}", db.id))
-        })?;
         Ok(Agent {
             id: db.id,
             company_id: db.company_id,
@@ -71,26 +48,8 @@ impl TryFrom<AgentDb> for Agent {
             slug: db.slug,
             provider: db.provider,
             model: db.model,
-            run_timeout_secs: db
-                .run_timeout_secs
-                .map(u32::try_from)
-                .transpose()
-                .map_err(|_| AppError::Internal("Invalid agents.run_timeout_secs".into()))?,
             system_prompt: db.system_prompt,
             description: db.description,
-            config_json: db.config_json,
-            response_contract: db.response_contract.map(|value| value.0),
-            memory_enabled: db.memory_enabled,
-            memory_persistence_mode: match db.memory_persistence_mode.as_str() {
-                "scope_specific_facts" => MemoryPersistenceMode::ScopeSpecificFacts,
-                _ => MemoryPersistenceMode::AudienceOnly,
-            },
-            memory_recall_mode: match db.memory_recall_mode.as_str() {
-                "thinking" => MemoryRecallMode::Thinking,
-                _ => MemoryRecallMode::Fast,
-            },
-            memory_max_results: u8::try_from(db.memory_max_results)
-                .map_err(|_| AppError::Internal("Invalid agents.memory_max_results".into()))?,
             avatar_url: db.avatar_url.map(AvatarUrl::from),
             created_by: serde_json::from_value(db.created_by).map_err(|err| {
                 AppError::Internal(format!("Invalid agents.created_by provenance: {err}"))
@@ -100,34 +59,21 @@ impl TryFrom<AgentDb> for Agent {
     }
 }
 
-struct AgentJsonFields {
-    harness_config: Option<serde_json::Value>,
-    created_by: serde_json::Value,
-}
-
-fn agent_json_fields(write: &AgentWrite) -> AppResult<AgentJsonFields> {
-    // Application use cases normalize first, but persistence is also called by provisioning
-    // adapters and maintenance code. Re-run the bounded, fail-closed validation before any SQL so
-    // an alternate caller cannot store a value the normal write path would reject.
+/// The provenance column for a write, after re-running its validation.
+///
+/// Application use cases normalize first, but persistence is also called by provisioning adapters
+/// and maintenance code. Re-running the bounded, fail-closed validation before any SQL means an
+/// alternate caller cannot store a value the normal write path would reject.
+fn validated_created_by(write: &AgentWrite) -> AppResult<serde_json::Value> {
     let mut validated = write.clone();
     validated.normalize()?;
-    if let Some(Some(contract)) = &write.response_contract.0 {
-        use crate::services::response_contract::ResponseContractValidator;
-        crate::adapters::response_schema::JsonResponseValidator.validate_contract(contract)?;
-    }
-    let harness_config = HarnessConfig::parse(HarnessKind::Rig, write.config_json.as_ref())
-        .map_err(AppError::BadRequest)?;
-    let canonical = harness_config.to_json().map_err(AppError::BadRequest)?;
-    Ok(AgentJsonFields {
-        harness_config: (canonical != serde_json::json!({"version": 1})).then_some(canonical),
-        created_by: serde_json::to_value(
-            write
-                .created_by
-                .clone()
-                .unwrap_or_else(CreationProvenance::system),
-        )
-        .map_err(|error| AppError::Internal(error.to_string()))?,
-    })
+    serde_json::to_value(
+        write
+            .created_by
+            .clone()
+            .unwrap_or_else(CreationProvenance::system),
+    )
+    .map_err(|error| AppError::Internal(error.to_string()))
 }
 
 pub(crate) async fn insert_agent_on(
@@ -136,20 +82,12 @@ pub(crate) async fn insert_agent_on(
     company_id: Option<Uuid>,
     write: &AgentWrite,
 ) -> AppResult<()> {
-    let run_timeout_secs = write
-        .run_timeout_secs
-        .map(i32::try_from)
-        .transpose()
-        .map_err(|_| AppError::BadRequest("Agent run timeout is too large.".into()))?;
-    let json = agent_json_fields(write)?;
+    let created_by = validated_created_by(write)?;
     sqlx::query(
         r#"INSERT INTO agents
            (id, company_id, name, slug, provider, model, system_prompt, description,
-            config_json, avatar_url, created_by, run_timeout_secs, memory_enabled,
-            memory_persistence_mode, memory_recall_mode, memory_max_results,
-            response_contract, workflow_tools)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
-                   $15, $16, $17, COALESCE($18, '{}'::text[]))"#,
+            avatar_url, created_by, workflow_tools)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, COALESCE($11, '{}'::text[]))"#,
     )
     .bind(id)
     .bind(company_id)
@@ -159,22 +97,8 @@ pub(crate) async fn insert_agent_on(
     .bind(&write.model)
     .bind(&write.system_prompt)
     .bind(&write.description)
-    .bind(json.harness_config)
     .bind(write.avatar_url.as_ref().map(AvatarUrl::as_str))
-    .bind(json.created_by)
-    .bind(run_timeout_secs)
-    .bind(write.memory_enabled)
-    .bind(write.memory_persistence_mode.as_str())
-    .bind(write.memory_recall_mode.as_str())
-    .bind(i16::from(write.memory_max_results))
-    .bind(
-        write
-            .response_contract
-            .0
-            .as_ref()
-            .and_then(|contract| contract.as_ref())
-            .map(sqlx::types::Json),
-    )
+    .bind(created_by)
     .bind(write.workflow_tools.as_ref().map(|names| {
         names
             .iter()
@@ -201,20 +125,8 @@ pub(crate) async fn insert_agent_on(
 pub(crate) async fn validate_agent_capabilities_on(
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     company_id: Option<Uuid>,
-    agent_id: Uuid,
     write: &AgentWrite,
 ) -> AppResult<Vec<Skill>> {
-    if company_id.is_none() && !write.sub_agent_ids.is_empty() {
-        return Err(AppError::BadRequest(
-            "A global library agent cannot store a sub-agent allowlist.".into(),
-        ));
-    }
-    if write.sub_agent_ids.contains(&agent_id) {
-        return Err(AppError::BadRequest(
-            "An agent cannot delegate to itself.".into(),
-        ));
-    }
-
     let mut skills = Vec::with_capacity(write.skill_ids.len());
     for skill_id in &write.skill_ids {
         let row = sqlx::query_as::<_, crate::adapters::persistence::skill::SkillDb>(&format!(
@@ -236,26 +148,6 @@ pub(crate) async fn validate_agent_capabilities_on(
         skills.push(row.try_into()?);
     }
 
-    if let Some(company_id) = company_id {
-        for sub_agent_id in &write.sub_agent_ids {
-            let exists = sqlx::query_scalar::<_, Uuid>(
-                "SELECT id FROM agents \
-                 WHERE company_id = $1 AND id = $2 FOR KEY SHARE",
-            )
-            .bind(company_id)
-            .bind(sub_agent_id)
-            .fetch_optional(&mut **transaction)
-            .await
-            .map_err(AppError::from)?
-            .is_some();
-            if !exists {
-                return Err(AppError::BadRequest(format!(
-                    "Sub-agent {sub_agent_id} does not belong to this company."
-                )));
-            }
-        }
-    }
-
     Ok(skills)
 }
 
@@ -265,23 +157,17 @@ pub(crate) async fn replace_agent_capabilities_on(
     agent_id: Uuid,
     write: &AgentWrite,
 ) -> AppResult<()> {
-    let _ = validate_agent_capabilities_on(transaction, company_id, agent_id, write).await?;
+    let _ = validate_agent_capabilities_on(transaction, company_id, write).await?;
     sqlx::query("DELETE FROM agent_skills WHERE agent_id = $1")
         .bind(agent_id)
         .execute(&mut **transaction)
         .await
         .map_err(AppError::from)?;
-    sqlx::query("DELETE FROM agent_sub_agents WHERE agent_id = $1")
-        .bind(agent_id)
-        .execute(&mut **transaction)
-        .await
-        .map_err(AppError::from)?;
 
-    // A statement per row, deliberately. These lists come from a person editing the agent form --
-    // a handful of skills, a handful of sub-agents -- as do the three channel-agent loops in
-    // `channel.rs`, so an `unnest` rewrite would buy nothing measurable. The collections that
-    // arrive from outside (task channel targets, message participants, inbound associations) are
-    // the ones written as one statement; `plan/db_audit/phase2.md` has the reasoning.
+    // A statement per row, deliberately. This list comes from a person editing the agent form -- a
+    // handful of skills -- so an `unnest` rewrite would buy nothing measurable. The collections
+    // that arrive from outside (message participants, inbound associations) are the ones written
+    // as one statement; `plan/db_audit/phase2.md` has the reasoning.
     for (position, skill_id) in write.skill_ids.iter().enumerate() {
         sqlx::query(
             "INSERT INTO agent_skills (company_id, agent_id, skill_id, position) \
@@ -295,22 +181,6 @@ pub(crate) async fn replace_agent_capabilities_on(
         .await
         .map_err(capability_relationship_error)?;
     }
-    if let Some(company_id) = company_id {
-        for (position, sub_agent_id) in write.sub_agent_ids.iter().enumerate() {
-            sqlx::query(
-                "INSERT INTO agent_sub_agents \
-                     (company_id, agent_id, sub_agent_id, position) \
-                 VALUES ($1, $2, $3, $4)",
-            )
-            .bind(company_id)
-            .bind(agent_id)
-            .bind(sub_agent_id)
-            .bind(position as i32)
-            .execute(&mut **transaction)
-            .await
-            .map_err(capability_relationship_error)?;
-        }
-    }
     Ok(())
 }
 
@@ -319,14 +189,8 @@ fn capability_relationship_error(error: sqlx::Error) -> AppError {
         return AppError::from(error);
     };
     match database.constraint() {
-        Some("agent_sub_agents_not_self") => {
-            AppError::BadRequest("An agent cannot delegate to itself.".into())
-        }
         Some("agent_skills_agent_scope_check") | Some("agent_skills_skill_scope_check") => {
             AppError::BadRequest("The selected skill belongs to another library.".into())
-        }
-        Some("agent_sub_agents_agent_fk") | Some("agent_sub_agents_sub_fk") => {
-            AppError::BadRequest("The selected sub-agent belongs to another company.".into())
         }
         _ => AppError::from(error),
     }
@@ -365,86 +229,28 @@ impl BuiltinAgentLibraryPersistence for PostgresPersistence {
     }
 }
 
-struct AgentUpdateScope {
-    company_id: Option<Uuid>,
-    company_slug: Option<String>,
-    json: AgentJsonFields,
-}
-
-async fn prepare_agent_update_on(
-    tx: &mut sqlx::PgConnection,
-    id: Uuid,
-    write: &mut AgentWrite,
-) -> AppResult<AgentUpdateScope> {
-    let (company_id, company_slug): (Option<Uuid>, Option<String>) = sqlx::query_as(
-        r#"SELECT agent.company_id, company.slug::text
-           FROM agents AS agent
-           LEFT JOIN companies AS company ON company.id = agent.company_id
-           WHERE agent.id = $1
-           FOR UPDATE OF agent"#,
-    )
-    .bind(id)
-    .fetch_one(&mut *tx)
-    .await
-    .map_err(AppError::from)?;
-    if write.config_json.is_none() {
-        write.config_json = sqlx::query_scalar("SELECT config_json FROM agents WHERE id = $1")
-            .bind(id)
-            .fetch_one(&mut *tx)
-            .await?;
-    }
-    if write.response_contract.0.is_none() {
-        let contract: Option<
-            sqlx::types::Json<crate::entities::response_contract::ResponseContract>,
-        > = sqlx::query_scalar("SELECT response_contract FROM agents WHERE id = $1")
-            .bind(id)
-            .fetch_one(&mut *tx)
-            .await?;
-        write.response_contract.0 = Some(contract.map(|value| value.0));
-    }
-    let json = agent_json_fields(write)?;
-    Ok(AgentUpdateScope {
-        company_id,
-        company_slug,
-        json,
-    })
-}
-
-pub(crate) async fn update_agent_and_owned_address(
+/// Save an agent's settings and capabilities in one transaction.
+pub(crate) async fn update_agent(
     persistence: &PostgresPersistence,
     id: Uuid,
-    mut write: AgentWrite,
+    write: AgentWrite,
 ) -> AppResult<Agent> {
-    let run_timeout_secs = write
-        .run_timeout_secs
-        .map(i32::try_from)
-        .transpose()
-        .map_err(|_| AppError::BadRequest("Agent run timeout is too large.".into()))?;
+    validated_created_by(&write)?;
     let mut tx = persistence.pool.begin().await.map_err(AppError::from)?;
-    // Keep the locked preparation future off the existing agent/channel write stack.
-    let AgentUpdateScope {
-        company_id,
-        company_slug,
-        json,
-    } = Box::pin(prepare_agent_update_on(&mut tx, id, &mut write)).await?;
-    replace_agent_capabilities_on(&mut tx, company_id, id, &write).await?;
-    // The name comes back with the id because the channel's canonical email binding is relabelled
-    // from it below, and this path must not overwrite that label with the agent's name.
-    let owned_channel: Option<(Uuid, String)> =
-        sqlx::query_as("SELECT id, name FROM channels WHERE owner_agent_id = $1 FOR UPDATE")
+    let company_id: Option<Uuid> =
+        sqlx::query_scalar("SELECT company_id FROM agents WHERE id = $1 FOR UPDATE")
             .bind(id)
             .fetch_optional(&mut *tx)
             .await
-            .map_err(AppError::from)?;
-
+            .map_err(AppError::from)?
+            .ok_or_else(crate::use_cases::agent::agent_not_found)?;
+    replace_agent_capabilities_on(&mut tx, company_id, id, &write).await?;
     let db = sqlx::query_as::<_, AgentDb>(&format!(
         r#"UPDATE agents AS agent
            SET name = $1, slug = $2, provider = $3, model = $4, system_prompt = $5,
-               description = $6, config_json = $7, avatar_url = $8, run_timeout_secs = $9,
-               memory_enabled = $10, memory_persistence_mode = $11,
-               memory_recall_mode = $12, memory_max_results = $13, response_contract = $15,
-               workflow_tools = COALESCE($16, agent.workflow_tools)
-           WHERE id = $14
+               description = $6, avatar_url = $7,
+               workflow_tools = COALESCE($8, agent.workflow_tools)
+           WHERE id = $9
            RETURNING {AGENT_COLUMNS}"#
     ))
     .bind(&write.name)
@@ -453,117 +259,31 @@ pub(crate) async fn update_agent_and_owned_address(
     .bind(&write.model)
     .bind(&write.system_prompt)
     .bind(&write.description)
-    .bind(&json.harness_config)
     .bind(write.avatar_url.as_ref().map(AvatarUrl::as_str))
-    .bind(run_timeout_secs)
-    .bind(write.memory_enabled)
-    .bind(write.memory_persistence_mode.as_str())
-    .bind(write.memory_recall_mode.as_str())
-    .bind(i16::from(write.memory_max_results))
-    .bind(id)
-    .bind(
-        write
-            .response_contract
-            .0
-            .as_ref()
-            .and_then(|contract| contract.as_ref())
-            .map(sqlx::types::Json),
-    )
     .bind(write.workflow_tools.as_ref().map(|names| {
         names
             .iter()
             .map(|name| name.as_str().to_owned())
             .collect::<Vec<_>>()
     }))
+    .bind(id)
     .fetch_one(&mut *tx)
     .await
-    .map_err(|error| address_update_error(error, &write.slug, company_slug.as_deref()))?;
-
-    if let (Some((channel_id, channel_name)), Some(company_id)) = (owned_channel, company_id) {
-        let current_slug: String = sqlx::query_scalar(
-            "SELECT slug::text FROM channel_slugs WHERE channel_id = $1 AND is_primary FOR UPDATE",
-        )
-        .bind(channel_id)
-        .fetch_one(&mut *tx)
-        .await
-        .map_err(AppError::from)?;
-        if !current_slug.eq_ignore_ascii_case(&write.slug) {
-            let occupied: bool = sqlx::query_scalar(
-                "SELECT EXISTS(SELECT 1 FROM channel_slugs WHERE company_id = $1 AND slug = $2 AND channel_id <> $3)",
-            )
-            .bind(company_id)
-            .bind(&write.slug)
-            .bind(channel_id)
-            .fetch_one(&mut *tx)
-            .await
-            .map_err(AppError::from)?;
-            if occupied {
-                return Err(address_update_error_message(
-                    &write.slug,
-                    company_slug.as_deref(),
-                ));
-            }
-            sqlx::query(
-                "UPDATE channel_slugs SET is_primary = FALSE WHERE channel_id = $1 AND is_primary",
-            )
-            .bind(channel_id)
-            .execute(&mut *tx)
-            .await
-            .map_err(AppError::from)?;
-            sqlx::query(
-                r#"INSERT INTO channel_slugs (company_id, channel_id, slug, is_primary)
-                   VALUES ($1, $2, $3, TRUE)
-                   ON CONFLICT (channel_id, slug) DO UPDATE SET is_primary = TRUE"#,
-            )
-            .bind(company_id)
-            .bind(channel_id)
-            .bind(&write.slug)
-            .execute(&mut *tx)
-            .await
-            .map_err(|error| address_update_error(error, &write.slug, company_slug.as_deref()))?;
-
-            // An agent's address *is* its channel's address, so the channel's email interface has
-            // to move with it. Same writer as every other rename, in this same transaction: a
-            // binding left on the old local part would stop resolving inbound mail entirely.
-            //
-            // The actor is `system` because this path has none -- `update_library_agent` is an
-            // operator route that takes no user id. Recording that honestly beats attributing the
-            // move to someone who did not make it.
-            write_canonical_email_binding(
-                &mut tx,
-                CanonicalEmailBinding {
-                    company_id,
-                    channel_id,
-                    channel_slug: &ChannelSlug::new(write.slug.clone()),
-                    channel_name: &channel_name,
-                    created_by: &CreationProvenance::system(),
-                },
-            )
-            .await?;
-        }
-    }
+    .map_err(slug_conflict)?;
     tx.commit().await.map_err(AppError::from)?;
     db.try_into()
 }
 
-fn address_update_error(error: sqlx::Error, slug: &str, company_slug: Option<&str>) -> AppError {
+fn slug_conflict(error: sqlx::Error) -> AppError {
     if error
         .as_database_error()
         .and_then(|db| db.code())
         .as_deref()
         == Some("23505")
     {
-        return address_update_error_message(slug, company_slug);
+        return AppError::Conflict("An agent with that slug already exists.".into());
     }
     AppError::from(error)
-}
-
-fn address_update_error_message(slug: &str, company_slug: Option<&str>) -> AppError {
-    let address =
-        company_slug.map_or_else(|| slug.to_string(), |company| format!("{slug}@{company}"));
-    AppError::BadRequest(format!(
-        "Address '{address}' is already in use; the agent was not changed."
-    ))
 }
 
 #[async_trait]
@@ -609,25 +329,6 @@ impl AgentPersistence for PostgresPersistence {
         db.map(TryInto::try_into).transpose()
     }
 
-    async fn get_by_company_slug_and_agent_slug(
-        &self,
-        company_slug: &str,
-        agent_slug: &str,
-    ) -> AppResult<Option<Agent>> {
-        let db = sqlx::query_as::<_, AgentDb>(&format!(
-            "SELECT {AGENT_COLUMNS} FROM agents AS agent \
-             JOIN companies AS company ON company.id = agent.company_id \
-             WHERE company.slug = $1 AND agent.slug = $2"
-        ))
-        .bind(company_slug)
-        .bind(agent_slug)
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(AppError::from)?;
-
-        db.map(TryInto::try_into).transpose()
-    }
-
     async fn list_by_company_id(&self, company_id: Uuid) -> AppResult<Vec<Agent>> {
         let db_list = sqlx::query_as::<_, AgentDb>(&format!(
             "SELECT {AGENT_COLUMNS} FROM agents AS agent WHERE agent.company_id = $1 \
@@ -653,7 +354,7 @@ impl AgentPersistence for PostgresPersistence {
     }
 
     async fn update(&self, id: Uuid, write: AgentWrite) -> AppResult<Agent> {
-        update_agent_and_owned_address(self, id, write).await
+        update_agent(self, id, write).await
     }
 
     async fn delete(&self, id: Uuid) -> AppResult<()> {
@@ -681,9 +382,9 @@ impl AgentPersistence for PostgresPersistence {
 
 #[async_trait]
 impl AgentCapabilityReader for PostgresPersistence {
-    async fn load_for_execution(
+    async fn load_capabilities(
         &self,
-        execution_company_id: Uuid,
+        company_id: Uuid,
         agent_id: Uuid,
     ) -> AppResult<Option<StoredAgentCapabilities>> {
         let mut transaction = self.pool.begin().await.map_err(AppError::from)?;
@@ -697,7 +398,7 @@ impl AgentCapabilityReader for PostgresPersistence {
                AND (agent.company_id = $2 OR agent.company_id IS NULL)"
         ))
         .bind(agent_id)
-        .bind(execution_company_id)
+        .bind(company_id)
         .fetch_optional(&mut *transaction)
         .await
         .map_err(AppError::from)?;
@@ -721,29 +422,8 @@ impl AgentCapabilityReader for PostgresPersistence {
             .into_iter()
             .map(TryInto::try_into)
             .collect::<AppResult<Vec<_>>>()?;
-        let sub_agent_scope = if agent.company_id.is_none() {
-            SubAgentScope::AllCompanySiblings
-        } else {
-            let ids = sqlx::query_scalar::<_, Uuid>(
-                "SELECT sub_agent_id FROM agent_sub_agents \
-                 WHERE agent_id = $1 ORDER BY position",
-            )
-            .bind(agent_id)
-            .fetch_all(&mut *transaction)
-            .await
-            .map_err(AppError::from)?;
-            if ids.is_empty() {
-                SubAgentScope::AllCompanySiblings
-            } else {
-                SubAgentScope::Restricted(ids)
-            }
-        };
         transaction.commit().await.map_err(AppError::from)?;
-        Ok(Some(StoredAgentCapabilities {
-            agent,
-            skills,
-            sub_agent_scope,
-        }))
+        Ok(Some(StoredAgentCapabilities { agent, skills }))
     }
 }
 
@@ -762,21 +442,14 @@ mod tests {
     #[test]
     fn malformed_provenance_is_a_conversion_error_not_a_panic() {
         let db = AgentDb {
-            response_contract: None,
-            memory_enabled: false,
-            memory_persistence_mode: "audience_only".into(),
-            memory_recall_mode: "fast".into(),
-            memory_max_results: 5,
             id: Uuid::new_v4(),
             company_id: None,
             name: "Broken".into(),
             slug: "broken".into(),
             provider: None,
             model: None,
-            run_timeout_secs: None,
             system_prompt: None,
             description: None,
-            config_json: None,
             avatar_url: None,
             created_by: json!({}),
             created_at: Utc::now(),
@@ -852,25 +525,16 @@ mod tests {
         .await
         .unwrap();
 
-        let config = json!({ "version": 1 });
-
         let agent = AgentPersistence::create(
             &persistence,
             company.id,
             AgentWrite {
-                memory_enabled: false,
-                memory_persistence_mode:
-                    crate::entities::memory::MemoryPersistenceMode::AudienceOnly,
-                memory_recall_mode: crate::entities::memory::MemoryRecallMode::Fast,
-                memory_max_results: 5,
                 name: "Support Agent".to_string(),
                 slug: "support-agent".to_string(),
                 provider: Some("openai".to_string()),
                 model: Some("gpt-4o".to_string()),
-                run_timeout_secs: Some(45),
                 system_prompt: Some("You are a helpful support agent.".to_string()),
                 description: Some("Answers customer support questions.".to_string()),
-                config_json: Some(config.clone()),
                 avatar_url: Some(AvatarUrl::from("https://example.com/support.png")),
                 created_by: None,
                 ..Default::default()
@@ -883,12 +547,10 @@ mod tests {
         assert_eq!(agent.slug, "support-agent");
         assert_eq!(agent.provider.as_deref(), Some("openai"));
         assert_eq!(agent.model.as_deref(), Some("gpt-4o"));
-        assert_eq!(agent.run_timeout_secs, Some(45));
         assert_eq!(
             agent.system_prompt.as_deref(),
             Some("You are a helpful support agent.")
         );
-        assert_eq!(agent.config_json, None);
         assert_eq!(
             agent.avatar_url,
             Some(AvatarUrl::from("https://example.com/support.png"))

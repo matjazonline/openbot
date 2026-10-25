@@ -19,7 +19,6 @@ pub mod ingress;
 pub mod lease;
 pub mod ports;
 pub mod queue;
-pub mod task_payload;
 
 /// Addressing role and the delivery state machine are domain transport vocabulary; re-exported
 /// here so the transport module reads as one place.
@@ -51,23 +50,22 @@ pub use inbox::{
     MAX_INBOUND_EVENT_PAYLOAD_BYTES, MonitoredInboundEventInbox, SafeHeaderFacts,
     SafeHeaderFactsError,
 };
-pub(crate) use ingress::each_channel_in_one_task;
 pub use ingress::{
     AddressedIdentity, AddressedRecipient, AddressedTarget, CanonicalContent, CommitDisposition,
-    EmailIngressFacts, InboundCommitOutcome, InboundCommitRequest, InboundDraft, InboundEnvelope,
-    InboundHold, InboundOutreachTransition, InboundRouting, InboundTaskRequest, InboundTaskTarget,
-    IngressDirectives, IngressPolicyFacts, MAX_ADDRESSED_IDENTITIES, MAX_ADDRESSED_TARGETS,
-    MAX_ATTACHMENTS, MAX_BODY_BYTES, MAX_INGRESS_HOPS, MAX_REPLY_CANDIDATES, MAX_SUBJECT_BYTES,
+    EmailIngressFacts, InboundAdmissionIntent, InboundCommitOutcome, InboundCommitRequest,
+    InboundDraft, InboundEnvelope, InboundOrigin, InboundRouting, IngressDirectives,
+    IngressPolicyFacts, MAX_ADDRESSED_IDENTITIES, MAX_ADDRESSED_TARGETS, MAX_ATTACHMENTS,
+    MAX_BODY_BYTES, MAX_INGRESS_HOPS, MAX_REPLY_CANDIDATES, MAX_SUBJECT_BYTES,
     MAX_THREAD_ASSOCIATIONS, MAX_THREAD_PRINCIPALS, MAX_TRACE_CHANNELS, MessageDisposition,
     PipelineStep, ProtocolExtension, ReplyCandidates, ReplyDelivery, SMALL_INLINE_IMAGE_BYTES,
     SystemAddress, ThreadAssociation, ThreadPrincipalIntent, ThreadTarget,
 };
 pub use lease::{ExecutionId, ExecutionLease, WorkerId};
 pub use ports::{
-    DeliveryPlanner, ExternalCorrelationStore, ExternalDestinationClassification,
-    InboundMessageCommitter, InternalMailRelay, InternalRelayMail, PolicyDeliveryPlanner,
-    RegisteredTransport, RelayDisposition, TransportRegistrationError, TransportRegistry,
-    TransportRenderer, TransportRenderers, TransportSender,
+    DeliveryPlanner, ExternalCorrelationStore, InboundMessageCommitter, InternalMailRelay,
+    InternalRelayMail, PolicyDeliveryPlanner, RegisteredTransport, RelayDisposition,
+    TransportRegistrationError, TransportRegistry, TransportRenderer, TransportRenderers,
+    TransportSender,
 };
 pub use queue::{
     ClaimedDelivery, DELIVERY_CLAIM_BATCH, DELIVERY_LEASE_SECONDS, DeliveryAttribution,
@@ -75,7 +73,6 @@ pub use queue::{
     DeliveryReaping, DeliveryRecord, Disposition, MAX_DELIVERY_ATTEMPTS, NewDelivery,
     NewStandaloneDelivery, PartResult, StandaloneDeliveryEnqueuer, StoredPart,
 };
-pub use task_payload::{InboundTaskPayload, InboundTaskPayloadV1};
 
 #[cfg(test)]
 pub mod test_support;

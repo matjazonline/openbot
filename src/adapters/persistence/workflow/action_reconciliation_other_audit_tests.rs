@@ -1,7 +1,7 @@
 //! Composed OtherAudit proof: service UNIQUE and separately labelled native SQL controls.
 use super::*;
 use chrono::{DateTime, Utc};
-use sqlx::postgres::{PgDatabaseError, PgPoolOptions};
+use sqlx::postgres::PgDatabaseError;
 
 #[path = "action_reconciliation_other_audit_sql_tests.rs"]
 mod sql_controls;
@@ -291,7 +291,7 @@ async fn service_pair(mode: OwnershipMode) {
     let owner = Box::pin(unknown_owner()).await;
     let f = &owner.fixture;
     let catalog = ownership_catalog(f).await;
-    let pool = PgPoolOptions::new()
+    let pool = crate::adapters::persistence::test_support::pool_options()
         .max_connections(1)
         .min_connections(1)
         .connect_with(f.persistence().pool().connect_options().as_ref().clone())

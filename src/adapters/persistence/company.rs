@@ -1,21 +1,15 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::Serialize;
-use std::str::FromStr;
 use uuid::Uuid;
 
 use crate::{
     adapters::persistence::{PostgresPersistence, participant::create_person_principal_on},
     app_error::{AppError, AppResult},
     entities::{
-        company::{
-            Company, CompanyAccess, CompanyChannelDefaults, CompanyModelConnection,
-            CompanyTeamAccount,
-        },
-        company_member::{CompanyAccessRole, CompanyMembership},
-        memory::{MEMORY_DELETION_QUIESCENCE_SECONDS, MemoryProviderKind},
-        transport::PrincipalId,
-        value_objects::{AvatarUrl, CompanySlug, EmailAddress, ModelName, ModelProvider},
+        company::{Company, CompanyAccess, CompanyChannelDefaults, CompanyModelConnection},
+        company_member::CompanyMembership,
+        value_objects::{AvatarUrl, CompanySlug, ModelName, ModelProvider},
     },
     use_cases::company::{CompanyModelConnectionWrite, CompanyPersistence, CompanyWrite},
 };
@@ -26,15 +20,7 @@ pub struct CompanyDb {
     pub user_id: Uuid,
     pub name: String,
     pub slug: String,
-    pub memory_provider: Option<String>,
     pub default_add_3rd_party: bool,
-    pub default_participant_emails: Option<Vec<String>>,
-    pub default_retrieve_company_memory: bool,
-    pub default_retrieve_agent_memory: bool,
-    pub default_retrieve_user_memory: bool,
-    pub default_persist_company_memory: bool,
-    pub default_persist_agent_memory: bool,
-    pub default_persist_user_memory: bool,
     pub avatar_url: Option<String>,
     pub created_at: DateTime<Utc>,
 }
@@ -46,27 +32,8 @@ impl From<CompanyDb> for Company {
             user_id: db.user_id,
             name: db.name,
             slug: CompanySlug::from(db.slug),
-            // `none` is accepted only as a legacy stored representation, and an unknown value
-            // reads as "no provider" rather than failing the row: memory is optional, and a
-            // company must stay loadable after a provider is withdrawn from a deployment.
-            memory_provider: db
-                .memory_provider
-                .as_deref()
-                .and_then(MemoryProviderKind::parse),
             channel_defaults: CompanyChannelDefaults {
                 add_3rd_party: db.default_add_3rd_party,
-                participant_emails: db.default_participant_emails.map(|values| {
-                    values
-                        .into_iter()
-                        .map(crate::entities::value_objects::EmailAddress::from)
-                        .collect()
-                }),
-                retrieve_company_memory: db.default_retrieve_company_memory,
-                retrieve_agent_memory: db.default_retrieve_agent_memory,
-                retrieve_user_memory: db.default_retrieve_user_memory,
-                persist_company_memory: db.default_persist_company_memory,
-                persist_agent_memory: db.default_persist_agent_memory,
-                persist_user_memory: db.default_persist_user_memory,
             },
             avatar_url: db.avatar_url.map(AvatarUrl::from),
             created_at: db.created_at,
@@ -126,59 +93,6 @@ async fn delete_company_with_cleanup(
     if !company_exists {
         return Ok(false);
     }
-    // Keep the lock order used by memory workers: execution row before lifecycle row. This also
-    // prevents the cascade below from deleting a job while deletion is deriving its fence.
-    sqlx::query("SELECT id FROM memory_provisioning_jobs WHERE company_id = $1 FOR UPDATE")
-        .bind(id)
-        .fetch_all(&mut *transaction)
-        .await
-        .map_err(AppError::from)?;
-    // Every provider this company holds remote data for, not just one of them: a lifecycle left
-    // behind here is remote data nothing remembers exists.
-    let remote_resources = sqlx::query_as::<_, (String, String)>(
-        r#"SELECT provider, remote_database_id
-           FROM memory_remote_resource_lifecycles
-           WHERE company_id = $1
-           FOR UPDATE"#,
-    )
-    .bind(id)
-    .fetch_all(&mut *transaction)
-    .await
-    .map_err(AppError::from)?;
-    let quiesce_until = Utc::now() + chrono::Duration::seconds(MEMORY_DELETION_QUIESCENCE_SECONDS);
-    for (provider, remote_database_id) in remote_resources {
-        sqlx::query(
-            r#"UPDATE memory_remote_resource_lifecycles
-               SET company_id = NULL, desired_state = 'absent',
-                   quiesce_until = GREATEST(quiesce_until, $3),
-                   last_error = NULL, updated_at = CURRENT_TIMESTAMP
-               WHERE provider = $1 AND remote_database_id = $2"#,
-        )
-        .bind(&provider)
-        .bind(&remote_database_id)
-        .bind(quiesce_until)
-        .execute(&mut *transaction)
-        .await
-        .map_err(AppError::from)?;
-        sqlx::query(
-            r#"INSERT INTO memory_cleanup_jobs
-                   (id, provider, remote_database_id, available_at)
-               VALUES ($1, $4, $2, $3)
-               ON CONFLICT (provider, remote_database_id) DO UPDATE
-               SET status = 'pending', attempts = 0, available_at = EXCLUDED.available_at,
-                   lease_token = NULL, lease_expires_at = NULL,
-                   operation_generation = NULL, last_error = NULL,
-                   updated_at = CURRENT_TIMESTAMP
-               WHERE memory_cleanup_jobs.status <> 'leased'"#,
-        )
-        .bind(Uuid::new_v4())
-        .bind(remote_database_id)
-        .bind(quiesce_until)
-        .bind(provider)
-        .execute(&mut *transaction)
-        .await
-        .map_err(AppError::from)?;
-    }
     sqlx::query("DELETE FROM companies WHERE id = $1")
         .bind(id)
         .execute(&mut *transaction)
@@ -201,42 +115,16 @@ impl CompanyPersistence for PostgresPersistence {
         .await
         .map_err(AppError::from)?;
         let db = sqlx::query_as::<_, CompanyDb>(
-            r#"INSERT INTO companies (id, user_id, name, slug,
-                                      memory_provider, avatar_url,
-                                      default_add_3rd_party, default_participant_emails,
-                                      default_retrieve_company_memory, default_retrieve_agent_memory,
-                                      default_retrieve_user_memory, default_persist_company_memory,
-                                      default_persist_agent_memory, default_persist_user_memory,
-                                      external_response_review, external_reply_handling)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
-               RETURNING id, user_id, name, slug, memory_provider,
-                      default_add_3rd_party, default_participant_emails,
-                      default_retrieve_company_memory, default_retrieve_agent_memory,
-                      default_retrieve_user_memory, default_persist_company_memory,
-                      default_persist_agent_memory, default_persist_user_memory,
-                      avatar_url, created_at, external_response_review, external_reply_handling"#,
+            r#"INSERT INTO companies (id, user_id, name, slug, avatar_url, default_add_3rd_party)
+               VALUES ($1, $2, $3, $4, $5, $6)
+               RETURNING id, user_id, name, slug, default_add_3rd_party, avatar_url, created_at"#,
         )
         .bind(uuid)
         .bind(user_id)
         .bind(&write.name)
         .bind(&write.slug)
-        .bind(write.memory_provider.map(MemoryProviderKind::as_str))
         .bind(write.avatar_url.as_ref().map(AvatarUrl::as_str))
         .bind(write.channel_defaults.add_3rd_party)
-        .bind(write.channel_defaults.participant_emails.as_ref().map(|values| values.iter().map(|value| value.as_str()).collect::<Vec<_>>()))
-        .bind(write.channel_defaults.retrieve_company_memory)
-        .bind(write.channel_defaults.retrieve_agent_memory)
-        .bind(write.channel_defaults.retrieve_user_memory)
-        .bind(write.channel_defaults.persist_company_memory)
-        .bind(write.channel_defaults.persist_agent_memory)
-        .bind(write.channel_defaults.persist_user_memory)
-        .bind(
-            write
-                .external_response_review
-                .unwrap_or_default()
-                .as_str(),
-        )
-        .bind(write.external_reply_handling.unwrap_or_default().as_str())
         .fetch_one(&mut *transaction)
         .await
         .map_err(AppError::from)?;
@@ -259,12 +147,7 @@ impl CompanyPersistence for PostgresPersistence {
 
     async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Company>> {
         let db = sqlx::query_as::<_, CompanyDb>(
-            r#"SELECT id, user_id, name, slug, memory_provider,
-                      default_add_3rd_party, default_participant_emails,
-                      default_retrieve_company_memory, default_retrieve_agent_memory,
-                      default_retrieve_user_memory, default_persist_company_memory,
-                      default_persist_agent_memory, default_persist_user_memory,
-                      avatar_url, created_at, external_response_review, external_reply_handling
+            r#"SELECT id, user_id, name, slug, default_add_3rd_party, avatar_url, created_at
                FROM companies WHERE id = $1"#,
         )
         .bind(id)
@@ -277,12 +160,7 @@ impl CompanyPersistence for PostgresPersistence {
 
     async fn get_by_slug(&self, slug: &str) -> AppResult<Option<Company>> {
         let db = sqlx::query_as::<_, CompanyDb>(
-            r#"SELECT id, user_id, name, slug, memory_provider,
-                      default_add_3rd_party, default_participant_emails,
-                      default_retrieve_company_memory, default_retrieve_agent_memory,
-                      default_retrieve_user_memory, default_persist_company_memory,
-                      default_persist_agent_memory, default_persist_user_memory,
-                      avatar_url, created_at, external_response_review, external_reply_handling
+            r#"SELECT id, user_id, name, slug, default_add_3rd_party, avatar_url, created_at
                FROM companies WHERE slug = $1"#,
         )
         .bind(slug)
@@ -295,12 +173,7 @@ impl CompanyPersistence for PostgresPersistence {
 
     async fn list_by_user_id(&self, user_id: Uuid) -> AppResult<Vec<Company>> {
         let db_list = sqlx::query_as::<_, CompanyDb>(
-            r#"SELECT id, user_id, name, slug, memory_provider,
-                      default_add_3rd_party, default_participant_emails,
-                      default_retrieve_company_memory, default_retrieve_agent_memory,
-                      default_retrieve_user_memory, default_persist_company_memory,
-                      default_persist_agent_memory, default_persist_user_memory,
-                      avatar_url, created_at, external_response_review, external_reply_handling
+            r#"SELECT id, user_id, name, slug, default_add_3rd_party, avatar_url, created_at
                FROM companies WHERE user_id = $1
                ORDER BY created_at DESC, id DESC LIMIT 200"#,
         )
@@ -318,13 +191,7 @@ impl CompanyPersistence for PostgresPersistence {
         // the two the caller is before they can decide what to show.
         let db_list = sqlx::query_as::<_, AccessibleCompanyDb>(
             r#"SELECT company.id, company.user_id, company.name, company.slug,
-                      company.memory_provider,
-                      company.default_add_3rd_party, company.default_participant_emails,
-                      company.default_retrieve_company_memory, company.default_retrieve_agent_memory,
-                      company.default_retrieve_user_memory, company.default_persist_company_memory,
-                      company.default_persist_agent_memory, company.default_persist_user_memory,
-                      company.avatar_url, company.created_at, company.external_response_review,
-                      company.external_reply_handling,
+                      company.default_add_3rd_party, company.avatar_url, company.created_at,
                       (company.user_id = $1) AS is_owner,
                       COALESCE((
                           SELECT member.role = 'admin'
@@ -349,49 +216,15 @@ impl CompanyPersistence for PostgresPersistence {
 
     async fn update(&self, id: Uuid, write: CompanyWrite) -> AppResult<Company> {
         let db = sqlx::query_as::<_, CompanyDb>(
-            r#"UPDATE companies SET name = $1, slug = $2,
-                      memory_provider = COALESCE($3, memory_provider), avatar_url = $4,
-                      default_add_3rd_party = $5, default_participant_emails = $6,
-                      default_retrieve_company_memory = $7, default_retrieve_agent_memory = $8,
-                      default_retrieve_user_memory = $9, default_persist_company_memory = $10,
-                      default_persist_agent_memory = $11, default_persist_user_memory = $12,
-                      external_response_review = COALESCE($13, external_response_review),
-                      external_reply_handling = COALESCE($14, external_reply_handling)
-               WHERE id = $15
-               RETURNING id, user_id, name, slug, memory_provider,
-                      default_add_3rd_party, default_participant_emails,
-                      default_retrieve_company_memory, default_retrieve_agent_memory,
-                      default_retrieve_user_memory, default_persist_company_memory,
-                      default_persist_agent_memory, default_persist_user_memory,
-                      avatar_url, created_at, external_response_review, external_reply_handling"#,
+            r#"UPDATE companies SET name = $1, slug = $2, avatar_url = $3,
+                      default_add_3rd_party = $4
+               WHERE id = $5
+               RETURNING id, user_id, name, slug, default_add_3rd_party, avatar_url, created_at"#,
         )
         .bind(&write.name)
         .bind(&write.slug)
-        .bind(write.memory_provider.map(MemoryProviderKind::as_str))
         .bind(write.avatar_url.as_ref().map(AvatarUrl::as_str))
         .bind(write.channel_defaults.add_3rd_party)
-        .bind(
-            write
-                .channel_defaults
-                .participant_emails
-                .as_ref()
-                .map(|values| {
-                    values
-                        .iter()
-                        .map(|value| value.as_str())
-                        .collect::<Vec<_>>()
-                }),
-        )
-        .bind(write.channel_defaults.retrieve_company_memory)
-        .bind(write.channel_defaults.retrieve_agent_memory)
-        .bind(write.channel_defaults.retrieve_user_memory)
-        .bind(write.channel_defaults.persist_company_memory)
-        .bind(write.channel_defaults.persist_agent_memory)
-        .bind(write.channel_defaults.persist_user_memory)
-        .bind(write.external_response_review.map(|policy| policy.as_str()))
-        // `COALESCE` is correct here and wrong for the channel override: this column is `NOT NULL`,
-        // so `None` genuinely means "preserve". See `plan/manual_handoff/phase1.md` §1.5.
-        .bind(write.external_reply_handling.map(|policy| policy.as_str()))
         .bind(id)
         .fetch_one(&self.pool)
         .await
@@ -413,48 +246,14 @@ impl CompanyPersistence for PostgresPersistence {
     ) -> AppResult<Company> {
         let db = sqlx::query_as::<_, CompanyDb>(
             r#"UPDATE companies
-               SET name = $1, slug = $2,
-                   memory_provider = COALESCE($3, memory_provider), avatar_url = $4,
-                   default_add_3rd_party = $5, default_participant_emails = $6,
-                   default_retrieve_company_memory = $7, default_retrieve_agent_memory = $8,
-                   default_retrieve_user_memory = $9, default_persist_company_memory = $10,
-                   default_persist_agent_memory = $11, default_persist_user_memory = $12,
-                   external_response_review = COALESCE($13, external_response_review),
-                   external_reply_handling = COALESCE($14, external_reply_handling)
-               WHERE id = $15 AND user_id = $16
-               RETURNING id, user_id, name, slug, memory_provider,
-                         default_add_3rd_party, default_participant_emails,
-                         default_retrieve_company_memory, default_retrieve_agent_memory,
-                         default_retrieve_user_memory, default_persist_company_memory,
-                         default_persist_agent_memory, default_persist_user_memory,
-                         avatar_url, created_at, external_response_review,
-                         external_reply_handling"#,
+               SET name = $1, slug = $2, avatar_url = $3, default_add_3rd_party = $4
+               WHERE id = $5 AND user_id = $6
+               RETURNING id, user_id, name, slug, default_add_3rd_party, avatar_url, created_at"#,
         )
         .bind(&write.name)
         .bind(&write.slug)
-        .bind(write.memory_provider.map(MemoryProviderKind::as_str))
         .bind(write.avatar_url.as_ref().map(AvatarUrl::as_str))
         .bind(write.channel_defaults.add_3rd_party)
-        .bind(
-            write
-                .channel_defaults
-                .participant_emails
-                .as_ref()
-                .map(|values| {
-                    values
-                        .iter()
-                        .map(|value| value.as_str())
-                        .collect::<Vec<_>>()
-                }),
-        )
-        .bind(write.channel_defaults.retrieve_company_memory)
-        .bind(write.channel_defaults.retrieve_agent_memory)
-        .bind(write.channel_defaults.retrieve_user_memory)
-        .bind(write.channel_defaults.persist_company_memory)
-        .bind(write.channel_defaults.persist_agent_memory)
-        .bind(write.channel_defaults.persist_user_memory)
-        .bind(write.external_response_review.map(|policy| policy.as_str()))
-        .bind(write.external_reply_handling.map(|policy| policy.as_str()))
         .bind(id)
         .bind(user_id)
         .fetch_optional(&self.pool)
@@ -469,81 +268,6 @@ impl CompanyPersistence for PostgresPersistence {
             return Err(AppError::Internal("Company not found.".into()));
         }
         Ok(())
-    }
-
-    async fn list_company_team_emails(&self, company_id: Uuid) -> AppResult<Vec<String>> {
-        let rows = sqlx::query_scalar!(
-            r#"SELECT DISTINCT LOWER(u.email) as "email!"
-               FROM (
-                   SELECT u.email FROM companies c JOIN users u ON c.user_id = u.id WHERE c.id = $1
-                   UNION ALL
-                   SELECT u.email FROM company_members m JOIN users u ON m.user_id = u.id WHERE m.company_id = $1
-               ) u"#,
-            company_id
-        )
-        .fetch_all(&self.pool)
-        .await
-        .map_err(AppError::from)?;
-
-        Ok(rows)
-    }
-
-    async fn list_company_team_accounts(
-        &self,
-        company_id: Uuid,
-    ) -> AppResult<Vec<CompanyTeamAccount>> {
-        // The owner is a `companies.user_id`, not a `company_members` row, so the two halves of a
-        // team only meet in a union. `DISTINCT ON` then keeps the stronger of the two if an owner
-        // was also invited as a member, and the rank puts them first for a reader.
-        let rows = sqlx::query!(
-            r#"WITH team AS (
-                   SELECT company.user_id AS account_id, 'owner'::text AS membership, 0 AS rank
-                   FROM companies AS company
-                   WHERE company.id = $1
-                   UNION ALL
-                   SELECT member.user_id, member.role::text, 1
-                   FROM company_members AS member
-                   WHERE member.company_id = $1
-               ), ranked AS (
-                   SELECT DISTINCT ON (account_id) account_id, membership, rank
-                   FROM team
-                   ORDER BY account_id, rank
-               )
-               SELECT account.id AS "user_id!", account.email::text AS "email!",
-                      account.username::text AS "username!", ranked.membership AS "membership!",
-                      -- Read here rather than by a second query per caller: the principal is what
-                      -- anything scoping work to this person names.
-                      principal.id AS "principal_id?"
-               FROM ranked
-               JOIN users AS account ON account.id = ranked.account_id
-               LEFT JOIN principals AS principal
-                 ON principal.company_id = $1 AND principal.user_id = ranked.account_id
-               ORDER BY ranked.rank, LOWER(account.email::text)
-               LIMIT 200"#,
-            company_id
-        )
-        .fetch_all(&self.pool)
-        .await
-        .map_err(AppError::from)?;
-
-        rows.into_iter()
-            .map(|row| {
-                let membership = match row.membership.as_str() {
-                    "owner" => CompanyMembership::Owner,
-                    role => CompanyMembership::from_access_role(
-                        CompanyAccessRole::from_str(role).map_err(AppError::Internal)?,
-                    ),
-                };
-
-                Ok(CompanyTeamAccount {
-                    user_id: row.user_id,
-                    email: EmailAddress::from(row.email),
-                    username: Some(row.username),
-                    membership,
-                    principal_id: row.principal_id.map(PrincipalId::new),
-                })
-            })
-            .collect()
     }
 
     async fn list_model_connections(
@@ -1104,6 +828,95 @@ mod tests {
             .expect("connections survive the rolled-back replace");
         assert_eq!(connections.len(), 1);
         assert!(connections[0].models.iter().any(|model| model == "gpt-b"));
+
+        persistence.delete(company.id).await.ok();
+    }
+
+    /// Both saves are positional binds built at runtime, so only a real database can say each
+    /// value still lands in its own column -- and that an owner-scoped save names its owner.
+    #[tokio::test]
+    async fn a_company_save_writes_every_field_to_its_own_column() {
+        let Some(pool) = test_pool().await else {
+            return;
+        };
+        let persistence = PostgresPersistence::new(pool.clone());
+        let owner = create_account(&persistence, "owner").await;
+        let stranger = create_account(&persistence, "stranger").await;
+        let company = persistence
+            .create(
+                owner.0,
+                CompanyWrite {
+                    name: "Acme".to_string(),
+                    slug: format!("acme-{}", Uuid::new_v4().simple()),
+                    ..CompanyWrite::default()
+                },
+            )
+            .await
+            .expect("a company");
+        assert!(company.channel_defaults.add_3rd_party);
+
+        let slug = format!("globex-{}", Uuid::new_v4().simple());
+        let saved = persistence
+            .update_for_user(
+                owner.0,
+                company.id,
+                CompanyWrite {
+                    name: "Globex".to_string(),
+                    slug: slug.clone(),
+                    channel_defaults: CompanyChannelDefaults {
+                        add_3rd_party: false,
+                    },
+                    avatar_url: Some(AvatarUrl::from("https://cdn.example.com/globex.png")),
+                },
+            )
+            .await
+            .expect("the owner saves");
+        assert_eq!(saved.name, "Globex");
+        assert_eq!(saved.slug.as_str(), slug);
+        assert!(!saved.channel_defaults.add_3rd_party);
+        assert_eq!(
+            saved.avatar_url,
+            Some(AvatarUrl::from("https://cdn.example.com/globex.png"))
+        );
+
+        // An unscoped save replaces every field too.
+        let renamed = persistence
+            .update(
+                company.id,
+                CompanyWrite {
+                    name: "Initech".to_string(),
+                    slug: slug.clone(),
+                    ..CompanyWrite::default()
+                },
+            )
+            .await
+            .expect("an unscoped save");
+        assert_eq!(renamed.name, "Initech");
+        assert!(renamed.channel_defaults.add_3rd_party);
+        assert_eq!(renamed.avatar_url, None);
+
+        assert!(
+            persistence
+                .update_for_user(
+                    stranger.0,
+                    company.id,
+                    CompanyWrite {
+                        name: "Stolen".to_string(),
+                        slug,
+                        ..CompanyWrite::default()
+                    },
+                )
+                .await
+                .is_err()
+        );
+        assert_eq!(
+            CompanyPersistence::get_by_id(&persistence, company.id)
+                .await
+                .unwrap()
+                .expect("still there")
+                .name,
+            "Initech"
+        );
 
         persistence.delete(company.id).await.ok();
     }

@@ -21,7 +21,7 @@ mod publish;
 #[path = "message_receipts.rs"]
 pub(crate) mod receipts;
 
-const MESSAGING: &str = "messaging";
+pub(super) const MESSAGING: &str = "messaging";
 
 /// Current authority for the built-in messaging target: the run actor must still be the
 /// company owner or an admin, and the snapshot must be exactly the trusted built-in.
@@ -191,6 +191,7 @@ impl MessageActionPreparation for PostgresPersistence {
             company_slug: run.company_slug,
             correlation_id: run.correlation_id,
             targets,
+            delivery_policy: run.delivery_policy,
         })
     }
 }
@@ -201,14 +202,15 @@ pub(super) struct RunRoute {
     correlation_id: CorrelationId,
     channel: Option<Uuid>,
     thread: Option<Uuid>,
+    delivery_policy: DeliveryPolicy,
 }
 
 async fn run_route_on(
     tx: &mut Transaction<'_, Postgres>,
     scope: ActionScope,
 ) -> AppResult<RunRoute> {
-    let (slug, correlation, channel, thread): (String, Uuid, Option<Uuid>, Option<Uuid>) = sqlx::query_as(
-        "SELECT company.slug, run.correlation_id, run.channel_id, run.thread_id FROM workflow_runs AS run \
+    let (slug, correlation, channel, thread, policy): (String, Uuid, Option<Uuid>, Option<Uuid>, String) = sqlx::query_as(
+        "SELECT company.slug, run.correlation_id, run.channel_id, run.thread_id, run.delivery_policy FROM workflow_runs AS run \
          JOIN companies AS company ON company.id=run.company_id WHERE run.company_id=$1 AND run.id=$2",
     )
     .bind(scope.company.as_uuid())
@@ -221,6 +223,7 @@ async fn run_route_on(
         correlation_id: CorrelationId::from(correlation),
         channel,
         thread,
+        delivery_policy: DeliveryPolicy::parse(&policy)?,
     })
 }
 
@@ -430,33 +433,31 @@ async fn reply_target_on(
     })
 }
 
-/// The relay trace the source arrived with, as its inbound task recorded it: the only place it
-/// is kept (`InboundTaskPayloadV1`). A payload that does not decode is refused, never guessed.
+/// The relay trace the source arrived with on this channel, as its admission intent recorded
+/// it: the only place it is kept (p08 D1.6). A source with no intent was never accepted inbound
+/// on this channel and starts a chain.
 async fn source_relay_on(
     tx: &mut Transaction<'_, Postgres>,
     company: CompanyId,
     source: CanonicalMessageId,
     channel: Uuid,
 ) -> AppResult<Option<SourceRelay>> {
-    use crate::application::transport::task_payload::InboundTaskPayload;
-    let payload: Option<Value> = sqlx::query_scalar(
-        "SELECT payload FROM background_tasks WHERE company_id=$1 AND source_message_uuid=$2 \
-           AND channel_id=$3 AND queue_kind='legacy'",
+    let recorded: Option<(i32, Vec<Uuid>)> = sqlx::query_as(
+        "SELECT hop_count, trace_channels FROM workflow_message_intents \
+         WHERE company_id=$1 AND message_id=$2 AND channel_id=$3",
     )
     .bind(company.as_uuid())
     .bind(source.as_uuid())
     .bind(channel)
     .fetch_optional(&mut **tx)
     .await?;
-    let Some(payload) = payload else {
+    let Some((hop_count, trace_channels)) = recorded else {
         return Ok(None);
     };
-    let payload = InboundTaskPayload::decode(&payload)
-        .map_err(|_| refused("the source's recorded relay trace cannot be read"))?;
-    let recorded = payload.identifiers();
     Ok(Some(SourceRelay {
-        hop_count: recorded.hop_count,
-        trace_channels: recorded.trace_channels.to_vec(),
+        hop_count: u32::try_from(hop_count)
+            .map_err(|_| refused("the source's recorded relay trace cannot be read"))?,
+        trace_channels,
     }))
 }
 
@@ -474,15 +475,21 @@ impl PublicationDirectory for MessagePublicationDirectory {
         let mut tx = begin_http(&self.persistence).await?;
         super::authority::authorize_company(&mut tx, draft.company(), actor).await?;
         tx.commit().await?;
-        Ok(PublicationDependencies {
-            snapshots: publication::DependencySnapshots {
-                tools: vec![
-                    builtin_message_snapshot(draft.company(), MessageKind::Send)?,
-                    builtin_message_snapshot(draft.company(), MessageKind::Reply)?,
-                ],
-                ..Default::default()
-            },
-            children: vec![],
-        })
+        message_builtins(draft.company())
     }
+}
+
+/// Every publication's message capture: both trusted built-ins, whatever the draft's steps
+/// (assistant provisioning starts its capture from these too, p08 D2.3).
+pub(super) fn message_builtins(company: CompanyId) -> AppResult<PublicationDependencies> {
+    Ok(PublicationDependencies {
+        snapshots: publication::DependencySnapshots {
+            tools: vec![
+                builtin_message_snapshot(company, MessageKind::Send)?,
+                builtin_message_snapshot(company, MessageKind::Reply)?,
+            ],
+            ..Default::default()
+        },
+        children: vec![],
+    })
 }

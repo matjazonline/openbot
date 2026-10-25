@@ -1,4 +1,5 @@
-//! Address boundaries survive routing, passive copies, and deduplication.
+//! Every addressed channel gets its own admission intent carrying its address facts (p08 D1.3);
+//! routing, passive copies and deduplication decide associations, never whether anything runs.
 use super::*;
 
 async fn fixture(slugs: &[&str]) -> ChannelFixture {
@@ -26,7 +27,6 @@ async fn fixture(slugs: &[&str]) -> ChannelFixture {
         }),
         fixture.use_cases.company_persistence.clone(),
         fixture.participants.clone(),
-        fixture.tasks.clone(),
         internal_test_config(),
     );
     fixture
@@ -54,31 +54,37 @@ async fn ingest(
     result
 }
 
-fn task_targets(fixture: &ChannelFixture, result: &InboundIngestResult) -> Vec<Vec<String>> {
-    let targets = fixture.tasks.task_targets.lock().unwrap();
-    result
-        .task_ids
+/// `(slug, role, mentioned, admissible)` per committed intent, in association order.
+fn intents(
+    fixture: &ChannelFixture,
+    result: &InboundIngestResult,
+) -> Vec<(String, &'static str, bool, bool)> {
+    let request = fixture.threads.committed_requests().pop().unwrap();
+    assert_eq!(result.intent_ids.len(), request.intents.len());
+    request
+        .intents
         .iter()
-        .map(|id| {
-            targets[id]
+        .map(|intent| {
+            let slug = result
+                .channel_matches
                 .iter()
-                .map(|target| {
-                    result
-                        .channel_matches
-                        .iter()
-                        .find(|matched| matched.channel.id == target.channel_id)
-                        .unwrap()
-                        .channel
-                        .slug
-                        .to_string()
-                })
-                .collect()
+                .find(|matched| matched.channel.id == intent.channel_id)
+                .unwrap()
+                .channel
+                .slug
+                .to_string();
+            (
+                slug,
+                intent.role.as_str(),
+                intent.mentioned,
+                request.admissible,
+            )
         })
         .collect()
 }
 
 #[tokio::test]
-async fn one_plus_address_remains_one_ordered_task() {
+async fn a_plus_address_gives_each_channel_its_own_intent() {
     let fixture = fixture(&["support", "sales"]).await;
     let result = ingest(
         &fixture,
@@ -88,13 +94,16 @@ async fn one_plus_address_remains_one_ordered_task() {
     )
     .await;
     assert_eq!(
-        task_targets(&fixture, &result),
-        vec![vec!["support", "sales"]]
+        intents(&fixture, &result),
+        vec![
+            ("support".into(), "to", false, true),
+            ("sales".into(), "to", false, true)
+        ]
     );
 }
 
 #[tokio::test]
-async fn an_activated_cc_address_gets_its_own_task_after_the_to_pipeline() {
+async fn a_cc_address_gets_an_intent_with_its_role_and_mention() {
     let fixture = fixture(&["support", "sales", "billing"]).await;
     let result = ingest(
         &fixture,
@@ -104,14 +113,19 @@ async fn an_activated_cc_address_gets_its_own_task_after_the_to_pipeline() {
     )
     .await;
     assert_eq!(
-        task_targets(&fixture, &result),
-        vec![vec!["support", "sales"], vec!["billing"]]
+        intents(&fixture, &result),
+        vec![
+            ("support".into(), "to", false, true),
+            ("sales".into(), "to", false, true),
+            ("billing".into(), "cc", true, true)
+        ]
     );
-    assert_eq!(fixture.tasks.tasks.lock().unwrap().len(), 2);
 }
 
+/// A Cc'd channel that is not mentioned is still a stored copy with an intent: whether it is
+/// answered is its bindings' message trigger, not a channel setting (p08 F001).
 #[tokio::test]
-async fn a_passive_cc_address_is_filed_without_a_task() {
+async fn an_unmentioned_cc_address_still_gets_an_intent() {
     let fixture = fixture(&["support", "sales", "billing"]).await;
     let result = ingest(
         &fixture,
@@ -121,8 +135,8 @@ async fn a_passive_cc_address_is_filed_without_a_task() {
     )
     .await;
     assert_eq!(
-        task_targets(&fixture, &result),
-        vec![vec!["support", "sales"]]
+        intents(&fixture, &result)[2],
+        ("billing".into(), "cc", false, true)
     );
     let billing = result
         .channel_matches
@@ -137,7 +151,7 @@ async fn a_passive_cc_address_is_filed_without_a_task() {
 }
 
 #[tokio::test]
-async fn separate_to_addresses_have_independent_ordered_tasks() {
+async fn separate_to_addresses_each_get_an_intent() {
     let fixture = fixture(&["target1", "target3", "target4"]).await;
     let result = ingest(
         &fixture,
@@ -146,10 +160,11 @@ async fn separate_to_addresses_have_independent_ordered_tasks() {
         "Please help.",
     )
     .await;
-    assert_eq!(
-        task_targets(&fixture, &result),
-        vec![vec!["target1"], vec!["target3", "target4"]]
-    );
+    let slugs: Vec<_> = intents(&fixture, &result)
+        .into_iter()
+        .map(|(slug, ..)| slug)
+        .collect();
+    assert_eq!(slugs, vec!["target1", "target3", "target4"]);
 }
 
 #[tokio::test]
@@ -163,14 +178,19 @@ async fn a_repeated_cc_channel_stays_in_its_first_address() {
     )
     .await;
     assert_eq!(
-        task_targets(&fixture, &result),
-        vec![vec!["support", "sales"]]
+        intents(&fixture, &result),
+        vec![
+            ("support".into(), "to", false, true),
+            ("sales".into(), "to", true, true)
+        ]
     );
     assert_eq!(result.channel_matches.len(), 2);
 }
 
+/// A quiet address makes the whole message quiet: every intent is kept for reply correlation,
+/// and none may admit a binding.
 #[tokio::test]
-async fn a_quiet_cc_address_suppresses_every_address_task() {
+async fn a_quiet_cc_address_makes_every_intent_inadmissible() {
     let fixture = fixture(&["support", "sales", "billing"]).await;
     let result = ingest(
         &fixture,
@@ -179,7 +199,8 @@ async fn a_quiet_cc_address_suppresses_every_address_task() {
         "@billing, please resend the invoice.",
     )
     .await;
-    assert!(result.task_ids.is_empty());
-    assert!(fixture.tasks.tasks.lock().unwrap().is_empty());
+    let committed = intents(&fixture, &result);
+    assert_eq!(committed.len(), 3);
+    assert!(committed.iter().all(|(.., admissible)| !admissible));
     assert_eq!(result.channel_matches.len(), 3);
 }

@@ -242,6 +242,8 @@ pub struct MessageRoutes {
     pub company_slug: CompanySlug,
     pub correlation_id: CorrelationId,
     pub targets: Vec<RouteTarget>,
+    /// The run's: `InAppOnly` publishes every email target in-app, with no delivery (p08 D1.7).
+    pub delivery_policy: crate::application::workflow::DeliveryPolicy,
 }
 
 #[derive(Debug, Clone)]

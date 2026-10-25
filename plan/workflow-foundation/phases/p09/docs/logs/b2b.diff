@@ -1,0 +1,1491 @@
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -43,7 +43,7 @@
+       - name: Run counts browser protocol
+         run: npm run test:run-counts
+       - name: SSE navigation lifecycle
+-        run: node --test scripts/tests/sse-navigation.mjs scripts/tests/agent-runtime.mjs scripts/tests/workflow-runs.mjs
++        run: node --test scripts/tests/sse-navigation.mjs scripts/tests/agent-runtime.mjs scripts/tests/workflow-runs.mjs scripts/tests/workflow-conversations.mjs
+       - name: Deployment script tests
+         run: |
+           scripts/tests/deploy.sh
+--- a/scripts/tests/workflow-conversations.mjs
++++ b/scripts/tests/workflow-conversations.mjs
+@@ -0,0 +1,62 @@
++// Shipped HTMX/SSE: late admission attribution reconciles without replacing conversation state.
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { readFileSync } from 'node:fs';
++import { createServer } from 'node:http';
++import { chromium, expect } from '@playwright/test';
++
++const assets = Object.fromEntries(['htmx-2.0.4.min.js', 'htmx-ext-sse-2.2.3.js'].map(name =>
++    [`/${name}`, readFileSync(new URL(`../../assets/${name}`, import.meta.url), 'utf8')]));
++
++test('late attribution and reconnect keep both replies, composer and stream owner', async () => {
++    let admitted = false;
++    let connections = 0;
++    const streams = new Set();
++    const activity = () => admitted ? '<ul><li>run first: working</li><li>run second: awaiting review</li></ul>' +
++        '<span id="message-runs-question" hx-swap-oob="innerHTML">Started run first, run second</span>' : '';
++    const send = response => response.write(`event: activity\ndata: ${activity()}\n\n`);
++    const server = createServer((req, res) => {
++        if (assets[req.url]) { res.setHeader('Content-Type', 'text/javascript'); return res.end(assets[req.url]); }
++        if (req.url === '/events') {
++            res.writeHead(200, {'Content-Type':'text/event-stream'});
++            res.write('retry: 100\n\n'); connections++; streams.add(res);
++            res.on('close', () => streams.delete(res)); send(res); return;
++        }
++        res.setHeader('Content-Type', 'text/html');
++        res.end(`<!doctype html><html><head><script src="/htmx-2.0.4.min.js"></script>
++            <script src="/htmx-ext-sse-2.2.3.js"></script></head><body>
++            <section id="detail-pane" hx-ext="sse" sse-connect="/events">
++            <div id="message-scroll" style="height:160px;overflow:auto">
++                <div id="question">Question <span id="message-runs-question"></span></div>
++                <div style="height:500px"></div><div id="reply-first">First reply: Written by run first</div>
++                <div id="reply-second">Second reply: Written by run second</div>
++            </div><div id="thread-activity" sse-swap="activity" hx-target="this" hx-swap="innerHTML"></div>
++            <textarea aria-label="Reply"></textarea></section></body></html>`);
++    });
++    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
++    const browser = await chromium.launch(process.env.CHROME_PATH ? {executablePath:process.env.CHROME_PATH} : {});
++    const page = await browser.newPage();
++    const errors = []; page.on('pageerror', e => errors.push(e.message));
++    try {
++        await page.goto(`http://127.0.0.1:${server.address().port}/`);
++        await expect.poll(() => connections).toBe(1);
++        await page.getByRole('textbox', {name:'Reply'}).fill('Unsent response');
++        await page.locator('#message-scroll').evaluate(el => { el.scrollTop = 100; });
++        await page.locator('#question').evaluate(el => { el.dataset.retained = 'yes'; });
++        admitted = true; for (const stream of streams) send(stream);
++        await expect(page.locator('#message-runs-question')).toHaveText('Started run first, run second');
++        assert.equal(connections, 1);
++        for (const stream of streams) stream.destroy();
++        await expect.poll(() => connections).toBe(2);
++        await expect(page.locator('#thread-activity')).toContainText('run second: awaiting review');
++        await expect(page.getByRole('textbox', {name:'Reply'})).toHaveValue('Unsent response');
++        await expect(page.locator('#question')).toHaveAttribute('data-retained', 'yes');
++        assert.equal(await page.locator('#message-scroll').evaluate(el => el.scrollTop), 100);
++        await expect(page.locator('#reply-first')).toHaveCount(1);
++        await expect(page.locator('#reply-second')).toHaveCount(1);
++        assert.deepEqual(errors, []);
++    } finally {
++        await browser.close(); for (const stream of streams) stream.destroy();
++        server.closeAllConnections(); await new Promise(resolve => server.close(resolve));
++    }
++});
+--- a/src/adapters/http/pages/mailbox.rs
++++ b/src/adapters/http/pages/mailbox.rs
+@@ -214,8 +214,8 @@
+     pub messages: &'a [ThreadMessageView],
+     /// The signed-in reader's address, used to put their own messages on the right.
+     pub viewer_email: &'a EmailAddress,
+-    /// What this thread's newest run is doing, for the strip above the composer.
+-    pub activity: Option<ThreadActivity>,
++    /// Independently identifiable runs for the strip above the composer.
++    pub activity: &'a crate::application::thread_activity::ThreadRuns,
+     /// Why the last action on this pane (an internal note) was refused, when it was.
+     pub error: Option<&'a str>,
+     /// Who the reader is to the company. Only its owner is offered the simulator, which is the
+@@ -2207,6 +2207,7 @@
+                         company_id: pane.company_id,
+                         channel_id: pane.channel.id,
+                     },
++                    RunLinkAccess::Authorized(&pane.activity.inspectable),
+                 )
+             })
+             .collect()
+@@ -2266,7 +2267,11 @@
+             r#"<div class="alert alert-error mx-4 mt-3 py-2 text-sm sm:mx-6">{}</div>"#,
+             escape_html_text(message)
+         )),
+-        activity_strip = thread_activity_strip(pane.activity),
++        activity_strip = thread_activity_strip(
++            pane.activity,
++            pane.company_id,
++            RunLinkAccess::Authorized(&pane.activity.inspectable)
++        ),
+         note_composer = internal_note_composer(pane),
+         composer = thread_composer(pane),
+         diagnostics_dialog = DIAGNOSTICS_DIALOG,
+@@ -2367,6 +2372,7 @@
+     message: &ThreadMessageView,
+     viewer_email: Option<&EmailAddress>,
+     scope: MessageScope,
++    run_access: RunLinkAccess<'_>,
+ ) -> String {
+     let is_agent = message.is_agent();
+     // Written by an agent in *another* channel: an inbound message only carries the agent role
+@@ -2450,9 +2456,10 @@
+                     </div>
+                     <div class="chat-bubble {bubble_class} max-w-2xl text-sm">{internal_label}{body}{attachments}</div>
+                     <div class="flex flex-wrap items-center gap-2">{note_controls}</div>
+-                    <div class="chat-footer font-mono text-[11px] opacity-50">{boundary} · {subject}{diagnostics}</div>
++                    <div class="chat-footer font-mono text-[11px] opacity-50">{boundary} · {subject}{diagnostics}</div>{run_attribution}
+                 </div>
+         "##,
++        run_attribution = message_run_attribution(message, scope.company_id, run_access),
+         side = if is_viewer { "chat-end" } else { "chat-start" },
+         // Read by the column when a bubble streams in: only the agent's own reply answers the
+         // question its row's activity mark was asking.
+--- a/src/adapters/http/pages/schedules.rs
++++ b/src/adapters/http/pages/schedules.rs
+@@ -222,7 +222,11 @@
+     let rows: String = if props.runs.is_empty() {
+         r#"<div class="p-8 text-center text-xs opacity-60">No execution runs yet. Click "Run Now" to trigger the first run.</div>"#.to_string()
+     } else {
+-        props.runs.iter().map(occurrence_row).collect()
++        props
++            .runs
++            .iter()
++            .map(|run| occurrence_row(run, props.company_id))
++            .collect()
+     };
+ 
+     let prev_disabled = if props.page <= 1 {
+@@ -313,7 +317,7 @@
+ }
+ 
+ /// One occurrence: when it was due, how it was started, and the run it admitted or why not.
+-fn occurrence_row(run: &ScheduleRun) -> String {
++fn occurrence_row(run: &ScheduleRun, company_id: Uuid) -> String {
+     let (badge_class, status) = match run.status {
+         OccurrenceStatus::Pending => ("badge-ghost", "Pending"),
+         OccurrenceStatus::Materializing => ("badge-info", "Starting"),
+@@ -322,8 +326,8 @@
+     };
+     let run_line = match (run.run_id, run.run_state.as_deref()) {
+         (Some(id), Some(state)) => format!(
+-            r#"<span class="font-mono" title="{id}">run {short} · {state}</span>"#,
+-            short = &id.simple().to_string()[..8],
++            r#"{chip} · {state}"#,
++            chip = run_chip(company_id, id, RunLinkAccess::Inspect),
+             state = escape_html_text(state),
+         ),
+         _ => String::new(),
+--- a/src/adapters/http/pages/tests.rs
++++ b/src/adapters/http/pages/tests.rs
+@@ -440,7 +440,7 @@
+         thread: &thread,
+         messages: &[],
+         viewer_email: &email,
+-        activity: None,
++        activity: &Default::default(),
+         error: None,
+         viewer_membership: CompanyMembership::Owner,
+     });
+@@ -1665,7 +1665,7 @@
+         thread: &thread,
+         messages: &[inbound, outbound],
+         viewer_email: &mailbox_account_email(),
+-        activity: None,
++        activity: &Default::default(),
+         error: None,
+         viewer_membership: CompanyMembership::Owner,
+     });
+@@ -1747,7 +1747,7 @@
+         channel_id: Uuid::new_v4(),
+     };
+ 
+-    let active = message_bubble_chat(&note, None, scope);
++    let active = message_bubble_chat(&note, None, scope, RunLinkAccess::Label);
+     assert!(active.contains("Internal only"));
+     assert!(active.contains("internal_only / note"));
+     assert!(!active.contains("use with agent"));
+@@ -1757,7 +1757,7 @@
+     assert!(!active.contains("<script>alert"));
+ 
+     note.internal_note.as_mut().unwrap().tombstoned_at = Some(Utc::now());
+-    let removed = message_bubble_chat(&note, None, scope);
++    let removed = message_bubble_chat(&note, None, scope, RunLinkAccess::Label);
+     assert!(removed.contains("This internal note was removed"));
+     assert!(removed.contains("removed</span>"));
+     assert!(!removed.contains("private customer secret"));
+@@ -1816,7 +1816,7 @@
+         thread: &thread,
+         messages: &[mailbox_message(thread.id, "older"), newest.clone()],
+         viewer_email: &mailbox_account_email(),
+-        activity: None,
++        activity: &Default::default(),
+         error: None,
+         viewer_membership: CompanyMembership::Owner,
+     });
+@@ -1850,7 +1850,7 @@
+         thread: &thread,
+         messages: &[],
+         viewer_email: &mailbox_account_email(),
+-        activity: None,
++        activity: &Default::default(),
+         error: None,
+         viewer_membership: CompanyMembership::Owner,
+     });
+@@ -2146,7 +2146,7 @@
+         thread: &thread,
+         messages: &[],
+         viewer_email: &mailbox_account_email(),
+-        activity: None,
++        activity: &Default::default(),
+         error: None,
+         viewer_membership: CompanyMembership::Owner,
+     });
+@@ -2166,7 +2166,11 @@
+ /// no spinner — something spinning forever reads as broken rather than blocked.
+ #[test]
+ fn only_a_running_agent_gets_a_spinner() {
+-    let working = thread_activity_strip(Some(ThreadActivity::Working));
++    let working = thread_activity_strip(
++        &test_thread_runs(ThreadActivity::Working),
++        Uuid::nil(),
++        RunLinkAccess::Label,
++    );
+     assert!(working.contains("loading loading-dots"));
+     assert!(working.contains("Agent working"));
+ 
+@@ -2177,13 +2181,19 @@
+         ThreadActivity::Waiting,
+         ThreadActivity::Failed,
+     ] {
+-        let strip = thread_activity_strip(Some(blocked));
++        let strip = thread_activity_strip(
++            &test_thread_runs(blocked),
++            Uuid::nil(),
++            RunLinkAccess::Label,
++        );
+         assert!(!strip.contains("loading"), "{blocked:?} must not spin");
+         assert!(strip.contains(blocked.label()));
+     }
+ 
+     // An idle thread renders nothing, which is what clears the strip.
+-    assert!(thread_activity_strip(None).is_empty());
++    assert!(
++        thread_activity_strip(&Default::default(), Uuid::nil(), RunLinkAccess::Label).is_empty()
++    );
+ }
+ 
+ #[test]
+@@ -2198,7 +2208,7 @@
+         thread: &thread,
+         messages: &[],
+         viewer_email: &mailbox_account_email(),
+-        activity: Some(ThreadActivity::Working),
++        activity: &test_thread_runs(ThreadActivity::Working),
+         error: None,
+         viewer_membership: CompanyMembership::Owner,
+     });
+@@ -2232,13 +2242,13 @@
+         sender: EmailAddress::from("support@acme.mailagents.com"),
+         ..mailbox_message_draft(thread.id, "The reply.")
+     });
+-    let html = message_bubble_chat(&reply, None, scope);
++    let html = message_bubble_chat(&reply, None, scope, RunLinkAccess::Label);
+     assert!(!html.contains("<img"));
+     assert!(html.contains("support@acme.mailagents.com"));
+ 
+     // An inbound message is its sender's.
+     let inbound = mailbox_message(thread.id, "The question.");
+-    let inbound_html = message_bubble_chat(&inbound, None, scope);
++    let inbound_html = message_bubble_chat(&inbound, None, scope, RunLinkAccess::Label);
+     assert!(!inbound_html.contains("<img"));
+     assert!(inbound_html.contains(inbound.author.display()));
+ 
+@@ -2265,7 +2275,7 @@
+         sender: EmailAddress::from("legal@acme.mailagents.test"),
+         ..mailbox_message_draft(thread.id, "Here is the contract review.")
+     });
+-    let html = message_bubble_chat(&delegated, None, scope);
++    let html = message_bubble_chat(&delegated, None, scope, RunLinkAccess::Label);
+ 
+     assert!(html.contains(&icon(Icon::Hubot, BUTTON_ICON)));
+     assert!(html.contains(r#"title="From an agent in another channel""#));
+@@ -2280,12 +2290,16 @@
+         direction: MessageDirection::Outbound,
+         ..delegated.clone()
+     };
+-    let own_html = message_bubble_chat(&own_reply, None, scope);
++    let own_html = message_bubble_chat(&own_reply, None, scope, RunLinkAccess::Label);
+     assert!(!own_html.contains(&icon(Icon::Hubot, BUTTON_ICON)));
+ 
+     // And an ordinary person's message carries no mark either.
+-    let from_person =
+-        message_bubble_chat(&mailbox_message(thread.id, "The question."), None, scope);
++    let from_person = message_bubble_chat(
++        &mailbox_message(thread.id, "The question."),
++        None,
++        scope,
++        RunLinkAccess::Label,
++    );
+     assert!(!from_person.contains(&icon(Icon::Hubot, BUTTON_ICON)));
+ }
+ 
+@@ -2456,7 +2470,7 @@
+     };
+ 
+     for message in [&email, &slack, &agent, &schedule] {
+-        let html = message_bubble_chat(message, None, scope);
++        let html = message_bubble_chat(message, None, scope, RunLinkAccess::Label);
+         assert!(
+             html.contains(&escape_html_text(&message.body)),
+             "the body has to render: {html}"
+@@ -2471,11 +2485,11 @@
+     }
+ 
+     // The badge is what says which interface a turn came from, now that the name does not.
+-    assert!(message_bubble_chat(&slack, None, scope).contains(">slack<"));
+-    assert!(message_bubble_chat(&email, None, scope).contains(">email<"));
++    assert!(message_bubble_chat(&slack, None, scope, RunLinkAccess::Label).contains(">slack<"));
++    assert!(message_bubble_chat(&email, None, scope, RunLinkAccess::Label).contains(">email<"));
+     // Nothing carried the schedule prompt or the agent's answer, so neither claims one.
+     for message in [&agent, &schedule] {
+-        let html = message_bubble_chat(message, None, scope);
++        let html = message_bubble_chat(message, None, scope, RunLinkAccess::Label);
+         assert!(!html.contains(">email<"), "{html}");
+         assert!(!html.contains(">slack<"), "{html}");
+     }
+@@ -2497,7 +2511,7 @@
+             thread: &thread,
+             messages: &[],
+             viewer_email: &mailbox_account_email(),
+-            activity: None,
++            activity: &Default::default(),
+             error: None,
+             viewer_membership,
+         })
+@@ -2535,7 +2549,7 @@
+         thread: &thread,
+         messages: &[message],
+         viewer_email: &mailbox_account_email(),
+-        activity: None,
++        activity: &Default::default(),
+         error: None,
+         viewer_membership: CompanyMembership::Owner,
+     });
+@@ -2647,6 +2661,7 @@
+             company_id: company.id,
+             channel_id: channel.id,
+         },
++        RunLinkAccess::Label,
+     );
+ 
+     // The link is the app's own, carrying the scope the download is authorized against -- never a
+@@ -2684,7 +2699,7 @@
+         thread: &thread,
+         messages: std::slice::from_ref(&message),
+         viewer_email: &mailbox_account_email(),
+-        activity: None,
++        activity: &Default::default(),
+         error: None,
+         viewer_membership: CompanyMembership::Owner,
+     });
+@@ -2696,7 +2711,15 @@
+         channel_id: channel.id,
+     };
+     assert!(
+-        pane.contains(message_bubble_chat(&message, Some(&mailbox_account_email()), scope).trim())
++        pane.contains(
++            message_bubble_chat(
++                &message,
++                Some(&mailbox_account_email()),
++                scope,
++                RunLinkAccess::Label
++            )
++            .trim()
++        )
+     );
+     assert!(!pane.contains("name=\"quiet\""));
+     assert!(pane.contains("hx-post=\"/ui/internal-notes\""));
+@@ -4624,3 +4647,19 @@
+     )
+     .expect("write bundle");
+ }
++
++fn test_thread_runs(activity: ThreadActivity) -> crate::application::thread_activity::ThreadRuns {
++    crate::application::thread_activity::ThreadRuns {
++        inspectable: Default::default(),
++        items: vec![crate::application::thread_activity::ThreadRunActivity {
++            run_id: Uuid::new_v4(),
++            title: "Workflow".into(),
++            activity,
++        }],
++        has_more: false,
++        message_runs: vec![],
++    }
++}
++
++#[path = "workflow_conversation_tests.rs"]
++mod workflow_conversation_tests;
+--- a/src/adapters/http/pages/thread_activity.rs
++++ b/src/adapters/http/pages/thread_activity.rs
+@@ -57,19 +57,30 @@
+     format!("activity-{thread_id}")
+ }
+ 
+-/// The full-width activity strip shown below an open thread.
+-pub fn thread_activity_strip(activity: Option<ThreadActivity>) -> String {
+-    let Some(activity) = activity else {
++/// Every unfinished or failed run remains independently identifiable. The live stream replaces
++/// only this strip, leaving its stream owner and the message/composer state mounted.
++pub fn thread_activity_strip(
++    runs: &crate::application::thread_activity::ThreadRuns,
++    company_id: Uuid,
++    access: RunLinkAccess<'_>,
++) -> String {
++    if runs.items.is_empty() {
+         return String::new();
+-    };
+-    let spinner = if activity.is_running() {
+-        r##"<span class="loading loading-dots loading-sm"></span>"##
++    }
++    let entries: String = runs.items.iter().map(|run| {
++        let spinner = if run.activity.is_running() {
++            r#"<span class="loading loading-dots loading-sm" aria-hidden="true"></span>"#
++        } else { "" };
++        format!(r#"<li class="flex flex-wrap items-center gap-2" data-run-id="{id}">{spinner}{chip}<span>{title}</span><span class="badge badge-sm {style}">{label}</span></li>"#,
++            id=run.run_id, chip=run_chip(company_id, run.run_id, access),
++            title=escape_html_text(&run.title), style=activity_style(run.activity), label=escape_html_text(run.activity.label()))
++    }).collect();
++    let more = if runs.has_more {
++        "<li>Showing the newest 50 active or failed runs. Older runs are not shown.</li>"
+     } else {
+         ""
+     };
+     format!(
+-        r##"<div class="flex flex-wrap items-center gap-2 border-t border-base-300 px-6 py-2 text-xs opacity-70">{spinner}<span class="badge badge-sm shrink-0 {style}">{label}</span></div>"##,
+-        style = activity_style(activity),
+-        label = escape_html_text(activity.label()),
++        r#"<ul aria-label="Thread runs" class="space-y-1 border-t border-base-300 px-6 py-2 text-xs">{entries}{more}</ul>"#
+     )
+ }
+--- a/src/adapters/http/pages/workflow_conversation_tests.rs
++++ b/src/adapters/http/pages/workflow_conversation_tests.rs
+@@ -0,0 +1,92 @@
++use super::*;
++use crate::application::thread_activity::{ThreadRunActivity, ThreadRuns};
++
++#[test]
++fn conversations_identify_each_run_and_its_own_reply() {
++    let company = mailbox_company();
++    let channel = mailbox_channel(company.id);
++    let thread = mailbox_thread(channel.id);
++    let first = Uuid::new_v4();
++    let second = Uuid::new_v4();
++    let mut runs = ThreadRuns {
++        inspectable: Default::default(),
++        items: vec![
++            ThreadRunActivity {
++                run_id: first,
++                title: "<img src=x onerror=alert(1)>".into(),
++                activity: ThreadActivity::Working,
++            },
++            ThreadRunActivity {
++                run_id: second,
++                title: "Review".into(),
++                activity: ThreadActivity::AwaitingReview,
++            },
++        ],
++        has_more: true,
++        message_runs: vec![],
++    };
++    let mut inbound = mailbox_message(thread.id, "Question");
++    inbound.run_ids = vec![first, second];
++    let mut reply_one = mailbox_message(thread.id, "First answer");
++    reply_one.direction = MessageDirection::Outbound;
++    reply_one.run_ids = vec![first];
++    let mut reply_two = reply_one.clone();
++    reply_two.canonical_id = crate::entities::message::CanonicalMessageId::new(Uuid::new_v4());
++    reply_two.body = "Second answer".into();
++    reply_two.run_ids = vec![second];
++    let messages = [inbound, reply_one, reply_two];
++    for membership in [
++        CompanyMembership::Owner,
++        CompanyMembership::Admin,
++        CompanyMembership::Member,
++    ] {
++        runs.inspectable = if membership.manages_company_operations() {
++            [first, second].into_iter().collect()
++        } else {
++            Default::default()
++        };
++        let html = message_pane(&MessagePane {
++            company_id: company.id,
++            channel: &channel,
++            thread: &thread,
++            messages: &messages,
++            viewer_email: &mailbox_account_email(),
++            activity: &runs,
++            error: None,
++            viewer_membership: membership,
++        });
++        assert!(html.contains(&format!("data-run-id=\"{first}\"")));
++        assert!(html.contains(&format!("data-run-id=\"{second}\"")));
++        assert!(html.contains("Agent working") && html.contains("Awaiting review"));
++        assert!(html.contains("&lt;img src=x") && !html.contains("<img src=x"));
++        assert!(html.contains("Older runs are not shown"));
++        assert_eq!(
++            html.contains("href=\"/ui/workflow-runs?"),
++            membership.manages_company_operations()
++        );
++        for (index, expected, other) in [(1, first, second), (2, second, first)] {
++            let attribution = message_run_attribution(
++                &messages[index],
++                company.id,
++                RunLinkAccess::Authorized(&runs.inspectable),
++            );
++            assert!(attribution.contains("Written by"));
++            assert!(attribution.contains(&expected.to_string()));
++            assert!(!attribution.contains(&other.to_string()));
++        }
++    }
++}
++
++#[test]
++fn a_visible_reply_does_not_offer_a_link_to_an_inaccessible_producer() {
++    let thread = Uuid::new_v4();
++    let run = Uuid::new_v4();
++    let mut reply = mailbox_message(thread, "Answer from another channel");
++    reply.direction = MessageDirection::Outbound;
++    reply.run_ids = vec![run];
++    let allowed = Default::default();
++    let html = message_run_attribution(&reply, Uuid::new_v4(), RunLinkAccess::Authorized(&allowed));
++    assert!(html.contains("Written by"));
++    assert!(html.contains(&run.to_string()));
++    assert!(!html.contains("href="));
++}
+--- a/src/adapters/http/pages/workflow_runs/mod.rs
++++ b/src/adapters/http/pages/workflow_runs/mod.rs
+@@ -274,4 +274,89 @@
+         r#"<section id="run-pane" class="ui-pane-detail flex min-w-0 flex-1 items-center justify-center bg-base-100 p-8"><p class="text-sm opacity-70">{}</p></section>"#,
+         escape_html_text(message)
+     )
++}
++
++/// Full navigation from a conversation, schedule or queue into the run workspace.
++pub fn run_href(company_id: Uuid, run_id: Uuid) -> String {
++    format!("/ui/workflow-runs?company_id={company_id}&run_id={run_id}")
++}
++
++/// The destination reauthorizes company and channel access. Non-operators get attribution only.
++#[derive(Clone, Copy)]
++pub enum RunLinkAccess<'a> {
++    Authorized(&'a std::collections::HashSet<Uuid>),
++    Inspect,
++    Label,
++}
++
++pub fn run_chip(company_id: Uuid, run_id: Uuid, access: RunLinkAccess<'_>) -> String {
++    let short = short_id(run_id);
++    let access = match access {
++        RunLinkAccess::Authorized(ids) if ids.contains(&run_id) => RunLinkAccess::Inspect,
++        RunLinkAccess::Authorized(_) => RunLinkAccess::Label,
++        other => other,
++    };
++    match access {
++        RunLinkAccess::Inspect => format!(
++            r#"<a class="link font-mono" href="{}" title="Run {run_id}">run {short}</a>"#,
++            escape_html_attr(&run_href(company_id, run_id))
++        ),
++        RunLinkAccess::Label | RunLinkAccess::Authorized(_) => {
++            format!(r#"<span class="font-mono" title="Run {run_id}">run {short}</span>"#)
++        }
++    }
+ }
++
++pub fn message_run_attribution(
++    message: &ThreadMessageView,
++    company_id: Uuid,
++    access: RunLinkAccess<'_>,
++) -> String {
++    let chips = message_run_chips(&message.run_ids, message.direction, company_id, access);
++    format!(
++        r#"<span id="message-runs-{}">{chips}</span>"#,
++        message.canonical_id.as_uuid()
++    )
++}
++
++fn message_run_chips(
++    run_ids: &[Uuid],
++    direction: MessageDirection,
++    company_id: Uuid,
++    access: RunLinkAccess<'_>,
++) -> String {
++    let chips = run_ids
++        .iter()
++        .map(|id| run_chip(company_id, *id, access))
++        .collect::<Vec<_>>()
++        .join(", ");
++    if chips.is_empty() {
++        String::new()
++    } else {
++        let label = if direction == MessageDirection::Outbound {
++            "Written by"
++        } else {
++            "Started"
++        };
++        format!("{label} {chips}")
++    }
++}
++
++/// Admission can follow the message's initial render. Reconcile attribution on the same wakeup
++/// as activity without replacing bubbles, scrolling the thread or disturbing the composer.
++pub fn thread_run_attribution_updates(
++    runs: &crate::application::thread_activity::ThreadRuns,
++    company_id: Uuid,
++    access: RunLinkAccess<'_>,
++) -> String {
++    runs.message_runs
++        .iter()
++        .map(|message| {
++            format!(
++                r#"<span id="message-runs-{}" hx-swap-oob="innerHTML">{}</span>"#,
++                message.canonical_id,
++                message_run_chips(&message.run_ids, message.direction, company_id, access)
++            )
++        })
++        .collect()
++}
+--- a/src/adapters/http/routes/ui.rs
++++ b/src/adapters/http/routes/ui.rs
+@@ -276,19 +276,6 @@
+         .collect())
+ }
+ 
+-/// What one open thread is doing, for the strip under its messages.
+-async fn open_thread_activity(
+-    activity_reader: &dyn ThreadActivityReader,
+-    company_id: Uuid,
+-    thread_id: Uuid,
+-) -> AppResult<Option<ThreadActivity>> {
+-    Ok(activity_reader
+-        .thread_activity(company_id, &[thread_id])
+-        .await?
+-        .remove(&thread_id)
+-        .and_then(|summary| summary.activity))
+-}
+-
+ /// Thread ids whose activity badges a newly connected column may already be displaying.
+ async fn first_page_thread_ids(
+     thread_use_cases: &ThreadUseCases,
+@@ -312,7 +299,9 @@
+     error: Option<&str>,
+ ) -> AppResult<String> {
+     let messages = thread_use_cases.get_thread_history(thread.id).await?;
+-    let activity = open_thread_activity(activity_reader, company_id, thread.id).await?;
++    let activity = activity_reader
++        .thread_runs(company_id, thread.id, viewer.user_id)
++        .await?;
+     let viewer_membership = thread_use_cases
+         .principal_access_for_user(company_id, viewer.user_id)
+         .await?
+@@ -323,7 +312,7 @@
+         thread,
+         messages: &messages,
+         viewer_email: &viewer.email,
+-        activity,
++        activity: &activity,
+         error,
+         viewer_membership,
+     }))
+@@ -601,20 +590,24 @@
+         // than leaving a freshly opened thread blank until something happens to change.
+         let mut pending_messages = true;
+         let mut pending_activity = true;
++        let mut inspectable = HashSet::new();
+ 
+         loop {
+             if pending_activity {
+                 pending_activity = false;
+-                match open_thread_activity(activity_reader.as_ref(), query.company_id, thread_id)
++                match activity_reader.thread_runs(query.company_id, thread_id, viewer.user_id)
+                     .await
+                 {
+                     // Activity is state, not an append: it carries no cursor and is re-read whole
+                     // every time, which is also what makes it correct after a reconnect. A thread
+                     // with no run renders as an empty strip, clearing whatever was there.
+                     Ok(activity) => {
++                        let run_access = pages::RunLinkAccess::Authorized(&activity.inspectable);
++                        let html = format!("{}{}", pages::thread_activity_strip(&activity, query.company_id, run_access), pages::thread_run_attribution_updates(&activity, query.company_id, run_access));
++                        inspectable = activity.inspectable;
+                         yield Ok(Event::default()
+                             .event("activity")
+-                            .data(pages::thread_activity_strip(activity)));
++                            .data(html));
+                     }
+                     Err(error) => {
+                         warn!(%error, %thread_id, "Thread activity query failed");
+@@ -641,6 +634,7 @@
+                                         company_id: query.company_id,
+                                         channel_id: channel.id,
+                                     },
++                                    pages::RunLinkAccess::Authorized(&inspectable),
+                                 )));
+                         }
+                         // A full batch means the reader is still behind; keep going rather than
+@@ -660,7 +654,7 @@
+             }
+ 
+             match wake_ups.next().await {
+-                Some(Wake::Event(MailboxEvent::MessageCommitted(_))) => pending_messages = true,
++                Some(Wake::Event(MailboxEvent::MessageCommitted(_))) => { pending_messages = true; pending_activity = true; },
+                 Some(Wake::Event(MailboxEvent::ActivityChanged(_))) => pending_activity = true,
+                 // Thread-scoped wake_ups filters these out before they reach this stream; a resync
+                 // arrives as `Lagged`, and a run on this thread reaches it as activity.
+--- a/src/adapters/http/routes/ui_conversation_stream_tests.rs
++++ b/src/adapters/http/routes/ui_conversation_stream_tests.rs
+@@ -0,0 +1,118 @@
++use super::*;
++use crate::application::thread_activity::{ThreadRunActivity, ThreadRuns};
++
++#[tokio::test]
++async fn both_runs_reconcile_on_connect_wakeup_and_reconnect() {
++    let Some(h) = Harness::new().await else {
++        return;
++    };
++    let thread = h.thread("Two runs").await;
++    let first = Uuid::new_v4();
++    let second = Uuid::new_v4();
++    h.activity.runs.lock().unwrap().insert(
++        thread,
++        ThreadRuns {
++            inspectable: Default::default(),
++            items: vec![
++                ThreadRunActivity {
++                    run_id: first,
++                    title: "First".into(),
++                    activity: ThreadActivity::Working,
++                },
++                ThreadRunActivity {
++                    run_id: second,
++                    title: "Second".into(),
++                    activity: ThreadActivity::AwaitingReview,
++                },
++            ],
++            has_more: false,
++            message_runs: vec![crate::application::thread_activity::MessageRuns {
++                canonical_id: Uuid::new_v4(),
++                run_ids: vec![first, second],
++                direction: crate::entities::message::MessageDirection::Inbound,
++            }],
++        },
++    );
++    // This wakeup predates subscription; the first read still recovers both identities.
++    h.publish_activity_change(thread);
++    let mut frames = h.message_stream(thread).await;
++    let initial = frames.next_named("activity").await.data;
++    for id in [first, second] {
++        assert!(initial.contains(&id.to_string()), "{initial}");
++    }
++    assert!(initial.contains("hx-swap-oob=\"innerHTML\""));
++    assert!(initial.contains("Started"));
++    assert!(initial.contains("Agent working") && initial.contains("Awaiting review"));
++    h.activity
++        .runs
++        .lock()
++        .unwrap()
++        .get_mut(&thread)
++        .unwrap()
++        .items
++        .remove(0);
++    h.publish_activity_change(thread);
++    let refreshed = frames.next_named("activity").await.data;
++    assert!(!refreshed.contains(&format!("data-run-id=\"{first}\"")));
++    assert!(refreshed.contains(&second.to_string()));
++    drop(frames);
++    let mut connected = h.message_stream(thread).await;
++    assert_eq!(connected.next_named("activity").await.data, refreshed);
++}
++
++#[tokio::test]
++async fn conversation_reads_refuse_foreign_scope_and_private_channels() {
++    let Some(h) = Harness::new().await else {
++        return;
++    };
++    let Some(other) = Harness::new().await else {
++        return;
++    };
++    let thread = h.thread("Private").await;
++    sqlx::query("UPDATE channels SET access_mode='allowlist' WHERE id=$1")
++        .bind(h.channel_id)
++        .execute(h.persistence.pool())
++        .await
++        .unwrap();
++    sqlx::query("INSERT INTO company_members(id,company_id,user_id,role) VALUES($1,$2,$3,'admin')")
++        .bind(Uuid::new_v4())
++        .bind(h.company_id)
++        .bind(other.owner.user_id)
++        .execute(h.persistence.pool())
++        .await
++        .unwrap();
++    for (viewer, company_id) in [
++        (h.owner.clone(), other.company_id),
++        (other.owner.clone(), h.company_id),
++    ] {
++        let result = thread_message_stream(
++            State(h.channels.clone()),
++            State(h.threads.clone()),
++            State(h.reader()),
++            State(h.events.clone()),
++            viewer.clone(),
++            HeaderMap::new(),
++            Query(ThreadStreamQuery {
++                company_id,
++                channel_id: h.channel_id,
++                thread_id: thread,
++                after: None,
++            }),
++        )
++        .await;
++        assert!(matches!(result, Err(AppError::NotFound(_))));
++        let result = message_pane_fragment(
++            State(h.channels.clone()),
++            State(h.threads.clone()),
++            State(h.reader()),
++            viewer,
++            Query(ThreadQuery {
++                company_id,
++                channel_id: h.channel_id,
++                thread_id: thread,
++            }),
++        )
++        .await;
++        assert!(matches!(result, Err(AppError::NotFound(_))));
++    }
++}
+--- a/src/adapters/http/routes/ui_stream_tests.rs
++++ b/src/adapters/http/routes/ui_stream_tests.rs
+@@ -168,16 +168,52 @@
+ 
+ /// Each thread's run activity, as the test sets it.
+ #[derive(Default)]
+-struct ScriptedActivity(Mutex<HashMap<Uuid, ThreadWorkSummary>>);
++struct ScriptedActivity {
++    summaries: Mutex<HashMap<Uuid, ThreadWorkSummary>>,
++    runs: Mutex<HashMap<Uuid, crate::application::thread_activity::ThreadRuns>>,
++}
+ 
+ #[async_trait::async_trait]
+ impl ThreadActivityReader for ScriptedActivity {
++    async fn thread_runs(
++        &self,
++        _company_id: Uuid,
++        thread_id: Uuid,
++        _viewer: Uuid,
++    ) -> AppResult<crate::application::thread_activity::ThreadRuns> {
++        if let Some(runs) = self.runs.lock().unwrap().get(&thread_id) {
++            return Ok(runs.clone());
++        }
++        let items = self
++            .summaries
++            .lock()
++            .unwrap()
++            .get(&thread_id)
++            .and_then(|row| {
++                row.activity.map(|activity| {
++                    crate::application::thread_activity::ThreadRunActivity {
++                        run_id: row.run_id,
++                        title: "Workflow".into(),
++                        activity,
++                    }
++                })
++            })
++            .into_iter()
++            .collect();
++        Ok(crate::application::thread_activity::ThreadRuns {
++            inspectable: Default::default(),
++            items,
++            has_more: false,
++            message_runs: vec![],
++        })
++    }
++
+     async fn thread_activity(
+         &self,
+         _company_id: Uuid,
+         thread_ids: &[Uuid],
+     ) -> AppResult<HashMap<Uuid, ThreadWorkSummary>> {
+-        let activity = self.0.lock().unwrap();
++        let activity = self.summaries.lock().unwrap();
+         Ok(thread_ids
+             .iter()
+             .filter_map(|id| activity.get(id).map(|summary| (*id, *summary)))
+@@ -286,7 +322,7 @@
+ 
+     /// Set what a thread's newest run is doing; `None` is a thread with no run, or a finished one.
+     fn set_activity(&self, thread_id: Uuid, activity: Option<ThreadActivity>) {
+-        self.activity.0.lock().unwrap().insert(
++        self.activity.summaries.lock().unwrap().insert(
+             thread_id,
+             ThreadWorkSummary {
+                 run_id: Uuid::new_v4(),
+@@ -479,3 +515,6 @@
+     let failed = frames.next_named("activity").await;
+     assert!(failed.data.contains("Run failed"), "{}", failed.data);
+ }
++
++#[path = "ui_conversation_stream_tests.rs"]
++mod conversation_stream_tests;
+--- a/src/adapters/http/routes/workflows/ui/authoring/bindings.rs
++++ b/src/adapters/http/routes/workflows/ui/authoring/bindings.rs
+@@ -710,5 +710,27 @@
+             bindings: &usage.bindings,
+             truncated: usage.truncated,
+         },
++    )))
++}
++
++/// Resolve an attention item to the binding's workflow without trusting an incoming workflow id.
++pub(super) async fn binding_destination(
++    ui: Ui,
++    Path(binding): Path<Uuid>,
++    Query(query): Query<CompanyQuery>,
++) -> AppResult<axum::response::Redirect> {
++    ui.company(query.company_id).await?;
++    let summary = ui
++        .engine
++        .authoring_reads()
++        .binding_use(company(query.company_id), binding)
++        .await?
++        .ok_or_else(|| AppError::NotFound("Workflow binding not found".into()))?;
++    let workflow = summary.binding.workflow.as_uuid();
++    ui.visible_binding(query.company_id, workflow, binding)
++        .await?;
++    Ok(axum::response::Redirect::to(&format!(
++        "/ui/workflows?company_id={}&workflow_id={workflow}&tab=bindings",
++        query.company_id
+     )))
+ }
+--- a/src/adapters/http/routes/workflows/ui/authoring/destination_tests.rs
++++ b/src/adapters/http/routes/workflows/ui/authoring/destination_tests.rs
+@@ -0,0 +1,60 @@
++use super::*;
++use crate::adapters::http::routes::workflows::bindings::{BindingRequest, configure_binding};
++use crate::application::workflow::{RelatedAssociation, RelatedChannelId};
++
++#[tokio::test]
++async fn binding_destinations_authorize_tenant_role_and_private_channel() {
++    let Some(f) = Fixture::new().await else {
++        return;
++    };
++    let workflow = Uuid::new_v4();
++    let version = f
++        .published(workflow, "Support", &blank_source(workflow))
++        .await;
++    let private = f.channel("Private", "private", true).await;
++    let binding = Uuid::new_v4();
++    configure_binding(
++        &f.engine,
++        f.company,
++        WorkflowActor::authenticated(f.owner).unwrap(),
++        binding,
++        BindingRequest {
++            expected_state_revision: None,
++            association: RelatedAssociation::Channel(RelatedChannelId::new(private)),
++            version,
++            params: json!({}),
++            resources: BTreeMap::new(),
++            run_as: None,
++            message_trigger: None,
++        },
++    )
++    .await
++    .unwrap();
++    let response = binding_destination(f.ui(f.owner), Path(binding), f.query())
++        .await
++        .unwrap()
++        .into_response();
++    assert_eq!(
++        response.headers()[header::LOCATION],
++        format!(
++            "/ui/workflows?company_id={}&workflow_id={workflow}&tab=bindings",
++            f.company
++        )
++    );
++    for (user, company_id) in [
++        (f.member, f.company),
++        (f.admin, f.company),
++        (f.stranger, f.company),
++        (f.stranger, f.other),
++    ] {
++        assert!(matches!(
++            binding_destination(
++                f.ui(user),
++                Path(binding),
++                Query(CompanyQuery { company_id })
++            )
++            .await,
++            Err(AppError::NotFound(_))
++        ));
++    }
++}
+--- a/src/adapters/http/routes/workflows/ui/authoring/mod.rs
++++ b/src/adapters/http/routes/workflows/ui/authoring/mod.rs
+@@ -66,6 +66,10 @@
+ pub(super) fn router() -> Router<AppState> {
+     Router::new()
+         .route("/ui/workflows", get(workspace))
++        .route(
++            "/ui/workflow-bindings/{binding_id}",
++            get(binding_destination),
++        )
+         .route("/ui/workflows/list", get(list_page))
+         .route(NEW_ROUTE, get(new_pane).post(create_draft))
+         .route("/ui/workflows/catalogue", get(catalogue))
+--- a/src/adapters/http/routes/workflows/ui/authoring/tests.rs
++++ b/src/adapters/http/routes/workflows/ui/authoring/tests.rs
+@@ -577,3 +577,6 @@
+ mod publish_tests;
+ #[path = "tools_tests.rs"]
+ mod tools_tests;
++
++#[path = "destination_tests.rs"]
++mod destination_tests;
+--- a/src/adapters/persistence/attention.rs
++++ b/src/adapters/persistence/attention.rs
+@@ -338,16 +338,25 @@
+         .bind(query.manager)
+ }
+ 
+-/// Where an item is worked on. Runs and bindings have no page until p09.
++/// Stable destinations; their routes independently authorize company and channel access.
+ fn item_href(item: &AttentionItem) -> Option<String> {
+     match item.source_kind {
+         AttentionSourceKind::Decision => Some(format!("/ui/workflow-decisions/{}", item.source_id)),
+         AttentionSourceKind::DeliveryFailure => {
+             Some(format!("/ui/deliveries?company_id={}", item.company_id))
+         }
+-        AttentionSourceKind::RunReconciliation
+-        | AttentionSourceKind::RunFailure
+-        | AttentionSourceKind::BindingRefusal => None,
++        AttentionSourceKind::RunReconciliation | AttentionSourceKind::RunFailure => {
++            item.run_id.map(|run| {
++                format!(
++                    "/ui/workflow-runs?company_id={}&run_id={run}",
++                    item.company_id
++                )
++            })
++        }
++        AttentionSourceKind::BindingRefusal => Some(format!(
++            "/ui/workflow-bindings/{}?company_id={}",
++            item.source_id, item.company_id
++        )),
+     }
+ }
+ 
+@@ -377,7 +386,16 @@
+             .map(TryInto::try_into)
+             .collect::<AppResult<Vec<AttentionItem>>>()?;
+         for item in &mut items {
+-            item.href = item_href(item);
++            item.href = match item.source_kind {
++                AttentionSourceKind::RunFailure
++                | AttentionSourceKind::RunReconciliation
++                | AttentionSourceKind::BindingRefusal
++                    if !query.manager =>
++                {
++                    None
++                }
++                _ => item_href(item),
++            };
+         }
+         let next_cursor = has_next
+             .then(|| {
+--- a/src/adapters/persistence/attention_tests.rs
++++ b/src/adapters/persistence/attention_tests.rs
+@@ -60,7 +60,13 @@
+         assert_eq!(item.responsibility, AttentionResponsibility::ChannelTeam);
+         assert_eq!(item.state, "waiting");
+         assert!(item.due_at.is_some(), "the run deadline is when it is due");
+-        assert_eq!(item.href, None, "a run has no page until p09");
++        assert_eq!(
++            item.href,
++            Some(format!(
++                "/ui/workflow-runs?company_id={}&run_id={}",
++                f.company, f.run
++            ))
++        );
+     }
+     assert!(
+         p.list_attention(query(f.company, owner, AttentionView::MyWork, true))
+--- a/src/adapters/persistence/thread/mod.rs
++++ b/src/adapters/persistence/thread/mod.rs
+@@ -11,6 +11,7 @@
+ mod internal_note;
+ mod message;
+ mod views;
++pub(in crate::adapters::persistence) use views::THREAD_RUN_LOOKUP_SQL;
+ 
+ #[cfg(test)]
+ #[path = "test_support.rs"]
+--- a/src/adapters/persistence/thread_activity.rs
++++ b/src/adapters/persistence/thread_activity.rs
+@@ -5,7 +5,9 @@
+ use crate::{
+     adapters::persistence::PostgresPersistence,
+     app_error::AppResult,
+-    application::thread_activity::ThreadActivityReader,
++    application::thread_activity::{
++        THREAD_RUN_LIMIT, ThreadActivityReader, ThreadRunActivity, ThreadRuns,
++    },
+     entities::thread_activity::{ThreadActivity, ThreadWorkSummary},
+ };
+ 
+@@ -31,6 +33,53 @@
+ 
+ #[async_trait::async_trait]
+ impl ThreadActivityReader for PostgresPersistence {
++    async fn thread_runs(
++        &self,
++        company_id: Uuid,
++        thread_id: Uuid,
++        viewer: Uuid,
++    ) -> AppResult<ThreadRuns> {
++        let mut rows = sqlx::query_as::<_, OpenThreadRunRow>(OPEN_THREAD_RUNS_SQL)
++            .bind(company_id)
++            .bind(thread_id)
++            .bind((THREAD_RUN_LIMIT + 1) as i64)
++            .fetch_all(self.pool())
++            .await?;
++        let has_more = rows.len() > THREAD_RUN_LIMIT;
++        rows.truncate(THREAD_RUN_LIMIT);
++        let items: Vec<ThreadRunActivity> = rows
++            .into_iter()
++            .map(|row| {
++                let activity = ThreadActivity::from_run(&row.state, row.waiting_reason.as_deref())
++                    .ok_or_else(|| {
++                        crate::app_error::AppError::Internal("Invalid open-thread run state".into())
++                    })?;
++                Ok(ThreadRunActivity {
++                    run_id: row.run_id,
++                    title: row.title,
++                    activity,
++                })
++            })
++            .collect::<AppResult<_>>()?;
++        let message_runs = message_runs(self.pool(), company_id, thread_id).await?;
++        let ids: Vec<Uuid> = items
++            .iter()
++            .map(|row| row.run_id)
++            .chain(
++                message_runs
++                    .iter()
++                    .flat_map(|row| row.run_ids.iter().copied()),
++            )
++            .collect();
++        let inspectable = inspectable_runs(self, company_id, viewer, &ids).await?;
++        Ok(ThreadRuns {
++            inspectable,
++            items,
++            has_more,
++            message_runs,
++        })
++    }
++
+     async fn thread_activity(
+         &self,
+         company_id: Uuid,
+@@ -61,3 +110,99 @@
+             .collect())
+     }
+ }
++
++// Existing workflow_runs_by_thread narrows the history before this bounded read. Immutable
++// version titles describe what ran, even if the draft is renamed later.
++pub(crate) const OPEN_THREAD_RUNS_SQL: &str = r#"
++SELECT run.id AS run_id, version.title, run.state, run.waiting_reason
++FROM workflow_runs run
++JOIN workflow_versions version ON (version.company_id, version.id) = (run.company_id, run.version_id)
++WHERE run.company_id = $1 AND run.thread_id = $2
++  AND run.state IN ('queued', 'running', 'waiting', 'failed')
++ORDER BY run.created_at DESC, run.id DESC LIMIT $3
++"#;
++
++#[derive(sqlx::FromRow)]
++struct OpenThreadRunRow {
++    run_id: Uuid,
++    title: String,
++    state: String,
++    waiting_reason: Option<String>,
++}
++
++async fn message_runs(
++    pool: &sqlx::PgPool,
++    company: Uuid,
++    thread: Uuid,
++) -> AppResult<Vec<crate::application::thread_activity::MessageRuns>> {
++    let messages: Vec<(Uuid, String)> = sqlx::query_as(
++        "SELECT association.message_id, message.direction FROM thread_messages association \
++         JOIN messages message ON (message.company_id,message.id)=(association.company_id,association.message_id) \
++         WHERE association.company_id=$1 AND association.thread_id=$2 \
++         ORDER BY association.created_at DESC, association.id DESC LIMIT $3")
++        .bind(company).bind(thread).bind(crate::entities::message_view::THREAD_HISTORY_LIMIT as i64)
++        .fetch_all(pool).await?;
++    let directions: HashMap<Uuid, _> = messages.into_iter().collect();
++    let ids: Vec<Uuid> = directions.keys().copied().collect();
++    #[derive(sqlx::FromRow)]
++    struct Row {
++        canonical_id: Uuid,
++        run_ids: Vec<Uuid>,
++    }
++    let rows = sqlx::query_as::<_, Row>(super::thread::THREAD_RUN_LOOKUP_SQL)
++        .bind(company)
++        .bind(thread)
++        .bind(ids)
++        .fetch_all(pool)
++        .await?;
++    rows.into_iter()
++        .map(|row| {
++            let direction = directions
++                .get(&row.canonical_id)
++                .expect("lookup uses these message identities")
++                .parse()
++                .map_err(crate::app_error::AppError::Internal)?;
++            Ok(crate::application::thread_activity::MessageRuns {
++                canonical_id: row.canonical_id,
++                run_ids: row.run_ids,
++                direction,
++            })
++        })
++        .collect()
++}
++
++/// Apply the same channel policy used by the mailbox. A destination thread can contain a reply
++/// produced on a different, private channel; its visible message does not grant run access.
++async fn inspectable_runs(
++    p: &PostgresPersistence,
++    company: Uuid,
++    viewer: Uuid,
++    ids: &[Uuid],
++) -> AppResult<std::collections::HashSet<Uuid>> {
++    use crate::use_cases::{channel::ChannelPersistence, participant::PrincipalAccessPersistence};
++    let Some(access) = p.access_context_for_user(company, viewer).await? else {
++        return Ok(Default::default());
++    };
++    if !access.membership.manages_company_operations() {
++        return Ok(Default::default());
++    }
++    let channels: std::collections::HashSet<_> = p
++        .list_by_company_id(company)
++        .await?
++        .into_iter()
++        .filter(|channel| channel.viewer_access(access))
++        .map(|channel| channel.id)
++        .collect();
++    let runs: Vec<(Uuid, Option<Uuid>)> = sqlx::query_as(
++        "SELECT id,channel_id FROM workflow_runs WHERE company_id=$1 AND id=ANY($2)",
++    )
++    .bind(company)
++    .bind(ids)
++    .fetch_all(p.pool())
++    .await?;
++    Ok(runs
++        .into_iter()
++        .filter(|(_, channel)| channel.is_none_or(|id| channels.contains(&id)))
++        .map(|(id, _)| id)
++        .collect())
++}
+--- a/src/adapters/persistence/workflow/attention_decision_tests.rs
++++ b/src/adapters/persistence/workflow/attention_decision_tests.rs
+@@ -163,7 +163,12 @@
+         mine[0].responsibility,
+         AttentionResponsibility::Principal(actor)
+     );
+-    assert_eq!(mine[0].href, None);
++    assert_eq!(
++        mine[0].href,
++        Some(format!(
++            "/ui/workflow-runs?company_id={company}&run_id={run}"
++        ))
++    );
+     assert!(
+         mine[0].next_action.contains("in the last 7 days"),
+         "{}",
+--- a/src/adapters/persistence/workflow/message_intent_tests.rs
++++ b/src/adapters/persistence/workflow/message_intent_tests.rs
+@@ -1323,7 +1323,13 @@
+         row.next_action,
+         "2 refusals in the last 7 days; latest: unavailable"
+     );
+-    assert_eq!(row.href, None);
++    assert_eq!(
++        row.href,
++        Some(format!(
++            "/ui/workflow-bindings/{}?company_id={company}",
++            removed.as_uuid()
++        ))
++    );
+     for view in [AttentionView::MyWork, AttentionView::Unassigned] {
+         assert!(
+             s.p()
+@@ -1455,6 +1461,7 @@
+         .unwrap();
+     assert_eq!(single.run_ids, expected_runs);
+ 
++    assert_independent_thread_runs(&s, company, message, &expected_runs).await;
+     let activity = s.p().thread_activity(company, &[s.thread]).await.unwrap();
+     assert_eq!(activity[&s.thread].activity, Some(ThreadActivity::Queued));
+     assert!(expected_runs.contains(&activity[&s.thread].run_id));
+@@ -1546,4 +1553,115 @@
+         .await
+         .unwrap();
+     super::super::assert_silent_until_marker(s.pool(), &mut listener).await;
++}
++
++async fn assert_independent_thread_runs(
++    s: &Intents,
++    company: Uuid,
++    message: Uuid,
++    expected_runs: &[Uuid],
++) {
++    use crate::application::thread_activity::ThreadActivityReader;
++    use crate::entities::thread_activity::ThreadActivity;
++    let runs = s
++        .p()
++        .thread_runs(company, s.thread, s.owner().user_id())
++        .await
++        .unwrap();
++    assert_eq!(runs.items.len(), 2);
++    assert!(!runs.has_more);
++    assert_eq!(
++        runs.message_runs
++            .iter()
++            .find(|row| row.canonical_id == message)
++            .unwrap()
++            .run_ids,
++        expected_runs
++    );
++    for run in &runs.items {
++        assert!(expected_runs.contains(&run.run_id));
++        assert_eq!(run.activity, ThreadActivity::Queued);
++        assert!(!run.title.is_empty());
++    }
++    assert!(
++        s.p()
++            .thread_runs(Uuid::new_v4(), s.thread, s.owner().user_id())
++            .await
++            .unwrap()
++            .items
++            .is_empty()
++    );
++}
++
++#[tokio::test]
++async fn thread_runs_are_bounded_and_report_truncation() {
++    use crate::application::thread_activity::{THREAD_RUN_LIMIT, ThreadActivityReader};
++    let s = Intents::new().await;
++    let binding = s.binding(MessageTrigger::Any, None).await;
++    for _ in 0..=THREAD_RUN_LIMIT {
++        s.intent(TO).await;
++        assert_eq!(s.drain(&s.admissions(admission(s.p()))).await, 1);
++    }
++    assert_eq!(s.runs(binding).await.len(), THREAD_RUN_LIMIT + 1);
++    let listed = s
++        .p()
++        .thread_runs(
++            s.fixture.target.company.as_uuid(),
++            s.thread,
++            s.owner().user_id(),
++        )
++        .await
++        .unwrap();
++    assert_eq!(listed.items.len(), THREAD_RUN_LIMIT);
++    assert!(listed.has_more);
+ }
++
++#[tokio::test]
++async fn thread_attribution_links_require_access_to_the_producing_run() {
++    use crate::application::thread_activity::ThreadActivityReader;
++    let s = Intents::new().await;
++    let admin = member(&s.fixture, "admin").await;
++    let reader = member(&s.fixture, "member").await;
++    let binding = s.binding(MessageTrigger::Any, None).await;
++    s.intent(TO).await;
++    s.drain(&s.admissions(admission(s.p()))).await;
++    let run = s.runs(binding).await[0];
++    let company = s.fixture.target.company.as_uuid();
++    assert!(
++        s.p()
++            .thread_runs(company, s.thread, admin)
++            .await
++            .unwrap()
++            .inspectable
++            .contains(&run)
++    );
++    assert!(
++        s.p()
++            .thread_runs(company, s.thread, reader)
++            .await
++            .unwrap()
++            .inspectable
++            .is_empty()
++    );
++    sqlx::query("UPDATE channels SET access_mode='allowlist' WHERE id=$1")
++        .bind(s.channel)
++        .execute(s.pool())
++        .await
++        .unwrap();
++    assert!(
++        s.p()
++            .thread_runs(company, s.thread, admin)
++            .await
++            .unwrap()
++            .inspectable
++            .is_empty()
++    );
++    assert!(
++        s.p()
++            .thread_runs(company, s.thread, s.owner().user_id())
++            .await
++            .unwrap()
++            .inspectable
++            .contains(&run)
++    );
++}
+--- a/src/application/thread_activity.rs
++++ b/src/application/thread_activity.rs
+@@ -4,13 +4,47 @@
+ 
+ use crate::{app_error::AppResult, entities::thread_activity::ThreadWorkSummary};
+ 
+-/// The mailbox's activity read (p08 D4.6): each thread's newest run, an unfinished one first.
++/// Mailbox activity: compact newest-run row marks and independent runs in the open thread.
+ /// The callers have proved the threads visible; the company scopes the index.
+ #[async_trait::async_trait]
+ pub trait ThreadActivityReader: Send + Sync {
++    async fn thread_runs(
++        &self,
++        company_id: Uuid,
++        thread_id: Uuid,
++        viewer: Uuid,
++    ) -> AppResult<ThreadRuns>;
++
+     async fn thread_activity(
+         &self,
+         company_id: Uuid,
+         thread_ids: &[Uuid],
+     ) -> AppResult<HashMap<Uuid, ThreadWorkSummary>>;
+ }
++
++/// The open thread's independently actionable runs. Callers must authorize the thread first.
++#[derive(Debug, Clone)]
++pub struct ThreadRunActivity {
++    pub run_id: Uuid,
++    pub title: String,
++    pub activity: crate::entities::thread_activity::ThreadActivity,
++}
++
++#[derive(Debug, Clone, Default)]
++pub struct ThreadRuns {
++    /// Inspector links permitted for this viewer, including replies produced on another channel.
++    pub inspectable: std::collections::HashSet<Uuid>,
++    pub items: Vec<ThreadRunActivity>,
++    pub has_more: bool,
++    pub message_runs: Vec<MessageRuns>,
++}
++
++pub const THREAD_RUN_LIMIT: usize = 50;
++
++/// The attribution of a message already authorized through its visible thread.
++#[derive(Debug, Clone)]
++pub struct MessageRuns {
++    pub direction: crate::entities::message::MessageDirection,
++    pub canonical_id: Uuid,
++    pub run_ids: Vec<Uuid>,
++}
