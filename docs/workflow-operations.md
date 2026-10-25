@@ -79,7 +79,7 @@ capacity, and retain the lease and stock-stack CI budget alarms.
    and credentials. Install validated workflow templates, publish and configure bindings while
    keeping them **inactive**. Keep schedules and external ingress closed. No legacy runtime flag
    or alternate dispatcher is needed. Memory and classifier-selected capability profiles are out
-   of this release; see [exclusions](../plan/workflow-foundation/NOT_PLANNED.md).
+   of this release; see [exclusions](https://github.com/matjazonline/openbot/blob/19bab48c28c76a929f20a19f46e44bfb75c24cae/plan/workflow-foundation/NOT_PLANNED.md).
 5. Run isolated samples first: confirm no customer deliveries or external writes. In a restricted
    pilot, deliberately activate only the controlled binding and exercise manual, email and schedule
    starts. Verify classification/context, comments and revision feedback, the exact accepted reply
@@ -99,5 +99,5 @@ Current ownership: ingress creates durable message intents; bindings admit immut
 `WorkflowEngine` owns polling and maintenance; executions own outputs/routes; action invocations
 own remote uncertainty; human decisions own review; the shared delivery worker owns transport
 attempts. Obsolete channel-owned agent dispatch and the alternative runtime were removed in phase08.
-The old [replacement inventory](../plan/workflow-foundation/REPLACEMENT-MAP.md) records that baseline,
+The old [replacement inventory](https://github.com/matjazonline/openbot/blob/19bab48c28c76a929f20a19f46e44bfb75c24cae/plan/workflow-foundation/REPLACEMENT-MAP.md) records that baseline,
 not supported APIs. [Release evidence](workflow-verification.md) maps the acceptance scenarios.

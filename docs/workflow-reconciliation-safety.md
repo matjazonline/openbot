@@ -8,7 +8,7 @@ uses that supported service contract without making a verifier available through
 
 ## Historical episode boundary
 
-Reassessed against phases01–09 at `5d4aab1`. The phase10 [P10-D1 decision](../plan/workflow-foundation/phases/p10/docs/logs/p10-d1-r1.md)
+Reassessed against phases01–09 at `5d4aab1`. The phase10 [P10-D1 decision](https://github.com/matjazonline/openbot/blob/19bab48c28c76a929f20a19f46e44bfb75c24cae/plan/workflow-foundation/phases/p10/docs/logs/p10-d1-r1.md)
 contains exact source spans and the owner inventory; independent review WF-P10-R001 accepted its
 bounded obstruction argument. This is not a universal SQL reachability proof.
 

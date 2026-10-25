@@ -1,3 +1,0 @@
-psql:src/adapters/persistence/workflow/metrics.sql:77: ERROR:  column "state" does not exist
-LINE 37: ... unknown FROM workflow_action_effect_states WHERE state = 'n...
-                                                              ^

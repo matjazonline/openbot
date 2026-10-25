@@ -8,9 +8,9 @@ readiness. The [cutover pilot](workflow-operations.md#deliberate-fresh-cutover) 
 the selected deployment.
 
 This is an executable test map, not a claim that naming a test means it passed. Commands, results,
-artifact identities and independent findings are retained in
-[phase10 TASK](../plan/workflow-foundation/phases/p10/docs/TASK.md) and
-[REVIEW](../plan/workflow-foundation/phases/p10/docs/REVIEW.md). Final acceptance is recorded there.
+artifact identities and independent findings are archived at release commit `19bab48` in
+[phase10 TASK](https://github.com/matjazonline/openbot/blob/19bab48c28c76a929f20a19f46e44bfb75c24cae/plan/workflow-foundation/phases/p10/docs/TASK.md) and
+[REVIEW](https://github.com/matjazonline/openbot/blob/19bab48c28c76a929f20a19f46e44bfb75c24cae/plan/workflow-foundation/phases/p10/docs/REVIEW.md). Final acceptance is recorded there; the completed plan directory was subsequently removed.
 
 | Plan10 scenario | Regression evidence |
 | --- | --- |
@@ -47,5 +47,5 @@ builds to a temporary file and compares bytes without mutating the tracked asset
 and pinned git revisions remain in force, and the production container remains non-root.
 
 The context graph could not be refreshed in this workspace: `graft`, indexed graph files and a
-graft connector were unavailable. Phase10 uses a retained scoped source/owner inventory instead;
+graft connector were unavailable. Phase10 used the scoped source/owner inventory archived with its review records instead;
 run `graft build` in an environment with the repository's graph tool before relying on graph spans.
