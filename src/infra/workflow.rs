@@ -54,11 +54,11 @@ pub const UNHANDLED_STEP_KINDS: &[&str] = &["memory.load", "memory.save"];
 
 /// The default and bounds of `WORKFLOW_WORKER_SLOTS`, and the database connections everything
 /// else `serve` runs needs (listener, HTTP headroom, task, delivery, notification and inbound
-/// workers, the intent worker, the schedule materializer). Each slot needs two: its claim or
-/// handler transaction and its lease renewal.
+/// workers, the intent worker, the schedule materializer and metrics sampler). Each slot needs
+/// two: its claim or handler transaction and its lease renewal.
 pub const DEFAULT_WORKFLOW_WORKER_SLOTS: usize = 2;
 pub const MAX_WORKFLOW_WORKER_SLOTS: usize = 16;
-pub const RESERVED_DATABASE_CONNECTIONS: u32 = 8;
+pub const RESERVED_DATABASE_CONNECTIONS: u32 = 9;
 
 const LEASE: Duration = Duration::from_secs(30);
 const POLL: Duration = Duration::from_secs(1);
@@ -436,10 +436,24 @@ impl WorkflowEngine {
             .with_refused_kinds(UNHANDLED_STEP_KINDS)
     }
 
-    /// Start the workflow worker slots, the message intent worker and the schedule materializer
+    /// Start workflow slots, the intent worker, schedule materializer and metrics sampler
     /// under `shutdown`. The caller keeps the handles and joins them on shutdown.
     pub fn spawn(&self, shutdown: &CancellationToken) -> Vec<(&'static str, JoinHandle<()>)> {
-        let mut handles = Vec::with_capacity(self.slots + 2);
+        let mut handles = Vec::with_capacity(self.slots + 3);
+        let metric_persistence = self.persistence.clone();
+        let monitoring = self.monitoring.clone();
+        let metric_shutdown = shutdown.clone();
+        handles.push((
+            "workflow metrics",
+            tokio::spawn(async move {
+                crate::application::workflow::metrics::run(
+                    &metric_persistence,
+                    monitoring.as_ref(),
+                    &metric_shutdown,
+                )
+                .await;
+            }),
+        ));
         for _ in 0..self.slots {
             let persistence = self.persistence.clone();
             let handler = self.handler.clone();
@@ -732,11 +746,7 @@ mod tests {
         let (_database, engine, _) = composed().await;
         let shutdown = CancellationToken::new();
         let handles = engine.spawn(&shutdown);
-        assert_eq!(
-            handles.len(),
-            3,
-            "one slot, the intent worker and the schedule materializer"
-        );
+        let task_count = handles.len();
         engine.intent_wakeups.notify_waiters();
         engine.worker_wakeups.notify_waiters();
         tokio::time::sleep(Duration::from_millis(50)).await;
@@ -747,6 +757,10 @@ mod tests {
                 .unwrap_or_else(|_| panic!("{name} did not stop"))
                 .unwrap();
         }
+        assert_eq!(
+            task_count, 4,
+            "one slot, metrics, the intent worker and the schedule materializer"
+        );
     }
 
     #[test]
@@ -760,8 +774,9 @@ mod tests {
             worker_slots(None, crate::infra::db::DEFAULT_DATABASE_MAX_CONNECTIONS).unwrap(),
             2
         );
-        assert_eq!(worker_slots(Some("4"), 16).unwrap(), 4);
-        assert!(worker_slots(Some("5"), 16).is_err());
+        assert_eq!(worker_slots(Some("4"), 17).unwrap(), 4);
+        assert!(worker_slots(Some("4"), 16).is_err());
+        assert!(worker_slots(Some("5"), 18).is_err());
         assert!(worker_slots(Some("0"), 64).is_err());
         assert!(worker_slots(Some("17"), 64).is_err());
         assert!(worker_slots(Some("two"), 64).is_err());

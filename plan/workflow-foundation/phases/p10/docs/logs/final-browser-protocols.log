@@ -1,0 +1,24 @@
+✔ library payload carries the agent's own fields and no retired runtime fields (1.256375ms)
+✔ accepted library writes show progress, prevent duplicate submits, and restore on failure (1.328166ms)
+✔ channel: snapshot before pane, OOB list, competing reads, reconnect and navigation (1936.811208ms)
+✔ channel: pane before first snapshot stays uninitialized and then hydrates (535.582583ms)
+✔ ordinary page links release every stream before navigation (2.527458ms)
+✔ HTMX/prevented clicks, modified clicks, downloads and new tabs keep streams (2.056959ms)
+✔ anchors and non-document protocols keep streams (0.946041ms)
+✔ native filter submissions release all streams on every navigation (5.122666ms)
+✔ cancelled, HTMX, dialog and other-window submissions retain streams (1.587458ms)
+✔ late attribution and reconnect keep both replies, composer and stream owner (1844.47775ms)
+✔ a reconnect backlog keeps an explicit 200-message live window and the composer (1552.859833ms)
+✔ a late body read cannot remove preserved steps after a cancel or navigation (3390.899958ms)
+✔ an actual SSE disconnect reconciles and preserves an unfinished note and disclosure (1551.884875ms)
+✔ a waiting parent refreshes a child badge on the child wakeup without reconnecting (1249.876208ms)
+✔ sample progress, failed request recovery and late navigation response use the requesting form (1900.289333ms)
+✔ actual sample textarea template preserves leading newlines for every raw JSON field (1057.522667ms)
+ℹ tests 16
+ℹ suites 0
+ℹ pass 16
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 6448.473583

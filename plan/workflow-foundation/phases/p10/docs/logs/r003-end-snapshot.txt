@@ -1,0 +1,8 @@
+base:   5d4aab1d44e209fbb46bae275be77c86cd3fef22
+digest: e8e20cf25f93466f1e09168fde58e2cc7d1c42dc6ab68d0fccefe5bc29077a43
+files:
+  docs/workflow-reconciliation-safety.md
+  plan/workflow-foundation/10-verification-and-cutover.md
+  src/adapters/persistence/workflow/http_reconciliation_integration_support.rs
+  src/adapters/persistence/workflow/http_reconciliation_integration_tests.rs
+  src/adapters/persistence/workflow/http_tests.rs

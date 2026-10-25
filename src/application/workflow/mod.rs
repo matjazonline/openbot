@@ -28,6 +28,7 @@ pub mod manual;
 pub mod mcp;
 pub mod message;
 pub mod message_admission;
+pub mod metrics;
 mod ports;
 pub mod provisioning;
 pub mod publication;

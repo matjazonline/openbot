@@ -17,8 +17,12 @@ use support::*;
 
 #[path = "http_authority_tests.rs"]
 mod authority_tests;
+#[path = "metrics_tests.rs"]
+mod metrics_tests;
 #[path = "reconciliation_fixture.rs"]
 pub(crate) mod reconciliation_fixture;
+#[path = "http_reconciliation_integration_tests.rs"]
+mod reconciliation_integration_tests;
 use super::action_outcome_support::*;
 
 #[tokio::test]

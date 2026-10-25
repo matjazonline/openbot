@@ -1,0 +1,11 @@
+{
+  "cluster": "/private/tmp/workflow10-ai7s7dqk",
+  "port": 55500,
+  "role": "workflow10",
+  "databases": [
+    "workflow10",
+    "workflow10_test"
+  ],
+  "status": "stopped and removed after final acceptance",
+  "browser_fixtures": "/private/tmp/workflow10-decision-browser (removed)"
+}

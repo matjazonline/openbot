@@ -42,9 +42,9 @@ fixtures for unscoped queue claims and whole-table assertions. Test poison batch
 ## Reconciliation stale-evidence and duplicate-candidate integration
 
 Required for Phase 10 acceptance, after phases 1–9. See the amended
-[SQL contract](CONTRACT-04.7-REMAINING-SQL-TESTS.md),
-[topology contract](CONTRACT-04.7-SQL-TOPOLOGY.md) and
-[A/C evidence](EVIDENCE-04.7-SQL-AC.md).
+[SQL contract](phases/p10/docs/logs/CONTRACT-04.7-REMAINING-SQL-TESTS.md),
+[topology contract](phases/p10/docs/logs/CONTRACT-04.7-SQL-TOPOLOGY.md) and
+[A/C evidence](phases/p10/docs/logs/EVIDENCE-04.7-SQL-AC.md).
 
 1. Refresh the owner/caller inventory across completed reconciliation, worker,
    recovery, operator and transport paths. Revisit earlier if a migration or writer
@@ -64,6 +64,9 @@ Required for Phase 10 acceptance, after phases 1–9. See the amended
 6. Retain C's adversarial SQL test. If later owners legitimately permit multiple
    live executions in a run, add an owner-created integration fixture and real
    competing-worker coverage.
+
+The current owner reassessment is recorded in [reconciliation safety](../../docs/workflow-reconciliation-safety.md).
+The linked historical contracts above were recovered verbatim from Git commit `2d608f2^`.
 
 Both the reassessment and behavioral integration tests are mandatory. Phase 10
 must not inherit fully-tested status from A's layered production-function coverage.

@@ -1,0 +1,143 @@
+                                                                                                 QUERY PLAN                                                                                                  
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Nested Loop  (cost=4846.57..4846.79 rows=1 width=32) (actual time=0.104..0.109 rows=1.00 loops=1)
+   Buffers: shared hit=5
+   CTE bounds
+     ->  Result  (cost=0.00..0.02 rows=1 width=16) (actual time=0.001..0.001 rows=1.00 loops=1)
+   CTE effects
+     ->  Aggregate  (cost=4705.55..4705.56 rows=1 width=8) (actual time=0.005..0.006 rows=1.00 loops=1)
+           ->  Subquery Scan on workflow_action_effect_states  (cost=68.50..4705.55 rows=3 width=0) (actual time=0.005..0.006 rows=0.00 loops=1)
+                 Filter: (workflow_action_effect_states.effect_state = ANY ('{needs_reconciliation,applied_without_result}'::text[]))
+                 ->  Hash Left Join  (cost=68.50..4702.17 rows=270 width=129) (actual time=0.005..0.006 rows=0.00 loops=1)
+                       Hash Cond: ((intent.company_id = message_action.company_id) AND (intent.id = message_action.invocation_id))
+                       ->  Hash Left Join  (cost=51.75..70.38 rows=270 width=128) (actual time=0.005..0.006 rows=0.00 loops=1)
+                             Hash Cond: ((intent.company_id = receipt.company_id) AND (intent.id = receipt.invocation_id))
+                             ->  Hash Left Join  (cost=33.50..50.71 rows=270 width=112) (actual time=0.005..0.005 rows=0.00 loops=1)
+                                   Hash Cond: ((intent.company_id = marker.company_id) AND (intent.id = marker.invocation_id))
+                                   ->  Hash Right Join  (cost=16.75..32.55 rows=270 width=64) (actual time=0.005..0.005 rows=0.00 loops=1)
+                                         Hash Cond: ((reconciliation.company_id = intent.company_id) AND (reconciliation.invocation_id = intent.id))
+                                         ->  Seq Scan on workflow_action_reconciliations reconciliation  (cost=0.00..13.80 rows=380 width=32) (never executed)
+                                         ->  Hash  (cost=12.70..12.70 rows=270 width=48) (actual time=0.001..0.001 rows=0.00 loops=1)
+                                               Buckets: 1024  Batches: 1  Memory Usage: 8kB
+                                               ->  Seq Scan on workflow_action_intents intent  (cost=0.00..12.70 rows=270 width=48) (actual time=0.001..0.001 rows=0.00 loops=1)
+                                   ->  Hash  (cost=12.70..12.70 rows=270 width=64) (never executed)
+                                         ->  Seq Scan on workflow_action_dispatches marker  (cost=0.00..12.70 rows=270 width=64) (never executed)
+                             ->  Hash  (cost=13.30..13.30 rows=330 width=32) (never executed)
+                                   ->  Seq Scan on workflow_action_receipts receipt  (cost=0.00..13.30 rows=330 width=32) (never executed)
+                       ->  Hash  (cost=12.70..12.70 rows=270 width=64) (never executed)
+                             ->  Seq Scan on workflow_message_actions message_action  (cost=0.00..12.70 rows=270 width=64) (never executed)
+                       SubPlan 3
+                         ->  Seq Scan on workflow_action_evidence evidence  (cost=0.00..11.62 rows=1 width=32) (never executed)
+                               Filter: (disposition = 'applied'::text)
+                       SubPlan 5
+                         ->  Seq Scan on workflow_action_evidence evidence_1  (cost=0.00..11.30 rows=130 width=32) (never executed)
+   ->  Nested Loop  (cost=92.65..92.84 rows=1 width=192) (actual time=0.036..0.038 rows=1.00 loops=1)
+         Buffers: shared hit=5
+         ->  Nested Loop  (cost=77.22..77.39 rows=1 width=168) (actual time=0.034..0.036 rows=1.00 loops=1)
+               Buffers: shared hit=5
+               ->  Nested Loop  (cost=77.22..77.36 rows=1 width=160) (actual time=0.028..0.030 rows=1.00 loops=1)
+                     Buffers: shared hit=5
+                     ->  Nested Loop  (cost=69.03..69.15 rows=1 width=152) (actual time=0.025..0.027 rows=1.00 loops=1)
+                           Buffers: shared hit=4
+                           ->  Nested Loop  (cost=52.65..52.75 rows=1 width=112) (actual time=0.023..0.024 rows=1.00 loops=1)
+                                 Buffers: shared hit=3
+                                 ->  Nested Loop  (cost=36.28..36.36 rows=1 width=104) (actual time=0.019..0.020 rows=1.00 loops=1)
+                                       Buffers: shared hit=2
+                                       ->  Nested Loop  (cost=19.60..19.66 rows=1 width=88) (actual time=0.014..0.015 rows=1.00 loops=1)
+                                             Buffers: shared hit=2
+                                             ->  Nested Loop  (cost=11.38..11.42 rows=1 width=40) (actual time=0.011..0.012 rows=1.00 loops=1)
+                                                   Buffers: shared hit=1
+                                                   ->  CTE Scan on bounds  (cost=0.00..0.02 rows=1 width=8) (actual time=0.003..0.003 rows=1.00 loops=1)
+                                                         Storage: Memory  Maximum Storage: 17kB
+                                                   ->  Aggregate  (cost=11.38..11.39 rows=1 width=32) (actual time=0.008..0.008 rows=1.00 loops=1)
+                                                         Buffers: shared hit=1
+                                                         ->  Nested Loop  (cost=4.16..11.32 rows=3 width=80) (actual time=0.006..0.007 rows=0.00 loops=1)
+                                                               Buffers: shared hit=1
+                                                               ->  CTE Scan on bounds bounds_1  (cost=0.00..0.02 rows=1 width=8) (actual time=0.000..0.000 rows=1.00 loops=1)
+                                                                     Storage: Memory  Maximum Storage: 17kB
+                                                               ->  Bitmap Heap Scan on workflow_runs  (cost=4.16..11.27 rows=3 width=72) (actual time=0.006..0.006 rows=0.00 loops=1)
+                                                                     Recheck Cond: (state = ANY ('{queued,running,waiting}'::text[]))
+                                                                     Buffers: shared hit=1
+                                                                     ->  Bitmap Index Scan on workflow_runs_open_by_channel  (cost=0.00..4.16 rows=3 width=0) (actual time=0.001..0.001 rows=0.00 loops=1)
+                                                                           Index Searches: 1
+                                                                           Buffers: shared hit=1
+                                             ->  Aggregate  (cost=8.22..8.23 rows=1 width=48) (actual time=0.002..0.003 rows=1.00 loops=1)
+                                                   Buffers: shared hit=1
+                                                   ->  Nested Loop  (cost=0.14..8.19 rows=1 width=56) (actual time=0.002..0.002 rows=0.00 loops=1)
+                                                         Buffers: shared hit=1
+                                                         ->  Index Scan using workflow_one_execution_job on background_tasks  (cost=0.14..8.16 rows=1 width=48) (actual time=0.002..0.002 rows=0.00 loops=1)
+                                                               Filter: (status = ANY ('{pending,processing}'::text[]))
+                                                               Index Searches: 1
+                                                               Buffers: shared hit=1
+                                                         ->  CTE Scan on bounds bounds_2  (cost=0.00..0.02 rows=1 width=8) (never executed)
+                                                               Storage: Memory  Maximum Storage: 17kB
+                                       ->  Aggregate  (cost=16.69..16.70 rows=1 width=16) (actual time=0.005..0.005 rows=1.00 loops=1)
+                                             ->  Nested Loop  (cost=0.00..15.64 rows=83 width=16) (actual time=0.004..0.004 rows=0.00 loops=1)
+                                                   Join Filter: (workflow_executions.completed_at >= bounds_3.since)
+                                                   ->  CTE Scan on bounds bounds_3  (cost=0.00..0.02 rows=1 width=8) (actual time=0.000..0.000 rows=1.00 loops=1)
+                                                         Storage: Memory  Maximum Storage: 17kB
+                                                   ->  Seq Scan on workflow_executions  (cost=0.00..12.50 rows=250 width=16) (actual time=0.003..0.003 rows=0.00 loops=1)
+                                 ->  Aggregate  (cost=16.37..16.38 rows=1 width=8) (actual time=0.003..0.003 rows=1.00 loops=1)
+                                       Buffers: shared hit=1
+                                       ->  Nested Loop  (cost=0.29..16.37 rows=1 width=0) (actual time=0.003..0.003 rows=0.00 loops=1)
+                                             Join Filter: (attempt.started_at >= bounds_4.since)
+                                             Buffers: shared hit=1
+                                             ->  Nested Loop  (cost=0.29..16.33 rows=1 width=8) (actual time=0.003..0.003 rows=0.00 loops=1)
+                                                   Buffers: shared hit=1
+                                                   ->  Index Scan using workflow_one_execution_job on background_tasks job  (cost=0.14..8.16 rows=1 width=16) (actual time=0.002..0.003 rows=0.00 loops=1)
+                                                         Index Searches: 1
+                                                         Buffers: shared hit=1
+                                                   ->  Index Scan using workflow_action_attempt_fence_key on task_attempts attempt  (cost=0.14..8.16 rows=1 width=24) (never executed)
+                                                         Index Cond: ((task_id = job.id) AND (attempt_number > 1))
+                                                         Index Searches: 0
+                                             ->  CTE Scan on bounds bounds_4  (cost=0.00..0.02 rows=1 width=8) (never executed)
+                                                   Storage: Memory  Maximum Storage: 17kB
+                           ->  Aggregate  (cost=16.37..16.38 rows=1 width=40) (actual time=0.002..0.002 rows=1.00 loops=1)
+                                 Buffers: shared hit=1
+                                 ->  Nested Loop  (cost=0.29..16.36 rows=1 width=16) (actual time=0.001..0.002 rows=0.00 loops=1)
+                                       Buffers: shared hit=1
+                                       ->  Nested Loop  (cost=0.29..16.33 rows=1 width=8) (actual time=0.001..0.001 rows=0.00 loops=1)
+                                             Buffers: shared hit=1
+                                             ->  Index Scan using workflow_wait_one_active on workflow_waits wait  (cost=0.14..8.16 rows=1 width=32) (actual time=0.001..0.001 rows=0.00 loops=1)
+                                                   Index Searches: 1
+                                                   Buffers: shared hit=1
+                                             ->  Index Scan using workflow_decisions_pkey on workflow_decisions decision  (cost=0.14..8.16 rows=1 width=40) (never executed)
+                                                   Index Cond: (company_id = wait.company_id)
+                                                   Filter: (wait.id = wait_id)
+                                                   Index Searches: 0
+                                       ->  CTE Scan on bounds bounds_5  (cost=0.00..0.02 rows=1 width=8) (never executed)
+                                             Storage: Memory  Maximum Storage: 17kB
+                     ->  Aggregate  (cost=8.19..8.20 rows=1 width=8) (actual time=0.002..0.003 rows=1.00 loops=1)
+                           Buffers: shared hit=1
+                           ->  Nested Loop  (cost=0.14..8.19 rows=1 width=0) (actual time=0.002..0.002 rows=0.00 loops=1)
+                                 Join Filter: (workflow_waits.deadline <= bounds_6.now)
+                                 Buffers: shared hit=1
+                                 ->  Index Scan using workflow_wait_one_active on workflow_waits  (cost=0.14..8.16 rows=1 width=8) (actual time=0.002..0.002 rows=0.00 loops=1)
+                                       Index Searches: 1
+                                       Buffers: shared hit=1
+                                 ->  CTE Scan on bounds bounds_6  (cost=0.00..0.02 rows=1 width=8) (never executed)
+                                       Storage: Memory  Maximum Storage: 17kB
+               ->  CTE Scan on effects  (cost=0.00..0.02 rows=1 width=8) (actual time=0.006..0.006 rows=1.00 loops=1)
+                     Storage: Memory  Maximum Storage: 17kB
+         ->  Aggregate  (cost=15.43..15.44 rows=1 width=24) (actual time=0.001..0.002 rows=1.00 loops=1)
+               ->  Nested Loop  (cost=0.00..13.87 rows=78 width=56) (actual time=0.001..0.001 rows=0.00 loops=1)
+                     Join Filter: ((message_deliveries.status = 'outcome_unknown'::text) OR (message_deliveries.delivered_at >= bounds_7.since) OR (message_deliveries.updated_at >= bounds_7.since))
+                     ->  CTE Scan on bounds bounds_7  (cost=0.00..0.02 rows=1 width=8) (actual time=0.000..0.000 rows=1.00 loops=1)
+                           Storage: Memory  Maximum Storage: 17kB
+                     ->  Seq Scan on message_deliveries  (cost=0.00..11.40 rows=140 width=48) (actual time=0.001..0.001 rows=0.00 loops=1)
+   ->  Aggregate  (cost=48.34..48.35 rows=1 width=136) (actual time=0.002..0.002 rows=1.00 loops=1)
+         ->  Hash Left Join  (cost=26.78..43.08 rows=84 width=88) (actual time=0.001..0.001 rows=0.00 loops=1)
+               Hash Cond: ((call.company_id = price.company_id) AND (call.provider = price.provider) AND (call.model = price.model))
+               ->  Nested Loop  (cost=0.00..15.64 rows=84 width=136) (actual time=0.001..0.001 rows=0.00 loops=1)
+                     Join Filter: ((call.settled_at IS NULL) OR (call.requested_at >= bounds_8.since))
+                     ->  CTE Scan on bounds bounds_8  (cost=0.00..0.02 rows=1 width=8) (actual time=0.000..0.000 rows=1.00 loops=1)
+                           Storage: Memory  Maximum Storage: 17kB
+                     ->  Seq Scan on model_usage_calls call  (cost=0.00..12.50 rows=250 width=128) (actual time=0.001..0.001 rows=0.00 loops=1)
+               ->  Hash  (cost=16.10..16.10 rows=610 width=96) (never executed)
+                     ->  Seq Scan on model_prices price  (cost=0.00..16.10 rows=610 width=96) (never executed)
+ Planning:
+   Buffers: shared hit=3027
+ Planning Time: 5.450 ms
+ Execution Time: 0.858 ms
+(139 rows)
+

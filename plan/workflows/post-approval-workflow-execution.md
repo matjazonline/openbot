@@ -2,6 +2,8 @@
 > when needed. Do not add data backfills, dual reads/writes, legacy decoders, compatibility shims,
 > or staged rollouts for existing data.
 
+> Historical proposal: execution architecture is superseded by [Workflow foundation](../workflow-foundation/README.md). Do not implement an additional SOP, post-approval or workflow-library engine from this document. Retained product ideas require a separately scoped follow-up.
+
 To standardize post-approval executions into a configurable workflow engine where steps and post-approval task types can be declared and executed independently of the agent, you can implement a **Declarative Step & Action Dispatcher** pattern.
 This separates the system into four decoupled layers:
 1. **Workflow & Step Definitions** (What runs next and under what conditions)

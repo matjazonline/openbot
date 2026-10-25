@@ -5,10 +5,10 @@
 > or staged rollouts for existing data.
 
 - Authority: /Users/mac02/dev/openbot/plan/workflow-foundation/COORDINATION.md
-- Writer: phase p09 resumed root session of 2026-10-25 (Codex; user confirms Astra/high),
-  worktree /Users/mac02/dev/openbot. Explicit r13 handoff from the stopped p09 Claude session;
-  p08 remains paused and its resources/records are preserved.
-- Revision: 14 (r14: 2026-10-25, p09 final acceptance/status closure only; requirements and notice revisions unchanged; r13: 2026-10-25, stopped-session ownership transferred to resumed p09 root;
+- Writer: phase p10 root session of 2026-10-25 (Codex; user confirms Astra/high),
+  worktree /Users/mac02/dev/openbot. Same root transfers ownership from completed p09 to p10;
+  earlier phase records/resources are preserved.
+- Revision: 16 (r16: 2026-10-25, p10 accepted locally after final R005 and full gates; status closure only, notice requirements unchanged; r15: 2026-10-25, p10 registered and ownership transferred; p08/p09 committed in 5d4aab1; existing requirements/notices unchanged; r14: 2026-10-25, p09 final acceptance/status closure only; requirements and notice revisions unchanged; r13: 2026-10-25, stopped-session ownership transferred to resumed p09 root;
   requirements and notices unchanged; r12: 2026-10-25, p09 response to WF-C003 r1: admin UI accepted in p09 B1b, and
   the reuse wording is read against P07-D2 rev 4 §D2.2; r11: 2026-10-24, writer handoff to p09;
   p09 registered; p09 acknowledgements of WF-C002 r1, WF-C003 r1, WF-C004 r2 and WF-C005 r1)
@@ -30,6 +30,7 @@ history at `921079d`).
 | p07 | root session 2026-10-22 (implement-opus-reviewed-2_2) — complete, committed `bd2ef36` | /Users/mac02/dev/openbot (branch `workflows`) | plan/workflow-foundation/phases/p07/docs/TASK.md, HANDOFF.md |
 | p08 | root session 2026-10-22 (implement-opus-reviewed-2_2), started at `da86871`; every batch accepted in phase, phase gate checks owed (user deferred), not committed | /Users/mac02/dev/openbot (branch `workflows`) | plan/workflow-foundation/phases/p08/docs/TASK.md, HANDOFF.md |
 | p09 | resumed root session 2026-10-25 (implement-astra-reviewed-2.2), started at `da86871` + p08 artifact `00ec454f…6829`; complete and accepted in phase, final R020 PASS, not committed | /Users/mac02/dev/openbot (branch `workflows`) | plan/workflow-foundation/phases/p09/docs/TASK.md, HANDOFF.md |
+| p10 | root session 2026-10-25 (implement-astra-reviewed-2.2), starting `5d4aab1`; complete and accepted locally, final R005 PASS, uncommitted | /Users/mac02/dev/openbot (branch `workflows`) | plan/workflow-foundation/phases/p10/docs/TASK.md, HANDOFF.md |
 
 ## Cross-phase notices
 
@@ -179,3 +180,29 @@ p09 accepted at artifact `76d100c63dd8735808ebd7b0c84ee0cbbb4e7932818e28575dc55f
 HEAD `da868710d3b235d49856e3e481f8f3735f6b3e56`; see p09 REVIEW/HANDOFF and final evidence.
 Full required Rust/database/stack/lease gates passed; pre-existing CSS drift DV-P09-8 retained.
 This does not change p08's recorded status or declare whole-plan integration complete.
+
+## p10 startup — r15
+
+p08/p09 implementation and records are committed/pushed in `5d4aab1`. This corrects only
+commit status in the historical directory rows, not independent phase acceptance status.
+p10 acknowledges WF-C004 r2 and preserves WF-C001r2/C002r1/C003r1/C005r1 contracts while
+verifying combined integration. No production deployment or database reset target is authorized.
+
+## p10 completion — r16
+
+p10 accepted in the current worktree at artifact
+`37915f1301f66f04c5fff3f2a2ea28bc1fb98649eeb7997f39e00b61b4661ecb`, base/HEAD `5d4aab1`.
+Independent final review WF-P10-R005 PASS; all F001–F003 closed. Full integrated library gate
+passed 2,311 tests at stock 2 MiB (three existing developer/optional DNS ignores); binary5,
+lease130+timing, browser17, migrations/SQLx/offline/Clippy/fmt/CSS/security boundaries passed.
+This supplies the combined verification of the integrated phases01–10 implementation; prior
+phase-specific historical records remain unchanged. p10 is not committed/pushed or deployed.
+
+WF-C004r2 remains enforced with no exemption; guarded-pool regression and DB-backed suite pass.
+Inherited WF-C001r2/C002r1/C003r1/C005r1 interfaces remain covered by the full integration suites;
+no contracts or notice revisions changed. Metrics add one accounted pool connection, not a new
+workflow authority. Exact historical public episode INSERT diagnostic remains unexecuted under
+the independently reviewed P10-D1r1 obstruction; C adversarial public-trigger and behavioral
+replay/effect integration coverage remain. Graft refresh unavailable in this environment.
+Only phase10-owned PG55500 and browser fixtures were stopped/removed after review. See p10
+TASK/REVIEW/HANDOFF for exact commands, failures/corrections, resources and limitations.

@@ -1,0 +1,30 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling mail_agents v0.1.0 (/Users/mac02/dev/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 26s
+     Running unittests src/lib.rs (target/debug/deps/mail_agents-dea38a64a93bbcd9)
+
+running 6 tests
+test infra::workflow::tests::worker_slots_respect_the_pool ... ok
+test application::workflow::metrics::tests::workflow_metrics_shutdown_drops_pending_read_and_joins ... ok
+test application::workflow::metrics::tests::workflow_metrics_failure_retains_last_success_and_empty_success_clears ... ok
+test adapters::persistence::workflow::tests::http_tests::metrics_tests::workflow_metrics_real_owners_and_bounded_lock_failure ... ok
+test adapters::persistence::workflow::tests::http_tests::reconciliation_integration_tests::workflow_cutover_http_historical_evidence_never_authorizes_an_extra_effect ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::reviewed_delivery_tests::workflow_cutover_reviewed_email_delivers_exact_accepted_artifact ... FAILED
+
+failures:
+
+---- adapters::persistence::workflow::tests::message_tests::ingress_tests::reviewed_delivery_tests::workflow_cutover_reviewed_email_delivers_exact_accepted_artifact stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::ingress_tests::reviewed_delivery_tests::workflow_cutover_reviewed_email_delivers_exact_accepted_artifact' (11969307) panicked at src/adapters/persistence/workflow/reviewed_delivery_tests.rs:159:5:
+assertion `left == right` failed
+  left: Some("<reviewed@partner.test>")
+ right: Some("reviewed@partner.test")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::workflow::tests::message_tests::ingress_tests::reviewed_delivery_tests::workflow_cutover_reviewed_email_delivers_exact_accepted_artifact
+
+test result: FAILED. 5 passed; 1 failed; 0 ignored; 0 measured; 2308 filtered out; finished in 12.35s
+
+error: test failed, to rerun pass `--lib`

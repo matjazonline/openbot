@@ -1,0 +1,1395 @@
+[
+  {
+    "file": "src/adapters/persistence/workflow/completion_job.rs",
+    "line": 30,
+    "test_named": false,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET status='completed',updated_at=clock_timestamp() WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 AND queue_kind='workflow' AND status='pending' AND worker_id IS NULL AND execution_generation IS NULL AND lock_expires_at IS NULL\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/completion_job.rs",
+    "line": 43,
+    "test_named": false,
+    "statement": "UPDATE task_attempts",
+    "crux": "UPDATE task_attempts SET status='completed',stop_reason='completed',finished_at=clock_timestamp() WHERE task_id=$1 AND attempt_number=$2 AND worker_id=$3 AND execution_generation=$4 AND status='processing'\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/completion_job.rs",
+    "line": 57,
+    "test_named": false,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET status='completed',updated_at=clock_timestamp(),worker_id=NULL,execution_generation=NULL,locked_at=NULL,lock_expires_at=NULL WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 AND queue_kind='workflow' AND status='processing' AND worker_id=$4 AND execution_generat"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/action_reconciliation_eligibility_invariant_tests.rs",
+    "line": 22,
+    "test_named": true,
+    "statement": "UPDATE workflow_executions",
+    "crux": "UPDATE workflow_executions SET {assignment} WHERE company_id=$1 AND run_id=$2 AND id=$3\""
+  },
+  {
+    "file": "src/adapters/persistence/workflow/action_reconciliation_eligibility_invariant_tests.rs",
+    "line": 60,
+    "test_named": true,
+    "statement": "INSERT INTO workflow_executions",
+    "crux": "INSERT INTO workflow_executions(company_id,run_id,id,step_id,activation) SELECT company_id,run_id,gen_random_uuid(),step_id,activation+1 FROM workflow_executions WHERE id=$1 RETURNING id\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/action_reconciliation_eligibility_invariant_tests.rs",
+    "line": 65,
+    "test_named": true,
+    "statement": "UPDATE workflow_executions",
+    "crux": "UPDATE workflow_executions SET committed_route='success',route_target=CASE WHEN $2::uuid IS NULL THEN '$end' ELSE step_id END,successor_execution_id=$2 WHERE id=$1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/action_reconciliation_eligibility_invariant_tests.rs",
+    "line": 127,
+    "test_named": true,
+    "statement": "UPDATE workflow_executions",
+    "crux": "UPDATE workflow_executions SET {assignment} WHERE id=$1\""
+  },
+  {
+    "file": "src/adapters/persistence/workflow/action_reconciliation_eligibility_invariant_tests.rs",
+    "line": 384,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET retry_count=max_retries WHERE id=$1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/action_reconciliation_eligibility_remaining_tests.rs",
+    "line": 209,
+    "test_named": true,
+    "statement": "INSERT INTO workflow_executions",
+    "crux": "INSERT INTO workflow_executions (company_id,run_id,id,step_id,activation) VALUES ($1,$2,$3,'start',2)\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/action_reconciliation_eligibility_remaining_tests.rs",
+    "line": 211,
+    "test_named": true,
+    "statement": "INSERT INTO background_tasks",
+    "crux": "INSERT INTO background_tasks (id,company_id,channel_id,thread_id,correlation_id,task_type,payload,queue_kind,workflow_execution_id)"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/action_reconciliation_eligibility_remaining_tests.rs",
+    "line": 311,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET {assignment} WHERE id=$1\""
+  },
+  {
+    "file": "src/adapters/persistence/workflow/action_dispatch_tests.rs",
+    "line": 405,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET locked_at=clock_timestamp()-interval '10 seconds', lock_expires_at=clock_timestamp()-interval '1 second' WHERE company_id=$1\","
+  },
+  {
+    "file": "src/adapters/persistence/workflow/action_dispatch_tests.rs",
+    "line": 450,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET locked_at=clock_timestamp()-interval '10 seconds', lock_expires_at=clock_timestamp()-interval '1 second' WHERE id=$1\").bind(request.fence.scope.job.0).execute(&mut *tx).await.unwrap();"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/batch_commit.rs",
+    "line": 33,
+    "test_named": false,
+    "statement": "UPDATE workflow_executions",
+    "crux": "UPDATE workflow_executions SET committed_output = $4, completed_at = clock_timestamp(), \\"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/batch_commit.rs",
+    "line": 80,
+    "test_named": false,
+    "statement": "INSERT INTO workflow_executions",
+    "crux": "INSERT INTO workflow_executions (company_id,run_id,id,step_id,activation) VALUES ($1,$2,$3,$4,$5)\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/batch_commit.rs",
+    "line": 84,
+    "test_named": false,
+    "statement": "INSERT INTO background_tasks",
+    "crux": "INSERT INTO background_tasks (id,company_id,channel_id,thread_id,correlation_id,task_type,payload,queue_kind,workflow_execution_id) \\"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/message_receipts.rs",
+    "line": 311,
+    "test_named": false,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET status='failed',updated_at=clock_timestamp() WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 AND queue_kind='workflow' AND status='completed'\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/message_recovery_tests.rs",
+    "line": 10,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET run_at=clock_timestamp() WHERE id=$1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/child_waits.rs",
+    "line": 270,
+    "test_named": false,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET status='failed',updated_at=clock_timestamp() WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 AND queue_kind='workflow' AND status='completed'\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/action_reconciliation_audit_tests.rs",
+    "line": 159,
+    "test_named": true,
+    "statement": "INSERT INTO workflow_action_evidence_commands",
+    "crux": "INSERT INTO workflow_action_evidence_commands SELECT (jsonb_populate_record(NULL::workflow_action_evidence_commands,to_jsonb(command)||$1::jsonb)).* FROM workflow_action_evidence_commands AS command LIMIT 1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/action_reconciliation_audit_tests.rs",
+    "line": 196,
+    "test_named": true,
+    "statement": "INSERT INTO workflow_action_evidence_commands",
+    "crux": "INSERT INTO workflow_action_evidence_commands SELECT (jsonb_populate_record(NULL::workflow_action_evidence_commands,to_jsonb(command)||$1::jsonb)).* FROM workflow_action_evidence_commands AS command LIMIT 1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/run_schema_tests.rs",
+    "line": 33,
+    "test_named": true,
+    "statement": "INSERT INTO workflow_executions",
+    "crux": "INSERT INTO workflow_executions (company_id, run_id, id, step_id, activation) VALUES ($1, $2, $3, 'entry', 1)\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/maintenance.rs",
+    "line": 69,
+    "test_named": false,
+    "statement": "UPDATE task_attempts",
+    "crux": "UPDATE task_attempts AS attempt SET status='failed',finished_at=clock_timestamp(),workflow_failure_class='terminal',workflow_failure_code=$3,workflow_retry_safety='unknown',workflow_retirement=$4,stop_reason=$5 FROM background_tasks AS job JOIN workflow_executions AS execution ON execution.company_i"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/maintenance.rs",
+    "line": 71,
+    "test_named": false,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks AS job SET status='failed',retry_count=retry_count+1,worker_id=NULL,execution_generation=NULL,locked_at=NULL,lock_expires_at=NULL,updated_at=clock_timestamp() FROM workflow_executions AS execution WHERE execution.company_id=$1 AND execution.run_id=$2 AND job.company_id=execut"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/maintenance.rs",
+    "line": 76,
+    "test_named": false,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks AS job SET status='failed',updated_at=clock_timestamp() FROM workflow_executions AS execution WHERE execution.company_id=$1 AND execution.run_id=$2 AND job.company_id=execution.company_id AND job.workflow_execution_id=execution.id AND job.queue_kind='workflow' AND job.status="
+  },
+  {
+    "file": "src/adapters/persistence/workflow/action_reconciliation_refusal_sql_tests.rs",
+    "line": 17,
+    "test_named": true,
+    "statement": "INSERT INTO workflow_action_evidence_commands",
+    "crux": "INSERT INTO workflow_action_evidence_commands(company_id,command_key,id,run_id,"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/action_approval_sql_tests.rs",
+    "line": 193,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET status='pending',continuation_count=continuation_count+$2 WHERE id=$1\","
+  },
+  {
+    "file": "src/adapters/persistence/workflow/control_revision_tests.rs",
+    "line": 35,
+    "test_named": true,
+    "statement": "UPDATE workflow_executions",
+    "crux": "UPDATE workflow_executions SET step_id=step_id WHERE id=$1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/control_revision_tests.rs",
+    "line": 40,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET status=status WHERE id=$1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/control_revision_tests.rs",
+    "line": 114,
+    "test_named": true,
+    "statement": "UPDATE task_attempts",
+    "crux": "UPDATE task_attempts SET status='failed',finished_at=clock_timestamp(),workflow_failure_class='terminal',workflow_failure_code='workflow.cancelled',workflow_retry_safety='unknown',workflow_retirement='cancel',stop_reason=NULL WHERE task_id=$1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/control_revision_tests.rs",
+    "line": 118,
+    "test_named": true,
+    "statement": "UPDATE task_attempts",
+    "crux": "UPDATE task_attempts SET execution_generation=gen_random_uuid() WHERE task_id=$1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/control_revision_tests.rs",
+    "line": 120,
+    "test_named": true,
+    "statement": "UPDATE task_attempts",
+    "crux": "UPDATE task_attempts SET worker_id=gen_random_uuid() WHERE task_id=$1\"),"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/control_revision_tests.rs",
+    "line": 122,
+    "test_named": true,
+    "statement": "UPDATE task_attempts",
+    "crux": "UPDATE task_attempts SET attempt_number=attempt_number+1 WHERE task_id=$1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/control_revision_tests.rs",
+    "line": 133,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET status=$2,retry_count=retry_count+$3,worker_id=NULL,execution_generation=NULL,locked_at=NULL,lock_expires_at=NULL,run_at=clock_timestamp()+interval '1 hour' WHERE id=$1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/control_revision_tests.rs",
+    "line": 144,
+    "test_named": true,
+    "statement": "INSERT INTO workflow_executions",
+    "crux": "INSERT INTO workflow_executions(company_id,run_id,id,step_id,activation) SELECT company_id,run_id,$2,'next',activation+1 FROM workflow_executions WHERE id=$1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/control_revision_tests.rs",
+    "line": 146,
+    "test_named": true,
+    "statement": "UPDATE workflow_executions",
+    "crux": "UPDATE workflow_executions SET completed_at=clock_timestamp(),committed_output='null'::jsonb,committed_route='final_error',route_target='next',successor_execution_id=$2 WHERE id=$1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/control_revision_tests.rs",
+    "line": 200,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET status='pending' WHERE id=$1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/control_revision_tests.rs",
+    "line": 226,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET lock_expires_at=clock_timestamp()+interval '400 milliseconds' WHERE id=$1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/job_association_tests.rs",
+    "line": 18,
+    "test_named": true,
+    "statement": "INSERT INTO background_tasks",
+    "crux": "INSERT INTO background_tasks (id, company_id, channel_id, thread_id, correlation_id, task_type, queue_kind, workflow_execution_id, payload) VALUES ($1, $2, $3, $4, $1, 'workflow_execution', 'workflow', $5, jsonb_build_object('version', 1, 'execution_id', $5::uuid::text))\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/job_association_tests.rs",
+    "line": 79,
+    "test_named": true,
+    "statement": "INSERT INTO task_attempts",
+    "crux": "INSERT INTO task_attempts (id, task_id, attempt_number, status, execution_generation, worker_id, machine_id) VALUES (gen_random_uuid(), $1, 1, 'processing', gen_random_uuid(), gen_random_uuid(), 'association-test')\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/job_association_tests.rs",
+    "line": 92,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET channel_id = $2, thread_id = $3 WHERE id = $1\","
+  },
+  {
+    "file": "src/adapters/persistence/workflow/job_association_tests.rs",
+    "line": 111,
+    "test_named": true,
+    "statement": "INSERT INTO background_tasks",
+    "crux": "INSERT INTO background_tasks (id, company_id, correlation_id, task_type) VALUES (gen_random_uuid(), $1, gen_random_uuid(), 'inbound_email')\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/job_association_tests.rs",
+    "line": 137,
+    "test_named": true,
+    "statement": "UPDATE workflow_executions",
+    "crux": "UPDATE workflow_executions SET {field} = $2 WHERE id = $1\""
+  },
+  {
+    "file": "src/adapters/persistence/workflow/job_association_tests.rs",
+    "line": 148,
+    "test_named": true,
+    "statement": "UPDATE workflow_executions",
+    "crux": "UPDATE workflow_executions SET {assignment} WHERE id = $1\""
+  },
+  {
+    "file": "src/adapters/persistence/workflow/job_association_tests.rs",
+    "line": 252,
+    "test_named": true,
+    "statement": "DELETE FROM background_tasks",
+    "crux": "DELETE FROM background_tasks WHERE id = $1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/job_association_tests.rs",
+    "line": 308,
+    "test_named": true,
+    "statement": "DELETE FROM background_tasks",
+    "crux": "DELETE FROM background_tasks WHERE id = $1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/child_output_tests.rs",
+    "line": 91,
+    "test_named": true,
+    "statement": "UPDATE workflow_executions",
+    "crux": "UPDATE workflow_executions SET committed_output='\\\"far more than eight\\\"'::jsonb WHERE run_id=$1 AND completed_at IS NOT NULL\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/lease_tests.rs",
+    "line": 371,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET locked_at=clock_timestamp()-interval '10 seconds',lock_expires_at=clock_timestamp()-interval '1 second' WHERE id=$1\").bind(scope.job.0).execute(f.persistence().pool()).await.unwrap();"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/lease_tests.rs",
+    "line": 375,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET run_at=clock_timestamp()-interval '1 second' WHERE id=$1\","
+  },
+  {
+    "file": "src/adapters/persistence/workflow/pending_recovery.rs",
+    "line": 106,
+    "test_named": false,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET status='failed',updated_at=clock_timestamp() WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 AND queue_kind='workflow' AND status='pending' AND worker_id IS NULL AND execution_generation IS NULL AND lock_expires_at IS NULL\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/wakeup_parent_link_tests.rs",
+    "line": 24,
+    "test_named": true,
+    "statement": "DELETE FROM background_tasks",
+    "crux": "DELETE FROM background_tasks WHERE id=$1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/wakeup_parent_link_tests.rs",
+    "line": 29,
+    "test_named": true,
+    "statement": "DELETE FROM workflow_executions",
+    "crux": "DELETE FROM workflow_executions WHERE id=$1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/wakeup_parent_link_tests.rs",
+    "line": 39,
+    "test_named": true,
+    "statement": "DELETE FROM background_tasks",
+    "crux": "DELETE FROM background_tasks WHERE id=$1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/wakeup_parent_link_tests.rs",
+    "line": 64,
+    "test_named": true,
+    "statement": "DELETE FROM background_tasks",
+    "crux": "DELETE FROM background_tasks WHERE id=$1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/activation_tests.rs",
+    "line": 106,
+    "test_named": true,
+    "statement": "INSERT INTO task_attempts",
+    "crux": "INSERT INTO task_attempts (id, task_id, attempt_number, status, execution_generation, worker_id, machine_id) VALUES (gen_random_uuid(), $1, $2, 'failed', gen_random_uuid(), gen_random_uuid(), 'activation-test')\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/activation_tests.rs",
+    "line": 139,
+    "test_named": true,
+    "statement": "INSERT INTO workflow_executions",
+    "crux": "INSERT INTO workflow_executions (company_id, run_id, id, step_id, activation) VALUES ($1,$2,$3,$4,$5)\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/activation_tests.rs",
+    "line": 142,
+    "test_named": true,
+    "statement": "INSERT INTO background_tasks",
+    "crux": "INSERT INTO background_tasks (id,company_id,correlation_id,task_type,payload,queue_kind,workflow_execution_id) VALUES ($1,$2,gen_random_uuid(),'workflow_execution',$3,'workflow',$4)\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/activation_tests.rs",
+    "line": 149,
+    "test_named": true,
+    "statement": "UPDATE workflow_executions",
+    "crux": "UPDATE workflow_executions SET committed_output = $2, completed_at = clock_timestamp() WHERE id = $1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/activation_tests.rs",
+    "line": 229,
+    "test_named": true,
+    "statement": "UPDATE workflow_executions",
+    "crux": "UPDATE workflow_executions SET frozen_inputs = '{}' WHERE id = $1\","
+  },
+  {
+    "file": "src/adapters/persistence/workflow/activation_tests.rs",
+    "line": 230,
+    "test_named": true,
+    "statement": "UPDATE workflow_executions",
+    "crux": "UPDATE workflow_executions SET activated_at = NULL, frozen_inputs = NULL WHERE id = $1\","
+  },
+  {
+    "file": "src/adapters/persistence/workflow/activation_tests.rs",
+    "line": 231,
+    "test_named": true,
+    "statement": "UPDATE workflow_executions",
+    "crux": "UPDATE workflow_executions SET committed_output = '1' WHERE id = $1\","
+  },
+  {
+    "file": "src/adapters/persistence/workflow/activation_tests.rs",
+    "line": 232,
+    "test_named": true,
+    "statement": "UPDATE workflow_executions",
+    "crux": "UPDATE workflow_executions SET completed_at = NULL, committed_output = NULL WHERE id = $1\","
+  },
+  {
+    "file": "src/adapters/persistence/workflow/activation_tests.rs",
+    "line": 233,
+    "test_named": true,
+    "statement": "UPDATE workflow_executions",
+    "crux": "UPDATE workflow_executions SET activation = 2 WHERE id = $1\","
+  },
+  {
+    "file": "src/adapters/persistence/workflow/activation_tests.rs",
+    "line": 245,
+    "test_named": true,
+    "statement": "UPDATE workflow_executions",
+    "crux": "UPDATE workflow_executions SET frozen_inputs = '{}' WHERE id = $1\","
+  },
+  {
+    "file": "src/adapters/persistence/workflow/activation_tests.rs",
+    "line": 246,
+    "test_named": true,
+    "statement": "UPDATE workflow_executions",
+    "crux": "UPDATE workflow_executions SET activated_at = clock_timestamp(), frozen_inputs = 'null' WHERE id = $1\","
+  },
+  {
+    "file": "src/adapters/persistence/workflow/activation_tests.rs",
+    "line": 247,
+    "test_named": true,
+    "statement": "UPDATE workflow_executions",
+    "crux": "UPDATE workflow_executions SET completed_at = clock_timestamp(), committed_output = 'null' WHERE id = $1\","
+  },
+  {
+    "file": "src/adapters/persistence/workflow/activation_tests.rs",
+    "line": 248,
+    "test_named": true,
+    "statement": "UPDATE workflow_executions",
+    "crux": "UPDATE workflow_executions SET activated_at = clock_timestamp(), frozen_inputs = jsonb_build_object('value',repeat('x',1048576)) WHERE id = $1\","
+  },
+  {
+    "file": "src/adapters/persistence/workflow/activation_tests.rs",
+    "line": 258,
+    "test_named": true,
+    "statement": "INSERT INTO workflow_executions",
+    "crux": "INSERT INTO workflow_executions(company_id,run_id,id,step_id,activation) VALUES($1,$2,gen_random_uuid(),'different',1)\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/control_tests.rs",
+    "line": 184,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET max_retries=1 WHERE id=$1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/maintenance_tests.rs",
+    "line": 78,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET run_at=clock_timestamp()+interval '1 day' WHERE id=$1\","
+  },
+  {
+    "file": "src/adapters/persistence/workflow/maintenance_tests.rs",
+    "line": 105,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET max_retries=1 WHERE id=$1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/maintenance_tests.rs",
+    "line": 234,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET lock_expires_at=clock_timestamp()+interval '150 milliseconds' WHERE id=$1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/recovery.rs",
+    "line": 174,
+    "test_named": false,
+    "statement": "UPDATE task_attempts",
+    "crux": "UPDATE task_attempts SET status='failed',finished_at=clock_timestamp(),workflow_failure_class=$5,workflow_failure_code=$6,workflow_retry_safety=$7,workflow_retirement=$8,stop_reason=$9 WHERE task_id=$1 AND attempt_number=$2 AND execution_generation=$3 AND worker_id=$4 AND status='processing'\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/recovery.rs",
+    "line": 213,
+    "test_named": false,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET status=$8,retry_count=retry_count+1,run_at=COALESCE($9,run_at),worker_id=NULL,execution_generation=NULL,locked_at=NULL,lock_expires_at=NULL,updated_at=clock_timestamp() WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 AND queue_kind='workflow' AND status='proces"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/recovery.rs",
+    "line": 358,
+    "test_named": false,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET status='failed',updated_at=clock_timestamp() WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 AND queue_kind='workflow' AND status='completed'\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/child_schema_tests.rs",
+    "line": 69,
+    "test_named": true,
+    "statement": "INSERT INTO workflow_executions",
+    "crux": "INSERT INTO workflow_executions(company_id,run_id,id,step_id,activation) VALUES($1,$2,$3,'start',2)\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/fairness_tests.rs",
+    "line": 238,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET created_at=(SELECT horizon FROM workflow_poll_companies WHERE worker_id=$2 AND company_id=$3) WHERE id=$1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/fairness_tests.rs",
+    "line": 337,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET run_at=clock_timestamp()+interval '1 hour' WHERE id=$1\","
+  },
+  {
+    "file": "src/adapters/persistence/workflow/pending_recovery_tests.rs",
+    "line": 107,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET retry_count=max_retries WHERE id=$1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/batch_tests.rs",
+    "line": 251,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET run_at = clock_timestamp() + interval '1 hour'\","
+  },
+  {
+    "file": "src/adapters/persistence/workflow/batch_tests.rs",
+    "line": 252,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET status = 'processing', worker_id = gen_random_uuid(), execution_generation = gen_random_uuid(), locked_at = clock_timestamp(), lock_expires_at = clock_timestamp() + interval '1 hour'\","
+  },
+  {
+    "file": "src/adapters/persistence/workflow/batch_tests.rs",
+    "line": 392,
+    "test_named": true,
+    "statement": "UPDATE workflow_executions",
+    "crux": "UPDATE workflow_executions SET frozen_choice = 'no' WHERE step_id = 'rule'\","
+  },
+  {
+    "file": "src/adapters/persistence/workflow/batch_tests.rs",
+    "line": 393,
+    "test_named": true,
+    "statement": "UPDATE workflow_executions",
+    "crux": "UPDATE workflow_executions SET committed_route = 'choice:no' WHERE step_id = 'rule'\","
+  },
+  {
+    "file": "src/adapters/persistence/workflow/batch_tests.rs",
+    "line": 394,
+    "test_named": true,
+    "statement": "UPDATE workflow_executions",
+    "crux": "UPDATE workflow_executions SET route_target = '$end',successor_execution_id = NULL WHERE step_id = 'start'\","
+  },
+  {
+    "file": "src/adapters/persistence/workflow/batch_tests.rs",
+    "line": 395,
+    "test_named": true,
+    "statement": "UPDATE workflow_executions",
+    "crux": "UPDATE workflow_executions SET successor_execution_id = gen_random_uuid() WHERE step_id = 'start'\","
+  },
+  {
+    "file": "src/adapters/persistence/workflow/batch_tests.rs",
+    "line": 396,
+    "test_named": true,
+    "statement": "INSERT INTO background_tasks",
+    "crux": "INSERT INTO background_tasks (company_id,channel_id,thread_id,correlation_id,task_type,payload,queue_kind,workflow_execution_id) SELECT company_id,channel_id,thread_id,correlation_id,task_type,payload,queue_kind,workflow_execution_id FROM background_tasks LIMIT 1\","
+  },
+  {
+    "file": "src/adapters/persistence/workflow/batch_tests.rs",
+    "line": 397,
+    "test_named": true,
+    "statement": "INSERT INTO workflow_executions",
+    "crux": "INSERT INTO workflow_executions (company_id,run_id,id,step_id,activation) SELECT company_id,run_id,gen_random_uuid(),step_id,activation FROM workflow_executions LIMIT 1\","
+  },
+  {
+    "file": "src/adapters/persistence/workflow/agent_recovery_tests.rs",
+    "line": 85,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET locked_at=clock_timestamp()-interval '10 seconds',lock_expires_at=clock_timestamp()-interval '1 second' WHERE id=$1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/agent_recovery_tests.rs",
+    "line": 97,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET run_at=clock_timestamp()-interval '1 second' WHERE id=$1\","
+  },
+  {
+    "file": "src/adapters/persistence/workflow/agent_recovery_tests.rs",
+    "line": 439,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET locked_at=clock_timestamp()-interval '10 seconds',lock_expires_at=clock_timestamp()-interval '1 second' WHERE id=$1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/action_reconciliation_other_audit_sql_tests.rs",
+    "line": 17,
+    "test_named": true,
+    "statement": "INSERT INTO workflow_action_evidence_commands",
+    "crux": "INSERT INTO workflow_action_evidence_commands(company_id,command_key,id,run_id,execution_id,invocation_id,argument_digest,dispatch_id,actor_id,request_digest,expected_revision,result_revision,outcome,evidence_id,audit_sequence,scheduled_job_id,previous_state,previous_waiting_reason) VALUES($1,$2,$3,"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/batch_recovery_tests.rs",
+    "line": 58,
+    "test_named": true,
+    "statement": "INSERT INTO workflow_executions",
+    "crux": "INSERT INTO workflow_executions (company_id,run_id,id,step_id,activation) VALUES ($1,$2,$3,'rule',4)\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/batch_recovery_tests.rs",
+    "line": 60,
+    "test_named": true,
+    "statement": "INSERT INTO background_tasks",
+    "crux": "INSERT INTO background_tasks (id,company_id,channel_id,thread_id,correlation_id,task_type,payload,queue_kind,workflow_execution_id) SELECT $1,run.company_id,run.channel_id,run.thread_id,run.correlation_id,'workflow_execution',$3,'workflow',$4 FROM workflow_runs AS run WHERE run.company_id = $2 AND r"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/batch_recovery_tests.rs",
+    "line": 64,
+    "test_named": true,
+    "statement": "INSERT INTO workflow_executions",
+    "crux": "INSERT INTO workflow_executions (company_id,run_id,id,step_id,activation,activated_at,frozen_inputs,completed_at,committed_output) VALUES ($1,$2,gen_random_uuid(),'start',3,clock_timestamp(),'{}',clock_timestamp(),'2')\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/batch_recovery_tests.rs",
+    "line": 159,
+    "test_named": true,
+    "statement": "INSERT INTO workflow_executions",
+    "crux": "INSERT INTO workflow_executions (company_id,run_id,id,step_id,activation) VALUES ($1,$2,$3,'rule',2)\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/batch_recovery_tests.rs",
+    "line": 164,
+    "test_named": true,
+    "statement": "INSERT INTO workflow_executions",
+    "crux": "INSERT INTO workflow_executions (company_id,run_id,id,step_id,activation) VALUES ($1,$2,$3,'rule',2)\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/batch_recovery_tests.rs",
+    "line": 196,
+    "test_named": true,
+    "statement": "UPDATE workflow_executions",
+    "crux": "UPDATE workflow_executions SET activated_at = clock_timestamp(),frozen_inputs = '{}',completed_at = clock_timestamp(),committed_output = '1',committed_route = 'success',route_target = 'rule',successor_execution_id = $2 WHERE id = $1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/recovery_tests.rs",
+    "line": 304,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET lock_expires_at=clock_timestamp()+interval '0.15 seconds' WHERE id=$1\").bind(scope.job.0).execute(f.persistence().pool()).await.unwrap();"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/recovery_tests.rs",
+    "line": 323,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET max_retries=1 WHERE id=$1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/lease_resolution_tests.rs",
+    "line": 147,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET lock_expires_at=clock_timestamp()+make_interval(secs => $2) WHERE id=$1 RETURNING lock_expires_at\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/lease_resolution_tests.rs",
+    "line": 572,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET lock_expires_at=clock_timestamp()-interval '1 second' WHERE workflow_execution_id IN (SELECT id FROM workflow_executions WHERE run_id=$1)\""
+  },
+  {
+    "file": "src/adapters/persistence/workflow/token_budget.rs",
+    "line": 202,
+    "test_named": false,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks AS job SET run_at=LEAST(clock_timestamp()+interval '5 seconds',run.deadline),updated_at=clock_timestamp()"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/action_reconciliation_runtime_tests.rs",
+    "line": 84,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET locked_at=clock_timestamp()-interval '10 seconds',lock_expires_at=clock_timestamp()-interval '1 second' WHERE id=$1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/message_authority_tests.rs",
+    "line": 198,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET run_at=clock_timestamp() WHERE id=$1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/job_projection_tests.rs",
+    "line": 27,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET created_at = CURRENT_TIMESTAMP - interval '10 minutes' WHERE company_id = $1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/job_projection_tests.rs",
+    "line": 30,
+    "test_named": true,
+    "statement": "INSERT INTO task_attempts",
+    "crux": "INSERT INTO task_attempts (id,task_id,attempt_number,execution_generation,status,worker_id,machine_id,started_at,finished_at) VALUES (gen_random_uuid(),$1,2,gen_random_uuid(),'completed',gen_random_uuid(),'projection',CURRENT_TIMESTAMP - make_interval(secs => 90),CURRENT_TIMESTAMP)\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/job_projection_tests.rs",
+    "line": 98,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET status = 'completed' WHERE company_id = $1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/control_retry.rs",
+    "line": 38,
+    "test_named": false,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET status='pending',run_at=clock_timestamp(),updated_at=clock_timestamp() WHERE company_id=$1 AND id=$2\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/mcp_test_support.rs",
+    "line": 527,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET run_at=clock_timestamp() WHERE id=$1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/budget_race_tests.rs",
+    "line": 68,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET lock_expires_at=clock_timestamp()+interval '250 milliseconds' WHERE id=$1\""
+  },
+  {
+    "file": "src/adapters/persistence/workflow/action_dispatch_remote_tests.rs",
+    "line": 644,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET worker_id=$1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/completion_race_tests.rs",
+    "line": 140,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET lock_expires_at=clock_timestamp()+interval '150 milliseconds' WHERE id=$1\").bind(claim.fence.scope.job.0).execute(f.persistence().pool()).await.unwrap();"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/completion_race_tests.rs",
+    "line": 162,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET lock_expires_at=clock_timestamp()+interval '400 milliseconds' WHERE id=$1\""
+  },
+  {
+    "file": "src/adapters/persistence/workflow/completion_race_tests.rs",
+    "line": 194,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET lock_expires_at=clock_timestamp()+interval '150 milliseconds' WHERE id=$1\").bind(claim.fence.scope.job.0).execute(f.persistence().pool()).await.unwrap();"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/lease_claim.rs",
+    "line": 168,
+    "test_named": false,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET status='processing', worker_id=$4, execution_generation=$5, locked_at=clock_timestamp(), lock_expires_at=LEAST(clock_timestamp()+make_interval(secs => $6), (SELECT deadline FROM workflow_runs WHERE company_id=$1 AND id=$7)) WHERE company_id=$1 AND id=$2 AND workflow_execu"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/lease_claim.rs",
+    "line": 173,
+    "test_named": false,
+    "statement": "INSERT INTO task_attempts",
+    "crux": "INSERT INTO task_attempts (id,task_id,attempt_number,execution_generation,status,worker_id,machine_id,started_at) VALUES (gen_random_uuid(),$1,$2,$3,'processing',$4,'workflow',clock_timestamp())\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/job_schema_tests.rs",
+    "line": 67,
+    "test_named": true,
+    "statement": "INSERT INTO background_tasks",
+    "crux": "INSERT INTO background_tasks (id, company_id, channel_id, correlation_id, task_type, queue_kind, workflow_execution_id, payload, thread_id) VALUES ($1, $2, $3, $4, 'workflow_execution', 'workflow', $5, $6, $7)\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/job_schema_tests.rs",
+    "line": 151,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET workflow_execution_id = $2 WHERE id = $1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/job_schema_tests.rs",
+    "line": 192,
+    "test_named": true,
+    "statement": "INSERT INTO background_tasks",
+    "crux": "INSERT INTO background_tasks (id, company_id, channel_id, correlation_id, task_type, queue_kind, workflow_execution_id, payload) VALUES ($1, $2, $3, $4, 'workflow_execution', 'workflow', $5, $6)\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/job_schema_tests.rs",
+    "line": 199,
+    "test_named": true,
+    "statement": "INSERT INTO background_tasks",
+    "crux": "INSERT INTO background_tasks (id, company_id, channel_id, thread_id, correlation_id, task_type, workflow_execution_id, payload) VALUES ($1, $2, $3, $4, $5, 'inbound_email', $6, $7)\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/job_schema_tests.rs",
+    "line": 206,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET queue_kind = 'other', workflow_execution_id = NULL WHERE id = $1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/action_reconciliation_native_command_fixture.sql",
+    "line": 16,
+    "test_named": true,
+    "statement": "INSERT INTO public.workflow_action_evidence_commands",
+    "crux": "INSERT INTO public.workflow_action_evidence_commands("
+  },
+  {
+    "file": "src/adapters/persistence/workflow/capacity_renew_tests.rs",
+    "line": 44,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET lock_expires_at=clock_timestamp()+interval '300 milliseconds' WHERE id=$1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/budget_schema_tests.rs",
+    "line": 252,
+    "test_named": true,
+    "statement": "INSERT INTO workflow_executions",
+    "crux": "INSERT INTO workflow_executions (company_id,run_id,id,step_id,activation) VALUES ($1,$2,$3,'start',1)\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/workflow_tool_race_tests.rs",
+    "line": 117,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET locked_at=clock_timestamp()-interval '10 seconds',lock_expires_at=clock_timestamp()-interval '1 second' WHERE id=$1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/workflow_tool_race_tests.rs",
+    "line": 141,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET lock_expires_at=clock_timestamp()+interval '300 milliseconds' WHERE id=$1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/workflow_tool_race_tests.rs",
+    "line": 245,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET locked_at=clock_timestamp()-interval '10 seconds',lock_expires_at=clock_timestamp()-interval '1 second' WHERE id=$1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/workflow_tool_race_tests.rs",
+    "line": 253,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET run_at=clock_timestamp()-interval '1 second' WHERE id=$1\","
+  },
+  {
+    "file": "src/adapters/persistence/workflow/workflow_tool_race_tests.rs",
+    "line": 300,
+    "test_named": true,
+    "statement": "UPDATE task_attempts",
+    "crux": "UPDATE task_attempts SET status='completed',stop_reason='child_parked',finished_at=clock_timestamp() WHERE task_id=$1 AND status='processing'\", scope.job.0),"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/workflow_tool_race_tests.rs",
+    "line": 302,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET status='completed',worker_id=NULL,execution_generation=NULL,locked_at=NULL,lock_expires_at=NULL WHERE id=$1\", scope.job.0),"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/workflow_tool_race_tests.rs",
+    "line": 313,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET status='pending',continuation_count=continuation_count+1 WHERE id=$1\", scope.job.0),"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/harness_token_scheduling_tests.rs",
+    "line": 47,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET run_at=clock_timestamp()-interval '1 second' WHERE id=$1\","
+  },
+  {
+    "file": "src/adapters/persistence/workflow/maintenance_guard_tests.rs",
+    "line": 77,
+    "test_named": true,
+    "statement": "UPDATE task_attempts",
+    "crux": "UPDATE task_attempts SET status='failed',finished_at=clock_timestamp(),workflow_failure_class='terminal',workflow_failure_code='workflow.run_deadline',workflow_retry_safety='unknown',workflow_retirement='deadline',stop_reason='timed_out' WHERE task_id=$1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/maintenance_guard_tests.rs",
+    "line": 80,
+    "test_named": true,
+    "statement": "UPDATE task_attempts",
+    "crux": "UPDATE task_attempts SET execution_generation=gen_random_uuid() WHERE task_id=$1\"),"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/maintenance_guard_tests.rs",
+    "line": 81,
+    "test_named": true,
+    "statement": "UPDATE task_attempts",
+    "crux": "UPDATE task_attempts SET worker_id=gen_random_uuid() WHERE task_id=$1\"),"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/maintenance_guard_tests.rs",
+    "line": 82,
+    "test_named": true,
+    "statement": "UPDATE task_attempts",
+    "crux": "UPDATE task_attempts SET attempt_number=attempt_number+1 WHERE task_id=$1\"),"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/maintenance_guard_tests.rs",
+    "line": 86,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET status=$2,retry_count=retry_count+$3,worker_id=NULL,execution_generation=NULL,locked_at=NULL,lock_expires_at=NULL,run_at=clock_timestamp()+interval '1 hour' WHERE id=$1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/maintenance_guard_tests.rs",
+    "line": 92,
+    "test_named": true,
+    "statement": "INSERT INTO workflow_executions",
+    "crux": "INSERT INTO workflow_executions(company_id,run_id,id,step_id,activation) SELECT company_id,run_id,$2,'next',activation+1 FROM workflow_executions WHERE id=$1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/maintenance_guard_tests.rs",
+    "line": 94,
+    "test_named": true,
+    "statement": "UPDATE workflow_executions",
+    "crux": "UPDATE workflow_executions SET completed_at=clock_timestamp(),committed_output='null'::jsonb,committed_route='final_error',route_target='next',successor_execution_id=$2 WHERE id=$1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/lease.rs",
+    "line": 85,
+    "test_named": false,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET lock_expires_at = LEAST(clock_timestamp() + make_interval(secs => $2), (SELECT deadline FROM workflow_runs WHERE company_id = $3 AND id = $4)) WHERE id = $1 AND lock_expires_at > clock_timestamp() AND EXISTS (SELECT 1 FROM workflow_runs AS run WHERE run.company_id=$3 AND "
+  },
+  {
+    "file": "src/adapters/persistence/workflow/action_reconciliation_state_witness_fixture.sql",
+    "line": 80,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET status='pending',run_at=clock_timestamp(),updated_at=clock_timestamp()"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/polling_tests.rs",
+    "line": 247,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET run_at=clock_timestamp()+interval '1 minute' WHERE id=$1\","
+  },
+  {
+    "file": "src/adapters/persistence/workflow/polling_tests.rs",
+    "line": 262,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET run_at=clock_timestamp() WHERE id=$1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/polling_tests.rs",
+    "line": 392,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET id=$2 WHERE id=$1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/action_evidence_binding_tests.rs",
+    "line": 38,
+    "test_named": true,
+    "statement": "INSERT INTO workflow_action_state_witnesses",
+    "crux": "INSERT INTO workflow_action_state_witnesses(company_id,run_id,transaction_id,initial_state,initial_waiting_reason) VALUES($1,$2,pg_current_xact_id(),'waiting','reconciliation')\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_tests.rs",
+    "line": 213,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET locked_at=clock_timestamp()-interval '10 seconds',lock_expires_at=clock_timestamp()-interval '1 second' WHERE id=$1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/action_reconciliation_prior_bounds_tests.rs",
+    "line": 29,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET max_retries=$2 WHERE id=$1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/message_publish.rs",
+    "line": 278,
+    "test_named": false,
+    "statement": "UPDATE task_attempts",
+    "crux": "UPDATE task_attempts SET status='completed',stop_reason='effect_parked',finished_at=clock_timestamp() WHERE task_id=$1 AND attempt_number=$2 AND worker_id=$3 AND execution_generation=$4 AND status='processing'\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/message_publish.rs",
+    "line": 281,
+    "test_named": false,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET status='completed',updated_at=clock_timestamp(),worker_id=NULL,execution_generation=NULL,locked_at=NULL,lock_expires_at=NULL WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 AND queue_kind='workflow' AND status='processing' AND worker_id=$4 AND execution_generat"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/action_reconciliation_claim_sql_episode_tests.rs",
+    "line": 178,
+    "test_named": true,
+    "statement": "INSERT INTO workflow_action_claim_episodes",
+    "crux": "INSERT INTO workflow_action_claim_episodes(company_id,run_id,execution_id,job_id,command_key,retired_attempt)"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/action_reconciliation_sibling_boundary_tests.rs",
+    "line": 42,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET max_retries=retry_count WHERE id=$1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/action_reconciliation_sibling_boundary_tests.rs",
+    "line": 122,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET locked_at=clock_timestamp()-interval '10 seconds',lock_expires_at=clock_timestamp()-interval '1 second' WHERE id=$1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/lease_adversarial_tests.rs",
+    "line": 20,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET run_at=clock_timestamp()+interval '1 hour'\","
+  },
+  {
+    "file": "src/adapters/persistence/workflow/lease_adversarial_tests.rs",
+    "line": 288,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET lock_expires_at=clock_timestamp()+interval '150 milliseconds' WHERE id=$1\").bind(scope.job.0).execute(f.persistence().pool()).await.unwrap();"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/action_history_tests.rs",
+    "line": 136,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET locked_at=clock_timestamp()-interval '10 seconds',lock_expires_at=clock_timestamp()-interval '1 second' WHERE id=$1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/action_history_tests.rs",
+    "line": 266,
+    "test_named": true,
+    "statement": "UPDATE task_attempts",
+    "crux": "UPDATE task_attempts SET status='failed',finished_at=clock_timestamp(),workflow_failure_class='terminal',workflow_failure_code='provider.rejected',workflow_retry_safety='safe',workflow_retirement='live' WHERE task_id=$1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/action_history_tests.rs",
+    "line": 268,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET status='failed',retry_count=retry_count+1,worker_id=NULL,execution_generation=NULL,locked_at=NULL,lock_expires_at=NULL WHERE id=$1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/action_history_tests.rs",
+    "line": 295,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET status='pending',run_at=clock_timestamp()+interval '1 second' WHERE id=$1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/action_history_tests.rs",
+    "line": 421,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET locked_at=clock_timestamp()-interval '10 seconds',lock_expires_at=clock_timestamp()-interval '1 second' WHERE id=$1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/action_approval_continuation_tests.rs",
+    "line": 166,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET max_retries=1 WHERE id=$1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/action_approval_continuation_tests.rs",
+    "line": 278,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET continuation_count=1 WHERE id=$1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/action_approval_continuation_tests.rs",
+    "line": 306,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET status='pending',continuation_count=continuation_count+1,retry_count=retry_count+1 WHERE id=$1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/action_approval_continuation_tests.rs",
+    "line": 376,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET max_retries=2 WHERE id=$1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/action_approval_continuation_tests.rs",
+    "line": 396,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET run_at=clock_timestamp()-interval '1 second' WHERE id=$1\","
+  },
+  {
+    "file": "src/adapters/persistence/workflow/action_approval_http_tests.rs",
+    "line": 295,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET max_retries=retry_count+1 WHERE id=$1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/action_approval_http_tests.rs",
+    "line": 335,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET status='pending',continuation_count=continuation_count+1 WHERE id=$1\","
+  },
+  {
+    "file": "src/adapters/persistence/workflow/workflow_tool_tests.rs",
+    "line": 322,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET continuation_count=63 WHERE id=$1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/workflow_tool_tests.rs",
+    "line": 364,
+    "test_named": true,
+    "statement": "UPDATE workflow_executions",
+    "crux": "UPDATE workflow_executions SET committed_output='{\\\"choice\\\":\\\"maybe\\\",\\\"answer\\\":\\\"q\\\"}'::jsonb WHERE run_id=$1 AND completed_at IS NOT NULL\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/action_dispatch_resolution_tests.rs",
+    "line": 327,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET locked_at=clock_timestamp()-interval '10 seconds', lock_expires_at=clock_timestamp()-interval '1 second' WHERE company_id=$1\","
+  },
+  {
+    "file": "src/adapters/persistence/workflow/action_dispatch_resolution_tests.rs",
+    "line": 536,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET lock_expires_at=clock_timestamp()-interval '1 second' WHERE workflow_execution_id IN (SELECT id FROM workflow_executions WHERE run_id=$1)\""
+  },
+  {
+    "file": "src/adapters/persistence/workflow/pending_io_tests.rs",
+    "line": 44,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET retry_count=max_retries WHERE id=$1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/action_reconciliation_validation_tests.rs",
+    "line": 69,
+    "test_named": true,
+    "statement": "INSERT INTO workflow_action_evidence_commands",
+    "crux": "INSERT INTO workflow_action_evidence_commands \\"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/workflow_tool_calls.rs",
+    "line": 154,
+    "test_named": false,
+    "statement": "UPDATE task_attempts",
+    "crux": "UPDATE task_attempts SET status='completed',stop_reason='child_parked',finished_at=clock_timestamp() WHERE task_id=$1 AND attempt_number=$2 AND worker_id=$3 AND execution_generation=$4 AND status='processing'\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/workflow_tool_calls.rs",
+    "line": 159,
+    "test_named": false,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET status='completed',updated_at=clock_timestamp(),worker_id=NULL,execution_generation=NULL,locked_at=NULL,lock_expires_at=NULL WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 AND queue_kind='workflow' AND status='processing' AND worker_id=$4 AND execution_generat"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/action_reconciliation_claim_sql_candidate_tests.rs",
+    "line": 17,
+    "test_named": true,
+    "statement": "INSERT INTO workflow_executions",
+    "crux": "INSERT INTO workflow_executions(company_id,run_id,id,step_id,activation) SELECT company_id,run_id,$2,step_id,2 FROM workflow_executions WHERE id=$1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/action_reconciliation_claim_sql_candidate_tests.rs",
+    "line": 20,
+    "test_named": true,
+    "statement": "INSERT INTO background_tasks",
+    "crux": "INSERT INTO background_tasks(id,company_id,channel_id,thread_id,correlation_id,task_type,payload,queue_kind,workflow_execution_id) SELECT $2,company_id,channel_id,thread_id,correlation_id,'workflow_execution',$3,'workflow',$4 FROM background_tasks WHERE id=$1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/action_reconciliation_claim_sql_candidate_tests.rs",
+    "line": 165,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET status='completed' WHERE id=$1 AND status='pending'\""
+  },
+  {
+    "file": "src/adapters/persistence/workflow/action_reconciliation_claim_sql_candidate_tests.rs",
+    "line": 201,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET status='pending' WHERE id=$1 AND status='completed'\""
+  },
+  {
+    "file": "src/adapters/persistence/workflow/admission_write.rs",
+    "line": 139,
+    "test_named": false,
+    "statement": "INSERT INTO workflow_executions",
+    "crux": "INSERT INTO workflow_executions (company_id, run_id, id, step_id, activation) VALUES ($1,$2,$3,$4,1)\","
+  },
+  {
+    "file": "src/adapters/persistence/workflow/admission_write.rs",
+    "line": 144,
+    "test_named": false,
+    "statement": "INSERT INTO background_tasks",
+    "crux": "INSERT INTO background_tasks (id, company_id, channel_id, thread_id, correlation_id, task_type, \\"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/message_race_tests.rs",
+    "line": 155,
+    "test_named": true,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET lock_expires_at=clock_timestamp()+interval '1 second' WHERE id=$1\","
+  },
+  {
+    "file": "src/adapters/persistence/workflow/decision_approvals.rs",
+    "line": 124,
+    "test_named": false,
+    "statement": "UPDATE task_attempts",
+    "crux": "UPDATE task_attempts SET status='completed',stop_reason='approval_parked',finished_at=clock_timestamp() WHERE task_id=$1 AND attempt_number=$2 AND worker_id=$3 AND execution_generation=$4 AND status='processing'\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/decision_approvals.rs",
+    "line": 126,
+    "test_named": false,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET status='completed',updated_at=clock_timestamp(),worker_id=NULL,execution_generation=NULL,locked_at=NULL,lock_expires_at=NULL WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 AND queue_kind='workflow' AND status='processing' AND worker_id=$4 AND execution_generat"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/decision_approvals.rs",
+    "line": 261,
+    "test_named": false,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET status='pending',continuation_count=continuation_count+1,run_at=clock_timestamp(),updated_at=clock_timestamp() WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 AND status='completed' AND continuation_count<63\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/action_reconciliation_owner_lifecycle_tests.rs",
+    "line": 35,
+    "test_named": true,
+    "statement": "DELETE FROM background_tasks",
+    "crux": "DELETE FROM background_tasks WHERE company_id=$1\","
+  },
+  {
+    "file": "src/adapters/persistence/workflow/action_reconciliation_owner_lifecycle_tests.rs",
+    "line": 39,
+    "test_named": true,
+    "statement": "DELETE FROM workflow_executions",
+    "crux": "DELETE FROM workflow_executions WHERE company_id=$1\","
+  },
+  {
+    "file": "src/adapters/persistence/workflow/action_reconciliation_owner_lifecycle_tests.rs",
+    "line": 43,
+    "test_named": true,
+    "statement": "DELETE FROM task_attempts",
+    "crux": "DELETE FROM task_attempts WHERE task_id IN (SELECT id FROM background_tasks WHERE company_id=$1)\","
+  },
+  {
+    "file": "src/adapters/persistence/workflow/action_reconciliation_claim_sql_deferred_tests.rs",
+    "line": 87,
+    "test_named": true,
+    "statement": "INSERT INTO task_attempts",
+    "crux": "INSERT INTO task_attempts(id,task_id,attempt_number,status,execution_generation,worker_id,machine_id) VALUES($1,$2,$3,'processing',$4,$5,'deferred-refusal-attack')\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_source.rs",
+    "line": 119,
+    "test_named": false,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET max_retries=$2 WHERE id=$1\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/action_reconciliation_native_command_assertions.rs",
+    "line": 171,
+    "test_named": false,
+    "statement": "INSERT INTO public.workflow_action_evidence_commands",
+    "crux": "INSERT INTO public.workflow_action_evidence_commands(\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/activation.rs",
+    "line": 86,
+    "test_named": false,
+    "statement": "UPDATE workflow_executions",
+    "crux": "UPDATE workflow_executions SET frozen_inputs = $4, frozen_choice = $5, activated_at = clock_timestamp() \\"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/decision_tokens.rs",
+    "line": 162,
+    "test_named": false,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET status='failed',updated_at=clock_timestamp() WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 AND queue_kind='workflow' AND status='completed'\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/action_reconciliation/settlement.rs",
+    "line": 75,
+    "test_named": false,
+    "statement": "INSERT INTO workflow_action_evidence_commands",
+    "crux": "INSERT INTO workflow_action_evidence_commands(company_id,command_key,id,run_id,execution_id,invocation_id,argument_digest,dispatch_id,actor_id,request_digest,expected_revision,result_revision,outcome,evidence_id,audit_sequence,scheduled_job_id,previous_state,previous_waiting_reason) VALUES($1,$2,$3,"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/action_reconciliation/settlement.rs",
+    "line": 217,
+    "test_named": false,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET status='pending',run_at=clock_timestamp(),updated_at=clock_timestamp() WHERE company_id=$1 AND id=$2\")"
+  },
+  {
+    "file": "src/adapters/persistence/workflow/action_reconciliation/mod.rs",
+    "line": 295,
+    "test_named": false,
+    "statement": "INSERT INTO workflow_action_evidence_commands",
+    "crux": "INSERT INTO workflow_action_evidence_commands(company_id,command_key,id,run_id,execution_id,invocation_id,argument_digest,dispatch_id,actor_id,request_digest,expected_revision,result_revision,outcome) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)\")"
+  },
+  {
+    "file": "migrations/20260817000000_init_schema.sql",
+    "line": 1883,
+    "test_named": false,
+    "statement": "INSERT INTO workflow_action_claim_episodes",
+    "crux": "INSERT INTO workflow_action_claim_episodes(company_id,run_id,execution_id,job_id,command_key,retired_attempt)"
+  },
+  {
+    "file": "migrations/20260817000000_init_schema.sql",
+    "line": 1945,
+    "test_named": false,
+    "statement": "INSERT INTO workflow_action_schedule_witnesses",
+    "crux": "INSERT INTO workflow_action_schedule_witnesses(company_id,run_id,execution_id,job_id,retired_attempt,transaction_id)"
+  },
+  {
+    "file": "migrations/20260817000000_init_schema.sql",
+    "line": 1961,
+    "test_named": false,
+    "statement": "INSERT INTO workflow_action_state_witnesses",
+    "crux": "INSERT INTO workflow_action_state_witnesses(company_id,run_id,transaction_id,initial_state,initial_waiting_reason)"
+  },
+  {
+    "file": "migrations/20260817000000_init_schema.sql",
+    "line": 2165,
+    "test_named": false,
+    "statement": "UPDATE background_tasks",
+    "crux": "UPDATE background_tasks SET status='failed',updated_at=clock_timestamp()"
+  }
+]

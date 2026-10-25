@@ -1,10 +1,11 @@
-# Phase 01 replacement map
+# Phase 01 replacement map (historical)
 
-This is an inventory of the **current** implementation and a target ownership map, not a claim
+This is an inventory of the **phase01 baseline** implementation and a target ownership map, not a claim
 that the workflow runtime or its interfaces ship today. After phases 02–07 provide replacements,
 dependent UI/API callers and projections must be retargeted before phase 08 deletes each legacy
 path; phase 09 completes the authoring and operations journey, and phase 10 proves the cutover.
-A source span below names an existing definition or caller, not a new API.
+Source spans below name definitions at phase01; removed files are expected after phase08.
+For current owners see [workflow operations](../../docs/workflow-operations.md).
 The phase 01 domain and application contracts alone do not replace any production dispatcher.
 
 The owner names are the authoritative records in [01](01-architecture-and-domain.md):

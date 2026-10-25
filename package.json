@@ -7,7 +7,7 @@
   },
   "scripts": {
     "build:css": "tailwindcss -i assets/app.css.in -o assets/app.css --minify",
-    "check:css": "npm run build:css && git diff --exit-code -- assets/app.css",
+    "check:css": "bash scripts/check-css.sh",
     "test:run-counts": "node --test scripts/tests/run-counts.mjs"
   },
   "repository": {

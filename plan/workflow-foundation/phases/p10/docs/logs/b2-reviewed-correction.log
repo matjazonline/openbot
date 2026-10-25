@@ -1,0 +1,10 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling mail_agents v0.1.0 (/Users/mac02/dev/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 29s
+     Running unittests src/lib.rs (target/debug/deps/mail_agents-dea38a64a93bbcd9)
+
+running 1 test
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::reviewed_delivery_tests::workflow_cutover_reviewed_email_delivers_exact_accepted_artifact ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2313 filtered out; finished in 12.02s
+

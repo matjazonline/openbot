@@ -1,0 +1,14 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling mail_agents v0.1.0 (/Users/mac02/dev/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 46.01s
+     Running unittests src/main.rs (target/debug/deps/mail_agents-98c0e28439ffe2b3)
+
+running 5 tests
+test tests::operational_commands_are_parsed_before_server_startup ... ok
+test tests::operational_command_rejects_zero_and_unknown_arguments ... ok
+test tests::second_interrupt_ends_the_drain_immediately ... ok
+test tests::drain_deadline_expires_when_no_second_interrupt_arrives ... ok
+test tests::a_background_owner_that_ignores_shutdown_is_aborted_inside_the_drain_grace ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

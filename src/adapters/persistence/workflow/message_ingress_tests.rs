@@ -29,6 +29,9 @@ mod schedule_runtime_tests;
 #[path = "provisioning_runtime_tests.rs"]
 mod provisioning_runtime_tests;
 
+#[path = "reviewed_delivery_tests.rs"]
+mod reviewed_delivery_tests;
+
 const CUSTOMER: &str = "customer@partner.test";
 
 /// The production engine and ingest over one company: a `support` channel the customer may

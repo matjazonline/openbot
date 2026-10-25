@@ -1,0 +1,9 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.26s
+     Running unittests src/lib.rs (target/debug/deps/mail_agents-dea38a64a93bbcd9)
+
+running 2 tests
+test adapters::http::pages::workflow_decision::tests::decision_browser_markup_and_closed_draft_recovery ... ok
+test adapters::http::routes::ui::stream_tests::message_source_tests::source_message_outside_window_is_exact_and_authorized ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 2312 filtered out; finished in 0.19s
+

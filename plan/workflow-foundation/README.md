@@ -29,8 +29,9 @@ not another engine alongside those proposals.
 - Explicit `mcp.call` steps invoke company-bound MCP tools over Streamable HTTP through that same
   action service, without requiring an agent step.
 - Standardize agent execution on Rig; remove the alternate `ai-agents` runtime.
-- Capability selection is optional: without an explicit selection, `agent.run` uses the agent's
-  saved tools and skills from the run's frozen specification, subject to authorization limits.
+- `agent.run` uses saved tools and skills from the frozen agent specification, subject to current
+  authorization. Classifier-selected profiles and explicit capability overrides are excluded by
+  06-D5; malformed or explicit selection fields fail validation instead of broadening defaults.
 - Use Rust/PostgreSQL and existing durable infrastructure; no external orchestration service.
 - Provider-neutral message steps, implemented against the existing email transport. Slack is future work.
 - Fresh-database cutover, with no legacy API/configuration compatibility or business-data migration.
@@ -58,38 +59,16 @@ all interfaces until then. Build the representative workflow fixtures from phase
 
 [NOT_PLANNED.md](NOT_PLANNED.md) records exclusions and future extensions separately.
 
-Phase01 and phase02 library scope (02.1–02.8),03.1–03.8 and the03.9 recovery,
-controls, durable root budgets and sustained tenant fairness fragments are verified.
-The combined phase03 gate has passed the full database-backed library suite at
-the stock2MiB stack (2191passed,0failed,22existing optional/developer ignores),
-plus migration/schema, SQLx, offline compilation, Clippy and formatting checks.
-Independent combined actual-code and final evidence review passed; root accepted phase03.
-[BRIEF-03-FINAL.md](BRIEF-03-FINAL.md) records the exact gate and limitations.
-Phase04.1 preparation and04.2 authorization-observation foundations are verified:
-14actiontests at stock2MiB and required static/SQLx gates passed, with independent
-review. Production dispatch/adapters/integration and the combined phase04 gate
-remain open; [BRIEF-04.1.md](BRIEF-04.1.md) and [BRIEF-04.2.md](BRIEF-04.2.md)
-record the exact scope. 04.3 durable dispatch foundation is also verified with29stock2MiB action tests
-and independent actual-code/criteria/gates PASS; [BRIEF-04.3.md](BRIEF-04.3.md)
-records exact scope. 04.4 approved-provider-contract foundation is verified with36stock2MiB action tests
-and independent review; [BRIEF-04.4.md](BRIEF-04.4.md) records mandatory04.5 supported
-replay integration. 04.5 receipt/supported-replay foundation is verified with52action and97affected
-stock2MiB integration tests, all required gates and independent overall PASS;
-[BRIEF-04.5.md](BRIEF-04.5.md) records exact scope. 04.6 uncertainty parking/audit is
-verified with62action and268affected stock2MiB tests, all required gates and independent
-PASS; [BRIEF-04.6.md](BRIEF-04.6.md) records exact scope. 04.7 authorized evidence settlement is now verified and
-root-accepted for the current user-authorized scope: final stock2MiB full library
-2532passed/0failed/22unchangedignored, lease-budget87passed, all required static,
-SQLx, fresh53migration/schema and graft gates passed, with independent final review.
-[Final04.7 handoff](HANDOFF-04.7-COMPLETE-20261012.md) preserves the earlier unexplained
-failure and established scope/future-phase limits. 04.8 is now in progress: group A is implemented and independently code-reviewed,
-but required verification and root acceptance remain pending. See the
-[current handoff](HANDOFF-20261014-04.8.md). Migration squash has not started.
-[RESUME.md](RESUME.md) records the current state and first next action.
-Superseded progress logs are available in Git history; retained briefs, contracts
-and the final 04.7 handoff preserve the foundation needed for later tasks.
-No backward compatibility is required. [REPLACEMENT-MAP.md](REPLACEMENT-MAP.md)
-inventories current owners and removal gates.
+Phases 01–09 are implemented. The phase08/09 combined artifact was committed as
+`5d4aab1d44e209fbb46bae275be77c86cd3fef22`; retained phase records distinguish implementation,
+independent review and verification. Phase10 implementation, full verification and independent acceptance status are recorded in
+[its task record](phases/p10/docs/TASK.md). Local acceptance does not constitute deployment.
+
+Current operator guidance is [workflow operations](../../docs/workflow-operations.md), with
+[reconciliation safety](../../docs/workflow-reconciliation-safety.md) documenting the precise
+historical SQL diagnostic limitation. [REPLACEMENT-MAP.md](REPLACEMENT-MAP.md) is the historical
+phase01 removal inventory; its old source spans are not the current architecture. Prior phase
+records are retained as evidence, not current setup instructions.
 
 ## Working rules
 

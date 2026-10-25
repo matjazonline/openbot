@@ -1,5 +1,7 @@
 # Business Workflow Library
 
+> Historical proposal: execution architecture is superseded by [Workflow foundation](../workflow-foundation/README.md). Do not implement an additional SOP, post-approval or workflow-library engine from this document. Retained product ideas require a separately scoped follow-up.
+
 > **No backward compatibility.** We don't need backward compatibility and will reset the database
 > when needed. Do not add data backfills, dual reads/writes, legacy decoders, compatibility shims,
 > or staged rollouts for existing data.
