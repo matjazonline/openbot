@@ -512,11 +512,11 @@ async fn delete_channel_handler(
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
     user: AuthenticatedUser,
     Path((company_id, channel_id)): Path<(Uuid, Uuid)>,
-) -> impl IntoResponse {
-    let _ = channel_use_cases
+) -> AppResult<Html<String>> {
+    channel_use_cases
         .delete_channel(user.id, company_id, channel_id)
-        .await;
-    Html(String::new())
+        .await?;
+    Ok(Html(String::new()))
 }
 
 #[derive(Debug, Clone, Deserialize)]

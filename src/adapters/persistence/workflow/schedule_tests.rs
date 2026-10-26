@@ -374,28 +374,26 @@ async fn schedule_slot_is_admitted_once_under_competing_materializers() {
     assert!(next > Utc::now());
 }
 
-/// F011.4: a crash after admission and before the run was recorded retries into the same run.
+/// F011.4: admission records the run and occurrence before a worker can crash.
 #[tokio::test]
 async fn schedule_occurrence_admitted_before_a_crash_replays_its_run() {
     let s = Schedules::new().await;
     let schedule = s.schedule("Hourly").await;
     s.due(schedule.id).await;
     let crashing = s.materializer(CrashAfterAdmission(admission(s.p())));
-    assert_eq!(s.drain(&crashing).await, vec![Materialized::Deferred]);
+    assert_eq!(s.drain(&crashing).await, vec![Materialized::LeaseLost]);
     let (occurrence, status, run, _, attempts) = s.occurrences(schedule.id).await[0].clone();
-    assert_eq!((status.as_str(), run, attempts), ("pending", None, 1));
+    assert_eq!(
+        (status.as_str(), run, attempts),
+        ("materialized", Some(s.runs_for(occurrence).await[0]), 1)
+    );
     let admitted = s.runs_for(occurrence).await;
     assert_eq!(
         admitted.len(),
         1,
         "the crashed attempt's admission committed"
     );
-    assert!(
-        s.last_error(schedule.id)
-            .await
-            .unwrap()
-            .contains("scripted crash")
-    );
+    assert_eq!(s.last_error(schedule.id).await, None);
 
     sqlx::query(
         "UPDATE schedule_runs SET materialization_available_at = clock_timestamp() WHERE id = $1",
@@ -405,15 +403,12 @@ async fn schedule_occurrence_admitted_before_a_crash_replays_its_run() {
     .await
     .unwrap();
     let retry = s.materializer(admission(s.p()));
-    assert_eq!(
-        s.drain(&retry).await,
-        vec![Materialized::Admitted(RunId::new(admitted[0]))]
-    );
+    assert!(s.drain(&retry).await.is_empty());
     assert_eq!(s.runs_for(occurrence).await, admitted, "no second run");
     let (_, status, run, _, attempts) = s.occurrences(schedule.id).await[0].clone();
     assert_eq!(
         (status.as_str(), run, attempts),
-        ("materialized", Some(admitted[0]), 2)
+        ("materialized", Some(admitted[0]), 1)
     );
     assert_eq!(
         s.last_error(schedule.id).await,

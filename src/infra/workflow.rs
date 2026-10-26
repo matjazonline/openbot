@@ -734,6 +734,7 @@ mod tests {
                 rerun_of: None,
                 delivery_policy: DeliveryPolicy::Deliver,
                 expected_binding_revision: None,
+                admission_claim: None,
             })
             .await;
         assert!(matches!(refused, Err(AppError::BadRequest(_))));

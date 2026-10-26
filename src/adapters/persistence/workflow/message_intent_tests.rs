@@ -683,9 +683,13 @@ async fn message_intent_competing_claimants_admit_one_run_and_fence_the_stale_wo
     assert!(s.outcomes(intent).await.is_empty());
 
     let admissions = s.admissions(admission(p));
-    let (a, b) = tokio::join!(admissions.process(stale), admissions.process(current));
-    a.unwrap();
-    b.unwrap();
+    admissions.process(stale).await.unwrap();
+    assert!(
+        s.runs(binding).await.is_empty(),
+        "a stale claim cannot create a run"
+    );
+    assert!(s.outcomes(intent).await.is_empty());
+    admissions.process(current).await.unwrap();
     assert_eq!(s.runs(binding).await.len(), 1);
     assert_eq!(s.admitted(intent).await, ids(&[binding]));
     assert_eq!(
@@ -694,7 +698,7 @@ async fn message_intent_competing_claimants_admit_one_run_and_fence_the_stale_wo
     );
 }
 
-/// Failure mode "crash after admission, before the outcome": the retry replays the same run.
+/// A crash after admission retains the outcome committed with its run.
 #[tokio::test]
 async fn message_intent_crash_after_admission_replays_its_run() {
     let s = Intents::new().await;
@@ -708,7 +712,7 @@ async fn message_intent_crash_after_admission_replays_its_run() {
     s.drain(&s.admissions(crashing)).await;
     let first = s.runs(binding).await;
     assert_eq!(first.len(), 1, "the admission committed");
-    assert!(s.outcomes(intent).await.is_empty(), "its outcome did not");
+    assert_eq!(s.admitted(intent).await, ids(&[binding]));
 
     s.make_due(intent).await;
     s.drain(&s.admissions(admission(s.p()))).await;
@@ -798,9 +802,8 @@ async fn message_intent_claims_are_fair_across_tenants() {
     assert!(page.iter().any(|intent| intent.claim.intent == lone));
 }
 
-/// Own background work through shutdown: the worker stops between iterations and mid-intent;
-/// an interrupted intent keeps a short lease whose expiry spends an attempt and is then
-/// processed once, with no run admitted by the interrupted pass.
+/// Own background work through shutdown: the worker starts a claimed page concurrently,
+/// stops between iterations and mid-page, and leaves interrupted intents for lease recovery.
 #[tokio::test]
 async fn message_intent_worker_stops_between_and_during_processing() {
     let s = Intents::new().await;
@@ -824,17 +827,21 @@ async fn message_intent_worker_stops_between_and_during_processing() {
     stopped.expect("an idle worker stops on shutdown");
 
     // During processing: the admission is in flight when shutdown arrives.
-    let intent = s.intent(TO).await;
+    let intents = [s.intent(TO).await, s.intent(TO).await];
     let entered = Arc::new(Notify::new());
     let held = Arc::new(Notify::new());
+    let started = Arc::new(AtomicUsize::new(0));
     let busy = MessageAdmissionWorker {
         admissions: s.admissions(Scripted::new(s.p(), {
             let entered = entered.clone();
             let held = held.clone();
+            let started = started.clone();
             Box::new(move |_, _| {
                 let entered = entered.clone();
                 let held = held.clone();
+                let started = started.clone();
                 Box::pin(async move {
+                    started.fetch_add(1, Ordering::SeqCst);
                     entered.notify_one();
                     held.notified().await;
                     Script::Delegate
@@ -847,25 +854,37 @@ async fn message_intent_worker_stops_between_and_during_processing() {
     let shutdown = CancellationToken::new();
     let ((), stopped) = tokio::join!(
         async {
-            entered.notified().await;
+            tokio::time::timeout(Duration::from_secs(5), async {
+                while started.load(Ordering::SeqCst) < intents.len() {
+                    entered.notified().await;
+                }
+            })
+            .await
+            .expect("every claimed intent starts before its lease waits");
             shutdown.cancel();
         },
         tokio::time::timeout(Duration::from_secs(5), busy.run(&wakeup, &shutdown))
     );
     stopped.expect("a busy worker stops on shutdown");
-    assert_eq!(
-        s.intent_state(intent).await,
-        ("claimed".to_string(), None, 1)
-    );
+    for intent in intents {
+        assert_eq!(
+            s.intent_state(intent).await,
+            ("claimed".to_string(), None, 1)
+        );
+    }
     assert!(s.runs(binding).await.is_empty(), "no orphaned run");
 
-    s.expire(intent).await;
+    for intent in intents {
+        s.expire(intent).await;
+    }
     s.drain(&s.admissions(admission(s.p()))).await;
-    assert_eq!(s.runs(binding).await.len(), 1);
-    assert_eq!(
-        s.intent_state(intent).await,
-        ("done".to_string(), Some("admitted".to_string()), 2)
-    );
+    assert_eq!(s.runs(binding).await.len(), intents.len());
+    for intent in intents {
+        assert_eq!(
+            s.intent_state(intent).await,
+            ("done".to_string(), Some("admitted".to_string()), 2)
+        );
+    }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1079,6 +1098,7 @@ async fn message_intent_lease_lapsing_on_the_last_attempt_fails_it_observably() 
     let worker = MessageIntentWorkerId(Uuid::new_v4());
     let claimed = admissions.claim(worker, MESSAGE_INTENT_PAGE).await.unwrap();
     assert_eq!(claimed.len(), 1, "the last attempt is claimed");
+    let stale = claimed.into_iter().next().unwrap();
     // Its worker dies with it.
     s.expire(intent).await;
 
@@ -1098,6 +1118,11 @@ async fn message_intent_lease_lapsing_on_the_last_attempt_fails_it_observably() 
         1
     );
     assert!(s.runs(binding).await.is_empty());
+    admissions.process(stale).await.unwrap();
+    assert!(
+        s.runs(binding).await.is_empty(),
+        "a terminal intent cannot create a run"
+    );
 }
 
 fn foreign_key_violation(result: Result<sqlx::postgres::PgQueryResult, sqlx::Error>) -> bool {
@@ -1206,6 +1231,7 @@ async fn message_intent_admission_replay_with_another_delivery_policy_conflicts(
         rerun_of: None,
         delivery_policy: policy,
         expected_binding_revision: None,
+        admission_claim: None,
     };
     let service = admission(s.p());
     let AdmissionResult::Created(run) = service

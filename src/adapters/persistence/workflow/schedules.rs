@@ -769,7 +769,7 @@ impl ScheduleOccurrences for PostgresPersistence {
     }
 
     async fn record_run(&self, claim: OccurrenceClaim, run: RunId) -> AppResult<bool> {
-        Ok(self
+        let recorded = self
             .record(
                 claim,
                 "run_id = $5, last_error = NULL, materialization_status = 'materialized'",
@@ -777,7 +777,22 @@ impl ScheduleOccurrences for PostgresPersistence {
                 None,
             )
             .await?
-            .is_some())
+            .is_some();
+        if recorded {
+            return Ok(true);
+        }
+        // Admission now commits the run and occurrence outcome together. A later
+        // worker write observes the already settled occurrence as success.
+        Ok(sqlx::query_scalar::<_, Uuid>(
+            "SELECT run_id FROM schedule_runs WHERE company_id=$1 AND id=$2 \
+             AND materialization_status='materialized' AND run_id=$3",
+        )
+        .bind(claim.company.as_uuid())
+        .bind(claim.occurrence)
+        .bind(run.as_uuid())
+        .fetch_optional(&self.pool)
+        .await?
+        .is_some())
     }
 
     async fn record_refusal(

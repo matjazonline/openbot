@@ -129,6 +129,12 @@ impl Fixture {
         Self::in_database(db, "").await
     }
     async fn in_database(db: Arc<OwnDatabase>, suffix: &str) -> Self {
+        // Runtime fault tests in this fixture rewrite frozen run data to simulate
+        // expiry and corruption. The strict guard is verified in its own test.
+        sqlx::query("ALTER TABLE workflow_runs DISABLE TRIGGER workflow_run_snapshot_immutable")
+            .execute(&db.pool)
+            .await
+            .unwrap();
         let persistence = PostgresPersistence::new(db.pool.clone());
         let email = format!("workflow{suffix}@example.test");
         persistence
@@ -415,13 +421,23 @@ async fn workflow_sql_corrupt_source_fails_and_cross_company_version_is_rejected
             .unwrap()
             .is_foreign_key_violation()
     );
+    let mut corruption = fixture.persistence.pool().begin().await.unwrap();
+    sqlx::query("ALTER TABLE workflow_versions DISABLE TRIGGER workflow_version_immutable")
+        .execute(&mut *corruption)
+        .await
+        .unwrap();
     sqlx::query(
         "UPDATE workflow_versions SET source = source || E'\\n# corrupt' WHERE company_id = $1",
     )
     .bind(fixture.target.company.as_uuid())
-    .execute(fixture.persistence.pool())
+    .execute(&mut *corruption)
     .await
     .unwrap();
+    sqlx::query("ALTER TABLE workflow_versions ENABLE TRIGGER workflow_version_immutable")
+        .execute(&mut *corruption)
+        .await
+        .unwrap();
+    corruption.commit().await.unwrap();
     assert!(
         fixture
             .persistence

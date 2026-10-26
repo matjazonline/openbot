@@ -100,6 +100,14 @@ pub struct AdmitWorkflowRequest {
     /// eligibility). A fresh admission under any other current revision is `Stale`; a replay of
     /// an existing run is unaffected (p08 D1.4.5).
     pub expected_binding_revision: Option<BindingRevision>,
+    /// Automatic queue ownership, checked and settled in the admission transaction.
+    pub admission_claim: Option<AdmissionClaim>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum AdmissionClaim {
+    Message(super::message_admission::IntentClaim),
+    Schedule(super::schedule_admission::OccurrenceClaim),
 }
 
 /// Input validated against the pinned bundle and aggregate input/parameter bound.
@@ -124,6 +132,7 @@ pub struct PreparedAdmission {
     rerun_of: Option<RunId>,
     delivery_policy: DeliveryPolicy,
     expected_binding_revision: Option<BindingRevision>,
+    admission_claim: Option<AdmissionClaim>,
 }
 
 impl PreparedAdmission {
@@ -164,6 +173,7 @@ impl PreparedAdmission {
             rerun_of: request.rerun_of,
             delivery_policy: request.delivery_policy,
             expected_binding_revision: request.expected_binding_revision,
+            admission_claim: request.admission_claim,
         })
     }
     pub fn company_id(&self) -> CompanyId {
@@ -233,6 +243,9 @@ impl PreparedAdmission {
     }
     pub fn expected_binding_revision(&self) -> Option<BindingRevision> {
         self.expected_binding_revision
+    }
+    pub fn admission_claim(&self) -> Option<AdmissionClaim> {
+        self.admission_claim
     }
 }
 

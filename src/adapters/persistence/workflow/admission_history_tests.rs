@@ -2,6 +2,12 @@ use super::*;
 use crate::application::use_cases::channel::{ChannelPersistence, ChannelWrite};
 use crate::domain::entities::message::CanonicalMessageId;
 
+async fn history_fixture() -> AdmissionFixture {
+    let source =
+        serde_json::from_str(&registry::example("context.history").unwrap().source).unwrap();
+    AdmissionFixture::with_binding(BindingFixture::from_source(source).await).await
+}
+
 pub(super) struct Conversation {
     pub(super) channel: Uuid,
     pub(super) thread: Uuid,
@@ -77,7 +83,7 @@ impl Conversation {
 
 #[tokio::test]
 async fn workflow_admit_sql_message_alias_equivalence_and_independent_runs() {
-    let f = AdmissionFixture::new().await;
+    let f = history_fixture().await;
     let c = Conversation::new(&f).await;
     let first = f.prepare(c.request(&f, "first", c.message)).await;
     let second = f.prepare(c.request(&f, "redelivery", c.message)).await;
@@ -158,7 +164,7 @@ async fn await_admission_audit_lock(pool: &sqlx::PgPool) {
 
 #[tokio::test]
 async fn workflow_admit_sql_history_excludes_older_uncommitted_membership() {
-    let f = AdmissionFixture::new().await;
+    let f = history_fixture().await;
     let c = Conversation::new(&f).await;
     let p = f.persistence();
     let command = f
@@ -203,24 +209,71 @@ async fn workflow_admit_sql_history_excludes_older_uncommitted_membership() {
 }
 
 #[tokio::test]
-async fn workflow_admit_sql_history_overflow_rolls_back_the_admission() {
-    let f = AdmissionFixture::new().await;
+async fn workflow_admit_sql_long_history_retains_only_newest_256() {
+    let f = history_fixture().await;
     let c = Conversation::new(&f).await;
     let p = f.persistence();
-    // One existing membership plus the full bound gives exactly bound+1.
+    // A thread beyond the old limit still admits and keeps a bounded snapshot.
     sqlx::query("WITH inserted AS (INSERT INTO messages (id,company_id,author_principal_id,subject,clean_text_body,direction,role,correlation_id,content_hash) SELECT gen_random_uuid(),$1,principal.id,'History','body','inbound','human',gen_random_uuid(),$5 FROM principals AS principal CROSS JOIN generate_series(1,$4::integer) WHERE principal.company_id=$1 AND principal.user_id=$6 RETURNING id) INSERT INTO thread_messages (id,company_id,channel_id,thread_id,message_id,entry_kind) SELECT gen_random_uuid(),$1,$2,$3,id,'conversation' FROM inserted")
         .bind(f.binding.target.company.as_uuid()).bind(c.channel).bind(c.thread)
-        .bind(i32::try_from(admission_history::MAX_HISTORY_MEMBERS).unwrap()).bind(vec![0_u8;32])
+        .bind(10_000_i32).bind(vec![0_u8;32])
         .bind(f.binding.target.actor.user_id()).execute(p.pool()).await.unwrap();
     let command = f.prepare(c.request(&f, "overflow", c.message)).await;
-    assert!(matches!(
-        p.admit(&command).await,
-        Err(AppError::BadRequest(_))
-    ));
     assert_eq!(
-        f.counts().await,
-        json!({"runs":0,"executions":0,"jobs":0,"admissions":0,"commands":0,"events":0,"history":0})
+        p.admit(&command).await.unwrap(),
+        AdmissionResult::Created(command.proposed_run_id())
     );
+    assert_eq!(c.members(&f, command.proposed_run_id()).await.len(), 256);
+    let eligible: i64 =
+        sqlx::query_scalar("SELECT eligible_count FROM workflow_history_snapshots WHERE run_id=$1")
+            .bind(command.proposed_run_id().as_uuid())
+            .fetch_one(p.pool())
+            .await
+            .unwrap();
+    assert_eq!(eligible, 10_001);
+    let changed =
+        sqlx::query("UPDATE workflow_history_snapshots SET eligible_count=1 WHERE run_id=$1")
+            .bind(command.proposed_run_id().as_uuid())
+            .execute(p.pool())
+            .await;
+    assert_eq!(
+        changed
+            .unwrap_err()
+            .as_database_error()
+            .unwrap()
+            .code()
+            .as_deref(),
+        Some("23514")
+    );
+    sqlx::query("DELETE FROM companies WHERE id=$1")
+        .bind(f.binding.target.company.as_uuid())
+        .execute(p.pool())
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn workflow_admit_without_history_step_skips_snapshot() {
+    let f = AdmissionFixture::new().await;
+    let conversation = Conversation::new(&f).await;
+    let command = f
+        .prepare(conversation.request(&f, "no-history", conversation.message))
+        .await;
+    let p = f.persistence();
+    p.admit(&command).await.unwrap();
+    assert!(
+        conversation
+            .members(&f, command.proposed_run_id())
+            .await
+            .is_empty()
+    );
+    let snapshots: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM workflow_history_snapshots WHERE run_id=$1")
+            .bind(command.proposed_run_id().as_uuid())
+            .fetch_one(p.pool())
+            .await
+            .unwrap();
+    assert_eq!(snapshots, 0);
 }
 
 #[tokio::test]

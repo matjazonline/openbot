@@ -259,6 +259,7 @@ pub(super) async fn admitted_with(
             rerun_of: None,
             delivery_policy: policy,
             expected_binding_revision: None,
+            admission_claim: None,
         })
         .await
         .unwrap();

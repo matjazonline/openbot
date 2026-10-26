@@ -68,6 +68,7 @@ pub async fn start(
                 rerun_of: command.rerun_of,
                 delivery_policy: DeliveryPolicy::Deliver,
                 expected_binding_revision: None,
+                admission_claim: None,
             })
             .await?;
         match result {

@@ -101,6 +101,7 @@ async fn workflow_http_admission_rechecks_bound_operation_after_activation() {
             rerun_of: None,
             delivery_policy: crate::application::workflow::DeliveryPolicy::Deliver,
             expected_binding_revision: None,
+            admission_claim: None,
         })
         .await;
     assert!(result.is_err());

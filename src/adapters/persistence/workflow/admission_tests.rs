@@ -97,6 +97,7 @@ impl AdmissionFixture {
             rerun_of: None,
             delivery_policy: crate::application::workflow::DeliveryPolicy::Deliver,
             expected_binding_revision: None,
+            admission_claim: None,
         }
     }
     fn manual(&self) -> TriggerRef {
@@ -136,6 +137,73 @@ impl AdmissionFixture {
         .await
         .unwrap()
     }
+}
+
+#[tokio::test]
+async fn workflow_sql_published_and_run_snapshots_reject_rewrites() {
+    let f = AdmissionFixture::new().await;
+    sqlx::query("ALTER TABLE workflow_runs ENABLE TRIGGER workflow_run_snapshot_immutable")
+        .execute(f.persistence().pool())
+        .await
+        .unwrap();
+    let command = f.prepare(f.request("immutable-snapshot", f.manual())).await;
+    let p = f.persistence();
+    p.admit(&command).await.unwrap();
+    let rejected = |error: sqlx::Error| {
+        assert_eq!(
+            error
+                .as_database_error()
+                .and_then(|db| db.code())
+                .as_deref(),
+            Some("23514")
+        );
+    };
+    for sql in [
+        "UPDATE workflow_runs SET input='{}'::jsonb WHERE id=$1",
+        "UPDATE workflow_runs SET params='{\"changed\":true}'::jsonb WHERE id=$1",
+        "UPDATE workflow_runs SET deadline=deadline+interval '1 second' WHERE id=$1",
+    ] {
+        rejected(
+            sqlx::query(sql)
+                .bind(command.proposed_run_id().as_uuid())
+                .execute(p.pool())
+                .await
+                .unwrap_err(),
+        );
+    }
+    rejected(
+        sqlx::query("UPDATE workflow_versions SET title=title||' changed' WHERE id=$1")
+            .bind(command.version_id().as_uuid())
+            .execute(p.pool())
+            .await
+            .unwrap_err(),
+    );
+    rejected(sqlx::query("UPDATE workflow_binding_revisions SET params='{\"changed\":true}'::jsonb WHERE binding_id=$1")
+        .bind(command.binding().id().as_uuid()).execute(p.pool()).await.unwrap_err());
+    rejected(
+        sqlx::query("DELETE FROM workflow_versions WHERE id=$1")
+            .bind(command.version_id().as_uuid())
+            .execute(p.pool())
+            .await
+            .unwrap_err(),
+    );
+    rejected(
+        sqlx::query("DELETE FROM workflow_binding_revisions WHERE binding_id=$1")
+            .bind(command.binding().id().as_uuid())
+            .execute(p.pool())
+            .await
+            .unwrap_err(),
+    );
+    sqlx::query("UPDATE workflow_runs SET state='running' WHERE id=$1")
+        .bind(command.proposed_run_id().as_uuid())
+        .execute(p.pool())
+        .await
+        .unwrap();
+    sqlx::query("DELETE FROM companies WHERE id=$1")
+        .bind(command.company_id().as_uuid())
+        .execute(p.pool())
+        .await
+        .unwrap();
 }
 
 #[tokio::test]

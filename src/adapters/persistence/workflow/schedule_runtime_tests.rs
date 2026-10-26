@@ -87,7 +87,7 @@ async fn schedule_end_to_end_a_due_slot_runs_its_workflow_once() {
     assert_eq!(claimed.len(), 1);
     assert_eq!(
         crashing.materialize(worker, &claimed[0]).await.unwrap(),
-        Materialized::Deferred
+        Materialized::LeaseLost
     );
     let occurrence = claimed[0].id;
     sqlx::query(
@@ -127,7 +127,7 @@ async fn schedule_end_to_end_a_due_slot_runs_its_workflow_once() {
             .fetch_one(d.p().pool())
             .await
             .unwrap();
-    assert_eq!((recorded, attempts), (Some(run), 2));
+    assert_eq!((recorded, attempts), (Some(run), 1));
     assert_eq!(
         d.count("SELECT count(*) FROM threads WHERE company_id = $1")
             .await,

@@ -1,6 +1,6 @@
 //! Reader of the run's frozen thread history for `context.history` (06-D6 A). One read in
-//! the claim's transaction: the admission snapshot (`workflow_history_members`), internal
-//! notes excluded, counted without bodies; only the newest 256 members join their messages,
+//! the claim's transaction: the admission snapshot (`workflow_history_members`), with
+//! internal notes excluded at capture; only the newest 256 members join their messages,
 //! so a long thread never materializes bodies it cannot return.
 use super::http::{begin_http, runtime};
 use super::*;
@@ -26,7 +26,6 @@ struct HistoryRow {
     author_subject: Option<String>,
     subject: String,
     body: String,
-    eligible: i64,
 }
 
 impl HistoryRow {
@@ -71,22 +70,17 @@ impl crate::application::workflow::history::WorkflowHistory for PostgresPersiste
             .ok_or_else(invalid)?;
         // Texts are cut one character past the bound so the handler can mark truncation
         // without reading an unbounded body.
+        let eligible: i64 = sqlx::query_scalar(
+            "SELECT eligible_count FROM workflow_history_snapshots WHERE company_id=$1 AND run_id=$2",
+        ).bind(scope.company.as_uuid()).bind(scope.run.as_uuid())
+            .fetch_optional(&mut *tx).await?.unwrap_or(0);
         let rows: Vec<HistoryRow> = sqlx::query_as(
-            "WITH eligible AS ( \
-               SELECT member.message_id, member.ordinal, member.channel_id, member.thread_id \
-                 FROM workflow_history_members AS member \
-                WHERE member.company_id = $1 AND member.run_id = $2 \
-                  AND NOT EXISTS (SELECT 1 FROM internal_notes AS private_note \
-                       WHERE private_note.company_id = member.company_id AND private_note.message_id = member.message_id) \
-             ), newest AS ( \
-               SELECT * FROM eligible ORDER BY ordinal DESC LIMIT $3 \
-             ) \
-             SELECT newest.message_id, association.created_at AS at, message.role, message.audience, \
+            "SELECT newest.message_id, association.created_at AS at, message.role, message.audience, \
                     association.entry_kind, author.display_label AS author_label, \
                     author_identity.subject AS author_subject, \
-                    left(message.subject, $4) AS subject, left(message.clean_text_body, $4) AS body, \
-                    (SELECT count(*) FROM eligible) AS eligible \
-               FROM newest \
+                    left(message.subject, $3) AS subject, left(message.clean_text_body, $3) AS body \
+               FROM (SELECT * FROM workflow_history_members WHERE company_id=$1 AND run_id=$2 \
+                     ORDER BY ordinal DESC LIMIT $4) AS newest \
                JOIN thread_messages AS association \
                  ON (association.company_id, association.channel_id, association.thread_id, association.message_id) = \
                     ($1, newest.channel_id, newest.thread_id, newest.message_id) \
@@ -100,12 +94,11 @@ impl crate::application::workflow::history::WorkflowHistory for PostgresPersiste
         )
         .bind(scope.company.as_uuid())
         .bind(scope.run.as_uuid())
-        .bind(MAX_HISTORY_ITEMS as i64)
         .bind(MAX_HISTORY_TEXT as i32 + 1)
+        .bind(MAX_HISTORY_ITEMS as i64)
         .fetch_all(&mut *tx)
         .await?;
         tx.commit().await?;
-        let eligible = rows.first().map_or(0, |row| row.eligible);
         Ok(FrozenHistory {
             max_tokens,
             eligible: u64::try_from(eligible).map_err(|_| invalid())?,

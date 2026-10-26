@@ -285,12 +285,16 @@ async fn workflow_child_history_is_empty_and_later_messages_stay_invisible() {
             count
         }
     };
-    assert_eq!(members(parent.run).await, 1);
+    assert_eq!(
+        members(parent.run).await,
+        0,
+        "the caller has no history step"
+    );
     let mut db = p.pool().acquire().await.unwrap();
     c.insert(&mut db, &f, Uuid::new_v4()).await;
     let child = f.spawn(parent).await;
     assert_eq!(members(child.run).await, 0);
-    assert_eq!(members(parent.run).await, 1);
+    assert_eq!(members(parent.run).await, 0);
     let association: (Option<Uuid>, Option<Uuid>) =
         sqlx::query_as("SELECT channel_id, thread_id FROM workflow_runs WHERE id=$1")
             .bind(child.run.as_uuid())

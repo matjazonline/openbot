@@ -105,6 +105,7 @@ async fn workflow_agent_mcp_tool_dispatches_once_through_the_bound_slot() {
             rerun_of: None,
             delivery_policy: crate::application::workflow::DeliveryPolicy::Deliver,
             expected_binding_revision: None,
+            admission_claim: None,
         })
         .await
         .unwrap();

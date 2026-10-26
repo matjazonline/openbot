@@ -5089,7 +5089,7 @@ CREATE TABLE public.workflow_history_members (
     thread_id uuid NOT NULL,
     message_id uuid NOT NULL,
     ordinal integer NOT NULL,
-    CONSTRAINT workflow_history_members_ordinal_check CHECK (((ordinal >= 1) AND (ordinal <= 10000)))
+    CONSTRAINT workflow_history_members_ordinal_check CHECK (((ordinal >= 1) AND (ordinal <= 256)))
 );
 
 
@@ -11193,3 +11193,68 @@ CREATE CONSTRAINT TRIGGER guard_workflow_token_reopen AFTER UPDATE ON public.wor
     DEFERRABLE INITIALLY DEFERRED
     FOR EACH ROW WHEN (OLD.state NOT IN ('queued','running') AND NEW.state IN ('queued','running'))
     EXECUTE FUNCTION public.guard_workflow_token_reopen();
+
+-- A history step needs the exact eligible count, while only its newest 256
+-- messages need retained membership rows. Both are captured in one statement.
+CREATE TABLE public.workflow_history_snapshots (
+    company_id uuid NOT NULL,
+    run_id uuid NOT NULL,
+    eligible_count bigint NOT NULL CHECK (eligible_count >= 0),
+    PRIMARY KEY (company_id, run_id),
+    FOREIGN KEY (company_id, run_id) REFERENCES public.workflow_runs(company_id, id) ON DELETE CASCADE
+);
+
+CREATE FUNCTION public.guard_workflow_run_snapshot() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF (to_jsonb(NEW) - ARRAY['state','waiting_reason','terminal_execution_id',
+        'terminal_wakeup_sequence','revision']) IS DISTINCT FROM
+       (to_jsonb(OLD) - ARRAY['state','waiting_reason','terminal_execution_id',
+        'terminal_wakeup_sequence','revision']) THEN
+        RAISE EXCEPTION 'workflow run snapshot is immutable' USING ERRCODE='23514';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER workflow_run_snapshot_immutable BEFORE UPDATE OF company_id, id, binding_id,
+    binding_revision, workflow_id, version_id, channel_id, thread_id, actor_id, trigger_id,
+    correlation_id, bundle, input, params, resources, max_steps, max_context_bytes, deadline,
+    created_at, parent_run_id, parent_execution_id, rerun_of_run_id, delivery_policy
+    ON public.workflow_runs
+    FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_run_snapshot();
+
+CREATE FUNCTION public.guard_workflow_publication_snapshot() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP='DELETE' THEN
+        IF pg_trigger_depth()>1 THEN
+            IF TG_TABLE_NAME='workflow_versions' THEN
+                IF NOT EXISTS (SELECT 1 FROM public.workflow_definitions
+                    WHERE company_id=OLD.company_id AND id=OLD.workflow_id)
+                THEN RETURN OLD; END IF;
+            ELSIF TG_TABLE_NAME='workflow_binding_revisions' THEN
+                IF NOT EXISTS (SELECT 1 FROM public.workflow_bindings
+                    WHERE company_id=OLD.company_id AND id=OLD.binding_id)
+                THEN RETURN OLD; END IF;
+            END IF;
+        END IF;
+        RAISE EXCEPTION 'published workflow configuration is immutable' USING ERRCODE='23514';
+    END IF;
+    IF NEW IS DISTINCT FROM OLD THEN
+        RAISE EXCEPTION 'published workflow configuration is immutable' USING ERRCODE='23514';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER workflow_version_immutable BEFORE UPDATE OR DELETE ON public.workflow_versions
+    FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_publication_snapshot();
+CREATE TRIGGER workflow_binding_revision_immutable BEFORE UPDATE OR DELETE ON public.workflow_binding_revisions
+    FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_publication_snapshot();
+
+CREATE FUNCTION public.guard_workflow_history_snapshot() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP='DELETE' AND pg_trigger_depth()>1
+        AND NOT EXISTS (SELECT 1 FROM public.workflow_runs WHERE company_id=OLD.company_id AND id=OLD.run_id)
+    THEN RETURN OLD; END IF;
+    RAISE EXCEPTION 'workflow history snapshot is immutable' USING ERRCODE='23514';
+END $$;
+CREATE TRIGGER workflow_history_members_immutable BEFORE UPDATE OR DELETE ON public.workflow_history_members
+    FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_history_snapshot();
+CREATE TRIGGER workflow_history_snapshots_immutable BEFORE UPDATE OR DELETE ON public.workflow_history_snapshots
+    FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_history_snapshot();

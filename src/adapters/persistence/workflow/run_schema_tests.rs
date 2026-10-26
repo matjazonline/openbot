@@ -339,7 +339,7 @@ async fn workflow_run_schema_history_membership_roundtrip_scope_and_bounds() {
             .unwrap()
             .is_unique_violation()
     );
-    for ordinal in [0, 10001] {
+    for ordinal in [0, 257] {
         assert_eq!(
             history
                 .insert(&mut db, company, run, history.messages[1], ordinal)
@@ -353,7 +353,7 @@ async fn workflow_run_schema_history_membership_roundtrip_scope_and_bounds() {
         );
     }
     history
-        .insert(&mut db, company, run, history.messages[1], 10000)
+        .insert(&mut db, company, run, history.messages[1], 256)
         .await
         .unwrap();
 }

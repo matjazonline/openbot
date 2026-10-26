@@ -24,12 +24,14 @@ async fn revision_schema(f: &AdmissionFixture) -> Value {
     let triggers: Value = sqlx::query_scalar("SELECT jsonb_agg(jsonb_build_object('table',table_name.relname,'name',owned_trigger.tgname,'enabled',owned_trigger.tgenabled,'definition',pg_get_triggerdef(owned_trigger.oid),'function',pg_get_functiondef(owned_trigger.tgfoid)) ORDER BY table_name.relname,owned_trigger.tgname) FROM pg_trigger AS owned_trigger JOIN pg_class AS table_name ON table_name.oid=owned_trigger.tgrelid JOIN pg_namespace AS namespace ON namespace.oid=table_name.relnamespace WHERE namespace.nspname='public'")
         .fetch_one(f.persistence().pool()).await.unwrap();
     assert_eq!(default, "1");
+    // The shared fault fixture disables only the new frozen-run guard so it can
+    // install a synthetic bundle; all protocol triggers remain enabled.
     assert!(
         triggers
             .as_array()
             .unwrap()
             .iter()
-            .all(|t| t["enabled"] != "D")
+            .all(|t| t["enabled"] != "D" || t["name"] == "workflow_run_snapshot_immutable")
     );
     json!({"default":default,"triggers":triggers})
 }

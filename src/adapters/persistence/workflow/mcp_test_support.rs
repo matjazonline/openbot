@@ -489,6 +489,7 @@ pub(super) async fn admitted(setup: &McpSetup, key: &str) -> ActivationRequest {
             rerun_of: None,
             delivery_policy: crate::application::workflow::DeliveryPolicy::Deliver,
             expected_binding_revision: None,
+            admission_claim: None,
         })
         .await
         .unwrap();

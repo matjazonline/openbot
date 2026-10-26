@@ -393,11 +393,46 @@ impl ChannelPersistence for PostgresPersistence {
     }
 
     async fn delete(&self, id: Uuid) -> AppResult<()> {
+        let mut tx = self.pool.begin().await?;
+        let channel: Option<Uuid> =
+            sqlx::query_scalar("SELECT id FROM channels WHERE id=$1 FOR UPDATE")
+                .bind(id)
+                .fetch_optional(&mut *tx)
+                .await?;
+        let Some(_) = channel else { return Ok(()) };
+        let retained: bool = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM threads WHERE channel_id=$1) \
+             OR EXISTS(SELECT 1 FROM workflow_bindings WHERE channel_id=$1) \
+             OR EXISTS(SELECT 1 FROM channel_schedules WHERE channel_id=$1) \
+             OR EXISTS(SELECT 1 FROM workflow_runs WHERE channel_id=$1)",
+        )
+        .bind(id)
+        .fetch_one(&mut *tx)
+        .await?;
+        if retained {
+            return Err(AppError::Conflict(
+                "This channel has retained conversations or workflow configuration and cannot be deleted"
+                    .into(),
+            ));
+        }
         sqlx::query("DELETE FROM channels WHERE id = $1")
             .bind(id)
-            .execute(&self.pool)
+            .execute(&mut *tx)
             .await
-            .map_err(AppError::from)?;
+            .map_err(|error| {
+                if error
+                    .as_database_error()
+                    .is_some_and(|error| error.is_foreign_key_violation())
+                {
+                    AppError::Conflict(
+                        "This channel has retained conversations or workflow configuration and cannot be deleted"
+                            .into(),
+                    )
+                } else {
+                    AppError::from(error)
+                }
+            })?;
+        tx.commit().await?;
         Ok(())
     }
 }
@@ -726,7 +761,27 @@ mod tests {
             Some("Now also handles refund requests.")
         );
 
-        // 5. Delete
+        // A retained conversation prevents deleting the channel, even after it is disabled.
+        let thread = Uuid::new_v4();
+        sqlx::query("INSERT INTO threads (id, company_id, channel_id, subject) VALUES ($1,$2,$3,'Retained')")
+            .bind(thread).bind(company.id).bind(channel.id).execute(persistence.pool()).await.unwrap();
+        assert!(matches!(
+            ChannelPersistence::delete(&persistence, channel.id).await,
+            Err(AppError::Conflict(_))
+        ));
+        assert!(
+            ChannelPersistence::get_by_id(&persistence, channel.id)
+                .await
+                .unwrap()
+                .is_some()
+        );
+        sqlx::query("DELETE FROM threads WHERE id=$1")
+            .bind(thread)
+            .execute(persistence.pool())
+            .await
+            .unwrap();
+
+        // 5. Delete an empty channel.
         ChannelPersistence::delete(&persistence, channel.id)
             .await
             .unwrap();

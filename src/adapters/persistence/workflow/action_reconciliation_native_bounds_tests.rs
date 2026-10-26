@@ -68,7 +68,13 @@ fn check_owner(catalog: &Value, owner: CheckOwner, limit: usize) {
     assert!(definition.contains("octet_length"));
     assert!(definition.contains(&format!("<= {limit}")));
     for trigger in catalog["triggers"].as_array().unwrap() {
-        assert_eq!(trigger["enabled"], "O", "native trigger stays enabled");
+        // This fault fixture rewrites admitted snapshots; only that guard is disabled.
+        assert!(
+            trigger["enabled"] == "O"
+                || (trigger["name"] == "workflow_run_snapshot_immutable"
+                    && trigger["enabled"] == "D"),
+            "native trigger stays enabled: {trigger}"
+        );
     }
 }
 

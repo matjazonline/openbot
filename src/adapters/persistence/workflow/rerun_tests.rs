@@ -22,6 +22,7 @@ fn relinked(request: &AdmitWorkflowRequest, rerun_of: Option<RunId>) -> AdmitWor
         rerun_of,
         delivery_policy: crate::application::workflow::DeliveryPolicy::Deliver,
         expected_binding_revision: None,
+        admission_claim: None,
     }
 }
 

@@ -268,6 +268,7 @@ impl ToolSetup {
                 rerun_of: None,
                 delivery_policy: crate::application::workflow::DeliveryPolicy::Deliver,
                 expected_binding_revision: None,
+                admission_claim: None,
             })
             .await
     }

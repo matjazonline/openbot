@@ -6,8 +6,8 @@
 use super::message_admission::{BindingOutcome, Classified, WorkflowAdmitter, classify};
 use super::triggers::ScheduleTriggerInput;
 use super::{
-    AdmitWorkflowRequest, DeliveryPolicy, IdempotencyKey, RelatedAssociation, RelatedChannelId,
-    WorkflowActor,
+    AdmissionClaim, AdmitWorkflowRequest, DeliveryPolicy, IdempotencyKey, RelatedAssociation,
+    RelatedChannelId, WorkflowActor,
 };
 use crate::application::app_error::{AppError, AppResult};
 use crate::domain::entities::correlation::CorrelationId;
@@ -170,12 +170,18 @@ where
     }
 
     pub async fn claim(&self, worker: ScheduleWorkerId) -> AppResult<Vec<ClaimedScheduleRun>> {
-        for expired in self.queue.fail_expired_occurrences(SCHEDULE_PAGE).await? {
+        self.claim_page(worker, SCHEDULE_PAGE).await
+    }
+
+    async fn claim_page(
+        &self,
+        worker: ScheduleWorkerId,
+        page: i64,
+    ) -> AppResult<Vec<ClaimedScheduleRun>> {
+        for expired in self.queue.fail_expired_occurrences(page).await? {
             self.failed(expired.company, expired.occurrence, "lease_expired");
         }
-        self.queue
-            .claim_due(worker, lease_until()?, SCHEDULE_PAGE)
-            .await
+        self.queue.claim_due(worker, lease_until()?, page).await
     }
 
     /// Admit one run for a claimed occurrence and record what happened under the claim.
@@ -198,7 +204,7 @@ where
             };
             let result = self
                 .admitter
-                .admit(admission_request(occurrence, &binding)?)
+                .admit(admission_request(occurrence, &binding, claim)?)
                 .await;
             let error = result.as_ref().err().map(ToString::to_string);
             match classify(result) {
@@ -337,6 +343,7 @@ fn lease_until() -> AppResult<DateTime<Utc>> {
 fn admission_request(
     occurrence: &ClaimedScheduleRun,
     binding: &ScheduleBinding,
+    claim: OccurrenceClaim,
 ) -> AppResult<AdmitWorkflowRequest> {
     let schedule = &occurrence.schedule;
     let company = CompanyId::new(schedule.company_id);
@@ -363,6 +370,7 @@ fn admission_request(
         rerun_of: None,
         delivery_policy: DeliveryPolicy::Deliver,
         expected_binding_revision: Some(binding.revision),
+        admission_claim: Some(AdmissionClaim::Schedule(claim)),
     })
 }
 
@@ -383,12 +391,12 @@ where
         loop {
             let page = tokio::select! { biased;
                 _ = shutdown.cancelled() => return,
-                page = self.materializer.claim(self.worker) => page,
+                page = self.materializer.claim_page(self.worker, 1) => page,
             };
             let mut full = false;
             match page {
                 Ok(occurrences) => {
-                    full = occurrences.len() == SCHEDULE_PAGE as usize;
+                    full = occurrences.len() == 1;
                     for occurrence in occurrences {
                         let id = occurrence.id;
                         let result = tokio::select! { biased;

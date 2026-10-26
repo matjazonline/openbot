@@ -6,9 +6,10 @@
 use super::triggers::MessageTriggerInput;
 use super::waits::{IngressReply, ReplyIngress, WorkflowEventId, WorkflowWaits};
 use super::{
-    AdmissionResult, AdmitWorkflowRequest, DeliveryPolicy, IdempotencyKey, RelatedAssociation,
-    RelatedChannelId, RelatedThreadId, WorkflowActor, WorkflowAdmission, WorkflowAuthorization,
-    WorkflowBindings, WorkflowInspection, WorkflowRunTransitions, WorkflowService,
+    AdmissionClaim, AdmissionResult, AdmitWorkflowRequest, DeliveryPolicy, IdempotencyKey,
+    RelatedAssociation, RelatedChannelId, RelatedThreadId, WorkflowActor, WorkflowAdmission,
+    WorkflowAuthorization, WorkflowBindings, WorkflowInspection, WorkflowRunTransitions,
+    WorkflowService,
 };
 use crate::application::app_error::{AppError, AppResult};
 use crate::domain::entities::correlation::CorrelationId;
@@ -36,6 +37,8 @@ pub const REPLY_PARK_GRACE: Duration = Duration::from_secs(5 * 60);
 /// Intents one claim takes, and at most how many of one company's (p08 D1.4.1).
 pub const MESSAGE_INTENT_PAGE: u16 = 32;
 pub const MESSAGE_INTENTS_PER_COMPANY: u16 = 4;
+/// The live worker starts every claimed lease immediately while retaining tenant spread.
+const WORKER_CLAIM_PAGE: u16 = 8;
 /// Re-reads of a binding reconfigured while its admission was in flight.
 const MAX_STALE_RETRIES: usize = 3;
 
@@ -490,11 +493,12 @@ fn admission_request(
         rerun_of: None,
         delivery_policy: intent.delivery_policy,
         expected_binding_revision: Some(binding.revision),
+        admission_claim: Some(AdmissionClaim::Message(intent.claim)),
     })
 }
 
-/// The intent queue's polling loop. One intent at a time; dropping the loop drops the in-flight
-/// intent, whose short lease then expires and spends an attempt (`src/AGENTS.md`).
+/// The intent queue's polling loop. Each claimed page is processed concurrently so no
+/// intent spends its lease waiting behind another. Shutdown drops the in-flight page.
 pub struct MessageAdmissionWorker<Q, A, W> {
     pub admissions: MessageAdmissions<Q, A, W>,
     pub worker: MessageIntentWorkerId,
@@ -511,20 +515,22 @@ where
         loop {
             let page = tokio::select! { biased;
                 _ = shutdown.cancelled() => return,
-                page = self.admissions.claim(self.worker, MESSAGE_INTENT_PAGE) => page,
+                page = self.admissions.claim(self.worker, WORKER_CLAIM_PAGE) => page,
             };
             let mut full = false;
             match page {
                 Ok(intents) => {
                     // A full page moved every row out of the claimable set, so it is evidence of
                     // more work; deferred rows were moved into the future and are not reclaimed.
-                    full = intents.len() == usize::from(MESSAGE_INTENT_PAGE);
-                    for intent in intents {
-                        let id = intent.claim.intent;
-                        let result = tokio::select! { biased;
-                            _ = shutdown.cancelled() => return,
-                            result = Box::pin(self.admissions.process(intent)) => result,
-                        };
+                    full = intents.len() == usize::from(WORKER_CLAIM_PAGE);
+                    let results = tokio::select! { biased;
+                        _ = shutdown.cancelled() => return,
+                        results = futures::future::join_all(intents.into_iter().map(|intent| async {
+                            let id = intent.claim.intent;
+                            (id, self.admissions.process(intent).await)
+                        })) => results,
+                    };
+                    for (id, result) in results {
                         if let Err(error) = result {
                             tracing::warn!(intent_id = %id, error = %error,
                                 "Workflow message intent processing failed; its lease will expire");

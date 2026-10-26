@@ -112,13 +112,20 @@ const FENCE: &str = "SELECT id FROM workflow_message_intents WHERE company_id = 
 #[async_trait]
 impl MessageIntentQueue for PostgresPersistence {
     async fn fail_expired_intents(&self, page: u16) -> AppResult<Vec<FailedIntent>> {
-        let rows: Vec<(Uuid, Uuid)> = sqlx::query_as(
-            "UPDATE workflow_message_intents SET state = 'failed', worker_id = NULL, \
-               claim_generation = NULL, lease_expires_at = NULL, updated_at = clock_timestamp() \
+        let rows: Vec<(Uuid, Uuid, String)> = sqlx::query_as(
+            "UPDATE workflow_message_intents AS intent SET \
+               state = CASE WHEN EXISTS (SELECT 1 FROM workflow_message_intent_bindings AS binding \
+                   WHERE binding.company_id=intent.company_id AND binding.intent_id=intent.id \
+                     AND binding.outcome='admitted') THEN 'done' ELSE 'failed' END, \
+               outcome = CASE WHEN EXISTS (SELECT 1 FROM workflow_message_intent_bindings AS binding \
+                   WHERE binding.company_id=intent.company_id AND binding.intent_id=intent.id \
+                     AND binding.outcome='admitted') THEN 'admitted' ELSE NULL END, \
+               worker_id = NULL, claim_generation = NULL, lease_expires_at = NULL, \
+               updated_at = clock_timestamp() \
              WHERE ctid IN (SELECT ctid FROM workflow_message_intents WHERE state = 'claimed' \
                AND attempts >= $1 AND lease_expires_at <= clock_timestamp() LIMIT $2 \
                FOR UPDATE SKIP LOCKED) \
-             RETURNING company_id, id",
+             RETURNING intent.company_id, intent.id, intent.state",
         )
         .bind(MAX_INTENT_ATTEMPTS)
         .bind(i64::from(page))
@@ -126,7 +133,8 @@ impl MessageIntentQueue for PostgresPersistence {
         .await?;
         Ok(rows
             .into_iter()
-            .map(|(company, intent)| FailedIntent {
+            .filter(|(_, _, state)| state == "failed")
+            .map(|(company, intent, _)| FailedIntent {
                 company: CompanyId::new(company),
                 intent,
             })
