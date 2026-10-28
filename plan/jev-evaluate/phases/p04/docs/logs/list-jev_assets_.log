@@ -1,0 +1,14 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.26s
+     Running unittests src/lib.rs (target/debug/deps/mail_agents-0fc485c3efcd046b)
+adapters::persistence::workflow::tests::jev_assets_tests::jev_assets_changed_object_retry_never_sends_or_adds_reservation: test
+adapters::persistence::workflow::tests::jev_assets_tests::jev_assets_cross_company_negative_and_forged_claim_are_denied_before_storage: test
+adapters::persistence::workflow::tests::jev_assets_tests::jev_assets_current_actor_channel_visibility_and_missing_file: test
+adapters::persistence::workflow::tests::jev_assets_tests::jev_assets_mixed_loopback_settlement_replay_and_metadata_only_ledger: test
+adapters::storage::gcs::tests::jev_assets_storage_read_bound_declared_and_streamed: test
+application::workflow::jev::assets::tests::jev_assets_aggregate_wire_bound_is_still_64_kib: test
+application::workflow::jev::assets::tests::jev_assets_forbid_inline_url_mutable_and_excess_references: test
+application::workflow::jev::assets::tests::jev_assets_identity_opaque_wire_and_pixel_reservation: test
+application::workflow::jev::assets::tests::jev_assets_jpeg_and_animation_are_explicitly_validated: test
+application::workflow::jev::assets::tests::jev_assets_reject_changed_unsupported_oversized_and_invalid_dimensions: test
+
+10 tests, 0 benchmarks

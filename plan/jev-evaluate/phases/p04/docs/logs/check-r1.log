@@ -1,0 +1,618 @@
+    Checking mail-auth v0.6.1
+    Checking mail_agents v0.1.0 (/Users/mac02/dev/openbot)
+error[E0277]: the trait bound `application::workflow::authorization::RelatedChannelId: serde::Serialize` is not satisfied
+    --> src/application/workflow/jev_assets.rs:30:39
+     |
+  30 | #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+     |                                       ^^^^^^^^^ unsatisfied trait bound
+...
+  33 |     pub channel_id: RelatedChannelId,
+     |     --- required by a bound introduced by this call
+     |
+help: the trait `domain::monitoring::_::_serde::Serialize` is not implemented for `application::workflow::authorization::RelatedChannelId`
+    --> src/application/workflow/authorization.rs:36:9
+     |
+  36 |         pub struct $name(Uuid);
+     |         ^^^^^^^^^^^^^^^^^^^^^^^
+...
+  47 | related_id!(RelatedChannelId);
+     | ----------------------------- in this macro invocation
+     = note: for local types consider adding `#[derive(serde::Serialize)]` to your `application::workflow::authorization::RelatedChannelId` type
+     = note: for types from other crates check whether the crate offers a `serde` feature flag
+     = help: the following other types implement trait `domain::monitoring::_::_serde::Serialize`:
+               &'a T
+               &'a mut T
+               ()
+               (T,)
+               (T0, T1)
+               (T0, T1, T2)
+               (T0, T1, T2, T3)
+               (T0, T1, T2, T3, T4)
+             and 1121 others
+note: required by a bound in `domain::monitoring::_::_serde::ser::SerializeStruct::serialize_field`
+    --> /Users/mac02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_core-1.0.229/src/ser/mod.rs:1917:21
+     |
+1915 |     fn serialize_field<T>(&mut self, key: &'static str, value: &T) -> Result<(), Self::Error>
+     |        --------------- required by a bound in this associated function
+1916 |     where
+1917 |         T: ?Sized + Serialize;
+     |                     ^^^^^^^^^ required by this bound in `SerializeStruct::serialize_field`
+     = note: this error originates in the derive macro `Serialize` which comes from the expansion of the macro `related_id` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `application::workflow::authorization::RelatedThreadId: serde::Serialize` is not satisfied
+    --> src/application/workflow/jev_assets.rs:30:39
+     |
+  30 | #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+     |                                       ^^^^^^^^^ unsatisfied trait bound
+...
+  34 |     pub thread_id: RelatedThreadId,
+     |     --- required by a bound introduced by this call
+     |
+help: the trait `domain::monitoring::_::_serde::Serialize` is not implemented for `application::workflow::authorization::RelatedThreadId`
+    --> src/application/workflow/authorization.rs:36:9
+     |
+  36 |         pub struct $name(Uuid);
+     |         ^^^^^^^^^^^^^^^^^^^^^^^
+...
+  48 | related_id!(RelatedThreadId);
+     | ---------------------------- in this macro invocation
+     = note: for local types consider adding `#[derive(serde::Serialize)]` to your `application::workflow::authorization::RelatedThreadId` type
+     = note: for types from other crates check whether the crate offers a `serde` feature flag
+     = help: the following other types implement trait `domain::monitoring::_::_serde::Serialize`:
+               &'a T
+               &'a mut T
+               ()
+               (T,)
+               (T0, T1)
+               (T0, T1, T2)
+               (T0, T1, T2, T3)
+               (T0, T1, T2, T3, T4)
+             and 1121 others
+note: required by a bound in `domain::monitoring::_::_serde::ser::SerializeStruct::serialize_field`
+    --> /Users/mac02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_core-1.0.229/src/ser/mod.rs:1917:21
+     |
+1915 |     fn serialize_field<T>(&mut self, key: &'static str, value: &T) -> Result<(), Self::Error>
+     |        --------------- required by a bound in this associated function
+1916 |     where
+1917 |         T: ?Sized + Serialize;
+     |                     ^^^^^^^^^ required by this bound in `SerializeStruct::serialize_field`
+     = note: this error originates in the derive macro `Serialize` which comes from the expansion of the macro `related_id` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `application::workflow::authorization::RelatedChannelId: serde::Deserialize<'de>` is not satisfied
+    --> src/application/workflow/jev_assets.rs:33:21
+     |
+  33 |     pub channel_id: RelatedChannelId,
+     |                     ^^^^^^^^^^^^^^^^ unsatisfied trait bound
+     |
+help: the trait `domain::monitoring::_::_serde::Deserialize<'_>` is not implemented for `application::workflow::authorization::RelatedChannelId`
+    --> src/application/workflow/authorization.rs:36:9
+     |
+  36 |         pub struct $name(Uuid);
+     |         ^^^^^^^^^^^^^^^^^^^^^^^
+...
+  47 | related_id!(RelatedChannelId);
+     | ----------------------------- in this macro invocation
+     = note: for local types consider adding `#[derive(serde::Deserialize)]` to your `application::workflow::authorization::RelatedChannelId` type
+     = note: for types from other crates check whether the crate offers a `serde` feature flag
+     = help: the following other types implement trait `domain::monitoring::_::_serde::Deserialize<'de>`:
+               `&'a JsonRawValue` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+               `&'a [u8]` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+               `&'a std::path::Path` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+               `&'a str` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+               `()` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+               `(T,)` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+               `(T0, T1)` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+               `(T0, T1, T2)` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+             and 1232 others
+note: required by a bound in `next_element`
+    --> /Users/mac02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_core-1.0.229/src/de/mod.rs:1771:12
+     |
+1769 |     fn next_element<T>(&mut self) -> Result<Option<T>, Self::Error>
+     |        ------------ required by a bound in this associated function
+1770 |     where
+1771 |         T: Deserialize<'de>,
+     |            ^^^^^^^^^^^^^^^^ required by this bound in `SeqAccess::next_element`
+     = note: the full name for the type has been written to '/Users/mac02/dev/openbot/target/debug/deps/mail_agents-996eed7ef8f82959.long-type-14525204129603497240.txt'
+     = note: consider using `--verbose` to print the full type name to the console
+     = note: this error originates in the macro `related_id` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `application::workflow::authorization::RelatedThreadId: serde::Deserialize<'de>` is not satisfied
+    --> src/application/workflow/jev_assets.rs:34:20
+     |
+  34 |     pub thread_id: RelatedThreadId,
+     |                    ^^^^^^^^^^^^^^^ unsatisfied trait bound
+     |
+help: the trait `domain::monitoring::_::_serde::Deserialize<'_>` is not implemented for `application::workflow::authorization::RelatedThreadId`
+    --> src/application/workflow/authorization.rs:36:9
+     |
+  36 |         pub struct $name(Uuid);
+     |         ^^^^^^^^^^^^^^^^^^^^^^^
+...
+  48 | related_id!(RelatedThreadId);
+     | ---------------------------- in this macro invocation
+     = note: for local types consider adding `#[derive(serde::Deserialize)]` to your `application::workflow::authorization::RelatedThreadId` type
+     = note: for types from other crates check whether the crate offers a `serde` feature flag
+     = help: the following other types implement trait `domain::monitoring::_::_serde::Deserialize<'de>`:
+               `&'a JsonRawValue` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+               `&'a [u8]` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+               `&'a std::path::Path` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+               `&'a str` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+               `()` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+               `(T,)` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+               `(T0, T1)` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+               `(T0, T1, T2)` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+             and 1232 others
+note: required by a bound in `next_element`
+    --> /Users/mac02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_core-1.0.229/src/de/mod.rs:1771:12
+     |
+1769 |     fn next_element<T>(&mut self) -> Result<Option<T>, Self::Error>
+     |        ------------ required by a bound in this associated function
+1770 |     where
+1771 |         T: Deserialize<'de>,
+     |            ^^^^^^^^^^^^^^^^ required by this bound in `SeqAccess::next_element`
+     = note: the full name for the type has been written to '/Users/mac02/dev/openbot/target/debug/deps/mail_agents-996eed7ef8f82959.long-type-14525204129603497240.txt'
+     = note: consider using `--verbose` to print the full type name to the console
+     = note: this error originates in the macro `related_id` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `application::workflow::authorization::RelatedChannelId: serde::Deserialize<'de>` is not satisfied
+    --> src/application/workflow/jev_assets.rs:33:21
+     |
+  33 |     pub channel_id: RelatedChannelId,
+     |                     ^^^^^^^^^^^^^^^^ unsatisfied trait bound
+     |
+help: the trait `domain::monitoring::_::_serde::Deserialize<'_>` is not implemented for `application::workflow::authorization::RelatedChannelId`
+    --> src/application/workflow/authorization.rs:36:9
+     |
+  36 |         pub struct $name(Uuid);
+     |         ^^^^^^^^^^^^^^^^^^^^^^^
+...
+  47 | related_id!(RelatedChannelId);
+     | ----------------------------- in this macro invocation
+     = note: for local types consider adding `#[derive(serde::Deserialize)]` to your `application::workflow::authorization::RelatedChannelId` type
+     = note: for types from other crates check whether the crate offers a `serde` feature flag
+     = help: the following other types implement trait `domain::monitoring::_::_serde::Deserialize<'de>`:
+               `&'a JsonRawValue` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+               `&'a [u8]` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+               `&'a std::path::Path` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+               `&'a str` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+               `()` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+               `(T,)` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+               `(T0, T1)` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+               `(T0, T1, T2)` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+             and 1232 others
+note: required by a bound in `next_value`
+    --> /Users/mac02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_core-1.0.229/src/de/mod.rs:1916:12
+     |
+1914 |     fn next_value<V>(&mut self) -> Result<V, Self::Error>
+     |        ---------- required by a bound in this associated function
+1915 |     where
+1916 |         V: Deserialize<'de>,
+     |            ^^^^^^^^^^^^^^^^ required by this bound in `MapAccess::next_value`
+     = note: the full name for the type has been written to '/Users/mac02/dev/openbot/target/debug/deps/mail_agents-996eed7ef8f82959.long-type-14525204129603497240.txt'
+     = note: consider using `--verbose` to print the full type name to the console
+     = note: this error originates in the macro `related_id` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `application::workflow::authorization::RelatedThreadId: serde::Deserialize<'de>` is not satisfied
+    --> src/application/workflow/jev_assets.rs:34:20
+     |
+  34 |     pub thread_id: RelatedThreadId,
+     |                    ^^^^^^^^^^^^^^^ unsatisfied trait bound
+     |
+help: the trait `domain::monitoring::_::_serde::Deserialize<'_>` is not implemented for `application::workflow::authorization::RelatedThreadId`
+    --> src/application/workflow/authorization.rs:36:9
+     |
+  36 |         pub struct $name(Uuid);
+     |         ^^^^^^^^^^^^^^^^^^^^^^^
+...
+  48 | related_id!(RelatedThreadId);
+     | ---------------------------- in this macro invocation
+     = note: for local types consider adding `#[derive(serde::Deserialize)]` to your `application::workflow::authorization::RelatedThreadId` type
+     = note: for types from other crates check whether the crate offers a `serde` feature flag
+     = help: the following other types implement trait `domain::monitoring::_::_serde::Deserialize<'de>`:
+               `&'a JsonRawValue` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+               `&'a [u8]` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+               `&'a std::path::Path` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+               `&'a str` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+               `()` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+               `(T,)` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+               `(T0, T1)` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+               `(T0, T1, T2)` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+             and 1232 others
+note: required by a bound in `next_value`
+    --> /Users/mac02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_core-1.0.229/src/de/mod.rs:1916:12
+     |
+1914 |     fn next_value<V>(&mut self) -> Result<V, Self::Error>
+     |        ---------- required by a bound in this associated function
+1915 |     where
+1916 |         V: Deserialize<'de>,
+     |            ^^^^^^^^^^^^^^^^ required by this bound in `MapAccess::next_value`
+     = note: the full name for the type has been written to '/Users/mac02/dev/openbot/target/debug/deps/mail_agents-996eed7ef8f82959.long-type-14525204129603497240.txt'
+     = note: consider using `--verbose` to print the full type name to the console
+     = note: this error originates in the macro `related_id` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `application::workflow::authorization::RelatedChannelId: serde::Deserialize<'de>` is not satisfied
+  --> src/application/workflow/jev_assets.rs:30:50
+   |
+30 | #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+   |                                                  ^^^^^^^^^^^ unsatisfied trait bound
+   |
+help: the trait `domain::monitoring::_::_serde::Deserialize<'_>` is not implemented for `application::workflow::authorization::RelatedChannelId`
+  --> src/application/workflow/authorization.rs:36:9
+   |
+36 |         pub struct $name(Uuid);
+   |         ^^^^^^^^^^^^^^^^^^^^^^^
+...
+47 | related_id!(RelatedChannelId);
+   | ----------------------------- in this macro invocation
+   = note: for local types consider adding `#[derive(serde::Deserialize)]` to your `application::workflow::authorization::RelatedChannelId` type
+   = note: for types from other crates check whether the crate offers a `serde` feature flag
+   = help: the following other types implement trait `domain::monitoring::_::_serde::Deserialize<'de>`:
+             `&'a JsonRawValue` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+             `&'a [u8]` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+             `&'a std::path::Path` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+             `&'a str` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+             `()` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+             `(T,)` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+             `(T0, T1)` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+             `(T0, T1, T2)` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+           and 1232 others
+note: required by a bound in `domain::monitoring::_::_serde::__private229::de::missing_field`
+  --> /Users/mac02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/de.rs:26:8
+   |
+24 | pub fn missing_field<'de, V, E>(field: &'static str) -> Result<V, E>
+   |        ------------- required by a bound in this function
+25 | where
+26 |     V: Deserialize<'de>,
+   |        ^^^^^^^^^^^^^^^^ required by this bound in `missing_field`
+   = note: the full name for the type has been written to '/Users/mac02/dev/openbot/target/debug/deps/mail_agents-996eed7ef8f82959.long-type-14525204129603497240.txt'
+   = note: consider using `--verbose` to print the full type name to the console
+   = note: this error originates in the derive macro `Deserialize` which comes from the expansion of the macro `related_id` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `application::workflow::authorization::RelatedThreadId: serde::Deserialize<'de>` is not satisfied
+  --> src/application/workflow/jev_assets.rs:30:50
+   |
+30 | #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+   |                                                  ^^^^^^^^^^^ unsatisfied trait bound
+   |
+help: the trait `domain::monitoring::_::_serde::Deserialize<'_>` is not implemented for `application::workflow::authorization::RelatedThreadId`
+  --> src/application/workflow/authorization.rs:36:9
+   |
+36 |         pub struct $name(Uuid);
+   |         ^^^^^^^^^^^^^^^^^^^^^^^
+...
+48 | related_id!(RelatedThreadId);
+   | ---------------------------- in this macro invocation
+   = note: for local types consider adding `#[derive(serde::Deserialize)]` to your `application::workflow::authorization::RelatedThreadId` type
+   = note: for types from other crates check whether the crate offers a `serde` feature flag
+   = help: the following other types implement trait `domain::monitoring::_::_serde::Deserialize<'de>`:
+             `&'a JsonRawValue` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+             `&'a [u8]` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+             `&'a std::path::Path` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+             `&'a str` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+             `()` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+             `(T,)` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+             `(T0, T1)` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+             `(T0, T1, T2)` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+           and 1232 others
+note: required by a bound in `domain::monitoring::_::_serde::__private229::de::missing_field`
+  --> /Users/mac02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/de.rs:26:8
+   |
+24 | pub fn missing_field<'de, V, E>(field: &'static str) -> Result<V, E>
+   |        ------------- required by a bound in this function
+25 | where
+26 |     V: Deserialize<'de>,
+   |        ^^^^^^^^^^^^^^^^ required by this bound in `missing_field`
+   = note: the full name for the type has been written to '/Users/mac02/dev/openbot/target/debug/deps/mail_agents-996eed7ef8f82959.long-type-14525204129603497240.txt'
+   = note: consider using `--verbose` to print the full type name to the console
+   = note: this error originates in the derive macro `Deserialize` which comes from the expansion of the macro `related_id` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+For more information about this error, try `rustc --explain E0277`.
+error: could not compile `mail_agents` (lib) due to 8 previous errors
+warning: build failed, waiting for other jobs to finish...
+error[E0277]: the trait bound `application::workflow::authorization::RelatedChannelId: serde::Serialize` is not satisfied
+    --> src/application/workflow/jev_assets.rs:30:39
+     |
+  30 | #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+     |                                       ^^^^^^^^^ unsatisfied trait bound
+...
+  33 |     pub channel_id: RelatedChannelId,
+     |     --- required by a bound introduced by this call
+     |
+help: the trait `domain::monitoring::_::_serde::Serialize` is not implemented for `application::workflow::authorization::RelatedChannelId`
+    --> src/application/workflow/authorization.rs:36:9
+     |
+  36 |         pub struct $name(Uuid);
+     |         ^^^^^^^^^^^^^^^^^^^^^^^
+...
+  47 | related_id!(RelatedChannelId);
+     | ----------------------------- in this macro invocation
+     = note: for local types consider adding `#[derive(serde::Serialize)]` to your `application::workflow::authorization::RelatedChannelId` type
+     = note: for types from other crates check whether the crate offers a `serde` feature flag
+     = help: the following other types implement trait `domain::monitoring::_::_serde::Serialize`:
+               &'a T
+               &'a mut T
+               ()
+               (T,)
+               (T0, T1)
+               (T0, T1, T2)
+               (T0, T1, T2, T3)
+               (T0, T1, T2, T3, T4)
+             and 1125 others
+note: required by a bound in `domain::monitoring::_::_serde::ser::SerializeStruct::serialize_field`
+    --> /Users/mac02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_core-1.0.229/src/ser/mod.rs:1917:21
+     |
+1915 |     fn serialize_field<T>(&mut self, key: &'static str, value: &T) -> Result<(), Self::Error>
+     |        --------------- required by a bound in this associated function
+1916 |     where
+1917 |         T: ?Sized + Serialize;
+     |                     ^^^^^^^^^ required by this bound in `SerializeStruct::serialize_field`
+     = note: this error originates in the derive macro `Serialize` which comes from the expansion of the macro `related_id` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `application::workflow::authorization::RelatedThreadId: serde::Serialize` is not satisfied
+    --> src/application/workflow/jev_assets.rs:30:39
+     |
+  30 | #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+     |                                       ^^^^^^^^^ unsatisfied trait bound
+...
+  34 |     pub thread_id: RelatedThreadId,
+     |     --- required by a bound introduced by this call
+     |
+help: the trait `domain::monitoring::_::_serde::Serialize` is not implemented for `application::workflow::authorization::RelatedThreadId`
+    --> src/application/workflow/authorization.rs:36:9
+     |
+  36 |         pub struct $name(Uuid);
+     |         ^^^^^^^^^^^^^^^^^^^^^^^
+...
+  48 | related_id!(RelatedThreadId);
+     | ---------------------------- in this macro invocation
+     = note: for local types consider adding `#[derive(serde::Serialize)]` to your `application::workflow::authorization::RelatedThreadId` type
+     = note: for types from other crates check whether the crate offers a `serde` feature flag
+     = help: the following other types implement trait `domain::monitoring::_::_serde::Serialize`:
+               &'a T
+               &'a mut T
+               ()
+               (T,)
+               (T0, T1)
+               (T0, T1, T2)
+               (T0, T1, T2, T3)
+               (T0, T1, T2, T3, T4)
+             and 1125 others
+note: required by a bound in `domain::monitoring::_::_serde::ser::SerializeStruct::serialize_field`
+    --> /Users/mac02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_core-1.0.229/src/ser/mod.rs:1917:21
+     |
+1915 |     fn serialize_field<T>(&mut self, key: &'static str, value: &T) -> Result<(), Self::Error>
+     |        --------------- required by a bound in this associated function
+1916 |     where
+1917 |         T: ?Sized + Serialize;
+     |                     ^^^^^^^^^ required by this bound in `SerializeStruct::serialize_field`
+     = note: this error originates in the derive macro `Serialize` which comes from the expansion of the macro `related_id` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `application::workflow::authorization::RelatedChannelId: serde::Deserialize<'de>` is not satisfied
+    --> src/application/workflow/jev_assets.rs:33:21
+     |
+  33 |     pub channel_id: RelatedChannelId,
+     |                     ^^^^^^^^^^^^^^^^ unsatisfied trait bound
+     |
+help: the trait `domain::monitoring::_::_serde::Deserialize<'_>` is not implemented for `application::workflow::authorization::RelatedChannelId`
+    --> src/application/workflow/authorization.rs:36:9
+     |
+  36 |         pub struct $name(Uuid);
+     |         ^^^^^^^^^^^^^^^^^^^^^^^
+...
+  47 | related_id!(RelatedChannelId);
+     | ----------------------------- in this macro invocation
+     = note: for local types consider adding `#[derive(serde::Deserialize)]` to your `application::workflow::authorization::RelatedChannelId` type
+     = note: for types from other crates check whether the crate offers a `serde` feature flag
+     = help: the following other types implement trait `domain::monitoring::_::_serde::Deserialize<'de>`:
+               `&'a JsonRawValue` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+               `&'a [u8]` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+               `&'a std::path::Path` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+               `&'a str` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+               `()` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+               `(T,)` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+               `(T0, T1)` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+               `(T0, T1, T2)` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+             and 1236 others
+note: required by a bound in `next_element`
+    --> /Users/mac02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_core-1.0.229/src/de/mod.rs:1771:12
+     |
+1769 |     fn next_element<T>(&mut self) -> Result<Option<T>, Self::Error>
+     |        ------------ required by a bound in this associated function
+1770 |     where
+1771 |         T: Deserialize<'de>,
+     |            ^^^^^^^^^^^^^^^^ required by this bound in `SeqAccess::next_element`
+     = note: the full name for the type has been written to '/Users/mac02/dev/openbot/target/debug/deps/mail_agents-4dc474aa86a1f7c7.long-type-3225404093957465786.txt'
+     = note: consider using `--verbose` to print the full type name to the console
+     = note: this error originates in the macro `related_id` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `application::workflow::authorization::RelatedThreadId: serde::Deserialize<'de>` is not satisfied
+    --> src/application/workflow/jev_assets.rs:34:20
+     |
+  34 |     pub thread_id: RelatedThreadId,
+     |                    ^^^^^^^^^^^^^^^ unsatisfied trait bound
+     |
+help: the trait `domain::monitoring::_::_serde::Deserialize<'_>` is not implemented for `application::workflow::authorization::RelatedThreadId`
+    --> src/application/workflow/authorization.rs:36:9
+     |
+  36 |         pub struct $name(Uuid);
+     |         ^^^^^^^^^^^^^^^^^^^^^^^
+...
+  48 | related_id!(RelatedThreadId);
+     | ---------------------------- in this macro invocation
+     = note: for local types consider adding `#[derive(serde::Deserialize)]` to your `application::workflow::authorization::RelatedThreadId` type
+     = note: for types from other crates check whether the crate offers a `serde` feature flag
+     = help: the following other types implement trait `domain::monitoring::_::_serde::Deserialize<'de>`:
+               `&'a JsonRawValue` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+               `&'a [u8]` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+               `&'a std::path::Path` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+               `&'a str` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+               `()` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+               `(T,)` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+               `(T0, T1)` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+               `(T0, T1, T2)` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+             and 1236 others
+note: required by a bound in `next_element`
+    --> /Users/mac02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_core-1.0.229/src/de/mod.rs:1771:12
+     |
+1769 |     fn next_element<T>(&mut self) -> Result<Option<T>, Self::Error>
+     |        ------------ required by a bound in this associated function
+1770 |     where
+1771 |         T: Deserialize<'de>,
+     |            ^^^^^^^^^^^^^^^^ required by this bound in `SeqAccess::next_element`
+     = note: the full name for the type has been written to '/Users/mac02/dev/openbot/target/debug/deps/mail_agents-4dc474aa86a1f7c7.long-type-3225404093957465786.txt'
+     = note: consider using `--verbose` to print the full type name to the console
+     = note: this error originates in the macro `related_id` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `application::workflow::authorization::RelatedChannelId: serde::Deserialize<'de>` is not satisfied
+    --> src/application/workflow/jev_assets.rs:33:21
+     |
+  33 |     pub channel_id: RelatedChannelId,
+     |                     ^^^^^^^^^^^^^^^^ unsatisfied trait bound
+     |
+help: the trait `domain::monitoring::_::_serde::Deserialize<'_>` is not implemented for `application::workflow::authorization::RelatedChannelId`
+    --> src/application/workflow/authorization.rs:36:9
+     |
+  36 |         pub struct $name(Uuid);
+     |         ^^^^^^^^^^^^^^^^^^^^^^^
+...
+  47 | related_id!(RelatedChannelId);
+     | ----------------------------- in this macro invocation
+     = note: for local types consider adding `#[derive(serde::Deserialize)]` to your `application::workflow::authorization::RelatedChannelId` type
+     = note: for types from other crates check whether the crate offers a `serde` feature flag
+     = help: the following other types implement trait `domain::monitoring::_::_serde::Deserialize<'de>`:
+               `&'a JsonRawValue` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+               `&'a [u8]` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+               `&'a std::path::Path` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+               `&'a str` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+               `()` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+               `(T,)` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+               `(T0, T1)` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+               `(T0, T1, T2)` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+             and 1236 others
+note: required by a bound in `next_value`
+    --> /Users/mac02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_core-1.0.229/src/de/mod.rs:1916:12
+     |
+1914 |     fn next_value<V>(&mut self) -> Result<V, Self::Error>
+     |        ---------- required by a bound in this associated function
+1915 |     where
+1916 |         V: Deserialize<'de>,
+     |            ^^^^^^^^^^^^^^^^ required by this bound in `MapAccess::next_value`
+     = note: the full name for the type has been written to '/Users/mac02/dev/openbot/target/debug/deps/mail_agents-4dc474aa86a1f7c7.long-type-3225404093957465786.txt'
+     = note: consider using `--verbose` to print the full type name to the console
+     = note: this error originates in the macro `related_id` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `application::workflow::authorization::RelatedThreadId: serde::Deserialize<'de>` is not satisfied
+    --> src/application/workflow/jev_assets.rs:34:20
+     |
+  34 |     pub thread_id: RelatedThreadId,
+     |                    ^^^^^^^^^^^^^^^ unsatisfied trait bound
+     |
+help: the trait `domain::monitoring::_::_serde::Deserialize<'_>` is not implemented for `application::workflow::authorization::RelatedThreadId`
+    --> src/application/workflow/authorization.rs:36:9
+     |
+  36 |         pub struct $name(Uuid);
+     |         ^^^^^^^^^^^^^^^^^^^^^^^
+...
+  48 | related_id!(RelatedThreadId);
+     | ---------------------------- in this macro invocation
+     = note: for local types consider adding `#[derive(serde::Deserialize)]` to your `application::workflow::authorization::RelatedThreadId` type
+     = note: for types from other crates check whether the crate offers a `serde` feature flag
+     = help: the following other types implement trait `domain::monitoring::_::_serde::Deserialize<'de>`:
+               `&'a JsonRawValue` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+               `&'a [u8]` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+               `&'a std::path::Path` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+               `&'a str` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+               `()` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+               `(T,)` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+               `(T0, T1)` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+               `(T0, T1, T2)` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+             and 1236 others
+note: required by a bound in `next_value`
+    --> /Users/mac02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_core-1.0.229/src/de/mod.rs:1916:12
+     |
+1914 |     fn next_value<V>(&mut self) -> Result<V, Self::Error>
+     |        ---------- required by a bound in this associated function
+1915 |     where
+1916 |         V: Deserialize<'de>,
+     |            ^^^^^^^^^^^^^^^^ required by this bound in `MapAccess::next_value`
+     = note: the full name for the type has been written to '/Users/mac02/dev/openbot/target/debug/deps/mail_agents-4dc474aa86a1f7c7.long-type-3225404093957465786.txt'
+     = note: consider using `--verbose` to print the full type name to the console
+     = note: this error originates in the macro `related_id` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `application::workflow::authorization::RelatedChannelId: serde::Deserialize<'de>` is not satisfied
+  --> src/application/workflow/jev_assets.rs:30:50
+   |
+30 | #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+   |                                                  ^^^^^^^^^^^ unsatisfied trait bound
+   |
+help: the trait `domain::monitoring::_::_serde::Deserialize<'_>` is not implemented for `application::workflow::authorization::RelatedChannelId`
+  --> src/application/workflow/authorization.rs:36:9
+   |
+36 |         pub struct $name(Uuid);
+   |         ^^^^^^^^^^^^^^^^^^^^^^^
+...
+47 | related_id!(RelatedChannelId);
+   | ----------------------------- in this macro invocation
+   = note: for local types consider adding `#[derive(serde::Deserialize)]` to your `application::workflow::authorization::RelatedChannelId` type
+   = note: for types from other crates check whether the crate offers a `serde` feature flag
+   = help: the following other types implement trait `domain::monitoring::_::_serde::Deserialize<'de>`:
+             `&'a JsonRawValue` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+             `&'a [u8]` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+             `&'a std::path::Path` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+             `&'a str` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+             `()` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+             `(T,)` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+             `(T0, T1)` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+             `(T0, T1, T2)` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+           and 1236 others
+note: required by a bound in `domain::monitoring::_::_serde::__private229::de::missing_field`
+  --> /Users/mac02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/de.rs:26:8
+   |
+24 | pub fn missing_field<'de, V, E>(field: &'static str) -> Result<V, E>
+   |        ------------- required by a bound in this function
+25 | where
+26 |     V: Deserialize<'de>,
+   |        ^^^^^^^^^^^^^^^^ required by this bound in `missing_field`
+   = note: the full name for the type has been written to '/Users/mac02/dev/openbot/target/debug/deps/mail_agents-4dc474aa86a1f7c7.long-type-3225404093957465786.txt'
+   = note: consider using `--verbose` to print the full type name to the console
+   = note: this error originates in the derive macro `Deserialize` which comes from the expansion of the macro `related_id` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `application::workflow::authorization::RelatedThreadId: serde::Deserialize<'de>` is not satisfied
+  --> src/application/workflow/jev_assets.rs:30:50
+   |
+30 | #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+   |                                                  ^^^^^^^^^^^ unsatisfied trait bound
+   |
+help: the trait `domain::monitoring::_::_serde::Deserialize<'_>` is not implemented for `application::workflow::authorization::RelatedThreadId`
+  --> src/application/workflow/authorization.rs:36:9
+   |
+36 |         pub struct $name(Uuid);
+   |         ^^^^^^^^^^^^^^^^^^^^^^^
+...
+48 | related_id!(RelatedThreadId);
+   | ---------------------------- in this macro invocation
+   = note: for local types consider adding `#[derive(serde::Deserialize)]` to your `application::workflow::authorization::RelatedThreadId` type
+   = note: for types from other crates check whether the crate offers a `serde` feature flag
+   = help: the following other types implement trait `domain::monitoring::_::_serde::Deserialize<'de>`:
+             `&'a JsonRawValue` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+             `&'a [u8]` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+             `&'a std::path::Path` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+             `&'a str` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+             `()` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+             `(T,)` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+             `(T0, T1)` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+             `(T0, T1, T2)` implements `domain::monitoring::_::_serde::Deserialize<'de>`
+           and 1236 others
+note: required by a bound in `domain::monitoring::_::_serde::__private229::de::missing_field`
+  --> /Users/mac02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/de.rs:26:8
+   |
+24 | pub fn missing_field<'de, V, E>(field: &'static str) -> Result<V, E>
+   |        ------------- required by a bound in this function
+25 | where
+26 |     V: Deserialize<'de>,
+   |        ^^^^^^^^^^^^^^^^ required by this bound in `missing_field`
+   = note: the full name for the type has been written to '/Users/mac02/dev/openbot/target/debug/deps/mail_agents-4dc474aa86a1f7c7.long-type-3225404093957465786.txt'
+   = note: consider using `--verbose` to print the full type name to the console
+   = note: this error originates in the derive macro `Deserialize` which comes from the expansion of the macro `related_id` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: could not compile `mail_agents` (lib test) due to 8 previous errors

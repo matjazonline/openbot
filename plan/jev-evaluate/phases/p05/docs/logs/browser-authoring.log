@@ -1,0 +1,10 @@
+PASS copy/edit/validate/sample/publish/activate; keyboard, both themes, progress, escaping, stale response
+✔ scripts/tests/workflow-authoring-browser.cjs (6441.582041ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 6445.845292

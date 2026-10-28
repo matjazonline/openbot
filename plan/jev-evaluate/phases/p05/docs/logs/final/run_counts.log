@@ -1,0 +1,14 @@
+
+> openbots@1.0.0 test:run-counts
+> node --test scripts/tests/run-counts.mjs
+
+✔ channel: snapshot before pane, OOB list, competing reads, reconnect and navigation (1623.725416ms)
+✔ channel: pane before first snapshot stays uninitialized and then hydrates (364.466917ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2399.62225

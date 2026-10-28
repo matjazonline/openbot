@@ -1,0 +1,116 @@
+   Compiling simd-adler32 v0.3.10
+   Compiling zune-core v0.5.3
+   Compiling pxfm v0.1.30
+   Compiling byteorder-lite v0.1.0
+   Compiling bytemuck v1.25.2
+   Compiling miniz_oxide v0.8.9
+   Compiling fdeflate v0.3.7
+   Compiling zopfli v0.8.3
+   Compiling zune-jpeg v0.5.15
+   Compiling flate2 v1.1.9
+   Compiling zip v2.4.2
+   Compiling png v0.18.1
+   Compiling mail-auth v0.6.1
+   Compiling moxcms v0.8.1
+   Compiling image v0.25.10
+   Compiling mail_agents v0.1.0 (/Users/mac02/dev/openbot)
+error: cannot find macro `json` in this scope
+  --> src/adapters/persistence/workflow/jev_assets_tests.rs:28:50
+   |
+28 |     source["steps"]["start"]["with"]["assets"] = json!({"literal":{"photo":attachment.reference}});
+   |                                                  ^^^^
+
+error: cannot find macro `json` in this scope
+  --> src/adapters/persistence/workflow/jev_assets_tests.rs:27:53
+   |
+27 |     source["steps"]["start"]["with"]["questions"] = json!({"literal":images::inputs(b"inert")["questions"]});
+   |                                                     ^^^^
+
+error: cannot find macro `json` in this scope
+  --> src/adapters/persistence/workflow/jev_assets_tests.rs:22:29
+   |
+22 |     Attachment { reference: json!({"channel_id":channel.id,"thread_id":thread,"sha256":ImageDigest::of(bytes)}), key }
+   |                             ^^^^
+
+error: cannot find macro `json` in this scope
+  --> src/adapters/persistence/workflow/jev_assets_tests.rs:18:20
+   |
+18 |     let metadata = json!({"version":"1","items":[{"filename":"fixture.png","content_type":"image/png","sha256_hash":ImageDigest::of(...
+   |                    ^^^^
+
+error[E0425]: cannot find type `Value` in this scope
+ --> src/adapters/persistence/workflow/jev_assets_tests.rs:9:32
+  |
+9 | struct Attachment { reference: Value, key: ObjectKey }
+  |                                ^^^^^ not found in this scope
+
+error[E0425]: cannot find type `Value` in this scope
+  --> src/adapters/persistence/workflow/jev_assets_tests.rs:26:21
+   |
+26 |     let mut source: Value = serde_json::from_str(&registry::example("jev.evaluate").unwrap().source).unwrap();
+   |                     ^^^^^ not found in this scope
+
+error[E0599]: no variant or associated item named `Failed` found for enum `application::workflow::lease::WorkflowHandlerOutcome` in the current scope
+   --> src/adapters/persistence/workflow/jev_assets_tests.rs:62:117
+    |
+ 62 |     assert!(matches!(runtime.execute(&WorkflowStepKind("jev.evaluate".into()),&first).await,WorkflowHandlerOutcome::Failed(_)));
+    |                                                                                                                     ^^^^^^ variant or associated item not found in `application::workflow::lease::WorkflowHandlerOutcome`
+    |
+   ::: src/application/workflow/lease.rs:104:1
+    |
+104 | pub enum WorkflowHandlerOutcome {
+    | ------------------------------- variant or associated item `Failed` not found for this enum
+
+error[E0618]: expected function, found `tokio::task::JoinHandle<std::string::String>`
+   --> src/adapters/persistence/workflow/http_test_support.rs:333:1
+    |
+333 |   pub(super) async fn server(response: &'static str) -> (String, tokio::task::JoinHandle<String>) {
+    |   ----------------------------------------------------------------------------------------------- this function of the same name is available here, but it's shadowed by the local binding
+    |
+   ::: src/adapters/workflow_jev/tests.rs:29:1
+    |
+ 29 | / pub(crate) async fn server(
+ 30 | |     status: u16,
+ 31 | |     headers: &str,
+ 32 | |     body: Vec<u8>,
+ 33 | |     delay: Duration,
+ 34 | | ) -> (JevHttp, JoinHandle<String>) {
+    | |__________________________________- this function of the same name is available here, but it's shadowed by the local binding
+    |
+   ::: src/adapters/persistence/workflow/jev_assets_tests.rs:60:15
+    |
+ 60 |       let (http,server) = server(503,"",vec![],Duration::ZERO).await;
+    |                 ------ `server` has type `tokio::task::JoinHandle<std::string::String>`
+...
+ 67 |       let (http,server) = server(200,"",serde_json::to_vec(&images::output()).unwrap(),Duration::ZERO).await;
+    |                           ^^^^^^----------------------------------------------------------------------
+    |                           |
+    |                           call expression requires function
+
+error[E0599]: no variant or associated item named `Failed` found for enum `application::workflow::lease::WorkflowHandlerOutcome` in the current scope
+   --> src/adapters/persistence/workflow/jev_assets_tests.rs:70:33
+    |
+ 70 |     let WorkflowHandlerOutcome::Failed(failure) = result else { panic!("changed image must fail") };
+    |                                 ^^^^^^ variant or associated item not found in `application::workflow::lease::WorkflowHandlerOutcome`
+    |
+   ::: src/application/workflow/lease.rs:104:1
+    |
+104 | pub enum WorkflowHandlerOutcome {
+    | ------------------------------- variant or associated item `Failed` not found for this enum
+
+error[E0308]: mismatched types
+  --> src/adapters/persistence/workflow/jev_assets_tests.rs:88:22
+   |
+88 |     assert_eq!(value,images::output());
+   |                      ^^^^^^^^^^^^^^^^ expected `Result<Value, WorkflowFailure>`, found `Value`
+   |
+   = note: expected enum `std::result::Result<JsonValue, application::workflow::lease::WorkflowFailure>`
+              found enum `JsonValue`
+help: try wrapping the expression in `Ok`
+   |
+88 |     assert_eq!(value,Ok(images::output()));
+   |                      +++                +
+
+Some errors have detailed explanations: E0308, E0425, E0599, E0618.
+For more information about an error, try `rustc --explain E0308`.
+error: could not compile `mail_agents` (lib test) due to 10 previous errors

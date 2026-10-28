@@ -1,0 +1,10 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.25s
+     Running unittests src/lib.rs (target/debug/deps/mail_agents-0fc485c3efcd046b)
+
+running 2 tests
+test adapters::http::routes::workflows::ui::authoring::tests::jev_tests::workflow_authoring_jev_company_forms_permissions_rotation_and_readiness ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::jev_tests::workflow_authoring_jev_catalogue_binding_and_sample ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 2380 filtered out; finished in 1.61s
+

@@ -1,0 +1,4 @@
+   Compiling mail_agents v0.1.0 (/Users/mac02/dev/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 19.06s
+  Executable unittests src/lib.rs (target/debug/deps/mail_agents-0fc485c3efcd046b)
+  Executable unittests src/main.rs (target/debug/deps/mail_agents-3ae3732f205bb8c4)

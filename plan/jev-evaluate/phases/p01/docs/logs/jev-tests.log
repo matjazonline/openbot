@@ -1,0 +1,36 @@
+   Compiling mail_agents v0.1.0 (/Users/mac02/dev/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 29.95s
+     Running unittests src/lib.rs (target/debug/deps/mail_agents-6693f25a28eea502)
+
+running 13 tests
+test application::workflow::registry::jev_tests::jev_contract_duplicate_keys_and_nonfinite_source_rejected ... ok
+test application::workflow::registry::jev_tests::jev_contract_request_budget_counts_envelope_and_escaping ... ok
+test application::workflow::registry::jev_tests::jev_contract_rejects_invalid_question_shapes ... ok
+test application::workflow::registry::jev_tests::jev_contract_static_fields_models_and_resources ... ok
+test application::workflow::registry::jev_tests::jev_contract_noul_criteria_and_escaped_question_paths ... ok
+test application::workflow::registry::jev_tests::jev_contract_probability_sum_tolerance ... ok
+test application::workflow::registry::jev_tests::jev_contract_mixed_exact_schema_and_metadata ... ok
+test application::workflow::registry::jev_tests::jev_contract_rejects_malformed_outputs ... ok
+test application::workflow::registry::jev_tests::jev_contract_frozen_semantics_change_hash ... ok
+test application::workflow::registry::jev_tests::jev_contract_dynamic_state_checks_and_workflow_context_budget ... ok
+test application::workflow::registry::jev_tests::jev_contract_primitive_limits_fail_at_next_item ... ok
+test application::workflow::registry::jev_tests::jev_contract_text_and_identifier_limits_count_utf8_bytes ... ok
+test application::workflow::registry::jev_tests::jev_contract_downstream_paths_are_exact_and_typed ... FAILED
+
+failures:
+
+---- application::workflow::registry::jev_tests::jev_contract_downstream_paths_are_exact_and_typed stdout ----
+
+thread 'application::workflow::registry::jev_tests::jev_contract_downstream_paths_are_exact_and_typed' (18303131) panicked at src/application/workflow/registry/jev_tests.rs:338:9:
+assertion `left == right` failed: /answers/urgent/noul
+  left: true
+ right: false
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    application::workflow::registry::jev_tests::jev_contract_downstream_paths_are_exact_and_typed
+
+test result: FAILED. 12 passed; 1 failed; 0 ignored; 0 measured; 2317 filtered out; finished in 0.16s
+
+error: test failed, to rerun pass `--lib`

@@ -1,0 +1,8 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.23s
+     Running unittests src/lib.rs (target/debug/deps/mail_agents-6693f25a28eea502)
+
+running 1 test
+test application::workflow::actions::failure::tests::workflow_effect_free_kinds_are_exactly_the_reads_pure_waits_and_model_steps ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2331 filtered out; finished in 0.00s
+

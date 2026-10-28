@@ -1,0 +1,24 @@
+✔ library payload carries the agent's own fields and no retired runtime fields (1.716291ms)
+✔ accepted library writes show progress, prevent duplicate submits, and restore on failure (0.903709ms)
+✔ ordinary page links release every stream before navigation (2.029208ms)
+✔ HTMX/prevented clicks, modified clicks, downloads and new tabs keep streams (1.960042ms)
+✔ anchors and non-document protocols keep streams (0.927583ms)
+✔ native filter submissions release all streams on every navigation (4.885042ms)
+✔ cancelled, HTMX, dialog and other-window submissions retain streams (1.575ms)
+PASS copy/edit/validate/sample/publish/activate; keyboard, both themes, progress, escaping, stale response
+✔ scripts/tests/workflow-authoring-browser.cjs (6674.019125ms)
+✔ late attribution and reconnect keep both replies, composer and stream owner (2687.992208ms)
+✔ a reconnect backlog keeps an explicit 200-message live window and the composer (1514.910375ms)
+✔ a late body read cannot remove preserved steps after a cancel or navigation (4488.006333ms)
+✔ an actual SSE disconnect reconciles and preserves an unfinished note and disclosure (1763.374125ms)
+✔ a waiting parent refreshes a child badge on the child wakeup without reconnecting (1457.245833ms)
+✔ sample progress, failed request recovery and late navigation response use the requesting form (1835.406958ms)
+✔ actual sample textarea template preserves leading newlines for every raw JSON field (1150.113416ms)
+ℹ tests 15
+ℹ suites 0
+ℹ pass 15
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 7895.471917

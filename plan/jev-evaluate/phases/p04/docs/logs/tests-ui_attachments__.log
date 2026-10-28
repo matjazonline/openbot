@@ -1,0 +1,11 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.23s
+     Running unittests src/lib.rs (target/debug/deps/mail_agents-0fc485c3efcd046b)
+
+running 4 tests
+test adapters::http::routes::ui_attachments::tests::a_nameless_attachment_still_downloads ... ok
+test adapters::http::routes::ui_attachments::tests::a_name_in_another_script_survives_in_the_encoded_form ... ok
+test adapters::http::routes::ui_attachments::tests::a_name_from_a_stranger_cannot_break_out_of_the_header ... ok
+test adapters::http::routes::ui_attachments::tests::an_attachment_is_found_by_its_hash_only_within_the_thread_it_hangs_on ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 2372 filtered out; finished in 0.00s
+

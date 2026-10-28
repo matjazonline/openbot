@@ -1,0 +1,40 @@
+    Checking simd-adler32 v0.3.10
+    Checking pxfm v0.1.30
+    Checking zune-core v0.5.3
+    Checking bytemuck v1.25.2
+    Checking byteorder-lite v0.1.0
+    Checking miniz_oxide v0.8.9
+    Checking zopfli v0.8.3
+    Checking fdeflate v0.3.7
+    Checking zune-jpeg v0.5.15
+    Checking flate2 v1.1.9
+    Checking png v0.18.1
+    Checking zip v2.4.2
+    Checking mail-auth v0.6.1
+    Checking moxcms v0.8.1
+    Checking image v0.25.10
+    Checking mail_agents v0.1.0 (/Users/mac02/dev/openbot)
+error[E0432]: unresolved imports `crate::domain::workflow::RelatedChannelId`, `crate::domain::workflow::RelatedThreadId`
+ --> src/application/workflow/jev_assets.rs:4:68
+  |
+4 | use crate::domain::{entities::value_objects::ObjectKey, workflow::{RelatedChannelId, RelatedThreadId}};
+  |                                                                    ^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^ no `RelatedThreadId` in `domain::workflow`
+  |                                                                    |
+  |                                                                    no `RelatedChannelId` in `domain::workflow`
+  |
+  = help: consider importing this struct through its public re-export instead:
+          crate::application::workflow::RelatedChannelId
+  = help: consider importing this struct through its public re-export instead:
+          crate::application::workflow::RelatedThreadId
+
+error[E0609]: no field `step` on type `&mut application::workflow::registry::Registration<'_>`
+   --> src/application/workflow/registry/jev.rs:342:30
+    |
+342 |         let assets = if self.step.inputs.contains_key("assets") { Some(self.literal("assets")?) } else { None };
+    |                              ^^^^ unknown field
+    |
+    = note: available fields are: `parsed`, `id`, `facts`, `checks`, `effective`, `static_fields`
+
+Some errors have detailed explanations: E0432, E0609.
+For more information about an error, try `rustc --explain E0432`.
+error: could not compile `mail_agents` (lib) due to 2 previous errors

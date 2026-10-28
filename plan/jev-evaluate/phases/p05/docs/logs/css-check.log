@@ -1,0 +1,10 @@
+
+> openbots@1.0.0 check:css
+> bash scripts/check-css.sh
+
+≈ tailwindcss v4.1.12
+
+(node:35064) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+/*! 🌼 daisyUI 5.0.50 */
+Done in 141ms

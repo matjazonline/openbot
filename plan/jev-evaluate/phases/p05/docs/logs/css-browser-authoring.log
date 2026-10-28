@@ -1,0 +1,23 @@
+Page errors: []
+page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:3001/register
+Call log:
+[2m  - navigating to "http://localhost:3001/register", waiting until "load"[22m
+
+    at /Users/mac02/dev/openbot/plan/jev-evaluate/phases/p05/docs/logs/css-authoring-browser.cjs:20:20 {
+  name: 'Error'
+}
+✖ plan/jev-evaluate/phases/p05/docs/logs/css-authoring-browser.cjs (1256.41925ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1260.841667
+
+✖ failing tests:
+
+test at plan/jev-evaluate/phases/p05/docs/logs/css-authoring-browser.cjs:1:1
+✖ plan/jev-evaluate/phases/p05/docs/logs/css-authoring-browser.cjs (1256.41925ms)
+  'test failed'

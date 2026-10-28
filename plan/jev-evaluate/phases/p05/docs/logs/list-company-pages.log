@@ -1,0 +1,11 @@
+    Blocking waiting for file lock on artifact directory
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 5.88s
+     Running unittests src/lib.rs (target/debug/deps/mail_agents-0fc485c3efcd046b)
+adapters::http::pages::tests::company_edit_pane_keeps_a_rejected_save_in_the_form: test
+adapters::http::pages::tests::company_edit_pane_prefills_the_stored_company_and_offers_delete: test
+adapters::http::pages::tests::company_member_can_open_company_without_edit_controls_or_api_key: test
+adapters::http::pages::tests::company_settings_list_saves_selection_in_the_url_and_swaps_out_of_band: test
+adapters::http::pages::tests::company_settings_page_uses_the_ui_shell_and_lights_its_own_rail_icon: test
+adapters::http::pages::tests::company_settings_page_without_a_company_still_offers_the_create_form: test
+
+6 tests, 0 benchmarks

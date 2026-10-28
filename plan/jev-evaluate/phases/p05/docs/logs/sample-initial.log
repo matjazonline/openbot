@@ -1,0 +1,24 @@
+   Compiling mail_agents v0.1.0 (/Users/mac02/dev/openbot)
+warning: unused `axum::response::Html` that must be used
+   --> src/adapters/http/routes/workflows/ui/authoring/jev_tests.rs:111:5
+    |
+111 | /     typesafe::create(f.ui(f.owner), Path(f.company), create_form("jev-1.14.0"))
+112 | |         .await
+113 | |         .unwrap();
+    | |_________________^
+    |
+    = note: `#[warn(unused_must_use)]` (part of `#[warn(unused)]`) on by default
+help: use `let _ = ...` to ignore the resulting value
+    |
+111 |     let _ = typesafe::create(f.ui(f.owner), Path(f.company), create_form("jev-1.14.0"))
+    |     +++++++
+
+warning: `mail_agents` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 40.02s
+     Running unittests src/lib.rs (target/debug/deps/mail_agents-0fc485c3efcd046b)
+
+running 1 test
+test application::workflow::sample::tests::jev_tests::workflow_sample_jev_mixed_thresholds_automatic_and_human_paths ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2381 filtered out; finished in 0.21s
+

@@ -1,0 +1,854 @@
+diff --git a/docs/workflow-language-v1.md b/docs/workflow-language-v1.md
+index b80c42f..562818e 100644
+--- a/docs/workflow-language-v1.md
++++ b/docs/workflow-language-v1.md
+@@ -1,6 +1,6 @@
+ # Workflow language v1 compiler contract
+ 
+-This document describes the phase 02 compiler and its 18-type catalogue. The
++This document describes the phase 02 compiler and its 19-type catalogue. The
+ application provides library validation/publication commands, but does not yet accept
+ workflow YAML through an authoring API, persist prepared inputs, or execute these definitions.
+ `application::workflow::registry::compile` uses the built-in catalogue and explicit
+@@ -83,7 +83,7 @@ source, compiled representation and hash atomically.
+ 
+ ## Registered contracts and authoring help
+ 
+-`registry::TYPES` is the exact 18-name set. `registry::example(type_name)` returns
++`registry::TYPES` is the exact 19-name set. `registry::example(type_name)` returns
+ valid v1 source plus illustrative caller facts; `registry::authoring_help` compiles
+ a supplied example and returns its specialized input/output schemas, literal-only
+ fields, routes/control, constraints, notes and source. Required and optional input
+@@ -96,6 +96,7 @@ for **resolved values**; every `with` field still needs a binding wrapper.
+ | `context.history` | `max_tokens` | Result `{items: [{message_id, at, role, audience, entry_kind, author, subject, body, truncated}], token_count, omitted}`: the run's thread history frozen at admission, internal notes excluded |
+ | `memory.load` | `scope`, `query`, `limit` | Result `{items: [{id, source, content}]}`; registered but unhandled: memory is not in this release |
+ | `memory.save` | `scope`, `facts` (nonempty strings) | Result `{saved_ids: [...]}`; registered but unhandled: memory is not in this release |
++| `jev.evaluate` | literal `connection`, `model`, `questions`; dynamic `state` | TypeSafe typed questions and exact answers; see Jev contract below |
+ | `ai.classify` | `agent`, `context`, literal `output_schema` | Tool-free call with the agent's instructions and model; direct schema result; finite string enum, or required `label` enum property |
+ | `agent.run` | `agent`, `context`, literal `output_schema` | Runs with exactly the agent's saved tools and skills; direct schema result |
+ | `decision.rule` | `data`, literal `data_schema` | Top-level ordered `rule`; result `{choice, data}` |
+@@ -348,3 +349,50 @@ missing result to an empty typed result. Present `null` is invalid for that resu
+ does not take the missing-value fallback. The future MCP handler must distinguish tool errors
+ and effect outcomes before selecting success; these fixtures perform no network or delivery work.
+ Production SQL/transaction races and provider-use authorization remain phases03/04 obligations.
++
++
++## Jev text contract
++
++`jev.evaluate` declares a `typesafe` resource slot and selects it with literal
++`connection`. Use an exact `jev-MAJOR.MINOR.PATCH` model ID, such as `jev-1.14.0`;
++moving aliases are rejected. `state` accepts a string, object, or array through any
++normal binding. `questions` is a literal map with 1–32 distinct, nonblank IDs, each
++at most 128 UTF-8 bytes and without control characters. Question IDs select
++`/steps/<step>/output/answers/<question>`, independently of the workflow step ID.
++Escape `~` and `/` as `~0` and `~1` when using them in JSON pointers.
++
++Each question has literal string `instructions` and one of these shapes:
++
++- `noul`: optional `criteria` with exactly string descriptions `true` and `false`.
++  Its answer has exactly `type: noul` and `noul` in [0, 1].
++- `choice`: `criteria` maps 1–64 nonblank option IDs to string descriptions.
++  Its answer has `type: choice`, a declared `choice`, `probabilities` with exactly
++  the option keys, and `confidence` in [0, 1].
++- `score`: `criteria` is an ordered list of 2–10 string descriptions. Its answer
++  has `type: score`, a numeric `score` from zero through the last level index,
++  `probabilities` keyed by zero-based level numbers as strings, `legend` with
++  the exact original descriptions, and `confidence` in [0, 1].
++
++Instructions and descriptions must be nonblank and at most 16 KiB of UTF-8 each.
++Unknown fields and duplicate keys are rejected; Box is reserved for the image phase.
++The exact output envelope contains `answers`, the selected versioned `model`, and
++nonnegative integer `usage.input_tokens` / `usage.output_tokens`. Missing, extra,
++mismatched, nonfinite and out-of-range answers fail completion. Every probability
++is in [0, 1]; each distribution must sum to one within absolute tolerance `1e-6`
++to accommodate rounding. Noul remains a probability; confidence does not assert
++correctness. Use downstream `decision.rule` for thresholds and routing.
++
++The entire serialized provider request (model, state, questions) and response each
++have a 64 KiB ceiling. Borrowed preflight counts bytes before descriptor copies;
++resolved state is checked again before dispatch. Existing source (256 KiB), schema
++(64 KiB / 4096 nodes), compiled-fact (1 MiB), and workflow context limits also apply,
++so aggregate budgets can reject combinations below the individual maxima. This
++step is one model invocation with committed-result reuse, without agent tools or
++action effects. Phase 01 supplies its contract; connection and runtime support
++arrive in later Jev phases. Do not deploy the partial implementation.
++
++The mixed Noul/Choice/Score example is available through
++`registry::example("jev.evaluate")`. Upstream contracts were checked against the
++[System One API](https://docs.typesafe.ai/api/system-one),
++[primitives](https://docs.typesafe.ai/primitives), and
++[versioned models](https://docs.typesafe.ai/models).
+diff --git a/migrations/20260817000000_init_schema.sql b/migrations/20260817000000_init_schema.sql
+index dda1b77..99d441e 100644
+--- a/migrations/20260817000000_init_schema.sql
++++ b/migrations/20260817000000_init_schema.sql
+@@ -10766,7 +10766,7 @@ CREATE TABLE public.model_usage_calls (
+     company_id uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
+     request_id uuid NOT NULL,
+     task_id uuid NOT NULL,
+-    agent_id uuid NOT NULL,
++    agent_id uuid,
+     workflow_id uuid,
+     version_id uuid,
+     run_id uuid,
+@@ -11258,3 +11258,60 @@ CREATE TRIGGER workflow_history_members_immutable BEFORE UPDATE OR DELETE ON pub
+     FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_history_snapshot();
+ CREATE TRIGGER workflow_history_snapshots_immutable BEFORE UPDATE OR DELETE ON public.workflow_history_snapshots
+     FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_history_snapshot();
++
++-- Company TypeSafe resources never enter the agent provider registry.
++CREATE TABLE public.company_typesafe_connections (
++    company_id uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
++    id uuid NOT NULL,
++    enabled boolean NOT NULL DEFAULT true,
++    revision bigint NOT NULL DEFAULT 1 CHECK (revision > 0),
++    models text[] NOT NULL CHECK (cardinality(models) BETWEEN 1 AND 64 AND array_position(models, NULL) IS NULL AND octet_length(models::text) <= 16384),
++    envelope text NOT NULL CHECK (envelope LIKE 'enc:v2:%' AND octet_length(envelope) <= 16384),
++    PRIMARY KEY (company_id, id)
++);
++
++-- Jev calls are not agent invocations. Keep that distinction explicit in usage reports.
++ALTER TABLE public.model_usage_calls ADD CONSTRAINT model_usage_agent_kind
++    CHECK ((provider = 'typesafe' AND agent_id IS NULL) OR (provider <> 'typesafe' AND agent_id IS NOT NULL));
++ALTER TABLE public.model_usage_calls ADD CONSTRAINT model_usage_jev_identity UNIQUE(company_id,run_id,execution_id,request_id);
++CREATE TABLE public.workflow_jev_invocations (
++    company_id uuid NOT NULL,
++    run_id uuid NOT NULL,
++    execution_id uuid NOT NULL,
++    request_id uuid NOT NULL,
++    generation uuid NOT NULL,
++    worker_id uuid NOT NULL,
++    attempt integer NOT NULL CHECK (attempt > 0),
++    prepared bytea NOT NULL CHECK (octet_length(prepared) BETWEEN 1 AND 65536),
++    digest bytea NOT NULL CHECK (octet_length(digest) = 32),
++    output jsonb,
++    failure_code text,
++    retryable boolean,
++    latency_ms bigint CHECK (latency_ms BETWEEN 0 AND 3600000),
++    created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
++    completed_at timestamptz,
++    retry_not_before timestamptz CHECK (retry_not_before IS NULL OR (retryable=true AND completed_at IS NOT NULL AND retry_not_before<=completed_at+interval '61 seconds')),
++    PRIMARY KEY(company_id, request_id),
++    UNIQUE(company_id, execution_id, generation),
++    CHECK ((output IS NULL AND failure_code IS NULL AND retryable IS NULL AND completed_at IS NULL AND latency_ms IS NULL)
++        OR (completed_at IS NOT NULL AND latency_ms IS NOT NULL AND
++            ((output IS NOT NULL AND failure_code IS NULL AND retryable IS NULL)
++            OR (output IS NULL AND failure_code IS NOT NULL AND retryable IS NOT NULL)))),
++    CHECK (output IS NULL OR (jsonb_typeof(output)='object' AND octet_length(output::text)<=131072)),
++    CHECK (failure_code IS NULL OR failure_code IN ('jev.invalid_request','jev.provider_protocol','jev.transport','jev.timeout','jev.rate_limited','jev.credentials','jev.http')),
++    FOREIGN KEY(company_id,run_id,execution_id) REFERENCES public.workflow_executions(company_id,run_id,id) ON DELETE CASCADE,
++    FOREIGN KEY(company_id,run_id,execution_id,request_id) REFERENCES public.model_usage_calls(company_id,run_id,execution_id,request_id) ON DELETE CASCADE
++);
++CREATE UNIQUE INDEX workflow_jev_success ON public.workflow_jev_invocations(company_id,execution_id) WHERE output IS NOT NULL;
++CREATE FUNCTION public.guard_jev_invocation_update() RETURNS trigger LANGUAGE plpgsql AS $$
++BEGIN
++    IF (to_jsonb(NEW)-ARRAY['output','failure_code','retryable','latency_ms','completed_at','retry_not_before'])
++       IS DISTINCT FROM (to_jsonb(OLD)-ARRAY['output','failure_code','retryable','latency_ms','completed_at','retry_not_before'])
++       OR (OLD.completed_at IS NOT NULL AND NEW IS DISTINCT FROM OLD) THEN
++        RAISE EXCEPTION 'Jev invocation identity and completed outcome are immutable' USING ERRCODE='23514';
++    END IF;
++    RETURN NEW;
++END;
++$$;
++CREATE TRIGGER workflow_jev_immutable BEFORE UPDATE ON public.workflow_jev_invocations
++    FOR EACH ROW EXECUTE FUNCTION public.guard_jev_invocation_update();
+diff --git a/src/adapters/http/routes/workflows/mod.rs b/src/adapters/http/routes/workflows/mod.rs
+index cb4e5a8..6c571cc 100644
+--- a/src/adapters/http/routes/workflows/mod.rs
++++ b/src/adapters/http/routes/workflows/mod.rs
+@@ -30,6 +30,7 @@ use crate::{
+ mod bindings;
+ mod decisions;
+ mod definitions;
++mod jev;
+ mod reconciliations;
+ mod tools;
+ mod ui;
+@@ -133,6 +134,7 @@ pub fn router() -> Router<AppState> {
+             &format!("{company}/agents/{{agent_id}}/workflow-tools"),
+             put(tools::grant),
+         )
++        .merge(jev::router())
+         .merge(ui::router())
+         .layer(DefaultBodyLimit::max(BODY_LIMIT))
+ }
+diff --git a/src/adapters/http/routes/workflows/tests.rs b/src/adapters/http/routes/workflows/tests.rs
+index 08e5d30..67a1a7f 100644
+--- a/src/adapters/http/routes/workflows/tests.rs
++++ b/src/adapters/http/routes/workflows/tests.rs
+@@ -2,6 +2,8 @@
+ //! member who is not an admin, revision conflicts, key replays and conflicts, workflow tools and
+ //! agent grants (WF-C003), and the decision page a review notice links to.
+ use super::*;
++#[path = "jev_tests.rs"]
++mod jev_tests;
+ use crate::adapters::http::session::SessionAuthority;
+ use crate::adapters::persistence::{
+     PostgresPersistence,
+diff --git a/src/adapters/mod.rs b/src/adapters/mod.rs
+index d313e9b..cc0ed02 100644
+--- a/src/adapters/mod.rs
++++ b/src/adapters/mod.rs
+@@ -18,3 +18,5 @@ pub mod workflow_mcp;
+ pub mod workflow_message;
+ pub mod workflow_provisioning;
+ pub mod workflow_source;
++
++pub mod workflow_jev;
+diff --git a/src/adapters/persistence/credential_rotation.rs b/src/adapters/persistence/credential_rotation.rs
+index 37d0349..3ab3d85 100644
+--- a/src/adapters/persistence/credential_rotation.rs
++++ b/src/adapters/persistence/credential_rotation.rs
+@@ -68,6 +68,7 @@ pub struct CredentialRotationReport {
+ /// whose rows never rotate, and nothing else in the system would notice.
+ #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+ enum CredentialTable {
++    TypeSafeCredentials,
+     WorkflowHttpCredentials,
+     CompanyMcpCredentials,
+     /// `company_model_connections.api_key` — the legacy `enc:v1` direct-key format.
+@@ -81,6 +82,7 @@ enum CredentialTable {
+ 
+ impl CredentialTable {
+     const ALL: &'static [Self] = &[
++        Self::TypeSafeCredentials,
+         Self::WorkflowHttpCredentials,
+         Self::CompanyMcpCredentials,
+         Self::ModelConnections,
+@@ -95,6 +97,10 @@ impl CredentialTable {
+ /// key of a batch is exactly where the next batch starts.
+ #[derive(Debug, Clone, PartialEq, Eq)]
+ enum CredentialKey {
++    TypeSafeCredential {
++        company_id: Uuid,
++        connection_id: Uuid,
++    },
+     WorkflowHttpCredential {
+         company_id: Uuid,
+         connection_id: Uuid,
+@@ -432,6 +438,10 @@ async fn store_rotated_credential(
+     rotated: &str,
+ ) -> AppResult<bool> {
+     let changed = match &row.key {
++        CredentialKey::TypeSafeCredential { company_id, connection_id } => {
++            sqlx::query("UPDATE company_typesafe_connections SET envelope=$3 WHERE company_id=$1 AND id=$2 AND envelope=$4")
++                .bind(company_id).bind(connection_id).bind(rotated).bind(&row.stored).execute(&mut **transaction).await
++        }
+         CredentialKey::WorkflowHttpCredential { company_id, connection_id } => {
+             sqlx::query("UPDATE workflow_http_credentials SET envelope=$3 WHERE company_id=$1 AND connection_id=$2 AND envelope=$4")
+                 .bind(company_id).bind(connection_id).bind(rotated).bind(&row.stored).execute(&mut **transaction).await
+@@ -571,6 +581,9 @@ async fn fetch_credential_batch(
+     cursor: Option<&CredentialKey>,
+ ) -> AppResult<Vec<InventoryRow>> {
+     match table {
++        CredentialTable::TypeSafeCredentials => {
++            fetch_typesafe_credential_batch(connection, cursor).await
++        }
+         CredentialTable::WorkflowHttpCredentials => {
+             fetch_http_credential_batch(connection, cursor).await
+         }
+@@ -819,3 +832,37 @@ async fn fetch_mcp_credential_batch(
+         })
+         .collect())
+ }
++
++async fn fetch_typesafe_credential_batch(
++    connection: &mut PgConnection,
++    cursor: Option<&CredentialKey>,
++) -> AppResult<Vec<InventoryRow>> {
++    let (company, id) = match cursor {
++        None => (None, None),
++        Some(CredentialKey::TypeSafeCredential {
++            company_id,
++            connection_id,
++        }) => (Some(*company_id), Some(*connection_id)),
++        Some(_) => {
++            return Err(AppError::Internal(
++                "TypeSafe credential cursor mismatch".into(),
++            ));
++        }
++    };
++    let rows = sqlx::query_as::<_, McpCredentialRow>("SELECT company_id,id AS connection_id,envelope FROM company_typesafe_connections WHERE $1::uuid IS NULL OR (company_id,id)>($1,$2) ORDER BY company_id,id LIMIT $3")
++        .bind(company).bind(id).bind(CREDENTIAL_BATCH_SIZE).fetch_all(connection).await?;
++    Ok(rows
++        .into_iter()
++        .map(|row| InventoryRow {
++            key: CredentialKey::TypeSafeCredential {
++                company_id: row.company_id,
++                connection_id: row.connection_id,
++            },
++            format: CredentialFormat::Envelope(CredentialContext::typesafe_credential(
++                row.company_id,
++                row.connection_id,
++            )),
++            stored: row.envelope,
++        })
++        .collect())
++}
+diff --git a/src/adapters/persistence/credential_rotation_tests.rs b/src/adapters/persistence/credential_rotation_tests.rs
+index 3312616..8ec91ee 100644
+--- a/src/adapters/persistence/credential_rotation_tests.rs
++++ b/src/adapters/persistence/credential_rotation_tests.rs
+@@ -21,6 +21,10 @@ async fn isolated_connection() -> Option<PgConnection> {
+     // tables by design, so a real-table fixture would rotate rows belonging to a test running
+     // beside it.
+     for statement in [
++        r#"CREATE TEMPORARY TABLE company_typesafe_connections (
++               company_id UUID NOT NULL, id UUID NOT NULL, envelope TEXT NOT NULL,
++               PRIMARY KEY (company_id, id)
++           ) ON COMMIT PRESERVE ROWS"#,
+         r#"CREATE TEMPORARY TABLE workflow_http_credentials (
+                company_id UUID NOT NULL, connection_id UUID NOT NULL, envelope TEXT NOT NULL,
+                PRIMARY KEY (company_id, connection_id)
+diff --git a/src/adapters/persistence/credentials/envelope.rs b/src/adapters/persistence/credentials/envelope.rs
+index 8c0ec44..58c5b5b 100644
+--- a/src/adapters/persistence/credentials/envelope.rs
++++ b/src/adapters/persistence/credentials/envelope.rs
+@@ -99,6 +99,16 @@ pub struct CredentialContext {
+ }
+ 
+ impl CredentialContext {
++    pub fn typesafe_credential(company_id: Uuid, connection_id: Uuid) -> Self {
++        Self {
++            scope: "typesafe_credential",
++            fields: vec![
++                company_id.as_bytes().to_vec(),
++                connection_id.as_bytes().to_vec(),
++            ],
++        }
++    }
++
+     pub fn workflow_http_credential(company_id: Uuid, connection_id: Uuid) -> Self {
+         Self {
+             scope: "workflow_http_credential",
+diff --git a/src/adapters/persistence/model_usage/report.rs b/src/adapters/persistence/model_usage/report.rs
+index c35ff7c..06e3d29 100644
+--- a/src/adapters/persistence/model_usage/report.rs
++++ b/src/adapters/persistence/model_usage/report.rs
+@@ -37,7 +37,7 @@ struct CallRow {
+     provider: String,
+     model: String,
+     workflow_id: Option<Uuid>,
+-    agent_id: Uuid,
++    agent_id: Option<Uuid>,
+     input_tokens: i64,
+     output_tokens: i64,
+     usage_source: Option<String>,
+diff --git a/src/adapters/persistence/workflow/authority.rs b/src/adapters/persistence/workflow/authority.rs
+index f56a612..87f826b 100644
+--- a/src/adapters/persistence/workflow/authority.rs
++++ b/src/adapters/persistence/workflow/authority.rs
+@@ -108,6 +108,9 @@ pub(super) async fn supported_publication(
+     bundle: &PublishedBundle,
+     check: workflow_tools::ToolCheck,
+ ) -> AppResult<()> {
++    if matches!(check, workflow_tools::ToolCheck::Publish) {
++        jev::publication_on(tx, bundle).await?;
++    }
+     let mut pending = vec![(bundle, check)];
+     let mut seen = 0;
+     while let Some((current, check)) = pending.pop() {
+diff --git a/src/adapters/persistence/workflow/mod.rs b/src/adapters/persistence/workflow/mod.rs
+index da0fc7e..e388a39 100644
+--- a/src/adapters/persistence/workflow/mod.rs
++++ b/src/adapters/persistence/workflow/mod.rs
+@@ -45,6 +45,7 @@ mod fair_polling;
+ mod fairness;
+ mod history_reader;
+ pub mod http;
++pub mod jev;
+ mod lease;
+ mod lease_claim;
+ pub mod mcp;
+@@ -119,3 +120,5 @@ mod inspection;
+ mod message_outcomes;
+ 
+ mod token_budget;
++
++mod jev_runtime;
+diff --git a/src/adapters/persistence/workflow/resources.rs b/src/adapters/persistence/workflow/resources.rs
+index 5fc20c2..d08ba6c 100644
+--- a/src/adapters/persistence/workflow/resources.rs
++++ b/src/adapters/persistence/workflow/resources.rs
+@@ -16,6 +16,9 @@ pub(super) async fn inspect_on(
+     if let Some(connection) = http::connection_on(tx, company, id.as_uuid()).await? {
+         return http::status_on(tx, &connection).await.map(Some);
+     }
++    if let Some(status) = jev::status_on(tx, company, id.as_uuid()).await? {
++        return Ok(Some(status));
++    }
+     match mcp::connection_on(tx, company, id.as_uuid()).await? {
+         Some(connection) => mcp::status_on(tx, &connection).await.map(Some),
+         None => Ok(None),
+@@ -105,6 +108,24 @@ pub(super) async fn check_readiness(
+             .ok_or_else(missing)?;
+         validate_resource(configuration.company_id(), id, requirement, &status)?;
+     }
++    jev_binding_models(tx, configuration).await
++}
++
++async fn jev_binding_models(
++    tx: &mut Transaction<'_, Postgres>,
++    configuration: &binding::ConfiguredBinding,
++) -> AppResult<()> {
++    for (slot, models) in
++        crate::application::workflow::jev::required_models(configuration.bundle())?
++    {
++        let id = configuration.resources().get(&slot).ok_or_else(missing)?;
++        let connection = jev::connection_on(tx, configuration.company_id(), id.as_uuid())
++            .await?
++            .ok_or_else(jev::revoked)?;
++        if !connection.enabled || !models.is_subset(&connection.models) {
++            return Err(jev::revoked());
++        }
++    }
+     Ok(())
+ }
+ 
+diff --git a/src/adapters/persistence/workflow/tests.rs b/src/adapters/persistence/workflow/tests.rs
+index 311c39f..f95108d 100644
+--- a/src/adapters/persistence/workflow/tests.rs
++++ b/src/adapters/persistence/workflow/tests.rs
+@@ -17,6 +17,8 @@ mod binding_tests;
+ mod child_publication_tests;
+ #[path = "http_tests.rs"]
+ mod http_tests;
++#[path = "jev_tests.rs"]
++mod jev_tests;
+ pub(crate) use http_tests::reconciliation_fixture;
+ #[path = "mcp_tests.rs"]
+ mod mcp_tests;
+@@ -579,3 +581,6 @@ async fn assert_silent_until_marker(
+         "nothing was notified before the marker"
+     );
+ }
++
++#[path = "jev_runtime_tests.rs"]
++mod jev_runtime_tests;
+diff --git a/src/application/services/model_usage/aggregate.rs b/src/application/services/model_usage/aggregate.rs
+index 9d6204d..3609a87 100644
+--- a/src/application/services/model_usage/aggregate.rs
++++ b/src/application/services/model_usage/aggregate.rs
+@@ -5,7 +5,7 @@ pub struct UsageSample {
+     pub provider: ModelProvider,
+     pub model: ModelName,
+     pub workflow: Option<Uuid>,
+-    pub agent: Uuid,
++    pub agent: Option<Uuid>,
+     pub input: u64,
+     pub output: u64,
+     pub source: Option<TokenUsageSource>,
+@@ -41,7 +41,7 @@ pub fn aggregate(
+     let mut groups = std::collections::BTreeMap::<GroupKey, Total>::new();
+     let mut truncated = false;
+     for call in calls {
+-        if query.agent.is_some_and(|id| id != call.agent)
++        if query.agent.is_some_and(|id| Some(id) != call.agent)
+             || query.workflow.is_some_and(|id| Some(id) != call.workflow)
+         {
+             continue;
+@@ -153,7 +153,7 @@ mod tests {
+             provider: "openai".into(),
+             model: "model".into(),
+             workflow: None,
+-            agent: Uuid::nil(),
++            agent: Some(Uuid::nil()),
+             input: 1,
+             output: 1,
+             source,
+diff --git a/src/application/workflow/actions/failure.rs b/src/application/workflow/actions/failure.rs
+index eb5f1b0..b957ca8 100644
+--- a/src/application/workflow/actions/failure.rs
++++ b/src/application/workflow/actions/failure.rs
+@@ -43,6 +43,7 @@ pub fn effect_free_kind(kind: &str) -> bool {
+             | "context.history"
+             | "memory.load"
+             | "ai.classify"
++            | "jev.evaluate"
+             | "wait.event"
+             | "wait.timer"
+     )
+diff --git a/src/application/workflow/binding/mod.rs b/src/application/workflow/binding/mod.rs
+index 07c7254..94e9816 100644
+--- a/src/application/workflow/binding/mod.rs
++++ b/src/application/workflow/binding/mod.rs
+@@ -125,6 +125,7 @@ impl ConfiguredBinding {
+         actor: WorkflowActor,
+         directory: &impl ResourceDirectory,
+     ) -> AppResult<()> {
++        let jev_models = super::jev::required_models(&self.bundle)?;
+         for requirement in &self.bundle.compiled().graph().definition().resources {
+             let id = self.configuration.resources[&requirement.slot];
+             let status = directory
+@@ -132,6 +133,18 @@ impl ConfiguredBinding {
+                 .await?
+                 .ok_or_else(|| AppError::NotFound("Workflow resource".into()))?;
+             validate_resource(self.company_id(), id, requirement, &status)?;
++            if let Some(models) = jev_models.get(&requirement.slot) {
++                if models.iter().any(|model| {
++                    !status
++                        .supported_contracts
++                        .iter()
++                        .any(|contract| *contract == model.resource_contract())
++                }) {
++                    return Err(AppError::BadRequest(
++                        "Selected TypeSafe connection does not allow the frozen model".into(),
++                    ));
++                }
++            }
+         }
+         Ok(())
+     }
+diff --git a/src/application/workflow/compiler/compile.rs b/src/application/workflow/compiler/compile.rs
+index b7e4d13..c5d676f 100644
+--- a/src/application/workflow/compiler/compile.rs
++++ b/src/application/workflow/compiler/compile.rs
+@@ -198,7 +198,13 @@ impl CompiledWorkflow {
+                 self.span(&format!("/steps/{step}")),
+             )
+         })?;
+-        schema.validate(value, &path, self.span(&format!("/steps/{step}")))
++        schema.validate(value, &path, self.span(&format!("/steps/{step}")))?;
++        if self.graph.definition().steps[step].step_type.as_str() == "jev.evaluate" {
++            crate::application::workflow::registry::jev::validate_output(value).map_err(
++                |message| Diagnostic::at("output.jev", message, &path, self.span(&path)),
++            )?;
++        }
++        Ok(())
+     }
+ }
+ 
+diff --git a/src/application/workflow/completion.rs b/src/application/workflow/completion.rs
+index 6578482..0bd11dc 100644
+--- a/src/application/workflow/completion.rs
++++ b/src/application/workflow/completion.rs
+@@ -40,6 +40,7 @@ pub fn is_io_kind(kind: &str) -> bool {
+             | "memory.load"
+             | "memory.save"
+             | "ai.classify"
++            | "jev.evaluate"
+             | "agent.run"
+             | "decision.agent"
+             | "http.request"
+diff --git a/src/application/workflow/mod.rs b/src/application/workflow/mod.rs
+index 67c7368..fe93a3c 100644
+--- a/src/application/workflow/mod.rs
++++ b/src/application/workflow/mod.rs
+@@ -22,6 +22,7 @@ pub mod decisions;
+ pub mod fixtures;
+ pub mod history;
+ pub mod http;
++pub mod jev;
+ pub mod lease;
+ pub mod lifecycle;
+ pub mod manual;
+diff --git a/src/application/workflow/registry/actions.rs b/src/application/workflow/registry/actions.rs
+index f6b7c32..a5b176b 100644
+--- a/src/application/workflow/registry/actions.rs
++++ b/src/application/workflow/registry/actions.rs
+@@ -33,7 +33,7 @@ impl Registration<'_> {
+         );
+         Ok(())
+     }
+-    fn resource(&mut self, kind: &str) -> Result<Value, Diagnostic> {
++    pub(super) fn resource(&mut self, kind: &str) -> Result<Value, Diagnostic> {
+         let connection = self.literal("connection")?;
+         let Some(slot) = connection.as_str() else {
+             return Err(self.error(
+diff --git a/src/application/workflow/registry/budget.rs b/src/application/workflow/registry/budget.rs
+index 2a592d8..e226f9f 100644
+--- a/src/application/workflow/registry/budget.rs
++++ b/src/application/workflow/registry/budget.rs
+@@ -16,6 +16,7 @@ pub(super) fn preflight(parsed: &ParsedWorkflow, facts: &CatalogueFacts) -> Resu
+     for (id, step) in &parsed.definition.steps {
+         declarations(&mut budget, step)?;
+         match step.step_type.as_str() {
++            "jev.evaluate" => jev::preflight(step, &mut budget, parsed.locations[""])?,
+             "tool.call" | "mcp.call" => tool(&mut budget, step, facts)?,
+             "workflow.call" | "flow.repeat" => {
+                 if let Some(control) = parsed.controls.get(id)
+diff --git a/src/application/workflow/registry/checks.rs b/src/application/workflow/registry/checks.rs
+index 7be7ffd..2f65c26 100644
+--- a/src/application/workflow/registry/checks.rs
++++ b/src/application/workflow/registry/checks.rs
+@@ -8,6 +8,7 @@ pub(crate) enum InputCheck {
+     Approval,
+     Http,
+     Message,
++    Jev,
+ }
+ impl InputCheck {
+     /// Called for known literals at compilation and again for all resolved inputs.
+@@ -41,6 +42,8 @@ impl InputCheck {
+             }
+             Self::Http => check_http(inputs, root, span)?,
+             Self::Message => check_message(inputs, root, span)?,
++            Self::Jev => jev::validate_inputs(inputs)
++                .map_err(|message| Diagnostic::at("registry.jev", message, root, span))?,
+         }
+         Ok(())
+     }
+diff --git a/src/application/workflow/registry/examples.rs b/src/application/workflow/registry/examples.rs
+index 450c0af..7bba571 100644
+--- a/src/application/workflow/registry/examples.rs
++++ b/src/application/workflow/registry/examples.rs
+@@ -30,6 +30,9 @@ pub fn example(name: &str) -> Option<AuthoringExample> {
+         step["rule"] =
+             json!({"cases":[{"when":{"literal":true},"choice":"continue"}],"default":"revise"});
+     }
++    if name == "jev.evaluate" {
++        resources = json!([{"slot":"service","kind":"typesafe"}]);
++    }
+     if ["http.request", "mcp.call"].contains(&name) {
+         resources =
+             json!([{"slot":"service","kind":if name == "http.request" { "http" } else { "mcp" }}]);
+@@ -84,6 +87,13 @@ fn values(name: &str) -> Value {
+         "memory.save" => {
+             json!({"scope":{"kind":"agent","id":"assistant"},"facts":["Prefers concise replies"]})
+         }
++        "jev.evaluate" => {
++            json!({"connection":"service","model":"jev-1.14.0","state":{"ticket":"Payment failed"},"questions":{
++                "department":{"type":"choice","instructions":"Which team should handle this ticket?","criteria":{"billing":"Payment issues","technical":"Bugs or integrations"}},
++                "urgent":{"type":"noul","instructions":"Does the ticket need immediate attention?"},
++                "severity":{"type":"score","instructions":"How severe is the issue?","criteria":["Cosmetic","Workaround available","Blocking"]}
++            }})
++        }
+         "ai.classify" => {
+             json!({"agent":"assistant","context":{"message":"hello"},"output_schema":{"type":"string","enum":["support","sales"]}})
+         }
+diff --git a/src/application/workflow/registry/families.rs b/src/application/workflow/registry/families.rs
+index bfceef5..8dfd1d3 100644
+--- a/src/application/workflow/registry/families.rs
++++ b/src/application/workflow/registry/families.rs
+@@ -2,6 +2,7 @@ use super::*;
+ impl Registration<'_> {
+     pub(super) fn basic(&mut self) -> Result<Contract, Diagnostic> {
+         match self.name() {
++            "jev.evaluate" => self.jev(),
+             "context.history" => Ok(contract(
+                 json!({"max_tokens":integer(MAX_CONTEXT_TOKENS)}),
+                 &["max_tokens"],
+diff --git a/src/application/workflow/registry/help.rs b/src/application/workflow/registry/help.rs
+index 9b679ef..6daab4c 100644
+--- a/src/application/workflow/registry/help.rs
++++ b/src/application/workflow/registry/help.rs
+@@ -59,6 +59,9 @@ fn notes(name: &str) -> &'static str {
+         "memory.load" | "memory.save" => {
+             "Not available in this release (memory is out of scope); publication refuses it. Scoped capability required; at most 256 items/facts, each text at most 16384 characters. Saves require logical idempotency."
+         }
++        "jev.evaluate" => {
++            "TypeSafe System One: literal typesafe connection slot, exact versioned model, and 1–32 independent typed questions; state is a string, object or array. Noul is a probability, Choice has up to 64 options, Score has 2–10 levels. Instructions/descriptions are literal strings up to 16384 UTF-8 bytes. Request and response are at most 65536 serialized bytes, also subject to workflow context/schema budgets. Probability sums allow absolute error 0.000001. Confidence is not correctness; decision.rule owns thresholds. Runtime and connection support are delivered by subsequent Jev phases; do not deploy a partial implementation."
++        }
+         "ai.classify" => {
+             "The selected agent's model and instructions classify the context into a finite label set; no tools or skills. Invalid labels get bounded repair, then fail terminally."
+         }
+diff --git a/src/application/workflow/registry/metadata.rs b/src/application/workflow/registry/metadata.rs
+index b19fe00..70639b4 100644
+--- a/src/application/workflow/registry/metadata.rs
++++ b/src/application/workflow/registry/metadata.rs
+@@ -58,6 +58,7 @@ pub(super) fn constraints(name: &str) -> ExecutionConstraints {
+         "memory.load" => (BoundedRead, vec![MemoryRead]),
+         "memory.save" => (DurableWrite, vec![MemoryWrite]),
+         "ai.classify" | "decision.agent" => (ModelInvocation, vec![ModelInvoke]),
++        "jev.evaluate" => (ModelInvocation, vec![ModelInvoke, ResourceUse]),
+         "agent.run" => (AgentActions, vec![AgentInvoke]),
+         "http.request" | "mcp.call" => (
+             EffectClass::SharedAction,
+diff --git a/src/application/workflow/registry/mod.rs b/src/application/workflow/registry/mod.rs
+index 22d2fc2..03b1515 100644
+--- a/src/application/workflow/registry/mod.rs
++++ b/src/application/workflow/registry/mod.rs
+@@ -7,6 +7,7 @@ mod examples;
+ mod facts;
+ mod families;
+ mod help;
++pub mod jev;
+ pub(crate) mod mcp;
+ pub(crate) use mcp::tool_result as mcp_tool_result;
+ mod metadata;
+@@ -29,7 +30,7 @@ use schemas::*;
+ use serde_json::{Value, json};
+ use std::collections::{BTreeMap, BTreeSet};
+ 
+-pub const CONTRACT_REVISION: &str = "workflow-catalogue-v1.5";
++pub const CONTRACT_REVISION: &str = "workflow-catalogue-v1.6";
+ pub const MAX_FACTS: usize = 256;
+ pub const MAX_SELECTIONS: usize = 128;
+ /// Explicit reviewers of one `decision.human` (user decision Q1, 05-D2 §2): at most this many
+@@ -47,11 +48,12 @@ pub const MAX_IDENTIFIER: usize = 128;
+ pub const MAX_PATH: usize = 2048;
+ pub const MAX_DEADLINE: usize = 64;
+ pub const MAX_CORRELATION: usize = 256;
+-pub const TYPES: [&str; 18] = [
++pub const TYPES: [&str; 19] = [
+     "context.history",
+     "memory.load",
+     "memory.save",
+     "ai.classify",
++    "jev.evaluate",
+     "agent.run",
+     "decision.rule",
+     "decision.human",
+@@ -120,6 +122,7 @@ pub fn compile(
+     }
+     compiler::check_resolved_budget(&parsed, &descriptors, dependencies, &facts.tool_workflows)?;
+     validate_declarations(&parsed)?;
++    validate_jev_resources(&parsed)?;
+     compiler::compile_resolved(
+         decoded,
+         parsed,
+@@ -423,3 +426,27 @@ fn validate_declarations(parsed: &ParsedWorkflow) -> Result<(), Diagnostic> {
+     }
+     Ok(())
+ }
++
++fn validate_jev_resources(parsed: &ParsedWorkflow) -> Result<(), Diagnostic> {
++    for resource in parsed
++        .definition
++        .resources
++        .iter()
++        .filter(|r| r.kind.as_str() == "typesafe")
++    {
++        let used = parsed.definition.steps.values().any(|step| step.step_type.as_str() == "jev.evaluate"
++            && matches!(step.inputs.get("connection"), Some(Binding::Literal(value)) if value.as_str() == Some(resource.slot.as_str())));
++        if !used {
++            return Err(Diagnostic::at(
++                "registry.resource",
++                "TypeSafe resource slots must be referenced by a Jev step",
++                "/resources",
++                parsed.locations[""],
++            ));
++        }
++    }
++    Ok(())
++}
++
++#[cfg(test)]
++mod jev_tests;
+diff --git a/src/application/workflow/registry/runtime_tests.rs b/src/application/workflow/registry/runtime_tests.rs
+index 83c3540..fe8296f 100644
+--- a/src/application/workflow/registry/runtime_tests.rs
++++ b/src/application/workflow/registry/runtime_tests.rs
+@@ -66,6 +66,7 @@ fn workflow_registry_each_type_validates_dynamic_required_inputs() {
+         let (field, bad) = match name {
+             "context.history" => ("max_tokens", json!(0)),
+             "memory.load" | "memory.save" => ("scope", json!({"kind":"user"})),
++            "jev.evaluate" => ("state", json!(true)),
+             "ai.classify" => continue, // Context is intentionally schema-free JSON; declaration must be static.
+             "agent.run" | "decision.agent" => ("agent", json!(3)),
+             "decision.rule" => ("data", json!(3)),
+diff --git a/src/application/workflow/registry/tests.rs b/src/application/workflow/registry/tests.rs
+index 96079d9..5d85843 100644
+--- a/src/application/workflow/registry/tests.rs
++++ b/src/application/workflow/registry/tests.rs
+@@ -37,13 +37,13 @@ pub(super) fn context<'a>(
+ }
+ #[test]
+ fn workflow_registry_exact_catalogue_and_help_examples_compile() {
+-    let expected = "agent.run ai.classify context.history data.map decision.agent decision.human decision.rule flow.repeat http.request mcp.call memory.load memory.save message.reply message.send tool.call wait.event wait.timer workflow.call";
++    let expected = "agent.run ai.classify context.history data.map decision.agent decision.human decision.rule flow.repeat http.request jev.evaluate mcp.call memory.load memory.save message.reply message.send tool.call wait.event wait.timer workflow.call";
+     assert_eq!(
+         TYPES.iter().copied().collect::<BTreeSet<_>>(),
+         expected.split_whitespace().collect()
+     );
+-    assert_eq!(TYPES.len(), 18);
+-    assert_eq!(TYPES.iter().collect::<BTreeSet<_>>().len(), 18);
++    assert_eq!(TYPES.len(), 19);
++    assert_eq!(TYPES.iter().collect::<BTreeSet<_>>().len(), 19);
+     for name in TYPES {
+         let example = example(name).unwrap();
+         let compiled = compile_example(&example).unwrap_or_else(|e| panic!("{name}: {e:?}"));
+diff --git a/src/infra/workflow.rs b/src/infra/workflow.rs
+index 5d39ed9..88228a4 100644
+--- a/src/infra/workflow.rs
++++ b/src/infra/workflow.rs
+@@ -50,7 +50,8 @@ use crate::domain::monitoring::MonitoringService;
+ 
+ /// Registered step kinds this deployment has no handler for: memory is out of this release
+ /// (NOT_PLANNED, 06-F032). Publication refuses them so no run can stall on one.
+-pub const UNHANDLED_STEP_KINDS: &[&str] = &["memory.load", "memory.save"];
++// Jev remains refused until its connection and runtime phases are complete.
++pub const UNHANDLED_STEP_KINDS: &[&str] = &["memory.load", "memory.save", "jev.evaluate"];
+ 
+ /// The default and bounds of `WORKFLOW_WORKER_SLOTS`, and the database connections everything
+ /// else `serve` runs needs (listener, HTTP headroom, task, delivery, notification and inbound
+@@ -126,6 +127,8 @@ pub fn worker_slots(configured: Option<&str>, pool_connections: u32) -> anyhow::
+ /// reaches its runtime, which performs effects only through ActionService's marker-first
+ /// protocol (§04.10); this composite adds no effect path of its own.
+ pub struct ProductionHandler {
++    jev: crate::application::workflow::jev::JevRuntime<PostgresPersistence>,
++    jev_enabled: bool,
+     agent: WorkflowAgentRuntime<PostgresPersistence, AgentActionTools>,
+     http: Arc<HttpRuntime>,
+     mcp: Arc<McpRuntime>,
+@@ -135,6 +138,9 @@ pub struct ProductionHandler {
+ 
+ impl ProductionHandler {
+     fn route(&self, kind: &WorkflowStepKind) -> Option<&dyn WorkflowHandler> {
++        if self.jev_enabled && self.jev.supports(kind) {
++            return Some(&self.jev);
++        }
+         let handlers: [&dyn WorkflowHandler; 5] = [
+             &self.agent,
+             self.http.as_ref(),
+@@ -234,6 +240,12 @@ impl WorkflowEngine {
+             lease,
+         );
+         let handler = Arc::new(ProductionHandler {
++            jev: crate::application::workflow::jev::JevRuntime::new(
++                persistence.clone(),
++                Arc::new(crate::adapters::workflow_jev::JevHttp::new()?),
++                lease,
++            ),
++            jev_enabled: !UNHANDLED_STEP_KINDS.contains(&"jev.evaluate"),
+             agent,
+             http,
+             mcp,
+@@ -360,6 +372,10 @@ impl WorkflowEngine {
+         &self.persistence
+     }
+ 
++    pub fn jev_connections(&self) -> &dyn crate::application::workflow::jev::JevConnections {
++        &self.persistence
++    }
++
+     /// Named workflow tool registrations (07-D2, notice WF-C003).
+     pub fn workflow_tools(&self) -> &dyn crate::application::workflow::tools::WorkflowTools {
+         &self.persistence
+@@ -517,6 +533,19 @@ impl WorkflowEngine {
+ #[cfg(test)]
+ impl WorkflowEngine {
+     /// The production composition on `persistence`, for tests: one slot, `agents.test`.
++    pub(crate) fn with_jev_test_provider(
++        mut self,
++        provider: Arc<dyn crate::application::workflow::jev::JevProvider>,
++    ) -> Self {
++        let handler = Arc::get_mut(&mut self.handler).expect("unshared test engine");
++        handler.jev = crate::application::workflow::jev::JevRuntime::new(
++            self.persistence.clone(),
++            provider,
++            LeasePolicy::new(LEASE).unwrap(),
++        );
++        handler.jev_enabled = true;
++        self
++    }
+     pub(crate) fn for_tests(persistence: PostgresPersistence) -> Self {
+         use crate::adapters::protocols::email::EmailRenderer;
+         use crate::application::transport::ports::TransportRenderers;
+diff --git a/src/main.rs b/src/main.rs
+index 898a8d4..0668107 100644
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -154,6 +154,12 @@ const NO_BACKWARD_COMPATIBILITY_NOTES: &[&str] = &[
+     "plan/hindsight_remaining_work.md",
+     "plan/hydradb/01-preserve-memory-scope-isolation.md",
+     "plan/hydradb/06-make-memory-ingestion-durable.md",
++    "plan/jev-evaluate/README.md",
++    "plan/jev-evaluate/01-step-contract.md",
++    "plan/jev-evaluate/02-connection-and-publication.md",
++    "plan/jev-evaluate/03-runtime-and-recovery.md",
++    "plan/jev-evaluate/04-images-and-box.md",
++    "plan/jev-evaluate/05-authoring-and-release.md",
+     "plan/local_machine_tunnel_plan.md",
+     "plan/memory_management/general_plan_instructions.md",
+     "plan/message-confirmation-ideas/outreach-target-allowlist.md",

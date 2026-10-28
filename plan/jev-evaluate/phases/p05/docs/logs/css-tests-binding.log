@@ -1,0 +1,12 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.24s
+     Running unittests src/lib.rs (target/debug/deps/mail_agents-0fc485c3efcd046b)
+
+running 4 tests
+test application::workflow::binding::tests::workflow_binding_revisions_retain_independent_snapshots ... ok
+test application::workflow::binding::tests::workflow_binding_rechecks_revocation_and_propagates_directory_outages ... ok
+test application::workflow::binding::tests::workflow_binding_checks_current_resource_identity_access_and_capabilities ... ok
+test application::workflow::binding::tests::workflow_binding_checks_ownership_params_and_exact_slots ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 2378 filtered out; finished in 0.11s
+

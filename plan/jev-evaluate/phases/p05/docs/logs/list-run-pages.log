@@ -1,0 +1,6 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.24s
+     Running unittests src/lib.rs (target/debug/deps/mail_agents-0fc485c3efcd046b)
+adapters::http::routes::workflows::ui::runs::tests::pages_tests::an_unfinished_step_of_an_ended_run_reads_as_stopped: test
+adapters::http::routes::workflows::ui::runs::tests::pages_tests::reconciliation_is_offered_as_an_annotation_and_a_step_shows_usage_and_receipts: test
+
+2 tests, 0 benchmarks

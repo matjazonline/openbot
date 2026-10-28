@@ -1,0 +1,38 @@
+    Checking mail_agents v0.1.0 (/Users/mac02/dev/openbot)
+error: this `if` statement can be collapsed
+   --> src/application/workflow/binding/mod.rs:136:13
+    |
+136 | /             if let Some(models) = jev_models.get(&requirement.slot) {
+137 | |                 if models.iter().any(|model| {
+138 | |                     !status
+139 | |                         .supported_contracts
+...   |
+147 | |             }
+    | |_____________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#collapsible_if
+    = note: `-D clippy::collapsible-if` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::collapsible_if)]`
+help: collapse nested if block
+    |
+136 ~             if let Some(models) = jev_models.get(&requirement.slot)
+137 ~                 && models.iter().any(|model| {
+138 |                     !status
+...
+145 |                     ));
+146 ~                 }
+    |
+
+error: could not compile `mail_agents` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: redundant closure
+   --> src/adapters/storage/gcs.rs:438:26
+    |
+438 |                     .map(|bytes| Ok::<_, std::io::Error>(bytes)),
+    |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace the closure with the tuple variant itself: `Ok::<_, std::io::Error>`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#redundant_closure
+    = note: `-D clippy::redundant-closure` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::redundant_closure)]`
+
+error: could not compile `mail_agents` (lib test) due to 2 previous errors

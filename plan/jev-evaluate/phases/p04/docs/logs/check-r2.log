@@ -1,0 +1,11 @@
+    Checking mail_agents v0.1.0 (/Users/mac02/dev/openbot)
+warning: function `output` is never used
+  --> src/application/workflow/jev_assets_tests.rs:14:15
+   |
+14 | pub(crate) fn output() -> Value {
+   |               ^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `mail_agents` (lib test) generated 1 warning
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 57.80s

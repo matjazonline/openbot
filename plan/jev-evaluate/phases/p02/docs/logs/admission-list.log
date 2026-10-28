@@ -1,0 +1,22 @@
+   Compiling mail_agents v0.1.0 (/Users/mac02/dev/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 12.27s
+     Running unittests src/lib.rs (target/debug/deps/mail_agents-6693f25a28eea502)
+adapters::persistence::workflow::tests::admission_tests::admission_authority_tests::workflow_admit_sql_actor_revocation_blocks_new_replay_and_alias: test
+adapters::persistence::workflow::tests::admission_tests::admission_authority_tests::workflow_admit_sql_channel_revocation_blocks_new_replay_and_alias: test
+adapters::persistence::workflow::tests::admission_tests::admission_authority_tests::workflow_admit_sql_deactivated_replay_uses_saved_resources_not_current_head: test
+adapters::persistence::workflow::tests::admission_tests::admission_authority_tests::workflow_admit_sql_message_membership_revocation_is_observed: test
+adapters::persistence::workflow::tests::admission_tests::admission_authority_tests::workflow_admit_sql_saved_resource_revocation_blocks_new_replay_and_alias: test
+adapters::persistence::workflow::tests::admission_tests::admission_history_tests::workflow_admit_sql_binding_scope_narrowing_matrix: test
+adapters::persistence::workflow::tests::admission_tests::admission_history_tests::workflow_admit_sql_history_excludes_older_uncommitted_membership: test
+adapters::persistence::workflow::tests::admission_tests::admission_history_tests::workflow_admit_sql_long_history_retains_only_newest_256: test
+adapters::persistence::workflow::tests::admission_tests::admission_history_tests::workflow_admit_sql_message_alias_equivalence_and_independent_runs: test
+adapters::persistence::workflow::tests::admission_tests::admission_history_tests::workflow_admit_sql_replay_rejects_changed_association_for_command_and_alias: test
+adapters::persistence::workflow::tests::admission_tests::admission_source_tests::workflow_admit_sql_message_source_rejects_missing_foreign_and_wrong_membership: test
+adapters::persistence::workflow::tests::admission_tests::admission_source_tests::workflow_admit_sql_schedule_source_checks_occurrence_owner_and_association: test
+adapters::persistence::workflow::tests::admission_tests::admission_source_tests::workflow_admit_sql_schedule_source_revocation_blocks_new_replay_and_alias: test
+adapters::persistence::workflow::tests::admission_tests::workflow_admit_sql_competing_same_key_and_canonical_source: test
+adapters::persistence::workflow::tests::admission_tests::workflow_admit_sql_exact_snapshot_job_and_replay_preserves_deadline: test
+adapters::persistence::workflow::tests::admission_tests::workflow_admit_sql_final_and_deferred_failure_roll_back_all_records: test
+adapters::persistence::workflow::tests::admission_tests::workflow_admit_sql_stale_selection_conflicts_and_saved_replay_survives_removal: test
+
+17 tests, 0 benchmarks

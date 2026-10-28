@@ -1,0 +1,72 @@
+    Checking mail_agents v0.1.0 (/Users/mac02/dev/openbot)
+error[E0599]: no method named `complete_io` found for struct `persistence::PostgresPersistence` in the current scope
+   --> src/adapters/persistence/workflow/jev_runtime_tests.rs:209:14
+    |
+208 | /         f.persistence
+209 | |             .complete_io(crate::application::workflow::lease::FencedWorkflowResult {
+    | |_____________-^^^^^^^^^^^
+    |
+   ::: src/application/workflow/completion.rs:30:14
+    |
+ 30 |       async fn complete_io(
+    |                ----------- the method is available for `persistence::PostgresPersistence` here
+    |
+   ::: src/adapters/persistence/mod.rs:35:1
+    |
+ 35 |   pub struct PostgresPersistence {
+    |   ------------------------------ method `complete_io` not found for this struct
+    |
+    = help: items from traits can only be used if the trait is in scope
+help: trait `WorkflowCompletion` which provides `complete_io` is implemented but not in scope; perhaps you want to import it
+    |
+  1 + use crate::application::workflow::completion::WorkflowCompletion;
+    |
+help: there is a method `complete_inbound_event` with a similar name
+    |
+209 -             .complete_io(crate::application::workflow::lease::FencedWorkflowResult {
+209 +             .complete_inbound_event(crate::application::workflow::lease::FencedWorkflowResult {
+    |
+
+error[E0061]: this method takes 2 arguments but 1 argument was supplied
+   --> src/adapters/persistence/workflow/jev_runtime_tests.rs:281:36
+    |
+281 |     let candidates = f.persistence.poll_work(16).await.unwrap();
+    |                                    ^^^^^^^^^ -- argument #1 of type `std::option::Option<application::workflow::polling::PollCursor>` is missing
+    |
+note: method defined here
+   --> src/application/workflow/polling.rs:61:14
+    |
+ 61 |     async fn poll_work(&self, after: Option<PollCursor>, limit: u16) -> AppResult<PollPage>;
+    |              ^^^^^^^^^        -----
+help: provide the argument
+    |
+281 |     let candidates = f.persistence.poll_work(/* std::option::Option<application::workflow::polling::PollCursor> */, 16).await.unwrap();
+    |                                              ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+error[E0599]: `application::workflow::polling::PollPage` is not an iterator
+   --> src/adapters/persistence/workflow/jev_runtime_tests.rs:282:32
+    |
+282 |     let candidate = candidates.into_iter().find(|c| c.scope.run == run).unwrap();
+    |                                ^^^^^^^^^ `application::workflow::polling::PollPage` is not an iterator
+    |
+   ::: src/application/workflow/polling.rs:28:1
+    |
+ 28 | pub struct PollPage {
+    | ------------------- method `into_iter` not found for this struct because it doesn't satisfy `_: IntoIterator` or `application::workflow::polling::PollPage: Iterator`
+    |
+    = note: the following trait bounds were not satisfied:
+            `application::workflow::polling::PollPage: Iterator`
+            which is required by `application::workflow::polling::PollPage: IntoIterator`
+            `&application::workflow::polling::PollPage: Iterator`
+            which is required by `&application::workflow::polling::PollPage: IntoIterator`
+            `&mut application::workflow::polling::PollPage: Iterator`
+            which is required by `&mut application::workflow::polling::PollPage: IntoIterator`
+note: the trait `Iterator` must be implemented
+   --> /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/iter/traits/iterator.rs:41:0
+    = help: items from traits can only be used if the trait is implemented and in scope
+    = note: the following trait defines an item `into_iter`, perhaps you need to implement it:
+            candidate #1: `IntoIterator`
+
+Some errors have detailed explanations: E0061, E0599.
+For more information about an error, try `rustc --explain E0061`.
+error: could not compile `mail_agents` (lib test) due to 3 previous errors

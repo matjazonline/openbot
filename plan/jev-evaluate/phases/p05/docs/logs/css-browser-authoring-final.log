@@ -1,0 +1,10 @@
+PASS copy/edit/validate/sample/publish/activate; keyboard, both themes, progress, escaping, stale response
+✔ plan/jev-evaluate/phases/p05/docs/logs/css-authoring-browser.cjs (6765.582042ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 6770.051792

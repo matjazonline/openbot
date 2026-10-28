@@ -1,0 +1,9 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.28s
+     Running unittests src/lib.rs (target/debug/deps/mail_agents-0fc485c3efcd046b)
+adapters::persistence::workflow::tests::jev_tests::jev_binding_competing_authorizations_observe_committed_revocation: test
+adapters::persistence::workflow::tests::jev_tests::jev_binding_current_rotation_model_removal_disable_and_no_fallback: test
+adapters::persistence::workflow::tests::jev_tests::jev_binding_foreign_selection_model_allowance_and_stale_revision: test
+adapters::persistence::workflow::tests::jev_tests::jev_binding_forged_inputs_and_current_actor_revocation_are_refused: test
+adapters::persistence::workflow::tests::jev_tests::jev_binding_publication_requires_company_model_and_stale_fence_refused: test
+
+5 tests, 0 benchmarks

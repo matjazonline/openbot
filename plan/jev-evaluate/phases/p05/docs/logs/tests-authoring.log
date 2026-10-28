@@ -1,0 +1,54 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling mail_agents v0.1.0 (/Users/mac02/dev/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 15.37s
+     Running unittests src/lib.rs (target/debug/deps/mail_agents-0fc485c3efcd046b)
+
+running 45 tests
+test adapters::http::routes::workflows::ui::authoring::tests::access_tests::every_workspace_write_refuses_a_cross_origin_cookie_post ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::access_tests::hostile_text_is_escaped_in_the_list_the_editor_and_the_preview ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::a_template_copy_is_keyed_and_a_stale_catalogue_revision_is_refused ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::a_blank_draft_is_created_once_per_key_and_validates_as_a_one_step_graph ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::access_tests::an_admin_of_another_company_reaches_no_write_or_version_of_this_one ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::access_tests::other_tenants_and_plain_members_reach_no_workflow_and_admins_do ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::a_refused_binding_keeps_every_choice_and_says_why ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::a_binding_is_created_once_paused_then_activated_at_the_revision_seen ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::an_archived_workflows_binding_can_still_be_paused_but_not_activated_or_configured ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::a_resource_that_is_not_ready_is_refused_as_such_on_create_configure_and_activate ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::a_version_change_renders_that_versions_fields_and_keeps_matching_values ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::hostile_names_are_escaped_in_the_tab_the_form_and_the_card ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::configure_saves_at_the_revision_seen_and_a_stale_one_keeps_the_choices ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::channels_an_admin_cannot_see_stay_out_of_the_tab_the_form_and_the_card ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::editor_tests::a_concurrent_save_keeps_the_authors_text_and_shows_what_the_other_saved ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::other_tenants_and_plain_members_reach_no_binding ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::destination_tests::binding_destinations_authorize_tenant_role_and_private_channel ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::params_the_fields_cannot_carry_open_as_json_and_save_unchanged ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::editor_tests::a_source_and_description_that_start_with_a_newline_keep_it ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::editor_tests::a_draft_naming_more_tools_than_are_offered_still_saves_and_renders ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::editor_tests::a_save_refreshes_the_sidebar_and_a_changed_publication_is_flagged ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::editor_tests::a_draft_that_moves_after_the_save_keeps_the_text_and_says_both ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::editor_tests::an_invalid_source_is_saved_kept_and_located ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::editor_tests::the_editor_guards_unsaved_text_and_reports_only_the_work_it_does ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::editor_tests::the_editor_offers_a_needed_mcp_tool_past_any_company_wide_count_and_cuts_per_tool ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::editor_tests::archiving_refuses_a_stale_revision_then_locks_the_draft ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::publish_tests::a_parameter_selected_agent_step_previews_every_frozen_candidate ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::jev_tests::workflow_authoring_jev_catalogue_binding_and_sample ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::publish_tests::a_parameter_selected_step_lists_its_own_parameters_agents ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::jev_tests::workflow_authoring_jev_company_forms_permissions_rotation_and_readiness ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::publish_tests::a_publish_of_a_revision_that_is_no_longer_the_draft_is_refused_in_the_editor ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::publish_tests::an_agent_step_previews_the_agents_frozen_tools_and_skills ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::publish_tests::an_mcp_step_validates_publishes_through_the_selected_slot_and_locates_bad_arguments ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::publish_tests::a_publish_conflict_that_is_not_a_moved_draft_says_what_the_command_said ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::publish_tests::publishing_moves_no_binding_and_versions_compare_line_by_line ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::selections_read_only_well_formed_connection_fields ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::sample_tests::sample_direct_workflow_tool_child_and_message_have_zero_production_effects ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::sample_tests::samples_authorize_tenant_revision_and_preserve_invalid_hostile_text ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::sample_tests::sample_mcp_fixture_never_contacts_selected_endpoint_and_rejects_foreign_selection ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::the_catalogue_lists_every_runnable_type_and_the_agents_a_step_can_name ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::the_sidebar_pages_through_every_draft ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::tools_tests::a_tool_name_is_registered_re_pinned_re_pointed_and_revoked_saying_what_each_does ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::tools_tests::an_agents_grants_save_against_the_list_seen_and_say_what_each_name_is ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::tools_tests::used_by_lists_a_binding_that_reaches_the_agent_only_through_a_child_diamond ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::tools_tests::revoking_or_re_pointing_a_frozen_tool_stops_its_versions_bindings_as_the_warning_says ... ok
+
+test result: ok. 45 passed; 0 failed; 0 ignored; 0 measured; 2337 filtered out; finished in 11.32s
+

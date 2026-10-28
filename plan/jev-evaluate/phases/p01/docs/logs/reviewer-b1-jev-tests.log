@@ -1,0 +1,22 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.26s
+     Running unittests src/lib.rs (target/debug/deps/mail_agents-6693f25a28eea502)
+
+running 15 tests
+test application::workflow::registry::jev_tests::jev_contract_duplicate_keys_and_nonfinite_source_rejected ... ok
+test application::workflow::registry::jev_tests::jev_contract_response_byte_limit_and_aggregate_questions ... ok
+test application::workflow::registry::jev_tests::jev_contract_rejects_invalid_question_shapes ... ok
+test application::workflow::registry::jev_tests::jev_contract_request_budget_counts_envelope_and_escaping ... ok
+test application::workflow::registry::jev_tests::jev_contract_static_fields_models_and_resources ... ok
+test application::workflow::registry::jev_tests::jev_contract_noul_criteria_and_escaped_question_paths ... ok
+test application::workflow::registry::jev_tests::jev_contract_downstream_runtime_never_coerces_probability_to_boolean ... ok
+test application::workflow::registry::jev_tests::jev_contract_probability_sum_tolerance ... ok
+test application::workflow::registry::jev_tests::jev_contract_rejects_malformed_outputs ... ok
+test application::workflow::registry::jev_tests::jev_contract_mixed_exact_schema_and_metadata ... ok
+test application::workflow::registry::jev_tests::jev_contract_frozen_semantics_change_hash ... ok
+test application::workflow::registry::jev_tests::jev_contract_dynamic_state_checks_and_workflow_context_budget ... ok
+test application::workflow::registry::jev_tests::jev_contract_primitive_limits_fail_at_next_item ... ok
+test application::workflow::registry::jev_tests::jev_contract_text_and_identifier_limits_count_utf8_bytes ... ok
+test application::workflow::registry::jev_tests::jev_contract_downstream_paths_are_exact_and_typed ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 2317 filtered out; finished in 0.11s
+

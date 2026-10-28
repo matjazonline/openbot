@@ -1,0 +1,1477 @@
+--- p05-start/docs/deploy.md
++++ p05-final/docs/deploy.md
+@@ -529,3 +529,24 @@
+ any request that needs the database, and recovers by itself. Avoid deploying
+ both apps simultaneously — that is the one case where the app crash-loops
+ instead of degrading, per the note above.
++
++
++### TypeSafe Jev
++
++`jev.evaluate` is available in the production workflow catalogue. Configure its
++company-owned API key and allowed versioned models in company Settings, then bind
++the `typesafe` workflow slot to that connection. There is no global TypeSafe API-key
++or endpoint environment setting. The adapter uses the fixed HTTPS System One URL;
++company forms cannot change it. Existing `CREDENTIAL_ENCRYPTION_KEYS` and
++`CREDENTIAL_ENCRYPTION_ACTIVE_VERSION` encrypt TypeSafe keys and the credential
++inventory/rotation commands include these rows. Startup validates encryption
++configuration; it does not probe TypeSafe credentials or model availability.
++
++Experimental image steps also need the private attachment storage already used by
++this deployment; use the documented GCS settings above. Text steps need no storage.
++Keep the enforced 64 KiB wire limit and image bounds described in the
++[workflow language](workflow-language-v1.md#experimental-jev-images-and-box).
++Use isolated scripted samples before a controlled live evaluation and inspect
++run history and company model usage. Provider usage is billed by TypeSafe; local
++estimates and configured prices are not invoices. Operational failure/recovery and
++revocation semantics are in the [Jev runbook](workflow-operations.md#typesafe-jev-evaluation).
+--- p05-start/docs/workflow-language-v1.md
++++ p05-final/docs/workflow-language-v1.md
+@@ -388,8 +388,12 @@
+ (64 KiB / 4096 nodes), compiled-fact (1 MiB), and workflow context limits also apply,
+ so aggregate budgets can reject combinations below the individual maxima. This
+ step is one model invocation with committed-result reuse, without agent tools or
+-action effects. Phase 01 supplies its contract; connection and runtime support
+-arrive in later Jev phases. Do not deploy the partial implementation.
++action effects. The production catalogue and worker support the complete text/image contract.
++Create a company TypeSafe connection in company Settings, allow the exact model,
++then select it for the `typesafe` slot on the workflow Bindings tab. The published
++source pins the model and questions; the binding stores only the connection ID.
++Rotation uses the current key on the next provider call. Disabled, revoked or
++model-disallowed connections fail current-use authorization without fallback.
+ 
+ The mixed Noul/Choice/Score example is available through
+ `registry::example("jev.evaluate")`. Upstream contracts were checked against the
+@@ -436,6 +440,12 @@
+ The scripted image sample in `samples/jev-image.json` contains inert references and
+ supplied results. It never reads private storage or calls TypeSafe. Its format has
+ `source` (workflow definition) and `sample` (sample request); use them with the
+-ordinary compile/publication and sample APIs. Production remains refused until the
+-final Jev release phase. Contracts checked against [TypeSafe Images](https://docs.typesafe.ai/images)
++ordinary compile/publication and sample APIs. The mixed scenario in
++`samples/jev-triage.json` provides `sample` (automatic routing) and `uncertain_sample`
++(a scripted human decision) against one source. Replace the illustrative reviewer
++and attachment identifiers with authorized company resources before live use.
++Jev sample usage comes from `output.usage.input_tokens` plus `output.usage.output_tokens`;
++leave the generic script `tokens` at zero. Samples charge one simulated model call
++and enforce their token allowance, without billing or external access.
++Contracts checked against [TypeSafe Images](https://docs.typesafe.ai/images)
+ and [Box](https://docs.typesafe.ai/primitives/box).
+--- p05-start/docs/workflow-operations.md
++++ p05-final/docs/workflow-operations.md
+@@ -101,3 +101,47 @@
+ attempts. Obsolete channel-owned agent dispatch and the alternative runtime were removed in phase08.
+ The old [replacement inventory](https://github.com/matjazonline/openbot/blob/19bab48c28c76a929f20a19f46e44bfb75c24cae/plan/workflow-foundation/REPLACEMENT-MAP.md) records that baseline,
+ not supported APIs. [Release evidence](workflow-verification.md) maps the acceptance scenarios.
++
++
++## TypeSafe Jev evaluation
++
++Company Settings manages TypeSafe connections separately from agent model providers.
++Owners and company admins can create, rotate, disable and restrict exact allowed
++model versions. The API is `/api/companies/{company_id}/typesafe-connections`,
++with `PUT /{id}` for availability/models and `POST /{id}/rotate` for a replacement
++key; updates carry `expected_revision`. Views expose readiness and revision only,
++never stored credentials. Ready means the connection is enabled. The list does not decrypt the credential
++or probe TypeSafe; current authorization and credential decryption are checked at
++provider use. Reload after a revision conflict.
++
++Choose a ready connection in the workflow Bindings tab. A published `jev.evaluate`
++step fixes its exact `jev-MAJOR.MINOR.PATCH` model and typed questions; aliases are
++rejected. Noul's `noul` value is already its probability, so it has no separate
++confidence. Use explicit downstream rule thresholds; confidence is not correctness.
++The catalogue shows exact answer paths and a compiling mixed example. The
++`samples/jev-triage.json` automatic/human scenarios and `samples/jev-image.json`
++experimental Box fixture run with supplied results and usage only.
++
++Jev calls use `https://api.typesafe.ai/v1/systemone`, a 5-second connection timeout,
++a deadline of at most 30 seconds and 64 KiB request/response limits. Each provider
++entry reserves one model call and tokens regardless of question count. Unconfirmed
++calls retain conservative usage; a crash after provider use but before durable
++settlement may incur another charged call on retry. A committed validated result
++is reused after recovery without another provider call. Usage and run-step views
++show provider `typesafe`, pinned model and tokens with no agent association.
++
++Disable a connection or remove its model to stop subsequent authorized provider
++entry; no replacement connection is selected. An already authorized in-flight call
++can finish. Rotation keeps the same connection ID and uses the new key at next use.
++Current company, connection and image-file authority are checked at the final
++provider boundary; loss of a lease cancels work and fences stale settlement.
++Authentication/model/validation refusals are terminal; bounded transport or rate
++failures follow the normal retry/deadline policy. Inspect failure codes and usage
++without copying keys, provider bodies or image bytes into incident notes.
++
++Images/Box remain experimental. Only private authorized immutable attachment
++references are accepted; PNG/JPEG images must be still, at most 24 KiB, 280–1024
++pixels per side, with at most four assets and the same aggregate 64 KiB wire cap.
++Images require Jev 1.13/1.14 and Box 1.14. A missing storage configuration or revoked,
++changed or oversized attachment produces an explicit failure, never an external URL
++fetch. See the exact [image contract](workflow-language-v1.md#experimental-jev-images-and-box).
+--- p05-start/samples/jev-triage.json
++++ p05-final/samples/jev-triage.json
+@@ -0,0 +1,291 @@
++{
++  "source": {
++    "format_version": 1,
++    "workflow_id": "00000000-0000-0000-0000-000000000001",
++    "input_schema": true,
++    "parameter_schema": true,
++    "output_schema": true,
++    "resources": [
++      {
++        "slot": "service",
++        "kind": "typesafe"
++      }
++    ],
++    "entry": "evaluate",
++    "steps": {
++      "evaluate": {
++        "type": "jev.evaluate",
++        "with": {
++          "connection": {
++            "literal": "service"
++          },
++          "model": {
++            "literal": "jev-1.14.0"
++          },
++          "state": {
++            "literal": {
++              "ticket": "Payment failed"
++            }
++          },
++          "questions": {
++            "literal": {
++              "urgent": {
++                "type": "noul",
++                "instructions": "Does this need immediate attention?"
++              },
++              "department": {
++                "type": "choice",
++                "instructions": "Which team?",
++                "criteria": {
++                  "billing": "Payment issues",
++                  "technical": "Bugs or integrations"
++                }
++              },
++              "severity": {
++                "type": "score",
++                "instructions": "How severe?",
++                "criteria": [
++                  "Cosmetic",
++                  "Workaround available",
++                  "Blocking"
++                ]
++              }
++            }
++          }
++        },
++        "routes": {
++          "success": "route"
++        }
++      },
++      "route": {
++        "type": "decision.rule",
++        "with": {
++          "data": {
++            "ref": "/steps/evaluate/output/answers"
++          },
++          "data_schema": {
++            "literal": true
++          }
++        },
++        "rule": {
++          "cases": [
++            {
++              "when": {
++                "and": [
++                  {
++                    "ge": [
++                      {
++                        "ref": "/steps/evaluate/output/answers/department/confidence"
++                      },
++                      {
++                        "literal": 0.8
++                      }
++                    ]
++                  },
++                  {
++                    "le": [
++                      {
++                        "ref": "/steps/evaluate/output/answers/urgent/noul"
++                      },
++                      {
++                        "literal": 0.75
++                      }
++                    ]
++                  },
++                  {
++                    "le": [
++                      {
++                        "ref": "/steps/evaluate/output/answers/severity/score"
++                      },
++                      {
++                        "literal": 1.5
++                      }
++                    ]
++                  }
++                ]
++              },
++              "choice": "automatic"
++            }
++          ],
++          "default": "uncertain"
++        },
++        "routes": {
++          "choices": {
++            "automatic": "automatic",
++            "uncertain": "review"
++          }
++        }
++      },
++      "automatic": {
++        "type": "data.map",
++        "with": {
++          "value": {
++            "literal": {
++              "path": "automatic"
++            }
++          },
++          "output_schema": {
++            "literal": true
++          }
++        },
++        "routes": {
++          "success": "$end"
++        }
++      },
++      "review": {
++        "type": "decision.human",
++        "with": {
++          "proposal": {
++            "ref": "/steps/evaluate/output"
++          },
++          "reviewers": {
++            "literal": [
++              {
++                "kind": "user",
++                "id": "00000000-0000-0000-0000-000000000006"
++              }
++            ]
++          },
++          "deadline": {
++            "literal": "2099-01-01T00:00:00Z"
++          },
++          "data_schema": {
++            "literal": true
++          },
++          "feedback_required": {
++            "literal": [
++              "reject"
++            ]
++          }
++        },
++        "routes": {
++          "choices": {
++            "accept": "$end",
++            "reject": "$end"
++          }
++        }
++      }
++    },
++    "limits": {
++      "max_steps": 100,
++      "max_context_bytes": 65536
++    }
++  },
++  "sample": {
++    "input": {},
++    "params": {},
++    "scripts": [
++      {
++        "workflow_id": "00000000-0000-0000-0000-000000000001",
++        "step": "evaluate",
++        "responses": [
++          {
++            "output": {
++              "model": "jev-1.14.0",
++              "answers": {
++                "urgent": {
++                  "type": "noul",
++                  "noul": 0.7
++                },
++                "department": {
++                  "type": "choice",
++                  "choice": "billing",
++                  "probabilities": {
++                    "billing": 0.9,
++                    "technical": 0.1
++                  },
++                  "confidence": 0.8
++                },
++                "severity": {
++                  "type": "score",
++                  "score": 1.5,
++                  "probabilities": {
++                    "0": 0.1,
++                    "1": 0.3,
++                    "2": 0.6
++                  },
++                  "legend": {
++                    "0": "Cosmetic",
++                    "1": "Workaround available",
++                    "2": "Blocking"
++                  },
++                  "confidence": 0.7
++                }
++              },
++              "usage": {
++                "input_tokens": 120,
++                "output_tokens": 12
++              }
++            }
++          }
++        ]
++      }
++    ]
++  },
++  "uncertain_sample": {
++    "input": {},
++    "params": {},
++    "scripts": [
++      {
++        "workflow_id": "00000000-0000-0000-0000-000000000001",
++        "step": "evaluate",
++        "responses": [
++          {
++            "output": {
++              "model": "jev-1.14.0",
++              "answers": {
++                "urgent": {
++                  "type": "noul",
++                  "noul": 0.7
++                },
++                "department": {
++                  "type": "choice",
++                  "choice": "billing",
++                  "probabilities": {
++                    "billing": 0.9,
++                    "technical": 0.1
++                  },
++                  "confidence": 0.5
++                },
++                "severity": {
++                  "type": "score",
++                  "score": 1.5,
++                  "probabilities": {
++                    "0": 0.1,
++                    "1": 0.3,
++                    "2": 0.6
++                  },
++                  "legend": {
++                    "0": "Cosmetic",
++                    "1": "Workaround available",
++                    "2": "Blocking"
++                  },
++                  "confidence": 0.7
++                }
++              },
++              "usage": {
++                "input_tokens": 120,
++                "output_tokens": 12
++              }
++            }
++          }
++        ]
++      },
++      {
++        "workflow_id": "00000000-0000-0000-0000-000000000001",
++        "step": "review",
++        "responses": [
++          {
++            "output": {
++              "choice": "accept",
++              "data": {
++                "path": "human"
++              },
++              "feedback": ""
++            }
++          }
++        ]
++      }
++    ]
++  }
++}
+--- p05-start/scripts/tests/workflow-authoring-browser.cjs
++++ p05-final/scripts/tests/workflow-authoring-browser.cjs
+@@ -31,6 +31,23 @@
+         await page.evaluate(async slug=>{const response=await fetch('/ui/companies',{method:'POST',body:new URLSearchParams({name:'Sample browser',slug,connection_0_provider:'openai',connection_0_models:'gpt-test',connection_0_api_key:'fixture-only-not-a-key',default_model_provider:'0'}),headers:{'HX-Request':'true'}});if(!response.ok)throw Error('company creation failed');},user);
+         await page.goto(BASE+'/ui/companies');
+         const company=(await page.content()).match(/company_id=([0-9a-f-]{36})/)[1];
++        await page.goto(`${BASE}/ui/companies?company_id=${company}`);
++        const connections=page.locator('#typesafe-connections');
++        await expect(connections.getByRole('heading',{name:'New connection'})).toBeVisible();
++        const createConnection=connections.locator('form').last();
++        await createConnection.locator('[name=api_key]').fill('browser-typesafe-secret');
++        await createConnection.getByRole('button',{name:'Create connection'}).click();
++        await expect(connections.getByText(/ready · revision 1/)).toBeVisible();
++        expect(await connections.innerHTML()).not.toContain('browser-typesafe-secret');
++        const rotateConnection=connections.locator('form[hx-post$="/rotate"]');
++        await rotateConnection.locator('[name=api_key]').fill('browser-typesafe-rotated');
++        await rotateConnection.getByRole('button',{name:'Rotate API key'}).click();
++        await expect(connections.getByText(/ready · revision 2/)).toBeVisible();
++        expect(await connections.innerHTML()).not.toContain('browser-typesafe-rotated');
++        const updateConnection=connections.locator('form').first();
++        await updateConnection.locator('[name=enabled]').uncheck();
++        await updateConnection.getByRole('button',{name:'Save models and availability'}).click();
++        await expect(connections.getByText(/not ready · revision 3/)).toBeVisible();
+         await page.evaluate(async company=>{
+             const response=await fetch(`/ui/agents?company_id=${company}`,{method:'POST',body:new URLSearchParams({name:'Assistant',slug:'assistant',provider:'openai',model:'gpt-test',system_prompt:'Draft a helpful response.'})});
+             if(!response.ok)throw Error('agent setup failed');
+--- p05-start/src/adapters/http/pages/company_settings.rs
++++ p05-final/src/adapters/http/pages/company_settings.rs
+@@ -307,14 +307,18 @@
+ /// The Settings tab: what the company holds, and the form that changes it.
+ fn company_settings_body(pane: &CompanyEditPane<'_>) -> String {
+     if !pane.editable {
+-        return r##"
++        return format!(
++            r##"
+             <div class="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
+                 <div class="rounded-box border border-base-300 bg-base-200 p-5">
+                     <h3 class="font-semibold">Company settings</h3>
+                     <p class="mt-1 text-sm opacity-70">Only the company owner can edit these settings.</p>
+                 </div>
++                {typesafe}
+             </div>
+-            "##.to_string();
++            "##,
++            typesafe = company_typesafe::loader(pane.company.id)
++        );
+     }
+ 
+     let stored = stored_draft(pane.company, pane.model_connections);
+@@ -354,11 +358,13 @@
+                     </div>
+                 </form>
+                 {resend_api_section}
++                {typesafe}
+             </div>
+         "##,
+         name = escape_html_text(&pane.company.name),
+         error_html = form_error_banner(pane.error),
+         resend_api_section = pane.resend_api_section,
++        typesafe = company_typesafe::loader(company_id),
+         workspace_links = workspace_links(company_id, pane.counts),
+         fields = company_fields(&draft),
+     )
+--- p05-start/src/adapters/http/pages/company_typesafe.rs
++++ p05-final/src/adapters/http/pages/company_typesafe.rs
+@@ -0,0 +1,87 @@
++//! Secret-free company connection forms; no credential is ever echoed.
++use super::{escape_html_attr, escape_html_text};
++use crate::application::workflow::jev::JevConnection;
++use uuid::Uuid;
++
++pub fn loader(company: Uuid) -> String {
++    format!(
++        r##"<section class="mt-4 rounded-box border border-base-300 p-3" id="typesafe-connections"
++        hx-get="/ui/companies/{company}/typesafe-connections" hx-trigger="load" hx-swap="outerHTML">
++        <h3 class="font-semibold">TypeSafe Jev connections</h3><p role="status">Loading connections…</p>
++    </section>"##
++    )
++}
++
++pub fn connections(company: Uuid, connections: &[JevConnection], message: Option<&str>) -> String {
++    let rows: String = connections
++        .iter()
++        .map(|connection| row(company, connection))
++        .collect();
++    let message = message
++        .map(|message| format!(r#"<p role="status">{}</p>"#, escape_html_text(message)))
++        .unwrap_or_default();
++    format!(
++        r##"<section id="typesafe-connections" class="mt-4 space-y-3 rounded-box border border-base-300 p-3">
++        <h3 class="font-semibold">TypeSafe Jev connections</h3>
++        <p class="text-sm">For workflow Jev evaluations. Select exact model versions in source and allow them here. Ready means the connection is enabled. Credential decryption and authorization are checked when a step uses it; this list does not verify the key with TypeSafe. Images are experimental on Jev 1.13/1.14; Box requires 1.14.</p>
++        {message}{rows}
++        <form hx-post="/ui/companies/{company}/typesafe-connections" hx-target="#typesafe-connections" hx-swap="outerHTML" hx-disabled-elt="find button" class="space-y-2">
++            <h4 class="font-semibold">New connection</h4>
++            {fields}{key}{save}
++        </form>
++    </section>"##,
++        fields = fields("jev-1.14.0", true),
++        key = key(),
++        save = save("Create connection")
++    )
++}
++
++fn row(company: Uuid, connection: &JevConnection) -> String {
++    let id = connection.id;
++    let revision = connection.revision;
++    let models = connection
++        .models
++        .iter()
++        .map(|model| model.as_str())
++        .collect::<Vec<_>>()
++        .join(", ");
++    format!(
++        r##"<div class="space-y-2 border-t border-base-300 pt-3">
++        <p class="text-sm"><span class="font-mono">{id}</span> · {readiness} · revision {revision}</p>
++        <form hx-post="/ui/companies/{company}/typesafe-connections/{id}" hx-target="#typesafe-connections" hx-swap="outerHTML" hx-disabled-elt="find button" class="space-y-2">
++            <input type="hidden" name="expected_revision" value="{revision}">{fields}{save}
++        </form>
++        <form hx-post="/ui/companies/{company}/typesafe-connections/{id}/rotate" hx-target="#typesafe-connections" hx-swap="outerHTML" hx-disabled-elt="find button" class="space-y-2">
++            <input type="hidden" name="expected_revision" value="{revision}">{key}{rotate}
++        </form>
++    </div>"##,
++        readiness = if connection.ready {
++            "ready"
++        } else {
++            "not ready"
++        },
++        fields = fields(&models, connection.enabled),
++        save = save("Save models and availability"),
++        key = key(),
++        rotate = save("Rotate API key")
++    )
++}
++
++fn fields(models: &str, enabled: bool) -> String {
++    format!(
++        r#"<label class="form-control"><span class="text-xs">Allowed versioned models (comma separated)</span><input class="input w-full font-mono" name="models" value="{}" required maxlength="4096"></label>
++        <label class="label"><input type="checkbox" class="checkbox checkbox-sm" name="enabled" value="true"{}>Enabled (uncheck to revoke provider use)</label>"#,
++        escape_html_attr(models),
++        if enabled { " checked" } else { "" }
++    )
++}
++
++fn key() -> &'static str {
++    r#"<label class="form-control"><span class="text-xs">TypeSafe API key</span><input class="input w-full" type="password" name="api_key" value="" required maxlength="4096" autocomplete="new-password"></label>"#
++}
++
++fn save(label: &str) -> String {
++    format!(
++        r#"<button type="submit" class="btn btn-primary btn-sm"><span class="[.htmx-request_&]:hidden">{label}</span><span class="hidden [.htmx-request_&]:inline" role="status">Saving…</span></button>"#
++    )
++}
+--- p05-start/src/adapters/http/pages/mod.rs
++++ p05-final/src/adapters/http/pages/mod.rs
+@@ -189,3 +189,5 @@
+ 
+ mod model_usage;
+ pub use model_usage::model_usage_page;
++
++pub mod company_typesafe;
+--- p05-start/src/adapters/http/pages/workflow_authoring/bindings.rs
++++ p05-final/src/adapters/http/pages/workflow_authoring/bindings.rs
+@@ -252,6 +252,7 @@
+     pub resources: &'a BTreeMap<String, Uuid>,
+     pub http: &'a [ChoiceOption],
+     pub mcp: &'a [ChoiceOption],
++    pub typesafe: &'a [ChoiceOption],
+     pub message_trigger: &'a str,
+     pub run_as: Option<Uuid>,
+     /// Only the company owner may name somebody else.
+@@ -541,6 +542,7 @@
+                 }
+                 "http" => form.http,
+                 "mcp" => form.mcp,
++                "typesafe" => form.typesafe,
+                 _ => &[][..],
+             };
+             let options: String = std::iter::once(format!(
+--- p05-start/src/adapters/http/routes/workflows/ui/authoring/access_tests.rs
++++ p05-final/src/adapters/http/routes/workflows/ui/authoring/access_tests.rs
+@@ -272,16 +272,24 @@
+ #[tokio::test]
+ async fn every_workspace_write_refuses_a_cross_origin_cookie_post() {
+     let mut app = Router::new();
+-    for pattern in WRITE_ROUTES {
++    for pattern in WRITE_ROUTES
++        .into_iter()
++        .chain(super::super::super::typesafe::WRITE_ROUTES)
++    {
+         app = app.route(pattern, post(|| async { StatusCode::NO_CONTENT }));
+     }
+     let app = app.layer(axum::middleware::from_fn_with_state(
+         crate::adapters::http::routes::ui::stream_tests::test_config(),
+         crate::adapters::http::security::browser_security,
+     ));
+-    for pattern in WRITE_ROUTES {
++    for pattern in WRITE_ROUTES
++        .into_iter()
++        .chain(super::super::super::typesafe::WRITE_ROUTES)
++    {
+         let path = pattern
+             .replace("{workflow_id}", &Uuid::new_v4().to_string())
++            .replace("{company_id}", &Uuid::new_v4().to_string())
++            .replace("{id}", &Uuid::new_v4().to_string())
+             .replace("{binding_id}", &Uuid::new_v4().to_string())
+             .replace("{agent_id}", &Uuid::new_v4().to_string())
+             .replace("{template_id}", "reviewed-support");
+--- p05-start/src/adapters/http/routes/workflows/ui/authoring/bindings.rs
++++ p05-final/src/adapters/http/routes/workflows/ui/authoring/bindings.rs
+@@ -207,6 +207,51 @@
+         visibility.report("workflow-binding-channels");
+         options.channels = channels;
+         Ok(options)
++    }
++
++    async fn typesafe_options(
++        &self,
++        company: Uuid,
++        definition: Option<&WorkflowDefinition>,
++    ) -> AppResult<Vec<crate::application::workflow::reads::ChoiceOption>> {
++        let typesafe = if definition.is_some_and(|definition| {
++            definition
++                .resources
++                .iter()
++                .any(|resource| resource.kind.as_str() == "typesafe")
++        }) {
++            self.engine
++                .jev_connections()
++                .list_jev(super::company(company), self.actor()?)
++                .await?
++                .into_iter()
++                .map(|connection| {
++                    let models = connection
++                        .models
++                        .iter()
++                        .map(|model| model.as_str())
++                        .collect::<Vec<_>>()
++                        .join(", ");
++                    crate::application::workflow::reads::ChoiceOption {
++                        id: connection.id,
++                        label: format!(
++                            "{} · {} · {models}",
++                            connection.id,
++                            if connection.ready {
++                                "ready"
++                            } else {
++                                "not ready"
++                            }
++                        ),
++                        enabled: connection.enabled,
++                        detail: String::new(),
++                    }
++                })
++                .collect::<Vec<_>>()
++        } else {
++            Vec::new()
++        };
++        Ok(typesafe)
+     }
+ 
+     /// The chosen version's definition, when it is a selectable version of this workflow.
+@@ -273,6 +318,9 @@
+             },
+             None => pages::BindingParams::Json(&json),
+         };
++        let typesafe = self
++            .typesafe_options(company.id, definition.as_ref())
++            .await?;
+         Ok(pages::workflow_binding_form(&pages::BindingFormView {
+             company_id: company.id,
+             workflow,
+@@ -287,6 +335,7 @@
+             resources: &form.resources,
+             http: &options.http,
+             mcp: &options.mcp,
++            typesafe: &typesafe,
+             message_trigger: &form.message_trigger,
+             run_as: form.run_as,
+             owner: company.user_id == self.user,
+--- p05-start/src/adapters/http/routes/workflows/ui/authoring/jev_tests.rs
++++ p05-final/src/adapters/http/routes/workflows/ui/authoring/jev_tests.rs
+@@ -0,0 +1,170 @@
++use super::super::super::typesafe;
++use super::*;
++use crate::adapters::persistence::credentials::CredentialCipher;
++use crate::application::workflow::jev::JevConnections;
++
++async fn fixture() -> Fixture {
++    let mut f = Fixture::new().await.unwrap();
++    f.persistence = PostgresPersistence::with_credential_cipher(
++        f.persistence.pool().clone(),
++        CredentialCipher::for_test(),
++    );
++    f.engine = Arc::new(WorkflowEngine::for_tests(f.persistence.clone()));
++    f
++}
++
++fn create_form(models: &str) -> axum::Form<typesafe::ConnectionForm> {
++    axum::Form(typesafe::ConnectionForm {
++        models: models.into(),
++        enabled: Some("true".into()),
++        expected_revision: None,
++        api_key: Some(secrecy::SecretString::from("do-not-echo-this-key")),
++    })
++}
++
++#[tokio::test]
++async fn workflow_authoring_jev_company_forms_permissions_rotation_and_readiness() {
++    let f = fixture().await;
++    for user in [f.member, f.stranger] {
++        assert!(
++            typesafe::create(f.ui(user), Path(f.company), create_form("jev-1.14.0"))
++                .await
++                .is_err()
++        );
++        let denied = typesafe::list(f.ui(user), Path(f.company)).await.unwrap().0;
++        assert!(
++            denied.contains("require company owner or admin permission")
++                && !denied.contains("<form")
++        );
++    }
++    let html = typesafe::create(f.ui(f.admin), Path(f.company), create_form("jev-1.14.0"))
++        .await
++        .unwrap()
++        .0;
++    assert!(
++        html.contains("ready") && html.contains("Rotate API key") && !html.contains("do-not-echo")
++    );
++    let c = f
++        .persistence
++        .list_jev(CompanyId::new(f.company), f.ui(f.owner).actor().unwrap())
++        .await
++        .unwrap()
++        .remove(0);
++    let html = typesafe::rotate(
++        f.ui(f.owner),
++        Path((f.company, c.id)),
++        axum::Form(typesafe::RotateForm {
++            expected_revision: c.revision,
++            api_key: "rotated-secret".into(),
++        }),
++    )
++    .await
++    .unwrap()
++    .0;
++    assert!(html.contains("revision 2") && !html.contains("rotated-secret"));
++    let html = typesafe::update(
++        f.ui(f.owner),
++        Path((f.company, c.id)),
++        axum::Form(typesafe::ConnectionForm {
++            models: "jev-1.14.0".into(),
++            enabled: None,
++            expected_revision: Some(2),
++            api_key: None,
++        }),
++    )
++    .await
++    .unwrap()
++    .0;
++    assert!(html.contains("not ready"));
++    let html = typesafe::rotate(
++        f.ui(f.owner),
++        Path((f.company, c.id)),
++        axum::Form(typesafe::RotateForm {
++            expected_revision: 1,
++            api_key: "stale-secret".into(),
++        }),
++    )
++    .await
++    .unwrap()
++    .0;
++    assert!(html.contains("connection changed") && !html.contains("stale-secret"));
++    let html = typesafe::create(f.ui(f.owner), Path(f.company), create_form("jev-latest"))
++        .await
++        .unwrap()
++        .0;
++    assert!(!html.contains("do-not-echo") && !html.contains("connection saved"));
++    let foreign = typesafe::update(
++        f.ui(f.stranger),
++        Path((f.other, c.id)),
++        axum::Form(typesafe::ConnectionForm {
++            models: "jev-1.14.0".into(),
++            enabled: None,
++            expected_revision: Some(3),
++            api_key: None,
++        }),
++    )
++    .await
++    .unwrap()
++    .0;
++    assert!(foreign.contains("permission denied") && !foreign.contains(&c.id.to_string()));
++}
++
++#[tokio::test]
++async fn workflow_authoring_jev_catalogue_binding_and_sample() {
++    let f = fixture().await;
++    let _ = typesafe::create(f.ui(f.owner), Path(f.company), create_form("jev-1.14.0"))
++        .await
++        .unwrap();
++    let c = f
++        .persistence
++        .list_jev(CompanyId::new(f.company), f.ui(f.owner).actor().unwrap())
++        .await
++        .unwrap()
++        .remove(0);
++    let workflow = Uuid::new_v4();
++    let source = source_of("jev.evaluate", workflow);
++    let version = f.published(workflow, "Jev mixed", &source).await;
++    let pane = f.pane(f.owner, workflow, "bindings").await.unwrap();
++    assert!(pane.contains(&format!("value=\"{}\"", c.id)) && pane.contains("ready · jev-1.14.0"));
++    let key = field_value(&pane, "form_key");
++    let html = save_binding(
++        f.ui(f.owner),
++        Path(workflow),
++        f.query(),
++        form(&[
++            ("form_key", &key),
++            ("version_id", &version.to_string()),
++            ("association", "company"),
++            ("params_mode", "json"),
++            ("params_json", "{}"),
++            ("resource:service", &c.id.to_string()),
++        ]),
++    )
++    .await
++    .unwrap()
++    .0;
++    assert!(html.contains("Saved binding"), "{html}");
++    let catalogue = catalogue(f.ui(f.owner), f.query()).await.unwrap().0;
++    assert!(
++        catalogue.contains("jev.evaluate")
++            && catalogue.contains("Noul has no separate confidence")
++            && catalogue.contains("/answers/department/confidence")
++    );
++    let scripts = json!([{"workflow_id":workflow,"step":"start","responses":[{"output":crate::adapters::workflow_jev::tests::output()}]}]);
++    let html = sample(
++        f.ui(f.owner),
++        Path(workflow),
++        f.query(),
++        form(&[
++            ("expected_revision", "1"),
++            ("input", "{}"),
++            ("params", "{}"),
++            ("scripts", &scripts.to_string()),
++        ]),
++    )
++    .await
++    .unwrap()
++    .0;
++    assert!(html.contains("Sample completed"), "{html}");
++    assert!(!html.contains("do-not-echo"));
++}
+--- p05-start/src/adapters/http/routes/workflows/ui/authoring/tests.rs
++++ p05-final/src/adapters/http/routes/workflows/ui/authoring/tests.rs
+@@ -583,3 +583,6 @@
+ 
+ #[path = "sample_tests.rs"]
+ mod sample_tests;
++
++#[path = "jev_tests.rs"]
++mod jev_tests;
+--- p05-start/src/adapters/http/routes/workflows/ui/mod.rs
++++ p05-final/src/adapters/http/routes/workflows/ui/mod.rs
+@@ -18,9 +18,12 @@
+ 
+ mod authoring;
+ mod runs;
++mod typesafe;
+ 
+ pub fn router() -> Router<AppState> {
+-    authoring::router().merge(runs::router())
++    authoring::router()
++        .merge(runs::router())
++        .merge(typesafe::router())
+ }
+ 
+ /// What every workspace handler starts from: the engine, the use cases its pages read, and the
+--- p05-start/src/adapters/http/routes/workflows/ui/typesafe.rs
++++ p05-final/src/adapters/http/routes/workflows/ui/typesafe.rs
+@@ -0,0 +1,149 @@
++//! Browser forms over the same company-scoped, revision-checked TypeSafe port as the API.
++use super::*;
++use crate::application::workflow::jev::{JevConnectionUpdate, JevConnectionWrite, JevModel};
++use axum::extract::{DefaultBodyLimit, Path};
++use secrecy::SecretString;
++use serde::Deserialize;
++use std::collections::BTreeSet;
++
++pub(super) const WRITE_ROUTES: [&str; 3] = [
++    "/ui/companies/{company_id}/typesafe-connections",
++    "/ui/companies/{company_id}/typesafe-connections/{id}",
++    "/ui/companies/{company_id}/typesafe-connections/{id}/rotate",
++];
++
++pub(super) fn router() -> Router<AppState> {
++    Router::new()
++        .route(WRITE_ROUTES[0], get(list).post(create))
++        .route(WRITE_ROUTES[1], post(update))
++        .route(WRITE_ROUTES[2], post(rotate))
++        .layer(DefaultBodyLimit::max(16_384))
++}
++
++// No Debug: a submitted key must never enter tracing or a rendered form.
++#[derive(Deserialize)]
++pub(super) struct ConnectionForm {
++    pub models: String,
++    pub enabled: Option<String>,
++    pub expected_revision: Option<i64>,
++    pub api_key: Option<SecretString>,
++}
++
++fn models(form: &ConnectionForm) -> AppResult<BTreeSet<JevModel>> {
++    form.models
++        .split(',')
++        .map(|model| JevModel::parse(model.trim()))
++        .collect()
++}
++
++pub(super) async fn list(ui: Ui, Path(company): Path<Uuid>) -> AppResult<Html<String>> {
++    match render(&ui, company, None).await {
++        Err(AppError::NotFound(_)) => Ok(Html(r#"<section id="typesafe-connections"><p role="status">TypeSafe connections require company owner or admin permission.</p></section>"#.into())),
++        result => result,
++    }
++}
++
++async fn render(ui: &Ui, company: Uuid, message: Option<&str>) -> AppResult<Html<String>> {
++    let connections = ui
++        .engine
++        .jev_connections()
++        .list_jev(super::super::company(company), ui.actor()?)
++        .await?;
++    Ok(Html(pages::company_typesafe::connections(
++        company,
++        &connections,
++        message,
++    )))
++}
++
++async fn answer(ui: &Ui, company: Uuid, result: AppResult<()>) -> AppResult<Html<String>> {
++    let message = match result {
++        Ok(()) => "TypeSafe connection saved.".to_owned(),
++        Err(AppError::BadRequest(message)) => message,
++        Err(AppError::Conflict(_)) => {
++            "This connection changed. Review its current revision and retry.".into()
++        }
++        Err(AppError::NotFound(_)) => "Connection unavailable or permission denied.".into(),
++        Err(error) => return Err(error),
++    };
++    render(ui, company, Some(&message)).await
++}
++
++pub(super) async fn create(
++    ui: Ui,
++    Path(company): Path<Uuid>,
++    axum::Form(form): axum::Form<ConnectionForm>,
++) -> AppResult<Html<String>> {
++    let result = async {
++        ui.engine
++            .jev_connections()
++            .create_jev(
++                super::super::company(company),
++                ui.actor()?,
++                JevConnectionWrite {
++                    models: models(&form)?,
++                    enabled: form.enabled.is_some(),
++                    secret: form
++                        .api_key
++                        .ok_or_else(|| AppError::BadRequest("Enter a TypeSafe API key".into()))?,
++                },
++            )
++            .await?;
++        Ok(())
++    }
++    .await;
++    answer(&ui, company, result).await
++}
++
++pub(super) async fn update(
++    ui: Ui,
++    Path((company, id)): Path<(Uuid, Uuid)>,
++    axum::Form(form): axum::Form<ConnectionForm>,
++) -> AppResult<Html<String>> {
++    let result = async {
++        ui.engine
++            .jev_connections()
++            .update_jev(
++                super::super::company(company),
++                ui.actor()?,
++                id,
++                JevConnectionUpdate {
++                    models: models(&form)?,
++                    enabled: form.enabled.is_some(),
++                    expected_revision: form.expected_revision.ok_or_else(|| {
++                        AppError::BadRequest("Missing connection revision".into())
++                    })?,
++                },
++            )
++            .await?;
++        Ok(())
++    }
++    .await;
++    answer(&ui, company, result).await
++}
++
++#[derive(Deserialize)]
++pub(super) struct RotateForm {
++    pub expected_revision: i64,
++    pub api_key: SecretString,
++}
++
++pub(super) async fn rotate(
++    ui: Ui,
++    Path((company, id)): Path<(Uuid, Uuid)>,
++    axum::Form(form): axum::Form<RotateForm>,
++) -> AppResult<Html<String>> {
++    let result = ui
++        .engine
++        .jev_connections()
++        .rotate_jev(
++            super::super::company(company),
++            ui.actor()?,
++            id,
++            form.expected_revision,
++            form.api_key,
++        )
++        .await
++        .map(|_| ());
++    answer(&ui, company, result).await
++}
+--- p05-start/src/adapters/persistence/workflow/jev_assets_tests.rs
++++ p05-final/src/adapters/persistence/workflow/jev_assets_tests.rs
+@@ -18,11 +18,11 @@
+ fn policy() -> LeasePolicy {
+     LeasePolicy::new(Duration::from_secs(30)).unwrap()
+ }
+-struct Attachment {
+-    reference: Value,
+-    key: ObjectKey,
+-}
+-async fn attachment(f: &Fixture, bytes: &[u8]) -> Attachment {
++pub(super) struct Attachment {
++    pub(super) reference: Value,
++    pub(super) key: ObjectKey,
++}
++pub(super) async fn attachment(f: &Fixture, bytes: &[u8]) -> Attachment {
+     let p = &f.persistence;
+     let company = f.target.company.as_uuid();
+     let channel = ChannelPersistence::create(
+--- p05-start/src/adapters/persistence/workflow/jev_end_to_end_tests.rs
++++ p05-final/src/adapters/persistence/workflow/jev_end_to_end_tests.rs
+@@ -0,0 +1,235 @@
++use super::jev_tests::{admit, bound_source, create, fixture};
++use super::*;
++use crate::adapters::{http::pages, protocols::email::EmailRenderer, workflow_jev::tests::server};
++use crate::application::{
++    transport::{DeliveryComposer, TransportRenderers},
++    workflow::{
++        decisions::*, lease::*, polling::*, reads::WorkflowReads, run_views::RunViews, worker::*,
++    },
++};
++use crate::infra::workflow::WorkflowEngine;
++use serde_json::{Value, json};
++use std::time::Duration;
++use tokio_util::sync::CancellationToken;
++
++fn notices(f: &Fixture) -> DecisionNotices {
++    let renderers = Arc::new(
++        TransportRenderers::new()
++            .register(Arc::new(EmailRenderer::new("agents.test")))
++            .unwrap(),
++    );
++    DecisionNotices::new(
++        DeliveryComposer::new(renderers, Arc::new(f.persistence.clone())),
++        "https://agents.test",
++        "agents.test",
++    )
++}
++
++async fn drive(f: &Fixture, engine: &WorkflowEngine, run: RunId) {
++    let notices = notices(f);
++    let worker = WorkflowWorker {
++        port: &f.persistence,
++        handler: engine.handler(),
++        notices: Some(&notices),
++        worker: WorkflowWorkerId(Uuid::new_v4()),
++        lease: LeasePolicy::new(Duration::from_secs(30)).unwrap(),
++        poll: PollPolicy::new(Duration::from_secs(1), 16).unwrap(),
++        active_jobs: None,
++    };
++    for _ in 0..8 {
++        let candidates = f.persistence.poll_work(None, 16).await.unwrap();
++        let Some(candidate) = candidates
++            .candidates
++            .into_iter()
++            .find(|candidate| candidate.scope.run == run)
++        else {
++            return;
++        };
++        worker
++            .process(candidate, &CancellationToken::new())
++            .await
++            .unwrap();
++    }
++    panic!("scenario did not quiesce");
++}
++
++async fn assert_history(f: &Fixture, run: RunId, step_name: &str, output: &Value) {
++    let detail = f
++        .persistence
++        .run_detail(f.target.company, run)
++        .await
++        .unwrap()
++        .unwrap();
++    let execution = detail
++        .executions
++        .iter()
++        .find(|step| step.step == step_name)
++        .unwrap()
++        .execution;
++    let view = f
++        .persistence
++        .step_view(f.target.company, run, execution)
++        .await
++        .unwrap()
++        .unwrap();
++    assert_eq!(view.committed_output.as_ref().unwrap(), output);
++    assert_eq!(view.model_calls.len(), 1);
++    assert_eq!(view.model_calls[0].provider, "typesafe");
++    let html = pages::run_step_body(&pages::StepBodyView {
++        company_id: f.target.company.as_uuid(),
++        step: &view,
++        agent: None,
++    });
++    assert!(html.contains("typesafe") && html.contains("jev-1.14.0"));
++    assert!(
++        !html.contains("fixture-jev-secret")
++            && !html.contains("data_base64")
++            && !html.contains("enc:v2")
++    );
++    let count: i64 = sqlx::query_scalar("SELECT count(*) FROM model_usage_calls WHERE run_id=$1 AND agent_id IS NULL AND provider='typesafe' AND settled_at IS NOT NULL")
++        .bind(run.as_uuid()).fetch_one(f.persistence.pool()).await.unwrap();
++    assert_eq!(count, 1);
++}
++
++#[tokio::test]
++async fn jev_end_to_end_mixed_thresholds_automatic_and_uncertain_human() {
++    for human in [false, true] {
++        let f = fixture().await;
++        let c = create(&f).await;
++        let fixture: Value =
++            serde_json::from_str(include_str!("../../../../samples/jev-triage.json")).unwrap();
++        let mut source = fixture["source"].clone();
++        source["steps"]["review"]["with"]["reviewers"]["literal"][0]["id"] =
++            json!(f.target.actor.user_id());
++        let target = bound_source(&f, &c, source).await;
++        let AdmissionResult::Created(run) = admit(&f, target, "mixed-scenario").await.unwrap()
++        else {
++            panic!()
++        };
++        let sample = if human { "uncertain_sample" } else { "sample" };
++        let output = fixture[sample]["scripts"][0]["responses"][0]["output"].clone();
++        let (http, server) = server(
++            200,
++            "",
++            serde_json::to_vec(&output).unwrap(),
++            Duration::ZERO,
++        )
++        .await;
++        let engine =
++            WorkflowEngine::for_tests(f.persistence.clone()).with_jev_test_provider(Arc::new(http));
++        drive(&f, &engine, run).await;
++        server.await.unwrap();
++        assert_history(&f, run, "evaluate", &output).await;
++        let detail = f
++            .persistence
++            .run_detail(target.company, run)
++            .await
++            .unwrap()
++            .unwrap();
++        if human {
++            assert_eq!(detail.summary.state, "waiting");
++            let decision = DecisionId(detail.waits.iter().find_map(|wait| wait.decision).unwrap());
++            let view = f
++                .persistence
++                .read_decision(target.company, target.actor, decision)
++                .await
++                .unwrap();
++            f.persistence
++                .submit_decision(SubmitDecision {
++                    company: target.company,
++                    actor: target.actor,
++                    decision,
++                    command_key: DecisionCommandKey::parse("accept").unwrap(),
++                    expected_revision: view.revision,
++                    expected_artifact: view.artifact_digest,
++                    choice: "accept".into(),
++                    feedback: String::new(),
++                    data: json!({"path":"human"}),
++                })
++                .await
++                .unwrap();
++            drive(&f, &engine, run).await;
++        } else {
++            assert!(
++                detail
++                    .executions
++                    .iter()
++                    .any(|step| step.step == "automatic")
++            );
++            assert!(!detail.executions.iter().any(|step| step.step == "review"));
++        }
++        assert_eq!(
++            f.persistence
++                .run_detail(target.company, run)
++                .await
++                .unwrap()
++                .unwrap()
++                .summary
++                .state,
++            "succeeded"
++        );
++    }
++}
++
++#[tokio::test]
++async fn jev_end_to_end_box_worker_history_and_invalid_output_rejection() {
++    use crate::adapters::{
++        storage::{BucketKind, FileStorage, test_support::FakeStorage},
++        workflow_jev::JevAssetReader,
++    };
++    use crate::application::workflow::jev::assets::tests as images;
++    for invalid in [false, true] {
++        let f = fixture().await;
++        let c = create(&f).await;
++        let bytes = images::png(280, 280);
++        let attachment = super::jev_assets_tests::attachment(&f, &bytes).await;
++        let storage = Arc::new(FakeStorage::new());
++        storage
++            .store_object(BucketKind::Private, &attachment.key, "image/png", bytes)
++            .await
++            .unwrap();
++        let fixture: Value =
++            serde_json::from_str(include_str!("../../../../samples/jev-image.json")).unwrap();
++        let mut source = fixture["source"].clone();
++        source["steps"]["start"]["with"]["assets"]["literal"]["photo"] = attachment.reference;
++        let target = bound_source(&f, &c, source).await;
++        let AdmissionResult::Created(run) = admit(&f, target, "box-scenario").await.unwrap() else {
++            panic!()
++        };
++        let mut output = images::output();
++        if invalid {
++            output["answers"]["mug"]["box"]["right"] = json!(0.01);
++        }
++        let (http, server) = server(
++            200,
++            "",
++            serde_json::to_vec(&output).unwrap(),
++            Duration::ZERO,
++        )
++        .await;
++        let engine = WorkflowEngine::for_tests(f.persistence.clone())
++            .with_jev_test_provider(Arc::new(http))
++            .with_jev_assets(Arc::new(JevAssetReader::new(
++                f.persistence.clone(),
++                Some(storage),
++            )));
++        drive(&f, &engine, run).await;
++        let wire = server.await.unwrap();
++        assert!(wire.contains("data_base64"));
++        let detail = f
++            .persistence
++            .run_detail(target.company, run)
++            .await
++            .unwrap()
++            .unwrap();
++        assert_eq!(
++            detail.summary.state,
++            if invalid { "failed" } else { "succeeded" }
++        );
++        if !invalid {
++            assert_history(&f, run, "start", &output).await;
++        }
++        let ledger: String = sqlx::query_scalar("SELECT to_jsonb(invocation)::text FROM workflow_jev_invocations AS invocation WHERE run_id=$1").bind(run.as_uuid()).fetch_one(f.persistence.pool()).await.unwrap();
++        assert!(!ledger.contains("data_base64") && !ledger.contains("fixture-jev-secret"));
++    }
++}
+--- p05-start/src/adapters/persistence/workflow/tests.rs
++++ p05-final/src/adapters/persistence/workflow/tests.rs
+@@ -587,3 +587,6 @@
+ 
+ #[path = "jev_assets_tests.rs"]
+ mod jev_assets_tests;
++
++#[path = "jev_end_to_end_tests.rs"]
++mod jev_end_to_end_tests;
+--- p05-start/src/application/workflow/binding/mod.rs
++++ p05-final/src/application/workflow/binding/mod.rs
+@@ -133,17 +133,17 @@
+                 .await?
+                 .ok_or_else(|| AppError::NotFound("Workflow resource".into()))?;
+             validate_resource(self.company_id(), id, requirement, &status)?;
+-            if let Some(models) = jev_models.get(&requirement.slot) {
+-                if models.iter().any(|model| {
++            if let Some(models) = jev_models.get(&requirement.slot)
++                && models.iter().any(|model| {
+                     !status
+                         .supported_contracts
+                         .iter()
+                         .any(|contract| *contract == model.resource_contract())
+-                }) {
+-                    return Err(AppError::BadRequest(
+-                        "Selected TypeSafe connection does not allow the frozen model".into(),
+-                    ));
+-                }
++                })
++            {
++                return Err(AppError::BadRequest(
++                    "Selected TypeSafe connection does not allow the frozen model".into(),
++                ));
+             }
+         }
+         Ok(())
+--- p05-start/src/application/workflow/registry/help.rs
++++ p05-final/src/application/workflow/registry/help.rs
+@@ -60,7 +60,7 @@
+             "Not available in this release (memory is out of scope); publication refuses it. Scoped capability required; at most 256 items/facts, each text at most 16384 characters. Saves require logical idempotency."
+         }
+         "jev.evaluate" => {
+-            "TypeSafe System One: literal typesafe connection slot, exact versioned model, and 1–32 independent typed questions; state is a string, object or array. Noul is a probability, Choice has up to 64 options, Score has 2–10 levels. Instructions/descriptions are literal strings up to 16384 UTF-8 bytes. Request and response are at most 65536 serialized bytes, also subject to workflow context/schema budgets. Experimental images: literal assets names immutable private channel/thread/SHA256 references (1–4, PNG/JPEG <=24 KiB, 280–1024 pixels per side), original state under content and images at assets.NAME. Box requires Jev 1.14 and instructions naming a declared `assets.NAME`; no criteria; normalized coordinates have positive width/height. Image-capable families: Jev 1.13/1.14. Probability sums allow absolute error 0.000001. Confidence is not correctness; decision.rule owns thresholds. Runtime and connection support are delivered by subsequent Jev phases; do not deploy a partial implementation."
++            "TypeSafe System One: literal typesafe connection slot, exact versioned model, and 1–32 independent typed questions; state is a string, object or array. Noul is a probability, Choice has up to 64 options, Score has 2–10 levels. Instructions/descriptions are literal strings up to 16384 UTF-8 bytes. Request and response are at most 65536 serialized bytes, also subject to workflow context/schema budgets. Experimental images: literal assets names immutable private channel/thread/SHA256 references (1–4, PNG/JPEG <=24 KiB, 280–1024 pixels per side), original state under content and images at assets.NAME. Box requires Jev 1.14 and instructions naming a declared `assets.NAME`; no criteria; normalized coordinates have positive width/height. Image-capable families: Jev 1.13/1.14. Probability sums allow absolute error 0.000001. Confidence is not correctness; decision.rule owns thresholds. Noul has no separate confidence: its noul field is the probability itself. For the mixed example, exact paths are /steps/start/output/answers/urgent/noul, /steps/start/output/answers/department/choice, /steps/start/output/answers/department/confidence, /steps/start/output/answers/department/probabilities/billing, /steps/start/output/answers/severity/score, /steps/start/output/answers/severity/confidence and /steps/start/output/answers/severity/probabilities/2. Manage TypeSafe connections in company settings; bind a ready connection allowing the exact source model."
+         }
+         "ai.classify" => {
+             "The selected agent's model and instructions classify the context into a finite label set; no tools or skills. Invalid labels get bounded repair, then fail terminally."
+--- p05-start/src/application/workflow/sample/dispatch.rs
++++ p05-final/src/application/workflow/sample/dispatch.rs
+@@ -39,13 +39,7 @@
+         }
+         let response = self.response(bundle, &activation.step)?;
+         if kind == "jev.evaluate" {
+-            if !response.tools.is_empty() || response.approval.is_some() {
+-                return Err(refused(
+-                    "Jev scripts are tool-free and do not accept approval",
+-                ));
+-            }
+-            self.charge_model_tokens(response.tokens)?;
+-            return prepare_io(bundle, activation, response.output);
++            return self.jev(bundle, activation, response);
+         }
+         if let Some(model) = ModelStep::of(kind) {
+             return self.model(bundle, frame, activation, path, model, response);
+@@ -68,6 +62,32 @@
+                 "Unsupported sample step {kind}; no production fallback exists"
+             ))),
+         }
++    }
++
++    fn jev(
++        &mut self,
++        bundle: &PublishedBundle,
++        activation: &ActivatedExecution,
++        response: ScriptedResponse,
++    ) -> AppResult<PureCompletion> {
++        if !response.tools.is_empty() || response.approval.is_some() || response.tokens != 0 {
++            return Err(refused(
++                "Jev scripts use output.usage only and accept no tools or approval",
++            ));
++        }
++        let completion = prepare_io(bundle, activation, response.output.clone())?;
++        let usage = &response.output["usage"];
++        let tokens = usage["input_tokens"]
++            .as_u64()
++            .and_then(|input| {
++                usage["output_tokens"]
++                    .as_u64()
++                    .and_then(|output| input.checked_add(output))
++            })
++            .and_then(|total| total.try_into().ok())
++            .ok_or_else(|| refused("Sample token usage overflow"))?;
++        self.charge_model_tokens(tokens)?;
++        Ok(completion)
+     }
+ 
+     fn external_step(
+--- p05-start/src/application/workflow/sample/jev_tests.rs
++++ p05-final/src/application/workflow/sample/jev_tests.rs
+@@ -13,11 +13,42 @@
+     .unwrap();
+     complete(&report);
+     assert_eq!(report.usage.model_calls, 1);
++    assert_eq!(report.usage.scripted_tokens, 220);
+     assert!(report.effects.is_empty());
+     assert_eq!(report.output.as_ref().unwrap(), &images::output());
+     let serialized = serde_json::to_string(&report).unwrap();
+     assert!(!serialized.contains("data_base64"));
+     assert!(!String::from_utf8_lossy(&frozen).contains("data_base64"));
++}
++
++#[test]
++fn workflow_sample_jev_mixed_thresholds_automatic_and_human_paths() {
++    let fixture: Value =
++        serde_json::from_str(include_str!("../../../../samples/jev-triage.json")).unwrap();
++    let bundle = build(&fixture["source"], DependencySnapshots::default(), vec![]);
++    for (name, human) in [("sample", false), ("uncertain_sample", true)] {
++        let report = execute(
++            bundle.clone(),
++            serde_json::from_value(fixture[name].clone()).unwrap(),
++        )
++        .unwrap();
++        complete(&report);
++        assert_eq!(report.usage.model_calls, 1);
++        assert_eq!(report.usage.scripted_tokens, 132);
++        assert!(report.effects.is_empty());
++        assert_eq!(
++            report
++                .steps
++                .iter()
++                .any(|step| step.kind.as_str() == "decision.human"),
++            human
++        );
++        assert_eq!(report.steps.len(), 3);
++    }
++    let mut over_budget = fixture["sample"].clone();
++    over_budget["scripts"][0]["responses"][0]["output"]["usage"]["input_tokens"] = json!(1_000_001);
++    let report = execute(bundle, serde_json::from_value(over_budget).unwrap()).unwrap();
++    assert_eq!(report.status, SampleStatus::Stopped);
+ }
+ 
+ #[test]
+--- p05-start/src/infra/workflow.rs
++++ p05-final/src/infra/workflow.rs
+@@ -50,8 +50,7 @@
+ 
+ /// Registered step kinds this deployment has no handler for: memory is out of this release
+ /// (NOT_PLANNED, 06-F032). Publication refuses them so no run can stall on one.
+-// Jev remains refused until its connection and runtime phases are complete.
+-pub const UNHANDLED_STEP_KINDS: &[&str] = &["memory.load", "memory.save", "jev.evaluate"];
++pub const UNHANDLED_STEP_KINDS: &[&str] = &["memory.load", "memory.save"];
+ 
+ /// The default and bounds of `WORKFLOW_WORKER_SLOTS`, and the database connections everything
+ /// else `serve` runs needs (listener, HTTP headroom, task, delivery, notification and inbound
+@@ -128,7 +127,6 @@
+ /// protocol (§04.10); this composite adds no effect path of its own.
+ pub struct ProductionHandler {
+     jev: crate::application::workflow::jev::JevRuntime<PostgresPersistence>,
+-    jev_enabled: bool,
+     agent: WorkflowAgentRuntime<PostgresPersistence, AgentActionTools>,
+     http: Arc<HttpRuntime>,
+     mcp: Arc<McpRuntime>,
+@@ -138,7 +136,7 @@
+ 
+ impl ProductionHandler {
+     fn route(&self, kind: &WorkflowStepKind) -> Option<&dyn WorkflowHandler> {
+-        if self.jev_enabled && self.jev.supports(kind) {
++        if self.jev.supports(kind) {
+             return Some(&self.jev);
+         }
+         let handlers: [&dyn WorkflowHandler; 5] = [
+@@ -245,7 +243,6 @@
+                 Arc::new(crate::adapters::workflow_jev::JevHttp::new()?),
+                 lease,
+             ),
+-            jev_enabled: !UNHANDLED_STEP_KINDS.contains(&"jev.evaluate"),
+             agent,
+             http,
+             mcp,
+@@ -554,7 +551,6 @@
+             provider,
+             LeasePolicy::new(LEASE).unwrap(),
+         );
+-        handler.jev_enabled = true;
+         self
+     }
+     pub(crate) fn for_tests(persistence: PostgresPersistence) -> Self {

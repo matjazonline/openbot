@@ -1,0 +1,23 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.24s
+     Running unittests src/lib.rs (target/debug/deps/mail_agents-6693f25a28eea502)
+
+running 16 tests
+test application::workflow::compiler::compile::validation_tests::workflow_compiler_ordered_rules_are_checked ... ok
+test application::workflow::compiler::compile::tests::workflow_compiler_reports_exact_reference_and_route_locations ... ok
+test application::workflow::compiler::compile::tests::workflow_compiler_round_trip_identity_and_runtime_snapshot ... ok
+test application::workflow::compiler::compile::tests::workflow_compiler_rejects_malformed_language_and_includes_descriptor_facts_in_hash ... ok
+test application::workflow::compiler::compile::tests::workflow_compiler_rejects_error_edge_and_diamond_output_gaps ... ok
+test application::workflow::compiler::compile::validation_tests::workflow_compiler_selects_escaped_and_unicode_destination_names ... ok
+test application::workflow::compiler::compile::validation_tests::workflow_compiler_preserves_local_ref_sibling_constraints ... ok
+test application::workflow::compiler::compile::validation_tests::workflow_compiler_child_dependencies_and_repeat_bounds_are_checked ... ok
+test application::workflow::compiler::compile::validation_tests::workflow_compiler_checks_nested_schema_and_literal_types ... ok
+test application::workflow::compiler::compile::validation_tests::workflow_compiler_validates_known_nested_literals_with_local_refs ... ok
+test application::workflow::compiler::compile::validation_tests::workflow_compiler_checks_root_local_ref_properties_and_required_inputs ... ok
+test application::workflow::compiler::compile::validation_tests::workflow_compiler_rejects_impossible_descriptor_bindings ... ok
+test application::workflow::compiler::compile::tests::workflow_compiler_parses_every_binding_operator ... ok
+test application::workflow::compiler::compile::validation_tests::workflow_compiler_validates_literals_in_original_reference_scopes ... ok
+test application::workflow::compiler::compile::validation_tests::workflow_compiler_distinguishes_equal_fragments_under_different_ids ... ok
+test application::workflow::compiler::compile::validation_tests::workflow_compiler_projects_local_refs_unions_and_array_bounds ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 2316 filtered out; finished in 0.08s
+

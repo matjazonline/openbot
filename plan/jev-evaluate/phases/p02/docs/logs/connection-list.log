@@ -1,0 +1,7 @@
+   Compiling mail_agents v0.1.0 (/Users/mac02/dev/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 22s
+     Running unittests src/lib.rs (target/debug/deps/mail_agents-6693f25a28eea502)
+adapters::persistence::workflow::tests::jev_tests::jev_connection_kek_rotation_inventory: test
+adapters::persistence::workflow::tests::jev_tests::jev_connection_roundtrip_scope_revision_envelope_and_rotation: test
+
+2 tests, 0 benchmarks

@@ -1,0 +1,7 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.26s
+     Running unittests src/lib.rs (target/debug/deps/mail_agents-6693f25a28eea502)
+adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::updates::workflow_harness_update_cannot_consume_reservation_approval: test
+adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::updates::workflow_harness_update_retains_result_after_refusal_but_cannot_prepare_next: test
+adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::updates::workflow_harness_update_settlement_approval_finishes_without_new_model_call: test
+
+3 tests, 0 benchmarks

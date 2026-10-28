@@ -1,0 +1,35 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.23s
+     Running unittests src/lib.rs (target/debug/deps/mail_agents-6693f25a28eea502)
+
+running 28 tests
+test application::workflow::registry::review1_tests::workflow_registry_dialects_follow_active_custom_targets_only ... ok
+test application::workflow::registry::contract_tests::workflow_registry_choice_resource_child_deadline_and_schema_errors ... ok
+test application::workflow::registry::decision_tests::workflow_registry_event_name_is_literal_and_has_one_schema ... ok
+test application::workflow::registry::review1_tests::workflow_registry_classifier_contract_excludes_scalar_loopholes ... ok
+test application::workflow::registry::contract_tests::workflow_registry_native_schema_resources_survive_nested_contracts ... ok
+test application::workflow::registry::runtime_tests::workflow_registry_child_params_are_static_and_resources_match_by_slot ... ok
+test application::workflow::registry::contract_tests::workflow_registry_per_step_schemas_and_choices_remain_distinct ... ok
+test application::workflow::registry::runtime_tests::workflow_registry_facts_bounded_unique_and_identity_sensitive ... ok
+test application::workflow::registry::decision_tests::workflow_registry_action_approval_allows_dynamic_deadline_but_validates_it ... ok
+test application::workflow::registry::schema_tests::workflow_registry_metadata_matches_effect_families_and_never_claims_authorization ... ok
+test application::workflow::registry::runtime_tests::workflow_registry_dynamic_http_and_deadline_checks_are_authoritative_and_redacted ... ok
+test application::workflow::registry::runtime_tests::workflow_registry_human_feedback_and_repeat_output_constraints ... ok
+test application::workflow::registry::schema_tests::workflow_registry_nested_schema_refs_ids_and_data_keywords_preserve_native_meaning ... ok
+test application::workflow::registry::schema_tests::workflow_registry_semantic_errors_locate_literal_values_without_leaking_them ... ok
+test application::workflow::registry::decision_tests::workflow_registry_decision_object_cannot_be_disclosed_as_message_content ... ok
+test application::workflow::registry::tests::workflow_registry_agent_action_approval_uses_shared_static_policy ... ok
+test application::workflow::registry::tests::workflow_registry_context_history_replaces_context_load ... ok
+test application::workflow::registry::schema_tests::workflow_registry_schema_budget_retains_external_recursion_depth_node_byte_rejection ... ok
+test application::workflow::registry::decision_tests::workflow_registry_decision_reviewers_static_nested_and_bounded ... ok
+test application::workflow::registry::review1_tests::workflow_registry_expansion_rejects_reused_facts_before_specialization ... ok
+test application::workflow::registry::runtime_tests::workflow_registry_mcp_output_and_downstream_structured_reference ... ok
+test application::workflow::registry::review1_tests::workflow_registry_mcp_all_protocol_content_variants_and_bounds ... ok
+test application::workflow::registry::contract_tests::workflow_registry_static_declarations_and_nested_configuration_are_checked ... ok
+test application::workflow::registry::review1_tests::workflow_registry_shared_actions_advertise_durable_suspension ... ok
+test application::workflow::registry::runtime_tests::workflow_registry_each_type_validates_dynamic_required_inputs ... ok
+test application::workflow::registry::tests::workflow_registry_exact_catalogue_and_help_examples_compile ... ok
+test application::workflow::registry::decision_tests::workflow_registry_action_approval_reviewers_are_static_and_bounded ... ok
+test application::workflow::registry::tests::workflow_registry_every_type_rejects_missing_invalid_and_unknown_fields ... ok
+
+test result: ok. 28 passed; 0 failed; 0 ignored; 0 measured; 2304 filtered out; finished in 0.31s
+

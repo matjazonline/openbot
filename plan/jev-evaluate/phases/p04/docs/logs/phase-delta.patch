@@ -1,0 +1,2174 @@
+--- before/Cargo.lock
++++ after/Cargo.lock
+@@ -4762,6 +4762,7 @@
+  "dotenvy",
+  "futures",
+  "htmd",
++ "image",
+  "jsonschema",
+  "jsonwebtoken",
+  "lettre",
+--- before/Cargo.toml
++++ after/Cargo.toml
+@@ -45,6 +45,7 @@
+ pulldown-cmark = "0.13"
+ ammonia = "4"
+ base64 = "0.22"
++image = { version = "=0.25.10", default-features = false, features = ["png", "jpeg"] }
+ ring = "0.17"
+ p256 = { version = "0.13", features = ["ecdsa", "pem"] }
+ # RS256 for the Google service-account assertion that buys a Cloud Storage access token.
+--- before/docs/workflow-language-v1.md
++++ after/docs/workflow-language-v1.md
+@@ -351,7 +351,7 @@
+ Production SQL/transaction races and provider-use authorization remain phases03/04 obligations.
+ 
+ 
+-## Jev text contract
++## Jev typed questions and images
+ 
+ `jev.evaluate` declares a `typesafe` resource slot and selects it with literal
+ `connection`. Use an exact `jev-MAJOR.MINOR.PATCH` model ID, such as `jev-1.14.0`;
+@@ -374,7 +374,7 @@
+   the exact original descriptions, and `confidence` in [0, 1].
+ 
+ Instructions and descriptions must be nonblank and at most 16 KiB of UTF-8 each.
+-Unknown fields and duplicate keys are rejected; Box is reserved for the image phase.
++Unknown fields and duplicate keys are rejected. Box and image assets follow the experimental contract below.
+ The exact output envelope contains `answers`, the selected versioned `model`, and
+ nonnegative integer `usage.input_tokens` / `usage.output_tokens`. Missing, extra,
+ mismatched, nonfinite and out-of-range answers fail completion. Every probability
+@@ -396,3 +396,46 @@
+ [System One API](https://docs.typesafe.ai/api/system-one),
+ [primitives](https://docs.typesafe.ai/primitives), and
+ [versioned models](https://docs.typesafe.ai/models).
++
++
++### Experimental Jev images and Box
++
++Images and Box are experimental TypeSafe features. This application supports images
++on exact `jev-1.13.PATCH` and `jev-1.14.PATCH` models, and Box on `jev-1.14.PATCH` only.
++Future model families require an explicit support update. Text-only requests never
++send the image opt-in header.
++
++Optional literal `with.assets` maps 1–4 logical identifiers (ASCII letter followed
++by letters, digits or underscores, at most 64 bytes) to immutable private message
++attachment references. Each reference has exactly `channel_id`, `thread_id` (nonnil
++UUIDs), and `sha256` (64 lowercase hex characters). Public URLs, object keys,
++base64 and unverifiable references are rejected. The run actor must currently
++have company and channel/thread visibility; cross-company attachments are refused.
++Missing, changed, unsupported or oversized images produce explicit `jev.asset_*`
++failures. A retry verifies the same digest again before replay or a new provider call.
++
++Local limits are 24 KiB per PNG/JPEG, dimensions 280–1024 each, at most 1,048,576
++pixels, still images only. Bytes, MIME, decoded image and digest must agree.
++The complete JSON request, including base64 framing, still fits within 64 KiB;
++several individually valid images can therefore exceed the aggregate limit.
++Image bytes exist only during an authorized provider request. Bundles, invocation
++identity, traces and sample reports carry inert references and digests only.
++Token admission conservatively adds one token per decoded pixel to the wire-byte
++estimate; actual provider usage is retained on settlement.
++
++For requests with assets, provider state is `{ "content": <original state>,
++"assets": { "<logical name>": <server opaque placeholder> } }`. Refer to original
++state through `content` and images through `assets.NAME`. No user text is replaced
++by a short logical token. A `box` question has `type` and string `instructions`
++only; instructions must name a declared image as a backtick path such as
++`assets.photo`. It forbids `criteria`. Its answer has exactly `type: box`, `box`
++with `left`, `right`, `top`, `bottom`, and `confidence`. Coordinates and confidence
++are in [0,1], with `left < right` and `top < bottom`. Mixed text and Box answers
++have static downstream paths, for example `/steps/start/output/answers/mug/box/left`.
++
++The scripted image sample in `samples/jev-image.json` contains inert references and
++supplied results. It never reads private storage or calls TypeSafe. Its format has
++`source` (workflow definition) and `sample` (sample request); use them with the
++ordinary compile/publication and sample APIs. Production remains refused until the
++final Jev release phase. Contracts checked against [TypeSafe Images](https://docs.typesafe.ai/images)
++and [Box](https://docs.typesafe.ai/primitives/box).
+--- before/samples/jev-image.json
++++ after/samples/jev-image.json
+@@ -0,0 +1,99 @@
++{
++  "source": {
++    "format_version": 1,
++    "workflow_id": "00000000-0000-0000-0000-000000000001",
++    "input_schema": true,
++    "parameter_schema": true,
++    "output_schema": true,
++    "resources": [
++      {
++        "slot": "service",
++        "kind": "typesafe"
++      }
++    ],
++    "entry": "start",
++    "steps": {
++      "start": {
++        "type": "jev.evaluate",
++        "with": {
++          "connection": {
++            "literal": "service"
++          },
++          "model": {
++            "literal": "jev-1.14.0"
++          },
++          "state": {
++            "literal": {
++              "note": "Scripted image demonstration"
++            }
++          },
++          "assets": {
++            "literal": {
++              "photo": {
++                "channel_id": "00000000-0000-0000-0000-000000000002",
++                "thread_id": "00000000-0000-0000-0000-000000000003",
++                "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
++              }
++            }
++          },
++          "questions": {
++            "literal": {
++              "visible": {
++                "type": "noul",
++                "instructions": "Is there a mug in `assets.photo`?"
++              },
++              "mug": {
++                "type": "box",
++                "instructions": "The mug in `assets.photo`"
++              }
++            }
++          }
++        },
++        "routes": {
++          "success": "$end"
++        }
++      }
++    },
++    "limits": {
++      "max_steps": 100,
++      "max_context_bytes": 65536
++    }
++  },
++  "sample": {
++    "input": {},
++    "params": {},
++    "scripts": [
++      {
++        "workflow_id": "00000000-0000-0000-0000-000000000001",
++        "step": "start",
++        "responses": [
++          {
++            "output": {
++              "model": "jev-1.14.0",
++              "answers": {
++                "visible": {
++                  "type": "noul",
++                  "noul": 0.9
++                },
++                "mug": {
++                  "type": "box",
++                  "box": {
++                    "left": 0.1,
++                    "right": 0.8,
++                    "top": 0.2,
++                    "bottom": 0.9
++                  },
++                  "confidence": 0.8
++                }
++              },
++              "usage": {
++                "input_tokens": 200,
++                "output_tokens": 20
++              }
++            }
++          }
++        ]
++      }
++    ]
++  }
++}
+--- before/src/adapters/persistence/workflow/jev_assets.rs
++++ after/src/adapters/persistence/workflow/jev_assets.rs
+@@ -0,0 +1,102 @@
++//! Authorize immutable private attachment references before storage reads.
++use super::*;
++use crate::application::workflow::{
++    actions::ActionScope, jev::*, lease::ClaimedWorkflow, polling::WorkflowStepKind,
++};
++use crate::domain::entities::message::AttachmentMetadata;
++use std::{collections::BTreeMap, time::Duration};
++
++#[async_trait]
++impl JevAssetDirectory for PostgresPersistence {
++    async fn locate_jev_assets(
++        &self,
++        claim: &ClaimedWorkflow,
++    ) -> AppResult<BTreeMap<AssetName, JevAssetLocation>> {
++        tokio::time::timeout(Duration::from_secs(5), locate(self, claim))
++            .await
++            .map_err(|_| AppError::Internal("Jev image authorization timed out".into()))?
++    }
++}
++async fn locate(
++    p: &PostgresPersistence,
++    claim: &ClaimedWorkflow,
++) -> AppResult<BTreeMap<AssetName, JevAssetLocation>> {
++    let refs = parse_assets(claim.activation.inputs.get("assets"))
++        .map_err(|s| AppError::BadRequest(s.into()))?;
++    let scope = claim.fence.scope;
++    let started = tokio::time::Instant::now();
++    let mut tx = http::begin_http(p).await?;
++    let actor = action_authority::prelock_on(
++        &mut tx,
++        ActionScope {
++            company: scope.company,
++            run: scope.run,
++            execution: scope.execution,
++        },
++    )
++    .await?
++    .ok_or_else(missing)?;
++    let mut locations = BTreeMap::new();
++    // Acquire every file's authority before workflow-local fence locks.
++    for (name, reference) in refs {
++        association::authorize_association(
++            &mut tx,
++            scope.company,
++            actor,
++            RelatedAssociation::Thread {
++                channel_id: reference.channel_id,
++                thread_id: reference.thread_id,
++            },
++        )
++        .await?;
++        let metadata: Option<serde_json::Value> = sqlx::query_scalar(
++            "SELECT attachment.value FROM thread_messages AS membership \
++             JOIN messages AS message ON message.company_id=membership.company_id AND message.id=membership.message_id \
++             CROSS JOIN LATERAL jsonb_array_elements(message.attachments->'items') AS attachment(value) \
++             WHERE membership.company_id=$1 AND membership.channel_id=$2 AND membership.thread_id=$3 \
++               AND attachment.value->>'sha256_hash'=$4 LIMIT 1"
++        ).bind(scope.company.as_uuid()).bind(reference.channel_id.as_uuid()).bind(reference.thread_id.as_uuid()).bind(reference.sha256.as_str()).fetch_optional(&mut *tx).await?;
++        let metadata: AttachmentMetadata =
++            serde_json::from_value(metadata.ok_or_else(missing)?).map_err(|_| invalid())?;
++        let key = metadata.storage_key.ok_or_else(missing)?;
++        locations.insert(
++            name,
++            JevAssetLocation {
++                reference,
++                key,
++                content_type: metadata.content_type,
++                size_bytes: metadata.size_bytes,
++            },
++        );
++    }
++    if !lease::lock_fence(&mut tx, claim.fence, Duration::from_secs(2)).await? {
++        return Err(missing());
++    }
++    let facts = http::runtime::facts(
++        &mut tx,
++        ActionScope {
++            company: scope.company,
++            run: scope.run,
++            execution: scope.execution,
++        },
++    )
++    .await?;
++    if facts.actor != actor {
++        return Err(missing());
++    }
++    http::runtime::frozen_inputs(
++        &mut tx,
++        &facts,
++        claim,
++        &WorkflowStepKind("jev.evaluate".into()),
++    )
++    .await?;
++    if lease::live_window(&mut tx, claim.fence, started)
++        .await?
++        .is_none()
++    {
++        return Err(missing());
++    }
++    tx.commit().await?;
++    Ok(locations)
++}
+--- before/src/adapters/persistence/workflow/jev_assets_tests.rs
++++ after/src/adapters/persistence/workflow/jev_assets_tests.rs
+@@ -0,0 +1,253 @@
++use super::jev_runtime_tests::expire_reclaim;
++use super::jev_tests::{bound_source, claim, create, fixture};
++use super::*;
++use crate::adapters::{
++    storage::{BucketKind, FileStorage, test_support::FakeStorage},
++    workflow_jev::{JevAssetReader, tests::server},
++};
++use crate::application::{
++    use_cases::channel::{ChannelPersistence, ChannelWrite},
++    workflow::{
++        jev::assets::tests as images, jev::*, lease::*, polling::WorkflowStepKind,
++        worker::WorkflowHandler,
++    },
++};
++use crate::domain::entities::value_objects::ObjectKey;
++use serde_json::{Value, json};
++use std::time::Duration;
++fn policy() -> LeasePolicy {
++    LeasePolicy::new(Duration::from_secs(30)).unwrap()
++}
++struct Attachment {
++    reference: Value,
++    key: ObjectKey,
++}
++async fn attachment(f: &Fixture, bytes: &[u8]) -> Attachment {
++    let p = &f.persistence;
++    let company = f.target.company.as_uuid();
++    let channel = ChannelPersistence::create(
++        p,
++        company,
++        ChannelWrite {
++            name: "Images".into(),
++            slug: format!("images-{}", Uuid::new_v4()),
++            ..Default::default()
++        },
++    )
++    .await
++    .unwrap();
++    let thread = Uuid::new_v4();
++    let message = Uuid::new_v4();
++    let key = ObjectKey::new(format!("attachments/{company}/{}.png", Uuid::new_v4()));
++    sqlx::query("INSERT INTO threads(id,company_id,channel_id,subject) VALUES($1,$2,$3,'Images')")
++        .bind(thread)
++        .bind(company)
++        .bind(channel.id)
++        .execute(p.pool())
++        .await
++        .unwrap();
++    let metadata = json!({"version":"1","items":[{"filename":"fixture.png","content_type":"image/png","sha256_hash":ImageDigest::of(bytes),"size_bytes":bytes.len(),"storage_key":key.as_str()}]});
++    sqlx::query("INSERT INTO messages(id,company_id,author_principal_id,subject,clean_text_body,direction,role,correlation_id,content_hash,attachments) SELECT $1,$2,principal.id,'Images','body','inbound','human',$3,$4,$5 FROM principals AS principal WHERE principal.company_id=$2 AND principal.user_id=$6")
++        .bind(message).bind(company).bind(Uuid::new_v4()).bind(vec![0u8;32]).bind(metadata).bind(f.target.actor.user_id()).execute(p.pool()).await.unwrap();
++    sqlx::query("INSERT INTO thread_messages(id,company_id,channel_id,thread_id,message_id,entry_kind) VALUES($1,$2,$3,$4,$5,'conversation')").bind(Uuid::new_v4()).bind(company).bind(channel.id).bind(thread).bind(message).execute(p.pool()).await.unwrap();
++    Attachment {
++        reference: json!({"channel_id":channel.id,"thread_id":thread,"sha256":ImageDigest::of(bytes)}),
++        key,
++    }
++}
++async fn image_claim(f: &Fixture, attachment: &Attachment) -> ClaimedWorkflow {
++    let c = create(f).await;
++    let mut source: Value =
++        serde_json::from_str(&registry::example("jev.evaluate").unwrap().source).unwrap();
++    source["steps"]["start"]["with"]["questions"] =
++        json!({"literal":images::inputs(b"inert")["questions"]});
++    source["steps"]["start"]["with"]["assets"] = json!({"literal":{"photo":attachment.reference}});
++    let target = bound_source(f, &c, source).await;
++    claim(f, target).await
++}
++async fn calls(p: &PostgresPersistence, claim: &ClaimedWorkflow) -> i64 {
++    sqlx::query_scalar(
++        "SELECT count(*) FROM workflow_jev_invocations WHERE company_id=$1 AND run_id=$2",
++    )
++    .bind(claim.fence.scope.company.as_uuid())
++    .bind(claim.fence.scope.run.as_uuid())
++    .fetch_one(p.pool())
++    .await
++    .unwrap()
++}
++#[tokio::test]
++async fn jev_assets_cross_company_negative_and_forged_claim_are_denied_before_storage() {
++    let f = fixture().await;
++    let other = Fixture::in_database(f._db.clone(), "foreign").await;
++    let bytes = images::png(280, 280);
++    let foreign = attachment(&other, &bytes).await;
++    let claim = image_claim(&f, &foreign).await;
++    // A storage failure would be retryable: authorization must reject before touching it.
++    let reader = JevAssetReader::new(
++        f.persistence.clone(),
++        Some(Arc::new(FakeStorage::failing())),
++    );
++    assert!(matches!(
++        reader.read(&claim).await,
++        Err(JevAssetError::Unauthorized)
++    ));
++    assert_eq!(calls(&f.persistence, &claim).await, 0);
++    let local = attachment(&f, &bytes).await;
++    let mut forged = claim.clone();
++    forged.activation.inputs["assets"]["photo"] = local.reference;
++    assert!(matches!(
++        reader.read(&forged).await,
++        Err(JevAssetError::Unauthorized)
++    ));
++}
++#[tokio::test]
++async fn jev_assets_changed_object_retry_never_sends_or_adds_reservation() {
++    let f = fixture().await;
++    let bytes = images::png(280, 280);
++    let attachment = attachment(&f, &bytes).await;
++    let first = image_claim(&f, &attachment).await;
++    let storage = Arc::new(FakeStorage::new());
++    storage
++        .store_object(
++            BucketKind::Private,
++            &attachment.key,
++            "image/png",
++            bytes.clone(),
++        )
++        .await
++        .unwrap();
++    let reader = Arc::new(JevAssetReader::new(
++        f.persistence.clone(),
++        Some(storage.clone()),
++    ));
++    let (http, task) = server(503, "", vec![], Duration::ZERO).await;
++    let runtime = JevRuntime::new(f.persistence.clone(), Arc::new(http), policy())
++        .with_assets(reader.clone());
++    assert!(matches!(
++        runtime
++            .execute(&WorkflowStepKind("jev.evaluate".into()), &first)
++            .await,
++        WorkflowHandlerOutcome::Completed(Err(_))
++    ));
++    task.await.unwrap();
++    assert_eq!(calls(&f.persistence, &first).await, 1);
++    let second = expire_reclaim(&f.persistence, &first).await;
++    let mut changed = bytes;
++    changed[20] ^= 1;
++    storage
++        .store_object(BucketKind::Private, &attachment.key, "image/png", changed)
++        .await
++        .unwrap();
++    let (http, task) = server(
++        200,
++        "",
++        serde_json::to_vec(&images::output()).unwrap(),
++        Duration::ZERO,
++    )
++    .await;
++    let runtime =
++        JevRuntime::new(f.persistence.clone(), Arc::new(http), policy()).with_assets(reader);
++    let result = runtime
++        .execute(&WorkflowStepKind("jev.evaluate".into()), &second)
++        .await;
++    let WorkflowHandlerOutcome::Completed(Err(failure)) = result else {
++        panic!("changed image must fail")
++    };
++    assert_eq!(failure.failure.code().as_str(), "jev.asset_changed");
++    assert_eq!(calls(&f.persistence, &second).await, 1);
++    assert!(!task.is_finished());
++    task.abort();
++    let _ = task.await;
++}
++#[tokio::test]
++async fn jev_assets_mixed_loopback_settlement_replay_and_metadata_only_ledger() {
++    let f = fixture().await;
++    let bytes = images::png(280, 280);
++    let attachment = attachment(&f, &bytes).await;
++    let first = image_claim(&f, &attachment).await;
++    let storage = Arc::new(FakeStorage::new());
++    storage
++        .store_object(BucketKind::Private, &attachment.key, "image/png", bytes)
++        .await
++        .unwrap();
++    let reader = Arc::new(JevAssetReader::new(f.persistence.clone(), Some(storage)));
++    let (http, task) = server(
++        200,
++        "",
++        serde_json::to_vec(&images::output()).unwrap(),
++        Duration::ZERO,
++    )
++    .await;
++    let runtime =
++        JevRuntime::new(f.persistence.clone(), Arc::new(http), policy()).with_assets(reader);
++    let result = runtime
++        .execute(&WorkflowStepKind("jev.evaluate".into()), &first)
++        .await;
++    let WorkflowHandlerOutcome::Completed(Ok(value)) = result else {
++        panic!("image completion expected")
++    };
++    assert_eq!(value, images::output());
++    let sent = task.await.unwrap();
++    assert!(sent.contains("typesafe-danger-zone-images: true"));
++    let prepared: Vec<u8> = sqlx::query_scalar(
++        "SELECT prepared FROM workflow_jev_invocations WHERE company_id=$1 AND execution_id=$2",
++    )
++    .bind(first.fence.scope.company.as_uuid())
++    .bind(first.fence.scope.execution.as_uuid())
++    .fetch_one(f.persistence.pool())
++    .await
++    .unwrap();
++    assert!(!String::from_utf8_lossy(&prepared).contains("data_base64"));
++    assert!(String::from_utf8_lossy(&prepared).contains("sha256"));
++    let second = expire_reclaim(&f.persistence, &first).await;
++    assert!(matches!(
++        runtime
++            .execute(&WorkflowStepKind("jev.evaluate".into()), &second)
++            .await,
++        WorkflowHandlerOutcome::Completed(Ok(_))
++    ));
++    assert_eq!(calls(&f.persistence, &second).await, 1);
++}
++
++#[tokio::test]
++async fn jev_assets_current_actor_channel_visibility_and_missing_file() {
++    let f = fixture().await;
++    let bytes = images::png(280, 280);
++    let attachment = attachment(&f, &bytes).await;
++    let claim = image_claim(&f, &attachment).await;
++    let reader = JevAssetReader::new(f.persistence.clone(), Some(Arc::new(FakeStorage::new())));
++    assert!(matches!(
++        reader.read(&claim).await,
++        Err(JevAssetError::Missing)
++    ));
++    let other = Fixture::in_database(f._db.clone(), "newowner").await;
++    sqlx::query("UPDATE companies SET user_id=$2 WHERE id=$1")
++        .bind(f.target.company.as_uuid())
++        .bind(other.target.actor.user_id())
++        .execute(f.persistence.pool())
++        .await
++        .unwrap();
++    sqlx::query("UPDATE company_members SET role='admin' WHERE company_id=$1 AND user_id=$2")
++        .bind(f.target.company.as_uuid())
++        .bind(f.target.actor.user_id())
++        .execute(f.persistence.pool())
++        .await
++        .unwrap();
++    sqlx::query("UPDATE channels SET access_mode='allowlist' WHERE company_id=$1 AND id=$2")
++        .bind(f.target.company.as_uuid())
++        .bind(
++            attachment.reference["channel_id"]
++                .as_str()
++                .unwrap()
++                .parse::<Uuid>()
++                .unwrap(),
++        )
++        .execute(f.persistence.pool())
++        .await
++        .unwrap();
++    assert!(matches!(
++        reader.read(&claim).await,
++        Err(JevAssetError::Unauthorized)
++    ));
++    assert_eq!(calls(&f.persistence, &claim).await, 0);
++}
+--- before/src/adapters/persistence/workflow/jev_runtime.rs
++++ after/src/adapters/persistence/workflow/jev_runtime.rs
+@@ -55,6 +55,7 @@
+         &self,
+         claim: &ClaimedWorkflow,
+         admission: &JevAdmission,
++        request: &JevRequest,
+         response: &JevResponse,
+         latency: Duration,
+         policy: LeasePolicy,
+@@ -64,9 +65,11 @@
+             .attempt(Box::pin(async {
+                 let mut conn = bound.acquire(&self.pool).await?;
+                 let mut tx = bound.begin(&mut conn).await?;
+-                let result = settle_on(&mut tx, claim, admission, response, latency, &bound)
+-                    .await
+-                    .map(End::Commit);
++                let result = settle_on(
++                    &mut tx, claim, admission, request, response, latency, &bound,
++                )
++                .await
++                .map(End::Commit);
+                 bound.end(tx, result).await
+             }))
+             .await;
+@@ -109,7 +112,7 @@
+     latency.as_millis().min(3_600_000) as i64
+ }
+ fn matching(request: &JevRequest, saved: Saved) -> AppResult<Option<Value>> {
+-    if saved.prepared != request.body() || saved.digest != request.digest() {
++    if saved.prepared != request.identity() || saved.digest != request.digest() {
+         return Err(AppError::BadRequest("Jev preparation changed".into()));
+     }
+     saved
+@@ -175,7 +178,8 @@
+     // Reuse current authority+selected connection checks before local fence and root locks.
+     let credential = jev::runtime::authorize_on(p, tx, claim).await?;
+     if credential.model != *request.model()
+-        || JevRequest::prepare(&claim.activation.inputs)?.body() != request.body()
++        || !request.ready()
++        || JevRequest::prepare(&claim.activation.inputs)?.identity() != request.identity()
+     {
+         return Err(jev::revoked());
+     }
+@@ -218,7 +222,7 @@
+     }
+     reserve_usage(tx, claim, request_id, request).await?;
+     sqlx::query("INSERT INTO workflow_jev_invocations(company_id,run_id,execution_id,request_id,generation,worker_id,attempt,prepared,digest) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)")
+-        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(request_id).bind(claim.fence.generation.0).bind(claim.fence.worker.0).bind(claim.fence.attempt.0).bind(request.body()).bind(request.digest()).execute(&mut **tx).await?;
++        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(request_id).bind(claim.fence.generation.0).bind(claim.fence.worker.0).bind(claim.fence.attempt.0).bind(request.identity()).bind(request.digest()).execute(&mut **tx).await?;
+     live(tx, claim, bound).await?;
+     Ok(End::Commit(JevAdmissionResult::New(JevAdmission {
+         request_id,
+@@ -243,6 +247,7 @@
+     tx: &mut Transaction<'_, Postgres>,
+     claim: &ClaimedWorkflow,
+     admission: &JevAdmission,
++    request: &JevRequest,
+     response: &JevResponse,
+     latency: Duration,
+     bound: &WriteBound,
+@@ -250,8 +255,12 @@
+     lock_owner(tx, claim, bound).await?;
+     let saved: Saved = sqlx::query_as("SELECT prepared,digest,output FROM workflow_jev_invocations WHERE company_id=$1 AND request_id=$2 AND execution_id=$3 AND generation=$4 AND worker_id=$5 AND attempt=$6 FOR UPDATE")
+         .bind(claim.fence.scope.company.as_uuid()).bind(admission.request_id()).bind(claim.fence.scope.execution.as_uuid()).bind(claim.fence.generation.0).bind(claim.fence.worker.0).bind(claim.fence.attempt.0).fetch_optional(&mut **tx).await?.ok_or_else(invalid)?;
+-    let request = JevRequest::prepare(&claim.activation.inputs)?;
+-    let prior = matching(&request, saved)?;
++    if !request.ready()
++        || JevRequest::prepare(&claim.activation.inputs)?.identity() != request.identity()
++    {
++        return Err(invalid());
++    }
++    let prior = matching(request, saved)?;
+     let validated = request
+         .validate_response(response.value.clone())
+         .map_err(|_| invalid())?;
+--- before/src/adapters/persistence/workflow/jev_runtime_tests.rs
++++ after/src/adapters/persistence/workflow/jev_runtime_tests.rs
+@@ -16,7 +16,10 @@
+     sqlx::query_scalar("SELECT jsonb_build_object('calls',usage.model_calls,'reserved',(SELECT count(*) FROM model_usage_calls WHERE company_id=$1 AND run_id=$2),'settled',(SELECT count(*) FROM model_usage_calls WHERE company_id=$1 AND run_id=$2 AND settled_at IS NOT NULL),'outputs',(SELECT count(*) FROM workflow_jev_invocations WHERE company_id=$1 AND run_id=$2 AND output IS NOT NULL)) FROM workflow_root_budget_usage AS usage JOIN workflow_run_budgets AS link USING(company_id,root_run_id) WHERE link.company_id=$1 AND link.run_id=$2")
+         .bind(claim.fence.scope.company.as_uuid()).bind(claim.fence.scope.run.as_uuid()).fetch_one(p.pool()).await.unwrap()
+ }
+-async fn expire_reclaim(p: &PostgresPersistence, claim: &ClaimedWorkflow) -> ClaimedWorkflow {
++pub(super) async fn expire_reclaim(
++    p: &PostgresPersistence,
++    claim: &ClaimedWorkflow,
++) -> ClaimedWorkflow {
+     sqlx::query("UPDATE background_tasks SET locked_at=clock_timestamp()-interval '40 seconds',lock_expires_at=clock_timestamp()-interval '1 second' WHERE id=$1").bind(claim.fence.scope.job.0).execute(p.pool()).await.unwrap();
+     assert!(
+         p.retire_expired_io(claim.fence.scope, policy())
+@@ -98,7 +101,14 @@
+     let response = request.validate_response(output()).unwrap();
+     assert!(
+         f.persistence
+-            .settle_jev(&first, &grant, &response, Duration::ZERO, policy())
++            .settle_jev(
++                &first,
++                &grant,
++                &request,
++                &response,
++                Duration::ZERO,
++                policy()
++            )
+             .await
+             .is_err()
+     );
+@@ -111,7 +121,14 @@
+         panic!()
+     };
+     f.persistence
+-        .settle_jev(&second, &next, &response, Duration::ZERO, policy())
++        .settle_jev(
++            &second,
++            &next,
++            &request,
++            &response,
++            Duration::ZERO,
++            policy(),
++        )
+         .await
+         .unwrap();
+     assert_eq!(
+--- before/src/adapters/persistence/workflow/mod.rs
++++ after/src/adapters/persistence/workflow/mod.rs
+@@ -46,6 +46,7 @@
+ mod history_reader;
+ pub mod http;
+ pub mod jev;
++mod jev_assets;
+ mod lease;
+ mod lease_claim;
+ pub mod mcp;
+--- before/src/adapters/persistence/workflow/tests.rs
++++ after/src/adapters/persistence/workflow/tests.rs
+@@ -584,3 +584,6 @@
+ 
+ #[path = "jev_runtime_tests.rs"]
+ mod jev_runtime_tests;
++
++#[path = "jev_assets_tests.rs"]
++mod jev_assets_tests;
+--- before/src/adapters/storage/gcs.rs
++++ after/src/adapters/storage/gcs.rs
+@@ -282,6 +282,15 @@
+ 
+     #[instrument(skip(self), fields(key = %key))]
+     async fn read_object(&self, bucket: BucketKind, key: &ObjectKey) -> AppResult<StoredObject> {
++        self.read_object_bounded(bucket, key, usize::MAX).await
++    }
++
++    async fn read_object_bounded(
++        &self,
++        bucket: BucketKind,
++        key: &ObjectKey,
++        max_bytes: usize,
++    ) -> AppResult<StoredObject> {
+         let token = self.access_token().await?;
+         let bucket = self.bucket_for(bucket)?;
+ 
+@@ -297,7 +306,12 @@
+             .await
+             .map_err(|err| AppError::Internal(format!("GCS read failed: {err}")))?;
+ 
+-        let response = require_success(response, "GCS read").await?;
++        if response.status() == reqwest::StatusCode::NOT_FOUND {
++            return Err(AppError::NotFound("Stored object is missing".into()));
++        }
++        if !response.status().is_success() {
++            return Err(AppError::Internal("GCS read refused".into()));
++        }
+ 
+         // What the object was stored as, which is what the download route serves it as.
+         let content_type = response
+@@ -307,17 +321,44 @@
+             .unwrap_or(DEFAULT_CONTENT_TYPE)
+             .to_string();
+ 
+-        let bytes = response
+-            .bytes()
+-            .await
+-            .map_err(|err| AppError::Internal(format!("GCS read was cut short: {err}")))?
+-            .to_vec();
++        let bytes = read_bounded_body(response, max_bytes).await?;
+ 
+         Ok(StoredObject {
+             content_type,
+             bytes,
+         })
+     }
++}
++
++async fn read_bounded_body(response: reqwest::Response, max_bytes: usize) -> AppResult<Vec<u8>> {
++    let declared = response
++        .headers()
++        .get(reqwest::header::CONTENT_LENGTH)
++        .and_then(|value| value.to_str().ok())
++        .and_then(|value| value.parse::<u64>().ok());
++    if declared
++        .into_iter()
++        .chain(response.content_length())
++        .any(|size| size > max_bytes as u64)
++    {
++        return Err(AppError::BadRequest(
++            "Stored object exceeds read limit".into(),
++        ));
++    }
++    use futures::StreamExt;
++    let mut bytes = Vec::new();
++    let mut stream = response.bytes_stream();
++    while let Some(chunk) = stream.next().await {
++        let chunk = chunk.map_err(|_| AppError::Internal("GCS read interrupted".into()))?;
++        if chunk.len() > max_bytes.saturating_sub(bytes.len()) {
++            return Err(AppError::BadRequest(
++                "Stored object exceeds read limit".into(),
++            ));
++        }
++        bytes.extend_from_slice(&chunk);
++    }
++
++    Ok(bytes)
+ }
+ 
+ /// What an object with no recorded type is served as: bytes to save, never something to run.
+@@ -388,6 +429,37 @@
+ mod tests {
+     use super::*;
+ 
++    #[tokio::test]
++    async fn jev_assets_storage_read_bound_declared_and_streamed() {
++        fn response(chunks: Vec<&'static [u8]>, length: Option<usize>) -> reqwest::Response {
++            let stream = futures::stream::iter(chunks.into_iter().map(Ok::<_, std::io::Error>));
++            let mut builder = axum::http::Response::builder();
++            if let Some(length) = length {
++                builder = builder.header("content-length", length);
++            }
++            builder
++                .body(reqwest::Body::wrap_stream(stream))
++                .unwrap()
++                .into()
++        }
++        assert_eq!(
++            read_bounded_body(response(vec![b"ab", b"cd"], None), 4)
++                .await
++                .unwrap(),
++            b"abcd"
++        );
++        assert!(
++            read_bounded_body(response(vec![b"ab", b"cde"], None), 4)
++                .await
++                .is_err()
++        );
++        assert!(
++            read_bounded_body(response(vec![], Some(5)), 4)
++                .await
++                .is_err()
++        );
++    }
++
+     #[test]
+     fn a_base64_key_is_decoded_into_its_fields() {
+         let json = r#"{
+--- before/src/adapters/storage/mod.rs
++++ after/src/adapters/storage/mod.rs
+@@ -52,6 +52,14 @@
+         bytes: Vec<u8>,
+     ) -> AppResult<()>;
+ 
++    /// Bounded streaming read: reject declared or streamed sizes beyond max_bytes before allocation.
++    async fn read_object_bounded(
++        &self,
++        bucket: BucketKind,
++        key: &ObjectKey,
++        max_bytes: usize,
++    ) -> AppResult<StoredObject>;
++
+     /// Read back what [`FileStorage::store_object`] wrote.
+     async fn read_object(&self, bucket: BucketKind, key: &ObjectKey) -> AppResult<StoredObject>;
+ }
+--- before/src/adapters/storage/test_support.rs
++++ after/src/adapters/storage/test_support.rs
+@@ -118,6 +118,29 @@
+         Ok(())
+     }
+ 
++    async fn read_object_bounded(
++        &self,
++        bucket: BucketKind,
++        key: &ObjectKey,
++        max_bytes: usize,
++    ) -> AppResult<StoredObject> {
++        self.refuse_if_broken()?;
++        let objects = self.stored.lock().expect("test storage");
++        let object = objects
++            .iter()
++            .rev()
++            .find(|object| object.bucket == bucket && &object.key == key)
++            .ok_or_else(|| AppError::NotFound("Missing object".into()))?;
++        if object.bytes.len() > max_bytes {
++            return Err(AppError::BadRequest(
++                "Stored object exceeds read limit".into(),
++            ));
++        }
++        Ok(StoredObject {
++            content_type: object.content_type.clone(),
++            bytes: object.bytes.clone(),
++        })
++    }
+     async fn read_object(&self, bucket: BucketKind, key: &ObjectKey) -> AppResult<StoredObject> {
+         self.refuse_if_broken()?;
+ 
+--- before/src/adapters/workflow_jev/assets.rs
++++ after/src/adapters/workflow_jev/assets.rs
+@@ -0,0 +1,90 @@
++//! Private storage composition for the application-owned Jev image port.
++use crate::{
++    adapters::storage::{BucketKind, FileStorage},
++    app_error::AppError,
++    application::workflow::{jev::*, lease::ClaimedWorkflow},
++};
++use async_trait::async_trait;
++use std::{collections::BTreeMap, sync::Arc, time::Duration};
++
++pub struct JevAssetReader<P> {
++    directory: P,
++    storage: Option<Arc<dyn FileStorage>>,
++}
++impl<P> JevAssetReader<P> {
++    pub fn new(directory: P, storage: Option<Arc<dyn FileStorage>>) -> Self {
++        Self { directory, storage }
++    }
++}
++#[async_trait]
++impl<P: JevAssetDirectory> JevAssets for JevAssetReader<P> {
++    async fn read(
++        &self,
++        claim: &ClaimedWorkflow,
++    ) -> Result<BTreeMap<AssetName, JevImage>, JevAssetError> {
++        let locations = self
++            .directory
++            .locate_jev_assets(claim)
++            .await
++            .map_err(authority_error)?;
++        let storage = self.storage.as_ref().ok_or(JevAssetError::Missing)?;
++        let mut images = BTreeMap::new();
++        for (name, location) in &locations {
++            if location.size_bytes == 0 || location.size_bytes > MAX_IMAGE_BYTES {
++                return Err(JevAssetError::TooLarge);
++            }
++            if !matches!(location.content_type.as_str(), "image/png" | "image/jpeg") {
++                return Err(JevAssetError::Unsupported);
++            }
++            let object = tokio::time::timeout(
++                Duration::from_secs(5),
++                storage.read_object_bounded(BucketKind::Private, &location.key, MAX_IMAGE_BYTES),
++            )
++            .await
++            .map_err(|_| JevAssetError::Storage)?
++            .map_err(storage_error)?;
++            if object.content_type != location.content_type {
++                return Err(JevAssetError::Unsupported);
++            }
++            if object.bytes.len() != location.size_bytes {
++                return Err(JevAssetError::Changed);
++            }
++            images.insert(
++                name.clone(),
++                JevImage::validate(&location.reference, &object.content_type, object.bytes)?,
++            );
++        }
++        // A slow storage read cannot retain a grant revoked while it was in flight.
++        let current = self
++            .directory
++            .locate_jev_assets(claim)
++            .await
++            .map_err(authority_error)?;
++        if current != locations {
++            return Err(JevAssetError::Changed);
++        }
++        Ok(images)
++    }
++    async fn authorize(&self, claim: &ClaimedWorkflow) -> Result<(), JevAssetError> {
++        self.directory
++            .locate_jev_assets(claim)
++            .await
++            .map_err(authority_error)?;
++        Ok(())
++    }
++}
++fn authority_error(error: AppError) -> JevAssetError {
++    match error {
++        AppError::NotFound(_) | AppError::BadRequest(_) | AppError::InvalidCredentials => {
++            JevAssetError::Unauthorized
++        }
++        _ => JevAssetError::Storage,
++    }
++}
++fn storage_error(error: AppError) -> JevAssetError {
++    match error {
++        AppError::NotFound(_) => JevAssetError::Missing,
++        AppError::BadRequest(_) => JevAssetError::TooLarge,
++        _ => JevAssetError::Storage,
++    }
++}
+--- before/src/adapters/workflow_jev/mod.rs
++++ after/src/adapters/workflow_jev/mod.rs
+@@ -62,7 +62,7 @@
+         request: &JevRequest,
+         credential: &JevCredential,
+     ) -> Result<JevResponse, JevError> {
+-        if credential.model != *request.model() {
++        if !request.ready() || credential.model != *request.model() {
+             return Err(JevError::Invalid);
+         }
+         let mut authorization = reqwest::header::HeaderValue::from_str(&format!(
+@@ -71,15 +71,16 @@
+         ))
+         .map_err(|_| JevError::Invalid)?;
+         authorization.set_sensitive(true);
+-        let response = self
++        let mut outgoing = self
+             .client
+             .post(self.endpoint.clone())
+             .header(reqwest::header::AUTHORIZATION, authorization)
+             .header(reqwest::header::CONTENT_TYPE, "application/json")
+-            .body(request.body().to_vec())
+-            .send()
+-            .await
+-            .map_err(transport)?;
++            .body(request.body().to_vec());
++        if request.has_images() {
++            outgoing = outgoing.header("TypeSafe-Danger-Zone-Images", "true");
++        }
++        let response = outgoing.send().await.map_err(transport)?;
+         let status = response.status().as_u16();
+         if status != 200 {
+             return Err(JevError::Http(status, retry_after(response.headers())));
+@@ -175,3 +176,6 @@
+ }
+ #[cfg(test)]
+ pub(crate) mod tests;
++
++mod assets;
++pub use assets::JevAssetReader;
+--- before/src/adapters/workflow_jev/tests.rs
++++ after/src/adapters/workflow_jev/tests.rs
+@@ -95,6 +95,7 @@
+     assert_eq!(result.value, output());
+     let wire = task.await.unwrap();
+     assert!(wire.contains("authorization: Bearer fixture-secret"));
++    assert!(!wire.to_lowercase().contains("typesafe-danger-zone-images"));
+     assert_eq!(
+         wire.split_once("\r\n\r\n").unwrap().1.as_bytes(),
+         request.body()
+@@ -246,3 +247,33 @@
+     ));
+     task.await.unwrap();
+ }
++
++#[tokio::test]
++async fn jev_box_http_mixed_images_header_and_exact_digest() {
++    use crate::application::workflow::jev::assets::tests as images;
++    use sha2::{Digest, Sha256};
++    let bytes = images::png(280, 280);
++    let request = images::hydrated(&images::inputs(&bytes), bytes);
++    let (http, task) = server(
++        200,
++        "",
++        serde_json::to_vec(&images::output()).unwrap(),
++        Duration::ZERO,
++    )
++    .await;
++    let response = http
++        .evaluate(
++            &request,
++            &credential(),
++            Instant::now() + Duration::from_secs(2),
++        )
++        .await
++        .unwrap();
++    assert_eq!(response.value, images::output());
++    let wire = task.await.unwrap();
++    assert!(wire.contains("typesafe-danger-zone-images: true"));
++    let body = wire.split_once("\r\n\r\n").unwrap().1.as_bytes();
++    assert_eq!(body, request.body());
++    assert_eq!(Sha256::digest(body).to_vec(), request.digest());
++    assert!(!String::from_utf8_lossy(request.identity()).contains("data_base64"));
++}
+--- before/src/application/workflow/jev.rs
++++ after/src/application/workflow/jev.rs
+@@ -166,3 +166,7 @@
+ #[path = "jev_runtime.rs"]
+ mod runtime;
+ pub use runtime::*;
++
++#[path = "jev_assets.rs"]
++pub(crate) mod assets;
++pub use assets::*;
+--- before/src/application/workflow/jev_assets.rs
++++ after/src/application/workflow/jev_assets.rs
+@@ -0,0 +1,246 @@
++//! Inert image references and application-owned private image read/authorization ports.
++use crate::app_error::AppResult;
++use crate::application::workflow::lease::ClaimedWorkflow;
++use crate::application::workflow::{RelatedChannelId, RelatedThreadId};
++use crate::domain::entities::value_objects::ObjectKey;
++use async_trait::async_trait;
++use serde::{Deserialize, Serialize};
++use serde_json::Value;
++use sha2::{Digest, Sha256};
++use std::collections::BTreeMap;
++
++pub const MAX_ASSETS: usize = 4;
++pub const MAX_IMAGE_BYTES: usize = 24 * 1024;
++pub const MAX_IMAGE_SIDE: u32 = 1024;
++pub const MAX_IMAGE_PIXELS: u64 = 1024 * 1024;
++
++#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
++#[serde(transparent)]
++pub struct AssetName(String);
++impl AssetName {
++    pub fn as_str(&self) -> &str {
++        &self.0
++    }
++}
++#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
++#[serde(transparent)]
++pub struct ImageDigest(String);
++impl ImageDigest {
++    pub fn of(bytes: &[u8]) -> Self {
++        Self(format!("{:x}", Sha256::digest(bytes)))
++    }
++    pub fn as_str(&self) -> &str {
++        &self.0
++    }
++}
++#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
++#[serde(deny_unknown_fields)]
++pub struct JevAssetRef {
++    #[serde(with = "channel_id")]
++    pub channel_id: RelatedChannelId,
++    #[serde(with = "thread_id")]
++    pub thread_id: RelatedThreadId,
++    pub sha256: ImageDigest,
++}
++mod channel_id {
++    use super::*;
++    pub fn serialize<S: serde::Serializer>(
++        value: &RelatedChannelId,
++        serializer: S,
++    ) -> Result<S::Ok, S::Error> {
++        value.as_uuid().serialize(serializer)
++    }
++    pub fn deserialize<'de, D: serde::Deserializer<'de>>(
++        deserializer: D,
++    ) -> Result<RelatedChannelId, D::Error> {
++        uuid::Uuid::deserialize(deserializer).map(RelatedChannelId::new)
++    }
++}
++mod thread_id {
++    use super::*;
++    pub fn serialize<S: serde::Serializer>(
++        value: &RelatedThreadId,
++        serializer: S,
++    ) -> Result<S::Ok, S::Error> {
++        value.as_uuid().serialize(serializer)
++    }
++    pub fn deserialize<'de, D: serde::Deserializer<'de>>(
++        deserializer: D,
++    ) -> Result<RelatedThreadId, D::Error> {
++        uuid::Uuid::deserialize(deserializer).map(RelatedThreadId::new)
++    }
++}
++pub type JevAssetRefs = BTreeMap<AssetName, JevAssetRef>;
++pub fn parse_assets(value: Option<&Value>) -> Result<JevAssetRefs, &'static str> {
++    let Some(value) = value else {
++        return Ok(BTreeMap::new());
++    };
++    crate::domain::workflow::validate_context_value(
++        value,
++        crate::domain::workflow::ContextLimits {
++            output_bytes: super::super::registry::jev::MAX_REQUEST_BYTES,
++            ..Default::default()
++        },
++    )
++    .map_err(|_| "Image references exceed limits")?;
++    let map = value
++        .as_object()
++        .ok_or("Assets must be a literal map of private attachment references")?;
++    if map.is_empty() || map.len() > MAX_ASSETS {
++        return Err("Use between 1 and 4 image assets");
++    }
++    let refs: JevAssetRefs =
++        serde_json::from_value(value.clone()).map_err(|_| "Invalid private image reference")?;
++    for (name, asset) in &refs {
++        let valid_name = !name.0.is_empty()
++            && name.0.len() <= 64
++            && name
++                .0
++                .bytes()
++                .all(|b| b.is_ascii_alphanumeric() || b == b'_')
++            && name.0.as_bytes()[0].is_ascii_alphabetic();
++        if !valid_name
++            || asset.channel_id.as_uuid().is_nil()
++            || asset.thread_id.as_uuid().is_nil()
++            || asset.sha256.0.len() != 64
++            || !asset
++                .sha256
++                .0
++                .bytes()
++                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
++        {
++            return Err(
++                "Use an asset identifier, nonnil channel/thread UUIDs and lowercase SHA256 digest",
++            );
++        }
++    }
++    Ok(refs)
++}
++/// Located only after current company/actor/thread authorization; never user-supplied keys.
++#[derive(PartialEq, Eq)]
++pub struct JevAssetLocation {
++    pub reference: JevAssetRef,
++    pub key: ObjectKey,
++    pub content_type: String,
++    pub size_bytes: usize,
++}
++#[async_trait]
++pub trait JevAssetDirectory: Send + Sync {
++    async fn locate_jev_assets(
++        &self,
++        claim: &ClaimedWorkflow,
++    ) -> AppResult<BTreeMap<AssetName, JevAssetLocation>>;
++}
++#[async_trait]
++pub trait JevAssets: Send + Sync {
++    async fn read(
++        &self,
++        claim: &ClaimedWorkflow,
++    ) -> Result<BTreeMap<AssetName, JevImage>, JevAssetError>;
++    async fn authorize(&self, claim: &ClaimedWorkflow) -> Result<(), JevAssetError>;
++}
++/// Validated ephemeral bytes. Neither Debug nor Serialize can disclose this object.
++pub struct JevImage {
++    bytes: Vec<u8>,
++    format: &'static str,
++    pixels: u64,
++}
++impl JevImage {
++    pub fn validate(
++        reference: &JevAssetRef,
++        mime: &str,
++        bytes: Vec<u8>,
++    ) -> Result<Self, JevAssetError> {
++        use image::{ImageDecoder, ImageFormat, ImageReader};
++        if bytes.is_empty() || bytes.len() > MAX_IMAGE_BYTES {
++            return Err(JevAssetError::TooLarge);
++        }
++        if ImageDigest::of(&bytes) != reference.sha256 {
++            return Err(JevAssetError::Changed);
++        }
++        let format = image::guess_format(&bytes).map_err(|_| JevAssetError::Unsupported)?;
++        let wire_format = match (format, mime) {
++            (ImageFormat::Png, "image/png") => "png",
++            (ImageFormat::Jpeg, "image/jpeg") => "jpeg",
++            _ => return Err(JevAssetError::Unsupported),
++        };
++        if format == ImageFormat::Png
++            && image::codecs::png::PngDecoder::with_limits(
++                std::io::Cursor::new(&bytes),
++                image_limits(),
++            )
++            .map_err(|_| JevAssetError::Unsupported)?
++            .is_apng()
++            .map_err(|_| JevAssetError::Unsupported)?
++        {
++            return Err(JevAssetError::Unsupported);
++        }
++        let mut reader = ImageReader::with_format(std::io::Cursor::new(&bytes), format);
++        reader.limits(image_limits());
++        let decoder = reader
++            .into_decoder()
++            .map_err(|_| JevAssetError::Unsupported)?;
++        let (width, height) = decoder.dimensions();
++        let pixels = u64::from(width) * u64::from(height);
++        if !(280..=MAX_IMAGE_SIDE).contains(&width)
++            || !(280..=MAX_IMAGE_SIDE).contains(&height)
++            || pixels > MAX_IMAGE_PIXELS
++            || decoder.total_bytes() > 8 * MAX_IMAGE_PIXELS
++        {
++            return Err(JevAssetError::Unsupported);
++        }
++        let mut decoded = vec![0; decoder.total_bytes() as usize];
++        decoder
++            .read_image(&mut decoded)
++            .map_err(|_| JevAssetError::Unsupported)?;
++        Ok(Self {
++            bytes,
++            format: wire_format,
++            pixels,
++        })
++    }
++    pub fn bytes(&self) -> &[u8] {
++        &self.bytes
++    }
++    pub fn format(&self) -> &'static str {
++        self.format
++    }
++    pub fn pixels(&self) -> u64 {
++        self.pixels
++    }
++}
++#[derive(Debug, Clone, Copy, PartialEq, Eq)]
++pub enum JevAssetError {
++    Unauthorized,
++    Missing,
++    Changed,
++    Unsupported,
++    TooLarge,
++    Storage,
++}
++impl JevAssetError {
++    pub fn code(self) -> &'static str {
++        match self {
++            Self::Unauthorized => "jev.asset_unauthorized",
++            Self::Missing => "jev.asset_missing",
++            Self::Changed => "jev.asset_changed",
++            Self::Unsupported => "jev.asset_unsupported",
++            Self::TooLarge => "jev.asset_too_large",
++            Self::Storage => "jev.asset_storage",
++        }
++    }
++    pub fn retryable(self) -> bool {
++        self == Self::Storage
++    }
++}
++
++fn image_limits() -> image::Limits {
++    let mut limits = image::Limits::default();
++    limits.max_image_width = Some(MAX_IMAGE_SIDE);
++    limits.max_image_height = Some(MAX_IMAGE_SIDE);
++    limits.max_alloc = Some(16 * 1024 * 1024);
++    limits
++}
++#[cfg(test)]
++#[path = "jev_assets_tests.rs"]
++pub(crate) mod tests;
+--- before/src/application/workflow/jev_assets_tests.rs
++++ after/src/application/workflow/jev_assets_tests.rs
+@@ -0,0 +1,161 @@
++use super::*;
++use crate::application::workflow::jev::JevRequest;
++use image::ImageEncoder;
++use serde_json::json;
++
++pub(crate) fn png(width: u32, height: u32) -> Vec<u8> {
++    let mut bytes = Vec::new();
++    image::codecs::png::PngEncoder::new(&mut bytes)
++        .write_image(
++            &vec![127; (width * height) as usize],
++            width,
++            height,
++            image::ExtendedColorType::L8,
++        )
++        .unwrap();
++    bytes
++}
++pub(crate) fn inputs(bytes: &[u8]) -> Value {
++    json!({"connection":"service","model":"jev-1.14.0","state":{"note":"photo category stays text"},"assets":{"photo":{"channel_id":uuid::Uuid::from_u128(1),"thread_id":uuid::Uuid::from_u128(2),"sha256":ImageDigest::of(bytes)}},"questions":{"visible":{"type":"noul","instructions":"Is there a mug in `assets.photo`?"},"mug":{"type":"box","instructions":"The mug in `assets.photo`"}}})
++}
++pub(crate) fn output() -> Value {
++    json!({"model":"jev-1.14.0","answers":{"visible":{"type":"noul","noul":0.9},"mug":{"type":"box","box":{"left":0.1,"right":0.8,"top":0.2,"bottom":0.9},"confidence":0.8}},"usage":{"input_tokens":200,"output_tokens":20}})
++}
++pub(crate) fn hydrated(inputs: &Value, bytes: Vec<u8>) -> JevRequest {
++    let refs = parse_assets(inputs.get("assets")).unwrap();
++    let (name, reference) = refs.first_key_value().unwrap();
++    JevRequest::prepare(inputs)
++        .unwrap()
++        .hydrate(BTreeMap::from([(
++            name.clone(),
++            JevImage::validate(reference, "image/png", bytes).unwrap(),
++        )]))
++        .unwrap()
++}
++#[test]
++fn jev_assets_identity_opaque_wire_and_pixel_reservation() {
++    let bytes = png(280, 280);
++    let inputs = inputs(&bytes);
++    let request = hydrated(&inputs, bytes.clone());
++    let second = hydrated(&inputs, bytes);
++    assert_eq!(request.body(), second.body());
++    assert_eq!(request.digest(), second.digest());
++    assert!(request.ready() && request.has_images());
++    let wire: Value = serde_json::from_slice(request.body()).unwrap();
++    let identity: Value = serde_json::from_slice(request.identity()).unwrap();
++    let token = wire["state"]["assets"]["photo"].as_str().unwrap();
++    assert_eq!(token.len(), 74);
++    assert_eq!(wire["state"]["content"], inputs["state"]);
++    assert!(wire["assets"][token]["data_base64"].is_string());
++    assert_eq!(identity["assets"], inputs["assets"]);
++    assert!(!String::from_utf8_lossy(request.identity()).contains("data_base64"));
++    assert_eq!(
++        request.reserved_input(),
++        request.body().len() as i64 + 280 * 280
++    );
++    assert!(!JevRequest::prepare(&inputs).unwrap().ready());
++}
++#[test]
++fn jev_assets_reject_changed_unsupported_oversized_and_invalid_dimensions() {
++    let bytes = png(280, 280);
++    let refs = parse_assets(inputs(&bytes).get("assets")).unwrap();
++    let reference = refs.values().next().unwrap();
++    assert!(matches!(
++        JevImage::validate(reference, "image/png", png(281, 280)),
++        Err(JevAssetError::Changed)
++    ));
++    assert!(matches!(
++        JevImage::validate(reference, "text/plain", bytes),
++        Err(JevAssetError::Unsupported)
++    ));
++    assert!(matches!(
++        JevImage::validate(reference, "image/png", vec![0; MAX_IMAGE_BYTES + 1]),
++        Err(JevAssetError::TooLarge)
++    ));
++    for bytes in [png(279, 280), png(1025, 280), b"broken image".to_vec()] {
++        let mut reference = reference.clone();
++        reference.sha256 = ImageDigest::of(&bytes);
++        assert!(matches!(
++            JevImage::validate(&reference, "image/png", bytes),
++            Err(JevAssetError::Unsupported)
++        ));
++    }
++}
++#[test]
++fn jev_assets_forbid_inline_url_mutable_and_excess_references() {
++    let bytes = png(280, 280);
++    let valid = inputs(&bytes)["assets"].clone();
++    for value in [
++        json!({}),
++        json!({"photo":"https://example.test/image.png"}),
++        json!({"photo":{"url":"https://example.test"}}),
++        json!({"photo":{"data_base64":"AAAA"}}),
++    ] {
++        assert!(parse_assets(Some(&value)).is_err());
++    }
++    for field in ["sha256", "channel_id", "thread_id"] {
++        let mut bad = valid.clone();
++        bad["photo"].as_object_mut().unwrap().remove(field);
++        assert!(parse_assets(Some(&bad)).is_err());
++    }
++    for count in [4, 5] {
++        let map: serde_json::Map<_, _> = (0..count)
++            .map(|n| (format!("p{n}"), valid["photo"].clone()))
++            .collect();
++        assert_eq!(parse_assets(Some(&json!(map))).is_ok(), count == 4);
++    }
++}
++#[test]
++fn jev_assets_aggregate_wire_bound_is_still_64_kib() {
++    let bytes = png(280, 280);
++    let mut inputs = inputs(&bytes);
++    inputs["state"] = json!("a".repeat(64_000));
++    let refs = parse_assets(inputs.get("assets")).unwrap();
++    let (name, reference) = refs.first_key_value().unwrap();
++    let request = JevRequest::prepare(&inputs).unwrap();
++    assert!(
++        request
++            .hydrate(BTreeMap::from([(
++                name.clone(),
++                JevImage::validate(reference, "image/png", bytes).unwrap()
++            )]))
++            .is_err()
++    );
++}
++
++#[test]
++fn jev_assets_jpeg_and_animation_are_explicitly_validated() {
++    let mut jpeg = Vec::new();
++    image::codecs::jpeg::JpegEncoder::new(&mut jpeg)
++        .write_image(
++            &vec![127; 280 * 280],
++            280,
++            280,
++            image::ExtendedColorType::L8,
++        )
++        .unwrap();
++    let refs = parse_assets(inputs(&jpeg).get("assets")).unwrap();
++    let reference = refs.values().next().unwrap();
++    assert_eq!(
++        JevImage::validate(reference, "image/jpeg", jpeg.clone())
++            .unwrap()
++            .format(),
++        "jpeg"
++    );
++    assert!(matches!(
++        JevImage::validate(reference, "image/png", jpeg),
++        Err(JevAssetError::Unsupported)
++    ));
++    let animated = include_bytes!("testdata/jev-animated.png").to_vec();
++    assert!(
++        image::codecs::png::PngDecoder::new(std::io::Cursor::new(&animated))
++            .unwrap()
++            .is_apng()
++            .unwrap()
++    );
++    let refs = parse_assets(inputs(&animated).get("assets")).unwrap();
++    assert!(matches!(
++        JevImage::validate(refs.values().next().unwrap(), "image/png", animated),
++        Err(JevAssetError::Unsupported)
++    ));
++}
+--- before/src/application/workflow/jev_runtime.rs
++++ after/src/application/workflow/jev_runtime.rs
+@@ -1,13 +1,17 @@
+ //! Tool-free TypeSafe execution ports and exact bounded wire contract.
+-use super::{JevAuthorization, JevCredential, JevModel};
++use super::{
++    AssetName, JevAssets, JevAuthorization, JevCredential, JevImage, JevModel, parse_assets,
++};
+ use crate::app_error::{AppError, AppResult};
+ use crate::application::workflow::{
+     lease::*, polling::WorkflowStepKind, registry::jev as contract, worker::WorkflowHandler,
+ };
+ use crate::domain::workflow::{FailureClass, FailureCode, RetrySafety, StepFailure};
+ use async_trait::async_trait;
++use base64::Engine;
+ use serde_json::{Value, json};
+ use sha2::{Digest, Sha256};
++use std::collections::BTreeMap;
+ use std::{sync::Arc, time::Duration};
+ use tokio::time::Instant;
+ use uuid::Uuid;
+@@ -16,6 +20,10 @@
+ #[derive(Clone)]
+ pub struct JevRequest {
+     body: Vec<u8>,
++    identity: Vec<u8>,
++    asset_pixels: u64,
++    images: bool,
++    ready: bool,
+     model: JevModel,
+     questions: contract::Questions,
+ }
+@@ -25,19 +33,74 @@
+         let model = JevModel::parse(inputs["model"].as_str().ok_or_else(invalid)?)?;
+         let questions = contract::Questions::parse(&inputs["questions"]).map_err(|_| invalid())?;
+         contract::validate_state(&inputs["state"]).map_err(|_| invalid())?;
+-        let body = serde_json::to_vec(
+-            &json!({"model":model,"state":inputs["state"],"questions":questions}),
+-        )
+-        .map_err(|_| invalid())?;
++        let assets = parse_assets(inputs.get("assets")).map_err(|_| invalid())?;
++        let mut identity = json!({"model":model,"state":inputs["state"],"questions":questions});
++        if !assets.is_empty() {
++            identity["assets"] = serde_json::to_value(&assets).map_err(|_| invalid())?;
++        }
++        let body = serde_json::to_vec(&identity).map_err(|_| invalid())?;
+         if body.len() > contract::MAX_REQUEST_BYTES {
+             return Err(invalid());
+         }
+         Ok(Self {
++            identity: body.clone(),
++            images: !assets.is_empty(),
++            ready: assets.is_empty(),
++            asset_pixels: 0,
+             body,
+             model,
+             questions,
+         })
+     }
++    pub fn hydrate(mut self, images: BTreeMap<AssetName, JevImage>) -> AppResult<Self> {
++        let mut wire: Value = serde_json::from_slice(&self.identity).map_err(|_| invalid())?;
++        let refs = parse_assets(wire.get("assets")).map_err(|_| invalid())?;
++        if refs.len() != images.len() || refs.keys().ne(images.keys()) {
++            return Err(invalid());
++        }
++        if refs.is_empty() {
++            return Ok(self);
++        }
++        self.asset_pixels = 0;
++        let mut state_assets = serde_json::Map::new();
++        let mut wire_assets = serde_json::Map::new();
++        for (name, image) in images {
++            if super::ImageDigest::of(image.bytes()) != refs[&name].sha256 {
++                return Err(invalid());
++            }
++            let mut hash = Sha256::new();
++            hash.update(&self.identity);
++            hash.update(name.as_str().as_bytes());
++            let placeholder = format!("jev_asset_{:x}", hash.finalize());
++            if self
++                .identity
++                .windows(placeholder.len())
++                .any(|window| window == placeholder.as_bytes())
++            {
++                return Err(invalid());
++            }
++            state_assets.insert(name.as_str().into(), json!(placeholder));
++            wire_assets.insert(placeholder, json!({"type":"image","format":image.format(),"data_base64":base64::engine::general_purpose::STANDARD.encode(image.bytes())}));
++            self.asset_pixels += image.pixels();
++        }
++        wire["state"] = json!({"content":wire["state"],"assets":state_assets});
++        wire["assets"] = json!(wire_assets);
++        self.body = serde_json::to_vec(&wire).map_err(|_| invalid())?;
++        if self.body.len() > contract::MAX_REQUEST_BYTES {
++            return Err(invalid());
++        }
++        self.ready = true;
++        Ok(self)
++    }
++    pub fn identity(&self) -> &[u8] {
++        &self.identity
++    }
++    pub fn has_images(&self) -> bool {
++        self.images
++    }
++    pub fn ready(&self) -> bool {
++        self.ready
++    }
+     pub fn body(&self) -> &[u8] {
+         &self.body
+     }
+@@ -49,7 +112,7 @@
+     }
+     // One token per UTF-8 byte is conservative; include the bounded answer envelope.
+     pub fn reserved_input(&self) -> i64 {
+-        self.body.len() as i64
++        self.body.len() as i64 + self.asset_pixels as i64
+     }
+     pub fn reserved_output(&self) -> i64 {
+         contract::MAX_RESPONSE_BYTES as i64
+@@ -155,6 +218,7 @@
+         &self,
+         claim: &ClaimedWorkflow,
+         admission: &JevAdmission,
++        request: &JevRequest,
+         response: &JevResponse,
+         latency: Duration,
+         policy: LeasePolicy,
+@@ -172,20 +236,62 @@
+     persistence: P,
+     provider: Arc<dyn JevProvider>,
+     policy: LeasePolicy,
++    assets: Option<Arc<dyn JevAssets>>,
+ }
+ impl<P> JevRuntime<P> {
++    pub fn with_assets(mut self, assets: Arc<dyn JevAssets>) -> Self {
++        self.assets = Some(assets);
++        self
++    }
++    pub fn set_assets(&mut self, assets: Arc<dyn JevAssets>) {
++        self.assets = Some(assets);
++    }
+     pub fn new(persistence: P, provider: Arc<dyn JevProvider>, policy: LeasePolicy) -> Self {
+         Self {
+             persistence,
+             provider,
+             policy,
+-        }
+-    }
++            assets: None,
++        }
++    }
++}
++struct JevInvocation {
++    request: JevRequest,
++    admission: JevAdmission,
++    slot: Box<dyn JevProviderSlot>,
++    started: Instant,
++    deadline: Instant,
+ }
+ impl<P: JevExecutions + JevAuthorization> JevRuntime<P> {
+     async fn run(&self, claim: &ClaimedWorkflow) -> WorkflowHandlerResult {
+         let request = JevRequest::prepare(&claim.activation.inputs)
+             .map_err(|_| failure("jev.invalid_request", false))?;
++        let started = Instant::now();
++        let deadline = claim
++            .window
++            .run_deadline
++            .min(started + Duration::from_secs(30));
++        // Capacity precedes asset reads and final current-use authorization.
++        let slot = self
++            .provider
++            .acquire(deadline)
++            .await
++            .map_err(|error| failure(error.code(), error.retryable()))?;
++        let request = if request.has_images() {
++            let reader = self
++                .assets
++                .as_ref()
++                .ok_or_else(|| failure("jev.asset_storage_unconfigured", false))?;
++            let images = tokio::time::timeout_at(deadline, reader.read(claim))
++                .await
++                .map_err(|_| failure("jev.asset_storage", true))?
++                .map_err(|e| failure(e.code(), e.retryable()))?;
++            request
++                .hydrate(images)
++                .map_err(|_| failure("jev.invalid_request", false))?
++        } else {
++            request
++        };
+         if let Some(saved) = self
+             .persistence
+             .replay_jev(claim, &request, self.policy)
+@@ -194,16 +300,6 @@
+         {
+             return saved;
+         }
+-        let started = Instant::now();
+-        let deadline = claim
+-            .window
+-            .run_deadline
+-            .min(started + Duration::from_secs(30));
+-        let slot = self
+-            .provider
+-            .acquire(deadline)
+-            .await
+-            .map_err(|error| failure(error.code(), error.retryable()))?;
+         let admission = match self
+             .persistence
+             .admit_jev(claim, &request, self.policy)
+@@ -221,6 +317,43 @@
+                 return Err(failure("jev.rate_limited", true));
+             }
+         };
++        // Keep the provider/settlement future off the worker's debug poll frame.
++        Box::pin(self.invoke(
++            claim,
++            JevInvocation {
++                request,
++                admission,
++                slot,
++                started,
++                deadline,
++            },
++        ))
++        .await
++    }
++    async fn invoke(
++        &self,
++        claim: &ClaimedWorkflow,
++        invocation: JevInvocation,
++    ) -> WorkflowHandlerResult {
++        let JevInvocation {
++            request,
++            admission,
++            slot,
++            started,
++            deadline,
++        } = invocation;
++        if request.has_images() {
++            tokio::time::timeout_at(
++                deadline,
++                self.assets
++                    .as_ref()
++                    .expect("image reader checked")
++                    .authorize(claim),
++            )
++            .await
++            .map_err(|_| failure("jev.asset_storage", true))?
++            .map_err(|e| failure(e.code(), e.retryable()))?;
++        }
+         // This final fenced authorization reloads the selected key; it is never checkpointed.
+         let credential = self
+             .persistence
+@@ -233,7 +366,7 @@
+         match result {
+             Ok(response) => {
+                 self.persistence
+-                    .settle_jev(claim, &admission, &response, latency, self.policy)
++                    .settle_jev(claim, &admission, &request, &response, latency, self.policy)
+                     .await
+                     .map_err(storage_failure)?;
+                 tracing::info!(provider="typesafe", model=%request.model().as_str(), run_id=%claim.fence.scope.run, execution_id=%claim.fence.scope.execution, step=%claim.activation.step, input_tokens=response.input_tokens, output_tokens=response.output_tokens, latency_ms=latency.as_millis(), state="settled", "Jev invocation");
+--- before/src/application/workflow/registry/help.rs
++++ after/src/application/workflow/registry/help.rs
+@@ -60,7 +60,7 @@
+             "Not available in this release (memory is out of scope); publication refuses it. Scoped capability required; at most 256 items/facts, each text at most 16384 characters. Saves require logical idempotency."
+         }
+         "jev.evaluate" => {
+-            "TypeSafe System One: literal typesafe connection slot, exact versioned model, and 1–32 independent typed questions; state is a string, object or array. Noul is a probability, Choice has up to 64 options, Score has 2–10 levels. Instructions/descriptions are literal strings up to 16384 UTF-8 bytes. Request and response are at most 65536 serialized bytes, also subject to workflow context/schema budgets. Probability sums allow absolute error 0.000001. Confidence is not correctness; decision.rule owns thresholds. Runtime and connection support are delivered by subsequent Jev phases; do not deploy a partial implementation."
++            "TypeSafe System One: literal typesafe connection slot, exact versioned model, and 1–32 independent typed questions; state is a string, object or array. Noul is a probability, Choice has up to 64 options, Score has 2–10 levels. Instructions/descriptions are literal strings up to 16384 UTF-8 bytes. Request and response are at most 65536 serialized bytes, also subject to workflow context/schema budgets. Experimental images: literal assets names immutable private channel/thread/SHA256 references (1–4, PNG/JPEG <=24 KiB, 280–1024 pixels per side), original state under content and images at assets.NAME. Box requires Jev 1.14 and instructions naming a declared `assets.NAME`; no criteria; normalized coordinates have positive width/height. Image-capable families: Jev 1.13/1.14. Probability sums allow absolute error 0.000001. Confidence is not correctness; decision.rule owns thresholds. Runtime and connection support are delivered by subsequent Jev phases; do not deploy a partial implementation."
+         }
+         "ai.classify" => {
+             "The selected agent's model and instructions classify the context into a finite label set; no tools or skills. Invalid labels get bounded repair, then fail terminally."
+--- before/src/application/workflow/registry/jev.rs
++++ after/src/application/workflow/registry/jev.rs
+@@ -1,4 +1,4 @@
+-//! TypeSafe text contract. This module is pure: no credentials, transport or agent selection.
++//! TypeSafe typed text/image contract. This module is pure: no credentials, transport or agent selection.
+ use super::*;
+ use crate::domain::workflow::{ContextLimits, validate_context_value};
+ use serde::{Deserialize, Serialize};
+@@ -43,6 +43,9 @@
+         instructions: String,
+         criteria: Vec<String>,
+     },
++    Box {
++        instructions: String,
++    },
+ }
+ 
+ /// Validated question definitions, also usable by the HTTP adapter without changing semantics.
+@@ -68,6 +71,31 @@
+             questions.insert(QuestionId(id.clone()), question);
+         }
+         Ok(Self(questions))
++    }
++
++    pub fn validate_assets(
++        &self,
++        model: &str,
++        assets: &crate::application::workflow::jev::JevAssetRefs,
++    ) -> Result<(), &'static str> {
++        if !(assets.is_empty() || model.starts_with("jev-1.13.") || model.starts_with("jev-1.14."))
++        {
++            return Err("Images require Jev 1.13 or 1.14");
++        }
++        for question in self.0.values() {
++            if let Question::Box { instructions } = question {
++                if !model.starts_with("jev-1.14.") {
++                    return Err("Box requires Jev 1.14");
++                }
++                if !assets
++                    .keys()
++                    .any(|name| instructions.contains(&format!("`assets.{}`", name.as_str())))
++                {
++                    return Err("Box instructions must identify a declared `assets.NAME` image");
++                }
++            }
++        }
++        Ok(())
+     }
+ 
+     pub fn output_schema(&self, model: &str) -> Value {
+@@ -107,6 +135,7 @@
+ impl Question {
+     fn validate(&self) -> Result<(), &'static str> {
+         let instructions = match self {
++            Self::Box { instructions } => instructions,
+             Self::Noul {
+                 instructions,
+                 criteria,
+@@ -147,6 +176,10 @@
+     }
+     fn output_schema(&self) -> Value {
+         match self {
++            Self::Box { .. } => object(
++                json!({"type":{"type":"string","const":"box"},"box":object(json!({"left":probability(),"right":probability(),"top":probability(),"bottom":probability()}), &["left","right","top","bottom"]),"confidence":probability()}),
++                &["type", "box", "confidence"],
++            ),
+             Self::Noul { .. } => object(
+                 json!({"type":{"type":"string","const":"noul"},"noul":probability()}),
+                 &["type", "noul"],
+@@ -232,8 +265,17 @@
+         model: inputs.get("model"),
+         state: inputs.get("state"),
+         questions: inputs.get("questions"),
++        assets: inputs.get("assets"),
+     };
+-    request.check_size()
++    request.check_size()?;
++    let assets = crate::application::workflow::jev::parse_assets(inputs.get("assets"))?;
++    if let (Some(model), Some(questions)) = (
++        inputs.get("model").and_then(Value::as_str),
++        inputs.get("questions"),
++    ) {
++        Questions::parse(questions)?.validate_assets(model, &assets)?;
++    }
++    Ok(())
+ }
+ pub fn validate_state(state: &Value) -> Result<(), &'static str> {
+     if !matches!(state, Value::String(_) | Value::Object(_) | Value::Array(_)) {
+@@ -249,10 +291,12 @@
+     state: Option<&'a Value>,
+     #[serde(skip_serializing_if = "Option::is_none")]
+     questions: Option<&'a Value>,
++    #[serde(skip_serializing_if = "Option::is_none")]
++    assets: Option<&'a Value>,
+ }
+ impl RequestFields<'_> {
+     fn check_size(&self) -> Result<(), &'static str> {
+-        for value in [self.model, self.state, self.questions]
++        for value in [self.model, self.state, self.questions, self.assets]
+             .into_iter()
+             .flatten()
+         {
+@@ -284,6 +328,18 @@
+         .ok_or("Missing Jev answers")?
+         .values()
+     {
++        if answer["type"] == "box" {
++            let coordinates = &answer["box"];
++            let edge = |name| {
++                coordinates[name]
++                    .as_f64()
++                    .filter(|n| n.is_finite() && (0.0..=1.0).contains(n))
++                    .ok_or("Invalid Box coordinate")
++            };
++            if edge("left")? >= edge("right")? || edge("top")? >= edge("bottom")? {
++                return Err("Box must have positive width and height");
++            }
++        }
+         if let Some(probabilities) = answer.get("probabilities").and_then(Value::as_object) {
+             let sum = probabilities.values().try_fold(0.0, |sum, value| {
+                 value
+@@ -312,13 +368,27 @@
+         let questions = self.literal("questions")?;
+         let typed = Questions::parse(&questions)
+             .map_err(|message| self.error("registry.jev", message, "questions"))?;
++        let assets = if self.parsed.definition.steps[self.id]
++            .inputs
++            .contains_key("assets")
++        {
++            Some(self.literal("assets")?)
++        } else {
++            None
++        };
++        let refs = crate::application::workflow::jev::parse_assets(assets.as_ref())
++            .map_err(|message| self.error("registry.jev", message, "assets"))?;
++        typed
++            .validate_assets(model_text, &refs)
++            .map_err(|message| self.error("registry.jev", message, "questions"))?;
+         self.check(InputCheck::Jev)?;
+-        Ok(contract(
+-            json!({"connection":{"const":connection},"model":{"const":model},
+-            "state":{"type":["string","object","array"]},"questions":{"const":questions}}),
+-            &["connection", "model", "state", "questions"],
+-            typed.output_schema(model_text),
+-        ))
++        let mut inputs = json!({"connection":{"const":connection},"model":{"const":model},"state":{"type":["string","object","array"]},"questions":{"const":questions}});
++        let mut required = vec!["connection", "model", "state", "questions"];
++        if let Some(assets) = assets {
++            inputs["assets"] = json!({"const":assets});
++            required.push("assets");
++        }
++        Ok(contract(inputs, &required, typed.output_schema(model_text)))
+     }
+ }
+ 
+@@ -336,9 +406,17 @@
+         model: literal("model"),
+         state: literal("state"),
+         questions: literal("questions"),
++        assets: literal("assets"),
+     }
+     .check_size()
+     .map_err(|message| Diagnostic::at("registry.jev", message, "/steps", span))?;
++    if let Some(assets) = literal("assets") {
++        crate::application::workflow::jev::parse_assets(Some(assets))
++            .map_err(|message| Diagnostic::at("registry.jev", message, "/steps", span))?;
++        for _ in 0..2 {
++            budget.schema(assets)?;
++        }
++    }
+     if let Some(questions) = literal("questions") {
+         // Input const, retained definition, and answer legend/option descriptions. Charge
+         // structural expansion conservatively before allocating a specialized schema.
+--- before/src/application/workflow/registry/jev_box_tests.rs
++++ after/src/application/workflow/registry/jev_box_tests.rs
+@@ -0,0 +1,75 @@
++use super::tests::*;
++use super::*;
++use crate::application::workflow::jev::assets::tests as images;
++fn sample() -> AuthoringExample {
++    let mut sample = example("jev.evaluate").unwrap();
++    let inputs = images::inputs(&images::png(280, 280));
++    changed(&mut sample, |source| {
++        source["steps"]["start"]["with"]["assets"] = json!({"literal":inputs["assets"]});
++        source["steps"]["start"]["with"]["questions"] = json!({"literal":inputs["questions"]});
++    });
++    sample
++}
++#[test]
++fn jev_box_mixed_output_coordinates_confidence_and_static_paths() {
++    let compiled = compile_example(&sample()).unwrap();
++    compiled
++        .validate_step_output(&step(), &images::output())
++        .unwrap();
++    for (path, value) in [
++        ("/answers/mug/box/left", json!(-0.1)),
++        ("/answers/mug/box/right", json!(1.1)),
++        ("/answers/mug/box/bottom", json!(0.2)),
++        ("/answers/mug/box/top", json!(0.95)),
++        ("/answers/mug/box/left", json!(0.8)),
++        ("/answers/mug/confidence", json!(1.01)),
++    ] {
++        let mut bad = images::output();
++        *bad.pointer_mut(path).unwrap() = value;
++        assert!(
++            compiled.validate_step_output(&step(), &bad).is_err(),
++            "{path}"
++        );
++    }
++    for (path, valid) in [
++        ("/answers/mug/box/left", true),
++        ("/answers/mug/confidence", true),
++        ("/answers/visible/noul", true),
++        ("/answers/mug/box/x", false),
++        ("/answers/mug/probabilities", false),
++    ] {
++        let mut sample = sample();
++        changed(&mut sample, |source| {
++            source["steps"]["start"]["routes"]["success"] = json!("next");
++            source["steps"]["next"] = json!({"type":"data.map","with":{"value":{"ref":format!("/steps/start/output{path}")},"output_schema":{"literal":{"type":"number"}}},"routes":{"success":"$end"}});
++        });
++        assert_eq!(compile_example(&sample).is_ok(), valid, "{path}");
++    }
++}
++#[test]
++fn jev_box_requires_declared_asset_version_and_no_criteria() {
++    for (field, value) in [
++        ("criteria", json!([])),
++        ("criteria", json!(null)),
++        ("instructions", json!("Find mug")),
++        ("instructions", json!("Find mug in `assets.missing`")),
++    ] {
++        let mut sample = sample();
++        changed(&mut sample, |source| {
++            source["steps"]["start"]["with"]["questions"]["literal"]["mug"][field] = value
++        });
++        assert!(compile_example(&sample).is_err());
++    }
++    for model in ["jev-1.12.0", "jev-1.13.0", "jev-1.15.0"] {
++        let mut sample = sample();
++        changed(&mut sample, |source| {
++            source["steps"]["start"]["with"]["model"] = json!({"literal":model})
++        });
++        assert!(compile_example(&sample).is_err());
++    }
++    let mut sample = sample();
++    changed(&mut sample, |source| {
++        source["steps"]["start"]["with"]["assets"] = json!({"ref":"/input"})
++    });
++    assert!(compile_example(&sample).is_err());
++}
+--- before/src/application/workflow/registry/mod.rs
++++ after/src/application/workflow/registry/mod.rs
+@@ -450,3 +450,6 @@
+ 
+ #[cfg(test)]
+ mod jev_tests;
++
++#[cfg(test)]
++mod jev_box_tests;
+--- before/src/application/workflow/sample/dispatch.rs
++++ after/src/application/workflow/sample/dispatch.rs
+@@ -38,6 +38,15 @@
+             return self.workflow_tool_step(bundle, frame, activation, path, &tool);
+         }
+         let response = self.response(bundle, &activation.step)?;
++        if kind == "jev.evaluate" {
++            if !response.tools.is_empty() || response.approval.is_some() {
++                return Err(refused(
++                    "Jev scripts are tool-free and do not accept approval",
++                ));
++            }
++            self.charge_model_tokens(response.tokens)?;
++            return prepare_io(bundle, activation, response.output);
++        }
+         if let Some(model) = ModelStep::of(kind) {
+             return self.model(bundle, frame, activation, path, model, response);
+         }
+@@ -149,12 +158,24 @@
+         model: ModelStep,
+         response: ScriptedResponse,
+     ) -> AppResult<PureCompletion> {
++        self.charge_model_tokens(response.tokens)?;
++        if !response.tools.is_empty() {
++            if !model.uses_capabilities() {
++                return Err(refused("This model step is tool-free"));
++            }
++            approval(&activation.inputs, response.approval)?;
++            self.agent_tools(bundle, frame, activation, path, response.tools)?;
++            self.charge(BudgetResource::ModelCall)?;
++        }
++        prepare_io(bundle, activation, response.output)
++    }
++    fn charge_model_tokens(&mut self, scripted_tokens: u32) -> AppResult<()> {
+         self.charge(BudgetResource::ModelCall)?;
+         let tokens = self
+             .report
+             .usage
+             .scripted_tokens
+-            .checked_add(response.tokens)
++            .checked_add(scripted_tokens)
+             .ok_or_else(|| refused("Sample token usage overflow"))?;
+         if tokens
+             > self
+@@ -165,15 +186,7 @@
+             return Err(refused("Scripted token allowance exhausted"));
+         }
+         self.report.usage.scripted_tokens = tokens;
+-        if !response.tools.is_empty() {
+-            if !model.uses_capabilities() {
+-                return Err(refused("This model step is tool-free"));
+-            }
+-            approval(&activation.inputs, response.approval)?;
+-            self.agent_tools(bundle, frame, activation, path, response.tools)?;
+-            self.charge(BudgetResource::ModelCall)?;
+-        }
+-        prepare_io(bundle, activation, response.output)
++        Ok(())
+     }
+ }
+ 
+--- before/src/application/workflow/sample/jev_tests.rs
++++ after/src/application/workflow/sample/jev_tests.rs
+@@ -0,0 +1,45 @@
++use super::*;
++use crate::application::workflow::jev::assets::tests as images;
++#[test]
++fn jev_box_sample_uses_only_scripted_answers_and_inert_metadata() {
++    let fixture: Value =
++        serde_json::from_str(include_str!("../../../../samples/jev-image.json")).unwrap();
++    let bundle = build(&fixture["source"], DependencySnapshots::default(), vec![]);
++    let frozen = crate::application::workflow::publication::store_bundle(&bundle).unwrap();
++    let report = execute(
++        bundle,
++        serde_json::from_value(fixture["sample"].clone()).unwrap(),
++    )
++    .unwrap();
++    complete(&report);
++    assert_eq!(report.usage.model_calls, 1);
++    assert!(report.effects.is_empty());
++    assert_eq!(report.output.as_ref().unwrap(), &images::output());
++    let serialized = serde_json::to_string(&report).unwrap();
++    assert!(!serialized.contains("data_base64"));
++    assert!(!String::from_utf8_lossy(&frozen).contains("data_base64"));
++}
++
++#[test]
++fn jev_box_sample_rejects_tools_tokens_and_invalid_box() {
++    let fixture: Value =
++        serde_json::from_str(include_str!("../../../../samples/jev-image.json")).unwrap();
++    let bundle = build(&fixture["source"], DependencySnapshots::default(), vec![]);
++    for edit in 0..3 {
++        let mut request = fixture["sample"].clone();
++        match edit {
++            0 => {
++                request["scripts"][0]["responses"][0]["tools"] =
++                    json!([{"name":"anything","input":{},"output":{}}])
++            }
++            1 => request["scripts"][0]["responses"][0]["tokens"] = json!(1_000_001),
++            _ => {
++                request["scripts"][0]["responses"][0]["output"]["answers"]["mug"]["box"]["left"] =
++                    json!(0.9)
++            }
++        }
++        let report = execute(bundle.clone(), serde_json::from_value(request).unwrap()).unwrap();
++        assert_eq!(report.status, SampleStatus::Stopped);
++        assert!(report.effects.is_empty());
++    }
++}
+--- before/src/application/workflow/sample/tests.rs
++++ after/src/application/workflow/sample/tests.rs
+@@ -294,3 +294,6 @@
+     );
+     assert!(serde_json::to_vec(&report).unwrap().len() <= MAX_REPORT_BYTES);
+ }
++
++#[path = "jev_tests.rs"]
++mod jev_tests;
+Binary image fixture src/application/workflow/testdata/jev-animated.png: 0 -> 669 bytes
+--- before/src/infra/setup.rs
++++ after/src/infra/setup.rs
+@@ -146,18 +146,26 @@
+             .map_err(|error| anyhow::anyhow!("Could not register the email renderer: {error}"))?,
+     );
+     let delivery_composer = DeliveryComposer::new(renderers.clone(), postgres_arc.clone());
+-    let workflow = Arc::new(crate::infra::workflow::WorkflowEngine::new(
+-        (*postgres_arc).clone(),
+-        &config.public_base_url(),
+-        &config.app_domain_name,
+-        delivery_composer.clone(),
+-        mcp_client,
+-        monitoring.clone(),
+-        crate::infra::workflow::worker_slots(
+-            std::env::var("WORKFLOW_WORKER_SLOTS").ok().as_deref(),
+-            crate::infra::db::max_connections(),
+-        )?,
+-    )?);
++    let workflow = Arc::new(
++        crate::infra::workflow::WorkflowEngine::new(
++            (*postgres_arc).clone(),
++            &config.public_base_url(),
++            &config.app_domain_name,
++            delivery_composer.clone(),
++            mcp_client,
++            monitoring.clone(),
++            crate::infra::workflow::worker_slots(
++                std::env::var("WORKFLOW_WORKER_SLOTS").ok().as_deref(),
++                crate::infra::db::max_connections(),
++            )?,
++        )?
++        .with_jev_assets(Arc::new(
++            crate::adapters::workflow_jev::JevAssetReader::new(
++                (*postgres_arc).clone(),
++                file_storage.clone(),
++            ),
++        )),
++    );
+     let notification_worker = Arc::new(NotificationWorker::new(
+         postgres_arc.clone(),
+         delivery_composer.clone(),
+--- before/src/infra/workflow.rs
++++ after/src/infra/workflow.rs
+@@ -265,6 +265,17 @@
+         })
+     }
+ 
++    pub fn with_jev_assets(
++        mut self,
++        assets: Arc<dyn crate::application::workflow::jev::JevAssets>,
++    ) -> Self {
++        Arc::get_mut(&mut self.handler)
++            .expect("engine composition precedes sharing")
++            .jev
++            .set_assets(assets);
++        self
++    }
++
+     pub fn handler(&self) -> &ProductionHandler {
+         &self.handler
+     }

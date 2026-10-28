@@ -1,0 +1,44 @@
+TAP version 13
+# Subtest: sample progress, failed request recovery and late navigation response use the requesting form
+not ok 1 - sample progress, failed request recovery and late navigation response use the requesting form
+  ---
+  duration_ms: 9.194958
+  type: 'test'
+  location: '/Users/mac02/dev/openbot/scripts/tests/workflow-samples.mjs:9:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    browserType.launch: Executable doesn't exist at /Users/mac02/Library/Caches/ms-playwright/chromium_headless_shell-1193/chrome-mac/headless_shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    TestContext.<anonymous> (/Users/mac02/dev/openbot/scripts/tests/workflow-samples.mjs:19:34)
+  ...
+# Subtest: actual sample textarea template preserves leading newlines for every raw JSON field
+not ok 2 - actual sample textarea template preserves leading newlines for every raw JSON field
+  ---
+  duration_ms: 2.730042
+  type: 'test'
+  location: '/Users/mac02/dev/openbot/scripts/tests/workflow-samples.mjs:42:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    browserType.launch: Executable doesn't exist at /Users/mac02/Library/Caches/ms-playwright/chromium_headless_shell-1193/chrome-mac/headless_shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     npx playwright install                                              ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    TestContext.<anonymous> (/Users/mac02/dev/openbot/scripts/tests/workflow-samples.mjs:46:34)
+  ...
+# Interrupted while running: scripts/tests/workflow-samples.mjs at /Users/mac02/dev/openbot/scripts/tests/workflow-samples.mjs:1:1

@@ -1,0 +1,64 @@
+   Compiling mail_agents v0.1.0 (/Users/mac02/dev/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 42.24s
+     Running unittests src/lib.rs (target/debug/deps/mail_agents-0fc485c3efcd046b)
+adapters::http::routes::workflows::tests::jev_tests::jev_connection_request_rejects_origin_aliases_and_secret_boundaries: test
+adapters::http::routes::workflows::tests::jev_tests::jev_connection_routes_owner_admin_scope_revision_and_secret_free_views: test
+adapters::persistence::workflow::tests::jev_assets_tests::jev_assets_changed_object_retry_never_sends_or_adds_reservation: test
+adapters::persistence::workflow::tests::jev_assets_tests::jev_assets_cross_company_negative_and_forged_claim_are_denied_before_storage: test
+adapters::persistence::workflow::tests::jev_assets_tests::jev_assets_current_actor_channel_visibility_and_missing_file: test
+adapters::persistence::workflow::tests::jev_assets_tests::jev_assets_mixed_loopback_settlement_replay_and_metadata_only_ledger: test
+adapters::persistence::workflow::tests::jev_runtime_tests::jev_runtime_committed_output_replays_after_reconstruction_without_provider: test
+adapters::persistence::workflow::tests::jev_runtime_tests::jev_runtime_competing_claimants_admissions_and_stale_settlement: test
+adapters::persistence::workflow::tests::jev_runtime_tests::jev_runtime_crash_after_response_reconstruction_and_budget_bound: test
+adapters::persistence::workflow::tests::jev_runtime_tests::jev_runtime_current_rotated_key_used_at_provider: test
+adapters::persistence::workflow::tests::jev_runtime_tests::jev_runtime_failures_remain_charged_and_secret_free: test
+adapters::persistence::workflow::tests::jev_runtime_tests::jev_runtime_production_worker_mixed_fixture_once: test
+adapters::persistence::workflow::tests::jev_runtime_tests::jev_runtime_revoked_or_model_removed_terminal_without_reservation: test
+adapters::persistence::workflow::tests::jev_runtime_tests::jev_runtime_token_allowance_blocks_entry_and_preserves_accounting: test
+adapters::persistence::workflow::tests::jev_runtime_tests::recovery::jev_runtime_corrupt_credential_is_terminal_and_optional_agent_usage_reports: test
+adapters::persistence::workflow::tests::jev_runtime_tests::recovery::jev_runtime_ledger_rejects_cross_tenant_and_mismatched_provenance: test
+adapters::persistence::workflow::tests::jev_runtime_tests::recovery::jev_runtime_lost_lease_cancels_actual_http_and_prevents_settlement: test
+adapters::persistence::workflow::tests::jev_runtime_tests::recovery::jev_runtime_queued_capacity_rechecks_revocation_model_and_current_key: test
+adapters::persistence::workflow::tests::jev_runtime_tests::recovery::jev_runtime_terminal_failure_and_retry_after_survive_worker_loss: test
+adapters::persistence::workflow::tests::jev_tests::jev_binding_competing_authorizations_observe_committed_revocation: test
+adapters::persistence::workflow::tests::jev_tests::jev_binding_current_rotation_model_removal_disable_and_no_fallback: test
+adapters::persistence::workflow::tests::jev_tests::jev_binding_foreign_selection_model_allowance_and_stale_revision: test
+adapters::persistence::workflow::tests::jev_tests::jev_binding_forged_inputs_and_current_actor_revocation_are_refused: test
+adapters::persistence::workflow::tests::jev_tests::jev_binding_publication_requires_company_model_and_stale_fence_refused: test
+adapters::persistence::workflow::tests::jev_tests::jev_connection_kek_rotation_inventory: test
+adapters::persistence::workflow::tests::jev_tests::jev_connection_roundtrip_scope_revision_envelope_and_rotation: test
+adapters::storage::gcs::tests::jev_assets_storage_read_bound_declared_and_streamed: test
+adapters::workflow_jev::tests::jev_box_http_mixed_images_header_and_exact_digest: test
+adapters::workflow_jev::tests::jev_http_capacity_wait_is_inside_deadline: test
+adapters::workflow_jev::tests::jev_http_deadline_cancellation_and_capacity_release: test
+adapters::workflow_jev::tests::jev_http_errors_redacted_retry_after_and_classification: test
+adapters::workflow_jev::tests::jev_http_mixed_types_exact_request_and_auth: test
+adapters::workflow_jev::tests::jev_http_rejects_malformed_oversized_and_wrong_contract: test
+adapters::workflow_jev::tests::jev_http_request_limit_and_retry_after_date: test
+adapters::workflow_jev::tests::jev_http_streamed_body_limit_without_content_length: test
+application::workflow::jev::assets::tests::jev_assets_aggregate_wire_bound_is_still_64_kib: test
+application::workflow::jev::assets::tests::jev_assets_forbid_inline_url_mutable_and_excess_references: test
+application::workflow::jev::assets::tests::jev_assets_identity_opaque_wire_and_pixel_reservation: test
+application::workflow::jev::assets::tests::jev_assets_jpeg_and_animation_are_explicitly_validated: test
+application::workflow::jev::assets::tests::jev_assets_reject_changed_unsupported_oversized_and_invalid_dimensions: test
+application::workflow::registry::jev_box_tests::jev_box_mixed_output_coordinates_confidence_and_static_paths: test
+application::workflow::registry::jev_box_tests::jev_box_requires_declared_asset_version_and_no_criteria: test
+application::workflow::registry::jev_tests::jev_contract_downstream_paths_are_exact_and_typed: test
+application::workflow::registry::jev_tests::jev_contract_downstream_runtime_never_coerces_probability_to_boolean: test
+application::workflow::registry::jev_tests::jev_contract_duplicate_keys_and_nonfinite_source_rejected: test
+application::workflow::registry::jev_tests::jev_contract_dynamic_state_checks_and_workflow_context_budget: test
+application::workflow::registry::jev_tests::jev_contract_frozen_semantics_change_hash: test
+application::workflow::registry::jev_tests::jev_contract_mixed_exact_schema_and_metadata: test
+application::workflow::registry::jev_tests::jev_contract_noul_criteria_and_escaped_question_paths: test
+application::workflow::registry::jev_tests::jev_contract_primitive_limits_fail_at_next_item: test
+application::workflow::registry::jev_tests::jev_contract_probability_sum_tolerance: test
+application::workflow::registry::jev_tests::jev_contract_rejects_invalid_question_shapes: test
+application::workflow::registry::jev_tests::jev_contract_rejects_malformed_outputs: test
+application::workflow::registry::jev_tests::jev_contract_request_budget_counts_envelope_and_escaping: test
+application::workflow::registry::jev_tests::jev_contract_response_byte_limit_and_aggregate_questions: test
+application::workflow::registry::jev_tests::jev_contract_static_fields_models_and_resources: test
+application::workflow::registry::jev_tests::jev_contract_text_and_identifier_limits_count_utf8_bytes: test
+application::workflow::sample::tests::jev_tests::jev_box_sample_rejects_tools_tokens_and_invalid_box: test
+application::workflow::sample::tests::jev_tests::jev_box_sample_uses_only_scripted_answers_and_inert_metadata: test
+
+59 tests, 0 benchmarks

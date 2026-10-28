@@ -1,0 +1,15 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.24s
+     Running unittests src/lib.rs (target/debug/deps/mail_agents-0fc485c3efcd046b)
+application::workflow::sample::tests::bounded_root_budget_and_external_kinds_never_fall_back: test
+application::workflow::sample::tests::descendants_cannot_replenish_root_budgets_and_report_size_is_bounded: test
+application::workflow::sample::tests::jev_tests::jev_box_sample_rejects_tools_tokens_and_invalid_box: test
+application::workflow::sample::tests::jev_tests::jev_box_sample_uses_only_scripted_answers_and_inert_metadata: test
+application::workflow::sample::tests::missing_invalid_unused_and_oversized_scripts_fail_explicitly: test
+application::workflow::sample::tests::pure_and_scripted_routing_share_compiled_validation: test
+application::workflow::sample::tests::repeated_human_revision_carries_edited_artifact_feedback_and_captures_reply: test
+application::workflow::sample::tests::tools_tests::direct_agent_tools_and_pinned_workflow_tools_stay_in_sample: test
+application::workflow::sample::tests::tools_tests::direct_mcp_tool_uses_the_production_result_envelope: test
+application::workflow::sample::tests::tools_tests::direct_tool_inputs_and_outputs_are_validated: test
+application::workflow::sample::tests::tools_tests::protected_step_workflow_tool_needs_approval_and_executes_child: test
+
+11 tests, 0 benchmarks

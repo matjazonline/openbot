@@ -1,0 +1,31 @@
+   Compiling mail_agents v0.1.0 (/Users/mac02/dev/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 44.21s
+     Running unittests src/lib.rs (target/debug/deps/mail_agents-6693f25a28eea502)
+
+running 23 tests
+test adapters::http::routes::workflows::tests::jev_tests::jev_connection_request_rejects_origin_aliases_and_secret_boundaries ... ok
+test application::workflow::registry::jev_tests::jev_contract_duplicate_keys_and_nonfinite_source_rejected ... ok
+test application::workflow::registry::jev_tests::jev_contract_downstream_runtime_never_coerces_probability_to_boolean ... ok
+test application::workflow::registry::jev_tests::jev_contract_mixed_exact_schema_and_metadata ... ok
+test application::workflow::registry::jev_tests::jev_contract_noul_criteria_and_escaped_question_paths ... ok
+test application::workflow::registry::jev_tests::jev_contract_probability_sum_tolerance ... ok
+test application::workflow::registry::jev_tests::jev_contract_frozen_semantics_change_hash ... ok
+test application::workflow::registry::jev_tests::jev_contract_dynamic_state_checks_and_workflow_context_budget ... ok
+test application::workflow::registry::jev_tests::jev_contract_rejects_malformed_outputs ... ok
+test application::workflow::registry::jev_tests::jev_contract_rejects_invalid_question_shapes ... ok
+test application::workflow::registry::jev_tests::jev_contract_response_byte_limit_and_aggregate_questions ... ok
+test application::workflow::registry::jev_tests::jev_contract_downstream_paths_are_exact_and_typed ... ok
+test application::workflow::registry::jev_tests::jev_contract_request_budget_counts_envelope_and_escaping ... ok
+test application::workflow::registry::jev_tests::jev_contract_primitive_limits_fail_at_next_item ... ok
+test application::workflow::registry::jev_tests::jev_contract_static_fields_models_and_resources ... ok
+test application::workflow::registry::jev_tests::jev_contract_text_and_identifier_limits_count_utf8_bytes ... ok
+test adapters::persistence::workflow::tests::jev_tests::jev_connection_roundtrip_scope_revision_envelope_and_rotation ... ok
+test adapters::persistence::workflow::tests::jev_tests::jev_connection_kek_rotation_inventory ... ok
+test adapters::http::routes::workflows::tests::jev_tests::jev_connection_routes_owner_admin_scope_revision_and_secret_free_views ... ok
+test adapters::persistence::workflow::tests::jev_tests::jev_binding_foreign_selection_model_allowance_and_stale_revision ... ok
+test adapters::persistence::workflow::tests::jev_tests::jev_binding_publication_requires_company_model_and_stale_fence_refused ... ok
+test adapters::persistence::workflow::tests::jev_tests::jev_binding_current_rotation_model_removal_disable_and_no_fallback ... ok
+test adapters::persistence::workflow::tests::jev_tests::jev_binding_competing_authorizations_observe_committed_revocation ... ok
+
+test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 2317 filtered out; finished in 2.39s
+

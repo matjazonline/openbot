@@ -1,0 +1,10 @@
+✔ sample progress, failed request recovery and late navigation response use the requesting form (1901.790791ms)
+✔ actual sample textarea template preserves leading newlines for every raw JSON field (942.88725ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3020.332709

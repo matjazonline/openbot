@@ -1,0 +1,5 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.23s
+     Running unittests src/lib.rs (target/debug/deps/mail_agents-0fc485c3efcd046b)
+adapters::persistence::thread::tests::derived_attachments_cannot_publish_a_private_source: test
+
+1 test, 0 benchmarks

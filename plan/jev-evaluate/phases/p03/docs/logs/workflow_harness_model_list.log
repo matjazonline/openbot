@@ -1,0 +1,10 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.27s
+     Running unittests src/lib.rs (target/debug/deps/mail_agents-6693f25a28eea502)
+adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::workflow_harness_model_store_competing_admission_and_settlement: test
+adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::workflow_harness_model_store_lost_request_stays_charged_and_cannot_reenter: test
+adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::workflow_harness_model_store_projection_failure_rolls_back_all_admission: test
+adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::workflow_harness_model_owner_competing_admissions_keep_one_slot: test
+adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::workflow_harness_model_owner_new_claim_releases_slot_without_refunding: test
+adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::workflow_harness_model_owner_requires_reservation_and_exact_settlement: test
+
+6 tests, 0 benchmarks

@@ -1,0 +1,30 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.23s
+     Running unittests src/lib.rs (target/debug/deps/mail_agents-6693f25a28eea502)
+
+running 19 tests
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::adversarial_tests::workflow_io_existing_mismatched_scope_and_run_states_reject_all_fenced_operations ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::adversarial_tests::workflow_io_contended_renewal_never_resurrects_expired_lease ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::adversarial_tests::workflow_io_pure_boundary_claim_freeze_supervised_result_integration ... ok
+SETTLE repoll op=competing at=src/adapters/persistence/workflow/lease_tests.rs:266:14 attempt=1 not_applied=pair, no winner
+SETTLE loser op=competing at=src/adapters/persistence/workflow/lease_tests.rs:266:14 not_applied=Workflow lease.claim not applied: persistence bound elapsed before commit
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::settle_tests::workflow_io_settle_competing_pair_repolls_only_when_nothing_was_written ... ok
+SETTLE repoll op=scripted at=src/adapters/persistence/workflow/lease_tests.rs:253:30 attempt=1 not_applied=Workflow lease.claim not applied: persistence bound elapsed before commit
+SETTLE repoll op=scripted at=src/adapters/persistence/workflow/lease_tests.rs:253:30 attempt=2 not_applied=Workflow lease.claim not applied: persistence bound elapsed before commit
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::settle_tests::workflow_io_settle_repolls_only_a_definite_not_applied ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::adversarial_tests::workflow_io_real_renew_reclaim_cancel_contenders_serialize_run_first ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::settle_tests::workflow_io_settle_unknown_setup_still_fails - should panic ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::workflow_io_exact_scope_fence_and_run_state_refuse_without_writes ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::workflow_io_external_handler_has_no_transaction_and_returns_fence ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::adversarial_tests::workflow_io_contended_claim_cannot_cross_deadline_or_wait_forever ... ok
+test application::workflow::supervise::tests::workflow_io_supervision_drops_actual_future_on_every_stop ... ok
+test application::workflow::supervise::tests::workflow_io_supervision_heartbeats_and_returns_only_fenced_bounded_result ... ok
+test application::workflow::supervise::tests::workflow_io_supervision_ready_result_loses_to_cancel_expiry_and_run_deadline ... ok
+test application::workflow::supervise::tests::workflow_io_supervision_renewal_settling_inside_its_deadline_continues ... ok
+test application::workflow::supervise::tests::workflow_io_supervision_renews_at_once_after_a_full_deadline_claim ... ok
+test application::workflow::supervise::tests::workflow_io_supervision_stops_renewing_a_deadline_capped_window ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::workflow_io_real_competing_claims_lost_ack_crash_backoff_and_frozen_retry ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::workflow_io_claim_rolls_back_at_each_write_boundary ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::adversarial_tests::workflow_io_claim_rejects_pure_wait_due_terminal_and_deadline ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 2338 filtered out; finished in 5.09s
+

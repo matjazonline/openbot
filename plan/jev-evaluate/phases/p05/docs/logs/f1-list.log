@@ -1,0 +1,7 @@
+   Compiling mail_agents v0.1.0 (/Users/mac02/dev/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 14.26s
+     Running unittests src/lib.rs (target/debug/deps/mail_agents-0fc485c3efcd046b)
+adapters::http::routes::workflows::ui::authoring::tests::jev_tests::workflow_authoring_jev_catalogue_binding_and_sample: test
+adapters::http::routes::workflows::ui::authoring::tests::jev_tests::workflow_authoring_jev_company_forms_permissions_rotation_and_readiness: test
+
+2 tests, 0 benchmarks

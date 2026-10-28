@@ -1,0 +1,10 @@
+   Compiling mail_agents v0.1.0 (/Users/mac02/dev/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 38s
+     Running unittests src/lib.rs (target/debug/deps/mail_agents-6693f25a28eea502)
+adapters::workflow_jev::tests::jev_http_deadline_cancellation_and_capacity_release: test
+adapters::workflow_jev::tests::jev_http_errors_redacted_retry_after_and_classification: test
+adapters::workflow_jev::tests::jev_http_mixed_types_exact_request_and_auth: test
+adapters::workflow_jev::tests::jev_http_rejects_malformed_oversized_and_wrong_contract: test
+adapters::workflow_jev::tests::jev_http_request_limit_and_retry_after_date: test
+
+5 tests, 0 benchmarks

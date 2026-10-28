@@ -1,0 +1,72 @@
+  2026-10-28T10:35:49.666413Z  WARN  No backward compatibility: schema and persisted data are not migrated across releases. The schema is a single init migration edited in place, so an existing database whose recorded migrations or checksum no longer match must be reset. When compatibility is required, freeze the init schema, reinstate follow-up migrations, and remove this warning and the listed notes., notes: ["AGENTS.md", "src/adapters/persistence/AGENTS.md", "plan/agent-response-setting.md", "plan/db_improve/05-deferred-until-traffic.md", "plan/db_improve/improve-key-credentials.md", "plan/db_improve/kanban_denormalized_rollup_table_optimization.md", "plan/hindsight_remaining_work.md", "plan/hydradb/01-preserve-memory-scope-isolation.md", "plan/hydradb/06-make-memory-ingestion-durable.md", "plan/jev-evaluate/README.md", "plan/jev-evaluate/01-step-contract.md", "plan/jev-evaluate/02-connection-and-publication.md", "plan/jev-evaluate/03-runtime-and-recovery.md", "plan/jev-evaluate/04-images-and-box.md", "plan/jev-evaluate/05-authoring-and-release.md", "plan/local_machine_tunnel_plan.md", "plan/memory_management/general_plan_instructions.md", "plan/message-confirmation-ideas/outreach-target-allowlist.md", "plan/opencode_microvm_sandbox_plan.md", "plan/outreach_allowlist_plan.md", "plan/shodh_memory_provider.md", "plan/slack-integration/README.md", "plan/standard-operating-procedures/README.md", "plan/standard-operating-procedures/01-shared-contracts-and-workflow-integration.md", "plan/standard-operating-procedures/02-guidance-and-authoring.md", "plan/standard-operating-procedures/03-verification-and-evidence.md", "plan/standard-operating-procedures/04-coordination-and-handoffs.md", "plan/standard-operating-procedures/05-flow-measures-and-capacity.md", "plan/standard-operating-procedures/06-debriefs-and-improvement-backlog.md", "plan/standard-operating-procedures/07-controlled-improvement-experiments.md", "plan/standard-operating-procedures/08-integration-verification-and-release.md", "plan/tenant-owned-execution-backends.md", "plan/workflow-library/README.md", "plan/workflow-library/01-architecture-and-scope.md"]
+    at src/main.rs:186
+
+  2026-10-28T10:35:50.083924Z  INFO  Connected to database and ran migrations!
+    at src/infra/db.rs:73
+
+  2026-10-28T10:35:50.084996Z  INFO  Credential encryption configuration validated, active_version: 1, available_versions: [1]
+    at src/infra/mod.rs:21
+
+  2026-10-28T10:35:50.089919Z  INFO  Built-in agent library definition is ready, slug: "agent-builder", outcome: Created
+    at src/application/use_cases/builtin_agent_library.rs:88
+
+  2026-10-28T10:35:50.308528Z  INFO  Starting the actionable notification projector, worker_id: 1b4d2123-2034-4a82-8121-8c93b812fb1b
+    at src/application/services/notification_worker.rs:53
+
+  2026-10-28T10:35:50.308674Z  INFO  Starting runtime metric sampler, interval_seconds: 10, retention_days: 7
+    at src/application/services/runtime_metrics.rs:137
+
+  2026-10-28T10:35:50.308960Z  INFO  Starting the delivery worker, worker_id: 890fdbd3-c4c8-4bbb-b085-0c30316c9c12, transports: [Email]
+    at src/application/services/delivery_worker.rs:86
+
+  2026-10-28T10:35:50.309018Z  INFO  Incoming SMTP server is disabled via configuration.
+    at src/adapters/smtp/server.rs:148
+
+  2026-10-28T10:35:50.309036Z  INFO  Starting the inbound event worker, worker_id: 7b742245-35f9-4c9e-a746-a2871d8a1a14, transports: [Email]
+    at src/application/services/inbound_event_worker.rs:120
+
+  2026-10-28T10:35:50.314156Z  INFO  Listening for mailbox notifications
+    at src/infra/events.rs:257
+
+  2026-10-28T10:35:50.324228Z  INFO  Backend listening at 0.0.0.0:3001
+    at src/main.rs:262
+
+  2026-10-28T10:36:17.027969Z  INFO  Adding user...
+    at src/application/use_cases/user.rs:511
+    in add with username: "p09sample328e8a2f", email: "p09sample328e8a2f@example.test"
+    in register_form
+    in http-request with method: POST, uri: /api/user/register, version: HTTP/1.1, request_id: ce8d5bc7-155e-4319-af74-ac47149867ca
+
+  2026-10-28T10:36:17.287676Z  INFO  Adding user finished.
+    at src/application/use_cases/user.rs:516
+    in add with username: "p09sample328e8a2f", email: "p09sample328e8a2f@example.test"
+    in register_form
+    in http-request with method: POST, uri: /api/user/register, version: HTTP/1.1, request_id: ce8d5bc7-155e-4319-af74-ac47149867ca
+
+  2026-10-28T10:36:17.866381Z  INFO  Creating company: Sample browser (p09sample328e8a2f) for user eb0e7160-15de-49fd-a7ec-7487eebe1d1d
+    at src/application/use_cases/company.rs:330
+    in create_company with user_id: eb0e7160-15de-49fd-a7ec-7487eebe1d1d, write: CompanyWrite { name: "Sample browser", slug: "p09sample328e8a2f", channel_defaults: CompanyChannelDefaults { add_3rd_party: false }, avatar_url: None }
+    in create_company
+    in http-request with method: POST, uri: /ui/companies, version: HTTP/1.1, request_id: a89df190-0ae8-4f56-82bd-11b088754645
+
+  2026-10-28T10:36:18.525680Z  INFO  Creating agent 'Assistant' (assistant) for company 7bc58139-af26-4917-b41e-9893eaa66bb4
+    at src/application/use_cases/agent.rs:303
+    in create_agent with user_id: eb0e7160-15de-49fd-a7ec-7487eebe1d1d, company_id: 7bc58139-af26-4917-b41e-9893eaa66bb4, write: AgentWrite { name: "Assistant", slug: "assistant", provider: Some("openai"), model: Some("gpt-test"), system_prompt: Some("Draft a helpful response."), description: None, workflow_tools: None, skill_ids: [], avatar_url: None, created_by: None }
+    in create_agent with query: CompanyQuery { company_id: 7bc58139-af26-4917-b41e-9893eaa66bb4 }
+    in http-request with method: POST, uri: /ui/agents?company_id=7bc58139-af26-4917-b41e-9893eaa66bb4, version: HTTP/1.1, request_id: f90e4aa2-113c-4b40-885c-2e09f6eb5a95
+
+  2026-10-28T10:37:07.279036Z  INFO  Received termination signal. Triggering graceful shutdown...
+    at src/main.rs:383
+
+  2026-10-28T10:37:07.279242Z  INFO  Shutdown signal received. Stopping the delivery worker...
+    at src/application/services/delivery_worker.rs:111
+
+  2026-10-28T10:37:07.279246Z  INFO  Runtime metric sampler stopped, buffered_samples: 0
+    at src/application/services/runtime_metrics.rs:175
+
+  2026-10-28T10:37:07.279308Z  INFO  Actionable notification projector shutting down
+    at src/application/services/notification_worker.rs:67
+
+  2026-10-28T10:37:07.279397Z  INFO  Thread message listener shutting down
+    at src/infra/events.rs:221
+

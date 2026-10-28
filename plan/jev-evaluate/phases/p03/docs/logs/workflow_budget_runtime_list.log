@@ -1,0 +1,13 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.27s
+     Running unittests src/lib.rs (target/debug/deps/mail_agents-6693f25a28eea502)
+adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::budget_runtime_tests::race_tests::workflow_budget_runtime_deferred_commit_failure_rolls_back_grant_and_refusal: test
+adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::budget_runtime_tests::race_tests::workflow_budget_runtime_descendants_share_without_locking_root_or_parent: test
+adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::budget_runtime_tests::race_tests::workflow_budget_runtime_reservation_competes_with_cancel_and_completion: test
+adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::budget_runtime_tests::race_tests::workflow_budget_runtime_unknown_effect_exhaustion_reconciles: test
+adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::budget_runtime_tests::race_tests::workflow_budget_runtime_usage_wait_crossing_lease_or_deadline_rolls_back: test
+adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::budget_runtime_tests::workflow_budget_runtime_conflicting_competitors_debit_one_payload: test
+adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::budget_runtime_tests::workflow_budget_runtime_duplicate_conflict_exact_and_exhausted_retry: test
+adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::budget_runtime_tests::workflow_budget_runtime_rollback_restart_and_safe_retry_preserve_charge: test
+adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::budget_runtime_tests::workflow_budget_runtime_scope_fence_expiry_and_cancel: test
+
+9 tests, 0 benchmarks

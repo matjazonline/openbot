@@ -1,0 +1,15 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.23s
+     Running unittests src/lib.rs (target/debug/deps/mail_agents-0fc485c3efcd046b)
+adapters::storage::gcs::tests::a_base64_key_is_decoded_into_its_fields: test
+adapters::storage::gcs::tests::a_key_that_is_not_base64_or_not_a_key_is_refused: test
+adapters::storage::gcs::tests::an_object_name_is_encoded_whole_for_the_read_url: test
+adapters::storage::gcs::tests::an_object_url_joins_the_base_and_the_key_exactly_once: test
+adapters::storage::gcs::tests::jev_assets_storage_read_bound_declared_and_streamed: test
+adapters::storage::gcs::tests::whitespace_around_the_encoded_key_is_tolerated: test
+application::workflow::publication::storage::tests::workflow_root_budget_storage_roundtrip_and_old_semantics_refusal: test
+application::workflow::publication::storage::tests::workflow_storage_deserialization_preserves_name_invariants: test
+application::workflow::publication::storage::tests::workflow_storage_rejects_corruption_and_compiler_drift: test
+application::workflow::publication::storage::tests::workflow_storage_rejects_incompatible_compiler_before_rebuilding: test
+application::workflow::publication::storage::tests::workflow_storage_restores_all_frozen_fixtures_and_child_identity: test
+
+11 tests, 0 benchmarks

@@ -1,0 +1,12 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.30s
+     Running unittests src/lib.rs (target/debug/deps/mail_agents-6693f25a28eea502)
+
+running 5 tests
+test adapters::workflow_jev::tests::jev_http_request_limit_and_retry_after_date ... ok
+test adapters::workflow_jev::tests::jev_http_errors_redacted_retry_after_and_classification ... ok
+test adapters::workflow_jev::tests::jev_http_mixed_types_exact_request_and_auth ... ok
+test adapters::workflow_jev::tests::jev_http_rejects_malformed_oversized_and_wrong_contract ... ok
+test adapters::workflow_jev::tests::jev_http_deadline_cancellation_and_capacity_release ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 2349 filtered out; finished in 0.18s
+

@@ -1,0 +1,18 @@
+   Compiling mail_agents v0.1.0 (/Users/mac02/dev/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 26s
+     Running unittests src/lib.rs (target/debug/deps/mail_agents-6693f25a28eea502)
+application::workflow::registry::jev_tests::jev_contract_downstream_paths_are_exact_and_typed: test
+application::workflow::registry::jev_tests::jev_contract_duplicate_keys_and_nonfinite_source_rejected: test
+application::workflow::registry::jev_tests::jev_contract_dynamic_state_checks_and_workflow_context_budget: test
+application::workflow::registry::jev_tests::jev_contract_frozen_semantics_change_hash: test
+application::workflow::registry::jev_tests::jev_contract_mixed_exact_schema_and_metadata: test
+application::workflow::registry::jev_tests::jev_contract_noul_criteria_and_escaped_question_paths: test
+application::workflow::registry::jev_tests::jev_contract_primitive_limits_fail_at_next_item: test
+application::workflow::registry::jev_tests::jev_contract_probability_sum_tolerance: test
+application::workflow::registry::jev_tests::jev_contract_rejects_invalid_question_shapes: test
+application::workflow::registry::jev_tests::jev_contract_rejects_malformed_outputs: test
+application::workflow::registry::jev_tests::jev_contract_request_budget_counts_envelope_and_escaping: test
+application::workflow::registry::jev_tests::jev_contract_static_fields_models_and_resources: test
+application::workflow::registry::jev_tests::jev_contract_text_and_identifier_limits_count_utf8_bytes: test
+
+13 tests, 0 benchmarks

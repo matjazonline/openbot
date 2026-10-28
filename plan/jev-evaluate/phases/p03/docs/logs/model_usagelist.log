@@ -1,0 +1,12 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.26s
+     Running unittests src/lib.rs (target/debug/deps/mail_agents-6693f25a28eea502)
+adapters::http::routes::model_usage::tests::model_usage_cookie_price_mutation_requires_same_origin: test
+adapters::http::routes::model_usage::tests::model_usage_http_projection_escaping_foreign_ids_and_price_errors: test
+adapters::http::routes::model_usage::tests::model_usage_http_query_bounds: test
+adapters::persistence::workflow::tests::admission_tests::model_usage_tests::model_usage_workflow_exact_provenance_and_grouping: test
+application::services::model_usage::aggregate::tests::model_usage_confidence_partial_prices_and_small_costs_survive_grouping: test
+application::services::model_usage::aggregate::tests::model_usage_cost_at_all_supported_bounds_is_exact: test
+application::services::model_usage::aggregate::tests::model_usage_group_bound_and_filters_are_explicit: test
+application::services::model_usage::tests::prices_are_exact_bounded_decimals: test
+
+8 tests, 0 benchmarks

@@ -1,0 +1,9 @@
+   Compiling mail_agents v0.1.0 (/Users/mac02/dev/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 38.80s
+     Running unittests src/lib.rs (target/debug/deps/mail_agents-6693f25a28eea502)
+adapters::http::routes::workflows::tests::jev_tests::jev_connection_request_rejects_origin_aliases_and_secret_boundaries: test
+adapters::http::routes::workflows::tests::jev_tests::jev_connection_routes_owner_admin_scope_revision_and_secret_free_views: test
+adapters::persistence::workflow::tests::jev_tests::jev_connection_kek_rotation_inventory: test
+adapters::persistence::workflow::tests::jev_tests::jev_connection_roundtrip_scope_revision_envelope_and_rotation: test
+
+4 tests, 0 benchmarks

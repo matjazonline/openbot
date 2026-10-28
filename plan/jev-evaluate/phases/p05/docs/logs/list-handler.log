@@ -1,0 +1,5 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.24s
+     Running unittests src/lib.rs (target/debug/deps/mail_agents-0fc485c3efcd046b)
+infra::workflow::tests::production_handler_covers_every_io_kind_or_refuses_it: test
+
+1 test, 0 benchmarks

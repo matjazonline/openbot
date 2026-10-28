@@ -1,0 +1,9 @@
+    Blocking waiting for file lock on artifact directory
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 07s
+     Running unittests src/lib.rs (target/debug/deps/mail_agents-0fc485c3efcd046b)
+application::workflow::binding::tests::workflow_binding_checks_current_resource_identity_access_and_capabilities: test
+application::workflow::binding::tests::workflow_binding_checks_ownership_params_and_exact_slots: test
+application::workflow::binding::tests::workflow_binding_rechecks_revocation_and_propagates_directory_outages: test
+application::workflow::binding::tests::workflow_binding_revisions_retain_independent_snapshots: test
+
+4 tests, 0 benchmarks

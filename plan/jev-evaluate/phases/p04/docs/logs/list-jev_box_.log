@@ -1,0 +1,9 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.23s
+     Running unittests src/lib.rs (target/debug/deps/mail_agents-0fc485c3efcd046b)
+adapters::workflow_jev::tests::jev_box_http_mixed_images_header_and_exact_digest: test
+application::workflow::registry::jev_box_tests::jev_box_mixed_output_coordinates_confidence_and_static_paths: test
+application::workflow::registry::jev_box_tests::jev_box_requires_declared_asset_version_and_no_criteria: test
+application::workflow::sample::tests::jev_tests::jev_box_sample_rejects_tools_tokens_and_invalid_box: test
+application::workflow::sample::tests::jev_tests::jev_box_sample_uses_only_scripted_answers_and_inert_metadata: test
+
+5 tests, 0 benchmarks

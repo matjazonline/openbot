@@ -1,0 +1,40 @@
+    Blocking waiting for file lock on artifact directory
+   Compiling mail_agents v0.1.0 (/Users/mac02/dev/openbot)
+error: cannot find macro `json` in this scope
+  --> src/adapters/persistence/workflow/jev_assets_tests.rs:63:50
+   |
+63 |     source["steps"]["start"]["with"]["assets"] = json!({"literal":{"photo":attachment.reference}});
+   |                                                  ^^^^
+
+error: cannot find macro `json` in this scope
+  --> src/adapters/persistence/workflow/jev_assets_tests.rs:62:9
+   |
+62 |         json!({"literal":images::inputs(b"inert")["questions"]});
+   |         ^^^^
+
+error: cannot find macro `json` in this scope
+  --> src/adapters/persistence/workflow/jev_assets_tests.rs:53:20
+   |
+53 |         reference: json!({"channel_id":channel.id,"thread_id":thread,"sha256":ImageDigest::of(bytes)}),
+   |                    ^^^^
+
+error: cannot find macro `json` in this scope
+  --> src/adapters/persistence/workflow/jev_assets_tests.rs:48:20
+   |
+48 |     let metadata = json!({"version":"1","items":[{"filename":"fixture.png","content_type":"image/png","sha256_hash":ImageDigest::of(...
+   |                    ^^^^
+
+error[E0425]: cannot find type `Value` in this scope
+  --> src/adapters/persistence/workflow/jev_assets_tests.rs:21:16
+   |
+21 |     reference: Value,
+   |                ^^^^^ not found in this scope
+
+error[E0425]: cannot find type `Value` in this scope
+  --> src/adapters/persistence/workflow/jev_assets_tests.rs:59:21
+   |
+59 |     let mut source: Value =
+   |                     ^^^^^ not found in this scope
+
+For more information about this error, try `rustc --explain E0425`.
+error: could not compile `mail_agents` (lib test) due to 6 previous errors

@@ -1,0 +1,21 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.24s
+     Running unittests src/lib.rs (target/debug/deps/mail_agents-6693f25a28eea502)
+application::workflow::publication::tests::diagnostic_tests::workflow_publication_duplicate_contracts_identify_the_dependency: test
+application::workflow::publication::tests::diagnostic_tests::workflow_publication_duplicate_selections_identify_the_list_and_member: test
+application::workflow::publication::tests::diagnostic_tests::workflow_publication_invalid_agent_settings_identify_the_field: test
+application::workflow::publication::tests::workflow_publication_ambiguous_agent_tool_fails_publication: test
+application::workflow::publication::tests::workflow_publication_bounds_child_depth_and_pins_transitive_content: test
+application::workflow::publication::tests::workflow_publication_children_pin_content_schemas_and_transitive_hashes: test
+application::workflow::publication::tests::workflow_publication_dependency_errors_name_the_problem_and_source_field: test
+application::workflow::publication::tests::workflow_publication_freezes_agents_skills_and_hashes: test
+application::workflow::publication::tests::workflow_publication_freezes_workflow_tool_pins_like_children: test
+application::workflow::publication::tests::workflow_publication_mcp_contract_policy_and_resource_are_frozen_together: test
+application::workflow::publication::tests::workflow_publication_rejects_conflicting_transitive_version_content: test
+application::workflow::publication::tests::workflow_publication_rejects_deep_and_aggregate_schema_facts_before_copying: test
+application::workflow::publication::tests::workflow_publication_rejects_incomplete_foreign_duplicate_and_oversized_dependencies: test
+application::workflow::publication::tests::workflow_publication_rejects_missing_duplicate_foreign_recursive_and_wrong_child_versions: test
+application::workflow::publication::tests::workflow_publication_requires_and_hashes_trusted_agent_identity: test
+application::workflow::publication::tests::workflow_publication_runtime_agent_selection_uses_only_frozen_catalogue: test
+application::workflow::publication::tests::workflow_publication_validates_skill_requirements_without_granting_tools: test
+
+17 tests, 0 benchmarks

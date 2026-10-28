@@ -1,0 +1,26 @@
+    Checking mail_agents v0.1.0 (/Users/mac02/dev/openbot)
+error[E0432]: unresolved import `super::lease`
+ --> src/application/workflow/jev_runtime.rs:3:13
+  |
+3 | use super::{lease::*, polling::WorkflowStepKind, registry::jev as contract, worker::WorkflowHandler};
+  |             ^^^^^ could not find `lease` in `super`
+
+error[E0432]: unresolved import `super::jev`
+ --> src/application/workflow/jev_runtime.rs:2:12
+  |
+2 | use super::jev::{JevAuthorization, JevCredential, JevModel};
+  |            ^^^ could not find `jev` in `super`
+
+error[E0432]: unresolved imports `super::polling`, `super::registry`, `super::worker`
+ --> src/application/workflow/jev_runtime.rs:3:23
+  |
+3 | use super::{lease::*, polling::WorkflowStepKind, registry::jev as contract, worker::WorkflowHandler};
+  |                       ^^^^^^^                    ^^^^^^^^                   ^^^^^^ could not find `worker` in `super`
+  |                       |                          |
+  |                       |                          could not find `registry` in `super`
+  |                       could not find `polling` in `super`
+
+For more information about this error, try `rustc --explain E0432`.
+error: could not compile `mail_agents` (lib) due to 3 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `mail_agents` (lib test) due to 3 previous errors

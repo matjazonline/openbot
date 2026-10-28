@@ -1,0 +1,11 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling mail_agents v0.1.0 (/Users/mac02/dev/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 33.21s
+     Running unittests src/lib.rs (target/debug/deps/mail_agents-0fc485c3efcd046b)
+
+running 2 tests
+test adapters::persistence::workflow::tests::jev_end_to_end_tests::jev_end_to_end_box_worker_history_and_invalid_output_rejection ... ok
+test adapters::persistence::workflow::tests::jev_end_to_end_tests::jev_end_to_end_mixed_thresholds_automatic_and_uncertain_human ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 2380 filtered out; finished in 2.47s
+
