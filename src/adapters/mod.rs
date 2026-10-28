@@ -18,3 +18,5 @@ pub mod workflow_mcp;
 pub mod workflow_message;
 pub mod workflow_provisioning;
 pub mod workflow_source;
+
+pub mod workflow_jev;

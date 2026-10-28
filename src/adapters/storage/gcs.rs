@@ -282,6 +282,15 @@ impl FileStorage for GcsFileStorage {
 
     #[instrument(skip(self), fields(key = %key))]
     async fn read_object(&self, bucket: BucketKind, key: &ObjectKey) -> AppResult<StoredObject> {
+        self.read_object_bounded(bucket, key, usize::MAX).await
+    }
+
+    async fn read_object_bounded(
+        &self,
+        bucket: BucketKind,
+        key: &ObjectKey,
+        max_bytes: usize,
+    ) -> AppResult<StoredObject> {
         let token = self.access_token().await?;
         let bucket = self.bucket_for(bucket)?;
 
@@ -297,7 +306,12 @@ impl FileStorage for GcsFileStorage {
             .await
             .map_err(|err| AppError::Internal(format!("GCS read failed: {err}")))?;
 
-        let response = require_success(response, "GCS read").await?;
+        if response.status() == reqwest::StatusCode::NOT_FOUND {
+            return Err(AppError::NotFound("Stored object is missing".into()));
+        }
+        if !response.status().is_success() {
+            return Err(AppError::Internal("GCS read refused".into()));
+        }
 
         // What the object was stored as, which is what the download route serves it as.
         let content_type = response
@@ -307,17 +321,44 @@ impl FileStorage for GcsFileStorage {
             .unwrap_or(DEFAULT_CONTENT_TYPE)
             .to_string();
 
-        let bytes = response
-            .bytes()
-            .await
-            .map_err(|err| AppError::Internal(format!("GCS read was cut short: {err}")))?
-            .to_vec();
+        let bytes = read_bounded_body(response, max_bytes).await?;
 
         Ok(StoredObject {
             content_type,
             bytes,
         })
     }
+}
+
+async fn read_bounded_body(response: reqwest::Response, max_bytes: usize) -> AppResult<Vec<u8>> {
+    let declared = response
+        .headers()
+        .get(reqwest::header::CONTENT_LENGTH)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.parse::<u64>().ok());
+    if declared
+        .into_iter()
+        .chain(response.content_length())
+        .any(|size| size > max_bytes as u64)
+    {
+        return Err(AppError::BadRequest(
+            "Stored object exceeds read limit".into(),
+        ));
+    }
+    use futures::StreamExt;
+    let mut bytes = Vec::new();
+    let mut stream = response.bytes_stream();
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.map_err(|_| AppError::Internal("GCS read interrupted".into()))?;
+        if chunk.len() > max_bytes.saturating_sub(bytes.len()) {
+            return Err(AppError::BadRequest(
+                "Stored object exceeds read limit".into(),
+            ));
+        }
+        bytes.extend_from_slice(&chunk);
+    }
+
+    Ok(bytes)
 }
 
 /// What an object with no recorded type is served as: bytes to save, never something to run.
@@ -387,6 +428,37 @@ async fn require_success(response: reqwest::Response, what: &str) -> AppResult<r
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn jev_assets_storage_read_bound_declared_and_streamed() {
+        fn response(chunks: Vec<&'static [u8]>, length: Option<usize>) -> reqwest::Response {
+            let stream = futures::stream::iter(chunks.into_iter().map(Ok::<_, std::io::Error>));
+            let mut builder = axum::http::Response::builder();
+            if let Some(length) = length {
+                builder = builder.header("content-length", length);
+            }
+            builder
+                .body(reqwest::Body::wrap_stream(stream))
+                .unwrap()
+                .into()
+        }
+        assert_eq!(
+            read_bounded_body(response(vec![b"ab", b"cd"], None), 4)
+                .await
+                .unwrap(),
+            b"abcd"
+        );
+        assert!(
+            read_bounded_body(response(vec![b"ab", b"cde"], None), 4)
+                .await
+                .is_err()
+        );
+        assert!(
+            read_bounded_body(response(vec![], Some(5)), 4)
+                .await
+                .is_err()
+        );
+    }
 
     #[test]
     fn a_base64_key_is_decoded_into_its_fields() {

@@ -40,6 +40,7 @@ pub fn is_io_kind(kind: &str) -> bool {
             | "memory.load"
             | "memory.save"
             | "ai.classify"
+            | "jev.evaluate"
             | "agent.run"
             | "decision.agent"
             | "http.request"

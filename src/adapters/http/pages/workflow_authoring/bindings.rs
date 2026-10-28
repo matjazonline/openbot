@@ -252,6 +252,7 @@ pub struct BindingFormView<'a> {
     pub resources: &'a BTreeMap<String, Uuid>,
     pub http: &'a [ChoiceOption],
     pub mcp: &'a [ChoiceOption],
+    pub typesafe: &'a [ChoiceOption],
     pub message_trigger: &'a str,
     pub run_as: Option<Uuid>,
     /// Only the company owner may name somebody else.
@@ -541,6 +542,7 @@ fn resource_fields(form: &BindingFormView<'_>) -> String {
                 }
                 "http" => form.http,
                 "mcp" => form.mcp,
+                "typesafe" => form.typesafe,
                 _ => &[][..],
             };
             let options: String = std::iter::once(format!(

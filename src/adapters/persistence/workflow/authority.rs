@@ -108,6 +108,9 @@ pub(super) async fn supported_publication(
     bundle: &PublishedBundle,
     check: workflow_tools::ToolCheck,
 ) -> AppResult<()> {
+    if matches!(check, workflow_tools::ToolCheck::Publish) {
+        jev::publication_on(tx, bundle).await?;
+    }
     let mut pending = vec![(bundle, check)];
     let mut seen = 0;
     while let Some((current, check)) = pending.pop() {

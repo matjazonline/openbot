@@ -16,6 +16,9 @@ pub(super) async fn inspect_on(
     if let Some(connection) = http::connection_on(tx, company, id.as_uuid()).await? {
         return http::status_on(tx, &connection).await.map(Some);
     }
+    if let Some(status) = jev::status_on(tx, company, id.as_uuid()).await? {
+        return Ok(Some(status));
+    }
     match mcp::connection_on(tx, company, id.as_uuid()).await? {
         Some(connection) => mcp::status_on(tx, &connection).await.map(Some),
         None => Ok(None),
@@ -104,6 +107,24 @@ pub(super) async fn check_readiness(
             .await?
             .ok_or_else(missing)?;
         validate_resource(configuration.company_id(), id, requirement, &status)?;
+    }
+    jev_binding_models(tx, configuration).await
+}
+
+async fn jev_binding_models(
+    tx: &mut Transaction<'_, Postgres>,
+    configuration: &binding::ConfiguredBinding,
+) -> AppResult<()> {
+    for (slot, models) in
+        crate::application::workflow::jev::required_models(configuration.bundle())?
+    {
+        let id = configuration.resources().get(&slot).ok_or_else(missing)?;
+        let connection = jev::connection_on(tx, configuration.company_id(), id.as_uuid())
+            .await?
+            .ok_or_else(jev::revoked)?;
+        if !connection.enabled || !models.is_subset(&connection.models) {
+            return Err(jev::revoked());
+        }
     }
     Ok(())
 }

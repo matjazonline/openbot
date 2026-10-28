@@ -529,3 +529,24 @@ fail over to, so that is real downtime: the app stays up but returns errors for
 any request that needs the database, and recovers by itself. Avoid deploying
 both apps simultaneously — that is the one case where the app crash-loops
 instead of degrading, per the note above.
+
+
+### TypeSafe Jev
+
+`jev.evaluate` is available in the production workflow catalogue. Configure its
+company-owned API key and allowed versioned models in company Settings, then bind
+the `typesafe` workflow slot to that connection. There is no global TypeSafe API-key
+or endpoint environment setting. The adapter uses the fixed HTTPS System One URL;
+company forms cannot change it. Existing `CREDENTIAL_ENCRYPTION_KEYS` and
+`CREDENTIAL_ENCRYPTION_ACTIVE_VERSION` encrypt TypeSafe keys and the credential
+inventory/rotation commands include these rows. Startup validates encryption
+configuration; it does not probe TypeSafe credentials or model availability.
+
+Experimental image steps also need the private attachment storage already used by
+this deployment; use the documented GCS settings above. Text steps need no storage.
+Keep the enforced 64 KiB wire limit and image bounds described in the
+[workflow language](workflow-language-v1.md#experimental-jev-images-and-box).
+Use isolated scripted samples before a controlled live evaluation and inspect
+run history and company model usage. Provider usage is billed by TypeSafe; local
+estimates and configured prices are not invoices. Operational failure/recovery and
+revocation semantics are in the [Jev runbook](workflow-operations.md#typesafe-jev-evaluation).

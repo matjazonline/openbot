@@ -58,6 +58,7 @@ pub(super) fn constraints(name: &str) -> ExecutionConstraints {
         "memory.load" => (BoundedRead, vec![MemoryRead]),
         "memory.save" => (DurableWrite, vec![MemoryWrite]),
         "ai.classify" | "decision.agent" => (ModelInvocation, vec![ModelInvoke]),
+        "jev.evaluate" => (ModelInvocation, vec![ModelInvoke, ResourceUse]),
         "agent.run" => (AgentActions, vec![AgentInvoke]),
         "http.request" | "mcp.call" => (
             EffectClass::SharedAction,

@@ -8,6 +8,7 @@ pub(crate) enum InputCheck {
     Approval,
     Http,
     Message,
+    Jev,
 }
 impl InputCheck {
     /// Called for known literals at compilation and again for all resolved inputs.
@@ -41,6 +42,8 @@ impl InputCheck {
             }
             Self::Http => check_http(inputs, root, span)?,
             Self::Message => check_message(inputs, root, span)?,
+            Self::Jev => jev::validate_inputs(inputs)
+                .map_err(|message| Diagnostic::at("registry.jev", message, root, span))?,
         }
         Ok(())
     }

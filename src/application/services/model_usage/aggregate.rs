@@ -5,7 +5,7 @@ pub struct UsageSample {
     pub provider: ModelProvider,
     pub model: ModelName,
     pub workflow: Option<Uuid>,
-    pub agent: Uuid,
+    pub agent: Option<Uuid>,
     pub input: u64,
     pub output: u64,
     pub source: Option<TokenUsageSource>,
@@ -41,7 +41,7 @@ pub fn aggregate(
     let mut groups = std::collections::BTreeMap::<GroupKey, Total>::new();
     let mut truncated = false;
     for call in calls {
-        if query.agent.is_some_and(|id| id != call.agent)
+        if query.agent.is_some_and(|id| Some(id) != call.agent)
             || query.workflow.is_some_and(|id| Some(id) != call.workflow)
         {
             continue;
@@ -153,7 +153,7 @@ mod tests {
             provider: "openai".into(),
             model: "model".into(),
             workflow: None,
-            agent: Uuid::nil(),
+            agent: Some(Uuid::nil()),
             input: 1,
             output: 1,
             source,

@@ -33,7 +33,7 @@ impl Registration<'_> {
         );
         Ok(())
     }
-    fn resource(&mut self, kind: &str) -> Result<Value, Diagnostic> {
+    pub(super) fn resource(&mut self, kind: &str) -> Result<Value, Diagnostic> {
         let connection = self.literal("connection")?;
         let Some(slot) = connection.as_str() else {
             return Err(self.error(

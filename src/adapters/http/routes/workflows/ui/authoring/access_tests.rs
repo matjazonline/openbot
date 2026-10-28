@@ -272,16 +272,24 @@ async fn an_admin_of_another_company_reaches_no_write_or_version_of_this_one() {
 #[tokio::test]
 async fn every_workspace_write_refuses_a_cross_origin_cookie_post() {
     let mut app = Router::new();
-    for pattern in WRITE_ROUTES {
+    for pattern in WRITE_ROUTES
+        .into_iter()
+        .chain(super::super::super::typesafe::WRITE_ROUTES)
+    {
         app = app.route(pattern, post(|| async { StatusCode::NO_CONTENT }));
     }
     let app = app.layer(axum::middleware::from_fn_with_state(
         crate::adapters::http::routes::ui::stream_tests::test_config(),
         crate::adapters::http::security::browser_security,
     ));
-    for pattern in WRITE_ROUTES {
+    for pattern in WRITE_ROUTES
+        .into_iter()
+        .chain(super::super::super::typesafe::WRITE_ROUTES)
+    {
         let path = pattern
             .replace("{workflow_id}", &Uuid::new_v4().to_string())
+            .replace("{company_id}", &Uuid::new_v4().to_string())
+            .replace("{id}", &Uuid::new_v4().to_string())
             .replace("{binding_id}", &Uuid::new_v4().to_string())
             .replace("{agent_id}", &Uuid::new_v4().to_string())
             .replace("{template_id}", "reviewed-support");

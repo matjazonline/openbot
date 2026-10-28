@@ -1,0 +1,15 @@
+--- accepted/src/application/workflow/binding/mod.rs
++++ corrected/src/application/workflow/binding/mod.rs
+@@ -135,10 +135,10 @@
+             validate_resource(self.company_id(), id, requirement, &status)?;
+             if let Some(models) = jev_models.get(&requirement.slot)
+                 && models.iter().any(|model| {
+-                    !status
++                    status
+                         .supported_contracts
+                         .iter()
+-                        .any(|contract| *contract == model.resource_contract())
++                        .all(|contract| *contract != model.resource_contract())
+                 })
+             {
+                 return Err(AppError::BadRequest(

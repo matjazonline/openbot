@@ -4762,6 +4762,7 @@ dependencies = [
  "dotenvy",
  "futures",
  "htmd",
+ "image",
  "jsonschema",
  "jsonwebtoken",
  "lettre",

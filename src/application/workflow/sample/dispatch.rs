@@ -38,6 +38,9 @@ impl Session {
             return self.workflow_tool_step(bundle, frame, activation, path, &tool);
         }
         let response = self.response(bundle, &activation.step)?;
+        if kind == "jev.evaluate" {
+            return self.jev(bundle, activation, response);
+        }
         if let Some(model) = ModelStep::of(kind) {
             return self.model(bundle, frame, activation, path, model, response);
         }
@@ -59,6 +62,32 @@ impl Session {
                 "Unsupported sample step {kind}; no production fallback exists"
             ))),
         }
+    }
+
+    fn jev(
+        &mut self,
+        bundle: &PublishedBundle,
+        activation: &ActivatedExecution,
+        response: ScriptedResponse,
+    ) -> AppResult<PureCompletion> {
+        if !response.tools.is_empty() || response.approval.is_some() || response.tokens != 0 {
+            return Err(refused(
+                "Jev scripts use output.usage only and accept no tools or approval",
+            ));
+        }
+        let completion = prepare_io(bundle, activation, response.output.clone())?;
+        let usage = &response.output["usage"];
+        let tokens = usage["input_tokens"]
+            .as_u64()
+            .and_then(|input| {
+                usage["output_tokens"]
+                    .as_u64()
+                    .and_then(|output| input.checked_add(output))
+            })
+            .and_then(|total| total.try_into().ok())
+            .ok_or_else(|| refused("Sample token usage overflow"))?;
+        self.charge_model_tokens(tokens)?;
+        Ok(completion)
     }
 
     fn external_step(
@@ -149,12 +178,24 @@ impl Session {
         model: ModelStep,
         response: ScriptedResponse,
     ) -> AppResult<PureCompletion> {
+        self.charge_model_tokens(response.tokens)?;
+        if !response.tools.is_empty() {
+            if !model.uses_capabilities() {
+                return Err(refused("This model step is tool-free"));
+            }
+            approval(&activation.inputs, response.approval)?;
+            self.agent_tools(bundle, frame, activation, path, response.tools)?;
+            self.charge(BudgetResource::ModelCall)?;
+        }
+        prepare_io(bundle, activation, response.output)
+    }
+    fn charge_model_tokens(&mut self, scripted_tokens: u32) -> AppResult<()> {
         self.charge(BudgetResource::ModelCall)?;
         let tokens = self
             .report
             .usage
             .scripted_tokens
-            .checked_add(response.tokens)
+            .checked_add(scripted_tokens)
             .ok_or_else(|| refused("Sample token usage overflow"))?;
         if tokens
             > self
@@ -165,15 +206,7 @@ impl Session {
             return Err(refused("Scripted token allowance exhausted"));
         }
         self.report.usage.scripted_tokens = tokens;
-        if !response.tools.is_empty() {
-            if !model.uses_capabilities() {
-                return Err(refused("This model step is tool-free"));
-            }
-            approval(&activation.inputs, response.approval)?;
-            self.agent_tools(bundle, frame, activation, path, response.tools)?;
-            self.charge(BudgetResource::ModelCall)?;
-        }
-        prepare_io(bundle, activation, response.output)
+        Ok(())
     }
 }
 

@@ -2,6 +2,8 @@
 //! member who is not an admin, revision conflicts, key replays and conflicts, workflow tools and
 //! agent grants (WF-C003), and the decision page a review notice links to.
 use super::*;
+#[path = "jev_tests.rs"]
+mod jev_tests;
 use crate::adapters::http::session::SessionAuthority;
 use crate::adapters::persistence::{
     PostgresPersistence,

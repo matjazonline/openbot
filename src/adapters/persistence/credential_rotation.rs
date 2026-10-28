@@ -68,6 +68,7 @@ pub struct CredentialRotationReport {
 /// whose rows never rotate, and nothing else in the system would notice.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum CredentialTable {
+    TypeSafeCredentials,
     WorkflowHttpCredentials,
     CompanyMcpCredentials,
     /// `company_model_connections.api_key` — the legacy `enc:v1` direct-key format.
@@ -81,6 +82,7 @@ enum CredentialTable {
 
 impl CredentialTable {
     const ALL: &'static [Self] = &[
+        Self::TypeSafeCredentials,
         Self::WorkflowHttpCredentials,
         Self::CompanyMcpCredentials,
         Self::ModelConnections,
@@ -95,6 +97,10 @@ impl CredentialTable {
 /// key of a batch is exactly where the next batch starts.
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum CredentialKey {
+    TypeSafeCredential {
+        company_id: Uuid,
+        connection_id: Uuid,
+    },
     WorkflowHttpCredential {
         company_id: Uuid,
         connection_id: Uuid,
@@ -432,6 +438,10 @@ async fn store_rotated_credential(
     rotated: &str,
 ) -> AppResult<bool> {
     let changed = match &row.key {
+        CredentialKey::TypeSafeCredential { company_id, connection_id } => {
+            sqlx::query("UPDATE company_typesafe_connections SET envelope=$3 WHERE company_id=$1 AND id=$2 AND envelope=$4")
+                .bind(company_id).bind(connection_id).bind(rotated).bind(&row.stored).execute(&mut **transaction).await
+        }
         CredentialKey::WorkflowHttpCredential { company_id, connection_id } => {
             sqlx::query("UPDATE workflow_http_credentials SET envelope=$3 WHERE company_id=$1 AND connection_id=$2 AND envelope=$4")
                 .bind(company_id).bind(connection_id).bind(rotated).bind(&row.stored).execute(&mut **transaction).await
@@ -571,6 +581,9 @@ async fn fetch_credential_batch(
     cursor: Option<&CredentialKey>,
 ) -> AppResult<Vec<InventoryRow>> {
     match table {
+        CredentialTable::TypeSafeCredentials => {
+            fetch_typesafe_credential_batch(connection, cursor).await
+        }
         CredentialTable::WorkflowHttpCredentials => {
             fetch_http_credential_batch(connection, cursor).await
         }
@@ -815,6 +828,40 @@ async fn fetch_mcp_credential_batch(
                     row.connection_id,
                 ),
             ),
+            stored: row.envelope,
+        })
+        .collect())
+}
+
+async fn fetch_typesafe_credential_batch(
+    connection: &mut PgConnection,
+    cursor: Option<&CredentialKey>,
+) -> AppResult<Vec<InventoryRow>> {
+    let (company, id) = match cursor {
+        None => (None, None),
+        Some(CredentialKey::TypeSafeCredential {
+            company_id,
+            connection_id,
+        }) => (Some(*company_id), Some(*connection_id)),
+        Some(_) => {
+            return Err(AppError::Internal(
+                "TypeSafe credential cursor mismatch".into(),
+            ));
+        }
+    };
+    let rows = sqlx::query_as::<_, McpCredentialRow>("SELECT company_id,id AS connection_id,envelope FROM company_typesafe_connections WHERE $1::uuid IS NULL OR (company_id,id)>($1,$2) ORDER BY company_id,id LIMIT $3")
+        .bind(company).bind(id).bind(CREDENTIAL_BATCH_SIZE).fetch_all(connection).await?;
+    Ok(rows
+        .into_iter()
+        .map(|row| InventoryRow {
+            key: CredentialKey::TypeSafeCredential {
+                company_id: row.company_id,
+                connection_id: row.connection_id,
+            },
+            format: CredentialFormat::Envelope(CredentialContext::typesafe_credential(
+                row.company_id,
+                row.connection_id,
+            )),
             stored: row.envelope,
         })
         .collect())

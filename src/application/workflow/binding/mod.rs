@@ -125,6 +125,7 @@ impl ConfiguredBinding {
         actor: WorkflowActor,
         directory: &impl ResourceDirectory,
     ) -> AppResult<()> {
+        let jev_models = super::jev::required_models(&self.bundle)?;
         for requirement in &self.bundle.compiled().graph().definition().resources {
             let id = self.configuration.resources[&requirement.slot];
             let status = directory
@@ -132,6 +133,18 @@ impl ConfiguredBinding {
                 .await?
                 .ok_or_else(|| AppError::NotFound("Workflow resource".into()))?;
             validate_resource(self.company_id(), id, requirement, &status)?;
+            if let Some(models) = jev_models.get(&requirement.slot)
+                && models.iter().any(|model| {
+                    status
+                        .supported_contracts
+                        .iter()
+                        .all(|contract| *contract != model.resource_contract())
+                })
+            {
+                return Err(AppError::BadRequest(
+                    "Selected TypeSafe connection does not allow the frozen model".into(),
+                ));
+            }
         }
         Ok(())
     }

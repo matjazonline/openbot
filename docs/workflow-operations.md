@@ -101,3 +101,47 @@ own remote uncertainty; human decisions own review; the shared delivery worker o
 attempts. Obsolete channel-owned agent dispatch and the alternative runtime were removed in phase08.
 The old [replacement inventory](https://github.com/matjazonline/openbot/blob/19bab48c28c76a929f20a19f46e44bfb75c24cae/plan/workflow-foundation/REPLACEMENT-MAP.md) records that baseline,
 not supported APIs. [Release evidence](workflow-verification.md) maps the acceptance scenarios.
+
+
+## TypeSafe Jev evaluation
+
+Company Settings manages TypeSafe connections separately from agent model providers.
+Owners and company admins can create, rotate, disable and restrict exact allowed
+model versions. The API is `/api/companies/{company_id}/typesafe-connections`,
+with `PUT /{id}` for availability/models and `POST /{id}/rotate` for a replacement
+key; updates carry `expected_revision`. Views expose readiness and revision only,
+never stored credentials. Ready means the connection is enabled. The list does not decrypt the credential
+or probe TypeSafe; current authorization and credential decryption are checked at
+provider use. Reload after a revision conflict.
+
+Choose a ready connection in the workflow Bindings tab. A published `jev.evaluate`
+step fixes its exact `jev-MAJOR.MINOR.PATCH` model and typed questions; aliases are
+rejected. Noul's `noul` value is already its probability, so it has no separate
+confidence. Use explicit downstream rule thresholds; confidence is not correctness.
+The catalogue shows exact answer paths and a compiling mixed example. The
+`samples/jev-triage.json` automatic/human scenarios and `samples/jev-image.json`
+experimental Box fixture run with supplied results and usage only.
+
+Jev calls use `https://api.typesafe.ai/v1/systemone`, a 5-second connection timeout,
+a deadline of at most 30 seconds and 64 KiB request/response limits. Each provider
+entry reserves one model call and tokens regardless of question count. Unconfirmed
+calls retain conservative usage; a crash after provider use but before durable
+settlement may incur another charged call on retry. A committed validated result
+is reused after recovery without another provider call. Usage and run-step views
+show provider `typesafe`, pinned model and tokens with no agent association.
+
+Disable a connection or remove its model to stop subsequent authorized provider
+entry; no replacement connection is selected. An already authorized in-flight call
+can finish. Rotation keeps the same connection ID and uses the new key at next use.
+Current company, connection and image-file authority are checked at the final
+provider boundary; loss of a lease cancels work and fences stale settlement.
+Authentication/model/validation refusals are terminal; bounded transport or rate
+failures follow the normal retry/deadline policy. Inspect failure codes and usage
+without copying keys, provider bodies or image bytes into incident notes.
+
+Images/Box remain experimental. Only private authorized immutable attachment
+references are accepted; PNG/JPEG images must be still, at most 24 KiB, 280–1024
+pixels per side, with at most four assets and the same aggregate 64 KiB wire cap.
+Images require Jev 1.13/1.14 and Box 1.14. A missing storage configuration or revoked,
+changed or oversized attachment produces an explicit failure, never an external URL
+fetch. See the exact [image contract](workflow-language-v1.md#experimental-jev-images-and-box).

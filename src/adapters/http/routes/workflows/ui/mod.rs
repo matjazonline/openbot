@@ -18,9 +18,12 @@ use axum::{
 
 mod authoring;
 mod runs;
+mod typesafe;
 
 pub fn router() -> Router<AppState> {
-    authoring::router().merge(runs::router())
+    authoring::router()
+        .merge(runs::router())
+        .merge(typesafe::router())
 }
 
 /// What every workspace handler starts from: the engine, the use cases its pages read, and the

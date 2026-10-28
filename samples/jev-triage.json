@@ -1,0 +1,291 @@
+{
+  "source": {
+    "format_version": 1,
+    "workflow_id": "00000000-0000-0000-0000-000000000001",
+    "input_schema": true,
+    "parameter_schema": true,
+    "output_schema": true,
+    "resources": [
+      {
+        "slot": "service",
+        "kind": "typesafe"
+      }
+    ],
+    "entry": "evaluate",
+    "steps": {
+      "evaluate": {
+        "type": "jev.evaluate",
+        "with": {
+          "connection": {
+            "literal": "service"
+          },
+          "model": {
+            "literal": "jev-1.14.0"
+          },
+          "state": {
+            "literal": {
+              "ticket": "Payment failed"
+            }
+          },
+          "questions": {
+            "literal": {
+              "urgent": {
+                "type": "noul",
+                "instructions": "Does this need immediate attention?"
+              },
+              "department": {
+                "type": "choice",
+                "instructions": "Which team?",
+                "criteria": {
+                  "billing": "Payment issues",
+                  "technical": "Bugs or integrations"
+                }
+              },
+              "severity": {
+                "type": "score",
+                "instructions": "How severe?",
+                "criteria": [
+                  "Cosmetic",
+                  "Workaround available",
+                  "Blocking"
+                ]
+              }
+            }
+          }
+        },
+        "routes": {
+          "success": "route"
+        }
+      },
+      "route": {
+        "type": "decision.rule",
+        "with": {
+          "data": {
+            "ref": "/steps/evaluate/output/answers"
+          },
+          "data_schema": {
+            "literal": true
+          }
+        },
+        "rule": {
+          "cases": [
+            {
+              "when": {
+                "and": [
+                  {
+                    "ge": [
+                      {
+                        "ref": "/steps/evaluate/output/answers/department/confidence"
+                      },
+                      {
+                        "literal": 0.8
+                      }
+                    ]
+                  },
+                  {
+                    "le": [
+                      {
+                        "ref": "/steps/evaluate/output/answers/urgent/noul"
+                      },
+                      {
+                        "literal": 0.75
+                      }
+                    ]
+                  },
+                  {
+                    "le": [
+                      {
+                        "ref": "/steps/evaluate/output/answers/severity/score"
+                      },
+                      {
+                        "literal": 1.5
+                      }
+                    ]
+                  }
+                ]
+              },
+              "choice": "automatic"
+            }
+          ],
+          "default": "uncertain"
+        },
+        "routes": {
+          "choices": {
+            "automatic": "automatic",
+            "uncertain": "review"
+          }
+        }
+      },
+      "automatic": {
+        "type": "data.map",
+        "with": {
+          "value": {
+            "literal": {
+              "path": "automatic"
+            }
+          },
+          "output_schema": {
+            "literal": true
+          }
+        },
+        "routes": {
+          "success": "$end"
+        }
+      },
+      "review": {
+        "type": "decision.human",
+        "with": {
+          "proposal": {
+            "ref": "/steps/evaluate/output"
+          },
+          "reviewers": {
+            "literal": [
+              {
+                "kind": "user",
+                "id": "00000000-0000-0000-0000-000000000006"
+              }
+            ]
+          },
+          "deadline": {
+            "literal": "2099-01-01T00:00:00Z"
+          },
+          "data_schema": {
+            "literal": true
+          },
+          "feedback_required": {
+            "literal": [
+              "reject"
+            ]
+          }
+        },
+        "routes": {
+          "choices": {
+            "accept": "$end",
+            "reject": "$end"
+          }
+        }
+      }
+    },
+    "limits": {
+      "max_steps": 100,
+      "max_context_bytes": 65536
+    }
+  },
+  "sample": {
+    "input": {},
+    "params": {},
+    "scripts": [
+      {
+        "workflow_id": "00000000-0000-0000-0000-000000000001",
+        "step": "evaluate",
+        "responses": [
+          {
+            "output": {
+              "model": "jev-1.14.0",
+              "answers": {
+                "urgent": {
+                  "type": "noul",
+                  "noul": 0.7
+                },
+                "department": {
+                  "type": "choice",
+                  "choice": "billing",
+                  "probabilities": {
+                    "billing": 0.9,
+                    "technical": 0.1
+                  },
+                  "confidence": 0.8
+                },
+                "severity": {
+                  "type": "score",
+                  "score": 1.5,
+                  "probabilities": {
+                    "0": 0.1,
+                    "1": 0.3,
+                    "2": 0.6
+                  },
+                  "legend": {
+                    "0": "Cosmetic",
+                    "1": "Workaround available",
+                    "2": "Blocking"
+                  },
+                  "confidence": 0.7
+                }
+              },
+              "usage": {
+                "input_tokens": 120,
+                "output_tokens": 12
+              }
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "uncertain_sample": {
+    "input": {},
+    "params": {},
+    "scripts": [
+      {
+        "workflow_id": "00000000-0000-0000-0000-000000000001",
+        "step": "evaluate",
+        "responses": [
+          {
+            "output": {
+              "model": "jev-1.14.0",
+              "answers": {
+                "urgent": {
+                  "type": "noul",
+                  "noul": 0.7
+                },
+                "department": {
+                  "type": "choice",
+                  "choice": "billing",
+                  "probabilities": {
+                    "billing": 0.9,
+                    "technical": 0.1
+                  },
+                  "confidence": 0.5
+                },
+                "severity": {
+                  "type": "score",
+                  "score": 1.5,
+                  "probabilities": {
+                    "0": 0.1,
+                    "1": 0.3,
+                    "2": 0.6
+                  },
+                  "legend": {
+                    "0": "Cosmetic",
+                    "1": "Workaround available",
+                    "2": "Blocking"
+                  },
+                  "confidence": 0.7
+                }
+              },
+              "usage": {
+                "input_tokens": 120,
+                "output_tokens": 12
+              }
+            }
+          }
+        ]
+      },
+      {
+        "workflow_id": "00000000-0000-0000-0000-000000000001",
+        "step": "review",
+        "responses": [
+          {
+            "output": {
+              "choice": "accept",
+              "data": {
+                "path": "human"
+              },
+              "feedback": ""
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

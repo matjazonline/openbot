@@ -307,14 +307,18 @@ fn company_tabs(company_id: Uuid, tab: CompanyTab) -> String {
 /// The Settings tab: what the company holds, and the form that changes it.
 fn company_settings_body(pane: &CompanyEditPane<'_>) -> String {
     if !pane.editable {
-        return r##"
+        return format!(
+            r##"
             <div class="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
                 <div class="rounded-box border border-base-300 bg-base-200 p-5">
                     <h3 class="font-semibold">Company settings</h3>
                     <p class="mt-1 text-sm opacity-70">Only the company owner can edit these settings.</p>
                 </div>
+                {typesafe}
             </div>
-            "##.to_string();
+            "##,
+            typesafe = company_typesafe::loader(pane.company.id)
+        );
     }
 
     let stored = stored_draft(pane.company, pane.model_connections);
@@ -354,11 +358,13 @@ fn company_settings_body(pane: &CompanyEditPane<'_>) -> String {
                     </div>
                 </form>
                 {resend_api_section}
+                {typesafe}
             </div>
         "##,
         name = escape_html_text(&pane.company.name),
         error_html = form_error_banner(pane.error),
         resend_api_section = pane.resend_api_section,
+        typesafe = company_typesafe::loader(company_id),
         workspace_links = workspace_links(company_id, pane.counts),
         fields = company_fields(&draft),
     )

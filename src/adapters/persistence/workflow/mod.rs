@@ -45,6 +45,8 @@ mod fair_polling;
 mod fairness;
 mod history_reader;
 pub mod http;
+pub mod jev;
+mod jev_assets;
 mod lease;
 mod lease_claim;
 pub mod mcp;
@@ -119,3 +121,5 @@ mod inspection;
 mod message_outcomes;
 
 mod token_budget;
+
+mod jev_runtime;

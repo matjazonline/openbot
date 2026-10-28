@@ -2,6 +2,7 @@ use super::*;
 impl Registration<'_> {
     pub(super) fn basic(&mut self) -> Result<Contract, Diagnostic> {
         match self.name() {
+            "jev.evaluate" => self.jev(),
             "context.history" => Ok(contract(
                 json!({"max_tokens":integer(MAX_CONTEXT_TOKENS)}),
                 &["max_tokens"],

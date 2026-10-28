@@ -37,7 +37,7 @@ struct CallRow {
     provider: String,
     model: String,
     workflow_id: Option<Uuid>,
-    agent_id: Uuid,
+    agent_id: Option<Uuid>,
     input_tokens: i64,
     output_tokens: i64,
     usage_source: Option<String>,

@@ -30,6 +30,9 @@ pub fn example(name: &str) -> Option<AuthoringExample> {
         step["rule"] =
             json!({"cases":[{"when":{"literal":true},"choice":"continue"}],"default":"revise"});
     }
+    if name == "jev.evaluate" {
+        resources = json!([{"slot":"service","kind":"typesafe"}]);
+    }
     if ["http.request", "mcp.call"].contains(&name) {
         resources =
             json!([{"slot":"service","kind":if name == "http.request" { "http" } else { "mcp" }}]);
@@ -83,6 +86,13 @@ fn values(name: &str) -> Value {
         "memory.load" => json!({"scope":{"kind":"company"},"query":"preferences","limit":10}),
         "memory.save" => {
             json!({"scope":{"kind":"agent","id":"assistant"},"facts":["Prefers concise replies"]})
+        }
+        "jev.evaluate" => {
+            json!({"connection":"service","model":"jev-1.14.0","state":{"ticket":"Payment failed"},"questions":{
+                "department":{"type":"choice","instructions":"Which team should handle this ticket?","criteria":{"billing":"Payment issues","technical":"Bugs or integrations"}},
+                "urgent":{"type":"noul","instructions":"Does the ticket need immediate attention?"},
+                "severity":{"type":"score","instructions":"How severe is the issue?","criteria":["Cosmetic","Workaround available","Blocking"]}
+            }})
         }
         "ai.classify" => {
             json!({"agent":"assistant","context":{"message":"hello"},"output_schema":{"type":"string","enum":["support","sales"]}})

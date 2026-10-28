@@ -1,6 +1,6 @@
 # Workflow language v1 compiler contract
 
-This document describes the phase 02 compiler and its 18-type catalogue. The
+This document describes the phase 02 compiler and its 19-type catalogue. The
 application provides library validation/publication commands, but does not yet accept
 workflow YAML through an authoring API, persist prepared inputs, or execute these definitions.
 `application::workflow::registry::compile` uses the built-in catalogue and explicit
@@ -83,7 +83,7 @@ source, compiled representation and hash atomically.
 
 ## Registered contracts and authoring help
 
-`registry::TYPES` is the exact 18-name set. `registry::example(type_name)` returns
+`registry::TYPES` is the exact 19-name set. `registry::example(type_name)` returns
 valid v1 source plus illustrative caller facts; `registry::authoring_help` compiles
 a supplied example and returns its specialized input/output schemas, literal-only
 fields, routes/control, constraints, notes and source. Required and optional input
@@ -96,6 +96,7 @@ for **resolved values**; every `with` field still needs a binding wrapper.
 | `context.history` | `max_tokens` | Result `{items: [{message_id, at, role, audience, entry_kind, author, subject, body, truncated}], token_count, omitted}`: the run's thread history frozen at admission, internal notes excluded |
 | `memory.load` | `scope`, `query`, `limit` | Result `{items: [{id, source, content}]}`; registered but unhandled: memory is not in this release |
 | `memory.save` | `scope`, `facts` (nonempty strings) | Result `{saved_ids: [...]}`; registered but unhandled: memory is not in this release |
+| `jev.evaluate` | literal `connection`, `model`, `questions`; dynamic `state` | TypeSafe typed questions and exact answers; see Jev contract below |
 | `ai.classify` | `agent`, `context`, literal `output_schema` | Tool-free call with the agent's instructions and model; direct schema result; finite string enum, or required `label` enum property |
 | `agent.run` | `agent`, `context`, literal `output_schema` | Runs with exactly the agent's saved tools and skills; direct schema result |
 | `decision.rule` | `data`, literal `data_schema` | Top-level ordered `rule`; result `{choice, data}` |
@@ -348,3 +349,103 @@ missing result to an empty typed result. Present `null` is invalid for that resu
 does not take the missing-value fallback. The future MCP handler must distinguish tool errors
 and effect outcomes before selecting success; these fixtures perform no network or delivery work.
 Production SQL/transaction races and provider-use authorization remain phases03/04 obligations.
+
+
+## Jev typed questions and images
+
+`jev.evaluate` declares a `typesafe` resource slot and selects it with literal
+`connection`. Use an exact `jev-MAJOR.MINOR.PATCH` model ID, such as `jev-1.14.0`;
+moving aliases are rejected. `state` accepts a string, object, or array through any
+normal binding. `questions` is a literal map with 1–32 distinct, nonblank IDs, each
+at most 128 UTF-8 bytes and without control characters. Question IDs select
+`/steps/<step>/output/answers/<question>`, independently of the workflow step ID.
+Escape `~` and `/` as `~0` and `~1` when using them in JSON pointers.
+
+Each question has literal string `instructions` and one of these shapes:
+
+- `noul`: optional `criteria` with exactly string descriptions `true` and `false`.
+  Its answer has exactly `type: noul` and `noul` in [0, 1].
+- `choice`: `criteria` maps 1–64 nonblank option IDs to string descriptions.
+  Its answer has `type: choice`, a declared `choice`, `probabilities` with exactly
+  the option keys, and `confidence` in [0, 1].
+- `score`: `criteria` is an ordered list of 2–10 string descriptions. Its answer
+  has `type: score`, a numeric `score` from zero through the last level index,
+  `probabilities` keyed by zero-based level numbers as strings, `legend` with
+  the exact original descriptions, and `confidence` in [0, 1].
+
+Instructions and descriptions must be nonblank and at most 16 KiB of UTF-8 each.
+Unknown fields and duplicate keys are rejected. Box and image assets follow the experimental contract below.
+The exact output envelope contains `answers`, the selected versioned `model`, and
+nonnegative integer `usage.input_tokens` / `usage.output_tokens`. Missing, extra,
+mismatched, nonfinite and out-of-range answers fail completion. Every probability
+is in [0, 1]; each distribution must sum to one within absolute tolerance `1e-6`
+to accommodate rounding. Noul remains a probability; confidence does not assert
+correctness. Use downstream `decision.rule` for thresholds and routing.
+
+The entire serialized provider request (model, state, questions) and response each
+have a 64 KiB ceiling. Borrowed preflight counts bytes before descriptor copies;
+resolved state is checked again before dispatch. Existing source (256 KiB), schema
+(64 KiB / 4096 nodes), compiled-fact (1 MiB), and workflow context limits also apply,
+so aggregate budgets can reject combinations below the individual maxima. This
+step is one model invocation with committed-result reuse, without agent tools or
+action effects. The production catalogue and worker support the complete text/image contract.
+Create a company TypeSafe connection in company Settings, allow the exact model,
+then select it for the `typesafe` slot on the workflow Bindings tab. The published
+source pins the model and questions; the binding stores only the connection ID.
+Rotation uses the current key on the next provider call. Disabled, revoked or
+model-disallowed connections fail current-use authorization without fallback.
+
+The mixed Noul/Choice/Score example is available through
+`registry::example("jev.evaluate")`. Upstream contracts were checked against the
+[System One API](https://docs.typesafe.ai/api/system-one),
+[primitives](https://docs.typesafe.ai/primitives), and
+[versioned models](https://docs.typesafe.ai/models).
+
+
+### Experimental Jev images and Box
+
+Images and Box are experimental TypeSafe features. This application supports images
+on exact `jev-1.13.PATCH` and `jev-1.14.PATCH` models, and Box on `jev-1.14.PATCH` only.
+Future model families require an explicit support update. Text-only requests never
+send the image opt-in header.
+
+Optional literal `with.assets` maps 1–4 logical identifiers (ASCII letter followed
+by letters, digits or underscores, at most 64 bytes) to immutable private message
+attachment references. Each reference has exactly `channel_id`, `thread_id` (nonnil
+UUIDs), and `sha256` (64 lowercase hex characters). Public URLs, object keys,
+base64 and unverifiable references are rejected. The run actor must currently
+have company and channel/thread visibility; cross-company attachments are refused.
+Missing, changed, unsupported or oversized images produce explicit `jev.asset_*`
+failures. A retry verifies the same digest again before replay or a new provider call.
+
+Local limits are 24 KiB per PNG/JPEG, dimensions 280–1024 each, at most 1,048,576
+pixels, still images only. Bytes, MIME, decoded image and digest must agree.
+The complete JSON request, including base64 framing, still fits within 64 KiB;
+several individually valid images can therefore exceed the aggregate limit.
+Image bytes exist only during an authorized provider request. Bundles, invocation
+identity, traces and sample reports carry inert references and digests only.
+Token admission conservatively adds one token per decoded pixel to the wire-byte
+estimate; actual provider usage is retained on settlement.
+
+For requests with assets, provider state is `{ "content": <original state>,
+"assets": { "<logical name>": <server opaque placeholder> } }`. Refer to original
+state through `content` and images through `assets.NAME`. No user text is replaced
+by a short logical token. A `box` question has `type` and string `instructions`
+only; instructions must name a declared image as a backtick path such as
+`assets.photo`. It forbids `criteria`. Its answer has exactly `type: box`, `box`
+with `left`, `right`, `top`, `bottom`, and `confidence`. Coordinates and confidence
+are in [0,1], with `left < right` and `top < bottom`. Mixed text and Box answers
+have static downstream paths, for example `/steps/start/output/answers/mug/box/left`.
+
+The scripted image sample in `samples/jev-image.json` contains inert references and
+supplied results. It never reads private storage or calls TypeSafe. Its format has
+`source` (workflow definition) and `sample` (sample request); use them with the
+ordinary compile/publication and sample APIs. The mixed scenario in
+`samples/jev-triage.json` provides `sample` (automatic routing) and `uncertain_sample`
+(a scripted human decision) against one source. Replace the illustrative reviewer
+and attachment identifiers with authorized company resources before live use.
+Jev sample usage comes from `output.usage.input_tokens` plus `output.usage.output_tokens`;
+leave the generic script `tokens` at zero. Samples charge one simulated model call
+and enforce their token allowance, without billing or external access.
+Contracts checked against [TypeSafe Images](https://docs.typesafe.ai/images)
+and [Box](https://docs.typesafe.ai/primitives/box).

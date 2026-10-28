@@ -52,6 +52,14 @@ pub trait FileStorage: Send + Sync {
         bytes: Vec<u8>,
     ) -> AppResult<()>;
 
+    /// Bounded streaming read: reject declared or streamed sizes beyond max_bytes before allocation.
+    async fn read_object_bounded(
+        &self,
+        bucket: BucketKind,
+        key: &ObjectKey,
+        max_bytes: usize,
+    ) -> AppResult<StoredObject>;
+
     /// Read back what [`FileStorage::store_object`] wrote.
     async fn read_object(&self, bucket: BucketKind, key: &ObjectKey) -> AppResult<StoredObject>;
 }

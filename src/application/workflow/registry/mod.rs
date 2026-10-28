@@ -7,6 +7,7 @@ mod examples;
 mod facts;
 mod families;
 mod help;
+pub mod jev;
 pub(crate) mod mcp;
 pub(crate) use mcp::tool_result as mcp_tool_result;
 mod metadata;
@@ -29,7 +30,7 @@ use schemas::*;
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 
-pub const CONTRACT_REVISION: &str = "workflow-catalogue-v1.5";
+pub const CONTRACT_REVISION: &str = "workflow-catalogue-v1.6";
 pub const MAX_FACTS: usize = 256;
 pub const MAX_SELECTIONS: usize = 128;
 /// Explicit reviewers of one `decision.human` (user decision Q1, 05-D2 §2): at most this many
@@ -47,11 +48,12 @@ pub const MAX_IDENTIFIER: usize = 128;
 pub const MAX_PATH: usize = 2048;
 pub const MAX_DEADLINE: usize = 64;
 pub const MAX_CORRELATION: usize = 256;
-pub const TYPES: [&str; 18] = [
+pub const TYPES: [&str; 19] = [
     "context.history",
     "memory.load",
     "memory.save",
     "ai.classify",
+    "jev.evaluate",
     "agent.run",
     "decision.rule",
     "decision.human",
@@ -120,6 +122,7 @@ pub fn compile(
     }
     compiler::check_resolved_budget(&parsed, &descriptors, dependencies, &facts.tool_workflows)?;
     validate_declarations(&parsed)?;
+    validate_jev_resources(&parsed)?;
     compiler::compile_resolved(
         decoded,
         parsed,
@@ -423,3 +426,30 @@ fn validate_declarations(parsed: &ParsedWorkflow) -> Result<(), Diagnostic> {
     }
     Ok(())
 }
+
+fn validate_jev_resources(parsed: &ParsedWorkflow) -> Result<(), Diagnostic> {
+    for resource in parsed
+        .definition
+        .resources
+        .iter()
+        .filter(|r| r.kind.as_str() == "typesafe")
+    {
+        let used = parsed.definition.steps.values().any(|step| step.step_type.as_str() == "jev.evaluate"
+            && matches!(step.inputs.get("connection"), Some(Binding::Literal(value)) if value.as_str() == Some(resource.slot.as_str())));
+        if !used {
+            return Err(Diagnostic::at(
+                "registry.resource",
+                "TypeSafe resource slots must be referenced by a Jev step",
+                "/resources",
+                parsed.locations[""],
+            ));
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod jev_tests;
+
+#[cfg(test)]
+mod jev_box_tests;

@@ -99,6 +99,16 @@ pub struct CredentialContext {
 }
 
 impl CredentialContext {
+    pub fn typesafe_credential(company_id: Uuid, connection_id: Uuid) -> Self {
+        Self {
+            scope: "typesafe_credential",
+            fields: vec![
+                company_id.as_bytes().to_vec(),
+                connection_id.as_bytes().to_vec(),
+            ],
+        }
+    }
+
     pub fn workflow_http_credential(company_id: Uuid, connection_id: Uuid) -> Self {
         Self {
             scope: "workflow_http_credential",

@@ -1,0 +1,99 @@
+{
+  "source": {
+    "format_version": 1,
+    "workflow_id": "00000000-0000-0000-0000-000000000001",
+    "input_schema": true,
+    "parameter_schema": true,
+    "output_schema": true,
+    "resources": [
+      {
+        "slot": "service",
+        "kind": "typesafe"
+      }
+    ],
+    "entry": "start",
+    "steps": {
+      "start": {
+        "type": "jev.evaluate",
+        "with": {
+          "connection": {
+            "literal": "service"
+          },
+          "model": {
+            "literal": "jev-1.14.0"
+          },
+          "state": {
+            "literal": {
+              "note": "Scripted image demonstration"
+            }
+          },
+          "assets": {
+            "literal": {
+              "photo": {
+                "channel_id": "00000000-0000-0000-0000-000000000002",
+                "thread_id": "00000000-0000-0000-0000-000000000003",
+                "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+              }
+            }
+          },
+          "questions": {
+            "literal": {
+              "visible": {
+                "type": "noul",
+                "instructions": "Is there a mug in `assets.photo`?"
+              },
+              "mug": {
+                "type": "box",
+                "instructions": "The mug in `assets.photo`"
+              }
+            }
+          }
+        },
+        "routes": {
+          "success": "$end"
+        }
+      }
+    },
+    "limits": {
+      "max_steps": 100,
+      "max_context_bytes": 65536
+    }
+  },
+  "sample": {
+    "input": {},
+    "params": {},
+    "scripts": [
+      {
+        "workflow_id": "00000000-0000-0000-0000-000000000001",
+        "step": "start",
+        "responses": [
+          {
+            "output": {
+              "model": "jev-1.14.0",
+              "answers": {
+                "visible": {
+                  "type": "noul",
+                  "noul": 0.9
+                },
+                "mug": {
+                  "type": "box",
+                  "box": {
+                    "left": 0.1,
+                    "right": 0.8,
+                    "top": 0.2,
+                    "bottom": 0.9
+                  },
+                  "confidence": 0.8
+                }
+              },
+              "usage": {
+                "input_tokens": 200,
+                "output_tokens": 20
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

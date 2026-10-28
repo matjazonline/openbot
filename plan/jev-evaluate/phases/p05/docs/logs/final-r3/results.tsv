@@ -1,0 +1,24 @@
+fmt	0	2	cargo fmt --all -- --check
+diff	0	0	git diff --check
+transport_tests	0	1	scripts/tests/transport-boundary.sh
+transport_check	0	2	scripts/transport-boundary-check.sh
+sample_boundary_tests	0	0	python3 scripts/tests/workflow-sample-boundary.py
+sample_boundary	0	0	python3 scripts/workflow-sample-boundary.py
+css	0	1	npm run check:css
+cargo_check	0	11	cargo check --locked --offline --all-targets
+clippy	0	0	cargo clippy --locked --offline --all-targets -- -D warnings
+migrate	0	0	env SQLX_OFFLINE=false cargo sqlx migrate run
+sqlx_check	0	10	env SQLX_OFFLINE=false cargo sqlx prepare --check -- --all-targets
+cargo_test_no_run	0	19	cargo test --locked --offline --all-targets --no-run
+cargo_test_full	0	480	scripts/test-network-isolation.sh cargo test --locked --offline --all-targets
+stack_budget	0	477	scripts/test-network-isolation.sh scripts/stack-budget.sh --offline
+lease_budget	0	218	scripts/test-network-isolation.sh scripts/lease-budget.sh --offline
+run_counts	0	3	npm run test:run-counts
+deploy_script	0	1	scripts/tests/deploy.sh
+credential_rotation_script	0	0	scripts/tests/credential-key-rotation.sh
+graft_build	127	0	graft build
+decision_markup	0	0	env WORKFLOW_DECISION_BROWSER_FIXTURES=/Users/mac02/dev/openbot/plan/jev-evaluate/phases/p05/docs/logs/final-r3/decision-fixtures cargo test --locked --offline --lib decision_browser_markup_and_closed_draft_recovery
+decision_source	0	1	env WORKFLOW_DECISION_BROWSER_FIXTURES=/Users/mac02/dev/openbot/plan/jev-evaluate/phases/p05/docs/logs/final-r3/decision-fixtures cargo test --locked --offline --lib source_message_outside_window_is_exact_and_authorized
+workflow_decisions_js	0	2	env WORKFLOW_DECISION_BROWSER_FIXTURES=/Users/mac02/dev/openbot/plan/jev-evaluate/phases/p05/docs/logs/final-r3/decision-fixtures node --test scripts/tests/workflow-decisions.mjs
+cargo_build_server	0	10	cargo build --locked --offline --bin mail_agents
+node_combined	0	8	node --test scripts/tests/sse-navigation.mjs scripts/tests/agent-runtime.mjs scripts/tests/workflow-runs.mjs scripts/tests/workflow-conversations.mjs scripts/tests/workflow-samples.mjs scripts/tests/workflow-authoring-browser.cjs

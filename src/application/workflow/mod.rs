@@ -22,6 +22,7 @@ pub mod decisions;
 pub mod fixtures;
 pub mod history;
 pub mod http;
+pub mod jev;
 pub mod lease;
 pub mod lifecycle;
 pub mod manual;

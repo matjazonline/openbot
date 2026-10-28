@@ -10766,7 +10766,7 @@ CREATE TABLE public.model_usage_calls (
     company_id uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
     request_id uuid NOT NULL,
     task_id uuid NOT NULL,
-    agent_id uuid NOT NULL,
+    agent_id uuid,
     workflow_id uuid,
     version_id uuid,
     run_id uuid,
@@ -11258,3 +11258,60 @@ CREATE TRIGGER workflow_history_members_immutable BEFORE UPDATE OR DELETE ON pub
     FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_history_snapshot();
 CREATE TRIGGER workflow_history_snapshots_immutable BEFORE UPDATE OR DELETE ON public.workflow_history_snapshots
     FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_history_snapshot();
+
+-- Company TypeSafe resources never enter the agent provider registry.
+CREATE TABLE public.company_typesafe_connections (
+    company_id uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
+    id uuid NOT NULL,
+    enabled boolean NOT NULL DEFAULT true,
+    revision bigint NOT NULL DEFAULT 1 CHECK (revision > 0),
+    models text[] NOT NULL CHECK (cardinality(models) BETWEEN 1 AND 64 AND array_position(models, NULL) IS NULL AND octet_length(models::text) <= 16384),
+    envelope text NOT NULL CHECK (envelope LIKE 'enc:v2:%' AND octet_length(envelope) <= 16384),
+    PRIMARY KEY (company_id, id)
+);
+
+-- Jev calls are not agent invocations. Keep that distinction explicit in usage reports.
+ALTER TABLE public.model_usage_calls ADD CONSTRAINT model_usage_agent_kind
+    CHECK ((provider = 'typesafe' AND agent_id IS NULL) OR (provider <> 'typesafe' AND agent_id IS NOT NULL));
+ALTER TABLE public.model_usage_calls ADD CONSTRAINT model_usage_jev_identity UNIQUE(company_id,run_id,execution_id,request_id);
+CREATE TABLE public.workflow_jev_invocations (
+    company_id uuid NOT NULL,
+    run_id uuid NOT NULL,
+    execution_id uuid NOT NULL,
+    request_id uuid NOT NULL,
+    generation uuid NOT NULL,
+    worker_id uuid NOT NULL,
+    attempt integer NOT NULL CHECK (attempt > 0),
+    prepared bytea NOT NULL CHECK (octet_length(prepared) BETWEEN 1 AND 65536),
+    digest bytea NOT NULL CHECK (octet_length(digest) = 32),
+    output jsonb,
+    failure_code text,
+    retryable boolean,
+    latency_ms bigint CHECK (latency_ms BETWEEN 0 AND 3600000),
+    created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+    completed_at timestamptz,
+    retry_not_before timestamptz CHECK (retry_not_before IS NULL OR (retryable=true AND completed_at IS NOT NULL AND retry_not_before<=completed_at+interval '61 seconds')),
+    PRIMARY KEY(company_id, request_id),
+    UNIQUE(company_id, execution_id, generation),
+    CHECK ((output IS NULL AND failure_code IS NULL AND retryable IS NULL AND completed_at IS NULL AND latency_ms IS NULL)
+        OR (completed_at IS NOT NULL AND latency_ms IS NOT NULL AND
+            ((output IS NOT NULL AND failure_code IS NULL AND retryable IS NULL)
+            OR (output IS NULL AND failure_code IS NOT NULL AND retryable IS NOT NULL)))),
+    CHECK (output IS NULL OR (jsonb_typeof(output)='object' AND octet_length(output::text)<=131072)),
+    CHECK (failure_code IS NULL OR failure_code IN ('jev.invalid_request','jev.provider_protocol','jev.transport','jev.timeout','jev.rate_limited','jev.credentials','jev.http')),
+    FOREIGN KEY(company_id,run_id,execution_id) REFERENCES public.workflow_executions(company_id,run_id,id) ON DELETE CASCADE,
+    FOREIGN KEY(company_id,run_id,execution_id,request_id) REFERENCES public.model_usage_calls(company_id,run_id,execution_id,request_id) ON DELETE CASCADE
+);
+CREATE UNIQUE INDEX workflow_jev_success ON public.workflow_jev_invocations(company_id,execution_id) WHERE output IS NOT NULL;
+CREATE FUNCTION public.guard_jev_invocation_update() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF (to_jsonb(NEW)-ARRAY['output','failure_code','retryable','latency_ms','completed_at','retry_not_before'])
+       IS DISTINCT FROM (to_jsonb(OLD)-ARRAY['output','failure_code','retryable','latency_ms','completed_at','retry_not_before'])
+       OR (OLD.completed_at IS NOT NULL AND NEW IS DISTINCT FROM OLD) THEN
+        RAISE EXCEPTION 'Jev invocation identity and completed outcome are immutable' USING ERRCODE='23514';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+CREATE TRIGGER workflow_jev_immutable BEFORE UPDATE ON public.workflow_jev_invocations
+    FOR EACH ROW EXECUTE FUNCTION public.guard_jev_invocation_update();

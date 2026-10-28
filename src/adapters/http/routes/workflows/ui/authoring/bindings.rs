@@ -209,6 +209,51 @@ impl Ui {
         Ok(options)
     }
 
+    async fn typesafe_options(
+        &self,
+        company: Uuid,
+        definition: Option<&WorkflowDefinition>,
+    ) -> AppResult<Vec<crate::application::workflow::reads::ChoiceOption>> {
+        let typesafe = if definition.is_some_and(|definition| {
+            definition
+                .resources
+                .iter()
+                .any(|resource| resource.kind.as_str() == "typesafe")
+        }) {
+            self.engine
+                .jev_connections()
+                .list_jev(super::company(company), self.actor()?)
+                .await?
+                .into_iter()
+                .map(|connection| {
+                    let models = connection
+                        .models
+                        .iter()
+                        .map(|model| model.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", ");
+                    crate::application::workflow::reads::ChoiceOption {
+                        id: connection.id,
+                        label: format!(
+                            "{} · {} · {models}",
+                            connection.id,
+                            if connection.ready {
+                                "ready"
+                            } else {
+                                "not ready"
+                            }
+                        ),
+                        enabled: connection.enabled,
+                        detail: String::new(),
+                    }
+                })
+                .collect::<Vec<_>>()
+        } else {
+            Vec::new()
+        };
+        Ok(typesafe)
+    }
+
     /// The chosen version's definition, when it is a selectable version of this workflow.
     async fn binding_definition(
         &self,
@@ -273,6 +318,9 @@ impl Ui {
             },
             None => pages::BindingParams::Json(&json),
         };
+        let typesafe = self
+            .typesafe_options(company.id, definition.as_ref())
+            .await?;
         Ok(pages::workflow_binding_form(&pages::BindingFormView {
             company_id: company.id,
             workflow,
@@ -287,6 +335,7 @@ impl Ui {
             resources: &form.resources,
             http: &options.http,
             mcp: &options.mcp,
+            typesafe: &typesafe,
             message_trigger: &form.message_trigger,
             run_as: form.run_as,
             owner: company.user_id == self.user,

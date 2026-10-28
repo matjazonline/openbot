@@ -21,6 +21,10 @@ async fn isolated_connection() -> Option<PgConnection> {
     // tables by design, so a real-table fixture would rotate rows belonging to a test running
     // beside it.
     for statement in [
+        r#"CREATE TEMPORARY TABLE company_typesafe_connections (
+               company_id UUID NOT NULL, id UUID NOT NULL, envelope TEXT NOT NULL,
+               PRIMARY KEY (company_id, id)
+           ) ON COMMIT PRESERVE ROWS"#,
         r#"CREATE TEMPORARY TABLE workflow_http_credentials (
                company_id UUID NOT NULL, connection_id UUID NOT NULL, envelope TEXT NOT NULL,
                PRIMARY KEY (company_id, connection_id)

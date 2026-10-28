@@ -1,0 +1,16 @@
+[
+  {
+    "theme": "dark",
+    "radius": "8px",
+    "outline": "-1px",
+    "color": "oklch(0.97807 0.029 256.847)",
+    "display": "inline-flex"
+  },
+  {
+    "theme": "light",
+    "radius": "8px",
+    "outline": "-1px",
+    "color": "oklch(0.21 0.006 285.885)",
+    "display": "inline-flex"
+  }
+]

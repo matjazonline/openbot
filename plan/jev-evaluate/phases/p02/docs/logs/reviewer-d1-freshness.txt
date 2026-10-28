@@ -1,0 +1,5 @@
+Decision file SHA-256: 98e95f3fc27ba8854016ba5bd0ca6755a9348724120578f1da1f79a03e7eaae1
+TASK decision body equals immutable decision: yes
+Coordination authority equals pinned r3 bytes: yes
+HEAD: 5a12ebec76c76c97e50b2a51ebacd66712db5820
+graft: unavailable (command -v graft exit 1)

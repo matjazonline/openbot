@@ -66,6 +66,7 @@ fn workflow_registry_each_type_validates_dynamic_required_inputs() {
         let (field, bad) = match name {
             "context.history" => ("max_tokens", json!(0)),
             "memory.load" | "memory.save" => ("scope", json!({"kind":"user"})),
+            "jev.evaluate" => ("state", json!(true)),
             "ai.classify" => continue, // Context is intentionally schema-free JSON; declaration must be static.
             "agent.run" | "decision.agent" => ("agent", json!(3)),
             "decision.rule" => ("data", json!(3)),

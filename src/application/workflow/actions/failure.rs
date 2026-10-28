@@ -43,6 +43,7 @@ pub fn effect_free_kind(kind: &str) -> bool {
             | "context.history"
             | "memory.load"
             | "ai.classify"
+            | "jev.evaluate"
             | "wait.event"
             | "wait.timer"
     )

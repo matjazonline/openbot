@@ -294,3 +294,6 @@ fn descendants_cannot_replenish_root_budgets_and_report_size_is_bounded() {
     );
     assert!(serde_json::to_vec(&report).unwrap().len() <= MAX_REPORT_BYTES);
 }
+
+#[path = "jev_tests.rs"]
+mod jev_tests;

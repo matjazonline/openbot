@@ -45,6 +45,7 @@ url = "2"
 pulldown-cmark = "0.13"
 ammonia = "4"
 base64 = "0.22"
+image = { version = "=0.25.10", default-features = false, features = ["png", "jpeg"] }
 ring = "0.17"
 p256 = { version = "0.13", features = ["ecdsa", "pem"] }
 # RS256 for the Google service-account assertion that buys a Cloud Storage access token.

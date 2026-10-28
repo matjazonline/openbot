@@ -146,18 +146,26 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
             .map_err(|error| anyhow::anyhow!("Could not register the email renderer: {error}"))?,
     );
     let delivery_composer = DeliveryComposer::new(renderers.clone(), postgres_arc.clone());
-    let workflow = Arc::new(crate::infra::workflow::WorkflowEngine::new(
-        (*postgres_arc).clone(),
-        &config.public_base_url(),
-        &config.app_domain_name,
-        delivery_composer.clone(),
-        mcp_client,
-        monitoring.clone(),
-        crate::infra::workflow::worker_slots(
-            std::env::var("WORKFLOW_WORKER_SLOTS").ok().as_deref(),
-            crate::infra::db::max_connections(),
-        )?,
-    )?);
+    let workflow = Arc::new(
+        crate::infra::workflow::WorkflowEngine::new(
+            (*postgres_arc).clone(),
+            &config.public_base_url(),
+            &config.app_domain_name,
+            delivery_composer.clone(),
+            mcp_client,
+            monitoring.clone(),
+            crate::infra::workflow::worker_slots(
+                std::env::var("WORKFLOW_WORKER_SLOTS").ok().as_deref(),
+                crate::infra::db::max_connections(),
+            )?,
+        )?
+        .with_jev_assets(Arc::new(
+            crate::adapters::workflow_jev::JevAssetReader::new(
+                (*postgres_arc).clone(),
+                file_storage.clone(),
+            ),
+        )),
+    );
     let notification_worker = Arc::new(NotificationWorker::new(
         postgres_arc.clone(),
         delivery_composer.clone(),

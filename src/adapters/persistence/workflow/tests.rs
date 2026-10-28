@@ -17,6 +17,8 @@ mod binding_tests;
 mod child_publication_tests;
 #[path = "http_tests.rs"]
 mod http_tests;
+#[path = "jev_tests.rs"]
+mod jev_tests;
 pub(crate) use http_tests::reconciliation_fixture;
 #[path = "mcp_tests.rs"]
 mod mcp_tests;
@@ -579,3 +581,12 @@ async fn assert_silent_until_marker(
         "nothing was notified before the marker"
     );
 }
+
+#[path = "jev_runtime_tests.rs"]
+mod jev_runtime_tests;
+
+#[path = "jev_assets_tests.rs"]
+mod jev_assets_tests;
+
+#[path = "jev_end_to_end_tests.rs"]
+mod jev_end_to_end_tests;

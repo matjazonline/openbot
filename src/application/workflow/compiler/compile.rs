@@ -198,7 +198,13 @@ impl CompiledWorkflow {
                 self.span(&format!("/steps/{step}")),
             )
         })?;
-        schema.validate(value, &path, self.span(&format!("/steps/{step}")))
+        schema.validate(value, &path, self.span(&format!("/steps/{step}")))?;
+        if self.graph.definition().steps[step].step_type.as_str() == "jev.evaluate" {
+            crate::application::workflow::registry::jev::validate_output(value).map_err(
+                |message| Diagnostic::at("output.jev", message, &path, self.span(&path)),
+            )?;
+        }
+        Ok(())
     }
 }
 

@@ -118,6 +118,29 @@ impl FileStorage for FakeStorage {
         Ok(())
     }
 
+    async fn read_object_bounded(
+        &self,
+        bucket: BucketKind,
+        key: &ObjectKey,
+        max_bytes: usize,
+    ) -> AppResult<StoredObject> {
+        self.refuse_if_broken()?;
+        let objects = self.stored.lock().expect("test storage");
+        let object = objects
+            .iter()
+            .rev()
+            .find(|object| object.bucket == bucket && &object.key == key)
+            .ok_or_else(|| AppError::NotFound("Missing object".into()))?;
+        if object.bytes.len() > max_bytes {
+            return Err(AppError::BadRequest(
+                "Stored object exceeds read limit".into(),
+            ));
+        }
+        Ok(StoredObject {
+            content_type: object.content_type.clone(),
+            bytes: object.bytes.clone(),
+        })
+    }
     async fn read_object(&self, bucket: BucketKind, key: &ObjectKey) -> AppResult<StoredObject> {
         self.refuse_if_broken()?;
 

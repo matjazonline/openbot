@@ -16,6 +16,7 @@ pub(super) fn preflight(parsed: &ParsedWorkflow, facts: &CatalogueFacts) -> Resu
     for (id, step) in &parsed.definition.steps {
         declarations(&mut budget, step)?;
         match step.step_type.as_str() {
+            "jev.evaluate" => jev::preflight(step, &mut budget, parsed.locations[""])?,
             "tool.call" | "mcp.call" => tool(&mut budget, step, facts)?,
             "workflow.call" | "flow.repeat" => {
                 if let Some(control) = parsed.controls.get(id)

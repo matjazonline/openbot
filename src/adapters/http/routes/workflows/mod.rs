@@ -30,6 +30,7 @@ use crate::{
 mod bindings;
 mod decisions;
 mod definitions;
+mod jev;
 mod reconciliations;
 mod tools;
 mod ui;
@@ -133,6 +134,7 @@ pub fn router() -> Router<AppState> {
             &format!("{company}/agents/{{agent_id}}/workflow-tools"),
             put(tools::grant),
         )
+        .merge(jev::router())
         .merge(ui::router())
         .layer(DefaultBodyLimit::max(BODY_LIMIT))
 }

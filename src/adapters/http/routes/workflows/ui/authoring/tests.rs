@@ -583,3 +583,6 @@ mod destination_tests;
 
 #[path = "sample_tests.rs"]
 mod sample_tests;
+
+#[path = "jev_tests.rs"]
+mod jev_tests;

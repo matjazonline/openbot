@@ -1,0 +1,7 @@
+#!/usr/bin/env python3
+"""macOS shim for snapshot.sh's GNU realpath -m --relative-to invocation."""
+import os
+import sys
+args = sys.argv[1:]
+root = next(arg.split('=', 1)[1] for arg in args if arg.startswith('--relative-to='))
+print(os.path.relpath(os.path.realpath(args[-1]), root))

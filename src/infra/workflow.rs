@@ -126,6 +126,7 @@ pub fn worker_slots(configured: Option<&str>, pool_connections: u32) -> anyhow::
 /// reaches its runtime, which performs effects only through ActionService's marker-first
 /// protocol (§04.10); this composite adds no effect path of its own.
 pub struct ProductionHandler {
+    jev: crate::application::workflow::jev::JevRuntime<PostgresPersistence>,
     agent: WorkflowAgentRuntime<PostgresPersistence, AgentActionTools>,
     http: Arc<HttpRuntime>,
     mcp: Arc<McpRuntime>,
@@ -135,6 +136,9 @@ pub struct ProductionHandler {
 
 impl ProductionHandler {
     fn route(&self, kind: &WorkflowStepKind) -> Option<&dyn WorkflowHandler> {
+        if self.jev.supports(kind) {
+            return Some(&self.jev);
+        }
         let handlers: [&dyn WorkflowHandler; 5] = [
             &self.agent,
             self.http.as_ref(),
@@ -234,6 +238,11 @@ impl WorkflowEngine {
             lease,
         );
         let handler = Arc::new(ProductionHandler {
+            jev: crate::application::workflow::jev::JevRuntime::new(
+                persistence.clone(),
+                Arc::new(crate::adapters::workflow_jev::JevHttp::new()?),
+                lease,
+            ),
             agent,
             http,
             mcp,
@@ -251,6 +260,17 @@ impl WorkflowEngine {
             intent_wakeups: Arc::new(Notify::new()),
             worker_wakeups: Arc::new(Notify::new()),
         })
+    }
+
+    pub fn with_jev_assets(
+        mut self,
+        assets: Arc<dyn crate::application::workflow::jev::JevAssets>,
+    ) -> Self {
+        Arc::get_mut(&mut self.handler)
+            .expect("engine composition precedes sharing")
+            .jev
+            .set_assets(assets);
+        self
     }
 
     pub fn handler(&self) -> &ProductionHandler {
@@ -357,6 +377,10 @@ impl WorkflowEngine {
     }
 
     pub fn decisions(&self) -> &dyn crate::application::workflow::decisions::WorkflowDecisions {
+        &self.persistence
+    }
+
+    pub fn jev_connections(&self) -> &dyn crate::application::workflow::jev::JevConnections {
         &self.persistence
     }
 
@@ -517,6 +541,18 @@ impl WorkflowEngine {
 #[cfg(test)]
 impl WorkflowEngine {
     /// The production composition on `persistence`, for tests: one slot, `agents.test`.
+    pub(crate) fn with_jev_test_provider(
+        mut self,
+        provider: Arc<dyn crate::application::workflow::jev::JevProvider>,
+    ) -> Self {
+        let handler = Arc::get_mut(&mut self.handler).expect("unshared test engine");
+        handler.jev = crate::application::workflow::jev::JevRuntime::new(
+            self.persistence.clone(),
+            provider,
+            LeasePolicy::new(LEASE).unwrap(),
+        );
+        self
+    }
     pub(crate) fn for_tests(persistence: PostgresPersistence) -> Self {
         use crate::adapters::protocols::email::EmailRenderer;
         use crate::application::transport::ports::TransportRenderers;
