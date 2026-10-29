@@ -127,6 +127,7 @@ pub fn profile_pane(pane: &ProfilePane<'_>) -> String {
                 <div class="min-w-0">
                     <h1 class="truncate text-2xl font-bold">{username}</h1>
                     <p class="truncate font-mono text-xs opacity-60">{email} &middot; joined {joined}</p>
+                    {verification_status}
                 </div>
             </div>
             {identity}
@@ -139,6 +140,11 @@ pub fn profile_pane(pane: &ProfilePane<'_>) -> String {
         username = escape_html_text(&user.username),
         email = escape_html_text(&user.email),
         joined = super::format_date(user.created_at),
+        verification_status = if user.email_verified_at.is_some() {
+            "<p class=\"mt-1 text-xs text-success\">Email verified</p>"
+        } else {
+            "<p class=\"mt-1 text-xs text-warning\">Email unverified. Email-based invitations, restricted channel access, and operator access are unavailable until you confirm this address.</p>"
+        },
         identity = identity_section(draft, pane.pending, &pane.outcome),
         login_methods = login_methods_section(pane),
         notifications = notification_preferences_section(pane),
@@ -277,7 +283,7 @@ fn identity_form(draft: &ProfileDraft<'_>) -> String {
                                 class="input w-full font-mono">
                         </label>
                     </div>
-                    <p class="text-[11px] opacity-60">A new address is mailed a code before it becomes yours, so it is not your account's until you confirm it. Changing it changes which channels treat you as a participant, and where mail addressed to you arrives. You stay signed in.</p>
+                    <p class="text-[11px] opacity-60">A new address is mailed a code before it becomes yours, so it is not your account's until you confirm it. Changing it changes which channels treat you as a participant, and where mail addressed to you arrives. Installing the new address signs out every browser. Sign in again afterward.</p>
                     <div class="border-t border-base-300 pt-4">
                         <button type="submit" class="btn btn-primary">
                             <span class="loading loading-spinner loading-sm hidden [.htmx-request_&]:inline-block"></span>
@@ -333,9 +339,9 @@ fn password_section(
         "##,
         banner = outcome.banner(ProfileForm::Password),
         description = if methods.password {
-            "Changing it does not sign your other browsers out."
+            "Changing your password signs out every browser. Sign in again afterward."
         } else {
-            "Add email or username and password as another way to sign in."
+            "Adding a password signs out every browser. Sign in again afterward."
         },
     )
 }

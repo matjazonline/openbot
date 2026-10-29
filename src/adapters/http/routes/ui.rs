@@ -323,15 +323,7 @@ pub(super) async fn render_message_pane(
 }
 
 /// GET /ui - The full mailbox shell for the selected company / channel / thread (Protected).
-#[instrument(skip(
-    activity_reader,
-    company_use_cases,
-    channel_use_cases,
-    thread_use_cases,
-    user_use_cases,
-    config,
-    user
-))]
+#[instrument(skip_all)]
 #[expect(
     clippy::too_many_arguments,
     reason = "Axum handlers receive request state and extractors as parameters"
@@ -424,7 +416,7 @@ async fn mailbox_page(
 }
 
 /// GET /ui/threads - The thread column for a channel, clearing the detail pane (Protected).
-#[instrument(skip(channel_use_cases, thread_use_cases, activity_reader, config, viewer))]
+#[instrument(skip_all)]
 async fn thread_column_fragment(
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
@@ -464,7 +456,7 @@ async fn thread_column_fragment(
 }
 
 /// GET /ui/threads/list - One older page of threads, appended to the open column (Protected).
-#[instrument(skip(channel_use_cases, thread_use_cases, activity_reader, config, viewer))]
+#[instrument(skip_all)]
 async fn thread_page_fragment(
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
@@ -504,7 +496,7 @@ async fn thread_page_fragment(
 }
 
 /// GET /ui/messages - The messages of one thread (Protected).
-#[instrument(skip(activity_reader, channel_use_cases, thread_use_cases, viewer))]
+#[instrument(skip_all)]
 async fn message_pane_fragment(
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
@@ -558,14 +550,7 @@ fn resume_cursor<C: FromStr>(headers: &HeaderMap, after: Option<&str>) -> Option
 /// Each event is one rendered chat bubble, appended to `#message-scroll` by htmx's SSE extension.
 /// The `id:` on every event is that message's cursor, which is what makes reconnects resume
 /// exactly where the reader left off.
-#[instrument(skip(
-    channel_use_cases,
-    thread_use_cases,
-    activity_reader,
-    events,
-    viewer,
-    headers
-))]
+#[instrument(skip_all)]
 async fn thread_message_stream(
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
@@ -611,8 +596,8 @@ async fn thread_message_stream(
                             .event("activity")
                             .data(html));
                     }
-                    Err(error) => {
-                        warn!(%error, %thread_id, "Thread activity query failed");
+                    Err(_) => {
+                        warn!(%thread_id, "Thread activity query failed");
                         return;
                     }
                 }
@@ -627,7 +612,7 @@ async fn thread_message_stream(
                         let ids: Vec<_> = messages.iter().flat_map(|message| message.run_ids.iter().copied()).collect();
                         let inspectable = match activity_reader.inspectable_runs(query.company_id, viewer.user_id, &ids).await {
                             Ok(ids) => ids,
-                            Err(error) => { warn!(%error, %thread_id, "Message run visibility query failed"); return; }
+                            Err(_) => { warn!(%thread_id, "Message run visibility query failed"); return; }
                         };
                         for message in &messages {
                             cursor = Some(message.cursor());
@@ -653,8 +638,8 @@ async fn thread_message_stream(
                     }
                     // Ending the stream makes the browser reconnect with `Last-Event-ID`, which
                     // resumes from the same cursor -- the right response to a transient failure.
-                    Err(error) => {
-                        warn!(%error, %thread_id, "Message stream query failed");
+                    Err(_) => {
+                        warn!(%thread_id, "Message stream query failed");
                         return;
                     }
                 }
@@ -692,15 +677,7 @@ async fn thread_message_stream(
 /// receives a message is bumped to the top of the column, so "insert at top, drop the stale copy"
 /// is the whole reordering — and it leaves any older pages the reader loaded on demand in place,
 /// which re-rendering the first page would not.
-#[instrument(skip(
-    channel_use_cases,
-    thread_use_cases,
-    activity_reader,
-    events,
-    config,
-    viewer,
-    headers
-))]
+#[instrument(skip_all)]
 #[expect(
     clippy::too_many_arguments,
     reason = "Axum handlers receive request state and extractors as parameters"
@@ -754,8 +731,8 @@ async fn thread_column_stream(
                                 )));
                         }
                     }
-                    Err(error) => {
-                        warn!(%error, %channel_id, "Thread activity query failed");
+                    Err(_) => {
+                        warn!(%channel_id, "Thread activity query failed");
                         return;
                     }
                 }
@@ -778,8 +755,8 @@ async fn thread_column_stream(
                         .await
                         {
                             Ok(activity) => activity,
-                            Err(error) => {
-                                warn!(%error, %channel_id, "Thread activity query failed");
+                            Err(_) => {
+                                warn!(%channel_id, "Thread activity query failed");
                                 return;
                             }
                         };
@@ -787,8 +764,8 @@ async fn thread_column_stream(
                         // about a person's message. Only streamed rows need it.
                         let last_roles = match thread_use_cases.thread_last_roles(&ids).await {
                             Ok(roles) => roles,
-                            Err(error) => {
-                                warn!(%error, %channel_id, "Thread last-role query failed");
+                            Err(_) => {
+                                warn!(%channel_id, "Thread last-role query failed");
                                 return;
                             }
                         };
@@ -821,8 +798,8 @@ async fn thread_column_stream(
                             continue;
                         }
                     }
-                    Err(error) => {
-                        warn!(%error, %channel_id, "Thread column stream query failed");
+                    Err(_) => {
+                        warn!(%channel_id, "Thread column stream query failed");
                         return;
                     }
                 }
@@ -847,8 +824,8 @@ async fn thread_column_stream(
                     pending_rows = true;
                     match first_page_thread_ids(&thread_use_cases, channel_id).await {
                         Ok(ids) => stale_badges.extend(ids),
-                        Err(error) => {
-                            warn!(%error, %channel_id, "Thread column catch-up query failed");
+                        Err(_) => {
+                            warn!(%channel_id, "Thread column catch-up query failed");
                             return;
                         }
                     }
@@ -862,7 +839,7 @@ async fn thread_column_stream(
 }
 
 /// GET /ui/compose - The new-thread form for the selected channel (Protected).
-#[instrument(skip(company_use_cases, channel_use_cases, user_use_cases, config, viewer))]
+#[instrument(skip_all)]
 async fn compose_form(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
@@ -900,16 +877,7 @@ async fn compose_form(
 /// delivered by email. That path is also why the guard here is the *read* guard: a participant who
 /// is not the company's owner composes from the mailbox exactly as they would by email, and the
 /// channel's own participant rules still decide whether the message lands.
-#[instrument(skip(
-    activity_reader,
-    company_use_cases,
-    channel_use_cases,
-    thread_use_cases,
-    user_use_cases,
-    config,
-    viewer,
-    form
-))]
+#[instrument(skip_all)]
 #[expect(
     clippy::too_many_arguments,
     reason = "Axum handlers receive request state and extractors as parameters"
@@ -995,14 +963,7 @@ async fn create_thread(
 }
 
 /// GET /ui/reply - The new-message form for the open thread (Protected).
-#[instrument(skip(
-    company_use_cases,
-    channel_use_cases,
-    thread_use_cases,
-    user_use_cases,
-    config,
-    viewer
-))]
+#[instrument(skip_all)]
 async fn reply_form(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
@@ -1041,16 +1002,7 @@ async fn reply_form(
 ///
 /// Like Compose, the message takes the inbound path a real email would; the threading headers are
 /// what keep it in this conversation instead of starting a new one.
-#[instrument(skip(
-    activity_reader,
-    company_use_cases,
-    channel_use_cases,
-    thread_use_cases,
-    user_use_cases,
-    config,
-    viewer,
-    form
-))]
+#[instrument(skip_all)]
 #[expect(
     clippy::too_many_arguments,
     reason = "Axum handlers receive request state and extractors as parameters"
@@ -1209,7 +1161,7 @@ pub(super) fn workspace_user<'a>(
         username: &account.username,
         email: account_email,
         avatar_url: account.avatar_url.as_ref(),
-        is_operator: config.is_operator(account_email),
+        is_operator: config.is_operator(account),
         company_membership: CompanyMembership::None,
     }
 }

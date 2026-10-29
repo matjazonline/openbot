@@ -65,6 +65,7 @@ fn set_membership(
         PrincipalAccessContext {
             principal_id,
             membership,
+            grant_authority: crate::entities::participant::PrincipalGrantAuthority::Available,
         },
     );
 }

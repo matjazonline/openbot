@@ -96,7 +96,7 @@ pub(super) async fn require_operator(
         .get_user_by_id(user.id)
         .await?
         .ok_or(AppError::InvalidCredentials)?;
-    if config.is_operator(&account.email.as_str().into()) {
+    if config.is_operator(&account) {
         Ok(())
     } else {
         Err(AppError::NotFound("Library workspace not found.".into()))

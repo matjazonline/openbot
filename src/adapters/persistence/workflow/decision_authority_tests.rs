@@ -23,6 +23,11 @@ async fn channel_fixture() -> (DecisionFixture, Uuid) {
         .unwrap();
     sqlx::query("INSERT INTO channel_principal_grants(company_id,channel_id,principal_id,capability,provenance) SELECT $1,$2,id,'view','configured_allowlist' FROM principals WHERE company_id=$1 AND user_id=$3")
         .bind(f.scope.company.as_uuid()).bind(channel).bind(f.users[0]).execute(f.persistence().pool()).await.unwrap();
+    sqlx::query("UPDATE users SET email_verified_at = CURRENT_TIMESTAMP WHERE id = $1")
+        .bind(f.users[0])
+        .execute(f.persistence().pool())
+        .await
+        .unwrap();
     f.admission.binding.target.binding = WorkflowBindingId::new(Uuid::new_v4());
     let binding = &f.admission.binding;
     let mut request = binding.request(None);
@@ -87,6 +92,18 @@ async fn hidden(f: &DecisionFixture, view: &DecisionView, actor: WorkflowActor) 
             .await
             .unwrap();
     assert!(submission.is_none());
+}
+
+#[tokio::test]
+async fn security_email_identity_unverified_reviewer_loses_restricted_decision_access() {
+    let (f, _) = channel_fixture().await;
+    let view = f.park().await;
+    sqlx::query("UPDATE users SET email_verified_at = NULL WHERE id = $1")
+        .bind(f.users[0])
+        .execute(f.persistence().pool())
+        .await
+        .unwrap();
+    hidden(&f, &view, f.actor(0)).await;
 }
 
 #[tokio::test]

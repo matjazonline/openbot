@@ -158,7 +158,7 @@ impl DashboardScope {
     /// would hand out every company's traffic — neither is a default worth having.
     async fn resolve(
         dashboard: &Dashboard,
-        email: &EmailAddress,
+        account: &crate::entities::user::User,
         query: &DashboardQuery,
     ) -> AppResult<Self> {
         let requested = query.company_id;
@@ -166,7 +166,7 @@ impl DashboardScope {
             load_managed_company(&dashboard.company_use_cases, dashboard.user_id, requested)
                 .await?;
 
-        let operator = dashboard.config.is_operator(email);
+        let operator = dashboard.config.is_operator(account);
 
         // An operator asking for one company in particular gets that company unless `scope=system`
         // explicitly selects the global rollup. The lookup goes through `get_company` rather than
@@ -317,7 +317,7 @@ fn render(
 }
 
 /// GET /ui/dashboard - The overview for the caller's scope (Protected).
-#[instrument(skip(dashboard))]
+#[instrument(skip_all)]
 async fn dashboard_page(
     dashboard: Dashboard,
     Query(query): Query<DashboardQuery>,
@@ -326,7 +326,7 @@ async fn dashboard_page(
     let account_email = EmailAddress::from(account.email.as_str());
     let user = workspace_user(&account, &account_email, &dashboard.config);
 
-    let scope = DashboardScope::resolve(&dashboard, &account_email, &query).await?;
+    let scope = DashboardScope::resolve(&dashboard, &account, &query).await?;
     let user = user.with_company_membership(scope.membership(dashboard.user_id));
 
     // A user with no company and no operator grant has nothing to show; the shell's own empty
@@ -352,7 +352,7 @@ async fn dashboard_page(
 }
 
 /// GET /ui/dashboard/panels - The panels alone, for a client that is not streaming (Protected).
-#[instrument(skip(dashboard))]
+#[instrument(skip_all)]
 async fn dashboard_panels_fragment(
     dashboard: Dashboard,
     Query(query): Query<DashboardQuery>,
@@ -361,7 +361,7 @@ async fn dashboard_panels_fragment(
     let account_email = EmailAddress::from(account.email.as_str());
     let user = workspace_user(&account, &account_email, &dashboard.config);
 
-    let scope = DashboardScope::resolve(&dashboard, &account_email, &query).await?;
+    let scope = DashboardScope::resolve(&dashboard, &account, &query).await?;
     let company = scope.authorized_company_id()?;
     let window = query.window();
     let reading = dashboard.read(company, window, scope.operator).await?;
@@ -372,7 +372,7 @@ async fn dashboard_panels_fragment(
 }
 
 /// GET /ui/dashboard/events - The panels, re-rendered on a tick (Protected).
-#[instrument(skip(dashboard))]
+#[instrument(skip_all)]
 async fn dashboard_stream(
     dashboard: Dashboard,
     Query(query): Query<DashboardQuery>,
@@ -381,7 +381,7 @@ async fn dashboard_stream(
     // re-checks it, exactly as the thread streams do.
     let account = load_account(&dashboard.user_use_cases, dashboard.user_id).await?;
     let account_email = EmailAddress::from(account.email.as_str());
-    let scope = DashboardScope::resolve(&dashboard, &account_email, &query).await?;
+    let scope = DashboardScope::resolve(&dashboard, &account, &query).await?;
     let company = scope.authorized_company_id()?;
     let operator = scope.operator;
     let window = query.window();
@@ -406,7 +406,7 @@ async fn dashboard_stream(
                 }
                 // One failed read is not a reason to drop a connection the reader would only
                 // re-establish; skip the tick and try again on the next one.
-                Err(error) => warn!(%error, "Dashboard read failed, skipping a tick"),
+                Err(_) => warn!("Dashboard read failed, skipping a tick"),
             }
         }
     };

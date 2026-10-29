@@ -54,6 +54,7 @@ impl Fixture {
             users: Arc::new(UserUseCases::new(
                 Arc::new(crate::infra::argon2_password_hasher()),
                 shared.clone(),
+                "test-attempt-secret",
             )),
             agents: Arc::new(AgentUseCases::new(
                 shared.clone(),

@@ -26,6 +26,7 @@ async fn replay_reauthorizes_and_association_is_part_of_dedup() {
         PrincipalAccessContext {
             principal_id: None,
             membership: CompanyMembership::Owner,
+            grant_authority: crate::entities::participant::PrincipalGrantAuthority::Available,
         },
     );
     let mut same_operation = request();

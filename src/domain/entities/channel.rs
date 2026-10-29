@@ -3,7 +3,9 @@ use uuid::Uuid;
 
 use crate::entities::{
     creation::CreationProvenance,
-    participant::{ChannelPrincipalGrant, PrincipalAccessContext, PrincipalCapability},
+    participant::{
+        ChannelPrincipalGrant, PrincipalAccessContext, PrincipalCapability, PrincipalGrantAuthority,
+    },
     transport::PrincipalId,
     value_objects::{ChannelSlug, CompanySlug, EmailAddress},
 };
@@ -131,9 +133,10 @@ impl Channel {
     /// never shuts its own company's owner out, whether they are reading it or writing to it.
     /// Mail from an address that belongs to no account is simply [`CompanyMembership::None`].
     pub fn participant_access(&self, context: PrincipalAccessContext) -> ParticipantAccess {
-        let explicitly_listed = context.principal_id.is_some_and(|principal_id| {
-            self.has_capability(principal_id, PrincipalCapability::Participate)
-        });
+        let explicitly_listed = context.grant_authority == PrincipalGrantAuthority::Available
+            && context.principal_id.is_some_and(|principal_id| {
+                self.has_capability(principal_id, PrincipalCapability::Participate)
+            });
         match self.access_mode {
             ChannelAccessMode::Public => ParticipantAccess {
                 authorized: true,
@@ -179,9 +182,12 @@ impl Channel {
 
         match self.access_mode {
             ChannelAccessMode::Team | ChannelAccessMode::Public => true,
-            ChannelAccessMode::Allowlist => context.principal_id.is_some_and(|principal_id| {
-                self.has_capability(principal_id, PrincipalCapability::View)
-            }),
+            ChannelAccessMode::Allowlist => {
+                context.grant_authority == PrincipalGrantAuthority::Available
+                    && context.principal_id.is_some_and(|principal_id| {
+                        self.has_capability(principal_id, PrincipalCapability::View)
+                    })
+            }
         }
     }
 
@@ -297,6 +303,7 @@ mod tests {
         PrincipalAccessContext {
             principal_id: Some(principal_id),
             membership,
+            grant_authority: PrincipalGrantAuthority::Available,
         }
     }
 
@@ -421,6 +428,7 @@ mod tests {
         PrincipalAccessContext {
             principal_id: None,
             membership,
+            grant_authority: PrincipalGrantAuthority::Available,
         }
     }
 

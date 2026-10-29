@@ -11,6 +11,7 @@ use uuid::Uuid;
 
 use crate::{
     adapters::http::{app_state::AppState, session::SessionAuthority},
+    application::session::VerifiedSession,
     entities::{user::Viewer, value_objects::EmailAddress},
 };
 
@@ -23,6 +24,7 @@ pub enum AuthError {
     RedirectToLogin,
     HtmxRedirectToLogin,
     Unauthorized,
+    ServiceUnavailable,
 }
 
 impl IntoResponse for AuthError {
@@ -35,24 +37,14 @@ impl IntoResponse for AuthError {
                 "Redirecting to login...",
             )
                 .into_response(),
+            AuthError::ServiceUnavailable => {
+                (StatusCode::SERVICE_UNAVAILABLE, "Session store unavailable").into_response()
+            }
             AuthError::Unauthorized => {
                 (StatusCode::UNAUTHORIZED, "Authentication required").into_response()
             }
         }
     }
-}
-
-/// Who a request is signed in as.
-///
-/// The answer comes from [`SessionAuthority`] and nowhere else: a cookie is believed because it
-/// carries a signature this deployment produced, never because it parses as a user id.
-fn authenticated_user(
-    sessions: &SessionAuthority,
-    headers: &axum::http::HeaderMap,
-) -> Option<AuthenticatedUser> {
-    sessions
-        .user_from_headers(headers)
-        .map(|id| AuthenticatedUser { id })
 }
 
 pub(super) fn is_htmx_request(headers: &axum::http::HeaderMap) -> bool {
@@ -82,11 +74,16 @@ fn auth_error_for(parts: &Parts) -> AuthError {
 
 pub async fn require_auth(
     State(sessions): State<Arc<SessionAuthority>>,
-    request: Request<Body>,
+    mut request: Request<Body>,
     next: Next,
 ) -> Response {
-    if authenticated_user(&sessions, request.headers()).is_some() {
-        return next.run(request).await;
+    match sessions.user_from_headers(request.headers()).await {
+        Ok(Some(session)) => {
+            request.extensions_mut().insert(session);
+            return next.run(request).await;
+        }
+        Err(_) => return AuthError::ServiceUnavailable.into_response(),
+        Ok(None) => {}
     }
 
     let is_htmx = is_htmx_request(request.headers());
@@ -94,18 +91,17 @@ pub async fn require_auth(
     auth_error(request.uri().path(), is_htmx).into_response()
 }
 
-impl FromRequestParts<AppState> for AuthenticatedUser {
+impl<S: Send + Sync> FromRequestParts<S> for AuthenticatedUser {
     type Rejection = AuthError;
 
-    async fn from_request_parts(
-        parts: &mut Parts,
-        state: &AppState,
-    ) -> Result<Self, Self::Rejection> {
-        if let Some(user) = authenticated_user(&state.sessions, &parts.headers) {
-            return Ok(user);
-        }
-
-        Err(auth_error_for(parts))
+    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+        parts
+            .extensions
+            .get::<VerifiedSession>()
+            .map(|session| Self {
+                id: session.user_id,
+            })
+            .ok_or_else(|| auth_error_for(parts))
     }
 }
 
@@ -130,13 +126,13 @@ impl FromRequestParts<AppState> for Viewer {
             .user_use_cases
             .get_user_by_id(user.id)
             .await
-            .ok()
-            .flatten()
+            .map_err(|_| AuthError::ServiceUnavailable)?
             .ok_or_else(|| auth_error_for(parts))?;
 
         Ok(Viewer {
             user_id: user.id,
             email: EmailAddress::from(account.email.as_str()),
+            email_verified_at: account.email_verified_at,
         })
     }
 }
@@ -149,8 +145,34 @@ mod tests {
 
     use crate::infra::config::AppConfig;
 
+    #[tokio::test]
+    async fn security_session_extractor_requires_verified_extension() {
+        let authority = sessions();
+        let id = Uuid::new_v4();
+        let mut parts = parts_for("/api/session", false);
+        parts.headers.insert(
+            "cookie",
+            format!("session={}", authority.cookie_for_test(id).await.value())
+                .parse()
+                .unwrap(),
+        );
+        assert!(matches!(
+            AuthenticatedUser::from_request_parts(&mut parts, &()).await,
+            Err(AuthError::Unauthorized)
+        ));
+        parts.extensions.insert(VerifiedSession {
+            user_id: id,
+            session_id: crate::application::session::SessionId(Uuid::new_v4()),
+        });
+        let principal = AuthenticatedUser::from_request_parts(&mut parts, &())
+            .await
+            .ok()
+            .unwrap();
+        assert_eq!(principal.id, id);
+    }
+
     fn sessions() -> Arc<SessionAuthority> {
-        Arc::new(SessionAuthority::new(&AppConfig::for_test()))
+        Arc::new(SessionAuthority::for_test(&AppConfig::for_test()))
     }
 
     #[tokio::test]
@@ -251,7 +273,10 @@ mod tests {
                 Request::get("/companies")
                     .header(
                         "cookie",
-                        format!("session={}", sessions.cookie(Uuid::new_v4()).value()),
+                        format!(
+                            "session={}",
+                            sessions.cookie_for_test(Uuid::new_v4()).await.value()
+                        ),
                     )
                     .body(Body::empty())
                     .unwrap(),

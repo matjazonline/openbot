@@ -28,7 +28,10 @@ use crate::{
         },
         storage::FileStorage,
     },
-    entities::transport::{InboundEventErrorClass, InboundEventIgnoreReason, TransportKind},
+    entities::{
+        correlation::CorrelationId,
+        transport::{InboundEventErrorClass, InboundEventIgnoreReason, TransportKind},
+    },
     infra::config::AppConfig,
     transport::{InboundEventDecodeOutcome, InboundEventDecoder, InboundEventRecord},
     use_cases::thread::{
@@ -92,11 +95,11 @@ impl ResendApiInboundDecoder {
 async fn fetch_raw_mime(
     api: &dyn ResendApi,
     email_id: &str,
+    correlation_id: CorrelationId,
 ) -> Result<(ReceivedEmail, Vec<u8>), Failure> {
-    let email = api
-        .retrieve_received(email_id)
-        .await
-        .map_err(|error| Failure::from_provider("retrieve a received mail", error))?;
+    let email = api.retrieve_received(email_id).await.map_err(|error| {
+        Failure::from_provider("retrieve a received mail", error, correlation_id)
+    })?;
     let Some(raw) = email.raw.as_ref() else {
         // Resend knows the mail but is not offering its bytes. Nothing here can produce them, and
         // asking again would ask the same question.
@@ -105,10 +108,9 @@ async fn fetch_raw_mime(
             "the received mail carries no raw representation".to_string(),
         ));
     };
-    let bytes = api
-        .download_raw(&raw.download_url)
-        .await
-        .map_err(|error| Failure::from_provider("download a received mail", error))?;
+    let bytes = api.download_raw(&raw.download_url).await.map_err(|error| {
+        Failure::from_provider("download a received mail", error, correlation_id)
+    })?;
     Ok((email, bytes))
 }
 
@@ -205,7 +207,8 @@ async fn read_mail(
     event: &InboundEventRecord,
     email_id: &str,
 ) -> Result<(InboundMessage, PendingEmailAttachments), Failure> {
-    let (email, raw_mime) = fetch_raw_mime(account.api.as_ref(), email_id).await?;
+    let (email, raw_mime) =
+        fetch_raw_mime(account.api.as_ref(), email_id, event.correlation_id).await?;
 
     // The verdicts are the receiving MTA's, and only the one this deployment named may make
     // them. A message whose top `Authentication-Results` is missing, or belongs to anyone
@@ -312,22 +315,43 @@ impl Failure {
     /// The retry decision is the provider error's own: a rate limit or an outage will read
     /// differently in a minute, and a 404 for an email id or a body this build cannot parse will
     /// not. Deciding it here from a status code would be the same table written twice.
-    fn from_provider(what: &str, error: ResendApiError) -> Self {
+    fn from_provider(
+        what: &'static str,
+        error: ResendApiError,
+        correlation_id: CorrelationId,
+    ) -> Self {
         let retry = error.is_transient();
-        let class = match &error {
-            ResendApiError::RateLimited { .. } => InboundEventErrorClass::RateLimited,
-            ResendApiError::Unavailable { .. } => InboundEventErrorClass::ProviderFault,
-            ResendApiError::Refused { .. } => InboundEventErrorClass::Routing,
-            ResendApiError::TooLarge { .. } | ResendApiError::Malformed { .. } => {
-                InboundEventErrorClass::InvalidPayload
+        let (class, error_kind, provider_status) = match &error {
+            ResendApiError::RateLimited { .. } => {
+                (InboundEventErrorClass::RateLimited, "rate_limited", None)
+            }
+            ResendApiError::Unavailable { .. } => {
+                (InboundEventErrorClass::ProviderFault, "unavailable", None)
+            }
+            ResendApiError::Refused { status, .. } => {
+                (InboundEventErrorClass::Routing, "refused", Some(*status))
+            }
+            ResendApiError::TooLarge { .. } => {
+                (InboundEventErrorClass::InvalidPayload, "too_large", None)
+            }
+            ResendApiError::Malformed { .. } => {
+                (InboundEventErrorClass::InvalidPayload, "malformed", None)
             }
         };
         if !retry {
-            warn!(%error, "Resend could not {what}, and asking again would not help");
+            warn!(
+                %correlation_id,
+                provider = "resend_api",
+                stage = what,
+                error_class = class.as_str(),
+                error_kind,
+                ?provider_status,
+                "Resend request will not be retried"
+            );
         }
         Self {
             class,
-            detail: format!("could not {what}: {error}"),
+            detail: format!("resend_api {what} failed ({error_kind}, status {provider_status:?})"),
             retry,
         }
     }

@@ -159,7 +159,7 @@ impl Workspace {
 
 /// GET /ui/deliveries - The Deliveries workspace for the selected company, filters and delivery
 /// (Protected).
-#[instrument(skip(workspace))]
+#[instrument(skip_all)]
 async fn deliveries_page(
     workspace: Workspace,
     Query(query): Query<DeliveriesQuery>,
@@ -215,7 +215,7 @@ async fn deliveries_page(
 ///
 /// Answers with the address-bar URL as well as the list, so filtering and paging stay linkable
 /// even though only the sidebar is swapped.
-#[instrument(skip(workspace))]
+#[instrument(skip_all)]
 async fn delivery_list_fragment(
     workspace: Workspace,
     Query(query): Query<DeliveriesQuery>,
@@ -234,7 +234,7 @@ async fn delivery_list_fragment(
 }
 
 /// GET /ui/deliveries/{entry_id} - One delivery's detail for the pane (Protected).
-#[instrument(skip(workspace))]
+#[instrument(skip_all)]
 async fn delivery_pane(
     workspace: Workspace,
     Path(entry_id): Path<Uuid>,

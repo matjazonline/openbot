@@ -470,6 +470,11 @@ mod tests {
         let admin = create_account(&persistence, "admin").await;
         let member = create_account(&persistence, "member").await;
         let stranger = create_account(&persistence, "stranger").await;
+        sqlx::query("UPDATE users SET email_verified_at = CURRENT_TIMESTAMP WHERE id = ANY($1)")
+            .bind([admin.0, member.0])
+            .execute(persistence.pool())
+            .await
+            .unwrap();
 
         let company = persistence
             .create(

@@ -54,6 +54,7 @@ impl PrincipalAccessPersistence for Store {
             .map(|membership| PrincipalAccessContext {
                 principal_id: None,
                 membership: *membership,
+                grant_authority: crate::entities::participant::PrincipalGrantAuthority::Available,
             }))
     }
 }

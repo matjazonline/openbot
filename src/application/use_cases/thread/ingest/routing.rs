@@ -176,7 +176,7 @@ impl ThreadUseCases {
                 // Disabled is undeliverable for everyone, so it is decided before the ACL, which
                 // rules only on *this sender's* access.
                 if !channel.enabled {
-                    warn!(channel = %channel.slug, "Bouncing a message for a disabled channel");
+                    warn!(channel_id = %channel.id, "Bouncing a message for a disabled channel");
                     undeliverable.disabled(slug);
                     continue;
                 }
@@ -304,12 +304,12 @@ impl ThreadUseCases {
         }
 
         if !access.authorized && !thread_authorized && !origin.is_internal() {
-            warn!(channel = %channel.slug, "Sender is not authorized for this channel");
+            warn!(channel_id = %channel.id, "Sender is not authorized for this channel");
             return Ok(ChannelVerdict::Unauthorized);
         }
 
         if exceeds_spam_threshold(&draft.policy, access, self.config.max_spam_score) {
-            warn!(channel = %channel.slug, "Refusing a message over the spam-score threshold");
+            warn!(channel_id = %channel.id, "Refusing a message over the spam-score threshold");
             return Ok(ChannelVerdict::Reject(IngestRejection::SpamScore));
         }
 
@@ -725,7 +725,7 @@ impl ThreadUseCases {
             if !context.membership.is_team() {
                 warn!(
                     address = system.local_part(),
-                    company = %company.slug,
+                    company_id = %company.id,
                     "Ignoring a reserved-address request from a non-member"
                 );
                 continue;

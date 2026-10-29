@@ -13,7 +13,10 @@ use crate::{
     entities::runtime_metrics::MachineIdentity,
     infra::{
         argon2_password_hasher,
-        config::{AppConfig, smtp_allow_plaintext_local_from_env},
+        config::{
+            AppConfig, allow_unverified_email_without_smtp_from_env,
+            smtp_allow_plaintext_local_from_env,
+        },
         events::MailboxEvents,
         postgres_persistence,
     },
@@ -50,10 +53,10 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
     // The relay every company that has *not* connected a provider account of its own sends
     // through, and the one every platform notice sends through whatever its tenants have
     // configured -- a confirmation code belongs to the deployment, not to a company.
-    let deployment_mail_transport: Arc<dyn MailTransport> =
+    let smtp_transport =
         LettreMailTransport::from_config(&config, smtp_allow_plaintext_local_from_env()).await?;
-
-    let sessions = Arc::new(SessionAuthority::new(&config));
+    let confirmation_transport_available = smtp_transport.is_configured();
+    let deployment_mail_transport: Arc<dyn MailTransport> = smtp_transport;
 
     let monitoring: Arc<dyn MonitoringService> = Arc::new(CompositeMonitor::new(vec![
         Arc::new(TracingMonitor::new()),
@@ -68,22 +71,31 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
     };
 
     let postgres_arc = Arc::new(postgres_persistence().await?);
+    let sessions = Arc::new(
+        SessionAuthority::new(&config, postgres_arc.clone()).with_monitoring(monitoring.clone()),
+    );
     install_builtin_agent_library(postgres_arc.as_ref()).await?;
     let database_query_health = Arc::new(DatabaseQueryHealthService::new(postgres_arc.clone()));
     let dashboard_snapshots = Arc::new(DashboardSnapshotService::new(postgres_arc.clone()));
     let runtime_identity = MachineIdentity::process().clone();
     let argon_hasher = argon2_password_hasher();
 
-    let user_use_cases = UserUseCases::new(Arc::new(argon_hasher), postgres_arc.clone())
-        .with_email_confirmation(EmailConfirmation {
-            registrations: postgres_arc.clone(),
-            account_changes: postgres_arc.clone(),
-            codes: Arc::new(SmtpConfirmationSender::new(
-                config.clone(),
-                deployment_mail_transport.clone(),
-            )),
-            config: config.clone(),
-        });
+    let user_use_cases = UserUseCases::new(
+        Arc::new(argon_hasher),
+        postgres_arc.clone(),
+        config.jwt_secret.clone(),
+    )
+    .with_email_confirmation(EmailConfirmation {
+        registrations: postgres_arc.clone(),
+        account_changes: postgres_arc.clone(),
+        codes: Arc::new(SmtpConfirmationSender::new(
+            config.clone(),
+            deployment_mail_transport.clone(),
+        )),
+        config: config.clone(),
+        transport_available: confirmation_transport_available,
+        allow_unverified_without_smtp: allow_unverified_email_without_smtp_from_env(),
+    });
     let company_use_cases = CompanyUseCases::new(postgres_arc.clone());
     let mcp_policy = crate::adapters::mcp::policy::EndpointPolicy::new(
         std::env::var("MCP_INTERNAL_ENDPOINTS")
@@ -250,6 +262,7 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
     ));
 
     Ok(AppState {
+        auth_admission: Arc::new(crate::adapters::http::auth_admission::AuthAdmission::from_env()?),
         model_usage: postgres_arc.clone(),
         run_counts: postgres_arc.clone(),
         thread_activity: postgres_arc.clone(),
@@ -289,9 +302,11 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
     })
 }
 
+const DEFAULT_LOG_FILTER: &str =
+    "mail_agents=info,tower_http=info,monitoring::counter=info,monitoring::gauge=info";
+
 pub fn init_tracing() {
-    let filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| "mail_agents=info,tower_http=info".into());
+    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| DEFAULT_LOG_FILTER.into());
 
     // Console (pretty logs)
     let console_layer = fmt::layer()
@@ -305,3 +320,7 @@ pub fn init_tracing() {
         .try_init()
         .ok();
 }
+
+#[cfg(test)]
+#[path = "setup_tests.rs"]
+mod tests;

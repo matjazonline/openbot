@@ -141,10 +141,10 @@ async fn store_avatar(
     let image = ImageUpload::parse(picked)?;
     let key = ObjectKey::generated(folder, image.format().extension());
 
-    let stored = storage.upload_image(&key, &image).await.map_err(|err| {
-        // The reason is for the operator's log, not for the person who picked a file: it can name
-        // a bucket and a service account.
-        warn!(%key, error = %err, "Avatar upload failed");
+    let stored = storage.upload_image(&key, &image).await.map_err(|_| {
+        // Storage errors can contain URLs or credentials. Keep the generated object key as the
+        // operator's correlation value without printing the provider's response.
+        warn!(%key, "Avatar upload failed");
         "The picture could not be stored. Please try again.".to_string()
     })?;
 
@@ -153,7 +153,7 @@ async fn store_avatar(
         // A bucket configured with a base URL that is not `http` would otherwise put an
         // unrenderable -- or worse, an active -- URL in front of every page that shows a face.
         Ok(None) | Err(_) => {
-            warn!(%stored, "Stored an avatar at a URL no page can render");
+            warn!(%key, "Stored an avatar at a URL no page can render");
             Err("The picture was stored at an address this app cannot show.".to_string())
         }
     }

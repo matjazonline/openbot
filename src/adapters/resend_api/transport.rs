@@ -97,8 +97,8 @@ fn accepted_key(message_id: Option<&MessageId>, provider_id: &str) -> Option<Ext
         return None;
     }
     ExternalMessageKey::parse(provider_id)
-        .inspect_err(|error| {
-            warn!(%error, "Resend returned an id that cannot be stored as a provider key");
+        .inspect_err(|_| {
+            warn!("Resend returned an id that cannot be stored as a provider key");
         })
         .ok()
 }

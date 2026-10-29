@@ -227,7 +227,7 @@ impl InboundMessage {
 
 impl ThreadUseCases {
     /// Take one inbound message all the way from "an adapter parsed it" to "it is durable".
-    #[instrument(skip(self, message), fields(origin = ?message.origin))]
+    #[instrument(skip_all, fields(origin = ?message.origin))]
     pub async fn ingest(&self, message: InboundMessage) -> AppResult<InboundIngestResult> {
         // Box the two-phase seam so callers without attachment bytes keep this already-deep
         // ingress future small, while SMTP and webhooks can pause between policy and persistence.

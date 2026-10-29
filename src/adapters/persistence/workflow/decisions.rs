@@ -313,10 +313,10 @@ async fn eligible_reviewer_row(
             OR (run.channel_id IS NOT NULL AND (channel.access_mode IN ('team','public') \
               OR EXISTS (SELECT 1 FROM channel_principal_grants AS access_grant WHERE access_grant.company_id=$1 \
                 AND access_grant.channel_id=run.channel_id AND access_grant.principal_id=principal.id \
-                AND access_grant.capability='view')))) \
+                AND account.email_verified_at IS NOT NULL AND access_grant.capability='view')))) \
           AND (run.thread_id IS NULL OR EXISTS (SELECT 1 FROM threads AS thread WHERE thread.company_id=$1 \
             AND thread.channel_id=run.channel_id AND thread.id=run.thread_id)) \
-        ORDER BY principal.id LIMIT 1 FOR SHARE OF member, principal")
+        ORDER BY principal.id LIMIT 1 FOR SHARE OF member, principal, account")
         .bind(scope.company.as_uuid()).bind(user).bind(scope.run.as_uuid()).fetch_optional(db).await?)
 }
 

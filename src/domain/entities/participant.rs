@@ -264,6 +264,15 @@ pub struct ChannelPrincipalGrant {
 pub struct PrincipalAccessContext {
     pub principal_id: Option<PrincipalId>,
     pub membership: CompanyMembership,
+    /// Whether a signed-in account may use participant grants derived from its current email.
+    /// Its principal remains available for attribution even when this is withheld.
+    pub grant_authority: PrincipalGrantAuthority,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PrincipalGrantAuthority {
+    Available,
+    WithheldUnverifiedEmail,
 }
 
 impl PrincipalAccessContext {
@@ -271,6 +280,7 @@ impl PrincipalAccessContext {
         Self {
             principal_id: Some(principal_id),
             membership: CompanyMembership::None,
+            grant_authority: PrincipalGrantAuthority::Available,
         }
     }
 }

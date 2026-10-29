@@ -180,12 +180,18 @@ async fn callback(
         .remove(Cookie::build(APPLE_FLOW_COOKIE).path("/auth/apple").build());
     match complete_flow(&config, &users, &sessions, &jar, form).await {
         Ok((user, AppleFlow::Connect)) => (
-            cleared.add(sessions.cookie(user.id)),
+            cleared.add(match sessions.cookie(&user).await {
+                Ok(cookie) => cookie,
+                Err(err) => return err.into_response(),
+            }),
             Redirect::temporary("/ui/profile?connected=apple"),
         )
             .into_response(),
         Ok((user, _)) => (
-            cleared.add(sessions.cookie(user.id)),
+            cleared.add(match sessions.cookie(&user).await {
+                Ok(cookie) => cookie,
+                Err(err) => return err.into_response(),
+            }),
             Redirect::temporary(SIGNED_IN_LANDING),
         )
             .into_response(),
@@ -245,15 +251,12 @@ async fn complete_flow(
         provider: LoginMethod::Apple,
         subject: &identity.sub,
         email: &email,
+        email_verified: identity.email_verified.is_true(),
         display_name: supplied_name.as_deref(),
     };
     let user = match flow {
         AppleFlow::Register => users.register_external(external).await?,
-        AppleFlow::Login => {
-            users
-                .login_external(LoginMethod::Apple, &identity.sub)
-                .await?
-        }
+        AppleFlow::Login => users.login_external(external).await?,
         AppleFlow::Connect => {
             let user_id = state.user_id.ok_or_else(|| {
                 AppError::BadRequest("Apple connection is missing its account.".into())
@@ -297,7 +300,7 @@ impl BoolClaim {
     fn is_true(&self) -> bool {
         match self {
             Self::Bool(value) => *value,
-            Self::Text(value) => value.eq_ignore_ascii_case("true"),
+            Self::Text(value) => value == "true",
         }
     }
 }
@@ -424,6 +427,29 @@ mod tests {
                 .unwrap()
                 .is_true()
         );
+    }
+
+    #[test]
+    fn security_email_identity_apple_rejects_missing_false_and_ambiguous_claims() {
+        let valid =
+            r#"{"sub":"subject","email":"a@example.com","nonce":"nonce","email_verified":"true"}"#;
+        assert!(
+            serde_json::from_str::<AppleIdentityClaims>(valid)
+                .unwrap()
+                .email_verified
+                .is_true()
+        );
+        for invalid in [
+            r#"{"sub":"subject","email":"a@example.com","nonce":"nonce"}"#,
+            r#"{"sub":"subject","email":"a@example.com","nonce":"nonce","email_verified":false}"#,
+            r#"{"sub":"subject","email":"a@example.com","nonce":"nonce","email_verified":"TRUE"}"#,
+            r#"{"sub":"subject","email":"a@example.com","nonce":"nonce","email_verified":"yes"}"#,
+        ] {
+            let rejected = serde_json::from_str::<AppleIdentityClaims>(invalid)
+                .map(|claims| !claims.email_verified.is_true())
+                .unwrap_or(true);
+            assert!(rejected, "ambiguous or absent Apple proof must be rejected");
+        }
     }
 
     #[test]

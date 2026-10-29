@@ -1,6 +1,314 @@
 use super::super::message::{MessageQuery, page};
 use super::*;
 
+async fn invite_journey_member(h: &Harness) -> crate::entities::user::User {
+    let suffix = Uuid::new_v4().simple().to_string();
+    let email = format!("journey-{suffix}@example.test");
+    let user = h
+        .persistence
+        .create_user(&format!("journey_{suffix}"), &email, "hash")
+        .await
+        .unwrap();
+    sqlx::query(
+        "INSERT INTO company_members (id, company_id, user_id, role) VALUES ($1, $2, $3, 'admin')",
+    )
+    .bind(Uuid::new_v4())
+    .bind(h.company_id)
+    .bind(user.id)
+    .execute(h.persistence.pool())
+    .await
+    .unwrap();
+    let principal_id = Uuid::new_v4();
+    sqlx::query("INSERT INTO principals (id, company_id, kind, user_id, display_label) VALUES ($1, $2, 'person', $3, 'Journey member')")
+        .bind(principal_id)
+        .bind(h.company_id)
+        .bind(user.id)
+        .execute(h.persistence.pool())
+        .await
+        .unwrap();
+    sqlx::query("UPDATE channels SET access_mode = 'allowlist' WHERE id = $1")
+        .bind(h.channel_id)
+        .execute(h.persistence.pool())
+        .await
+        .unwrap();
+    sqlx::query("INSERT INTO channel_principal_grants (company_id, channel_id, principal_id, capability, provenance) VALUES ($1, $2, $3, 'view', 'configured_allowlist')")
+        .bind(h.company_id)
+        .bind(h.channel_id)
+        .bind(principal_id)
+        .execute(h.persistence.pool())
+        .await
+        .unwrap();
+    user
+}
+
+fn journey_viewer(user: &crate::entities::user::User) -> Viewer {
+    Viewer {
+        user_id: user.id,
+        email: EmailAddress::from(user.email.as_str()),
+        email_verified_at: user.email_verified_at,
+    }
+}
+
+async fn invitation_for_journey(
+    h: &Harness,
+    member: &crate::entities::user::User,
+) -> (
+    crate::use_cases::company_invite::CompanyInviteUseCases,
+    crate::entities::company_invite::CompanyInvite,
+) {
+    use crate::entities::company_member::CompanyAccessRole;
+    let invitations = crate::use_cases::company_invite::CompanyInviteUseCases::new(
+        h.persistence.clone(),
+        h.persistence.clone(),
+    );
+    let company = CompanyPersistence::create(
+        h.persistence.as_ref(),
+        h.owner.user_id,
+        CompanyWrite {
+            name: "Invitation journey".into(),
+            slug: format!("invitation-journey-{}", Uuid::new_v4().simple()),
+            ..CompanyWrite::default()
+        },
+    )
+    .await
+    .unwrap();
+    let invite = invitations
+        .create_company_invite(
+            h.owner.user_id,
+            company.id,
+            &member.email,
+            CompanyAccessRole::Admin,
+        )
+        .await
+        .unwrap();
+    (invitations, invite)
+}
+
+async fn install_unverified_journey_address(
+    h: &Harness,
+    user: &crate::entities::user::User,
+) -> crate::entities::user::User {
+    use crate::use_cases::user::ProfileUpdate;
+    let next = EmailAddress::from(format!("next-{}@example.test", Uuid::new_v4().simple()));
+    UserPersistence::update_profile(
+        h.persistence.as_ref(),
+        user.id,
+        ProfileUpdate {
+            username: &user.username,
+            email: &next,
+            avatar_url: user.avatar_url.as_ref(),
+        },
+    )
+    .await
+    .unwrap();
+    UserPersistence::get_by_id(h.persistence.as_ref(), user.id)
+        .await
+        .unwrap()
+        .unwrap()
+}
+
+#[tokio::test]
+async fn security_email_identity_one_session_loses_invite_channel_and_operator_after_address_change()
+ {
+    use crate::adapters::http::session::SessionAuthority;
+
+    let Some(h) = Harness::new().await else {
+        return;
+    };
+    let member = invite_journey_member(&h).await;
+    let (invitations, invite) = invitation_for_journey(&h, &member).await;
+    let mut operator_config = test_config();
+    Arc::get_mut(&mut operator_config)
+        .unwrap()
+        .operator_emails
+        .push(EmailAddress::from(member.email.as_str()));
+    let sessions = SessionAuthority::new(&operator_config, h.persistence.clone());
+    let same_cookie = sessions.cookie(&member).await.unwrap().value().to_string();
+
+    assert!(invitations.accept_invite(&member, invite.id).await.is_err());
+    assert!(
+        h.channels
+            .get_readable_channel(&journey_viewer(&member), h.company_id, h.channel_id)
+            .await
+            .unwrap()
+            .is_none()
+    );
+    assert!(!operator_config.is_operator(&member));
+
+    sqlx::query("UPDATE users SET email_verified_at = CURRENT_TIMESTAMP WHERE id = $1")
+        .bind(member.id)
+        .execute(h.persistence.pool())
+        .await
+        .unwrap();
+    let verified = UserPersistence::get_by_id(h.persistence.as_ref(), member.id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        sessions
+            .verify(&same_cookie)
+            .await
+            .unwrap()
+            .map(|s| s.user_id),
+        Some(member.id)
+    );
+    assert_eq!(
+        invitations
+            .accept_invite(&verified, invite.id)
+            .await
+            .unwrap()
+            .status,
+        "accepted"
+    );
+    assert!(
+        h.channels
+            .get_readable_channel(&journey_viewer(&verified), h.company_id, h.channel_id)
+            .await
+            .unwrap()
+            .is_some()
+    );
+    assert!(operator_config.is_operator(&verified));
+
+    let changed = install_unverified_journey_address(&h, &verified).await;
+    assert_eq!(
+        sessions
+            .verify(&same_cookie)
+            .await
+            .unwrap()
+            .map(|s| s.user_id),
+        None
+    );
+    assert!(changed.email_verified_at.is_none());
+    assert!(matches!(
+        invitations.accept_invite(&verified, invite.id).await,
+        Err(AppError::NotFound(_))
+    ));
+    assert!(
+        h.channels
+            .get_readable_channel(&journey_viewer(&changed), h.company_id, h.channel_id)
+            .await
+            .unwrap()
+            .is_none()
+    );
+    assert!(!operator_config.is_operator(&changed));
+}
+
+async fn unverified_team_viewers(h: &Harness) -> [Viewer; 2] {
+    let suffix = Uuid::new_v4().simple().to_string();
+    let member_email = format!("team-{suffix}@example.test");
+    let member = h
+        .persistence
+        .create_user(&format!("team_{suffix}"), &member_email, "hash")
+        .await
+        .unwrap();
+    sqlx::query(
+        "INSERT INTO company_members (id, company_id, user_id, role) VALUES ($1, $2, $3, 'admin')",
+    )
+    .bind(Uuid::new_v4())
+    .bind(h.company_id)
+    .bind(member.id)
+    .execute(h.persistence.pool())
+    .await
+    .unwrap();
+    let member_principal = Uuid::new_v4();
+    sqlx::query("INSERT INTO principals (id, company_id, kind, user_id, display_label) VALUES ($1, $2, 'person', $3, 'Team member')")
+        .bind(member_principal)
+        .bind(h.company_id)
+        .bind(member.id)
+        .execute(h.persistence.pool())
+        .await
+        .unwrap();
+    sqlx::query("UPDATE users SET email_verified_at = NULL WHERE id = ANY($1)")
+        .bind([h.owner.user_id, member.id])
+        .execute(h.persistence.pool())
+        .await
+        .unwrap();
+
+    [
+        h.owner.clone(),
+        Viewer {
+            user_id: member.id,
+            email: EmailAddress::from(member_email.as_str()),
+            email_verified_at: None,
+        },
+    ]
+}
+
+async fn assert_unverified_team_attention_and_note(h: &Harness, viewer: Viewer, thread_id: Uuid) {
+    use crate::entities::{
+        internal_note::{AddInternalNote, InternalNoteProvenance, TombstoneInternalNote},
+        participant::PrincipalGrantAuthority,
+    };
+    let context = h
+        .threads
+        .principal_access_for_user(h.company_id, viewer.user_id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        context.grant_authority,
+        PrincipalGrantAuthority::WithheldUnverifiedEmail
+    );
+    let principal_id = context.principal_id.expect("account keeps its principal");
+    let companies = CompanyUseCases::new(h.persistence.clone());
+    let attention = super::super::super::attention::read_context(
+        &companies,
+        &h.channels,
+        &h.threads,
+        &viewer,
+        h.company_id,
+    )
+    .await
+    .unwrap();
+    assert_eq!(attention.principal_id, principal_id);
+    assert!(attention.visible_channel_ids.contains(&h.channel_id));
+
+    let note = h
+        .threads
+        .add_internal_note(
+            AddInternalNote {
+                company_id: h.company_id,
+                channel_id: h.channel_id,
+                thread_id,
+                text: "Unverified team note".into(),
+                command_id: Uuid::new_v4(),
+                supersedes_note_id: None,
+                provenance: InternalNoteProvenance::HumanUi,
+            },
+            context,
+        )
+        .await
+        .unwrap();
+    let note_id = note.internal_note.expect("created note").id;
+    let tombstoned = h
+        .threads
+        .tombstone_internal_note(
+            TombstoneInternalNote {
+                company_id: h.company_id,
+                channel_id: h.channel_id,
+                thread_id,
+                note_id,
+                command_id: Uuid::new_v4(),
+            },
+            context,
+        )
+        .await
+        .unwrap();
+    assert_eq!(tombstoned.author_principal_id, principal_id);
+    assert!(tombstoned.tombstoned_at.is_some());
+}
+
+#[tokio::test]
+async fn security_email_identity_unverified_team_keeps_attention_and_internal_notes() {
+    let Some(h) = Harness::new().await else {
+        return;
+    };
+    let thread_id = h.thread("Team notes").await;
+    for viewer in unverified_team_viewers(&h).await {
+        assert_unverified_team_attention_and_note(&h, viewer, thread_id).await;
+    }
+}
+
 async fn source(h: &Harness, viewer: Viewer, query: MessageQuery) -> AppResult<Html<String>> {
     page(
         State(Arc::new(CompanyUseCases::new(h.persistence.clone()))),

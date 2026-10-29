@@ -38,9 +38,11 @@ pub(super) async fn authorize_association(
                 "SELECT access_grant.principal_id FROM channel_principal_grants AS access_grant \
                  JOIN principals AS principal ON principal.company_id = access_grant.company_id \
                    AND principal.id = access_grant.principal_id \
+                 JOIN users AS account ON account.id = principal.user_id \
                  WHERE access_grant.company_id = $1 AND access_grant.channel_id = $2 \
-                   AND principal.user_id = $3 AND access_grant.capability = 'view' \
-                 FOR SHARE OF access_grant",
+                   AND principal.user_id = $3 AND account.email_verified_at IS NOT NULL \
+                   AND access_grant.capability = 'view' \
+                 FOR SHARE OF access_grant, account",
             )
             .bind(company.as_uuid())
             .bind(channel.as_uuid())

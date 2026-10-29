@@ -8,7 +8,7 @@ kill_timeout = "30s"
 [build]
 
 [env]
-  RUST_LOG = "mail_agents=info,tower_http=info,sqlx=warn"
+  RUST_LOG = "mail_agents=info,tower_http=info,sqlx=warn,monitoring::counter=info,monitoring::gauge=info"
   # Must match the MX domain you point at this app.
   APP_DOMAIN_NAME = "example.com"
   # Comma-separated; credentials are enabled so no wildcard is possible.
@@ -21,6 +21,9 @@ kill_timeout = "30s"
   # Production relays use certificate-validated TLS. Never enable this local-only escape hatch
   # on Fly; startup also rejects it when SMTP credentials are configured.
   SMTP_ALLOW_PLAINTEXT_LOCAL = "false"
+  # Without an outbound SMTP confirmation transport, public password registration and email
+  # address changes are unavailable. Never bypass proof for deployed accounts.
+  ALLOW_UNVERIFIED_EMAIL_WITHOUT_SMTP = "false"
   INCOMING_SMTP_DNSBL_ENABLED = "true"
   REFRESH_TOKEN_TTL_DAYS = "30"
   # Comma-separated addresses that see /ui/dashboard across every company rather than

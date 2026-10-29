@@ -34,6 +34,7 @@ htmd = "0.1"
 mail-parser = "0.9"
 mail-auth = "0.6"
 sha2 = "0.10"
+hmac = "0.12"
 jsonschema = { version = "=0.33.0", default-features = false }
 serde_yaml = "0.9"
 regex = "1"

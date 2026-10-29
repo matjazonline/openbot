@@ -66,6 +66,12 @@ async fn workflow_admit_sql_actor_revocation_blocks_new_replay_and_alias() {
 
 async fn restrict_channel(f: &AdmissionFixture, c: &Conversation) -> Uuid {
     let p = f.persistence();
+    // Start with valid email-based access so these tests reach grant revocation.
+    sqlx::query("UPDATE users SET email_verified_at = CURRENT_TIMESTAMP WHERE id = $1")
+        .bind(f.binding.target.actor.user_id())
+        .execute(p.pool())
+        .await
+        .unwrap();
     p.create_user("replacement_owner", "replacement@example.test", "hash")
         .await
         .unwrap();

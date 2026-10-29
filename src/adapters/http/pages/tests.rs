@@ -4046,9 +4046,11 @@ fn every_ui_workspace_first_column_renders_a_sidebar_header() {
 
 fn profile_account() -> User {
     User {
+        auth_revision: 0,
         id: Uuid::new_v4(),
         username: "dana".to_string(),
         email: "dana@example.com".to_string(),
+        email_verified_at: None,
         password_hash: "irrelevant".to_string(),
         avatar_url: Some(AvatarUrl::from("https://cdn.example.com/dana.png")),
         created_at: Utc::now(),
@@ -4081,6 +4083,10 @@ fn the_profile_pane_offers_the_account_its_own_details_and_never_its_password() 
 
     assert!(html.contains(r#"name="username" required value="dana""#));
     assert!(html.contains(r#"name="email" required value="dana@example.com""#));
+    assert!(html.contains("Email unverified"));
+    assert!(html.contains(
+        "Email-based invitations, restricted channel access, and operator access are unavailable"
+    ));
 
     // The picture is picked from disk; the URL it was stored at rides along hidden.
     assert!(html.contains(r#"type="file" name="avatar_file""#));
@@ -4093,6 +4099,32 @@ fn the_profile_pane_offers_the_account_its_own_details_and_never_its_password() 
     assert!(html.contains(r#"name="current_password""#));
     assert!(!html.contains("irrelevant"));
     assert!(!html.contains(r#"name="current_password" value"#));
+}
+
+#[test]
+fn security_email_identity_profile_displays_current_address_proof() {
+    let mut account = profile_account();
+    let pane = |user: &User| {
+        profile_pane(&ProfilePane {
+            user,
+            draft: None,
+            pending: &[],
+            methods: &LoginMethods {
+                password: true,
+                google: false,
+                apple: false,
+            },
+            google_enabled: false,
+            apple_enabled: false,
+            notification_preferences: Default::default(),
+            outcome: ProfileOutcome::Untouched,
+        })
+    };
+    assert!(pane(&account).contains("Email unverified"));
+    account.email_verified_at = Some(Utc::now());
+    let html = pane(&account);
+    assert!(html.contains("Email verified"));
+    assert!(!html.contains("Email unverified"));
 }
 
 /// P08-Q8: the profile offers exactly two email toggles, each showing its stored value.
@@ -4646,6 +4678,49 @@ fn dump_application_javascript() {
         application_javascript(),
     )
     .expect("write bundle");
+}
+
+#[test]
+#[ignore = "browser protocol fixture: write the server-rendered forms, alerts, and shipped JavaScript"]
+fn dump_html_injection_browser_fixtures() {
+    let output = std::path::PathBuf::from(
+        std::env::var("HTML_INJECTION_BROWSER_FIXTURES").expect("fixture directory"),
+    );
+    std::fs::create_dir_all(&output).expect("create fixture directory");
+    let malicious_name = "victim<img/src=x/onerror=fetch('/exfil')>";
+    let files = [
+        ("app.js", application_javascript()),
+        ("register.html", register_page(false, false)),
+        ("login.html", login_page(false, false)),
+        (
+            "team.html",
+            base_layout(
+                "Team",
+                "<p id=\"viewer\">Viewer: owner@example.com</p><label>Participants<input name=\"participant_emails\" data-company-id=\"00000000-0000-4000-8000-000000000001\"></label>",
+            ),
+        ),
+        (
+            "register-success.html",
+            success_alert(
+                &format!("Welcome, {malicious_name}! Your account is ready."),
+                Some(("/", "Continue")),
+            ),
+        ),
+        (
+            "login-success.html",
+            success_alert(
+                &format!("Welcome back, {malicious_name}! Authentication successful."),
+                Some(("/", "Continue")),
+            ),
+        ),
+        (
+            "form-error.html",
+            error_alert("Registration failed: <svg/onload=fetch('/exfil')>"),
+        ),
+    ];
+    for (name, body) in files {
+        std::fs::write(output.join(name), body).expect("write fixture");
+    }
 }
 
 fn test_thread_runs(activity: ThreadActivity) -> crate::application::thread_activity::ThreadRuns {

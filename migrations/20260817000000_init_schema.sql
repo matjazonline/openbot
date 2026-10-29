@@ -3971,6 +3971,26 @@ CREATE TABLE public.participant_identities (
 -- Name: pending_account_changes; Type: TABLE; Schema: public; Owner: -
 --
 
+-- Auth guess budgets outlive pending codes: cancellation, code expiry and reissue cannot reset
+-- the one-hour operation window. Keys are HMAC digests; no raw identity or code is stored.
+CREATE TABLE public.auth_code_attempts (
+    operation_key bytea PRIMARY KEY,
+    attempts smallint NOT NULL DEFAULT 0,
+    window_ends_at timestamp with time zone NOT NULL,
+    CONSTRAINT auth_code_attempts_key_length CHECK (octet_length(operation_key) = 32),
+    CONSTRAINT auth_code_attempts_count CHECK (attempts BETWEEN 0 AND 5)
+);
+CREATE INDEX auth_code_attempts_expiry_idx ON public.auth_code_attempts (window_ends_at);
+
+CREATE TABLE public.auth_login_attempts (
+    identity_source_key bytea PRIMARY KEY,
+    attempts smallint NOT NULL DEFAULT 0,
+    window_ends_at timestamp with time zone NOT NULL,
+    CONSTRAINT auth_login_attempts_key_length CHECK (octet_length(identity_source_key) = 32),
+    CONSTRAINT auth_login_attempts_count CHECK (attempts BETWEEN 0 AND 5)
+);
+CREATE INDEX auth_login_attempts_expiry_idx ON public.auth_login_attempts (window_ends_at);
+
 CREATE TABLE public.pending_account_changes (
     user_id uuid NOT NULL,
     kind text NOT NULL,
@@ -4268,6 +4288,7 @@ CREATE TABLE public.users (
     id uuid NOT NULL,
     username public.citext NOT NULL,
     email public.citext NOT NULL,
+    email_verified_at timestamp with time zone,
     password_hash text NOT NULL,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     avatar_url text,
@@ -11315,3 +11336,43 @@ END;
 $$;
 CREATE TRIGGER workflow_jev_immutable BEFORE UPDATE ON public.workflow_jev_invocations
     FOR EACH ROW EXECUTE FUNCTION public.guard_jev_invocation_update();
+
+-- Revocable browser sessions. Pre-release schema: reset existing databases.
+ALTER TABLE public.users ADD COLUMN auth_revision bigint NOT NULL DEFAULT 0
+    CONSTRAINT users_auth_revision_nonnegative CHECK (auth_revision >= 0);
+
+CREATE TABLE public.user_sessions (
+    id uuid PRIMARY KEY,
+    user_id uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    auth_revision bigint NOT NULL CHECK (auth_revision >= 0),
+    issued_at timestamptz NOT NULL,
+    expires_at timestamptz NOT NULL,
+    revoked_at timestamptz,
+    CONSTRAINT user_sessions_positive_lifetime CHECK (expires_at > issued_at)
+);
+CREATE INDEX user_sessions_active_user ON public.user_sessions (user_id) WHERE revoked_at IS NULL;
+CREATE INDEX user_sessions_expiry ON public.user_sessions (expires_at, id);
+CREATE INDEX user_sessions_revoked ON public.user_sessions (revoked_at, id) WHERE revoked_at IS NOT NULL;
+
+-- All credential writers, including code-confirmed changes, share the account-row fence.
+CREATE FUNCTION public.advance_account_auth_revision() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF NEW.password_hash IS DISTINCT FROM OLD.password_hash OR NEW.email IS DISTINCT FROM OLD.email THEN
+        NEW.auth_revision := OLD.auth_revision + 1;
+    ELSIF NEW.auth_revision IS DISTINCT FROM OLD.auth_revision THEN
+        RAISE EXCEPTION 'Account authentication revision is database generated' USING ERRCODE = '23514';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER users_advance_auth_revision BEFORE UPDATE OF password_hash, email, auth_revision
+    ON public.users FOR EACH ROW EXECUTE FUNCTION public.advance_account_auth_revision();
+
+CREATE FUNCTION public.revoke_account_sessions() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    UPDATE public.user_sessions SET revoked_at = clock_timestamp()
+        WHERE user_id = NEW.id AND revoked_at IS NULL;
+    RETURN NULL;
+END $$;
+CREATE TRIGGER users_revoke_sessions AFTER UPDATE OF password_hash, email ON public.users
+    FOR EACH ROW WHEN (OLD.auth_revision IS DISTINCT FROM NEW.auth_revision)
+    EXECUTE FUNCTION public.revoke_account_sessions();

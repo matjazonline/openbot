@@ -228,7 +228,7 @@ impl SchedulesWorkspace {
 
 const PAGE_SIZE: i64 = 15;
 
-#[instrument(skip(workspace, headers))]
+#[instrument(skip_all)]
 async fn schedules_page(
     workspace: SchedulesWorkspace,
     headers: axum::http::HeaderMap,
@@ -339,7 +339,7 @@ async fn schedules_page(
     })))
 }
 
-#[instrument(skip(workspace))]
+#[instrument(skip_all)]
 async fn schedule_runs_fragment(
     workspace: SchedulesWorkspace,
     Query(query): Query<CompanyScopedQuery>,
@@ -354,7 +354,7 @@ async fn schedule_runs_fragment(
         .await
 }
 
-#[instrument(skip(workspace))]
+#[instrument(skip_all)]
 async fn create_pane(
     workspace: SchedulesWorkspace,
     Query(query): Query<CompanyScopedQuery>,
@@ -382,7 +382,7 @@ async fn create_pane(
     )))
 }
 
-#[instrument(skip(workspace))]
+#[instrument(skip_all)]
 async fn edit_schedule_pane(
     workspace: SchedulesWorkspace,
     Path(id): Path<Uuid>,
@@ -434,7 +434,7 @@ impl ScheduleActionForm {
     }
 }
 
-#[instrument(skip(workspace))]
+#[instrument(skip_all)]
 async fn run_schedule_now(
     workspace: SchedulesWorkspace,
     Path(id): Path<Uuid>,
@@ -453,7 +453,7 @@ async fn run_schedule_now(
     workspace.runs_column(form.company_id, id, form.page).await
 }
 
-#[instrument(skip(workspace))]
+#[instrument(skip_all)]
 async fn toggle_schedule(
     workspace: SchedulesWorkspace,
     Path(id): Path<Uuid>,
@@ -484,7 +484,7 @@ async fn toggle_schedule(
     Ok(Html(format!("{runs_column}{sidebar}")))
 }
 
-#[instrument(skip(_workspace))]
+#[instrument(skip_all)]
 async fn close_pane(
     _workspace: SchedulesWorkspace,
     Query(_query): Query<CompanyScopedQuery>,
@@ -504,7 +504,7 @@ pub struct CreateScheduleForm {
     pub schedule: UiScheduleForm,
 }
 
-#[instrument(skip(workspace, form))]
+#[instrument(skip_all)]
 async fn create_schedule(
     workspace: SchedulesWorkspace,
     Form(form): Form<CreateScheduleForm>,
@@ -531,7 +531,7 @@ async fn create_schedule(
         .into_response())
 }
 
-#[instrument(skip(workspace, form))]
+#[instrument(skip_all)]
 async fn update_schedule(
     workspace: SchedulesWorkspace,
     Path(id): Path<Uuid>,
@@ -560,7 +560,7 @@ async fn update_schedule(
         .into_response())
 }
 
-#[instrument(skip(workspace))]
+#[instrument(skip_all)]
 async fn delete_schedule(
     workspace: SchedulesWorkspace,
     Path(id): Path<Uuid>,
@@ -583,7 +583,7 @@ async fn delete_schedule(
         .into_response())
 }
 
-#[instrument(skip(_workspace))]
+#[instrument(skip_all)]
 async fn schedule_page_redirect(
     _workspace: SchedulesWorkspace,
     Path(id): Path<Uuid>,

@@ -62,8 +62,8 @@ async fn sendgrid_inbound_webhook(
     let ingest = match thread_use_cases
         .preflight_inbound(inbound)
         .await
-        .map_err(|error| {
-            warn!(%error, "Could not preflight an inbound SendGrid message");
+        .map_err(|_| {
+            warn!("Could not preflight an inbound SendGrid message");
             StatusCode::INTERNAL_SERVER_ERROR
         })? {
         InboundPreflight::Rejected(result) => *result,
@@ -71,8 +71,8 @@ async fn sendgrid_inbound_webhook(
             let persisted = attachments
                 .persist(config, file_storage.as_deref())
                 .await
-                .map_err(|error| {
-                    warn!(%error, "Could not prepare inbound SendGrid attachment metadata");
+                .map_err(|_| {
+                    warn!("Could not prepare inbound SendGrid attachment metadata");
                     StatusCode::UNPROCESSABLE_ENTITY
                 })?;
             prepared.replace_attachments(
@@ -83,8 +83,8 @@ async fn sendgrid_inbound_webhook(
             thread_use_cases
                 .commit_prepared_inbound(*prepared)
                 .await
-                .map_err(|error| {
-                    warn!(%error, "Could not ingest an inbound SendGrid message");
+                .map_err(|_| {
+                    warn!("Could not ingest an inbound SendGrid message");
                     StatusCode::INTERNAL_SERVER_ERROR
                 })?
         }
@@ -96,8 +96,8 @@ async fn sendgrid_inbound_webhook(
         thread_use_cases
             .handle_bounce_dispatch(&ingest)
             .await
-            .map_err(|error| {
-                warn!(%error, "Could not queue an inbound SendGrid rejection bounce");
+            .map_err(|_| {
+                warn!("Could not queue an inbound SendGrid rejection bounce");
                 StatusCode::INTERNAL_SERVER_ERROR
             })?;
     }

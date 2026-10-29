@@ -134,7 +134,7 @@ impl Workspace {
 }
 
 /// GET /ui/channels - The Channels workspace for the selected company / channel (Protected).
-#[instrument(skip(workspace))]
+#[instrument(skip_all)]
 async fn channels_page(
     workspace: Workspace,
     Query(query): Query<WorkspaceQuery>,
@@ -190,7 +190,7 @@ async fn channels_page(
 }
 
 /// GET /ui/channels/new - The create-channel form for the pane (Protected).
-#[instrument(skip(workspace))]
+#[instrument(skip_all)]
 async fn create_pane(
     workspace: Workspace,
     Query(query): Query<CompanyQuery>,
@@ -208,7 +208,7 @@ async fn create_pane(
 /// What Cancel does: the pane goes back to its placeholder and the sidebar loses its highlight,
 /// so cancelling a create and cancelling an edit both leave the workspace in the same state as
 /// arriving at `/ui/channels` with nothing selected.
-#[instrument(skip(workspace))]
+#[instrument(skip_all)]
 async fn close_pane(
     workspace: Workspace,
     Query(query): Query<CompanyQuery>,
@@ -218,7 +218,7 @@ async fn close_pane(
 }
 
 /// GET /ui/channels/{channel_id} - One channel's settings for the pane (Protected).
-#[instrument(skip(workspace))]
+#[instrument(skip_all)]
 async fn edit_pane(
     workspace: Workspace,
     Path(channel_id): Path<Uuid>,
@@ -233,7 +233,7 @@ async fn edit_pane(
 }
 
 /// POST /ui/channels - Create a channel from the pane's Simple or Advanced form (Protected).
-#[instrument(skip(workspace, form))]
+#[instrument(skip_all)]
 async fn create_channel(
     workspace: Workspace,
     Query(query): Query<CompanyQuery>,
@@ -265,7 +265,7 @@ async fn create_channel(
 }
 
 /// PUT /ui/channels/{channel_id} - Save one channel's settings (Protected).
-#[instrument(skip(workspace, form))]
+#[instrument(skip_all)]
 async fn update_channel(
     workspace: Workspace,
     Path(channel_id): Path<Uuid>,
@@ -307,7 +307,7 @@ async fn update_channel(
 }
 
 /// DELETE /ui/channels/{channel_id} - Delete a channel and clear the pane (Protected).
-#[instrument(skip(workspace))]
+#[instrument(skip_all)]
 async fn delete_channel(
     workspace: Workspace,
     Path(channel_id): Path<Uuid>,

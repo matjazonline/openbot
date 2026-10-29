@@ -376,7 +376,7 @@ struct Ids {
 /// The workflow routes mount beside every other route without a path conflict.
 #[test]
 fn workflow_routes_mount_in_the_app_router() {
-    let sessions = Arc::new(SessionAuthority::new(&AppConfig::for_test()));
+    let sessions = Arc::new(SessionAuthority::for_test(&AppConfig::for_test()));
     let _ = crate::adapters::http::routes::router(sessions);
 }
 

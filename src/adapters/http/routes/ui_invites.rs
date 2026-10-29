@@ -36,7 +36,7 @@ struct InviteQuery {
     company_id: Option<Uuid>,
 }
 
-#[instrument(skip(company_use_cases, invite_use_cases, user_use_cases, config, user))]
+#[instrument(skip_all)]
 async fn invites_page(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(invite_use_cases): State<Arc<CompanyInviteUseCases>>,
@@ -47,7 +47,7 @@ async fn invites_page(
 ) -> AppResult<Html<String>> {
     let account = load_account(&user_use_cases, user.id).await?;
     let (_, company) = load_readable_company(&company_use_cases, user.id, query.company_id).await?;
-    let invites = invite_use_cases.list_user_invites(&account.email).await?;
+    let invites = invite_use_cases.list_user_invites(&account).await?;
     let account_email = EmailAddress::from(account.email.as_str());
     let mailbox_user = workspace_user(&account, &account_email, &config).with_company_membership(
         company
@@ -65,7 +65,7 @@ async fn invites_page(
     )))
 }
 
-#[instrument(skip(invite_use_cases, user_use_cases, user))]
+#[instrument(skip_all)]
 async fn accept_invite(
     State(invite_use_cases): State<Arc<CompanyInviteUseCases>>,
     State(user_use_cases): State<Arc<UserUseCases>>,
@@ -77,7 +77,7 @@ async fn accept_invite(
     Ok(Html(pages::invite_settings_row(&invite)))
 }
 
-#[instrument(skip(invite_use_cases, user_use_cases, user))]
+#[instrument(skip_all)]
 async fn decline_invite(
     State(invite_use_cases): State<Arc<CompanyInviteUseCases>>,
     State(user_use_cases): State<Arc<UserUseCases>>,

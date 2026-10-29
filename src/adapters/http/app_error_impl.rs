@@ -6,8 +6,22 @@ use axum::{
 
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
-        // Log the error before it gets converted into a status response.
-        tracing::error!(error = ?self, "Request failed");
+        // Error messages can contain provider responses, request URLs, or caller text. The
+        // request span and response event supply correlation/status; log only a fixed category.
+        let error_kind = match &self {
+            AppError::Execution(_) => "execution",
+            AppError::Database(_) => "database",
+            AppError::DatabaseTimeout(_) => "database_timeout",
+            AppError::InvalidCredentials => "invalid_credentials",
+            AppError::ServiceUnavailable(_) => "service_unavailable",
+            AppError::BadRequest(_) => "bad_request",
+            AppError::NotFound(_) => "not_found",
+            AppError::Conflict(_) => "conflict",
+            AppError::Superseded(_) => "superseded",
+            AppError::Timeout(_) => "timeout",
+            AppError::Internal(_) => "internal",
+        };
+        tracing::error!(error_kind, "Request failed");
 
         match self {
             AppError::Execution(_) => {
@@ -24,6 +38,11 @@ impl IntoResponse for AppError {
             AppError::InvalidCredentials => {
                 (StatusCode::UNAUTHORIZED, "Invalid credentials").into_response()
             }
+            AppError::ServiceUnavailable(_) => (
+                StatusCode::SERVICE_UNAVAILABLE,
+                "Service is busy. Try again shortly.",
+            )
+                .into_response(),
             AppError::BadRequest(message) => (StatusCode::BAD_REQUEST, message).into_response(),
             AppError::NotFound(message) => (StatusCode::NOT_FOUND, message).into_response(),
             AppError::Conflict(message) | AppError::Superseded(message) => {

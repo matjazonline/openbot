@@ -149,7 +149,7 @@ impl CompanyResendApiUseCases {
         Self { store }
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     pub async fn integration(
         &self,
         user_id: Uuid,
@@ -161,7 +161,7 @@ impl CompanyResendApiUseCases {
     /// Save what the form submitted. A signing secret that is not a Svix one is refused before it
     /// is stored, so a mistyped credential is a message under the field rather than a webhook
     /// that answers 401 to every delivery and looks like a provider outage.
-    #[instrument(skip(self, submitted))]
+    #[instrument(skip_all)]
     pub async fn save(
         &self,
         user_id: Uuid,
@@ -186,7 +186,7 @@ impl CompanyResendApiUseCases {
         Ok(saved)
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     pub async fn rotate_webhook_token(
         &self,
         user_id: Uuid,
@@ -202,7 +202,7 @@ impl CompanyResendApiUseCases {
         Ok(rotated)
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     pub async fn disconnect(&self, user_id: Uuid, company_id: Uuid) -> AppResult<bool> {
         let removed = self
             .store

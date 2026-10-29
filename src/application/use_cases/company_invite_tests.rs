@@ -156,13 +156,17 @@ impl CompanyInvitePersistence for MockCompanyInvitePersistence {
         Ok(())
     }
 
-    async fn list_invites_by_email(&self, email: &str) -> AppResult<Vec<CompanyInvite>> {
+    async fn list_invites_for_user(
+        &self,
+        _user_id: Uuid,
+        expected_email: &str,
+    ) -> AppResult<Vec<CompanyInvite>> {
         Ok(self
             .invites
             .lock()
             .unwrap()
             .iter()
-            .filter(|i| i.email.eq_ignore_ascii_case(email))
+            .filter(|i| i.email.eq_ignore_ascii_case(expected_email))
             .cloned()
             .collect())
     }
@@ -174,11 +178,19 @@ impl CompanyInvitePersistence for MockCompanyInvitePersistence {
         user_email: &str,
     ) -> AppResult<Option<CompanyInvite>> {
         let mut invites = self.invites.lock().unwrap();
-        let Some(invite) = invites.iter_mut().find(|i| {
-            i.id == invite_id && i.status == "pending" && i.email.eq_ignore_ascii_case(user_email)
-        }) else {
+        let Some(invite) = invites
+            .iter_mut()
+            .find(|i| i.id == invite_id && i.email.eq_ignore_ascii_case(user_email))
+        else {
             return Ok(None);
         };
+
+        if invite.status == "accepted" {
+            return Ok(Some(invite.clone()));
+        }
+        if invite.status != "pending" {
+            return Ok(None);
+        }
 
         let mut members = self.members.lock().unwrap();
         if let Some(member) = members
@@ -205,14 +217,22 @@ impl CompanyInvitePersistence for MockCompanyInvitePersistence {
     async fn decline_pending_invite(
         &self,
         invite_id: Uuid,
+        _user_id: Uuid,
         user_email: &str,
     ) -> AppResult<Option<CompanyInvite>> {
         let mut invites = self.invites.lock().unwrap();
-        let Some(invite) = invites.iter_mut().find(|i| {
-            i.id == invite_id && i.status == "pending" && i.email.eq_ignore_ascii_case(user_email)
-        }) else {
+        let Some(invite) = invites
+            .iter_mut()
+            .find(|i| i.id == invite_id && i.email.eq_ignore_ascii_case(user_email))
+        else {
             return Ok(None);
         };
+        if invite.status == "declined" {
+            return Ok(Some(invite.clone()));
+        }
+        if invite.status != "pending" {
+            return Ok(None);
+        }
         invite.status = "declined".to_string();
         Ok(Some(invite.clone()))
     }
@@ -431,37 +451,44 @@ async fn company_invites_crud_and_accept_flow() {
         .unwrap();
     assert_eq!(backwards_compatible_update.role, CompanyAccessRole::Admin);
 
-    // List invites for user
-    let user_invites = use_cases
-        .list_user_invites("newuser@example.com")
-        .await
-        .unwrap();
-    assert_eq!(user_invites.len(), 1);
-    assert!(
-        use_cases
-            .has_pending_user_invites("newuser@example.com")
-            .await
-            .unwrap()
-    );
-
-    // User accepts invite
     let user = User {
+        auth_revision: 0,
         id: Uuid::new_v4(),
         username: "newuser".to_string(),
         email: "newuser@example.com".to_string(),
+        email_verified_at: Some(Utc::now()),
         password_hash: "hash".to_string(),
         avatar_url: None,
         created_at: Utc::now(),
     };
 
-    let accepted = use_cases.accept_invite(&user, invite.id).await.unwrap();
-    assert_eq!(accepted.status, "accepted");
+    let unverified_user = User {
+        email_verified_at: None,
+        ..user.clone()
+    };
+    assert!(matches!(
+        use_cases.list_user_invites(&unverified_user).await,
+        Err(AppError::BadRequest(_))
+    ));
     assert!(
         !use_cases
-            .has_pending_user_invites("newuser@example.com")
+            .has_pending_user_invites(&unverified_user)
             .await
             .unwrap()
     );
+    assert!(matches!(
+        use_cases.accept_invite(&unverified_user, invite.id).await,
+        Err(AppError::BadRequest(_))
+    ));
+
+    // List invites for the verified current address.
+    let user_invites = use_cases.list_user_invites(&user).await.unwrap();
+    assert_eq!(user_invites.len(), 1);
+    assert!(use_cases.has_pending_user_invites(&user).await.unwrap());
+
+    let accepted = use_cases.accept_invite(&user, invite.id).await.unwrap();
+    assert_eq!(accepted.status, "accepted");
+    assert!(!use_cases.has_pending_user_invites(&user).await.unwrap());
     assert_eq!(
         use_cases
             .accept_invite(&user, invite.id)

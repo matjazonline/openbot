@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, username, email, password_hash, avatar_url, created_at as \"created_at!\" FROM users WHERE id = $1",
+  "query": "SELECT id, username, email, password_hash, avatar_url, email_verified_at, auth_revision, created_at as \"created_at!\" FROM users WHERE username = $1::citext",
   "describe": {
     "columns": [
       {
@@ -40,13 +40,28 @@
       },
       {
         "ordinal": 5,
+        "name": "email_verified_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 6,
+        "name": "auth_revision",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 7,
         "name": "created_at!",
         "type_info": "Timestamptz"
       }
     ],
     "parameters": {
       "Left": [
-        "Uuid"
+        {
+          "Custom": {
+            "name": "citext",
+            "kind": "Simple"
+          }
+        }
       ]
     },
     "nullable": [
@@ -55,8 +70,10 @@
       false,
       false,
       true,
+      true,
+      false,
       false
     ]
   },
-  "hash": "d88a2a564f59f81be44af8625efc4f13399a36242541a4a84f623fdf43712e92"
+  "hash": "bac4fe0e49e4388e5d9c66cf0acb2346fd6a4713019c9718e009c2666abf82e7"
 }

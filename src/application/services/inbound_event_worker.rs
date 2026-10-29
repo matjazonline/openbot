@@ -138,8 +138,8 @@ impl InboundEventWorker {
 
             let claimed = match self.claim().await {
                 Ok(claimed) => claimed,
-                Err(error) => {
-                    warn!(%error, "The inbound event loop could not claim work");
+                Err(_) => {
+                    warn!("The inbound event loop could not claim work");
                     if wait_for_next(ERROR_BACKOFF, &mut wakeups, &mut shutdown).await {
                         return;
                     }
@@ -249,11 +249,10 @@ impl InboundEventWorker {
                 .await;
             }
             SupervisedEvent::LeaseLost => self.record_lease_lost(&claimed, "renewal_refused"),
-            SupervisedEvent::RenewalFailed(error) => warn!(
+            SupervisedEvent::RenewalFailed => warn!(
                 event_id = %claimed.record.id,
                 installation_id = ?claimed.record.installation_id,
                 correlation_id = %claimed.record.correlation_id,
-                %error,
                 "Could not renew an inbound event lease; its reaper owns recovery"
             ),
             SupervisedEvent::Shutdown => info!(
@@ -358,10 +357,9 @@ impl InboundEventWorker {
             Ok(InboundEventTransition::LeaseLost) => {
                 self.record_lease_lost(claimed, "settlement_refused")
             }
-            Err(error) => warn!(
+            Err(_) => warn!(
                 event_id = %claimed.record.id,
                 correlation_id = %claimed.record.correlation_id,
-                %error,
                 "Could not settle an inbound event; its lease reaper owns recovery"
             ),
         }
@@ -390,8 +388,8 @@ impl InboundEventWorker {
             Ok(InboundEventTransition::LeaseLost) => {
                 self.record_lease_lost(claimed, "deadline_settlement_refused")
             }
-            Err(error) => {
-                warn!(event_id = %claimed.record.id, %error, "Could not retry an inbound event")
+            Err(_) => {
+                warn!(event_id = %claimed.record.id, "Could not retry an inbound event")
             }
         }
     }
@@ -473,7 +471,7 @@ impl InboundEventWorker {
                 "Recovered expired inbound event leases"
             ),
             Ok(_) => {}
-            Err(error) => warn!(%error, "Could not reap expired inbound event leases"),
+            Err(_) => warn!("Could not reap expired inbound event leases"),
         }
         match self.queue.inbound_event_census().await {
             Ok(census) => {
@@ -490,7 +488,7 @@ impl InboundEventWorker {
                     );
                 }
             }
-            Err(error) => warn!(%error, "Could not census the inbound event queue"),
+            Err(_) => warn!("Could not census the inbound event queue"),
         }
     }
 
@@ -513,7 +511,7 @@ impl InboundEventWorker {
                 );
             }
             Ok(_) => {}
-            Err(error) => warn!(%error, "Could not purge retained inbound event payloads"),
+            Err(_) => warn!("Could not purge retained inbound event payloads"),
         }
     }
 }
@@ -531,7 +529,7 @@ enum SupervisedEvent<T> {
     Deadline,
     Shutdown,
     LeaseLost,
-    RenewalFailed(AppError),
+    RenewalFailed,
 }
 
 async fn supervise_event_lease<T, Work, Shutdown>(
@@ -575,7 +573,7 @@ where
         match renewed {
             Ok(true) => *lease = (*lease).renewed_until(renewed_until),
             Ok(false) => return SupervisedEvent::LeaseLost,
-            Err(error) => return SupervisedEvent::RenewalFailed(error),
+            Err(_) => return SupervisedEvent::RenewalFailed,
         }
         next_heartbeat = Instant::now() + heartbeat;
     }
@@ -668,6 +666,7 @@ fn classify_commit_error(error: &AppError) -> (InboundEventErrorClass, bool) {
         AppError::Superseded(_) => (InboundEventErrorClass::Superseded, false),
         AppError::Database(_)
         | AppError::DatabaseTimeout(_)
+        | AppError::ServiceUnavailable(_)
         | AppError::Internal(_)
         | AppError::InvalidCredentials => (InboundEventErrorClass::Internal, false),
     }

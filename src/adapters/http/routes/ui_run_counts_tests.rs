@@ -140,6 +140,7 @@ impl CountsFixture {
             owner: Viewer {
                 user_id: user.id,
                 email: email.into(),
+                email_verified_at: Some(chrono::Utc::now()),
             },
         })
     }
@@ -409,6 +410,11 @@ async fn admin(f: &CountsFixture) -> Viewer {
         .await
         .unwrap()
         .unwrap();
+    sqlx::query("UPDATE users SET email_verified_at = CURRENT_TIMESTAMP WHERE id = $1")
+        .bind(user.id)
+        .execute(f.persistence.pool())
+        .await
+        .unwrap();
     let invite = f
         .persistence
         .create_invite(
@@ -425,6 +431,7 @@ async fn admin(f: &CountsFixture) -> Viewer {
     Viewer {
         user_id: user.id,
         email: email.into(),
+        email_verified_at: Some(chrono::Utc::now()),
     }
 }
 

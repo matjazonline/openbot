@@ -224,7 +224,7 @@ impl SkillUseCases {
             .filter(|stored| stored.agent.is_library()))
     }
 
-    #[instrument(skip(self, write), fields(%user_id, %company_id))]
+    #[instrument(skip_all, fields(%user_id, %company_id))]
     pub async fn create_company(
         &self,
         user_id: Uuid,
@@ -237,7 +237,7 @@ impl SkillUseCases {
         self.persistence.create_company(company_id, write).await
     }
 
-    #[instrument(skip(self), fields(%user_id, %company_id, %skill_id))]
+    #[instrument(skip_all, fields(%user_id, %company_id, %skill_id))]
     pub async fn get_company(
         &self,
         user_id: Uuid,
@@ -248,7 +248,7 @@ impl SkillUseCases {
         self.persistence.get_company(company_id, skill_id).await
     }
 
-    #[instrument(skip(self), fields(%user_id, %company_id))]
+    #[instrument(skip_all, fields(%user_id, %company_id))]
     pub async fn list_company_page(
         &self,
         user_id: Uuid,
@@ -266,7 +266,7 @@ impl SkillUseCases {
         self.persistence.count_company(company_id).await
     }
 
-    #[instrument(skip(self, write), fields(%user_id, %company_id, %skill_id))]
+    #[instrument(skip_all, fields(%user_id, %company_id, %skill_id))]
     pub async fn update_company(
         &self,
         user_id: Uuid,
@@ -282,7 +282,7 @@ impl SkillUseCases {
             .await
     }
 
-    #[instrument(skip(self), fields(%user_id, %company_id, %skill_id))]
+    #[instrument(skip_all, fields(%user_id, %company_id, %skill_id))]
     pub async fn delete_company(
         &self,
         user_id: Uuid,
@@ -294,7 +294,7 @@ impl SkillUseCases {
     }
 
     /// Insert a company-owned copy of a global library skill.
-    #[instrument(skip(self), fields(%user_id, %company_id, %skill_id))]
+    #[instrument(skip_all, fields(%user_id, %company_id, %skill_id))]
     pub async fn create_skill_from_library(
         &self,
         user_id: Uuid,
@@ -307,31 +307,31 @@ impl SkillUseCases {
             .await
     }
 
-    #[instrument(skip(self, write))]
+    #[instrument(skip_all)]
     pub async fn create_library(&self, mut write: SkillWrite) -> AppResult<Skill> {
         write.created_by = Some(CreationProvenance::system());
         write.normalize()?;
         self.persistence.create_library(write).await
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     pub async fn get_library(&self, skill_id: Uuid) -> AppResult<Option<Skill>> {
         self.persistence.get_library(skill_id).await
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     pub async fn list_library_page(&self, page: SkillPageRequest) -> AppResult<SkillPage> {
         self.persistence.list_library_page(page.validate()?).await
     }
 
-    #[instrument(skip(self, write))]
+    #[instrument(skip_all)]
     pub async fn update_library(&self, skill_id: Uuid, mut write: SkillWrite) -> AppResult<Skill> {
         write.created_by = None;
         write.normalize()?;
         self.persistence.update_library(skill_id, write).await
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     pub async fn delete_library(&self, skill_id: Uuid) -> AppResult<()> {
         self.persistence.delete_library(skill_id).await
     }

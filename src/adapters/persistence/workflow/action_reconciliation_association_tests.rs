@@ -76,6 +76,12 @@ async fn associated(kind: AssociationKind) -> Associated {
     .await;
     resources(&f).await;
     let admin = principal(&f, Some("admin")).await;
+    // The positive reconciliation path needs proof before its grant is revoked.
+    sqlx::query("UPDATE users SET email_verified_at = CURRENT_TIMESTAMP WHERE id = $1")
+        .bind(admin.user_id())
+        .execute(f.persistence().pool())
+        .await
+        .unwrap();
     sqlx::query("UPDATE channels SET access_mode='allowlist' WHERE id=$1")
         .bind(conversation.channel)
         .execute(f.persistence().pool())

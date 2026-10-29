@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, username, email, password_hash, avatar_url, created_at as \"created_at!\" FROM users WHERE username = $1",
+  "query": "UPDATE users\n               SET username = $2, email = $3, avatar_url = $4,\n                   email_verified_at = CASE WHEN email IS DISTINCT FROM $3::citext\n                                            THEN NULL ELSE email_verified_at END\n               WHERE id = $1\n               RETURNING id, username, email, password_hash, avatar_url, email_verified_at, auth_revision, created_at as \"created_at!\"",
   "describe": {
     "columns": [
       {
@@ -40,18 +40,36 @@
       },
       {
         "ordinal": 5,
+        "name": "email_verified_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 6,
+        "name": "auth_revision",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 7,
         "name": "created_at!",
         "type_info": "Timestamptz"
       }
     ],
     "parameters": {
       "Left": [
+        "Uuid",
         {
           "Custom": {
             "name": "citext",
             "kind": "Simple"
           }
-        }
+        },
+        {
+          "Custom": {
+            "name": "citext",
+            "kind": "Simple"
+          }
+        },
+        "Text"
       ]
     },
     "nullable": [
@@ -60,8 +78,10 @@
       false,
       false,
       true,
+      true,
+      false,
       false
     ]
   },
-  "hash": "1a436a779e480c9b414091c0facc2f6dbd140bf866449d8d20bd8de594ae039b"
+  "hash": "d7b3c0710e0a7ffd3f9b7220f3a5aae847351efae2a4ee5d495928026570c57d"
 }

@@ -184,7 +184,7 @@ impl IntoResponse for WorkflowError {
             // app answers other timeouts with 500. Logged here, because this branch bypasses
             // `AppError::into_response`, which is where every other failed request is.
             Self::App(AppError::Timeout(message)) => {
-                tracing::warn!(error = %message, "Workflow request timed out; answered 503");
+                tracing::warn!("Workflow request timed out; answered 503");
                 (
                     StatusCode::SERVICE_UNAVAILABLE,
                     [(axum::http::header::RETRY_AFTER, "1")],

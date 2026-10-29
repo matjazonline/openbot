@@ -9,7 +9,7 @@ use crate::{
     entities::{
         company_invite::CompanyInvite,
         company_member::{CompanyAccessRole, CompanyMember},
-        user::User,
+        user::{User, VerifiedEmail},
     },
     use_cases::company::{CompanyPersistence, company_not_found, owned_company},
 };
@@ -18,6 +18,10 @@ use crate::{
 /// cannot tell a foreign invite from a nonexistent one. See [`owned_company`].
 fn invite_not_found() -> AppError {
     AppError::NotFound("Invite not found in this company.".into())
+}
+
+fn unverified_email_error() -> AppError {
+    AppError::BadRequest("Verify your current email address before using invitations.".into())
 }
 
 #[async_trait]
@@ -37,7 +41,11 @@ pub trait CompanyInvitePersistence: Send + Sync {
         role: CompanyAccessRole,
     ) -> AppResult<CompanyInvite>;
     async fn delete_invite(&self, id: Uuid) -> AppResult<()>;
-    async fn list_invites_by_email(&self, email: &str) -> AppResult<Vec<CompanyInvite>>;
+    async fn list_invites_for_user(
+        &self,
+        user_id: Uuid,
+        expected_email: &str,
+    ) -> AppResult<Vec<CompanyInvite>>;
     async fn accept_pending_invite(
         &self,
         invite_id: Uuid,
@@ -47,6 +55,7 @@ pub trait CompanyInvitePersistence: Send + Sync {
     async fn decline_pending_invite(
         &self,
         invite_id: Uuid,
+        user_id: Uuid,
         user_email: &str,
     ) -> AppResult<Option<CompanyInvite>>;
     async fn list_members_by_company(&self, company_id: Uuid) -> AppResult<Vec<CompanyMember>>;
@@ -81,7 +90,7 @@ impl CompanyInviteUseCases {
         Ok(())
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     pub async fn create_company_invite(
         &self,
         user_id: Uuid,
@@ -98,16 +107,13 @@ impl CompanyInviteUseCases {
             ));
         }
 
-        info!(
-            "Creating invite for email {} to company {}",
-            email_trimmed, company_id
-        );
+        info!(%company_id, "Creating invite");
         self.invite_persistence
             .create_invite(company_id, &email_trimmed, role)
             .await
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     pub async fn list_company_invites(
         &self,
         user_id: Uuid,
@@ -119,7 +125,7 @@ impl CompanyInviteUseCases {
             .await
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     pub async fn get_company_invite(
         &self,
         user_id: Uuid,
@@ -136,7 +142,7 @@ impl CompanyInviteUseCases {
         Ok(invite)
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     pub async fn update_company_invite(
         &self,
         user_id: Uuid,
@@ -169,13 +175,13 @@ impl CompanyInviteUseCases {
             ));
         }
 
-        info!("Updating invite {} email to {}", invite_id, email_trimmed);
+        info!(%invite_id, "Updating invite email");
         self.invite_persistence
             .update_invite(invite_id, &email_trimmed, role.unwrap_or(invite.role))
             .await
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     pub async fn delete_company_invite(
         &self,
         user_id: Uuid,
@@ -198,84 +204,48 @@ impl CompanyInviteUseCases {
         self.invite_persistence.delete_invite(invite_id).await
     }
 
-    #[instrument(skip(self))]
-    pub async fn list_user_invites(&self, user_email: &str) -> AppResult<Vec<CompanyInvite>> {
+    #[instrument(skip_all)]
+    pub async fn list_user_invites(&self, user: &User) -> AppResult<Vec<CompanyInvite>> {
+        VerifiedEmail::from_user(user).ok_or_else(unverified_email_error)?;
         self.invite_persistence
-            .list_invites_by_email(user_email.trim())
+            .list_invites_for_user(user.id, &user.email)
             .await
     }
 
     /// Whether an account has an invitation that still needs an answer.
-    #[instrument(skip(self))]
-    pub async fn has_pending_user_invites(&self, user_email: &str) -> AppResult<bool> {
+    #[instrument(skip_all)]
+    pub async fn has_pending_user_invites(&self, user: &User) -> AppResult<bool> {
+        if VerifiedEmail::from_user(user).is_none() {
+            return Ok(false);
+        }
         Ok(self
-            .list_user_invites(user_email)
+            .list_user_invites(user)
             .await?
             .iter()
             .any(|invite| invite.status == "pending"))
     }
 
-    #[instrument(skip(self, user))]
+    #[instrument(skip_all)]
     pub async fn accept_invite(&self, user: &User, invite_id: Uuid) -> AppResult<CompanyInvite> {
+        VerifiedEmail::from_user(user).ok_or_else(unverified_email_error)?;
         info!("User {} accepting invite {}", user.id, invite_id);
-        if let Some(invite) = self
-            .invite_persistence
+        self.invite_persistence
             .accept_pending_invite(invite_id, user.id, &user.email)
             .await?
-        {
-            return Ok(invite);
-        }
-
-        let invite = self
-            .invite_persistence
-            .get_invite_by_id(invite_id)
-            .await?
-            .ok_or_else(invite_not_found)?;
-        if !invite.email.eq_ignore_ascii_case(&user.email) {
-            return Err(AppError::Internal(
-                "Invite email does not match active user email.".into(),
-            ));
-        }
-        if invite.status == "accepted" {
-            return Ok(invite);
-        }
-        Err(AppError::Internal(format!(
-            "Invite was already processed as '{}'.",
-            invite.status
-        )))
+            .ok_or_else(invite_not_found)
     }
 
-    #[instrument(skip(self, user))]
+    #[instrument(skip_all)]
     pub async fn decline_invite(&self, user: &User, invite_id: Uuid) -> AppResult<CompanyInvite> {
+        VerifiedEmail::from_user(user).ok_or_else(unverified_email_error)?;
         info!("User {} declining invite {}", user.id, invite_id);
-        if let Some(invite) = self
-            .invite_persistence
-            .decline_pending_invite(invite_id, &user.email)
+        self.invite_persistence
+            .decline_pending_invite(invite_id, user.id, &user.email)
             .await?
-        {
-            return Ok(invite);
-        }
-
-        let invite = self
-            .invite_persistence
-            .get_invite_by_id(invite_id)
-            .await?
-            .ok_or_else(invite_not_found)?;
-        if !invite.email.eq_ignore_ascii_case(&user.email) {
-            return Err(AppError::Internal(
-                "Invite email does not match active user email.".into(),
-            ));
-        }
-        if invite.status == "declined" {
-            return Ok(invite);
-        }
-        Err(AppError::Internal(format!(
-            "Invite was already processed as '{}'.",
-            invite.status
-        )))
+            .ok_or_else(invite_not_found)
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     pub async fn list_company_team_members(
         &self,
         user_id: Uuid,
@@ -305,7 +275,7 @@ impl CompanyInviteUseCases {
             .await
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     pub async fn remove_company_team_member(
         &self,
         user_id: Uuid,
@@ -329,7 +299,7 @@ impl CompanyInviteUseCases {
             .await
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     pub async fn update_company_team_member_role(
         &self,
         user_id: Uuid,

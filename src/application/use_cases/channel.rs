@@ -186,7 +186,7 @@ impl ChannelUseCases {
         Ok(())
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     pub async fn create_channel(
         &self,
         user_id: Uuid,
@@ -200,10 +200,7 @@ impl ChannelUseCases {
         write.normalize()?;
         self.check_spam_interlock(&write, confirm_spam_disabled)?;
 
-        info!(
-            "Creating channel '{}' ({}) for company {}",
-            write.name, write.slug, company_id
-        );
+        info!(%company_id, "Creating channel");
 
         self.channel_persistence.create(company_id, write).await
     }
@@ -225,7 +222,7 @@ impl ChannelUseCases {
         check_spam_interlock(write, self.spam_scanning(), confirm_spam_disabled)
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     pub async fn list_company_channels(
         &self,
         user_id: Uuid,
@@ -253,7 +250,7 @@ impl ChannelUseCases {
     /// The read counterpart of [`ChannelUseCases::list_company_channels`]: that one is for the
     /// pages that *configure* channels and stays owner-or-admin, this one is what the mailbox lists,
     /// and a restricted channel simply is not in it for a colleague who is not a participant.
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     pub async fn list_readable_channels(
         &self,
         viewer: &Viewer,
@@ -276,7 +273,7 @@ impl ChannelUseCases {
     ///
     /// Answers `None` for "no such channel", "not your company" and "not yours to read" alike:
     /// telling them apart would let anyone probe ids to learn which channels a company runs.
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     pub async fn get_readable_channel(
         &self,
         viewer: &Viewer,
@@ -312,7 +309,7 @@ impl ChannelUseCases {
             .await
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     pub async fn get_company_channel(
         &self,
         user_id: Uuid,
@@ -333,7 +330,7 @@ impl ChannelUseCases {
         &self.channel_persistence
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     pub async fn update_channel(
         &self,
         user_id: Uuid,
@@ -357,10 +354,7 @@ impl ChannelUseCases {
         write.normalize()?;
         self.check_spam_interlock(&write, confirm_spam_disabled)?;
 
-        info!(
-            "Updating channel {} for company {}: {} ({}), enabled={}",
-            channel_id, company_id, write.name, write.slug, write.enabled
-        );
+        info!(%channel_id, %company_id, enabled = write.enabled, "Updating channel");
 
         self.channel_persistence
             .update(ChannelUpdate {
@@ -371,7 +365,7 @@ impl ChannelUseCases {
             .await
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     pub async fn delete_channel(
         &self,
         user_id: Uuid,
@@ -394,7 +388,7 @@ impl ChannelUseCases {
         self.channel_persistence.delete(channel_id).await
     }
 
-    #[instrument(skip(self, sender))]
+    #[instrument(skip_all)]
     pub async fn preview_inbound_route(
         &self,
         company_slug: CompanySlug,
@@ -816,6 +810,71 @@ mod tests {
             gcs: None,
             operator_emails: Vec::new(),
         })
+    }
+
+    #[tokio::test]
+    async fn security_email_identity_unverified_account_cannot_read_participant_channel() {
+        let owner_id = Uuid::new_v4();
+        let member_id = Uuid::new_v4();
+        let company_id = Uuid::new_v4();
+        let channel_id = Uuid::new_v4();
+        let company_persistence = Arc::new(MockCompanyPersistence {
+            companies: Mutex::new(vec![Company {
+                id: company_id,
+                user_id: owner_id,
+                name: "Acme".into(),
+                slug: "acme".into(),
+                avatar_url: None,
+                created_at: Utc::now(),
+                channel_defaults: Default::default(),
+            }]),
+            memberships: Mutex::new(vec![(member_id, company_id, CompanyMembership::Member)]),
+        });
+        let channel = channel_from_write(
+            channel_id,
+            company_id,
+            ChannelWrite {
+                name: "Private".into(),
+                slug: "private".into(),
+                participant_emails: Some(vec!["member@example.com".into()]),
+                enabled: true,
+                ..ChannelWrite::default()
+            },
+        );
+        let directory = Arc::new(
+            InMemoryParticipantDirectory::new()
+                .with_team(company_persistence.clone())
+                .with_user(company_id, member_id, "member@example.com"),
+        );
+        let cases = ChannelUseCases::new(
+            company_persistence,
+            Arc::new(MockChannelPersistence {
+                channels: Mutex::new(vec![channel]),
+            }),
+            directory.clone(),
+            test_config(false),
+        );
+        let mut viewer = Viewer {
+            user_id: member_id,
+            email: EmailAddress::from("member@example.com"),
+            email_verified_at: Some(Utc::now()),
+        };
+        assert!(
+            cases
+                .get_readable_channel(&viewer, company_id, channel_id)
+                .await
+                .unwrap()
+                .is_some()
+        );
+        directory.revoke_user_email_proof(company_id, member_id);
+        viewer.email_verified_at = None;
+        assert!(
+            cases
+                .get_readable_channel(&viewer, company_id, channel_id)
+                .await
+                .unwrap()
+                .is_none()
+        );
     }
 
     /// `GET` and `PUT` on the same channel must agree, and neither may reveal whether an id it

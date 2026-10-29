@@ -209,6 +209,7 @@ impl MemoryStore {
             PrincipalAccessContext {
                 principal_id: None,
                 membership: CompanyMembership::Owner,
+                grant_authority: crate::entities::participant::PrincipalGrantAuthority::Available,
             },
         );
         state.versions.insert(

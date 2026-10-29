@@ -123,8 +123,8 @@ async fn resend_api_inbound_webhook(
     let credentials = accounts
         .inbound_credentials(&token)
         .await
-        .map_err(|error| {
-            warn!(%error, "Could not resolve the company a Resend webhook token names");
+        .map_err(|_| {
+            warn!("Could not resolve the company a Resend webhook token names");
             StatusCode::INTERNAL_SERVER_ERROR
         })?
         .ok_or(StatusCode::NOT_FOUND)?;
@@ -182,8 +182,8 @@ async fn resend_api_inbound_webhook(
             received_at: now,
         })
         .await
-        .map_err(|error| {
-            warn!(%error, "Could not store an authenticated Resend event");
+        .map_err(|_| {
+            warn!("Could not store an authenticated Resend event");
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
@@ -214,8 +214,8 @@ fn safe_header_facts(svix_id: &str, svix_timestamp: &str) -> SafeHeaderFacts {
         (SVIX_ID_FACT.to_string(), svix_id.to_string()),
         (SVIX_TIMESTAMP_FACT.to_string(), svix_timestamp.to_string()),
     ]);
-    SafeHeaderFacts::parse(facts).unwrap_or_else(|error| {
-        warn!(%error, "Storing a Resend event without its delivery identity");
+    SafeHeaderFacts::parse(facts).unwrap_or_else(|_| {
+        warn!("Storing a Resend event without its delivery identity");
         SafeHeaderFacts::default()
     })
 }

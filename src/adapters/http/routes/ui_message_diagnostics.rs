@@ -43,7 +43,7 @@ pub fn router() -> Router<AppState> {
 /// must own the thread, the thread must hold the message, and the message's own company must match
 /// the one the read is made under. Three of those are guards a caller could not satisfy by
 /// guessing an id; the fourth is what makes a guessed id from another tenant a plain "not found".
-#[instrument(skip(company_use_cases, channel_use_cases, thread_use_cases, viewer))]
+#[instrument(skip_all)]
 async fn message_diagnostics(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(channel_use_cases): State<Arc<ChannelUseCases>>,

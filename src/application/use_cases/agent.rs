@@ -290,7 +290,7 @@ impl AgentUseCases {
 
     /// Create a company agent, and only the agent: its address is an assistant channel the agent
     /// page's "Create assistant channel" action makes (P08-D4 §D4.7).
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     pub async fn create_agent(
         &self,
         user_id: Uuid,
@@ -300,10 +300,7 @@ impl AgentUseCases {
         let (_, write) = self
             .prepared_agent_write(user_id, company_id, write)
             .await?;
-        info!(
-            "Creating agent '{}' ({}) for company {}",
-            write.name, write.slug, company_id
-        );
+        info!(%company_id, "Creating agent");
         self.agent_persistence.create(company_id, write).await
     }
 
@@ -346,7 +343,7 @@ impl AgentUseCases {
     /// The definition is copied rather than referenced: the company owns what it creates and can
     /// edit it afterwards without the global entry changing under it. Agent only, like every
     /// create (P08-D4 §D4.7).
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     pub async fn create_agent_from_library(
         &self,
         user_id: Uuid,
@@ -413,7 +410,7 @@ impl AgentUseCases {
         Ok(ProvisionedAgent { agent, warnings })
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     pub async fn list_company_agents(
         &self,
         user_id: Uuid,
@@ -460,7 +457,7 @@ impl AgentUseCases {
         self.agent_persistence.delete(agent_id).await
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     pub async fn get_company_agent(
         &self,
         user_id: Uuid,
@@ -483,7 +480,7 @@ impl AgentUseCases {
     /// that *configure* agents and stays owner-or-admin, this one is what a rendered thread names as
     /// its responder, and an invited member reads that just as the owner does. Which channels the
     /// member may read at all is `Channel::viewer_access`'s question, asked before this one.
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     pub async fn get_readable_agent(
         &self,
         viewer: &Viewer,
@@ -506,7 +503,7 @@ impl AgentUseCases {
             .filter(|agent| agent.company_id.is_none() || agent.company_id == Some(company_id)))
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     pub async fn update_agent(
         &self,
         user_id: Uuid,
@@ -529,15 +526,12 @@ impl AgentUseCases {
         write.normalize()?;
         self.validate_model_selection(company_id, &write).await?;
 
-        info!(
-            "Updating agent {} for company {}: {} ({})",
-            agent_id, company_id, write.name, write.slug
-        );
+        info!(%agent_id, %company_id, "Updating agent");
 
         self.agent_persistence.update(agent_id, write).await
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     pub async fn delete_agent(
         &self,
         user_id: Uuid,
@@ -560,7 +554,7 @@ impl AgentUseCases {
         self.agent_persistence.delete(agent_id).await
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     /// Expand a plain-language description of an agent into a full system prompt, using the
     /// company's own LLM credentials.
     pub async fn generate_system_prompt(
@@ -634,10 +628,7 @@ async fn generate_prompt_with(
     llm: PromptGeneratorLlm,
     instructions: &str,
 ) -> AppResult<String> {
-    info!(
-        "Calling generate_system_prompt AI model | provider: '{}', model: '{}'",
-        llm.provider, llm.model
-    );
+    info!("Calling prompt generator");
     let response = classifier
         .complete(ClassificationRequest {
             system_prompt: PROMPT_GENERATOR_SYSTEM_PROMPT,

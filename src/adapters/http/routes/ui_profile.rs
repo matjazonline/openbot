@@ -11,18 +11,22 @@
 use std::sync::Arc;
 
 use axum::{
-    Form, Router,
+    Extension, Form, Router,
     extract::{Path, Query, State},
-    response::Html,
+    http::HeaderMap,
+    response::{Html, IntoResponse, Redirect, Response},
     routing::{get, post, put},
 };
+use axum_extra::extract::CookieJar;
 use secrecy::SecretString;
 use serde::Deserialize;
 use tracing::instrument;
 use uuid::Uuid;
 
 use crate::{
-    adapters::http::{app_state::AppState, auth::AuthenticatedUser, pages},
+    adapters::http::{
+        app_state::AppState, auth::AuthenticatedUser, pages, session::SessionAuthority,
+    },
     app_error::{AppError, AppResult},
     entities::{
         company_member::CompanyMembership,
@@ -34,8 +38,8 @@ use crate::{
     use_cases::{
         company::CompanyUseCases,
         user::{
-            AccountChangeKind, LoginMethods, PasswordChange, PasswordOutcome, PasswordSetup,
-            PendingChange, ProfileUpdate, UserUseCases,
+            AccountChangeKind, AddressSaveOutcome, AuthWorkLifetime, LoginMethods, PasswordChange,
+            PasswordOutcome, PasswordSetup, PendingChange, ProfileUpdate, UserUseCases,
         },
     },
 };
@@ -157,7 +161,7 @@ impl Account {
     }
 }
 
-#[instrument(skip(user_use_cases, user, form))]
+#[instrument(skip_all)]
 async fn update_notification_preferences(
     State(user_use_cases): State<Arc<UserUseCases>>,
     user: AuthenticatedUser,
@@ -186,7 +190,7 @@ async fn update_notification_preferences(
 }
 
 /// GET /ui/profile - The account's own settings (Protected).
-#[instrument(skip(company_use_cases, user_use_cases, config, user))]
+#[instrument(skip_all)]
 async fn profile_page(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(user_use_cases): State<Arc<UserUseCases>>,
@@ -217,13 +221,16 @@ async fn profile_page(
 /// PUT /ui/profile - Save the account's picture, name and address (Protected).
 ///
 /// The account is always the caller's own: there is no id in the URL to point somewhere else.
-#[instrument(skip(user_use_cases, config, user, form))]
+#[instrument(skip_all)]
 async fn update_profile(
     State(user_use_cases): State<Arc<UserUseCases>>,
     State(config): State<Arc<AppConfig>>,
+    State(sessions): State<Arc<SessionAuthority>>,
+    headers: HeaderMap,
+    jar: CookieJar,
     user: AuthenticatedUser,
     Form(form): Form<IdentityForm>,
-) -> AppResult<Html<String>> {
+) -> AppResult<Response> {
     let draft = pages::ProfileDraft {
         username: &form.username,
         email: &form.email,
@@ -240,7 +247,8 @@ async fn update_profile(
                 Some(&draft),
                 &message,
             )
-            .await;
+            .await
+            .map(IntoResponse::into_response);
         }
     };
 
@@ -265,33 +273,47 @@ async fn update_profile(
                 Some(&draft),
                 &write_error(&err, "save your details"),
             )
-            .await;
+            .await
+            .map(IntoResponse::into_response);
         }
     };
+
+    if matches!(saved.address, AddressSaveOutcome::InstalledUnverified) {
+        return Ok(security_change_complete(&sessions, jar, &headers));
+    }
 
     // Re-read rather than trust the write: the address only moves once its code comes back, so
     // what the pane shows has to come from the store and the pending list together.
     let account = Account::load(&user_use_cases, user.id).await?;
-    let message = match &saved.pending {
-        Some(PendingChange::Email { new_email, .. }) => format!(
+    let message = match &saved.address {
+        AddressSaveOutcome::ConfirmationPending(PendingChange::Email { new_email, .. }) => format!(
             "Your name and picture are saved. Check {new_email} for the code that moves your address there."
         ),
+        AddressSaveOutcome::InstalledUnverified => "Your details are saved with an unverified email. Email-based privileges are unavailable until the address is verified.".to_string(),
+        AddressSaveOutcome::Unavailable => "Your name and picture are saved. Your email address did not change because outbound SMTP confirmation is not configured.".to_string(),
+        AddressSaveOutcome::CurrentAddressChanged => "Your name and picture are saved. Your email address changed while this page was saving; the current address is shown above.".to_string(),
         _ => "Your account details are saved.".to_string(),
     };
 
-    Ok(account.pane_with_chip(
-        &config,
-        pages::ProfileOutcome::Saved(pages::ProfileForm::Identity, &message),
-    ))
+    Ok(account
+        .pane_with_chip(
+            &config,
+            pages::ProfileOutcome::Saved(pages::ProfileForm::Identity, &message),
+        )
+        .into_response())
 }
 
 /// PUT /ui/profile/password - Ask to replace the account's password (Protected).
-#[instrument(skip(user_use_cases, user, form))]
+#[instrument(skip_all)]
 async fn change_password(
     State(user_use_cases): State<Arc<UserUseCases>>,
+    State(sessions): State<Arc<SessionAuthority>>,
+    headers: HeaderMap,
+    jar: CookieJar,
     user: AuthenticatedUser,
+    work: Extension<AuthWorkLifetime>,
     Form(form): Form<PasswordForm>,
-) -> AppResult<Html<String>> {
+) -> AppResult<Response> {
     let changed = user_use_cases
         .change_password(
             user.id,
@@ -300,11 +322,14 @@ async fn change_password(
                 new: &form.new_password,
                 confirmation: &form.confirm_password,
             },
+            Some(work.0),
         )
         .await;
 
     let message = match changed {
-        Ok(PasswordOutcome::Changed) => "Your password has been changed.".to_string(),
+        Ok(PasswordOutcome::Changed) => {
+            return Ok(security_change_complete(&sessions, jar, &headers));
+        }
         Ok(PasswordOutcome::ConfirmationSent(_)) => format!(
             "Check {} for the code that finishes the change.",
             load_account(&user_use_cases, user.id).await?.email
@@ -320,8 +345,10 @@ async fn change_password(
                 None,
                 "That is not your current password.",
             )
-            .await;
+            .await
+            .map(IntoResponse::into_response);
         }
+        Err(error @ AppError::ServiceUnavailable(_)) => return Err(error),
         Err(err) => {
             return rejected(
                 &user_use_cases,
@@ -330,7 +357,8 @@ async fn change_password(
                 None,
                 &write_error(&err, "change your password"),
             )
-            .await;
+            .await
+            .map(IntoResponse::into_response);
         }
     };
 
@@ -338,16 +366,21 @@ async fn change_password(
     Ok(Html(account.pane(
         None,
         pages::ProfileOutcome::Saved(pages::ProfileForm::Password, &message),
-    )))
+    ))
+    .into_response())
 }
 
 /// PUT /ui/profile/password/setup - Add password login to an OAuth-only account (Protected).
-#[instrument(skip(user_use_cases, user, form))]
+#[instrument(skip_all)]
 async fn set_password(
     State(user_use_cases): State<Arc<UserUseCases>>,
+    State(sessions): State<Arc<SessionAuthority>>,
+    headers: HeaderMap,
+    jar: CookieJar,
     user: AuthenticatedUser,
+    work: Extension<AuthWorkLifetime>,
     Form(form): Form<PasswordSetupForm>,
-) -> AppResult<Html<String>> {
+) -> AppResult<Response> {
     let outcome = user_use_cases
         .set_password(
             user.id,
@@ -355,14 +388,18 @@ async fn set_password(
                 new: &form.new_password,
                 confirmation: &form.confirm_password,
             },
+            Some(work.0),
         )
         .await;
     let message = match outcome {
-        Ok(PasswordOutcome::Changed) => "Password login has been added.".to_string(),
+        Ok(PasswordOutcome::Changed) => {
+            return Ok(security_change_complete(&sessions, jar, &headers));
+        }
         Ok(PasswordOutcome::ConfirmationSent(_)) => format!(
             "Check {} for the code that activates password login.",
             load_account(&user_use_cases, user.id).await?.email
         ),
+        Err(error @ AppError::ServiceUnavailable(_)) => return Err(error),
         Err(err) => {
             return rejected(
                 &user_use_cases,
@@ -371,26 +408,30 @@ async fn set_password(
                 None,
                 &write_error(&err, "add password login"),
             )
-            .await;
+            .await
+            .map(IntoResponse::into_response);
         }
     };
     let account = Account::load(&user_use_cases, user.id).await?;
     Ok(Html(account.pane(
         None,
         pages::ProfileOutcome::Saved(pages::ProfileForm::Password, &message),
-    )))
+    ))
+    .into_response())
 }
 
 /// POST /ui/profile/changes/{kind} - Turn a mailed code into the change it was sent for
 /// (Protected).
-#[instrument(skip(user_use_cases, config, user, form))]
+#[instrument(skip_all)]
 async fn confirm_change(
     State(user_use_cases): State<Arc<UserUseCases>>,
-    State(config): State<Arc<AppConfig>>,
+    State(sessions): State<Arc<SessionAuthority>>,
+    headers: HeaderMap,
+    jar: CookieJar,
     user: AuthenticatedUser,
     Path(kind): Path<String>,
     Form(form): Form<CodeForm>,
-) -> AppResult<Html<String>> {
+) -> AppResult<Response> {
     let kind = change_kind(&kind)?;
     let section = section_of(kind);
 
@@ -399,15 +440,7 @@ async fn confirm_change(
         .await;
 
     let Err(err) = confirmed else {
-        let account = Account::load(&user_use_cases, user.id).await?;
-        let message = match kind {
-            AccountChangeKind::Email => format!("Your address is now {}.", account.user.email),
-            AccountChangeKind::Password => "Your password has been changed.".to_string(),
-        };
-
-        // The chip rides along either way: a confirmed address rewrites what the bar says the
-        // reader is signed in as.
-        return Ok(account.pane_with_chip(&config, pages::ProfileOutcome::Saved(section, &message)));
+        return Ok(security_change_complete(&sessions, jar, &headers));
     };
 
     rejected(
@@ -418,13 +451,14 @@ async fn confirm_change(
         &write_error(&err, "confirm that code"),
     )
     .await
+    .map(IntoResponse::into_response)
 }
 
 /// DELETE /ui/profile/changes/{kind} - Abandon a requested change (Protected).
 ///
 /// No banner: the section coming back as its form is what says the request is gone, and a green
 /// "cancelled" would read as something having been saved.
-#[instrument(skip(user_use_cases, user))]
+#[instrument(skip_all)]
 async fn cancel_change(
     State(user_use_cases): State<Arc<UserUseCases>>,
     user: AuthenticatedUser,
@@ -483,3 +517,29 @@ fn write_error(error: &AppError, attempted: &str) -> String {
         other => format!("Failed to {attempted}: {other}"),
     }
 }
+
+/// A committed account security change invalidates every browser, including this one.
+fn security_change_complete(
+    sessions: &SessionAuthority,
+    jar: CookieJar,
+    headers: &HeaderMap,
+) -> Response {
+    let jar = sessions
+        .cleared_cookies()
+        .into_iter()
+        .fold(jar, |jar, cookie| jar.remove(cookie));
+    if crate::adapters::http::auth::is_htmx_request(headers) {
+        (
+            jar,
+            [("HX-Redirect", "/login")],
+            Html("Account security updated. Sign in again."),
+        )
+            .into_response()
+    } else {
+        (jar, Redirect::to("/login")).into_response()
+    }
+}
+
+#[cfg(test)]
+#[path = "ui_profile_session_tests.rs"]
+mod session_tests;

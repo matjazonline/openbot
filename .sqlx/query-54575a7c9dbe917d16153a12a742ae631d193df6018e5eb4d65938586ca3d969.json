@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT invite.id, invite.company_id, company.name AS \"company_name?\", invite.email,\n                      invite.role, invite.status, invite.created_at AS \"created_at!\"\n               FROM company_invites AS invite\n               JOIN companies AS company ON company.id = invite.company_id\n               WHERE invite.email = $1\n               ORDER BY invite.created_at DESC, invite.id DESC LIMIT 200",
+  "query": "UPDATE users SET email = $2, email_verified_at = CURRENT_TIMESTAMP WHERE id = $1\n                       RETURNING id, username, email, password_hash, avatar_url, email_verified_at, auth_revision, created_at as \"created_at!\"",
   "describe": {
     "columns": [
       {
@@ -10,16 +10,16 @@
       },
       {
         "ordinal": 1,
-        "name": "company_id",
-        "type_info": "Uuid"
+        "name": "username",
+        "type_info": {
+          "Custom": {
+            "name": "citext",
+            "kind": "Simple"
+          }
+        }
       },
       {
         "ordinal": 2,
-        "name": "company_name?",
-        "type_info": "Text"
-      },
-      {
-        "ordinal": 3,
         "name": "email",
         "type_info": {
           "Custom": {
@@ -29,23 +29,34 @@
         }
       },
       {
+        "ordinal": 3,
+        "name": "password_hash",
+        "type_info": "Text"
+      },
+      {
         "ordinal": 4,
-        "name": "role",
+        "name": "avatar_url",
         "type_info": "Text"
       },
       {
         "ordinal": 5,
-        "name": "status",
-        "type_info": "Text"
+        "name": "email_verified_at",
+        "type_info": "Timestamptz"
       },
       {
         "ordinal": 6,
+        "name": "auth_revision",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 7,
         "name": "created_at!",
         "type_info": "Timestamptz"
       }
     ],
     "parameters": {
       "Left": [
+        "Uuid",
         {
           "Custom": {
             "name": "citext",
@@ -59,10 +70,11 @@
       false,
       false,
       false,
-      false,
+      true,
+      true,
       false,
       false
     ]
   },
-  "hash": "7ccc0e6b84fbc38e628176269bb992101c210042533ca813cd6b18dbc65d5185"
+  "hash": "54575a7c9dbe917d16153a12a742ae631d193df6018e5eb4d65938586ca3d969"
 }

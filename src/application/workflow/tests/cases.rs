@@ -99,6 +99,7 @@ async fn replay_conflict_and_company_scoped_key() {
         PrincipalAccessContext {
             principal_id: None,
             membership: CompanyMembership::Owner,
+            grant_authority: crate::entities::participant::PrincipalGrantAuthority::Available,
         },
     );
     let svc = service(&store);

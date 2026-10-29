@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use axum::{
-    Form, Json, Router,
+    Extension, Form, Json, Router,
     extract::{Query, State},
     http::{HeaderMap, StatusCode},
     response::{Html, IntoResponse, Redirect},
@@ -16,7 +16,8 @@ use uuid::Uuid;
 
 use crate::{
     adapters::http::{
-        app_state::AppState, auth::AuthenticatedUser, pages, session::SessionAuthority,
+        app_state::AppState, auth::AuthenticatedUser, auth_admission::AuthClientSource, pages,
+        session::SessionAuthority,
     },
     app_error::{AppError, AppResult},
     entities::value_objects::EmailAddress,
@@ -24,7 +25,9 @@ use crate::{
     use_cases::{
         company::CompanyUseCases,
         company_invite::CompanyInviteUseCases,
-        user::{ExternalIdentity, LoginMethod, RegistrationOutcome, UserUseCases},
+        user::{
+            AuthWorkLifetime, ExternalIdentity, LoginMethod, RegistrationOutcome, UserUseCases,
+        },
     },
 };
 
@@ -34,6 +37,7 @@ use crate::{
 /// before deciding between onboarding and the mailbox. Named once so every sign-in method uses
 /// the same decision path.
 pub(super) const SIGNED_IN_LANDING: &str = "/";
+const AUTH_BUSY_MESSAGE: &str = "Authentication is busy. Try again shortly.";
 const GOOGLE_FLOW_COOKIE: &str = "google_oauth_flow";
 
 pub fn public_router() -> Router<AppState> {
@@ -75,10 +79,7 @@ async fn index(
         .await?
         .ok_or_else(|| crate::app_error::AppError::NotFound("User not found".into()))?;
 
-    if invite_use_cases
-        .has_pending_user_invites(&account.email)
-        .await?
-    {
+    if invite_use_cases.has_pending_user_invites(&account).await? {
         return Ok(Redirect::temporary("/ui/invites"));
     }
 
@@ -92,16 +93,17 @@ async fn index(
 }
 
 async fn logout(
-    _user: AuthenticatedUser,
+    Extension(session): Extension<crate::application::session::VerifiedSession>,
     State(sessions): State<Arc<SessionAuthority>>,
     jar: CookieJar,
-) -> impl IntoResponse {
+) -> AppResult<impl IntoResponse> {
+    sessions.revoke(session).await?;
     let jar = sessions
         .cleared_cookies()
         .into_iter()
         .fold(jar, |jar, cookie| jar.remove(cookie));
 
-    (jar, Redirect::to("/login"))
+    Ok((jar, Redirect::to("/login")))
 }
 
 async fn login_page() -> impl IntoResponse {
@@ -245,7 +247,10 @@ async fn google_callback(
     jar: CookieJar,
     Query(query): Query<GoogleCallbackQuery>,
 ) -> impl IntoResponse {
-    let signed_in_user = sessions.user_from_headers(&headers);
+    let signed_in_user = match sessions.user_from_headers(&headers).await {
+        Ok(session) => session.map(|s| s.user_id),
+        Err(err) => return err.into_response(),
+    };
     let result = complete_google_flow(
         &config,
         &user_use_cases,
@@ -262,12 +267,18 @@ async fn google_callback(
     );
     match result {
         Ok((user, GoogleFlow::Connect)) => (
-            cleared.add(sessions.cookie(user.id)),
+            cleared.add(match sessions.cookie(&user).await {
+                Ok(cookie) => cookie,
+                Err(err) => return err.into_response(),
+            }),
             Redirect::temporary("/ui/profile?connected=google"),
         )
             .into_response(),
         Ok((user, _)) => (
-            cleared.add(sessions.cookie(user.id)),
+            cleared.add(match sessions.cookie(&user).await {
+                Ok(cookie) => cookie,
+                Err(err) => return err.into_response(),
+            }),
             Redirect::temporary(SIGNED_IN_LANDING),
         )
             .into_response(),
@@ -324,23 +335,17 @@ async fn complete_google_flow(
             "Google has not verified this email address.".into(),
         ));
     }
+    let email = EmailAddress::from(profile.email.as_str());
+    let external = ExternalIdentity {
+        provider: LoginMethod::Google,
+        subject: &profile.sub,
+        email: &email,
+        email_verified: profile.email_verified,
+        display_name: profile.name.as_deref(),
+    };
     let user = match flow {
-        GoogleFlow::Register => {
-            let email = EmailAddress::from(profile.email.as_str());
-            user_use_cases
-                .register_external(ExternalIdentity {
-                    provider: LoginMethod::Google,
-                    subject: &profile.sub,
-                    email: &email,
-                    display_name: profile.name.as_deref(),
-                })
-                .await
-        }
-        GoogleFlow::Login => {
-            user_use_cases
-                .login_external(LoginMethod::Google, &profile.sub)
-                .await
-        }
+        GoogleFlow::Register => user_use_cases.register_external(external).await,
+        GoogleFlow::Login => user_use_cases.login_external(external).await,
         GoogleFlow::Connect => {
             let initiating_user = state
                 .user_id
@@ -350,17 +355,8 @@ async fn complete_google_flow(
                     "Google connection expired. Please sign in and try again.".into(),
                 ));
             }
-            let email = EmailAddress::from(profile.email.as_str());
             user_use_cases
-                .link_external(
-                    initiating_user,
-                    ExternalIdentity {
-                        provider: LoginMethod::Google,
-                        subject: &profile.sub,
-                        email: &email,
-                        display_name: profile.name.as_deref(),
-                    },
-                )
+                .link_external(initiating_user, external)
                 .await
         }
     }?;
@@ -463,10 +459,11 @@ pub struct LoginResponse {
 /// A successful registration signs the new account in on the spot: it leaves with the same session
 /// cookie [`login_form`] would have minted, so the browser lands on [`SIGNED_IN_LANDING`] already
 /// authenticated instead of being sent back to the sign-in form to retype what it just chose.
-#[instrument(skip(user_use_cases, sessions, jar, form))]
+#[instrument(skip_all)]
 async fn register_form(
     State(user_use_cases): State<Arc<UserUseCases>>,
     State(sessions): State<Arc<SessionAuthority>>,
+    work: Extension<AuthWorkLifetime>,
     jar: CookieJar,
     Form(form): Form<RegisterForm>,
 ) -> impl IntoResponse {
@@ -485,14 +482,20 @@ async fn register_form(
     }
 
     match user_use_cases
-        .register(&form.username, &form.email, &form.password)
+        .register(&form.username, &form.email, &form.password, Some(work.0))
         .await
     {
-        Ok(RegistrationOutcome::Created(user)) => {
-            let updated_jar = jar.add(sessions.cookie(user.id));
+        Ok(RegistrationOutcome::CreatedUnverified(user)) => {
+            let updated_jar = jar.add(match sessions.cookie(&user).await {
+                Ok(cookie) => cookie,
+                Err(err) => return err.into_response(),
+            });
 
             let alert = pages::success_alert(
-                &format!("Welcome, {}! Your account is ready.", user.username),
+                &format!(
+                    "Welcome, {}! Your account is ready with an unverified email. Email-based privileges are unavailable until the address is verified.",
+                    user.username
+                ),
                 Some((SIGNED_IN_LANDING, "Continue")),
             );
 
@@ -506,6 +509,12 @@ async fn register_form(
         Ok(RegistrationOutcome::ConfirmationSent) => {
             (jar, Html(pages::confirmation_form(&form.email))).into_response()
         }
+        Err(AppError::ServiceUnavailable(_)) => (
+            StatusCode::SERVICE_UNAVAILABLE,
+            jar,
+            Html(pages::error_alert(AUTH_BUSY_MESSAGE)),
+        )
+            .into_response(),
         Err(err) => (
             jar,
             Html(pages::error_alert(&format!("Registration failed: {err}"))),
@@ -525,7 +534,10 @@ async fn confirm_registration_form(
         .await
     {
         Ok(user) => (
-            jar.add(sessions.cookie(user.id)),
+            jar.add(match sessions.cookie(&user).await {
+                Ok(cookie) => cookie,
+                Err(err) => return err.into_response(),
+            }),
             [("HX-Redirect", SIGNED_IN_LANDING)],
             Html(pages::success_alert(
                 "Email confirmed. Your account is ready!",
@@ -542,10 +554,12 @@ async fn confirm_registration_form(
 }
 
 /// Handles HTMX form submission for user login.
-#[instrument(skip(user_use_cases, sessions, jar, form))]
+#[instrument(skip_all)]
 async fn login_form(
     State(user_use_cases): State<Arc<UserUseCases>>,
     State(sessions): State<Arc<SessionAuthority>>,
+    source: Option<Extension<AuthClientSource>>,
+    work: Extension<AuthWorkLifetime>,
     jar: CookieJar,
     Form(form): Form<LoginForm>,
 ) -> impl IntoResponse {
@@ -558,11 +572,19 @@ async fn login_form(
     }
 
     match user_use_cases
-        .login(&form.email_or_username, &form.password)
+        .login(
+            &form.email_or_username,
+            &form.password,
+            source.map(|value| value.0.0),
+            Some(work.0),
+        )
         .await
     {
         Ok(user) => {
-            let updated_jar = jar.add(sessions.cookie(user.id));
+            let updated_jar = jar.add(match sessions.cookie(&user).await {
+                Ok(cookie) => cookie,
+                Err(err) => return err.into_response(),
+            });
 
             let alert = pages::success_alert(
                 &format!(
@@ -579,6 +601,12 @@ async fn login_form(
             )
                 .into_response()
         }
+        Err(AppError::ServiceUnavailable(_)) => (
+            StatusCode::SERVICE_UNAVAILABLE,
+            jar,
+            Html(pages::error_alert(AUTH_BUSY_MESSAGE)),
+        )
+            .into_response(),
         Err(_) => (
             jar,
             Html(pages::error_alert("Invalid username/email or password.")),
@@ -591,25 +619,31 @@ async fn login_form(
 ///
 /// Answers with the session cookie as well as the confirmation, so an API client is signed in by
 /// registering exactly as a browser is.
-#[instrument(skip(user_use_cases, sessions, jar, payload))]
+#[instrument(skip_all)]
 async fn register_json(
     State(user_use_cases): State<Arc<UserUseCases>>,
     State(sessions): State<Arc<SessionAuthority>>,
+    work: Extension<AuthWorkLifetime>,
     jar: CookieJar,
     Json(payload): Json<RegisterPayload>,
 ) -> AppResult<axum::response::Response> {
     info!("Register JSON API called");
     let outcome = user_use_cases
-        .register(&payload.username, &payload.email, &payload.password)
+        .register(
+            &payload.username,
+            &payload.email,
+            &payload.password,
+            Some(work.0),
+        )
         .await?;
     Ok(match outcome {
-        RegistrationOutcome::Created(user) => (
-            jar.add(sessions.cookie(user.id)),
+        RegistrationOutcome::CreatedUnverified(user) => (
+            jar.add(sessions.cookie(&user).await?),
             (
                 StatusCode::CREATED,
                 Json(RegisterResponse {
                     success: true,
-                    message: "User registered successfully".into(),
+                    message: "User registered with an unverified email; email-based privileges are unavailable until the address is verified".into(),
                 }),
             ),
         )
@@ -638,7 +672,7 @@ async fn confirm_registration_json(
         .confirm_registration(&payload.email, &payload.code)
         .await?;
     Ok((
-        jar.add(sessions.cookie(user.id)),
+        jar.add(sessions.cookie(&user).await?),
         (
             StatusCode::CREATED,
             Json(RegisterResponse {
@@ -650,19 +684,26 @@ async fn confirm_registration_json(
 }
 
 /// JSON endpoint for login (API compatibility).
-#[instrument(skip(user_use_cases, sessions, jar, payload))]
+#[instrument(skip_all)]
 async fn login_json(
     State(user_use_cases): State<Arc<UserUseCases>>,
     State(sessions): State<Arc<SessionAuthority>>,
+    source: Option<Extension<AuthClientSource>>,
+    work: Extension<AuthWorkLifetime>,
     jar: CookieJar,
     Json(payload): Json<LoginForm>,
 ) -> AppResult<impl IntoResponse> {
     info!("Login JSON API called");
     let user = user_use_cases
-        .login(&payload.email_or_username, &payload.password)
+        .login(
+            &payload.email_or_username,
+            &payload.password,
+            source.map(|value| value.0.0),
+            Some(work.0),
+        )
         .await?;
 
-    let updated_jar = jar.add(sessions.cookie(user.id));
+    let updated_jar = jar.add(sessions.cookie(&user).await?);
 
     Ok((
         updated_jar,
@@ -678,286 +719,5 @@ async fn login_json(
 }
 
 #[cfg(test)]
-mod tests {
-    use axum_extra::extract::cookie::Cookie;
-
-    use super::*;
-
-    #[tokio::test]
-    async fn login_page_contains_htmx_attributes() {
-        let html = pages::login_page(false, false);
-        assert!(html.contains("/assets/htmx-2.0.4.min.js"));
-        assert!(html.contains("hx-post=\"/api/user/login\""));
-        assert!(html.contains("hx-target=\"#response-message\""));
-        assert!(!html.contains(">Companies</a>"));
-        assert!(!html.contains(">My Invites</a>"));
-    }
-
-    #[tokio::test]
-    async fn register_page_contains_htmx_attributes() {
-        let html = pages::register_page(false, false);
-        assert!(html.contains("/assets/htmx-2.0.4.min.js"));
-        assert!(html.contains("hx-post=\"/api/user/register\""));
-        assert!(html.contains("hx-target=\"#response-message\""));
-        assert!(!html.contains(">Companies</a>"));
-        assert!(!html.contains(">My Invites</a>"));
-    }
-
-    #[test]
-    fn google_buttons_are_only_rendered_when_google_is_configured() {
-        assert!(!pages::login_page(false, false).contains("/auth/google/login"));
-        assert!(!pages::register_page(false, false).contains("/auth/google/register"));
-        assert!(pages::login_page(true, false).contains("/auth/google/login"));
-        assert!(pages::register_page(true, false).contains("/auth/google/register"));
-        assert!(pages::login_page(false, true).contains("/auth/apple/login"));
-        assert!(pages::register_page(false, true).contains("/auth/apple/register"));
-    }
-
-    #[test]
-    fn alerts_render_correct_html() {
-        let success = pages::success_alert("Done!", Some(("/login", "Login")));
-        assert!(success.contains("Done!"));
-        assert!(success.contains("href=\"/login\""));
-
-        let error = pages::error_alert("Something went wrong");
-        assert!(error.contains("Something went wrong"));
-    }
-
-    /// A persistence that hands back the account it was asked to create, so a handler that signs
-    /// the new user in has an id to sign in.
-    struct StubUserPersistence {
-        id: uuid::Uuid,
-    }
-
-    #[async_trait::async_trait]
-    impl crate::use_cases::user::UserPersistence for StubUserPersistence {
-        async fn create_user(
-            &self,
-            username: &str,
-            email: &str,
-            password_hash: &str,
-        ) -> AppResult<crate::entities::user::User> {
-            Ok(crate::entities::user::User {
-                id: self.id,
-                username: username.to_string(),
-                email: email.to_string(),
-                password_hash: password_hash.to_string(),
-                avatar_url: None,
-                created_at: chrono::Utc::now(),
-            })
-        }
-
-        async fn get_by_email(&self, _: &str) -> AppResult<Option<crate::entities::user::User>> {
-            Ok(None)
-        }
-
-        async fn get_by_username(&self, _: &str) -> AppResult<Option<crate::entities::user::User>> {
-            Ok(None)
-        }
-
-        async fn get_by_id(&self, _: uuid::Uuid) -> AppResult<Option<crate::entities::user::User>> {
-            Ok(None)
-        }
-
-        async fn notification_preferences(
-            &self,
-            _: uuid::Uuid,
-        ) -> AppResult<crate::entities::notification::NotificationPreferences> {
-            Ok(crate::entities::notification::NotificationPreferences::default())
-        }
-
-        async fn set_notification_preferences(
-            &self,
-            _: uuid::Uuid,
-            _: crate::entities::notification::NotificationPreferences,
-        ) -> AppResult<()> {
-            Ok(())
-        }
-
-        async fn update_avatar_url(
-            &self,
-            _: uuid::Uuid,
-            _: Option<&crate::entities::value_objects::AvatarUrl>,
-        ) -> AppResult<Option<crate::entities::user::User>> {
-            Ok(None)
-        }
-
-        async fn update_profile(
-            &self,
-            _: uuid::Uuid,
-            _: crate::use_cases::user::ProfileUpdate<'_>,
-        ) -> AppResult<Option<crate::entities::user::User>> {
-            Ok(None)
-        }
-
-        async fn update_password_hash(
-            &self,
-            _: uuid::Uuid,
-            _: &str,
-        ) -> AppResult<Option<crate::entities::user::User>> {
-            Ok(None)
-        }
-    }
-
-    struct StubHasher;
-
-    impl crate::use_cases::user::UserCredentialsHasher for StubHasher {
-        fn hash_password(&self, password: &str) -> AppResult<String> {
-            Ok(format!("{password}_hash"))
-        }
-
-        fn verify_password(&self, password: &str, hash: &str) -> AppResult<bool> {
-            Ok(hash == format!("{password}_hash"))
-        }
-    }
-
-    fn registering(id: uuid::Uuid) -> Arc<UserUseCases> {
-        Arc::new(UserUseCases::new(
-            Arc::new(StubHasher),
-            Arc::new(StubUserPersistence { id }),
-        ))
-    }
-
-    fn registration(password: &str, confirm: Option<&str>) -> RegisterForm {
-        RegisterForm {
-            username: "newcomer".to_string(),
-            email: "newcomer@example.com".to_string(),
-            password: password.into(),
-            confirm_password: confirm.map(Into::into),
-        }
-    }
-
-    /// Registering is signing in: the response carries a session this deployment will believe,
-    /// naming the account that was just created.
-    #[tokio::test]
-    async fn registering_signs_the_new_account_in() {
-        let id = uuid::Uuid::new_v4();
-        let sessions = Arc::new(SessionAuthority::new(
-            &crate::infra::config::AppConfig::for_test(),
-        ));
-
-        let response = register_form(
-            State(registering(id)),
-            State(sessions.clone()),
-            CookieJar::new(),
-            Form(registration("hunter2", Some("hunter2"))),
-        )
-        .await
-        .into_response();
-
-        let session = response
-            .headers()
-            .get_all("set-cookie")
-            .iter()
-            .map(|value| value.to_str().expect("a printable cookie"))
-            .find_map(|value| Cookie::parse(value.to_string()).ok())
-            .filter(|cookie| cookie.name() == crate::adapters::http::session::SESSION_COOKIE)
-            .expect("registration issues a session cookie");
-
-        assert_eq!(sessions.verify(session.value()), Some(id));
-    }
-
-    #[tokio::test]
-    async fn registering_lands_on_the_post_authentication_gateway() {
-        let sessions = Arc::new(SessionAuthority::new(
-            &crate::infra::config::AppConfig::for_test(),
-        ));
-
-        let response = register_form(
-            State(registering(uuid::Uuid::new_v4())),
-            State(sessions),
-            CookieJar::new(),
-            Form(registration("hunter2", Some("hunter2"))),
-        )
-        .await
-        .into_response();
-
-        assert_eq!(response.headers().get("HX-Redirect").unwrap(), "/");
-    }
-
-    /// A rejected registration must not hand out a session for an account that was never created.
-    #[tokio::test]
-    async fn mismatched_passwords_issue_no_session() {
-        let sessions = Arc::new(SessionAuthority::new(
-            &crate::infra::config::AppConfig::for_test(),
-        ));
-
-        let response = register_form(
-            State(registering(uuid::Uuid::new_v4())),
-            State(sessions),
-            CookieJar::new(),
-            Form(registration("hunter2", Some("hunter3"))),
-        )
-        .await
-        .into_response();
-
-        assert!(response.headers().get("HX-Redirect").is_none());
-        assert!(
-            response
-                .headers()
-                .get_all("set-cookie")
-                .iter()
-                .next()
-                .is_none()
-        );
-    }
-
-    #[tokio::test]
-    async fn logout_clears_both_cookies_and_redirects_to_login() {
-        let sessions = Arc::new(SessionAuthority::new(
-            &crate::infra::config::AppConfig::for_test(),
-        ));
-
-        // A browser part-way through the change carries both: the session it signed in with, and
-        // the plaintext cookie left over from before.
-        let mut headers = axum::http::HeaderMap::new();
-        headers.insert(
-            axum::http::header::COOKIE,
-            format!(
-                "session={}; user_id={}",
-                sessions.cookie(uuid::Uuid::nil()).value(),
-                uuid::Uuid::nil()
-            )
-            .parse()
-            .unwrap(),
-        );
-        let jar = CookieJar::from_headers(&headers);
-
-        let response = logout(
-            AuthenticatedUser {
-                id: uuid::Uuid::nil(),
-            },
-            State(sessions),
-            jar,
-        )
-        .await
-        .into_response();
-
-        assert_eq!(response.status(), StatusCode::SEE_OTHER);
-        assert_eq!(response.headers().get("location").unwrap(), "/login");
-
-        let cleared: Vec<&str> = response
-            .headers()
-            .get_all("set-cookie")
-            .iter()
-            .map(|value| value.to_str().expect("a printable cookie"))
-            .collect();
-
-        // The session goes, and so does the plaintext cookie it replaced -- a browser still
-        // holding one of those should stop offering it.
-        assert!(
-            cleared.iter().any(|cookie| cookie.starts_with("session=")),
-            "{cleared:?}"
-        );
-        assert!(
-            cleared.iter().any(|cookie| cookie.starts_with("user_id=")),
-            "{cleared:?}"
-        );
-        assert!(
-            cleared
-                .iter()
-                .all(|cookie| cookie.contains("Max-Age=0") && cookie.contains("Path=/")),
-            "{cleared:?}"
-        );
-    }
-}
+#[path = "user_tests.rs"]
+mod tests;

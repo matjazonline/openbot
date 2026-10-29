@@ -390,7 +390,7 @@ impl Workspace {
 }
 
 /// GET /ui/companies - The Companies workspace for the selected company (Protected).
-#[instrument(skip(workspace))]
+#[instrument(skip_all)]
 async fn companies_page(
     workspace: Workspace,
     Query(query): Query<WorkspaceQuery>,
@@ -477,7 +477,7 @@ async fn companies_page(
 ///
 /// The sidebar comes with it, deselected: the form belongs to no company, so leaving the entry
 /// that was open before it lit would say the pane is showing a company it is not.
-#[instrument(skip(workspace))]
+#[instrument(skip_all)]
 async fn create_pane(workspace: Workspace) -> AppResult<Response> {
     let pane = pages::company_create_pane(&pages::CompanyCreatePane {
         draft: &pages::CompanyDraft::default(),
@@ -493,13 +493,13 @@ async fn create_pane(workspace: Workspace) -> AppResult<Response> {
 /// What Cancel does: the pane goes back to its placeholder and the sidebar loses its highlight,
 /// so cancelling a create and cancelling an edit both leave the workspace in the same state as
 /// arriving at `/ui/companies` with nothing selected.
-#[instrument(skip(workspace))]
+#[instrument(skip_all)]
 async fn close_pane(workspace: Workspace) -> AppResult<Response> {
     workspace.cleared_response().await
 }
 
 /// GET /ui/companies/{company_id} - One company's settings for the pane (Protected).
-#[instrument(skip(workspace))]
+#[instrument(skip_all)]
 async fn edit_pane(workspace: Workspace, Path(company_id): Path<Uuid>) -> AppResult<Html<String>> {
     let access = workspace.scoped_company(company_id).await?;
     let editable = access.membership.is_owner();
@@ -513,7 +513,7 @@ async fn edit_pane(workspace: Workspace, Path(company_id): Path<Uuid>) -> AppRes
 }
 
 /// POST /ui/companies - Create a company from the pane's form (Protected).
-#[instrument(skip(workspace, form))]
+#[instrument(skip_all)]
 async fn create_company(workspace: Workspace, Form(form): Form<CompanyForm>) -> Response {
     let submitted = SubmittedCompany::new(form);
 
@@ -571,7 +571,7 @@ async fn create_company(workspace: Workspace, Form(form): Form<CompanyForm>) -> 
 }
 
 /// PUT /ui/companies/{company_id} - Save one company's settings (Protected).
-#[instrument(skip(workspace, form))]
+#[instrument(skip_all)]
 async fn update_company(
     workspace: Workspace,
     Path(company_id): Path<Uuid>,
@@ -664,7 +664,7 @@ impl ResendApiForm {
 /// A refusal comes back as the panel with the message above it and the typed `authserv-id` still
 /// in place, never as a bare error: the two credential fields are already blank by design, so
 /// re-rendering costs the operator nothing but the two secrets they were entering anyway.
-#[instrument(skip(workspace, form))]
+#[instrument(skip_all)]
 async fn save_resend_api(
     workspace: Workspace,
     Path(company_id): Path<Uuid>,
@@ -696,7 +696,7 @@ async fn save_resend_api(
 }
 
 /// POST /ui/companies/{company_id}/resend_api/token - Issue a fresh webhook URL for this company.
-#[instrument(skip(workspace))]
+#[instrument(skip_all)]
 async fn rotate_resend_api_token(
     workspace: Workspace,
     Path(company_id): Path<Uuid>,
@@ -718,7 +718,7 @@ async fn rotate_resend_api_token(
 }
 
 /// DELETE /ui/companies/{company_id}/resend_api - Forget this company's Resend account.
-#[instrument(skip(workspace))]
+#[instrument(skip_all)]
 async fn disconnect_resend_api(
     workspace: Workspace,
     Path(company_id): Path<Uuid>,
@@ -738,7 +738,7 @@ async fn disconnect_resend_api(
 }
 
 /// DELETE /ui/companies/{company_id} - Delete a company and clear the pane (Protected).
-#[instrument(skip(workspace))]
+#[instrument(skip_all)]
 async fn delete_company(workspace: Workspace, Path(company_id): Path<Uuid>) -> AppResult<Response> {
     workspace
         .company_use_cases

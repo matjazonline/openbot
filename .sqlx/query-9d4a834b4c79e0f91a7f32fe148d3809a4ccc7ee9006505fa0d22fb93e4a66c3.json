@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "UPDATE users SET username = $2, email = $3, avatar_url = $4 WHERE id = $1\n               RETURNING id, username, email, password_hash, avatar_url, created_at as \"created_at!\"",
+  "query": "UPDATE users SET password_hash = $2 WHERE id = $1\n               RETURNING id, username, email, password_hash, avatar_url, email_verified_at, auth_revision, created_at as \"created_at!\"",
   "describe": {
     "columns": [
       {
@@ -40,6 +40,16 @@
       },
       {
         "ordinal": 5,
+        "name": "email_verified_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 6,
+        "name": "auth_revision",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 7,
         "name": "created_at!",
         "type_info": "Timestamptz"
       }
@@ -47,18 +57,6 @@
     "parameters": {
       "Left": [
         "Uuid",
-        {
-          "Custom": {
-            "name": "citext",
-            "kind": "Simple"
-          }
-        },
-        {
-          "Custom": {
-            "name": "citext",
-            "kind": "Simple"
-          }
-        },
         "Text"
       ]
     },
@@ -68,8 +66,10 @@
       false,
       false,
       true,
+      true,
+      false,
       false
     ]
   },
-  "hash": "6b5f771052c66dfd8e35f0f1e45187fcbc3d7ddd092c28e5c68f9a7564c47d58"
+  "hash": "9d4a834b4c79e0f91a7f32fe148d3809a4ccc7ee9006505fa0d22fb93e4a66c3"
 }

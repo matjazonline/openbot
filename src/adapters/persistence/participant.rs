@@ -13,7 +13,7 @@ use crate::{
         company_member::CompanyMembership,
         participant::{
             IdentityClaimMetadata, IdentityProvenance, IdentityStatus, Principal,
-            PrincipalAccessContext, PrincipalIdentity, PrincipalKind,
+            PrincipalAccessContext, PrincipalGrantAuthority, PrincipalIdentity, PrincipalKind,
         },
         transport::{
             IdentityNamespace, IdentitySubject, ParticipantIdentityId, PrincipalId,
@@ -484,17 +484,20 @@ impl PrincipalAccessPersistence for PostgresPersistence {
             return Ok(PrincipalAccessContext {
                 principal_id: None,
                 membership: CompanyMembership::None,
+                grant_authority: PrincipalGrantAuthority::Available,
             });
         };
         if status == "disabled" {
             return Ok(PrincipalAccessContext {
                 principal_id: None,
                 membership: CompanyMembership::None,
+                grant_authority: PrincipalGrantAuthority::Available,
             });
         }
         Ok(PrincipalAccessContext {
             principal_id: Some(PrincipalId::new(principal_id)),
             membership: membership_from_db(membership.as_deref())?,
+            grant_authority: PrincipalGrantAuthority::Available,
         })
     }
 
@@ -503,11 +506,12 @@ impl PrincipalAccessPersistence for PostgresPersistence {
         company_id: Uuid,
         user_id: Uuid,
     ) -> AppResult<Option<PrincipalAccessContext>> {
-        let row: Option<(Uuid, String)> = sqlx::query_as(
-            r#"SELECT principal.id,
+        let row: Option<(Uuid, bool, String)> = sqlx::query_as(
+            r#"SELECT principal.id, account.email_verified_at IS NOT NULL AS email_proved,
                       CASE WHEN company.user_id = principal.user_id
                            THEN 'owner' ELSE member.role END AS membership
                FROM principals AS principal
+               JOIN users AS account ON account.id = principal.user_id
                JOIN companies AS company ON company.id = principal.company_id
                JOIN company_members AS member
                  ON (member.company_id, member.user_id) =
@@ -519,10 +523,15 @@ impl PrincipalAccessPersistence for PostgresPersistence {
         .fetch_optional(&self.pool)
         .await
         .map_err(AppError::from)?;
-        row.map(|(principal_id, membership)| {
+        row.map(|(principal_id, email_proved, membership)| {
             Ok(PrincipalAccessContext {
                 principal_id: Some(PrincipalId::new(principal_id)),
                 membership: membership_from_db(Some(&membership))?,
+                grant_authority: if email_proved {
+                    PrincipalGrantAuthority::Available
+                } else {
+                    PrincipalGrantAuthority::WithheldUnverifiedEmail
+                },
             })
         })
         .transpose()

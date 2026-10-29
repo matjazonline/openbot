@@ -102,6 +102,19 @@ jobs:
         run: cargo sqlx prepare --check -- --all-targets
       - name: Compile tests before denying network access
         run: cargo test --locked --offline --all-targets --no-run
+      - name: HTML rendering and team autocomplete browser protocol
+        env:
+          HTML_INJECTION_BROWSER_FIXTURES: /tmp/html-injection-browser
+          APP_JS_OUT: /tmp/html-injection-browser/app.js
+        run: |
+          cargo test --locked --offline --lib dump_html_injection_browser_fixtures -- --ignored
+          node --test scripts/tests/team-autocomplete-browser.mjs scripts/tests/html-injection-browser.mjs
+      - name: Session revocation browser protocol
+        env:
+          SESSION_REVOCATION_BROWSER_FIXTURES: /tmp/session-revocation-browser
+        run: |
+          cargo test --locked --offline --lib dump_session_revocation_browser_fixtures -- --ignored
+          node --test scripts/tests/session-revocation-browser.mjs
       - name: Database-backed test suite (isolated network)
         run: scripts/test-network-isolation.sh cargo test --locked --offline --all-targets
       - name: Decision browser forms

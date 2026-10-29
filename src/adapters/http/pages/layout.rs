@@ -73,6 +73,7 @@ pub(crate) fn public_layout(title: &str, content: &str) -> String {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmx-config" content='{{"responseHandling":[{{"code":"204","swap":false}},{{"code":"[23]..","swap":true}},{{"code":"(408|413|429|503)","swap":true,"error":true}},{{"code":"[45]..","swap":false,"error":true}}]}}'>
     <title>{title} - Mail Agents</title>
     <link href="{app_css}" rel="stylesheet" type="text/css" />
     <style>{SPINNER_STYLES}
@@ -363,8 +364,15 @@ pub(crate) const APP_SCRIPT: &str = r##"        function getCachedCompanyId() {
                     matches.forEach(m => {
                         const item = document.createElement('div');
                         item.className = 'px-3 py-2 hover:bg-base-300 cursor-pointer text-xs flex items-center justify-between border-b border-base-300 last:border-b-0 text-base-content';
-                        item.innerHTML = `<span class="font-mono text-base-content font-medium">${m.email}</span>` +
-                            (m.username ? `<span class="text-base-content/70 text-[11px]">${m.username} (${m.role})</span>` : `<span class="text-base-content/70 text-[11px]">${m.role}</span>`);
+                        // Team API fields are plain strings: create the markup here, then add
+                        // each field as text so names and addresses cannot become elements.
+                        const email = document.createElement('span');
+                        email.className = 'font-mono text-base-content font-medium';
+                        email.textContent = m.email;
+                        const identity = document.createElement('span');
+                        identity.className = 'text-base-content/70 text-[11px]';
+                        identity.textContent = m.username ? m.username + ' (' + m.role + ')' : m.role;
+                        item.append(email, identity);
 
                         item.addEventListener('mousedown', (e) => {
                             e.preventDefault();
@@ -545,13 +553,24 @@ pub(crate) fn layout(title: &str, content: &str, authenticated: bool) -> String 
     )
 }
 
+/// Alert messages are plain text. Assemble trusted markup here, never in a caller's message.
 pub fn success_alert(message: &str, redirect_url: Option<(&str, &str)>) -> String {
-    let redirect_html = match redirect_url {
-        Some((url, label)) => format!(
-            r##"<div class="mt-3"><a href="{url}" class="inline-block text-xs font-semibold uppercase tracking-wider text-base-content hover:text-base-content underline transition">{label} &rarr;</a></div>"##
-        ),
-        None => String::new(),
-    };
+    let redirect_html = redirect_url
+        .filter(|(url, _)| {
+            url.starts_with('/')
+                && !url.starts_with("//")
+                && !url.contains('\\')
+                && !url.chars().any(char::is_control)
+        })
+        .map(|(url, label)| {
+            let url = escape_html_attr(url);
+            let label = escape_html_text(label);
+            format!(
+                r##"<div class="mt-3"><a href="{url}" class="inline-block text-xs font-semibold uppercase tracking-wider text-base-content hover:text-base-content underline transition">{label} &rarr;</a></div>"##
+            )
+        })
+        .unwrap_or_default();
+    let message = escape_html_text(message);
 
     format!(
         r##"<div class="p-4 mb-4 rounded-xl bg-success/10 border border-success/40 text-base-content text-sm">
@@ -565,6 +584,7 @@ pub fn success_alert(message: &str, redirect_url: Option<(&str, &str)>) -> Strin
 }
 
 pub fn error_alert(message: &str) -> String {
+    let message = escape_html_text(message);
     format!(
         r##"<div class="p-4 mb-4 rounded-xl bg-error/10 border border-error/40 text-base-content text-sm flex items-center gap-2 font-medium">
             <svg class="w-5 h-5 text-base-content flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 19 9 0 0118 0z"></path></svg>

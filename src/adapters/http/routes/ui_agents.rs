@@ -164,7 +164,7 @@ impl Workspace {
 }
 
 /// GET /ui/agents - The Agents workspace for the selected company / agent (Protected).
-#[instrument(skip(workspace))]
+#[instrument(skip_all)]
 async fn agents_page(
     workspace: Workspace,
     Query(query): Query<WorkspaceQuery>,
@@ -223,7 +223,7 @@ async fn agents_page(
 }
 
 /// GET /ui/agents/new - The create-agent form for the pane (Protected).
-#[instrument(skip(workspace))]
+#[instrument(skip_all)]
 async fn create_pane(
     workspace: Workspace,
     Query(query): Query<CompanyQuery>,
@@ -243,7 +243,7 @@ async fn create_pane(
 }
 
 /// GET /ui/agents/{agent_id} - One agent's settings for the pane (Protected).
-#[instrument(skip(workspace))]
+#[instrument(skip_all)]
 async fn edit_pane(
     workspace: Workspace,
     Path(agent_id): Path<Uuid>,
@@ -261,7 +261,7 @@ async fn edit_pane(
 ///
 /// Answers with the status line and the filled-in field, rather than a redirect or a new pane: the
 /// rest of the form is whatever the user has already typed and must survive untouched.
-#[instrument(skip(workspace, form))]
+#[instrument(skip_all)]
 async fn generate_prompt(
     workspace: Workspace,
     Query(query): Query<CompanyQuery>,
@@ -299,7 +299,7 @@ async fn generate_prompt(
 }
 
 /// POST /ui/agents - Create an agent from the pane's Simple or Advanced form (Protected).
-#[instrument(skip(workspace, form))]
+#[instrument(skip_all)]
 async fn create_agent(
     workspace: Workspace,
     Query(query): Query<CompanyQuery>,
@@ -379,7 +379,7 @@ async fn rejected(
 /// Each pick is copied and provisioned on its own, so one that collides with an agent this company
 /// already has does not cost the others: the pane comes back showing what was created, with a line
 /// per pick that could not be.
-#[instrument(skip(workspace, form))]
+#[instrument(skip_all)]
 async fn create_from_library(
     workspace: Workspace,
     Query(query): Query<CompanyQuery>,
@@ -433,7 +433,7 @@ async fn create_from_library(
 }
 
 /// PUT /ui/agents/{agent_id} - Save one agent's settings (Protected).
-#[instrument(skip(workspace, form))]
+#[instrument(skip_all)]
 async fn update_agent(
     workspace: Workspace,
     Path(agent_id): Path<Uuid>,
@@ -476,7 +476,7 @@ async fn update_agent(
 }
 
 /// DELETE /ui/agents/{agent_id} - Delete an agent and clear the pane (Protected).
-#[instrument(skip(workspace))]
+#[instrument(skip_all)]
 async fn delete_agent(
     workspace: Workspace,
     Path(agent_id): Path<Uuid>,

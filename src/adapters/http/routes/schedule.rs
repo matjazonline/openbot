@@ -198,7 +198,7 @@ impl UiScheduleForm {
     }
 }
 
-#[instrument(skip(schedule_use_cases, user))]
+#[instrument(skip_all)]
 pub async fn list_channel_schedules_json(
     State(schedule_use_cases): State<Arc<ScheduleUseCases>>,
     user: AuthenticatedUser,
@@ -210,7 +210,7 @@ pub async fn list_channel_schedules_json(
     Ok(Json(list))
 }
 
-#[instrument(skip(schedule_use_cases, user, body))]
+#[instrument(skip_all)]
 pub async fn create_channel_schedule_json(
     State(schedule_use_cases): State<Arc<ScheduleUseCases>>,
     user: AuthenticatedUser,
@@ -223,7 +223,7 @@ pub async fn create_channel_schedule_json(
     Ok((StatusCode::CREATED, Json(schedule)))
 }
 
-#[instrument(skip(schedule_use_cases, user))]
+#[instrument(skip_all)]
 pub async fn get_schedule_json(
     State(schedule_use_cases): State<Arc<ScheduleUseCases>>,
     user: AuthenticatedUser,
@@ -236,7 +236,7 @@ pub async fn get_schedule_json(
     Ok(Json(schedule))
 }
 
-#[instrument(skip(schedule_use_cases, user, body))]
+#[instrument(skip_all)]
 pub async fn update_schedule_json(
     State(schedule_use_cases): State<Arc<ScheduleUseCases>>,
     user: AuthenticatedUser,
@@ -250,7 +250,7 @@ pub async fn update_schedule_json(
     Ok(Json(updated))
 }
 
-#[instrument(skip(schedule_use_cases, user))]
+#[instrument(skip_all)]
 pub async fn delete_schedule_json(
     State(schedule_use_cases): State<Arc<ScheduleUseCases>>,
     user: AuthenticatedUser,
@@ -269,7 +269,7 @@ pub struct RunNowBody {
     pub command_key: String,
 }
 
-#[instrument(skip(schedule_use_cases, user, body))]
+#[instrument(skip_all)]
 pub async fn run_schedule_now_json(
     State(schedule_use_cases): State<Arc<ScheduleUseCases>>,
     user: AuthenticatedUser,
@@ -299,7 +299,7 @@ fn default_runs_limit() -> i64 {
     20
 }
 
-#[instrument(skip(schedule_use_cases, user))]
+#[instrument(skip_all)]
 pub async fn list_schedule_runs_json(
     State(schedule_use_cases): State<Arc<ScheduleUseCases>>,
     user: AuthenticatedUser,
@@ -338,7 +338,7 @@ impl From<ScheduleBindingChoice> for ScheduleBindingJson {
 }
 
 /// The bindings a schedule on this channel may name.
-#[instrument(skip(schedule_use_cases, user))]
+#[instrument(skip_all)]
 pub async fn list_schedule_bindings_json(
     State(schedule_use_cases): State<Arc<ScheduleUseCases>>,
     user: AuthenticatedUser,
@@ -355,7 +355,7 @@ pub struct ToggleBody {
     pub enabled: bool,
 }
 
-#[instrument(skip(schedule_use_cases, user))]
+#[instrument(skip_all)]
 pub async fn toggle_schedule_json(
     State(schedule_use_cases): State<Arc<ScheduleUseCases>>,
     user: AuthenticatedUser,
@@ -402,7 +402,7 @@ async fn schedules_card(
     ))
 }
 
-#[instrument(skip(schedule_use_cases, user, form))]
+#[instrument(skip_all)]
 pub async fn ui_create_schedule(
     State(schedule_use_cases): State<Arc<ScheduleUseCases>>,
     user: AuthenticatedUser,
@@ -439,7 +439,7 @@ pub fn run_now_key(submitted: Option<String>) -> String {
         .unwrap_or_else(|| Uuid::new_v4().to_string())
 }
 
-#[instrument(skip(schedule_use_cases, user))]
+#[instrument(skip_all)]
 pub async fn ui_delete_schedule(
     State(schedule_use_cases): State<Arc<ScheduleUseCases>>,
     user: AuthenticatedUser,
@@ -457,7 +457,7 @@ pub async fn ui_delete_schedule(
     schedules_card(&schedule_use_cases, user.id, query.company_id, channel_id).await
 }
 
-#[instrument(skip(schedule_use_cases, user))]
+#[instrument(skip_all)]
 pub async fn ui_run_schedule_now(
     State(schedule_use_cases): State<Arc<ScheduleUseCases>>,
     user: AuthenticatedUser,
@@ -482,7 +482,7 @@ pub struct UiToggleForm {
     pub enabled: Option<String>,
 }
 
-#[instrument(skip(schedule_use_cases, user))]
+#[instrument(skip_all)]
 pub async fn ui_toggle_schedule(
     State(schedule_use_cases): State<Arc<ScheduleUseCases>>,
     user: AuthenticatedUser,

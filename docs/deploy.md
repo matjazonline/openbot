@@ -131,12 +131,61 @@ Secrets — set with `fly secrets set`, never in `fly.toml`:
 | `DATABASE_URL` | Points at `openbots-db.internal` |
 | `JWT_SECRET` | Session signing key |
 | `SMTP_USERNAME` / `SMTP_PASSWORD` | Outbound relay credentials |
-| `SMTP_HOST` / `SMTP_FROM_ADDRESS` | Outbound TLS relay and sender; when both are configured with a non-local host, new accounts must confirm a six-digit code sent by email. Remote relay certificates are validated. If outbound SMTP is not configured, registration skips confirmation. |
+| `SMTP_HOST` / `SMTP_FROM_ADDRESS` | Outbound relay and sender. When a usable SMTP transport is configured, password registration and address changes send a six-digit confirmation code; the account/address is verified only after the correct code is redeemed. Remote relay certificates are validated. A configured relay send failure does not bypass confirmation. |
 | `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` | Optional Google registration/login. Set both and register `https://<APP_DOMAIN_NAME>/auth/google/callback` as an authorized redirect URI in Google Cloud. |
 | `APPLE_OAUTH_CLIENT_ID` / `APPLE_OAUTH_TEAM_ID` / `APPLE_OAUTH_KEY_ID` / `APPLE_OAUTH_PRIVATE_KEY_BASE64` | Optional Sign in with Apple. Set all four, use the Services ID as the client ID, base64-encode the `.p8` private key, and register `https://<APP_DOMAIN_NAME>/auth/apple/callback` as the return URL. Apple requires a real HTTPS domain and does not accept localhost. Register the outbound mail domain and sender with Apple's private email relay so confirmation codes reach relay addresses. |
 | `CREDENTIAL_ENCRYPTION_KEYS` | Versioned AES-256-GCM keys (`1:<base64-32-bytes>,2:<base64-32-bytes>`). This is the read key ring; keep prior versions during rotation. |
 | `CREDENTIAL_ENCRYPTION_ACTIVE_VERSION` | Positive version in `CREDENTIAL_ENCRYPTION_KEYS` used for new writes. It is intentionally independent of the highest readable version. |
 | `GCS_SERVICE_ACCOUNT_JSON_BASE64` | The Cloud Storage service account key, base64-encoded — see [Picture uploads](#picture-uploads) |
+
+`ALLOW_UNVERIFIED_EMAIL_WITHOUT_SMTP` is a startup-read boolean, default `false` in
+`fly.toml` and `.env.example`. With no usable outbound confirmation transport, password
+registration and email address changes are unavailable by default. Set it to `true` only when
+deliberately allowing those operations without SMTP: the resulting address remains unverified,
+so email-based invitations, participant-restricted channels, and operator access stay unavailable.
+The flag has no effect when outbound SMTP is configured, including when a send fails. A loopback
+SMTP relay counts as configured only when `SMTP_ALLOW_PLAINTEXT_LOCAL=true` meets its local-only
+requirements; the default localhost placeholder does not enable confirmation.
+
+`AUTH_TRUSTED_PROXY_IPS` is an optional, non-secret comma-separated list of TCP peer IPs for
+trusted ingress proxies. Startup rejects invalid entries. A trusted proxy must replace any
+client-supplied `X-Forwarded-For` with exactly one client IP; untrusted peers' forwarded headers
+are ignored. If the list is empty, clients behind one proxy share one auth rate bucket. The
+current fixed 60-second admission budgets are 600 requests globally, 30 per source for login or
+OAuth, and 12 per source for registration, confirmation, or credential changes. Auth request
+bodies are capped at 8 KiB, except OAuth at 32 KiB, with a 10-second read deadline; at most four
+Argon2 jobs run concurrently.
+PostgreSQL applies five code guesses per registration address or account-change kind across
+reissues in a fixed one-hour window, and five password-login attempts per normalized identifier
+and resolved source in a fixed two-minute window. A blocked request does not extend its window;
+successful login clears that identifier/source counter. Expired rows are removed in bounded batches
+as authentication traffic continues. A correct code is spent once. Invalid, expired, and exhausted
+codes return the same response; password-login exhaustion returns invalid credentials.
+See [authentication operations](authentication-operations.md) for all fixed bounds, low-cardinality
+telemetry and provider-outage triage.
+
+Session validation and cleanup metrics use the separate `monitoring::counter` and
+`monitoring::gauge` targets. The startup default and supplied `fly.toml`/`.env.example` filters
+enable both at info. If overriding `RUST_LOG`, retain `monitoring::counter=info,monitoring::gauge=info`
+to export these signals; the application-only `mail_agents` directive does not include them.
+See [authentication operations](authentication-operations.md#security-changes-and-session-cleanup)
+for session lifetime, revocation and backlog alerts.
+
+### Request traces and ingress access logs
+
+The application's HTTP span records a generated request ID, method, protocol version, and only a
+static Axum matched-route template when one exists. The response event adds status and latency.
+Use those fields, provider type, and an opaque event correlation ID for incident triage; do not
+paste OAuth callback URLs or webhook URLs into tickets. The exact field policy and sensitive-route
+inventory are in [request trace redaction](request-trace-redaction.md).
+
+`fly.toml` sets `RUST_LOG` for application output but has no access-log redaction setting for an
+upstream proxy. Fly's [security questionnaire](https://fly.io/legal/security-questionnaire/)
+states that Fly Proxy records request paths on errors. An application span cannot remove a Resend
+webhook token from a proxy error record made before the request reaches Rust. Restrict access to
+platform logs and rotate a webhook token after suspected exposure. If another proxy, CDN, or log
+shipper is added, configure it to omit path and query values before retaining or forwarding access
+logs, and verify that configuration with marker requests.
 
 Startup validates both credential-encryption settings but never mutates stored credentials. Use the
 explicit operational commands below to inspect or rotate rows. After the first encrypted deployment,

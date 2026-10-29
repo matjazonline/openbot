@@ -25,14 +25,10 @@ async fn get_monitoring_stats(
         .get_user_by_id(user.id)
         .await?
         .ok_or_else(|| AppError::NotFound("Operator not found".into()))?;
-    if !operator_allowed(&config, &user.email) {
+    if !config.is_operator(&user) {
         return Err(AppError::NotFound("Operator not found".into()));
     }
     Ok(Json(monitoring.get_stats_json()))
-}
-
-fn operator_allowed(config: &AppConfig, email: &str) -> bool {
-    config.is_operator(&email.into())
 }
 
 #[cfg(test)]
@@ -42,9 +38,20 @@ mod tests {
     #[test]
     fn metrics_require_deployment_operator() {
         let mut config = AppConfig::for_test();
-        assert!(!operator_allowed(&config, "member@example.com"));
+        let mut user = crate::entities::user::User {
+            auth_revision: 0,
+            id: uuid::Uuid::new_v4(),
+            username: "operator".into(),
+            email: "OPERATOR@example.com".into(),
+            email_verified_at: None,
+            password_hash: String::new(),
+            avatar_url: None,
+            created_at: chrono::Utc::now(),
+        };
+        assert!(!config.is_operator(&user));
         config.operator_emails = vec!["operator@example.com".into()];
-        assert!(!operator_allowed(&config, "member@example.com"));
-        assert!(operator_allowed(&config, "OPERATOR@example.com"));
+        assert!(!config.is_operator(&user));
+        user.email_verified_at = Some(chrono::Utc::now());
+        assert!(config.is_operator(&user));
     }
 }

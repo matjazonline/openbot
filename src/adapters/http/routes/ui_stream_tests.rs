@@ -318,6 +318,7 @@ impl Harness {
             owner: Viewer {
                 user_id: owner.id,
                 email: EmailAddress::from(email.as_str()),
+                email_verified_at: Some(chrono::Utc::now()),
             },
         })
     }

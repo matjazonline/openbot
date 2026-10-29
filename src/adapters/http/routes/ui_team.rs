@@ -71,6 +71,56 @@ pub fn router() -> Router<AppState> {
         )
 }
 
+#[cfg(test)]
+mod trace_tests {
+    use super::*;
+    use std::{
+        io::Write,
+        sync::{Arc, Mutex},
+    };
+    use tower::ServiceExt;
+    use tracing_subscriber::fmt::format::FmtSpan;
+
+    struct Capture(Arc<Mutex<Vec<u8>>>);
+
+    impl Write for Capture {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            self.0.lock().unwrap().extend_from_slice(bytes);
+            Ok(bytes.len())
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn security_trace_redaction_team_query_is_not_a_handler_span_field() {
+        let output = Arc::new(Mutex::new(Vec::new()));
+        let subscriber = tracing_subscriber::fmt()
+            .with_ansi(false)
+            .with_span_events(FmtSpan::NEW)
+            .with_writer({
+                let output = output.clone();
+                move || Capture(output.clone())
+            })
+            .finish();
+        let _guard = tracing::subscriber::set_default(subscriber);
+        let app = Router::new().route("/ui/team", get(team_redirect));
+        let marker = "12345678-1234-1234-1234-123456789abc";
+        let request = axum::http::Request::builder()
+            .uri(format!("/ui/team?company_id={marker}"))
+            .body(axum::body::Body::empty())
+            .unwrap();
+        let response = app.oneshot(request).await.unwrap();
+        assert_eq!(response.status(), axum::http::StatusCode::SEE_OTHER);
+
+        let log = String::from_utf8(output.lock().unwrap().clone()).unwrap();
+        assert!(log.contains("team_redirect"), "{log}");
+        assert!(!log.contains(marker), "query value leaked into span: {log}");
+    }
+}
+
 /// What the Team tab has selected, all optional so the tab alone is a valid entry point.
 ///
 /// It arrives as part of [`super::ui_companies::WorkspaceQuery`] rather than being parsed here:
@@ -204,7 +254,7 @@ pub(super) async fn team_tab_body(
 /// The team lives in its company's pane now, so a stale link is answered with the company it named
 /// rather than a 404; without one there is nothing to show, and the Companies workspace is where a
 /// company gets picked.
-#[instrument]
+#[instrument(skip_all)]
 async fn team_redirect(Query(query): Query<LegacyTeamQuery>) -> Redirect {
     match query.company_id {
         Some(company_id) => Redirect::to(&pages::team_url(company_id, TeamSelection::None)),
@@ -216,7 +266,7 @@ async fn team_redirect(Query(query): Query<LegacyTeamQuery>) -> Redirect {
 ///
 /// The list comes with it, deselected: the form belongs to nobody, so leaving whoever was open
 /// before it lit would say the pane is showing a person it is not.
-#[instrument(skip(workspace))]
+#[instrument(skip_all)]
 async fn invite_form_pane(
     workspace: Workspace,
     Path(company_id): Path<Uuid>,
@@ -233,14 +283,14 @@ async fn invite_form_pane(
 /// What Cancel does: the pane goes back to its placeholder and the list loses its highlight, so
 /// cancelling a form and closing a person both leave the tab in the same state as arriving at it
 /// with nothing selected.
-#[instrument(skip(workspace))]
+#[instrument(skip_all)]
 async fn close_pane(workspace: Workspace, Path(company_id): Path<Uuid>) -> AppResult<Response> {
     let company = workspace.scoped_company(company_id).await?;
     workspace.view(&company).cleared_response().await
 }
 
 /// GET /ui/companies/{company_id}/team/members/{user_id} - One member's access (Protected).
-#[instrument(skip(workspace))]
+#[instrument(skip_all)]
 async fn member_pane(
     workspace: Workspace,
     Path((company_id, user_id)): Path<(Uuid, Uuid)>,
@@ -256,7 +306,7 @@ async fn member_pane(
 ///
 /// An avatar belongs to the account, not to the membership, so this refuses any `user_id` but the
 /// caller's -- being the company owner does not make somebody else's picture yours to set.
-#[instrument(skip(workspace, form))]
+#[instrument(skip_all)]
 async fn set_member_avatar(
     workspace: Workspace,
     Path((company_id, user_id)): Path<(Uuid, Uuid)>,
@@ -321,7 +371,7 @@ async fn set_member_avatar(
 }
 
 /// GET /ui/companies/{company_id}/team/invites/{invite_id} - One invite for the pane (Protected).
-#[instrument(skip(workspace))]
+#[instrument(skip_all)]
 async fn invite_pane(
     workspace: Workspace,
     Path((company_id, invite_id)): Path<(Uuid, Uuid)>,
@@ -334,7 +384,7 @@ async fn invite_pane(
 }
 
 /// POST /ui/companies/{company_id}/team/invites - Invite someone from the form (Protected).
-#[instrument(skip(workspace, form))]
+#[instrument(skip_all)]
 async fn create_invite(
     workspace: Workspace,
     Path(company_id): Path<Uuid>,
@@ -369,7 +419,7 @@ async fn create_invite(
 }
 
 /// PUT /ui/companies/{company_id}/team/invites/{invite_id} - Save one address (Protected).
-#[instrument(skip(workspace, form))]
+#[instrument(skip_all)]
 async fn update_invite(
     workspace: Workspace,
     Path((company_id, invite_id)): Path<(Uuid, Uuid)>,
@@ -401,7 +451,7 @@ async fn update_invite(
 }
 
 /// DELETE /ui/companies/{company_id}/team/invites/{invite_id} - Withdraw an invite (Protected).
-#[instrument(skip(workspace))]
+#[instrument(skip_all)]
 async fn delete_invite(
     workspace: Workspace,
     Path((company_id, invite_id)): Path<(Uuid, Uuid)>,
@@ -416,7 +466,7 @@ async fn delete_invite(
 }
 
 /// PUT /ui/companies/{company_id}/team/members/{user_id} - Change access role (Protected).
-#[instrument(skip(workspace, form))]
+#[instrument(skip_all)]
 async fn update_member_role(
     workspace: Workspace,
     Path((company_id, user_id)): Path<(Uuid, Uuid)>,
@@ -450,7 +500,7 @@ async fn update_member_role(
 }
 
 /// POST /ui/companies/{company_id}/team/members/{user_id}/removal - Remove someone (Protected).
-#[instrument(skip(workspace))]
+#[instrument(skip_all)]
 async fn remove_member(
     workspace: Workspace,
     Path((company_id, user_id)): Path<(Uuid, Uuid)>,

@@ -5,6 +5,7 @@ use crate::app_error::AppError;
 
 pub mod agent;
 pub mod attention;
+mod auth_attempts;
 pub mod channel;
 pub(crate) mod channel_edit;
 pub(crate) mod channel_gate;
@@ -23,6 +24,7 @@ pub mod notification;
 pub mod participant;
 pub mod run_counts;
 pub mod runtime_metrics;
+mod session;
 pub mod skill;
 #[cfg(test)]
 pub mod test_support;

@@ -12,18 +12,22 @@ use crate::{
         value_objects::{AvatarUrl, EmailAddress},
     },
     use_cases::user::{
-        AccountChange, AccountChangeKind, AccountChangePersistence, ExternalIdentity, LoginMethod,
-        PendingAccountChange, PendingChange, PendingRegistration, ProfileUpdate,
-        RegistrationPersistence, UserPersistence,
+        AccountChange, AccountChangeKind, AccountChangePersistence, AuthAttemptKey,
+        ExternalIdentity, LoginMethod, PendingAccountChange, PendingChange, PendingRegistration,
+        ProfileUpdate, RegistrationPersistence, UserPersistence,
     },
 };
+
+use super::auth_attempts;
 
 // User struct as stored in the db.
 #[derive(sqlx::FromRow, Debug, Serialize)]
 pub struct UserDb {
     pub id: Uuid,
+    pub auth_revision: i64,
     pub username: String,
     pub email: String,
+    pub email_verified_at: Option<DateTime<Utc>>,
     pub password_hash: String,
     pub avatar_url: Option<String>,
     pub created_at: DateTime<Utc>,
@@ -38,6 +42,7 @@ struct NotificationPreferencesDb {
 #[async_trait]
 impl RegistrationPersistence for PostgresPersistence {
     async fn save_pending_registration(&self, pending: PendingRegistration<'_>) -> AppResult<()> {
+        auth_attempts::cleanup_pending_registrations(&self.pool).await?;
         sqlx::query(
             r#"INSERT INTO pending_user_registrations
                    (email, username, password_hash, confirmation_code_hash, expires_at)
@@ -64,49 +69,70 @@ impl RegistrationPersistence for PostgresPersistence {
         &self,
         email: &crate::entities::value_objects::EmailAddress,
         confirmation_code_hash: &str,
+        attempt_key: &AuthAttemptKey,
     ) -> AppResult<Option<User>> {
+        auth_attempts::cleanup_code_attempts(&self.pool).await?;
         let mut transaction = self.pool.begin().await.map_err(AppError::from)?;
-        let user = sqlx::query_as::<_, UserDb>(
-            r#"INSERT INTO users (id, username, email, password_hash)
-               SELECT $3, pending.username, pending.email, pending.password_hash
-               FROM pending_user_registrations AS pending
-               WHERE pending.email = $1
-                 AND pending.confirmation_code_hash = $2
-                 AND pending.expires_at > CURRENT_TIMESTAMP
-               RETURNING id, username, email, password_hash, avatar_url, created_at"#,
+        if !auth_attempts::reserve_code_attempt(&mut transaction, attempt_key).await? {
+            transaction.commit().await.map_err(AppError::from)?;
+            return Ok(None);
+        }
+        let pending = sqlx::query_as::<_, (String, String, String)>(
+            r#"SELECT username::text, password_hash, confirmation_code_hash
+               FROM pending_user_registrations
+               WHERE email = $1::citext AND expires_at > CURRENT_TIMESTAMP
+               FOR UPDATE"#,
         )
         .bind(email.as_str())
-        .bind(confirmation_code_hash)
-        .bind(Uuid::new_v4())
         .fetch_optional(&mut *transaction)
         .await
         .map_err(AppError::from)?;
+        let Some((username, password_hash, stored_hash)) = pending else {
+            transaction.commit().await.map_err(AppError::from)?;
+            return Ok(None);
+        };
+        if stored_hash != confirmation_code_hash {
+            transaction.commit().await.map_err(AppError::from)?;
+            return Ok(None);
+        }
 
-        if let Some(user) = &user {
-            sqlx::query(
-                "INSERT INTO user_login_methods (user_id, provider) VALUES ($1, 'password')",
-            )
+        sqlx::query("DELETE FROM pending_user_registrations WHERE email = $1::citext")
+            .bind(email.as_str())
+            .execute(&mut *transaction)
+            .await
+            .map_err(AppError::from)?;
+        let user = sqlx::query_as::<_, UserDb>(
+            r#"INSERT INTO users (id, username, email, password_hash, email_verified_at)
+               VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
+               RETURNING id, username, email, password_hash, avatar_url, email_verified_at, auth_revision, created_at"#,
+        )
+        .bind(Uuid::new_v4())
+        .bind(username)
+        .bind(email.as_str())
+        .bind(password_hash)
+        .fetch_one(&mut *transaction)
+        .await
+        .map_err(AppError::from)?;
+
+        sqlx::query("INSERT INTO user_login_methods (user_id, provider) VALUES ($1, 'password')")
             .bind(user.id)
             .execute(&mut *transaction)
             .await
             .map_err(AppError::from)?;
-            sqlx::query("DELETE FROM pending_user_registrations WHERE email = $1")
-                .bind(email.as_str())
-                .execute(&mut *transaction)
-                .await
-                .map_err(AppError::from)?;
-        }
+        auth_attempts::clear_code_attempt(&mut transaction, attempt_key).await?;
         transaction.commit().await.map_err(AppError::from)?;
-        Ok(user.map(Into::into))
+        Ok(Some(user.into()))
     }
 }
 
 impl From<UserDb> for User {
     fn from(user_db: UserDb) -> Self {
         User {
+            auth_revision: user_db.auth_revision,
             id: user_db.id,
             username: user_db.username,
             email: user_db.email,
+            email_verified_at: user_db.email_verified_at,
             password_hash: user_db.password_hash,
             avatar_url: user_db.avatar_url.map(AvatarUrl::from),
             created_at: user_db.created_at,
@@ -116,6 +142,22 @@ impl From<UserDb> for User {
 
 #[async_trait]
 impl UserPersistence for PostgresPersistence {
+    async fn canonical_auth_identifier(&self, value: &str) -> AppResult<String> {
+        sqlx::query_scalar("SELECT lower($1::citext)::text")
+            .bind(value)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(AppError::from)
+    }
+
+    async fn reserve_login_attempt(&self, key: &AuthAttemptKey) -> AppResult<bool> {
+        auth_attempts::reserve_login_attempt(&self.pool, key).await
+    }
+
+    async fn clear_login_attempt(&self, key: &AuthAttemptKey) -> AppResult<()> {
+        auth_attempts::clear_login_attempt(&self.pool, key).await
+    }
+
     async fn create_user(
         &self,
         username: &str,
@@ -128,7 +170,7 @@ impl UserPersistence for PostgresPersistence {
         let db = sqlx::query_as::<_, UserDb>(
             r#"INSERT INTO users (id, username, email, password_hash)
                VALUES ($1, $2, $3, $4)
-               RETURNING id, username, email, password_hash, avatar_url, created_at"#,
+               RETURNING id, username, email, password_hash, avatar_url, email_verified_at, auth_revision, created_at"#,
         )
         .bind(uuid)
         .bind(username)
@@ -210,7 +252,7 @@ impl UserPersistence for PostgresPersistence {
     async fn get_by_email(&self, email: &str) -> AppResult<Option<User>> {
         let result = sqlx::query_as!(
             UserDb,
-            r#"SELECT id, username, email, password_hash, avatar_url, created_at as "created_at!" FROM users WHERE email = $1"#,
+            r#"SELECT id, username, email, password_hash, avatar_url, email_verified_at, auth_revision, created_at as "created_at!" FROM users WHERE email = $1::citext"#,
             email
         )
         .fetch_optional(&self.pool)
@@ -223,7 +265,7 @@ impl UserPersistence for PostgresPersistence {
     async fn get_by_username(&self, username: &str) -> AppResult<Option<User>> {
         let result = sqlx::query_as!(
             UserDb,
-            r#"SELECT id, username, email, password_hash, avatar_url, created_at as "created_at!" FROM users WHERE username = $1"#,
+            r#"SELECT id, username, email, password_hash, avatar_url, email_verified_at, auth_revision, created_at as "created_at!" FROM users WHERE username = $1::citext"#,
             username
         )
         .fetch_optional(&self.pool)
@@ -236,7 +278,7 @@ impl UserPersistence for PostgresPersistence {
     async fn get_by_id(&self, id: Uuid) -> AppResult<Option<User>> {
         let result = sqlx::query_as!(
             UserDb,
-            r#"SELECT id, username, email, password_hash, avatar_url, created_at as "created_at!" FROM users WHERE id = $1"#,
+            r#"SELECT id, username, email, password_hash, avatar_url, email_verified_at, auth_revision, created_at as "created_at!" FROM users WHERE id = $1"#,
             id
         )
         .fetch_optional(&self.pool)
@@ -254,7 +296,7 @@ impl UserPersistence for PostgresPersistence {
         let result = sqlx::query_as!(
             UserDb,
             r#"UPDATE users SET avatar_url = $2 WHERE id = $1
-               RETURNING id, username, email, password_hash, avatar_url, created_at as "created_at!""#,
+               RETURNING id, username, email, password_hash, avatar_url, email_verified_at, auth_revision, created_at as "created_at!""#,
             id,
             avatar_url.map(AvatarUrl::as_str)
         )
@@ -272,8 +314,12 @@ impl UserPersistence for PostgresPersistence {
     ) -> AppResult<Option<User>> {
         let result = sqlx::query_as!(
             UserDb,
-            r#"UPDATE users SET username = $2, email = $3, avatar_url = $4 WHERE id = $1
-               RETURNING id, username, email, password_hash, avatar_url, created_at as "created_at!""#,
+            r#"UPDATE users
+               SET username = $2, email = $3, avatar_url = $4,
+                   email_verified_at = CASE WHEN email IS DISTINCT FROM $3::citext
+                                            THEN NULL ELSE email_verified_at END
+               WHERE id = $1
+               RETURNING id, username, email, password_hash, avatar_url, email_verified_at, auth_revision, created_at as "created_at!""#,
             id,
             profile.username,
             profile.email.as_str(),
@@ -286,11 +332,31 @@ impl UserPersistence for PostgresPersistence {
         Ok(result.map(Into::into))
     }
 
+    async fn update_profile_display(
+        &self,
+        id: Uuid,
+        username: &str,
+        avatar_url: Option<&AvatarUrl>,
+    ) -> AppResult<Option<User>> {
+        let result = sqlx::query_as!(
+            UserDb,
+            r#"UPDATE users SET username = $2, avatar_url = $3 WHERE id = $1
+               RETURNING id, username, email, password_hash, avatar_url, email_verified_at, auth_revision, created_at as "created_at!""#,
+            id,
+            username,
+            avatar_url.map(AvatarUrl::as_str)
+        )
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+        Ok(result.map(Into::into))
+    }
+
     async fn update_password_hash(&self, id: Uuid, password_hash: &str) -> AppResult<Option<User>> {
         let result = sqlx::query_as!(
             UserDb,
             r#"UPDATE users SET password_hash = $2 WHERE id = $1
-               RETURNING id, username, email, password_hash, avatar_url, created_at as "created_at!""#,
+               RETURNING id, username, email, password_hash, avatar_url, email_verified_at, auth_revision, created_at as "created_at!""#,
             id,
             password_hash
         )
@@ -305,7 +371,7 @@ impl UserPersistence for PostgresPersistence {
         let mut transaction = self.pool.begin().await.map_err(AppError::from)?;
         let result = sqlx::query_as::<_, UserDb>(
             r#"UPDATE users SET password_hash = $2 WHERE id = $1
-               RETURNING id, username, email, password_hash, avatar_url, created_at"#,
+               RETURNING id, username, email, password_hash, avatar_url, email_verified_at, auth_revision, created_at"#,
         )
         .bind(id)
         .bind(password_hash)
@@ -337,9 +403,9 @@ impl UserPersistence for PostgresPersistence {
     }
 
     async fn create_external_user(&self, identity: ExternalIdentity<'_>) -> AppResult<User> {
-        if identity.provider == LoginMethod::Password {
+        if identity.provider == LoginMethod::Password || !identity.email_verified {
             return Err(AppError::BadRequest(
-                "Password registration is not an external-provider flow.".into(),
+                "An external account requires a verified provider email claim.".into(),
             ));
         }
         let id = Uuid::new_v4();
@@ -349,9 +415,9 @@ impl UserPersistence for PostgresPersistence {
         let password_hash = format!("{}-only:{id}", identity.provider.as_str());
         let mut transaction = self.pool.begin().await.map_err(AppError::from)?;
         let user = sqlx::query_as::<_, UserDb>(
-            r#"INSERT INTO users (id, username, email, password_hash)
-               VALUES ($1, $2, $3, $4)
-               RETURNING id, username, email, password_hash, avatar_url, created_at"#,
+            r#"INSERT INTO users (id, username, email, password_hash, email_verified_at)
+               VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
+               RETURNING id, username, email, password_hash, avatar_url, email_verified_at, auth_revision, created_at"#,
         )
         .bind(id)
         .bind(username)
@@ -380,7 +446,7 @@ impl UserPersistence for PostgresPersistence {
     ) -> AppResult<Option<User>> {
         sqlx::query_as::<_, UserDb>(
             r#"SELECT users.id, users.username, users.email, users.password_hash,
-                      users.avatar_url, users.created_at
+                      users.avatar_url, users.email_verified_at, users.auth_revision, users.created_at
                FROM users
                JOIN user_login_methods methods ON methods.user_id = users.id
                WHERE methods.provider = $1 AND methods.provider_subject = $2"#,
@@ -393,20 +459,70 @@ impl UserPersistence for PostgresPersistence {
         .map_err(AppError::from)
     }
 
+    async fn login_external_identity(
+        &self,
+        identity: ExternalIdentity<'_>,
+    ) -> AppResult<Option<User>> {
+        if identity.provider == LoginMethod::Password || !identity.email_verified {
+            return Err(AppError::BadRequest(
+                "An external login requires a verified provider email claim.".into(),
+            ));
+        }
+        // The row lock from UPDATE serializes with an address change. The provider's proof
+        // installs a marker only while it names the address currently stored on this row.
+        sqlx::query_as::<_, UserDb>(
+            r#"UPDATE users AS account
+               SET email_verified_at = CASE
+                   WHEN account.email = $3::citext THEN COALESCE(account.email_verified_at, CURRENT_TIMESTAMP)
+                   ELSE account.email_verified_at END
+               FROM user_login_methods AS method
+               WHERE method.user_id = account.id AND method.provider = $1 AND method.provider_subject = $2
+               RETURNING account.id, account.username, account.email, account.password_hash,
+                         account.avatar_url, account.email_verified_at, account.auth_revision, account.created_at"#,
+        )
+        .bind(identity.provider.as_str())
+        .bind(identity.subject)
+        .bind(identity.email.as_str())
+        .fetch_optional(&self.pool)
+        .await
+        .map(|user| user.map(Into::into))
+        .map_err(AppError::from)
+    }
+
     async fn link_external_identity(
         &self,
         user_id: Uuid,
         identity: ExternalIdentity<'_>,
     ) -> AppResult<()> {
+        if identity.provider == LoginMethod::Password || !identity.email_verified {
+            return Err(AppError::BadRequest(
+                "An external link requires a verified provider email claim.".into(),
+            ));
+        }
+        let mut transaction = self.pool.begin().await.map_err(AppError::from)?;
         sqlx::query(
             "INSERT INTO user_login_methods (user_id, provider, provider_subject) VALUES ($1, $2, $3)",
         )
         .bind(user_id)
         .bind(identity.provider.as_str())
         .bind(identity.subject)
-        .execute(&self.pool)
+        .execute(&mut *transaction)
         .await
         .map_err(external_identity_conflict)?;
+        let updated = sqlx::query(
+            "UPDATE users SET email_verified_at = COALESCE(email_verified_at, CURRENT_TIMESTAMP) WHERE id = $1 AND email = $2::citext",
+        )
+        .bind(user_id)
+        .bind(identity.email.as_str())
+        .execute(&mut *transaction)
+        .await
+        .map_err(AppError::from)?;
+        if updated.rows_affected() != 1 {
+            return Err(AppError::Conflict(
+                "The verified provider email no longer matches this account.".into(),
+            ));
+        }
+        transaction.commit().await.map_err(AppError::from)?;
         Ok(())
     }
 }
@@ -516,6 +632,7 @@ impl AccountChangePersistence for PostgresPersistence {
         &self,
         pending: PendingAccountChange<'_>,
     ) -> AppResult<()> {
+        auth_attempts::cleanup_pending_account_changes(&self.pool).await?;
         // Split here rather than in the SQL: the columns a kind may fill are the one thing the
         // table's CHECK constraint enforces, and the enum is what makes filling the wrong one
         // impossible to write in the first place.
@@ -553,11 +670,32 @@ impl AccountChangePersistence for PostgresPersistence {
         user_id: Uuid,
         kind: AccountChangeKind,
         confirmation_code_hash: &str,
+        attempt_key: &AuthAttemptKey,
     ) -> AppResult<Option<User>> {
+        auth_attempts::cleanup_code_attempts(&self.pool).await?;
         let mut transaction = self.pool.begin().await.map_err(AppError::from)?;
 
-        // Deleting is what claims the request, and it happens in the same transaction as the
-        // write: two browsers racing the same code cannot both find a row to spend.
+        if !auth_attempts::reserve_code_attempt(&mut transaction, attempt_key).await? {
+            transaction.commit().await.map_err(AppError::from)?;
+            return Ok(None);
+        }
+        let stored_hash = sqlx::query_scalar::<_, String>(
+            r#"SELECT confirmation_code_hash FROM pending_account_changes
+               WHERE user_id = $1 AND kind = $2 AND expires_at > CURRENT_TIMESTAMP
+               FOR UPDATE"#,
+        )
+        .bind(user_id)
+        .bind(kind.as_str())
+        .fetch_optional(&mut *transaction)
+        .await
+        .map_err(AppError::from)?;
+        if stored_hash.as_deref() != Some(confirmation_code_hash) {
+            transaction.commit().await.map_err(AppError::from)?;
+            return Ok(None);
+        }
+
+        // The locked row is deleted in the same transaction as the account mutation. A second
+        // claimant waits, then sees no row to spend.
         let claimed = sqlx::query!(
             r#"DELETE FROM pending_account_changes
                WHERE user_id = $1
@@ -574,7 +712,7 @@ impl AccountChangePersistence for PostgresPersistence {
         .map_err(AppError::from)?;
 
         let Some(claimed) = claimed else {
-            transaction.rollback().await.map_err(AppError::from)?;
+            transaction.commit().await.map_err(AppError::from)?;
             return Ok(None);
         };
 
@@ -582,8 +720,8 @@ impl AccountChangePersistence for PostgresPersistence {
             AccountChangeKind::Email => {
                 sqlx::query_as!(
                     UserDb,
-                    r#"UPDATE users SET email = $2 WHERE id = $1
-                       RETURNING id, username, email, password_hash, avatar_url, created_at as "created_at!""#,
+                    r#"UPDATE users SET email = $2, email_verified_at = CURRENT_TIMESTAMP WHERE id = $1
+                       RETURNING id, username, email, password_hash, avatar_url, email_verified_at, auth_revision, created_at as "created_at!""#,
                     user_id,
                     claimed.new_email,
                 )
@@ -595,7 +733,7 @@ impl AccountChangePersistence for PostgresPersistence {
                 let updated = sqlx::query_as!(
                     UserDb,
                     r#"UPDATE users SET password_hash = $2 WHERE id = $1
-                       RETURNING id, username, email, password_hash, avatar_url, created_at as "created_at!""#,
+                       RETURNING id, username, email, password_hash, avatar_url, email_verified_at, auth_revision, created_at as "created_at!""#,
                     user_id,
                     claimed.new_password_hash,
                 )
@@ -615,6 +753,7 @@ impl AccountChangePersistence for PostgresPersistence {
             }
         };
 
+        auth_attempts::clear_code_attempt(&mut transaction, attempt_key).await?;
         transaction.commit().await.map_err(AppError::from)?;
         Ok(updated.map(Into::into))
     }
@@ -676,8 +815,18 @@ mod tests {
     //! real database.
 
     use super::*;
-    use crate::adapters::persistence::test_support::test_pool;
-    use crate::use_cases::user::{AccountChangePersistence, UserCredentialsHasher};
+    use crate::adapters::persistence::test_support::own_database;
+    use crate::use_cases::user::{
+        AccountChangePersistence, UserCredentialsHasher, auth_attempt_key,
+    };
+
+    fn code_key(id: Uuid, kind: AccountChangeKind) -> AuthAttemptKey {
+        auth_attempt_key(
+            "test-attempt-secret",
+            "account-change-code:v1",
+            &[id.as_bytes(), kind.as_str().as_bytes()],
+        )
+    }
 
     async fn account(persistence: &PostgresPersistence) -> User {
         let username = format!("pending_{}", Uuid::new_v4().simple());
@@ -692,10 +841,433 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_confirmed_code_moves_the_address_and_cannot_be_spent_twice() {
-        let Some(pool) = test_pool().await else {
+    async fn security_email_identity_proof_round_trips_and_stays_with_current_address() {
+        let Some(database) = own_database().await else {
             return;
         };
+        let persistence = PostgresPersistence::new(database.pool.clone());
+        let user = account(&persistence).await;
+        assert!(
+            user.email_verified_at.is_none(),
+            "generic creation is unverified"
+        );
+        assert!(
+            persistence
+                .get_by_id(user.id)
+                .await
+                .unwrap()
+                .unwrap()
+                .email_verified_at
+                .is_none()
+        );
+
+        let provider_email =
+            EmailAddress::from(format!("oauth-{}@example.com", Uuid::new_v4().simple()));
+        let subject = format!("subject-{}", Uuid::new_v4().simple());
+        let identity = ExternalIdentity {
+            provider: LoginMethod::Google,
+            subject: &subject,
+            email: &provider_email,
+            email_verified: true,
+            display_name: None,
+        };
+        let external = persistence.create_external_user(identity).await.unwrap();
+        assert!(external.email_verified_at.is_some());
+        assert!(
+            persistence
+                .get_by_email(provider_email.as_str())
+                .await
+                .unwrap()
+                .unwrap()
+                .email_verified_at
+                .is_some()
+        );
+
+        let renamed = persistence
+            .update_profile(
+                external.id,
+                ProfileUpdate {
+                    username: "renamed",
+                    email: &provider_email,
+                    avatar_url: None,
+                },
+            )
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(renamed.email_verified_at, external.email_verified_at);
+
+        let new_email = EmailAddress::from(format!("new-{}@example.com", Uuid::new_v4().simple()));
+        let changed = persistence
+            .update_profile(
+                external.id,
+                ProfileUpdate {
+                    username: "renamed",
+                    email: &new_email,
+                    avatar_url: None,
+                },
+            )
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(
+            changed.email_verified_at.is_none(),
+            "old-address proof cannot verify a new address"
+        );
+        let old_claim = persistence
+            .login_external_identity(identity)
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(
+            old_claim.email_verified_at.is_none(),
+            "old provider email cannot refresh the marker"
+        );
+        assert!(matches!(
+            persistence
+                .login_external_identity(ExternalIdentity {
+                    email_verified: false,
+                    email: &new_email,
+                    ..identity
+                })
+                .await,
+            Err(AppError::BadRequest(_))
+        ));
+        let new_claim = persistence
+            .login_external_identity(ExternalIdentity {
+                email: &new_email,
+                ..identity
+            })
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(new_claim.email_verified_at.is_some());
+        assert_eq!(
+            persistence
+                .get_by_id(external.id)
+                .await
+                .unwrap()
+                .unwrap()
+                .email_verified_at,
+            new_claim.email_verified_at
+        );
+    }
+
+    #[tokio::test]
+    async fn security_email_identity_registration_code_installs_proof_once() {
+        let Some(database) = own_database().await else {
+            return;
+        };
+        let persistence = PostgresPersistence::new(database.pool.clone());
+        let email =
+            EmailAddress::from(format!("confirmed-{}@example.com", Uuid::new_v4().simple()));
+        let key = auth_attempt_key(
+            "test-attempt-secret",
+            "registration-code:v1",
+            &[email.as_str().as_bytes()],
+        );
+        persistence
+            .save_pending_registration(PendingRegistration {
+                username: "confirmed",
+                email: &email,
+                password_hash: "hash",
+                confirmation_code_hash: "exact-code-hash",
+                expires_at: in_fifteen_minutes(),
+            })
+            .await
+            .unwrap();
+        assert!(
+            persistence
+                .confirm_pending_registration(&email, "wrong-code-hash", &key)
+                .await
+                .unwrap()
+                .is_none()
+        );
+        let confirmed = persistence
+            .confirm_pending_registration(&email, "exact-code-hash", &key)
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(confirmed.email_verified_at.is_some());
+        assert_eq!(
+            persistence
+                .get_by_id(confirmed.id)
+                .await
+                .unwrap()
+                .unwrap()
+                .email_verified_at,
+            confirmed.email_verified_at
+        );
+        assert!(
+            persistence
+                .confirm_pending_registration(&email, "exact-code-hash", &key)
+                .await
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[tokio::test]
+    async fn security_email_identity_link_proof_is_atomic_and_idempotent() {
+        let Some(database) = own_database().await else {
+            return;
+        };
+        let persistence = std::sync::Arc::new(PostgresPersistence::new(database.pool.clone()));
+        let user = account(&persistence).await;
+        let email = EmailAddress::from(user.email.as_str());
+        let subject = format!("linked-{}", Uuid::new_v4().simple());
+        let identity = ExternalIdentity {
+            provider: LoginMethod::Google,
+            subject: &subject,
+            email: &email,
+            email_verified: true,
+            display_name: None,
+        };
+        assert!(matches!(
+            persistence
+                .link_external_identity(
+                    user.id,
+                    ExternalIdentity {
+                        email_verified: false,
+                        ..identity
+                    }
+                )
+                .await,
+            Err(AppError::BadRequest(_))
+        ));
+        assert!(
+            !persistence
+                .has_login_method(user.id, LoginMethod::Google)
+                .await
+                .unwrap()
+        );
+
+        persistence
+            .link_external_identity(user.id, identity)
+            .await
+            .unwrap();
+        let marked = persistence.get_by_id(user.id).await.unwrap().unwrap();
+        assert!(marked.email_verified_at.is_some());
+        let use_cases = crate::use_cases::user::UserUseCases::new(
+            std::sync::Arc::new(crate::infra::argon2_password_hasher()),
+            persistence.clone(),
+            "test-attempt-secret",
+        );
+        let repeated = use_cases.link_external(user.id, identity).await.unwrap();
+        assert_eq!(repeated.email_verified_at, marked.email_verified_at);
+
+        let new_email =
+            EmailAddress::from(format!("changed-{}@example.com", Uuid::new_v4().simple()));
+        persistence
+            .update_profile(
+                user.id,
+                ProfileUpdate {
+                    username: &user.username,
+                    email: &new_email,
+                    avatar_url: None,
+                },
+            )
+            .await
+            .unwrap();
+        let apple_subject = format!("apple-{}", Uuid::new_v4().simple());
+        let stale = ExternalIdentity {
+            provider: LoginMethod::Apple,
+            subject: &apple_subject,
+            ..identity
+        };
+        assert!(matches!(
+            persistence.link_external_identity(user.id, stale).await,
+            Err(AppError::Conflict(_))
+        ));
+        assert!(
+            !persistence
+                .has_login_method(user.id, LoginMethod::Apple)
+                .await
+                .unwrap()
+        );
+        assert!(
+            persistence
+                .get_by_id(user.id)
+                .await
+                .unwrap()
+                .unwrap()
+                .email_verified_at
+                .is_none()
+        );
+    }
+
+    #[tokio::test]
+    async fn security_email_identity_competing_claimants_verify_only_the_winner() {
+        let Some(database) = own_database().await else {
+            return;
+        };
+        let persistence = std::sync::Arc::new(PostgresPersistence::new(database.pool.clone()));
+        let first = account(&persistence).await;
+        let second = account(&persistence).await;
+        let destination =
+            EmailAddress::from(format!("contended-{}@example.com", Uuid::new_v4().simple()));
+        for user in [&first, &second] {
+            persistence
+                .save_pending_account_change(PendingAccountChange {
+                    user_id: user.id,
+                    change: AccountChange::Email(&destination),
+                    confirmation_code_hash: "shared-code-hash",
+                    expires_at: in_fifteen_minutes(),
+                })
+                .await
+                .unwrap();
+        }
+        let first_key = code_key(first.id, AccountChangeKind::Email);
+        let second_key = code_key(second.id, AccountChangeKind::Email);
+        let (one, two) = tokio::join!(
+            persistence.confirm_pending_account_change(
+                first.id,
+                AccountChangeKind::Email,
+                "shared-code-hash",
+                &first_key
+            ),
+            persistence.confirm_pending_account_change(
+                second.id,
+                AccountChangeKind::Email,
+                "shared-code-hash",
+                &second_key
+            ),
+        );
+        let winners = [one, two]
+            .into_iter()
+            .filter(|result| matches!(result, Ok(Some(_))))
+            .count();
+        assert_eq!(winners, 1);
+        let first_after = persistence.get_by_id(first.id).await.unwrap().unwrap();
+        let second_after = persistence.get_by_id(second.id).await.unwrap().unwrap();
+        assert_eq!(
+            [
+                first_after.email_verified_at,
+                second_after.email_verified_at
+            ]
+            .into_iter()
+            .filter(Option::is_some)
+            .count(),
+            1
+        );
+        assert_eq!(
+            [first_after.email, second_after.email]
+                .into_iter()
+                .filter(|email| email == destination.as_str())
+                .count(),
+            1
+        );
+    }
+
+    #[tokio::test]
+    async fn security_email_identity_bypassed_address_claim_is_atomic_under_contention() {
+        let Some(database) = own_database().await else {
+            return;
+        };
+        let persistence = std::sync::Arc::new(PostgresPersistence::new(database.pool.clone()));
+        let first = account(&persistence).await;
+        let second = account(&persistence).await;
+        sqlx::query("UPDATE users SET email_verified_at = CURRENT_TIMESTAMP WHERE id = ANY($1)")
+            .bind(vec![first.id, second.id])
+            .execute(&database.pool)
+            .await
+            .unwrap();
+        let destination =
+            EmailAddress::from(format!("bypass-{}@example.com", Uuid::new_v4().simple()));
+        let (one, two) = tokio::join!(
+            persistence.update_profile(
+                first.id,
+                ProfileUpdate {
+                    username: &first.username,
+                    email: &destination,
+                    avatar_url: None,
+                }
+            ),
+            persistence.update_profile(
+                second.id,
+                ProfileUpdate {
+                    username: &second.username,
+                    email: &destination,
+                    avatar_url: None,
+                }
+            ),
+        );
+        assert_eq!(
+            [&one, &two]
+                .into_iter()
+                .filter(|result| result.is_ok())
+                .count(),
+            1
+        );
+        let first_after = persistence.get_by_id(first.id).await.unwrap().unwrap();
+        let second_after = persistence.get_by_id(second.id).await.unwrap().unwrap();
+        let claimants = [&first_after, &second_after];
+        assert_eq!(
+            claimants
+                .iter()
+                .filter(|user| user.email == destination.as_str())
+                .count(),
+            1
+        );
+        for user in claimants {
+            assert_eq!(
+                user.email_verified_at.is_some(),
+                user.email != destination.as_str(),
+                "only the account retaining its proved address may retain proof"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn security_email_identity_display_save_cannot_restore_address_confirmed_after_read() {
+        let Some(database) = own_database().await else {
+            return;
+        };
+        let persistence = PostgresPersistence::new(database.pool.clone());
+        let user = account(&persistence).await;
+        let observed = persistence.get_by_id(user.id).await.unwrap().unwrap();
+        assert_eq!(observed.email, user.email);
+
+        let destination = EmailAddress::from(format!(
+            "concurrent-{}@example.com",
+            Uuid::new_v4().simple()
+        ));
+        persistence
+            .save_pending_account_change(PendingAccountChange {
+                user_id: user.id,
+                change: AccountChange::Email(&destination),
+                confirmation_code_hash: "right-code",
+                expires_at: in_fifteen_minutes(),
+            })
+            .await
+            .unwrap();
+        let key = code_key(user.id, AccountChangeKind::Email);
+        let confirmed = persistence
+            .confirm_pending_account_change(user.id, AccountChangeKind::Email, "right-code", &key)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(confirmed.email, destination.as_str());
+        assert!(confirmed.email_verified_at.is_some());
+
+        // This is the display write that follows the stale profile read. It never supplies the
+        // observed address to SQL, so a confirmed address and its proof survive the interleaving.
+        let saved = persistence
+            .update_profile_display(user.id, "renamed", None)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(saved.username, "renamed");
+        assert_eq!(saved.email, destination.as_str());
+        assert_eq!(saved.email_verified_at, confirmed.email_verified_at);
+    }
+
+    #[tokio::test]
+    async fn a_confirmed_code_moves_the_address_and_cannot_be_spent_twice() {
+        let Some(database) = own_database().await else {
+            return;
+        };
+        let pool = database.pool.clone();
         let persistence = std::sync::Arc::new(PostgresPersistence::new(pool));
         let user = account(&persistence).await;
         let moved_to = EmailAddress::from(format!("moved_{}@example.com", Uuid::new_v4().simple()));
@@ -728,7 +1300,12 @@ mod tests {
         );
 
         let confirmed = persistence
-            .confirm_pending_account_change(user.id, AccountChangeKind::Email, "hash-of-123456")
+            .confirm_pending_account_change(
+                user.id,
+                AccountChangeKind::Email,
+                "hash-of-123456",
+                &code_key(user.id, AccountChangeKind::Email),
+            )
             .await
             .expect("a confirmation")
             .expect("the updated account");
@@ -737,7 +1314,12 @@ mod tests {
         // The delete is what claims the request, so the same code cannot be replayed.
         assert!(
             persistence
-                .confirm_pending_account_change(user.id, AccountChangeKind::Email, "hash-of-123456")
+                .confirm_pending_account_change(
+                    user.id,
+                    AccountChangeKind::Email,
+                    "hash-of-123456",
+                    &code_key(user.id, AccountChangeKind::Email)
+                )
                 .await
                 .expect("a second attempt")
                 .is_none()
@@ -746,9 +1328,10 @@ mod tests {
 
     #[tokio::test]
     async fn a_wrong_or_expired_code_changes_nothing() {
-        let Some(pool) = test_pool().await else {
+        let Some(database) = own_database().await else {
             return;
         };
+        let pool = database.pool.clone();
         let persistence = PostgresPersistence::new(pool);
         let user = account(&persistence).await;
 
@@ -767,7 +1350,8 @@ mod tests {
                 .confirm_pending_account_change(
                     user.id,
                     AccountChangeKind::Password,
-                    "hash-of-000000"
+                    "hash-of-000000",
+                    &code_key(user.id, AccountChangeKind::Password),
                 )
                 .await
                 .expect("a wrong code")
@@ -790,7 +1374,8 @@ mod tests {
                 .confirm_pending_account_change(
                     user.id,
                     AccountChangeKind::Password,
-                    "hash-of-123456"
+                    "hash-of-123456",
+                    &code_key(user.id, AccountChangeKind::Password),
                 )
                 .await
                 .expect("an expired code")
@@ -817,9 +1402,10 @@ mod tests {
 
     #[tokio::test]
     async fn each_kind_gets_one_request_and_a_second_ask_replaces_it() {
-        let Some(pool) = test_pool().await else {
+        let Some(database) = own_database().await else {
             return;
         };
+        let pool = database.pool.clone();
         let persistence = PostgresPersistence::new(pool);
         let user = account(&persistence).await;
         let first = EmailAddress::from(format!("first_{}@example.com", Uuid::new_v4().simple()));
@@ -860,7 +1446,12 @@ mod tests {
         // ...and the code the first ask mailed out is dead.
         assert!(
             persistence
-                .confirm_pending_account_change(user.id, AccountChangeKind::Email, "hash-of-111111")
+                .confirm_pending_account_change(
+                    user.id,
+                    AccountChangeKind::Email,
+                    "hash-of-111111",
+                    &code_key(user.id, AccountChangeKind::Email)
+                )
                 .await
                 .expect("the superseded code")
                 .is_none()
@@ -881,9 +1472,10 @@ mod tests {
 
     #[tokio::test]
     async fn an_address_taken_since_the_code_was_mailed_refuses_the_confirmation() {
-        let Some(pool) = test_pool().await else {
+        let Some(database) = own_database().await else {
             return;
         };
+        let pool = database.pool.clone();
         let persistence = PostgresPersistence::new(pool);
         let mover = account(&persistence).await;
         let squatter = account(&persistence).await;
@@ -899,7 +1491,12 @@ mod tests {
             .expect("a stored request");
 
         let refused = persistence
-            .confirm_pending_account_change(mover.id, AccountChangeKind::Email, "hash-of-123456")
+            .confirm_pending_account_change(
+                mover.id,
+                AccountChangeKind::Email,
+                "hash-of-123456",
+                &code_key(mover.id, AccountChangeKind::Email),
+            )
             .await;
         assert!(
             matches!(refused, Err(AppError::BadRequest(ref message)) if message.contains(&squatter.email)),
@@ -920,9 +1517,10 @@ mod tests {
 
     #[tokio::test]
     async fn notification_preferences_default_and_round_trip_every_email_family() {
-        let Some(pool) = test_pool().await else {
+        let Some(database) = own_database().await else {
             return;
         };
+        let pool = database.pool.clone();
         let persistence = PostgresPersistence::new(pool);
         let user = account(&persistence).await;
         assert_eq!(
@@ -960,9 +1558,10 @@ mod tests {
 
     #[tokio::test]
     async fn accounts_only_receive_the_login_method_they_registered() {
-        let Some(pool) = test_pool().await else {
+        let Some(database) = own_database().await else {
             return;
         };
+        let pool = database.pool.clone();
         let persistence = std::sync::Arc::new(PostgresPersistence::new(pool));
         let suffix = Uuid::new_v4().simple().to_string();
         let password_user = persistence
@@ -993,6 +1592,7 @@ mod tests {
                 provider: LoginMethod::Google,
                 subject: &google_subject,
                 email: &google_email,
+                email_verified: true,
                 display_name: Some("Google Person"),
             })
             .await
@@ -1029,25 +1629,40 @@ mod tests {
         let use_cases = crate::use_cases::user::UserUseCases::new(
             std::sync::Arc::new(crate::infra::argon2_password_hasher()),
             persistence.clone(),
+            "test-attempt-secret",
         );
         assert!(matches!(
             use_cases
                 .login(
                     &google_user.email,
-                    &secrecy::SecretString::from("irrelevant-password")
+                    &secrecy::SecretString::from("irrelevant-password"),
+                    None,
+                    None,
                 )
                 .await,
             Err(AppError::InvalidCredentials)
         ));
         assert!(matches!(
             use_cases
-                .login_external(LoginMethod::Google, "some-other-google-subject")
+                .login_external(ExternalIdentity {
+                    provider: LoginMethod::Google,
+                    subject: "some-other-google-subject",
+                    email: &google_email,
+                    email_verified: true,
+                    display_name: None,
+                })
                 .await,
             Err(AppError::InvalidCredentials)
         ));
         assert_eq!(
             use_cases
-                .login_external(LoginMethod::Google, &google_subject)
+                .login_external(ExternalIdentity {
+                    provider: LoginMethod::Google,
+                    subject: &google_subject,
+                    email: &google_email,
+                    email_verified: true,
+                    display_name: None,
+                })
                 .await
                 .expect("registered Google login")
                 .id,
@@ -1071,7 +1686,12 @@ mod tests {
         );
         assert_eq!(
             use_cases
-                .login(&google_user.email, &secrecy::SecretString::from(password))
+                .login(
+                    &google_user.email,
+                    &secrecy::SecretString::from(password),
+                    None,
+                    None,
+                )
                 .await
                 .expect("added password login")
                 .id,
@@ -1087,6 +1707,7 @@ mod tests {
                     provider: LoginMethod::Google,
                     subject: &linked_subject,
                     email: &password_email,
+                    email_verified: true,
                     display_name: None,
                 },
             )
@@ -1094,7 +1715,13 @@ mod tests {
             .expect("link Google to password account");
         assert_eq!(
             use_cases
-                .login_external(LoginMethod::Google, &linked_subject)
+                .login_external(ExternalIdentity {
+                    provider: LoginMethod::Google,
+                    subject: &linked_subject,
+                    email: &password_email,
+                    email_verified: true,
+                    display_name: None,
+                })
                 .await
                 .expect("linked Google login")
                 .id,
@@ -1108,6 +1735,7 @@ mod tests {
                 provider: LoginMethod::Apple,
                 subject: &apple_subject,
                 email: &apple_email,
+                email_verified: true,
                 display_name: Some("Apple Person"),
             })
             .await
@@ -1120,7 +1748,13 @@ mod tests {
         );
         assert_eq!(
             use_cases
-                .login_external(LoginMethod::Apple, &apple_subject)
+                .login_external(ExternalIdentity {
+                    provider: LoginMethod::Apple,
+                    subject: &apple_subject,
+                    email: &apple_email,
+                    email_verified: true,
+                    display_name: None,
+                })
                 .await
                 .expect("Apple login")
                 .id,

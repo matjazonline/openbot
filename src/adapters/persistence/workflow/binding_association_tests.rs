@@ -2,6 +2,139 @@ use super::binding_tests::*;
 use super::*;
 use crate::application::use_cases::channel::{ChannelPersistence, ChannelWrite};
 use crate::application::use_cases::participant::PrincipalAccessPersistence;
+use crate::application::workflow::{LifecycleAuthorizer, WorkflowAuthorization, WorkflowOperation};
+
+#[tokio::test]
+async fn security_email_identity_workflow_channel_and_thread_need_current_address_proof() {
+    let f = BindingFixture::new(serde_json::json!([])).await;
+    let p = &f.fixture.persistence;
+    let company = f.target.company;
+    let owner = f.target.actor;
+    let admin_email = format!("admin-{}@example.test", Uuid::new_v4().simple());
+    let admin = p
+        .create_user(
+            &format!("admin_{}", Uuid::new_v4().simple()),
+            &admin_email,
+            "hash",
+        )
+        .await
+        .unwrap();
+    sqlx::query(
+        "INSERT INTO company_members (id, company_id, user_id, role) VALUES ($1, $2, $3, 'admin')",
+    )
+    .bind(Uuid::new_v4())
+    .bind(company.as_uuid())
+    .bind(admin.id)
+    .execute(p.pool())
+    .await
+    .unwrap();
+    let principal_id = Uuid::new_v4();
+    sqlx::query("INSERT INTO principals (id, company_id, kind, user_id, display_label) VALUES ($1, $2, 'person', $3, 'Admin')")
+        .bind(principal_id).bind(company.as_uuid()).bind(admin.id)
+        .execute(p.pool()).await.unwrap();
+    let channel = ChannelPersistence::create(
+        p,
+        company.as_uuid(),
+        ChannelWrite {
+            name: "Restricted".into(),
+            slug: "restricted".into(),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+    sqlx::query("UPDATE channels SET access_mode = 'allowlist' WHERE id = $1")
+        .bind(channel.id)
+        .execute(p.pool())
+        .await
+        .unwrap();
+    sqlx::query("INSERT INTO channel_principal_grants (company_id, channel_id, principal_id, capability, provenance) VALUES ($1, $2, $3, 'view', 'configured_allowlist')")
+        .bind(company.as_uuid()).bind(channel.id).bind(principal_id)
+        .execute(p.pool()).await.unwrap();
+    let thread_id = Uuid::new_v4();
+    sqlx::query(
+        "INSERT INTO threads (id, company_id, channel_id, subject) VALUES ($1, $2, $3, 'Subject')",
+    )
+    .bind(thread_id)
+    .bind(company.as_uuid())
+    .bind(channel.id)
+    .execute(p.pool())
+    .await
+    .unwrap();
+    let actor = WorkflowActor::authenticated(admin.id).unwrap();
+    let channel_association = RelatedAssociation::Channel(RelatedChannelId::new(channel.id));
+    let thread_association = RelatedAssociation::Thread {
+        channel_id: RelatedChannelId::new(channel.id),
+        thread_id: RelatedThreadId::new(thread_id),
+    };
+    let authorizer = LifecycleAuthorizer::new(p.clone(), p.clone(), p.clone());
+
+    sqlx::query("UPDATE users SET email_verified_at = CURRENT_TIMESTAMP WHERE id = $1")
+        .bind(admin.id)
+        .execute(p.pool())
+        .await
+        .unwrap();
+    for association in [channel_association, thread_association] {
+        authorizer
+            .authorize(company, actor, association, WorkflowOperation::Inspect)
+            .await
+            .unwrap();
+    }
+
+    // A bypassed address change clears proof on the same account. A reused session still has the
+    // same user id, but both the preflight and transactional association checks must now deny it.
+    sqlx::query("UPDATE users SET email_verified_at = NULL WHERE id = $1")
+        .bind(admin.id)
+        .execute(p.pool())
+        .await
+        .unwrap();
+    let context = p
+        .access_context_for_user(company.as_uuid(), admin.id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        context.membership,
+        crate::entities::company_member::CompanyMembership::Admin
+    );
+    assert!(context.principal_id.is_some());
+    assert_eq!(
+        context.grant_authority,
+        crate::entities::participant::PrincipalGrantAuthority::WithheldUnverifiedEmail
+    );
+    for association in [channel_association, thread_association] {
+        assert!(matches!(
+            authorizer
+                .authorize(company, actor, association, WorkflowOperation::Inspect)
+                .await,
+            Err(AppError::NotFound(_))
+        ));
+        let mut tx = p.pool().begin().await.unwrap();
+        assert!(matches!(
+            association::authorize_association(&mut tx, company, actor, association).await,
+            Err(AppError::NotFound(_))
+        ));
+        tx.rollback().await.unwrap();
+    }
+    authorizer
+        .authorize(
+            company,
+            actor,
+            RelatedAssociation::Company,
+            WorkflowOperation::Inspect,
+        )
+        .await
+        .unwrap();
+    authorizer
+        .authorize(
+            company,
+            owner,
+            channel_association,
+            WorkflowOperation::Inspect,
+        )
+        .await
+        .unwrap();
+}
 
 #[tokio::test]
 async fn workflow_binding_sql_association_matches_domain_visibility_and_management() {
@@ -11,6 +144,11 @@ async fn workflow_binding_sql_association_matches_domain_visibility_and_manageme
         .await
         .unwrap();
     let user = p.get_by_email("admin@example.test").await.unwrap().unwrap();
+    sqlx::query("UPDATE users SET email_verified_at = CURRENT_TIMESTAMP WHERE id = $1")
+        .bind(user.id)
+        .execute(p.pool())
+        .await
+        .unwrap();
     let principal = Uuid::new_v4();
     sqlx::query(
         "INSERT INTO company_members (id, company_id, user_id, role) VALUES ($1, $2, $3, 'admin')",
@@ -172,6 +310,11 @@ async fn workflow_binding_sql_grant_revocation_thread_scope_and_fixed_associatio
         .unwrap();
     sqlx::query("UPDATE company_members SET role = 'admin' WHERE company_id = $1 AND user_id = $2")
         .bind(f.target.company.as_uuid())
+        .bind(f.target.actor.user_id())
+        .execute(p.pool())
+        .await
+        .unwrap();
+    sqlx::query("UPDATE users SET email_verified_at = CURRENT_TIMESTAMP WHERE id = $1")
         .bind(f.target.actor.user_id())
         .execute(p.pool())
         .await

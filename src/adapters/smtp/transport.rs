@@ -46,6 +46,11 @@ pub struct LettreMailTransport {
 }
 
 impl LettreMailTransport {
+    /// Whether startup constructed an outbound SMTP client for confirmation codes.
+    pub fn is_configured(&self) -> bool {
+        self.inner.is_some()
+    }
+
     pub async fn from_config(
         config: &AppConfig,
         allow_plaintext_local: bool,
@@ -223,6 +228,34 @@ mod tests {
                 .unwrap();
             assert!(transport.inner.is_some());
         }
+    }
+
+    #[tokio::test]
+    async fn security_email_identity_transport_availability_matches_built_client() {
+        let config = AppConfig::for_test();
+        assert!(
+            !LettreMailTransport::from_config(&config, false)
+                .await
+                .unwrap()
+                .is_configured()
+        );
+        assert!(
+            LettreMailTransport::from_config(&config, true)
+                .await
+                .unwrap()
+                .is_configured()
+        );
+
+        let remote = AppConfig {
+            smtp_host: "smtp.example.com".into(),
+            ..AppConfig::for_test()
+        };
+        assert!(
+            LettreMailTransport::from_config(&remote, false)
+                .await
+                .unwrap()
+                .is_configured()
+        );
     }
 
     #[tokio::test]

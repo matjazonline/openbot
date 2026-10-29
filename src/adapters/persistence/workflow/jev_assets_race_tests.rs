@@ -105,6 +105,62 @@ async fn blocked_by(pool: &sqlx::PgPool, blocker: i32) -> i32 {
         }
     }).await.expect("competing operation must be blocked by the held authority lock")
 }
+async fn verify_actor_email(f: &Fixture) {
+    sqlx::query("UPDATE users SET email_verified_at = CURRENT_TIMESTAMP WHERE id = $1")
+        .bind(f.target.actor.user_id())
+        .execute(f.persistence.pool())
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn jev_assets_allowlist_grant_requires_current_verified_email() {
+    use crate::{
+        entities::value_objects::EmailAddress,
+        use_cases::user::{ProfileUpdate, UserPersistence},
+    };
+    let f = fixture().await;
+    let attachment = attachment(&f, &images::png(280, 280)).await;
+    let claim = image_claim(&f, &attachment).await;
+    restrict_to_view_grant(&f, &attachment).await;
+    assert!(matches!(
+        f.persistence.locate_jev_assets(&claim).await,
+        Err(AppError::NotFound(_))
+    ));
+    verify_actor_email(&f).await;
+    assert_eq!(
+        f.persistence.locate_jev_assets(&claim).await.unwrap().len(),
+        1
+    );
+    let user = UserPersistence::get_by_id(&f.persistence, f.target.actor.user_id())
+        .await
+        .unwrap()
+        .unwrap();
+    let updated = f
+        .persistence
+        .update_profile(
+            user.id,
+            ProfileUpdate {
+                username: &user.username,
+                email: &EmailAddress::from("changed-image-reader@example.test"),
+                avatar_url: None,
+            },
+        )
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(updated.email_verified_at.is_none());
+    assert!(matches!(
+        f.persistence.locate_jev_assets(&claim).await,
+        Err(AppError::NotFound(_))
+    ));
+    assert_eq!(
+        calls(&f.persistence, &claim).await,
+        0,
+        "directory checks never enter the provider"
+    );
+}
+
 #[tokio::test]
 async fn jev_assets_final_authorization_holds_view_grant_across_connection_wait() {
     let f = fixture().await;
@@ -112,6 +168,7 @@ async fn jev_assets_final_authorization_holds_view_grant_across_connection_wait(
     let attachment = attachment(&f, &bytes).await;
     let claim = image_claim(&f, &attachment).await;
     let channel = restrict_to_view_grant(&f, &attachment).await;
+    verify_actor_email(&f).await;
     let storage = Arc::new(FakeStorage::new());
     storage
         .store_object(BucketKind::Private, &attachment.key, "image/png", bytes)
@@ -143,7 +200,10 @@ async fn jev_assets_final_authorization_holds_view_grant_across_connection_wait(
             .execute(&WorkflowStepKind("jev.evaluate".into()), &owned)
             .await
     });
-    entered.notified().await; // Admission finished; only final authorization is gated.
+    // Admission must reach this gate; an earlier refusal should fail instead of hanging forever.
+    tokio::time::timeout(Duration::from_secs(5), entered.notified())
+        .await
+        .expect("successful admission reaches final authorization");
     let mut connection_lock = f.persistence.pool().begin().await.unwrap();
     let holder: i32 = sqlx::query_scalar("SELECT pg_backend_pid()")
         .fetch_one(&mut *connection_lock)

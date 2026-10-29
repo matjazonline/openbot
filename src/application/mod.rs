@@ -5,6 +5,7 @@ pub mod model_providers;
 pub mod notification;
 pub mod run_counts;
 pub mod services;
+pub mod session;
 pub mod thread_activity;
 pub mod transport;
 pub mod use_cases;

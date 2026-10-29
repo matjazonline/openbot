@@ -23,7 +23,8 @@ use crate::{
         company_member::CompanyMembership,
         participant::{
             ChannelPrincipalGrant, GrantProvenance, IdentityProvenance, IdentityStatus, Principal,
-            PrincipalAccessContext, PrincipalCapability, PrincipalIdentity, PrincipalKind,
+            PrincipalAccessContext, PrincipalCapability, PrincipalGrantAuthority,
+            PrincipalIdentity, PrincipalKind,
         },
         transport::{ParticipantIdentityId, PrincipalId, QualifiedIdentity, TransportKind},
         value_objects::EmailAddress,
@@ -139,7 +140,7 @@ pub trait TeamFixture: Send + Sync {
 #[derive(Default)]
 struct DirectoryState {
     identities: HashMap<(Uuid, QualifiedIdentity), PrincipalIdentity>,
-    users: HashMap<(Uuid, Uuid), PrincipalId>,
+    users: HashMap<(Uuid, Uuid), (PrincipalId, bool)>,
 }
 
 /// An `IdentityDirectory` + `PrincipalAccessPersistence` backed by a `HashMap`.
@@ -179,8 +180,21 @@ impl InMemoryParticipantDirectory {
             .lock()
             .unwrap()
             .users
-            .insert((company_id, user_id), principal_id);
+            .insert((company_id, user_id), (principal_id, true));
         self
+    }
+
+    /// Model a later address installation that cleared proof while preserving team membership.
+    pub fn revoke_user_email_proof(&self, company_id: Uuid, user_id: Uuid) {
+        if let Some((_, verified)) = self
+            .state
+            .lock()
+            .unwrap()
+            .users
+            .get_mut(&(company_id, user_id))
+        {
+            *verified = false;
+        }
     }
 
     /// Number of identities actually observed by a write. Policy tests use this to prove a
@@ -305,6 +319,7 @@ impl PrincipalAccessPersistence for InMemoryParticipantDirectory {
             return Ok(PrincipalAccessContext {
                 principal_id: None,
                 membership: CompanyMembership::None,
+                grant_authority: PrincipalGrantAuthority::Available,
             });
         }
         // Test fixtures state ACL principals and team membership without running the database
@@ -318,6 +333,7 @@ impl PrincipalAccessPersistence for InMemoryParticipantDirectory {
                     .unwrap_or_else(|| principal_for_identity(company_id, identity)),
             ),
             membership: self.membership_for_subject(company_id, identity).await?,
+            grant_authority: PrincipalGrantAuthority::Available,
         })
     }
 
@@ -326,14 +342,14 @@ impl PrincipalAccessPersistence for InMemoryParticipantDirectory {
         company_id: Uuid,
         user_id: Uuid,
     ) -> AppResult<Option<PrincipalAccessContext>> {
-        let principal_id = self
+        let principal = self
             .state
             .lock()
             .unwrap()
             .users
             .get(&(company_id, user_id))
             .copied();
-        let Some(principal_id) = principal_id else {
+        let Some((principal_id, verified)) = principal else {
             return Ok(None);
         };
         let membership = match &self.team {
@@ -347,6 +363,11 @@ impl PrincipalAccessPersistence for InMemoryParticipantDirectory {
         Ok(Some(PrincipalAccessContext {
             principal_id: Some(principal_id),
             membership,
+            grant_authority: if verified {
+                PrincipalGrantAuthority::Available
+            } else {
+                PrincipalGrantAuthority::WithheldUnverifiedEmail
+            },
         }))
     }
 }

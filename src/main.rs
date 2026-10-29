@@ -148,15 +148,9 @@ const NO_BACKWARD_COMPATIBILITY_NOTES: &[&str] = &[
     "AGENTS.md",
     "src/adapters/persistence/AGENTS.md",
     "plan/agent-response-setting.md",
-    "plan/fix-authentication-attempt-limits/01-admission-and-hashing-bounds.md",
-    "plan/fix-authentication-attempt-limits/02-atomic-attempt-budgets.md",
-    "plan/fix-authentication-attempt-limits/03-route-integration-and-release.md",
     "plan/db_improve/05-deferred-until-traffic.md",
     "plan/db_improve/improve-key-credentials.md",
     "plan/db_improve/kanban_denormalized_rollup_table_optimization.md",
-    "plan/fix-email-identity-verification/01-verified-email-contract.md",
-    "plan/fix-email-identity-verification/02-registration-and-address-changes.md",
-    "plan/fix-email-identity-verification/03-authorization-and-release.md",
     "plan/hindsight_remaining_work.md",
     "plan/hydradb/01-preserve-memory-scope-isolation.md",
     "plan/hydradb/06-make-memory-ingestion-durable.md",
@@ -171,12 +165,6 @@ const NO_BACKWARD_COMPATIBILITY_NOTES: &[&str] = &[
     "plan/message-confirmation-ideas/outreach-target-allowlist.md",
     "plan/opencode_microvm_sandbox_plan.md",
     "plan/outreach_allowlist_plan.md",
-    "plan/fix-request-trace-redaction/01-sensitive-route-inventory.md",
-    "plan/fix-request-trace-redaction/02-central-span-and-handler-audit.md",
-    "plan/fix-request-trace-redaction/03-log-verification-and-release.md",
-    "plan/fix-session-revocation/01-session-store-and-token-contract.md",
-    "plan/fix-session-revocation/02-issuance-validation-and-revocation.md",
-    "plan/fix-session-revocation/03-security-change-and-release.md",
     "plan/shodh_memory_provider.md",
     "plan/slack-integration/README.md",
     "plan/standard-operating-procedures/README.md",
@@ -188,9 +176,6 @@ const NO_BACKWARD_COMPATIBILITY_NOTES: &[&str] = &[
     "plan/standard-operating-procedures/06-debriefs-and-improvement-backlog.md",
     "plan/standard-operating-procedures/07-controlled-improvement-experiments.md",
     "plan/standard-operating-procedures/08-integration-verification-and-release.md",
-    "plan/fix-team-autocomplete-html-injection/01-rendering-contract-and-server-alerts.md",
-    "plan/fix-team-autocomplete-html-injection/02-team-autocomplete-dom.md",
-    "plan/fix-team-autocomplete-html-injection/03-browser-regression-and-release.md",
     "plan/tenant-owned-execution-backends.md",
     "plan/workflow-library/README.md",
     "plan/workflow-library/01-architecture-and-scope.md",
@@ -235,6 +220,12 @@ async fn serve() -> anyhow::Result<()> {
     let runtime_sampler =
         RuntimeMetricSampler::new(app_state.runtime_metrics.clone(), runtime_source);
     let mut runtime_sampler_handle = tokio::spawn(runtime_sampler.run(shutdown_rx.resubscribe()));
+    let mut session_cleanup_handle = tokio::spawn(
+        app_state
+            .sessions
+            .clone()
+            .run_cleanup(shutdown_rx.resubscribe()),
+    );
 
     let mut inbound_event_worker_handle =
         tokio::spawn(inbound_event_worker.run(shutdown_rx.resubscribe()));
@@ -278,9 +269,12 @@ async fn serve() -> anyhow::Result<()> {
 
     // Serve axum app with graceful shutdown listener
     let mut draining = shutdown_tx.subscribe();
-    let server = axum::serve(listener, app)
-        .with_graceful_shutdown(shutdown_signal(shutdown_tx.clone()))
-        .into_future();
+    let server = axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+    )
+    .with_graceful_shutdown(shutdown_signal(shutdown_tx.clone()))
+    .into_future();
     tokio::pin!(server);
 
     tokio::select! {
@@ -314,6 +308,7 @@ async fn serve() -> anyhow::Result<()> {
     let mut mailbox_listener_handle = mailbox_listener_handle;
     tokio::join!(
         join_background("runtime metric sampler", &mut runtime_sampler_handle),
+        join_background("session cleanup", &mut session_cleanup_handle),
         join_background("inbound event worker", &mut inbound_event_worker_handle),
         join_background("notification projector", &mut notification_worker_handle),
         join_background("delivery worker", &mut delivery_worker_handle),

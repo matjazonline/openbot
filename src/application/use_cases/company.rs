@@ -319,7 +319,7 @@ impl CompanyUseCases {
         managed_company(self.persistence.as_ref(), user_id, company_id).await
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     pub async fn create_company(
         &self,
         user_id: Uuid,
@@ -327,14 +327,11 @@ impl CompanyUseCases {
     ) -> AppResult<Company> {
         write.normalize()?;
 
-        info!(
-            "Creating company: {} ({}) for user {}",
-            write.name, write.slug, user_id
-        );
+        info!(%user_id, "Creating company");
         self.persistence.create(user_id, write).await
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     pub async fn list_user_companies(&self, user_id: Uuid) -> AppResult<Vec<Company>> {
         self.persistence.list_by_user_id(user_id).await
     }
@@ -343,13 +340,13 @@ impl CompanyUseCases {
     ///
     /// What the mailbox scopes by, where an invited member belongs. Administration pages apply a
     /// narrower owner-or-admin filter with [`CompanyUseCases::list_managed_companies`].
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     pub async fn list_accessible_companies(&self, user_id: Uuid) -> AppResult<Vec<CompanyAccess>> {
         self.persistence.list_accessible_by_user_id(user_id).await
     }
 
     /// Companies whose operational workspaces and automation the caller may manage.
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     pub async fn list_managed_companies(&self, user_id: Uuid) -> AppResult<Vec<Company>> {
         Ok(self
             .persistence
@@ -362,7 +359,7 @@ impl CompanyUseCases {
     }
 
     /// What a user is to one company: its owner, an invited member, or nothing.
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     pub async fn company_access(
         &self,
         user_id: Uuid,
@@ -371,25 +368,25 @@ impl CompanyUseCases {
         self.persistence.company_access(user_id, company_id).await
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     pub async fn get_company(&self, id: Uuid) -> AppResult<Option<Company>> {
         self.persistence.get_by_id(id).await
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     pub async fn get_company_by_slug(&self, slug: &str) -> AppResult<Option<Company>> {
         self.persistence.get_by_slug(slug.trim()).await
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     pub async fn update_company(&self, id: Uuid, mut write: CompanyWrite) -> AppResult<Company> {
         write.normalize()?;
 
-        info!("Updating company {}: {} ({})", id, write.name, write.slug);
+        info!(company_id = %id, "Updating company");
         self.persistence.update(id, write).await
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     pub async fn delete_company(&self, id: Uuid) -> AppResult<()> {
         info!("Deleting company {}", id);
         self.persistence.delete(id).await

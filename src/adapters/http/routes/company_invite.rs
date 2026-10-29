@@ -104,7 +104,7 @@ pub struct TeamMembersResponse {
 }
 
 /// GET /companies/{company_id}/invites - Full HTML page for company invites & team management.
-#[instrument(skip(company_use_cases, invite_use_cases, user))]
+#[instrument(skip_all)]
 async fn company_invites_page(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(invite_use_cases): State<Arc<CompanyInviteUseCases>>,
@@ -137,7 +137,7 @@ async fn company_invites_page(
 }
 
 /// POST /companies/{company_id}/invites - Create email invite (HTMX).
-#[instrument(skip(invite_use_cases, user, form))]
+#[instrument(skip_all)]
 async fn create_company_invite(
     State(invite_use_cases): State<Arc<CompanyInviteUseCases>>,
     user: AuthenticatedUser,
@@ -176,7 +176,7 @@ async fn create_company_invite(
 }
 
 /// GET /companies/{company_id}/invites/{invite_id}/edit - Edit form fragment.
-#[instrument(skip(invite_use_cases, user))]
+#[instrument(skip_all)]
 async fn edit_invite_form(
     State(invite_use_cases): State<Arc<CompanyInviteUseCases>>,
     user: AuthenticatedUser,
@@ -193,7 +193,7 @@ async fn edit_invite_form(
 }
 
 /// GET /companies/{company_id}/invites/{invite_id}/cancel - Cancel edit fragment.
-#[instrument(skip(invite_use_cases, user))]
+#[instrument(skip_all)]
 async fn cancel_invite_edit(
     State(invite_use_cases): State<Arc<CompanyInviteUseCases>>,
     user: AuthenticatedUser,
@@ -210,7 +210,7 @@ async fn cancel_invite_edit(
 }
 
 /// PUT /companies/{company_id}/invites/{invite_id} - Update invite email (HTMX).
-#[instrument(skip(invite_use_cases, user, form))]
+#[instrument(skip_all)]
 async fn update_company_invite(
     State(invite_use_cases): State<Arc<CompanyInviteUseCases>>,
     user: AuthenticatedUser,
@@ -227,7 +227,7 @@ async fn update_company_invite(
 }
 
 /// PUT /companies/{company_id}/team/{user_id} - Update member access role (HTMX).
-#[instrument(skip(invite_use_cases, user, form))]
+#[instrument(skip_all)]
 async fn update_team_member_role(
     State(invite_use_cases): State<Arc<CompanyInviteUseCases>>,
     user: AuthenticatedUser,
@@ -246,7 +246,7 @@ async fn update_team_member_role(
 }
 
 /// DELETE /companies/{company_id}/invites/{invite_id} - Delete invite (HTMX).
-#[instrument(skip(invite_use_cases, user))]
+#[instrument(skip_all)]
 async fn delete_company_invite(
     State(invite_use_cases): State<Arc<CompanyInviteUseCases>>,
     user: AuthenticatedUser,
@@ -259,7 +259,7 @@ async fn delete_company_invite(
 }
 
 /// DELETE /companies/{company_id}/team/{user_id} - Remove member from company team (HTMX).
-#[instrument(skip(invite_use_cases, user))]
+#[instrument(skip_all)]
 async fn remove_team_member(
     State(invite_use_cases): State<Arc<CompanyInviteUseCases>>,
     user: AuthenticatedUser,
@@ -277,7 +277,7 @@ async fn remove_team_member(
 }
 
 /// GET /invites - Page listing user's invites.
-#[instrument(skip(user_use_cases, invite_use_cases, user))]
+#[instrument(skip_all)]
 async fn user_invites_page(
     State(user_use_cases): State<Arc<UserUseCases>>,
     State(invite_use_cases): State<Arc<CompanyInviteUseCases>>,
@@ -288,16 +288,16 @@ async fn user_invites_page(
         _ => return Html(pages::error_alert("User not found.")).into_response(),
     };
 
-    let invites = invite_use_cases
-        .list_user_invites(&active_user.email)
-        .await
-        .unwrap_or_default();
+    let invites = match invite_use_cases.list_user_invites(&active_user).await {
+        Ok(invites) => invites,
+        Err(error) => return Html(pages::error_alert(&error.to_string())).into_response(),
+    };
 
     Html(pages::user_invites_page(&active_user.email, &invites)).into_response()
 }
 
 /// POST /invites/{invite_id}/accept - Accept invite (HTMX).
-#[instrument(skip(user_use_cases, invite_use_cases, user))]
+#[instrument(skip_all)]
 async fn accept_user_invite(
     State(user_use_cases): State<Arc<UserUseCases>>,
     State(invite_use_cases): State<Arc<CompanyInviteUseCases>>,
@@ -319,7 +319,7 @@ async fn accept_user_invite(
 }
 
 /// POST /invites/{invite_id}/decline - Decline invite (HTMX).
-#[instrument(skip(user_use_cases, invite_use_cases, user))]
+#[instrument(skip_all)]
 async fn decline_user_invite(
     State(user_use_cases): State<Arc<UserUseCases>>,
     State(invite_use_cases): State<Arc<CompanyInviteUseCases>>,
@@ -463,9 +463,7 @@ async fn list_user_invites_json(
         .await?
         .ok_or_else(|| crate::app_error::AppError::Internal("User not found.".into()))?;
 
-    let invites = invite_use_cases
-        .list_user_invites(&active_user.email)
-        .await?;
+    let invites = invite_use_cases.list_user_invites(&active_user).await?;
     Ok((StatusCode::OK, Json(invites)))
 }
 

@@ -279,7 +279,7 @@ pub struct ChannelsPageQuery {
 }
 
 /// GET /companies/{company_id}/channels - Full HTML page listing channels (Protected).
-#[instrument(skip(company_use_cases, channel_use_cases, config, user))]
+#[instrument(skip_all)]
 async fn list_channels_page(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
@@ -311,7 +311,7 @@ async fn list_channels_page(
 }
 
 /// POST /companies/{company_id}/channels - HTMX create channel (Protected).
-#[instrument(skip(company_use_cases, channel_use_cases, config, user, form))]
+#[instrument(skip_all)]
 async fn create_channel_handler(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
@@ -391,7 +391,7 @@ impl ChannelListView<'_> {
 }
 
 /// GET /companies/{company_id}/channels/{id}/edit - HTMX edit channel form fragment (Protected).
-#[instrument(skip(company_use_cases, channel_use_cases, config, user))]
+#[instrument(skip_all)]
 async fn edit_channel_form(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
@@ -420,7 +420,7 @@ async fn edit_channel_form(
 }
 
 /// GET /companies/{company_id}/channels/{id}/cancel - Cancel channel edit fragment (Protected).
-#[instrument(skip(company_use_cases, channel_use_cases, config, user))]
+#[instrument(skip_all)]
 async fn cancel_channel_edit(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
@@ -448,7 +448,7 @@ async fn cancel_channel_edit(
 }
 
 /// PUT /companies/{company_id}/channels/{id} - HTMX update channel (Protected).
-#[instrument(skip(company_use_cases, channel_use_cases, config, user, form))]
+#[instrument(skip_all)]
 async fn update_channel_handler(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
@@ -507,7 +507,7 @@ async fn update_channel_handler(
 }
 
 /// DELETE /companies/{company_id}/channels/{id} - HTMX delete channel (Protected).
-#[instrument(skip(channel_use_cases, user))]
+#[instrument(skip_all)]
 async fn delete_channel_handler(
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
     user: AuthenticatedUser,
@@ -541,15 +541,7 @@ pub struct OpenThreadParams {
 }
 
 /// GET /companies/{company_id}/channels/{id}/simulate - Simulation page (Protected).
-#[instrument(skip(
-    user_use_cases,
-    company_use_cases,
-    channel_use_cases,
-    thread_use_cases,
-    outcome_reader,
-    config,
-    user
-))]
+#[instrument(skip_all)]
 #[expect(
     clippy::too_many_arguments,
     reason = "Axum handlers receive request state and extractors as parameters"
@@ -706,16 +698,7 @@ fn simulation_thread_url(company_id: Uuid, channel_id: Uuid, thread_id: Uuid) ->
 }
 
 /// POST /companies/{company_id}/channels/{id}/simulate - Submit simulation form (Protected).
-#[instrument(skip(
-    company_use_cases,
-    channel_use_cases,
-    thread_use_cases,
-    outcome_reader,
-    user_use_cases,
-    config,
-    user,
-    form
-))]
+#[instrument(skip_all)]
 #[expect(
     clippy::too_many_arguments,
     reason = "Axum handlers receive request state and extractors as parameters"
@@ -903,14 +886,7 @@ async fn simulate_channel_handler(
 /// is queued like every other message, so the page starts out showing only what was sent and fills
 /// in from here. Every commit or status change on the thread re-renders the view whole: this is a
 /// debugging page, and re-reading it in full is simpler and more honest than patching it in pieces.
-#[instrument(skip(
-    company_use_cases,
-    channel_use_cases,
-    thread_use_cases,
-    outcome_reader,
-    events,
-    user
-))]
+#[instrument(skip_all)]
 #[expect(
     clippy::too_many_arguments,
     reason = "Axum handlers receive request state and extractors as parameters"
@@ -1127,14 +1103,7 @@ async fn open_simulated_thread_logic(
     }
 }
 
-#[instrument(skip(
-    company_use_cases,
-    channel_use_cases,
-    thread_use_cases,
-    outcome_reader,
-    config,
-    user
-))]
+#[instrument(skip_all)]
 #[expect(
     clippy::too_many_arguments,
     reason = "Axum handlers receive request state and extractors as parameters"
@@ -1166,14 +1135,7 @@ async fn open_simulated_thread_get(
     .await
 }
 
-#[instrument(skip(
-    company_use_cases,
-    channel_use_cases,
-    thread_use_cases,
-    outcome_reader,
-    config,
-    user
-))]
+#[instrument(skip_all)]
 #[expect(
     clippy::too_many_arguments,
     reason = "Axum handlers receive request state and extractors as parameters"

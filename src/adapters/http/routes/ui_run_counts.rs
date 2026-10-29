@@ -121,8 +121,8 @@ async fn run_counts_stream(
                         yield Ok(event);
                     }
                 }
-                Err(error) => {
-                    tracing::warn!(%error, %company_id, "Run counts stream query failed");
+                Err(_) => {
+                    tracing::warn!(%company_id, "Run counts stream query failed");
                     break;
                 }
             }

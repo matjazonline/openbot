@@ -250,7 +250,7 @@ pub(super) async fn agent_write_from_instructions(
 }
 
 /// GET /companies/{company_id}/agents - Full HTML page listing agents (Protected).
-#[instrument(skip(company_use_cases, agent_use_cases, user))]
+#[instrument(skip_all)]
 async fn list_agents_page(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(agent_use_cases): State<Arc<AgentUseCases>>,
@@ -271,7 +271,7 @@ async fn list_agents_page(
 }
 
 /// POST /companies/{company_id}/agents - HTMX create agent (Protected).
-#[instrument(skip(company_use_cases, agent_use_cases, user, form))]
+#[instrument(skip_all)]
 async fn create_agent_handler(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(agent_use_cases): State<Arc<AgentUseCases>>,
@@ -347,7 +347,7 @@ async fn create_agent_handler(
 }
 
 /// GET /companies/{company_id}/agents/{id}/edit - HTMX edit agent form fragment (Protected).
-#[instrument(skip(company_use_cases, agent_use_cases, user))]
+#[instrument(skip_all)]
 async fn edit_agent_form(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(agent_use_cases): State<Arc<AgentUseCases>>,
@@ -370,7 +370,7 @@ async fn edit_agent_form(
 }
 
 /// GET /companies/{company_id}/agents/{id}/cancel - Cancel agent edit fragment (Protected).
-#[instrument(skip(company_use_cases, agent_use_cases, user))]
+#[instrument(skip_all)]
 async fn cancel_agent_edit(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(agent_use_cases): State<Arc<AgentUseCases>>,
@@ -393,7 +393,7 @@ async fn cancel_agent_edit(
 }
 
 /// PUT /companies/{company_id}/agents/{id} - HTMX update agent (Protected).
-#[instrument(skip(company_use_cases, agent_use_cases, user, form))]
+#[instrument(skip_all)]
 async fn update_agent_handler(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(agent_use_cases): State<Arc<AgentUseCases>>,
@@ -442,7 +442,7 @@ async fn update_agent_handler(
 }
 
 /// DELETE /companies/{company_id}/agents/{id} - HTMX delete agent (Protected).
-#[instrument(skip(agent_use_cases, user))]
+#[instrument(skip_all)]
 async fn delete_agent_handler(
     State(agent_use_cases): State<Arc<AgentUseCases>>,
     user: AuthenticatedUser,
@@ -627,7 +627,7 @@ pub struct GeneratePromptJsonResponse {
     pub system_prompt: String,
 }
 
-#[instrument(skip(agent_use_cases, user, form))]
+#[instrument(skip_all)]
 pub async fn generate_agent_prompt_handler(
     State(agent_use_cases): State<Arc<AgentUseCases>>,
     user: AuthenticatedUser,
@@ -695,7 +695,7 @@ pub async fn generate_agent_prompt_handler(
     }
 }
 
-#[instrument(skip(agent_use_cases, user, payload))]
+#[instrument(skip_all)]
 pub async fn generate_agent_prompt_json(
     State(agent_use_cases): State<Arc<AgentUseCases>>,
     user: AuthenticatedUser,

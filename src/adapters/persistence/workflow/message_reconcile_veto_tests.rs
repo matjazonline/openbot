@@ -282,6 +282,12 @@ async fn workflow_message_reconcile_wrong_association_actor_is_refused() {
         .await
         .unwrap();
     let admin = member(&setup.fixture, "admin").await;
+    // Isolate channel-grant authorization from the separate current-email proof guard.
+    sqlx::query("UPDATE users SET email_verified_at = CURRENT_TIMESTAMP WHERE id = $1")
+        .bind(admin)
+        .execute(setup.pool())
+        .await
+        .unwrap();
     let actor = WorkflowActor::authenticated(admin).unwrap();
     let note = || EvidenceInput::UnknownNote {
         note: "checked elsewhere".into(),

@@ -4,7 +4,10 @@ use axum::extract::FromRef;
 use sqlx::PgPool;
 
 use crate::{
-    adapters::{http::session::SessionAuthority, storage::FileStorage},
+    adapters::{
+        http::{auth_admission::AuthAdmission, session::SessionAuthority},
+        storage::FileStorage,
+    },
     application::{attention::AttentionPersistence, notification::NotificationPersistence},
     domain::monitoring::MonitoringService,
     entities::runtime_metrics::MachineIdentity,
@@ -33,6 +36,7 @@ use crate::{
 
 #[derive(Clone)]
 pub struct AppState {
+    pub auth_admission: Arc<AuthAdmission>,
     /// The production workflow engine: services for the workflow routes, loops for `serve`.
     pub workflow: Arc<crate::infra::workflow::WorkflowEngine>,
     pub model_usage: Arc<dyn crate::services::model_usage::ModelUsageStore>,

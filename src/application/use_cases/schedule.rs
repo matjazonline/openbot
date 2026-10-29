@@ -228,7 +228,7 @@ impl ScheduleUseCases {
     }
 
     /// The bindings a schedule on `channel_id` may name, or on any channel this caller can see.
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     pub async fn binding_choices(
         &self,
         user_id: Uuid,
@@ -284,16 +284,13 @@ impl ScheduleUseCases {
             .authorize(user_id, company_id, Some(channel_id))
             .await?;
         Self::validate_write(&write)?;
-        info!(
-            "Creating schedule '{}' (type={}) for channel {} in company {}",
-            write.name, write.schedule_type, channel_id, company_id
-        );
+        info!(%channel_id, %company_id, schedule_type = %write.schedule_type, "Creating schedule");
         self.persistence
             .create(actor, company, channel_id, write)
             .await
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     pub async fn get_schedule(
         &self,
         user_id: Uuid,
@@ -307,7 +304,7 @@ impl ScheduleUseCases {
         }
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     pub async fn list_channel_schedules(
         &self,
         user_id: Uuid,
@@ -321,7 +318,7 @@ impl ScheduleUseCases {
     }
 
     /// Every schedule on a channel this caller can see.
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     pub async fn list_company_schedules(
         &self,
         user_id: Uuid,
@@ -337,7 +334,7 @@ impl ScheduleUseCases {
             .collect())
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     pub async fn update_schedule(
         &self,
         user_id: Uuid,
@@ -353,16 +350,13 @@ impl ScheduleUseCases {
             ));
         }
         Self::validate_write(&write)?;
-        info!(
-            "Updating schedule {} for company {}: {}",
-            id, company_id, write.name
-        );
+        info!(schedule_id = %id, %company_id, "Updating schedule");
         self.persistence
             .update(actor, company, id, channel_id, write)
             .await
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     pub async fn delete_schedule(
         &self,
         user_id: Uuid,
@@ -374,7 +368,7 @@ impl ScheduleUseCases {
         self.persistence.delete(actor, company, id).await
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     pub async fn toggle_schedule(
         &self,
         user_id: Uuid,
@@ -388,7 +382,7 @@ impl ScheduleUseCases {
             .await
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     pub async fn list_schedule_runs(
         &self,
         user_id: Uuid,
@@ -406,7 +400,7 @@ impl ScheduleUseCases {
     /// Run the schedule now (p08 D1.9): capture one occurrence for `command_key` and materialize
     /// it through the materializer's own path. A repeated key returns the same occurrence and
     /// run. An occurrence that could not be admitted yet stays for the materializer's retry.
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     pub async fn trigger_schedule_now(
         &self,
         user_id: Uuid,
@@ -420,10 +414,7 @@ impl ScheduleUseCases {
             ));
         }
         let (actor, company, schedule) = self.managed_schedule(user_id, scope, id).await?;
-        info!(
-            "Manually triggering schedule '{}' ({})",
-            schedule.name, schedule.id
-        );
+        info!(schedule_id = %schedule.id, "Manually triggering schedule");
         let occurrence = self
             .persistence
             .capture_now(actor, company, id, command_key)
@@ -433,8 +424,8 @@ impl ScheduleUseCases {
             Ok(Some(outcome)) => {
                 warn!(occurrence_id = %occurrence, ?outcome, "A run-now occurrence was not admitted")
             }
-            Err(error) => {
-                warn!(occurrence_id = %occurrence, error = %error,
+            Err(_) => {
+                warn!(occurrence_id = %occurrence,
                     "A run-now occurrence is left for the schedule materializer")
             }
         }

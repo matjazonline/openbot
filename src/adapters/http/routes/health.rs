@@ -23,8 +23,8 @@ pub fn router() -> Router<AppState> {
 async fn health(State(db): State<PgPool>) -> Json<Value> {
     let database = match tokio::time::timeout(DB_PROBE_TIMEOUT, probe_db(&db)).await {
         Ok(Ok(())) => "up",
-        Ok(Err(err)) => {
-            tracing::warn!("health check database probe failed: {err}");
+        Ok(Err(_)) => {
+            tracing::warn!("health check database probe failed");
             "down"
         }
         Err(_) => {

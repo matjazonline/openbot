@@ -542,6 +542,7 @@ async fn members_read_agents_and_admins_manage_them() {
     let viewer = |user_id: Uuid, email: &str| Viewer {
         user_id,
         email: EmailAddress::from(email),
+        email_verified_at: Some(chrono::Utc::now()),
     };
 
     // The member reads it, exactly as the owner does.

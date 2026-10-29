@@ -1,4 +1,7 @@
-use std::sync::Arc;
+use std::{
+    io::Write,
+    sync::{Arc, Mutex},
+};
 
 use super::*;
 use crate::{
@@ -229,6 +232,64 @@ async fn a_transient_provider_failure_asks_again_and_a_definite_one_does_not() {
             panic!("a failed retrieve must not produce a mail");
         };
         assert_eq!(failure.retry, expect_retry, "for {error:?}");
+    }
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn security_trace_redaction_provider_refusal_keeps_class_without_signed_url() {
+    struct Capture(Arc<Mutex<Vec<u8>>>);
+    impl Write for Capture {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            self.0.lock().unwrap().extend_from_slice(bytes);
+            Ok(bytes.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    let output = Arc::new(Mutex::new(Vec::new()));
+    let subscriber = tracing_subscriber::fmt()
+        .with_ansi(false)
+        .with_max_level(tracing::Level::WARN)
+        .with_writer({
+            let output = output.clone();
+            move || Capture(output.clone())
+        })
+        .finish();
+    let _guard = tracing::subscriber::set_default(subscriber);
+
+    let signed_url = "https://inbound-cdn.resend.com/raw?token=cdn-url-marker";
+    let mut email = received_email();
+    email.raw.as_mut().unwrap().download_url = signed_url.to_string();
+    let provider_error = ResendApiError::Refused {
+        status: 403,
+        detail: format!("response-body-marker: {signed_url}"),
+    };
+    let api = FakeResendApi::new()
+        .retrieving(Ok(email))
+        .with_raw(Err(provider_error));
+    let event = received_event();
+    let failure = read(api, &config(), &event).await.unwrap_err();
+    assert_eq!(failure.class, InboundEventErrorClass::Routing);
+    assert!(!failure.retry);
+
+    let log = String::from_utf8(output.lock().unwrap().clone()).unwrap();
+    for kept in [
+        event.correlation_id.to_string(),
+        "resend_api".to_string(),
+        "download a received mail".to_string(),
+        "routing".to_string(),
+        "403".to_string(),
+    ] {
+        assert!(log.contains(&kept), "missing {kept}: {log}");
+    }
+    for marker in ["cdn-url-marker", "response-body-marker"] {
+        assert!(!log.contains(marker), "{marker} leaked into log: {log}");
+        assert!(
+            !failure.detail.contains(marker),
+            "{marker} retained in detail"
+        );
     }
 }
 

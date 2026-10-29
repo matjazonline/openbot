@@ -59,13 +59,7 @@ pub struct AttachmentQuery {
 }
 
 /// GET /ui/threads/{thread_id}/attachments/{sha256} - One attachment of one thread (Protected).
-#[instrument(skip(
-    company_use_cases,
-    channel_use_cases,
-    thread_use_cases,
-    storage,
-    viewer
-))]
+#[instrument(skip_all)]
 async fn download_attachment(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(channel_use_cases): State<Arc<ChannelUseCases>>,

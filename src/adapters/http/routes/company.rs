@@ -77,7 +77,7 @@ pub struct CompanyResponse {
 }
 
 /// GET /companies - Full HTML page listing all user companies (Protected).
-#[instrument(skip(company_use_cases, user))]
+#[instrument(skip_all)]
 async fn list_companies(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     user: AuthenticatedUser,
@@ -91,7 +91,7 @@ async fn list_companies(
 }
 
 /// POST /companies - HTMX create company form submission (Protected).
-#[instrument(skip(company_use_cases, user, form))]
+#[instrument(skip_all)]
 async fn create_company(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     user: AuthenticatedUser,
@@ -126,7 +126,7 @@ async fn create_company(
 }
 
 /// GET /companies/{id}/edit - Returns inline edit form fragment (Protected).
-#[instrument(skip(company_use_cases, _user))]
+#[instrument(skip_all)]
 async fn edit_company_form(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     _user: AuthenticatedUser,
@@ -142,7 +142,7 @@ async fn edit_company_form(
 }
 
 /// GET /companies/{id}/cancel - Cancels edit and returns single row fragment (Protected).
-#[instrument(skip(company_use_cases, _user))]
+#[instrument(skip_all)]
 async fn cancel_company_edit(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     _user: AuthenticatedUser,
@@ -158,7 +158,7 @@ async fn cancel_company_edit(
 }
 
 /// PUT /companies/{id} - Handles HTMX company update form submission (Protected).
-#[instrument(skip(company_use_cases, _user, form))]
+#[instrument(skip_all)]
 async fn update_company(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     _user: AuthenticatedUser,
@@ -181,7 +181,7 @@ async fn update_company(
 }
 
 /// DELETE /companies/{id} - Handles HTMX company deletion (Protected).
-#[instrument(skip(company_use_cases, _user))]
+#[instrument(skip_all)]
 async fn delete_company(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     _user: AuthenticatedUser,

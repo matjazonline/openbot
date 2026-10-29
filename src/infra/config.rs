@@ -3,7 +3,13 @@ use std::{env, time::Duration as StdDuration};
 use p256::{ecdsa::VerifyingKey, pkcs8::DecodePublicKey};
 use time::Duration;
 
-use crate::{adapters::http::session::MIN_SECRET_BYTES, entities::value_objects::EmailAddress};
+use crate::{
+    adapters::http::session::MIN_SECRET_BYTES,
+    entities::{
+        user::{User, VerifiedEmail},
+        value_objects::EmailAddress,
+    },
+};
 
 /// Stack size for the async runtime's worker and blocking threads.
 ///
@@ -38,6 +44,23 @@ fn parse_runtime_thread_stack_bytes(value: Option<&str>) -> usize {
 
 pub fn smtp_allow_plaintext_local_from_env() -> bool {
     parse_smtp_allow_plaintext_local(env::var("SMTP_ALLOW_PLAINTEXT_LOCAL").ok().as_deref())
+}
+
+/// Explicitly permit public password accounts with an unverified address when no outbound SMTP
+/// confirmation transport was built at startup.
+pub fn allow_unverified_email_without_smtp_from_env() -> bool {
+    parse_allow_unverified_email_without_smtp(
+        env::var("ALLOW_UNVERIFIED_EMAIL_WITHOUT_SMTP")
+            .ok()
+            .as_deref(),
+    )
+}
+
+fn parse_allow_unverified_email_without_smtp(value: Option<&str>) -> bool {
+    value
+        .unwrap_or("false")
+        .parse::<bool>()
+        .expect("ALLOW_UNVERIFIED_EMAIL_WITHOUT_SMTP must be true or false")
 }
 
 fn parse_smtp_allow_plaintext_local(value: Option<&str>) -> bool {
@@ -356,15 +379,6 @@ fn non_empty_var(name: &str) -> Option<String> {
 }
 
 impl AppConfig {
-    /// Whether registration must prove ownership of the supplied email address.
-    /// Local SMTP defaults deliberately do not turn this on.
-    pub fn email_confirmation_enabled(&self) -> bool {
-        !self.smtp_host.trim().is_empty()
-            && !is_loopback_host(&self.smtp_host)
-            && !self.smtp_from_address.trim().is_empty()
-            && self.smtp_from_address != "noreply@localhost"
-    }
-
     /// The absolute origin this deployment is reached at, e.g. `https://example.com`.
     ///
     /// For the values that have to be *given* to somebody outside the browser -- a webhook URL
@@ -385,10 +399,13 @@ impl AppConfig {
     }
 
     /// Is this the address of a system operator, and so entitled to the cross-company rollup?
-    pub fn is_operator(&self, email: &EmailAddress) -> bool {
+    pub fn is_operator(&self, user: &User) -> bool {
+        let Some(email) = VerifiedEmail::from_user(user) else {
+            return false;
+        };
         self.operator_emails
             .iter()
-            .any(|operator| operator.eq_ignore_case(email))
+            .any(|operator| operator.eq_ignore_case(email.as_address()))
     }
 
     pub fn from_env() -> Self {
@@ -407,6 +424,11 @@ impl AppConfig {
             .unwrap_or("30".to_string())
             .parse()
             .expect("REFRESH_TOKEN_TTL_DAYS must be a valid number");
+
+        assert!(
+            (1..=365).contains(&refresh_token_ttl_days),
+            "REFRESH_TOKEN_TTL_DAYS must be between 1 and 365"
+        );
 
         let app_domain_name =
             env::var("APP_DOMAIN_NAME").unwrap_or_else(|_| "localhost".to_string());
@@ -636,6 +658,19 @@ mod tests {
     fn smtp_plaintext_local_is_an_explicit_opt_in() {
         assert!(!parse_smtp_allow_plaintext_local(None));
         assert!(parse_smtp_allow_plaintext_local(Some("true")));
+    }
+
+    #[test]
+    fn security_email_identity_smtp_bypass_is_explicit_and_strict() {
+        assert!(!parse_allow_unverified_email_without_smtp(None));
+        assert!(!parse_allow_unverified_email_without_smtp(Some("false")));
+        assert!(parse_allow_unverified_email_without_smtp(Some("true")));
+    }
+
+    #[test]
+    #[should_panic(expected = "ALLOW_UNVERIFIED_EMAIL_WITHOUT_SMTP must be true or false")]
+    fn security_email_identity_smtp_bypass_rejects_invalid_value() {
+        parse_allow_unverified_email_without_smtp(Some("sometimes"));
     }
 
     #[test]
