@@ -259,7 +259,7 @@ impl AttemptStats {
 /// How many outstanding workflow jobs the dashboard lists.
 ///
 /// Enough to cover a normal bad morning, short enough that the panel stays a summary rather than
-/// becoming a second task monitor with none of its filtering.
+/// becoming a second run list with none of its filtering.
 pub const OUTSTANDING_LIMIT: i64 = 20;
 
 /// One task the dashboard can hand you a link to.
@@ -385,7 +385,7 @@ pub struct DashboardSnapshot {
     pub retry_rate: Vec<RetryRateBucket>,
     pub queue_depth: Vec<QueueDepthBucket>,
     pub attempts: AttemptStats,
-    /// Capped at [`OUTSTANDING_LIMIT`]; the page links to the task monitor for the rest.
+    /// Capped at [`OUTSTANDING_LIMIT`]; the page says when the cap bites.
     pub outstanding: Vec<OutstandingTask>,
 }
 

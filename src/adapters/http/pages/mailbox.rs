@@ -859,7 +859,7 @@ function closeLiveStreams() {
     });
 }
 // Run after document-level handlers so HTMX and cancelled clicks retain their streams.
-// Plain links (including task Board/List and detail links) need the same cleanup as the rail.
+// Plain links (list, detail and cross-workspace links) need the same cleanup as the rail.
 window.addEventListener('click', function (event) {
     var link = event.target.closest('a[href]');
     if (link) closeLiveStreamsForNavigation(event, link);

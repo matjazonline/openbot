@@ -1,14 +1,14 @@
 //! `/ui/deliveries` — the Deliveries workspace: every message the company has handed to a
 //! transport, and what became of it.
 //!
-//! The shell and the company scoping are shared with the Tasks workspace next door: chrome comes
+//! The shell and the company scoping are shared with the other `/ui` workspaces: chrome comes
 //! from [`crate::adapters::http::pages::ui_shell`] and the company from
 //! [`super::ui::load_managed_company`]. Which page of the queue a request means is one
 //! [`DeliveryFilter`], carried through every fragment so a click never lands the reader on a
 //! different list than the one they were looking at.
 //!
-//! Read-only by design: the delivery worker owns these rows, so the workspace links to the task
-//! that produced a message rather than offering buttons that would race the transport.
+//! Read-only by design: the delivery worker owns these rows, so the workspace offers no buttons
+//! that would race the transport.
 
 use std::sync::Arc;
 

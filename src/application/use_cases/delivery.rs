@@ -1,8 +1,8 @@
 //! Reading the delivery queue.
 //!
 //! Read-only, and deliberately so: the delivery worker owns these rows, and a page that offered
-//! buttons would be racing the transport. The port lives here because the `/ui` routes and the
-//! task board are what consume it; the SQLx projection that answers it is an adapter.
+//! buttons would be racing the transport. The port lives here because the `/ui` Deliveries routes
+//! are what consume it; the SQLx projection that answers it is an adapter.
 
 use async_trait::async_trait;
 use uuid::Uuid;

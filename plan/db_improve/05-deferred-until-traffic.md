@@ -1,5 +1,29 @@
 # Deferred Until There Is Traffic
 
+> **Status (2026-10-30): partly stale, not re-audited.** This file was written against the task
+> subsystem that `5d4aab1` (2026-10-25) removed when workflow runs replaced tasks. Treat its file,
+> line and table references as unverified until a section has been re-checked against the
+> workflow code. What is known to be out of date:
+>
+> - §1 — schedule-run listing moved from `src/adapters/persistence/schedule.rs` to `list_runs` in
+>   `src/adapters/persistence/workflow/schedules.rs`.
+> - §2 — `background_tasks` now holds only workflow step jobs (`queue_kind = 'workflow'`), and
+>   `background_tasks_company_updated_idx` was added for the deleted tasks Kanban. Init-schema line
+>   numbers here and elsewhere are out of date (that index is now near line 7465, not 712).
+> - §3 — two of the three pages are gone (the task list and the `email_outbox` page; the table no
+>   longer exists). The schedule-runs page moved as in §1. The keyset model `thread.rs` is now
+>   `src/adapters/persistence/thread/`.
+> - §5 and §8 — `task/operations.rs`, `task/queue.rs`, `task/claim_tests.rs` and
+>   `channel_assignment.rs` (with its tests) are deleted. The claim under discussion is now the
+>   workflow job claim.
+> - §6 — `task/release_tests.rs` is deleted; recount the unindexed foreign keys before relying on
+>   the figure.
+> - §7 — the `manual_handoffs` table no longer exists, so this section is obsolete.
+> - "Message-to-task correctness fix" describes the task-era pipeline.
+>
+> §4 (`task_attempts` still exists), the evidence tooling, and the collection and verification gaps
+> may still hold, but were not re-checked either.
+
 > **No backward compatibility.** We don't need backward compatibility and will reset the database
 > when needed. Do not add data backfills, dual reads/writes, legacy decoders, compatibility shims,
 > or staged rollouts for existing data.

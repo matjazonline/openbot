@@ -44,8 +44,8 @@ restyles every component that reads it, in one place — that is what `DARK_THEM
 
 Do not instead add `rounded-*`, `focus:ring-*`, or `border-*` utilities onto individual daisyUI
 fields. There are 40-odd fields across `agent_settings.rs`, `channel_settings.rs`,
-`company_settings.rs`, `team_settings.rs`, `task_monitor.rs`, `deliveries.rs` and `mailbox.rs`, and a
-per-field override is a rule that drifts out of sync with the other thirty-nine.
+`company_settings.rs`, `team_settings.rs`, `deliveries.rs` and `mailbox.rs`, and a per-field
+override is a rule that drifts out of sync with the other thirty-nine.
 
 Overriding `border-radius` directly on `.input` / `.select` is also wrong: daisyUI writes the four
 corners individually as `border-start-start-radius: var(--join-ss, var(--radius-field))` so that
