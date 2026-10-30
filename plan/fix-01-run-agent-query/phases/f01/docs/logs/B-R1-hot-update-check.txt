@@ -1,0 +1,24 @@
+== which workflow_runs indexes reference state (key or predicate)
+             index             
+-------------------------------
+ workflow_runs_attention
+ workflow_runs_open_by_channel
+(2 rows)
+
+== update 5 rows: revision only (no indexed column)
+ n_tup_upd | n_tup_hot_upd 
+-----------+---------------
+         5 |             5
+(1 row)
+
+== update 5 other rows: state queued -> running
+ n_tup_upd | n_tup_hot_upd 
+-----------+---------------
+        10 |             5
+(1 row)
+
+                                                           version                                                           
+-----------------------------------------------------------------------------------------------------------------------------
+ PostgreSQL 18.6 (Homebrew) on aarch64-apple-darwin24.6.0, compiled by Apple clang version 17.0.0 (clang-1700.6.4.2), 64-bit
+(1 row)
+

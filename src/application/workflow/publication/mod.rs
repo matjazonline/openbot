@@ -57,7 +57,8 @@ impl PublishedBundle {
 
     /// The distinct agents frozen in this bundle and in every child it pins (step children and
     /// workflow-tool pins), each child version visited once however many parents pin it. A
-    /// display index for "used by" (p09 gate P09-B1b-D1); nothing decides on it.
+    /// display index (p09 gate P09-B1b-D1) for "used by" and the run list's agent filter;
+    /// nothing decides or authorizes on it.
     pub fn frozen_agent_ids(&self) -> std::collections::BTreeSet<uuid::Uuid> {
         let mut agents = std::collections::BTreeSet::new();
         let mut visited = std::collections::BTreeSet::new();

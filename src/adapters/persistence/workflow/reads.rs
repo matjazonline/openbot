@@ -5,6 +5,8 @@ use super::*;
 use crate::application::workflow::reads::*;
 use chrono::{DateTime, Utc};
 use serde_json::Value;
+use sqlx::QueryBuilder;
+use std::time::{Duration, Instant};
 
 pub(super) fn revision_of(value: i64) -> AppResult<u64> {
     u64::try_from(value).map_err(|_| invalid())
@@ -150,6 +152,142 @@ fn run_summary(row: RunRow) -> AppResult<RunSummary> {
     })
 }
 
+/// The run list's statement: newest first, `limit` rows, after `cursor` when given. Synchronous so
+/// `dump_run_list_query_shapes` can hand `scripts/tests/run-list-query-plan.py` the shipped text.
+///
+/// With an agent, the versions that use it (their `agent_ids` display index, gate P09-B1b-D1) are
+/// read in the same statement, and each version's runs are one ordered range of
+/// `workflow_runs_version_newest` cut at `limit` before the ranges are merged. A page therefore
+/// reads at most `limit` runs per such version — never more than the agent's history, but all of
+/// it once its versions each hold no more runs than a page. A plain `version_id IN (...)` read and
+/// sorted the whole history on every page. Measurements, and the deferred run-to-agent link table
+/// that would read one page, are in `docs/performance/run-list.md`.
+fn run_list_query(
+    company: CompanyId,
+    filter: &RunFilter,
+    cursor: Option<(DateTime<Utc>, Uuid)>,
+    limit: i64,
+) -> QueryBuilder<'static, Postgres> {
+    let mut query = QueryBuilder::new("");
+    let Some(agent) = filter.agent else {
+        push_run_page(&mut query, company, None, filter, cursor, limit);
+        return query;
+    };
+    query
+        .push(format!(
+            "SELECT {RUN_COLUMNS} FROM (SELECT version.id AS used_version \
+             FROM workflow_versions AS version WHERE version.company_id = "
+        ))
+        .push_bind(company.as_uuid())
+        .push(" AND ")
+        .push_bind(agent)
+        .push(" = ANY(version.agent_ids)) AS agent_versions CROSS JOIN LATERAL (");
+    push_run_page(
+        &mut query,
+        company,
+        Some("agent_versions.used_version"),
+        filter,
+        cursor,
+        limit,
+    );
+    query
+        .push(") AS run ORDER BY created_at DESC, id DESC LIMIT ")
+        .push_bind(limit);
+    query
+}
+
+/// One newest-first page of the company's runs with the filters present — only those, because a
+/// generic plan over `$n IS NULL OR ...` would not use the `workflow_runs_newest` /
+/// `workflow_runs_binding_newest` keyset indexes. `version`, an outer column, narrows it to one
+/// version's range.
+fn push_run_page(
+    query: &mut QueryBuilder<'static, Postgres>,
+    company: CompanyId,
+    version: Option<&'static str>,
+    filter: &RunFilter,
+    cursor: Option<(DateTime<Utc>, Uuid)>,
+    limit: i64,
+) {
+    query
+        .push(format!(
+            "SELECT {RUN_COLUMNS} FROM workflow_runs WHERE company_id = "
+        ))
+        .push_bind(company.as_uuid());
+    if let Some(version) = version {
+        query.push(format!(" AND version_id = {version}"));
+    }
+    if let Some(binding) = filter.binding {
+        query
+            .push(" AND binding_id = ")
+            .push_bind(binding.as_uuid());
+    }
+    if let Some(state) = &filter.state {
+        query.push(" AND state = ").push_bind(state.clone());
+    }
+    if let Some((created, id)) = cursor {
+        query
+            .push(" AND (created_at, id) < (")
+            .push_bind(created)
+            .push(", ")
+            .push_bind(id)
+            .push(")");
+    }
+    query
+        .push(" ORDER BY created_at DESC, id DESC LIMIT ")
+        .push_bind(limit);
+}
+
+/// How long one run-list read may take before it is logged. The deleted task board's threshold
+/// (`BOARD_QUERY_WARN_THRESHOLD`); `docs/performance/run-list.md` says how to read the line.
+pub(crate) const RUN_LIST_QUERY_WARN_THRESHOLD: Duration = Duration::from_millis(500);
+
+/// Whether a read that took `elapsed` is past `threshold`.
+fn is_slow(elapsed: Duration, threshold: Duration) -> bool {
+    elapsed > threshold
+}
+
+/// The state filter as the slow-read log names it: one of the run states, `none`, or `other`. The
+/// JSON route passes the caller's text through unchecked, so it is never logged as given.
+fn logged_state(state: Option<&str>) -> &'static str {
+    match state {
+        None => "none",
+        Some("queued") => "queued",
+        Some("running") => "running",
+        Some("waiting") => "waiting",
+        Some("succeeded") => "succeeded",
+        Some("failed") => "failed",
+        Some("cancelled") => "cancelled",
+        Some(_) => "other",
+    }
+}
+
+/// Log a run-list read past [`RUN_LIST_QUERY_WARN_THRESHOLD`] with the shape that ran — which
+/// binding and agent filters were present (not their ids) and the state asked for — and
+/// `page_rows`, the rows the statement returned: `page_size` plus one look-ahead row when the
+/// page filled, fewer when it ran out of matches. That is the evidence for revisiting the index
+/// decision in `docs/performance/run-list.md`.
+fn warn_if_run_list_is_slow(
+    company: CompanyId,
+    filter: &RunFilter,
+    page_size: i64,
+    page_rows: usize,
+    elapsed: Duration,
+) {
+    if !is_slow(elapsed, RUN_LIST_QUERY_WARN_THRESHOLD) {
+        return;
+    }
+    tracing::warn!(
+        elapsed_ms = u64::try_from(elapsed.as_millis()).unwrap_or(u64::MAX),
+        company_id = %company.as_uuid(),
+        binding = filter.binding.is_some(),
+        state = logged_state(filter.state.as_deref()),
+        agent = filter.agent.is_some(),
+        page_size,
+        page_rows,
+        "Workflow run list is slow"
+    );
+}
+
 #[async_trait]
 impl WorkflowReads for PostgresPersistence {
     async fn list_definitions(
@@ -287,35 +425,13 @@ impl WorkflowReads for PostgresPersistence {
                 .ok_or_else(stale_cursor)?,
             ),
         };
-        // Only the filters present: a generic plan over `$n IS NULL OR ...` would not use the
-        // `workflow_runs_newest` / `workflow_runs_binding_newest` keyset indexes.
-        let mut query = sqlx::QueryBuilder::<Postgres>::new(format!(
-            "SELECT {RUN_COLUMNS} FROM workflow_runs WHERE company_id = "
-        ));
-        query.push_bind(company.as_uuid());
-        if let Some(binding) = filter.binding {
-            query
-                .push(" AND binding_id = ")
-                .push_bind(binding.as_uuid());
-        }
-        if let Some(state) = &filter.state {
-            query.push(" AND state = ").push_bind(state.clone());
-        }
-        if let Some((created, id)) = cursor {
-            query
-                .push(" AND (created_at, id) < (")
-                .push_bind(created)
-                .push(", ")
-                .push_bind(id)
-                .push(")");
-        }
-        query
-            .push(" ORDER BY created_at DESC, id DESC LIMIT ")
-            .push_bind(page.size + 1);
-        let rows = query
+        let started = Instant::now();
+        let rows = run_list_query(company, filter, cursor, page.size + 1)
             .build_query_as::<RunRow>()
             .fetch_all(self.pool())
-            .await?
+            .await?;
+        warn_if_run_list_is_slow(company, filter, page.size, rows.len(), started.elapsed());
+        let rows = rows
             .into_iter()
             .map(run_summary)
             .collect::<AppResult<Vec<_>>>()?;
@@ -535,3 +651,7 @@ impl PostgresPersistence {
         Ok((actions, truncated))
     }
 }
+
+#[cfg(test)]
+#[path = "reads_tests.rs"]
+mod tests;

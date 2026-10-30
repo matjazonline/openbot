@@ -5613,7 +5613,7 @@ CREATE TABLE public.workflow_versions (
 -- Name: COLUMN workflow_versions.agent_ids; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON COLUMN public.workflow_versions.agent_ids IS 'Display index only: the distinct agents frozen in this version''s bundle and its pinned children, written once with the row. No execution, admission or authorization path reads it.';
+COMMENT ON COLUMN public.workflow_versions.agent_ids IS 'Display index only: the distinct agents frozen in this version''s bundle and its pinned children, written once with the row. Read only by the Used-by listing and the run list''s agent filter; no execution, admission or authorization path reads it.';
 
 
 --
@@ -7316,6 +7316,9 @@ ALTER TABLE ONLY public.workflow_runs
 -- The run listings' keyset order, company-wide and by binding (p08 B3b-1).
 CREATE INDEX workflow_runs_newest ON public.workflow_runs(company_id, created_at DESC, id DESC);
 CREATE INDEX workflow_runs_binding_newest ON public.workflow_runs(company_id, binding_id, created_at DESC, id DESC);
+-- One version's runs in keyset order: the agent filter reads one range per version that uses the
+-- agent, cut at the page size (fix-01; evidence in docs/performance/run-list.md).
+CREATE INDEX workflow_runs_version_newest ON public.workflow_runs(company_id, version_id, created_at DESC, id DESC);
 -- The retargeted surfaces (P08-D4): attention, run counts and thread activity.
 CREATE INDEX workflow_runs_attention ON public.workflow_runs(company_id, state, created_at DESC) WHERE state IN ('waiting', 'failed');
 CREATE INDEX workflow_runs_reruns ON public.workflow_runs(company_id, rerun_of_run_id) WHERE rerun_of_run_id IS NOT NULL;

@@ -401,11 +401,10 @@ pub(super) async fn agent_usage(
     let company = ui.company(query.company_id).await?.id;
     let company_id = super::company(company);
     // Company-scoped: another company's agent is not found, never an empty list.
-    ui.engine
-        .authoring_reads()
-        .agent_tool_grants(company_id, agent)
-        .await?
-        .ok_or_else(|| AppError::NotFound("Agent not found".into()))?;
+    crate::adapters::http::routes::workflows::bindings::company_agent(
+        &ui.engine, company_id, agent,
+    )
+    .await?;
     let usage = ui
         .engine
         .authoring_reads()

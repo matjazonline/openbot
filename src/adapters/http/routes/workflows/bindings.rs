@@ -445,12 +445,32 @@ fn run_json(run: &RunSummary) -> Value {
 pub struct RunsQuery {
     pub binding_id: Option<Uuid>,
     pub state: Option<String>,
+    /// Runs of versions that use this agent of the company — including branches a run never
+    /// took — not the agents a run actually called (see [`RunFilter::agent`]). Another
+    /// company's agent, or one deleted, is not found.
+    pub agent_id: Option<Uuid>,
     /// The id of the last run of the previous page.
     pub after: Option<Uuid>,
     pub limit: Option<i64>,
 }
 
-/// The newest runs the caller may see, a page at a time, children labelled with their parent.
+/// `agent` when it is an agent of `company`; another company's, or a deleted one, is not found
+/// rather than an empty listing.
+pub(super) async fn company_agent(
+    engine: &WorkflowEngine,
+    company: CompanyId,
+    agent: Uuid,
+) -> AppResult<Uuid> {
+    engine
+        .authoring_reads()
+        .agent_tool_grants(company, agent)
+        .await?
+        .map(|_| agent)
+        .ok_or_else(|| AppError::NotFound("Agent not found".into()))
+}
+
+/// The newest runs the caller may see, a page at a time, children labelled with their parent;
+/// `agent_id` keeps those of versions that use that agent of the company ("uses", not "ran").
 pub async fn runs(
     State(engine): State<Engine>,
     user: AuthenticatedUser,
@@ -459,9 +479,14 @@ pub async fn runs(
 ) -> WorkflowResult<Json<Value>> {
     let (company, actor) = (company(company_id), actor(&user)?);
     authorize(&engine, company, actor, RelatedAssociation::Company).await?;
+    let agent = match query.agent_id {
+        Some(agent) => Some(company_agent(&engine, company, agent).await?),
+        None => None,
+    };
     let filter = RunFilter {
         binding: query.binding_id.map(WorkflowBindingId::new),
         state: query.state,
+        agent,
     };
     let page = engine
         .reads()

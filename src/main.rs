@@ -150,6 +150,7 @@ const NO_BACKWARD_COMPATIBILITY_NOTES: &[&str] = &[
     "plan/agent-response-setting.md",
     "plan/db_improve/05-deferred-until-traffic.md",
     "plan/db_improve/improve-key-credentials.md",
+    "plan/db_improve/run-agent-link-table.md",
     "plan/fix-01-run-agent-query/01-agent-run-filter.md",
     "plan/fix-01-run-agent-query/02-query-plan-evidence-and-index.md",
     "plan/fix-01-run-agent-query/03-slow-read-tripwire-and-release.md",

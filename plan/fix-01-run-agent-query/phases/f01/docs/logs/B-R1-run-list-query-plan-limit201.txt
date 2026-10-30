@@ -1,0 +1,711 @@
+== Table and index sizes (temporary clones)
+                             relname                             |  rows   |    size    
+-----------------------------------------------------------------+---------+------------
+ workflow_runs                                                   | 1096000 | 268 MB
+ workflow_versions                                               |   80000 | 21 MB
+ pg_toast_203393736_index                                        |       0 | 8192 bytes
+ pg_toast_203393770_index                                        |       0 | 8192 bytes
+ workflow_runs_company_id_binding_id_created_at_id_idx           | 1096000 | 143 MB
+ workflow_runs_company_id_channel_id_state_idx                   |   57796 | 448 kB
+ workflow_runs_company_id_created_at_id_idx                      | 1096000 | 109 MB
+ workflow_runs_company_id_id_binding_id_key                      | 1096000 | 92 MB
+ workflow_runs_company_id_id_channel_id_thread_id_key            | 1096000 | 80 MB
+ workflow_runs_company_id_id_parent_run_id_key                   | 1096000 | 81 MB
+ workflow_runs_company_id_id_parent_run_id_parent_execution__key | 1096000 | 83 MB
+ workflow_runs_company_id_id_workflow_id_key                     | 1096000 | 92 MB
+ workflow_runs_company_id_id_workflow_id_version_id_key          | 1096000 | 118 MB
+ workflow_runs_company_id_rerun_of_run_id_idx                    |       0 | 8192 bytes
+ workflow_runs_company_id_state_created_at_idx                   |  370522 | 31 MB
+ workflow_runs_company_id_thread_id_created_at_idx               |       0 | 8192 bytes
+ workflow_runs_company_id_version_id_created_at_id_idx           | 1096000 | 135 MB
+ workflow_runs_pkey                                              | 1096000 | 68 MB
+ workflow_versions_company_id_command_key_key                    |   80000 | 5240 kB
+ workflow_versions_company_id_workflow_id_id_key                 |   80000 | 7136 kB
+ workflow_versions_pkey                                          |   80000 | 5480 kB
+(21 rows)
+
+== Shipped indexes on public.workflow_runs and public.workflow_versions
+                                                                                           indexdef                                                                                           
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ CREATE INDEX workflow_runs_attention ON public.workflow_runs USING btree (company_id, state, created_at DESC) WHERE (state = ANY (ARRAY['waiting'::text, 'failed'::text]))
+ CREATE INDEX workflow_runs_binding_newest ON public.workflow_runs USING btree (company_id, binding_id, created_at DESC, id DESC)
+ CREATE INDEX workflow_runs_by_thread ON public.workflow_runs USING btree (company_id, thread_id, created_at DESC) WHERE (thread_id IS NOT NULL)
+ CREATE INDEX workflow_runs_newest ON public.workflow_runs USING btree (company_id, created_at DESC, id DESC)
+ CREATE INDEX workflow_runs_open_by_channel ON public.workflow_runs USING btree (company_id, channel_id, state) WHERE (state = ANY (ARRAY['queued'::text, 'running'::text, 'waiting'::text]))
+ CREATE INDEX workflow_runs_reruns ON public.workflow_runs USING btree (company_id, rerun_of_run_id) WHERE (rerun_of_run_id IS NOT NULL)
+ CREATE INDEX workflow_runs_version_newest ON public.workflow_runs USING btree (company_id, version_id, created_at DESC, id DESC)
+ CREATE UNIQUE INDEX workflow_run_budget_parent_identity ON public.workflow_runs USING btree (company_id, id, parent_run_id)
+ CREATE UNIQUE INDEX workflow_run_parent_identity ON public.workflow_runs USING btree (company_id, id, parent_run_id, parent_execution_id)
+ CREATE UNIQUE INDEX workflow_run_workflow_identity ON public.workflow_runs USING btree (company_id, id, workflow_id)
+ CREATE UNIQUE INDEX workflow_runs_company_id_id_binding_id_key ON public.workflow_runs USING btree (company_id, id, binding_id)
+ CREATE UNIQUE INDEX workflow_runs_company_id_id_channel_id_thread_id_key ON public.workflow_runs USING btree (company_id, id, channel_id, thread_id)
+ CREATE UNIQUE INDEX workflow_runs_pkey ON public.workflow_runs USING btree (company_id, id)
+ CREATE UNIQUE INDEX workflow_usage_version_identity ON public.workflow_runs USING btree (company_id, id, workflow_id, version_id)
+ CREATE UNIQUE INDEX workflow_versions_company_id_command_key_key ON public.workflow_versions USING btree (company_id, command_key)
+ CREATE UNIQUE INDEX workflow_versions_company_id_workflow_id_id_key ON public.workflow_versions USING btree (company_id, workflow_id, id)
+ CREATE UNIQUE INDEX workflow_versions_pkey ON public.workflow_versions USING btree (company_id, id)
+(17 rows)
+
+== company (plan_cache_mode = auto)
+                                                                                   QUERY PLAN                                                                                    
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=0.43..115.50 rows=201 width=185) (actual time=0.102..0.398 rows=201.00 loops=1)
+   Buffers: local read=12 dirtied=1 written=12
+   ->  Index Scan using workflow_runs_company_id_created_at_id_idx on workflow_runs  (cost=0.43..142556.17 rows=249011 width=185) (actual time=0.100..0.366 rows=201.00 loops=1)
+         Index Cond: (company_id = 'df655f97-6f7c-9d32-6381-5bd981225cd9'::uuid)
+         Index Searches: 1
+         Buffers: local read=12 dirtied=1 written=12
+ Planning:
+   Buffers: shared hit=99, local read=14 written=14
+ Planning Time: 1.761 ms
+ Execution Time: 0.448 ms
+(10 rows)
+
+== binding (plan_cache_mode = auto)
+                                                                                       QUERY PLAN                                                                                       
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=0.55..736.47 rows=201 width=185) (actual time=0.102..3.816 rows=201.00 loops=1)
+   Buffers: local hit=5 read=203 dirtied=29 written=203
+   ->  Index Scan using workflow_runs_company_id_binding_id_created_at_id_idx on workflow_runs  (cost=0.55..5378.99 rows=1469 width=185) (actual time=0.101..3.770 rows=201.00 loops=1)
+         Index Cond: ((company_id = 'df655f97-6f7c-9d32-6381-5bd981225cd9'::uuid) AND (binding_id = 'da00e194-7e43-1657-c177-b9300c98b9b0'::uuid))
+         Index Searches: 1
+         Buffers: local hit=5 read=203 dirtied=29 written=203
+ Planning:
+   Buffers: local hit=2
+ Planning Time: 0.236 ms
+ Execution Time: 3.856 ms
+(10 rows)
+
+== state failed (plan_cache_mode = auto)
+                                                                                       QUERY PLAN                                                                                        
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=2.48..337.83 rows=201 width=185) (actual time=0.163..0.509 rows=201.00 loops=1)
+   Buffers: local hit=18 read=9 written=9
+   ->  Incremental Sort  (cost=2.48..133056.67 rows=79750 width=185) (actual time=0.163..0.480 rows=201.00 loops=1)
+         Sort Key: created_at DESC, id DESC
+         Presorted Key: created_at
+         Full-sort Groups: 7  Sort Method: quicksort  Average Memory: 33kB  Peak Memory: 33kB
+         Buffers: local hit=18 read=9 written=9
+         ->  Index Scan using workflow_runs_company_id_state_created_at_idx on workflow_runs  (cost=0.42..130035.66 rows=79750 width=185) (actual time=0.085..0.334 rows=202.00 loops=1)
+               Index Cond: ((company_id = 'df655f97-6f7c-9d32-6381-5bd981225cd9'::uuid) AND (state = 'failed'::text))
+               Index Searches: 1
+               Buffers: local hit=18 read=9 written=9
+ Planning:
+   Buffers: local hit=2
+ Planning Time: 0.267 ms
+ Execution Time: 0.546 ms
+(15 rows)
+
+== state queued (plan_cache_mode = auto)
+                                                                                  QUERY PLAN                                                                                   
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=0.43..6517.37 rows=201 width=185) (actual time=0.036..8.631 rows=201.00 loops=1)
+   Buffers: local hit=211 read=321 dirtied=18 written=321
+   ->  Index Scan using workflow_runs_company_id_created_at_id_idx on workflow_runs  (cost=0.43..143178.69 rows=4416 width=185) (actual time=0.035..8.594 rows=201.00 loops=1)
+         Index Cond: (company_id = 'df655f97-6f7c-9d32-6381-5bd981225cd9'::uuid)
+         Filter: (state = 'queued'::text)
+         Rows Removed by Filter: 11839
+         Index Searches: 1
+         Buffers: local hit=211 read=321 dirtied=18 written=321
+ Planning:
+   Buffers: local hit=2
+ Planning Time: 0.249 ms
+ Execution Time: 8.668 ms
+(12 rows)
+
+== agent dense (plan_cache_mode = auto)
+                                                                                               QUERY PLAN                                                                                                
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=2360.58..2360.97 rows=156 width=185) (actual time=77.099..77.112 rows=201.00 loops=1)
+   Buffers: local hit=78562 read=4281 dirtied=334 written=739
+   ->  Sort  (cost=2360.58..2360.97 rows=156 width=185) (actual time=77.098..77.103 rows=201.00 loops=1)
+         Sort Key: workflow_runs.created_at DESC, workflow_runs.id DESC
+         Sort Method: top-N heapsort  Memory: 103kB
+         Buffers: local hit=78562 read=4281 dirtied=334 written=739
+         ->  Nested Loop  (cost=34.85..2354.90 rows=156 width=185) (actual time=0.301..59.448 rows=80400.00 loops=1)
+               Buffers: local hit=78562 read=4281 dirtied=334 written=739
+               ->  Bitmap Heap Scan on workflow_versions version  (cost=34.42..1762.16 rows=4 width=16) (actual time=0.227..0.521 rows=400.00 loops=1)
+                     Recheck Cond: (company_id = 'df655f97-6f7c-9d32-6381-5bd981225cd9'::uuid)
+                     Filter: ('ece9b879-9c74-6761-429c-e1255fa7303d'::uuid = ANY (agent_ids))
+                     Rows Removed by Filter: 400
+                     Heap Blocks: exact=27
+                     Buffers: local read=36 written=17
+                     ->  Bitmap Index Scan on workflow_versions_pkey  (cost=0.00..34.42 rows=800 width=0) (actual time=0.167..0.167 rows=800.00 loops=1)
+                           Index Cond: (company_id = 'df655f97-6f7c-9d32-6381-5bd981225cd9'::uuid)
+                           Index Searches: 1
+                           Buffers: local read=9 written=9
+               ->  Limit  (cost=0.43..147.79 rows=39 width=185) (actual time=0.010..0.131 rows=201.00 loops=400)
+                     Buffers: local hit=78562 read=4245 dirtied=334 written=722
+                     ->  Index Scan using workflow_runs_company_id_version_id_created_at_id_idx on workflow_runs  (cost=0.43..147.79 rows=39 width=185) (actual time=0.009..0.119 rows=201.00 loops=400)
+                           Index Cond: ((company_id = 'df655f97-6f7c-9d32-6381-5bd981225cd9'::uuid) AND (version_id = version.id))
+                           Index Searches: 400
+                           Buffers: local hit=78562 read=4245 dirtied=334 written=722
+ Planning:
+   Buffers: shared hit=42, local hit=2 read=3 written=3
+ Planning Time: 0.842 ms
+ Execution Time: 77.149 ms
+(28 rows)
+
+== agent sparse (plan_cache_mode = auto)
+                                                                                              QUERY PLAN                                                                                               
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=1911.38..1911.47 rows=39 width=185) (actual time=0.745..0.757 rows=201.00 loops=1)
+   Buffers: local hit=2 read=240 written=35
+   ->  Sort  (cost=1911.38..1911.47 rows=39 width=185) (actual time=0.745..0.749 rows=201.00 loops=1)
+         Sort Key: workflow_runs.created_at DESC, workflow_runs.id DESC
+         Sort Method: quicksort  Memory: 76kB
+         Buffers: local hit=2 read=240 written=35
+         ->  Nested Loop  (cost=34.85..1910.34 rows=39 width=185) (actual time=0.061..0.703 rows=201.00 loops=1)
+               Buffers: local hit=2 read=240 written=35
+               ->  Bitmap Heap Scan on workflow_versions version  (cost=34.42..1762.16 rows=1 width=16) (actual time=0.052..0.162 rows=1.00 loops=1)
+                     Recheck Cond: (company_id = 'df655f97-6f7c-9d32-6381-5bd981225cd9'::uuid)
+                     Filter: ('039f741a-71a9-523b-64ea-6cef61bc08fa'::uuid = ANY (agent_ids))
+                     Rows Removed by Filter: 799
+                     Heap Blocks: exact=27
+                     Buffers: local read=36 written=3
+                     ->  Bitmap Index Scan on workflow_versions_pkey  (cost=0.00..34.42 rows=800 width=0) (actual time=0.040..0.040 rows=800.00 loops=1)
+                           Index Cond: (company_id = 'df655f97-6f7c-9d32-6381-5bd981225cd9'::uuid)
+                           Index Searches: 1
+                           Buffers: local read=9 written=1
+               ->  Limit  (cost=0.43..147.79 rows=39 width=185) (actual time=0.008..0.530 rows=201.00 loops=1)
+                     Buffers: local hit=2 read=204 written=32
+                     ->  Index Scan using workflow_runs_company_id_version_id_created_at_id_idx on workflow_runs  (cost=0.43..147.79 rows=39 width=185) (actual time=0.008..0.521 rows=201.00 loops=1)
+                           Index Cond: ((company_id = 'df655f97-6f7c-9d32-6381-5bd981225cd9'::uuid) AND (version_id = version.id))
+                           Index Searches: 1
+                           Buffers: local hit=2 read=204 written=32
+ Planning:
+   Buffers: local read=2 written=1
+ Planning Time: 0.209 ms
+ Execution Time: 0.780 ms
+(28 rows)
+
+== agent_state dense failed (plan_cache_mode = auto)
+                                                                                               QUERY PLAN                                                                                               
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=2355.55..2355.67 rows=48 width=185) (actual time=43.018..43.030 rows=201.00 loops=1)
+   Buffers: local hit=121918 read=6053 dirtied=204 written=234
+   ->  Sort  (cost=2355.55..2355.67 rows=48 width=185) (actual time=43.018..43.023 rows=201.00 loops=1)
+         Sort Key: workflow_runs.created_at DESC, workflow_runs.id DESC
+         Sort Method: top-N heapsort  Memory: 108kB
+         Buffers: local hit=121918 read=6053 dirtied=204 written=234
+         ->  Nested Loop  (cost=34.85..2354.21 rows=48 width=185) (actual time=0.348..37.363 rows=39584.00 loops=1)
+               Buffers: local hit=121918 read=6053 dirtied=204 written=234
+               ->  Bitmap Heap Scan on workflow_versions version  (cost=34.42..1762.16 rows=4 width=16) (actual time=0.018..0.170 rows=400.00 loops=1)
+                     Recheck Cond: (company_id = 'df655f97-6f7c-9d32-6381-5bd981225cd9'::uuid)
+                     Filter: ('ece9b879-9c74-6761-429c-e1255fa7303d'::uuid = ANY (agent_ids))
+                     Rows Removed by Filter: 400
+                     Heap Blocks: exact=27
+                     Buffers: local hit=12 read=24 written=2
+                     ->  Bitmap Index Scan on workflow_versions_pkey  (cost=0.00..34.42 rows=800 width=0) (actual time=0.014..0.014 rows=800.00 loops=1)
+                           Index Cond: (company_id = 'df655f97-6f7c-9d32-6381-5bd981225cd9'::uuid)
+                           Index Searches: 1
+                           Buffers: local hit=9
+               ->  Limit  (cost=0.43..147.89 rows=12 width=185) (actual time=0.021..0.088 rows=98.96 loops=400)
+                     Buffers: local hit=121906 read=6029 dirtied=204 written=232
+                     ->  Index Scan using workflow_runs_company_id_version_id_created_at_id_idx on workflow_runs  (cost=0.43..147.89 rows=12 width=185) (actual time=0.020..0.084 rows=98.96 loops=400)
+                           Index Cond: ((company_id = 'df655f97-6f7c-9d32-6381-5bd981225cd9'::uuid) AND (version_id = version.id))
+                           Filter: (state = 'failed'::text)
+                           Rows Removed by Filter: 214
+                           Index Searches: 400
+                           Buffers: local hit=121906 read=6029 dirtied=204 written=232
+ Planning:
+   Buffers: local hit=2
+ Planning Time: 0.129 ms
+ Execution Time: 43.045 ms
+(30 rows)
+
+== agent_state dense queued (plan_cache_mode = auto)
+                                                                                              QUERY PLAN                                                                                              
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=2353.81..2353.82 rows=4 width=185) (actual time=29.681..29.693 rows=201.00 loops=1)
+   Buffers: local hit=121651 read=6320 written=39
+   ->  Sort  (cost=2353.81..2353.82 rows=4 width=185) (actual time=29.681..29.685 rows=201.00 loops=1)
+         Sort Key: workflow_runs.created_at DESC, workflow_runs.id DESC
+         Sort Method: top-N heapsort  Memory: 127kB
+         Buffers: local hit=121651 read=6320 written=39
+         ->  Nested Loop  (cost=34.85..2353.77 rows=4 width=185) (actual time=0.051..29.298 rows=2084.00 loops=1)
+               Buffers: local hit=121651 read=6320 written=39
+               ->  Bitmap Heap Scan on workflow_versions version  (cost=34.42..1762.16 rows=4 width=16) (actual time=0.043..0.175 rows=400.00 loops=1)
+                     Recheck Cond: (company_id = 'df655f97-6f7c-9d32-6381-5bd981225cd9'::uuid)
+                     Filter: ('ece9b879-9c74-6761-429c-e1255fa7303d'::uuid = ANY (agent_ids))
+                     Rows Removed by Filter: 400
+                     Heap Blocks: exact=27
+                     Buffers: local read=36
+                     ->  Bitmap Index Scan on workflow_versions_pkey  (cost=0.00..34.42 rows=800 width=0) (actual time=0.032..0.032 rows=800.00 loops=1)
+                           Index Cond: (company_id = 'df655f97-6f7c-9d32-6381-5bd981225cd9'::uuid)
+                           Index Searches: 1
+                           Buffers: local read=9
+               ->  Limit  (cost=0.43..147.89 rows=1 width=185) (actual time=0.057..0.072 rows=5.21 loops=400)
+                     Buffers: local hit=121651 read=6284 written=39
+                     ->  Index Scan using workflow_runs_company_id_version_id_created_at_id_idx on workflow_runs  (cost=0.43..147.89 rows=1 width=185) (actual time=0.057..0.072 rows=5.21 loops=400)
+                           Index Cond: ((company_id = 'df655f97-6f7c-9d32-6381-5bd981225cd9'::uuid) AND (version_id = version.id))
+                           Filter: (state = 'queued'::text)
+                           Rows Removed by Filter: 307
+                           Index Searches: 400
+                           Buffers: local hit=121651 read=6284 written=39
+ Planning:
+   Buffers: local read=2
+ Planning Time: 0.166 ms
+ Execution Time: 29.707 ms
+(30 rows)
+
+== agent_state sparse failed (plan_cache_mode = auto)
+                                                                                             QUERY PLAN                                                                                              
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=1910.39..1910.42 rows=12 width=185) (actual time=0.665..0.665 rows=0.00 loops=1)
+   Buffers: local hit=2 read=354
+   ->  Sort  (cost=1910.39..1910.42 rows=12 width=185) (actual time=0.664..0.665 rows=0.00 loops=1)
+         Sort Key: workflow_runs.created_at DESC, workflow_runs.id DESC
+         Sort Method: quicksort  Memory: 25kB
+         Buffers: local hit=2 read=354
+         ->  Nested Loop  (cost=34.85..1910.17 rows=12 width=185) (actual time=0.663..0.664 rows=0.00 loops=1)
+               Buffers: local hit=2 read=354
+               ->  Bitmap Heap Scan on workflow_versions version  (cost=34.42..1762.16 rows=1 width=16) (actual time=0.042..0.134 rows=1.00 loops=1)
+                     Recheck Cond: (company_id = 'df655f97-6f7c-9d32-6381-5bd981225cd9'::uuid)
+                     Filter: ('039f741a-71a9-523b-64ea-6cef61bc08fa'::uuid = ANY (agent_ids))
+                     Rows Removed by Filter: 799
+                     Heap Blocks: exact=27
+                     Buffers: local read=36
+                     ->  Bitmap Index Scan on workflow_versions_pkey  (cost=0.00..34.42 rows=800 width=0) (actual time=0.033..0.033 rows=800.00 loops=1)
+                           Index Cond: (company_id = 'df655f97-6f7c-9d32-6381-5bd981225cd9'::uuid)
+                           Index Searches: 1
+                           Buffers: local read=9
+               ->  Limit  (cost=0.43..147.89 rows=12 width=185) (actual time=0.529..0.529 rows=0.00 loops=1)
+                     Buffers: local hit=2 read=318
+                     ->  Index Scan using workflow_runs_company_id_version_id_created_at_id_idx on workflow_runs  (cost=0.43..147.89 rows=12 width=185) (actual time=0.529..0.529 rows=0.00 loops=1)
+                           Index Cond: ((company_id = 'df655f97-6f7c-9d32-6381-5bd981225cd9'::uuid) AND (version_id = version.id))
+                           Filter: (state = 'failed'::text)
+                           Rows Removed by Filter: 313
+                           Index Searches: 1
+                           Buffers: local hit=2 read=318
+ Planning:
+   Buffers: local read=2
+ Planning Time: 0.136 ms
+ Execution Time: 0.674 ms
+(30 rows)
+
+== agent_state sparse queued (plan_cache_mode = auto)
+                                                                                              QUERY PLAN                                                                                              
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=1910.07..1910.08 rows=1 width=185) (actual time=0.160..0.166 rows=105.00 loops=1)
+   Buffers: local hit=356
+   ->  Sort  (cost=1910.07..1910.08 rows=1 width=185) (actual time=0.160..0.162 rows=105.00 loops=1)
+         Sort Key: workflow_runs.created_at DESC, workflow_runs.id DESC
+         Sort Method: quicksort  Memory: 52kB
+         Buffers: local hit=356
+         ->  Nested Loop  (cost=34.85..1910.06 rows=1 width=185) (actual time=0.019..0.145 rows=105.00 loops=1)
+               Buffers: local hit=356
+               ->  Bitmap Heap Scan on workflow_versions version  (cost=34.42..1762.16 rows=1 width=16) (actual time=0.015..0.082 rows=1.00 loops=1)
+                     Recheck Cond: (company_id = 'df655f97-6f7c-9d32-6381-5bd981225cd9'::uuid)
+                     Filter: ('039f741a-71a9-523b-64ea-6cef61bc08fa'::uuid = ANY (agent_ids))
+                     Rows Removed by Filter: 799
+                     Heap Blocks: exact=27
+                     Buffers: local hit=36
+                     ->  Bitmap Index Scan on workflow_versions_pkey  (cost=0.00..34.42 rows=800 width=0) (actual time=0.013..0.013 rows=800.00 loops=1)
+                           Index Cond: (company_id = 'df655f97-6f7c-9d32-6381-5bd981225cd9'::uuid)
+                           Index Searches: 1
+                           Buffers: local hit=9
+               ->  Limit  (cost=0.43..147.89 rows=1 width=185) (actual time=0.003..0.059 rows=105.00 loops=1)
+                     Buffers: local hit=320
+                     ->  Index Scan using workflow_runs_company_id_version_id_created_at_id_idx on workflow_runs  (cost=0.43..147.89 rows=1 width=185) (actual time=0.003..0.054 rows=105.00 loops=1)
+                           Index Cond: ((company_id = 'df655f97-6f7c-9d32-6381-5bd981225cd9'::uuid) AND (version_id = version.id))
+                           Filter: (state = 'queued'::text)
+                           Rows Removed by Filter: 208
+                           Index Searches: 1
+                           Buffers: local hit=320
+ Planning:
+   Buffers: local hit=2
+ Planning Time: 0.098 ms
+ Execution Time: 0.175 ms
+(30 rows)
+
+== agent_cursor dense (plan_cache_mode = auto)
+                                                                                                                                 QUERY PLAN                                                                                                                                 
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=2331.21..2331.58 rows=148 width=185) (actual time=41.704..41.716 rows=201.00 loops=1)
+   Buffers: local hit=78560 read=4284
+   ->  Sort  (cost=2331.21..2331.58 rows=148 width=185) (actual time=41.704..41.709 rows=201.00 loops=1)
+         Sort Key: workflow_runs.created_at DESC, workflow_runs.id DESC
+         Sort Method: top-N heapsort  Memory: 103kB
+         Buffers: local hit=78560 read=4284
+         ->  Nested Loop  (cost=34.85..2325.87 rows=148 width=185) (actual time=0.050..30.594 rows=80400.00 loops=1)
+               Buffers: local hit=78560 read=4284
+               ->  Bitmap Heap Scan on workflow_versions version  (cost=34.42..1762.16 rows=4 width=16) (actual time=0.041..0.165 rows=400.00 loops=1)
+                     Recheck Cond: (company_id = 'df655f97-6f7c-9d32-6381-5bd981225cd9'::uuid)
+                     Filter: ('ece9b879-9c74-6761-429c-e1255fa7303d'::uuid = ANY (agent_ids))
+                     Rows Removed by Filter: 400
+                     Heap Blocks: exact=27
+                     Buffers: local read=36
+                     ->  Bitmap Index Scan on workflow_versions_pkey  (cost=0.00..34.42 rows=800 width=0) (actual time=0.031..0.031 rows=800.00 loops=1)
+                           Index Cond: (company_id = 'df655f97-6f7c-9d32-6381-5bd981225cd9'::uuid)
+                           Index Searches: 1
+                           Buffers: local read=9
+               ->  Limit  (cost=0.43..140.56 rows=37 width=185) (actual time=0.005..0.066 rows=201.00 loops=400)
+                     Buffers: local hit=78560 read=4248
+                     ->  Index Scan using workflow_runs_company_id_version_id_created_at_id_idx on workflow_runs  (cost=0.43..140.56 rows=37 width=185) (actual time=0.005..0.058 rows=201.00 loops=400)
+                           Index Cond: ((company_id = 'df655f97-6f7c-9d32-6381-5bd981225cd9'::uuid) AND (version_id = version.id) AND (ROW(created_at, id) < ROW('2026-09-23 09:26:58.875296+02'::timestamp with time zone, '7f510339-d0c4-418d-4411-92012d177a43'::uuid)))
+                           Index Searches: 400
+                           Buffers: local hit=78560 read=4248
+ Planning:
+   Buffers: shared hit=5, local read=2
+ Planning Time: 0.150 ms
+ Execution Time: 41.737 ms
+(28 rows)
+
+== agent_cursor sparse (plan_cache_mode = auto)
+                                                                                                                                 QUERY PLAN                                                                                                                                 
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=1770.63..1770.64 rows=1 width=185) (actual time=0.131..0.138 rows=113.00 loops=1)
+   Buffers: local hit=154
+   ->  Sort  (cost=1770.63..1770.64 rows=1 width=185) (actual time=0.131..0.134 rows=113.00 loops=1)
+         Sort Key: workflow_runs.created_at DESC, workflow_runs.id DESC
+         Sort Method: quicksort  Memory: 54kB
+         Buffers: local hit=154
+         ->  Nested Loop  (cost=34.85..1770.62 rows=1 width=185) (actual time=0.019..0.116 rows=113.00 loops=1)
+               Buffers: local hit=154
+               ->  Bitmap Heap Scan on workflow_versions version  (cost=34.42..1762.16 rows=1 width=16) (actual time=0.015..0.082 rows=1.00 loops=1)
+                     Recheck Cond: (company_id = 'df655f97-6f7c-9d32-6381-5bd981225cd9'::uuid)
+                     Filter: ('039f741a-71a9-523b-64ea-6cef61bc08fa'::uuid = ANY (agent_ids))
+                     Rows Removed by Filter: 799
+                     Heap Blocks: exact=27
+                     Buffers: local hit=36
+                     ->  Bitmap Index Scan on workflow_versions_pkey  (cost=0.00..34.42 rows=800 width=0) (actual time=0.012..0.012 rows=800.00 loops=1)
+                           Index Cond: (company_id = 'df655f97-6f7c-9d32-6381-5bd981225cd9'::uuid)
+                           Index Searches: 1
+                           Buffers: local hit=9
+               ->  Limit  (cost=0.43..8.45 rows=1 width=185) (actual time=0.003..0.028 rows=113.00 loops=1)
+                     Buffers: local hit=118
+                     ->  Index Scan using workflow_runs_company_id_version_id_created_at_id_idx on workflow_runs  (cost=0.43..8.45 rows=1 width=185) (actual time=0.003..0.024 rows=113.00 loops=1)
+                           Index Cond: ((company_id = 'df655f97-6f7c-9d32-6381-5bd981225cd9'::uuid) AND (version_id = version.id) AND (ROW(created_at, id) < ROW('2024-11-12 23:41:45.915296+01'::timestamp with time zone, '3e0d5b8e-e511-e7d4-4d08-e448ca4fa62d'::uuid)))
+                           Index Searches: 1
+                           Buffers: local hit=118
+ Planning:
+   Buffers: local hit=2
+ Planning Time: 0.100 ms
+ Execution Time: 0.149 ms
+(28 rows)
+
+== company (plan_cache_mode = force_generic_plan)
+                                                                                  QUERY PLAN                                                                                   
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=0.43..3522.55 rows=1096 width=185) (actual time=0.014..0.059 rows=201.00 loops=1)
+   Buffers: local read=12
+   ->  Index Scan using workflow_runs_company_id_created_at_id_idx on workflow_runs  (cost=0.43..35221.61 rows=10960 width=185) (actual time=0.013..0.052 rows=201.00 loops=1)
+         Index Cond: (company_id = $1)
+         Index Searches: 1
+         Buffers: local read=12
+ Planning:
+   Buffers: local hit=2
+ Planning Time: 0.042 ms
+ Execution Time: 0.066 ms
+(10 rows)
+
+== binding (plan_cache_mode = force_generic_plan)
+                                                                                    QUERY PLAN                                                                                     
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=0.55..5.09 rows=1 width=185) (actual time=0.013..0.390 rows=201.00 loops=1)
+   Buffers: local hit=5 read=203
+   ->  Index Scan using workflow_runs_company_id_binding_id_created_at_id_idx on workflow_runs  (cost=0.55..23.23 rows=5 width=185) (actual time=0.013..0.382 rows=201.00 loops=1)
+         Index Cond: ((company_id = $1) AND (binding_id = $2))
+         Index Searches: 1
+         Buffers: local hit=5 read=203
+ Planning:
+   Buffers: local hit=2
+ Planning Time: 0.047 ms
+ Execution Time: 0.397 ms
+(10 rows)
+
+== state failed (plan_cache_mode = force_generic_plan)
+                                                                                  QUERY PLAN                                                                                  
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=0.43..3531.07 rows=183 width=185) (actual time=0.003..0.101 rows=201.00 loops=1)
+   Buffers: local hit=23 read=8
+   ->  Index Scan using workflow_runs_company_id_created_at_id_idx on workflow_runs  (cost=0.43..35249.01 rows=1827 width=185) (actual time=0.003..0.093 rows=201.00 loops=1)
+         Index Cond: (company_id = $1)
+         Filter: (state = $2)
+         Rows Removed by Filter: 432
+         Index Searches: 1
+         Buffers: local hit=23 read=8
+ Planning:
+   Buffers: local hit=2
+ Planning Time: 0.042 ms
+ Execution Time: 0.107 ms
+(12 rows)
+
+== state queued (plan_cache_mode = force_generic_plan)
+                                                                                  QUERY PLAN                                                                                  
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=0.43..3531.07 rows=183 width=185) (actual time=0.006..1.704 rows=201.00 loops=1)
+   Buffers: local hit=216 read=316
+   ->  Index Scan using workflow_runs_company_id_created_at_id_idx on workflow_runs  (cost=0.43..35249.01 rows=1827 width=185) (actual time=0.006..1.696 rows=201.00 loops=1)
+         Index Cond: (company_id = $1)
+         Filter: (state = $2)
+         Rows Removed by Filter: 11839
+         Index Searches: 1
+         Buffers: local hit=216 read=316
+ Planning Time: 0.005 ms
+ Execution Time: 1.711 ms
+(10 rows)
+
+== agent dense (plan_cache_mode = force_generic_plan)
+                                                                                              QUERY PLAN                                                                                               
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=2008.11..2008.12 rows=4 width=185) (actual time=39.798..39.810 rows=201.00 loops=1)
+   Buffers: local hit=78573 read=4270
+   ->  Sort  (cost=2008.11..2008.21 rows=39 width=185) (actual time=39.798..39.802 rows=201.00 loops=1)
+         Sort Key: workflow_runs.created_at DESC, workflow_runs.id DESC
+         Sort Method: top-N heapsort  Memory: 103kB
+         Buffers: local hit=78573 read=4270
+         ->  Nested Loop  (cost=34.85..2007.08 rows=39 width=185) (actual time=0.036..28.861 rows=80400.00 loops=1)
+               Buffers: local hit=78573 read=4270
+               ->  Bitmap Heap Scan on workflow_versions version  (cost=34.43..1762.17 rows=39 width=16) (actual time=0.029..0.159 rows=400.00 loops=1)
+                     Recheck Cond: (company_id = $1)
+                     Filter: ($2 = ANY (agent_ids))
+                     Rows Removed by Filter: 400
+                     Heap Blocks: exact=27
+                     Buffers: local hit=2 read=34
+                     ->  Bitmap Index Scan on workflow_versions_pkey  (cost=0.00..34.42 rows=800 width=0) (actual time=0.026..0.026 rows=800.00 loops=1)
+                           Index Cond: (company_id = $1)
+                           Index Searches: 1
+                           Buffers: local read=9
+               ->  Limit  (cost=0.43..6.27 rows=1 width=185) (actual time=0.004..0.062 rows=201.00 loops=400)
+                     Buffers: local hit=78571 read=4236
+                     ->  Index Scan using workflow_runs_company_id_version_id_created_at_id_idx on workflow_runs  (cost=0.43..12.11 rows=2 width=185) (actual time=0.004..0.055 rows=201.00 loops=400)
+                           Index Cond: ((company_id = $3) AND (version_id = version.id))
+                           Index Searches: 400
+                           Buffers: local hit=78571 read=4236
+ Planning:
+   Buffers: local hit=2
+ Planning Time: 0.083 ms
+ Execution Time: 39.822 ms
+(28 rows)
+
+== agent sparse (plan_cache_mode = force_generic_plan)
+                                                                                             QUERY PLAN                                                                                              
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=2008.11..2008.12 rows=4 width=185) (actual time=0.524..0.535 rows=201.00 loops=1)
+   Buffers: local hit=2 read=240
+   ->  Sort  (cost=2008.11..2008.21 rows=39 width=185) (actual time=0.524..0.528 rows=201.00 loops=1)
+         Sort Key: workflow_runs.created_at DESC, workflow_runs.id DESC
+         Sort Method: quicksort  Memory: 76kB
+         Buffers: local hit=2 read=240
+         ->  Nested Loop  (cost=34.85..2007.08 rows=39 width=185) (actual time=0.048..0.495 rows=201.00 loops=1)
+               Buffers: local hit=2 read=240
+               ->  Bitmap Heap Scan on workflow_versions version  (cost=34.43..1762.17 rows=39 width=16) (actual time=0.040..0.135 rows=1.00 loops=1)
+                     Recheck Cond: (company_id = $1)
+                     Filter: ($2 = ANY (agent_ids))
+                     Rows Removed by Filter: 799
+                     Heap Blocks: exact=27
+                     Buffers: local read=36
+                     ->  Bitmap Index Scan on workflow_versions_pkey  (cost=0.00..34.42 rows=800 width=0) (actual time=0.031..0.031 rows=800.00 loops=1)
+                           Index Cond: (company_id = $1)
+                           Index Searches: 1
+                           Buffers: local read=9
+               ->  Limit  (cost=0.43..6.27 rows=1 width=185) (actual time=0.007..0.349 rows=201.00 loops=1)
+                     Buffers: local hit=2 read=204
+                     ->  Index Scan using workflow_runs_company_id_version_id_created_at_id_idx on workflow_runs  (cost=0.43..12.11 rows=2 width=185) (actual time=0.007..0.341 rows=201.00 loops=1)
+                           Index Cond: ((company_id = $3) AND (version_id = version.id))
+                           Index Searches: 1
+                           Buffers: local hit=2 read=204
+ Planning Time: 0.015 ms
+ Execution Time: 0.548 ms
+(26 rows)
+
+== agent_state dense failed (plan_cache_mode = force_generic_plan)
+                                                                                              QUERY PLAN                                                                                              
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=2236.16..2236.17 rows=4 width=185) (actual time=40.715..40.726 rows=201.00 loops=1)
+   Buffers: local hit=121886 read=6085
+   ->  Sort  (cost=2236.16..2236.26 rows=39 width=185) (actual time=40.714..40.719 rows=201.00 loops=1)
+         Sort Key: workflow_runs.created_at DESC, workflow_runs.id DESC
+         Sort Method: top-N heapsort  Memory: 108kB
+         Buffers: local hit=121886 read=6085
+         ->  Nested Loop  (cost=34.85..2235.13 rows=39 width=185) (actual time=0.245..35.093 rows=39584.00 loops=1)
+               Buffers: local hit=121886 read=6085
+               ->  Bitmap Heap Scan on workflow_versions version  (cost=34.43..1762.17 rows=39 width=16) (actual time=0.018..0.158 rows=400.00 loops=1)
+                     Recheck Cond: (company_id = $1)
+                     Filter: ($2 = ANY (agent_ids))
+                     Rows Removed by Filter: 400
+                     Heap Blocks: exact=27
+                     Buffers: local hit=12 read=24
+                     ->  Bitmap Index Scan on workflow_versions_pkey  (cost=0.00..34.42 rows=800 width=0) (actual time=0.012..0.013 rows=800.00 loops=1)
+                           Index Cond: (company_id = $1)
+                           Index Searches: 1
+                           Buffers: local hit=9
+               ->  Limit  (cost=0.43..12.12 rows=1 width=185) (actual time=0.018..0.082 rows=98.96 loops=400)
+                     Buffers: local hit=121874 read=6061
+                     ->  Index Scan using workflow_runs_company_id_version_id_created_at_id_idx on workflow_runs  (cost=0.43..12.12 rows=1 width=185) (actual time=0.018..0.079 rows=98.96 loops=400)
+                           Index Cond: ((company_id = $3) AND (version_id = version.id))
+                           Filter: (state = $4)
+                           Rows Removed by Filter: 214
+                           Index Searches: 400
+                           Buffers: local hit=121874 read=6061
+ Planning:
+   Buffers: local read=2
+ Planning Time: 0.107 ms
+ Execution Time: 40.738 ms
+(30 rows)
+
+== agent_state dense queued (plan_cache_mode = force_generic_plan)
+                                                                                             QUERY PLAN                                                                                              
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=2236.16..2236.17 rows=4 width=185) (actual time=30.382..30.394 rows=201.00 loops=1)
+   Buffers: local hit=121622 read=6349
+   ->  Sort  (cost=2236.16..2236.26 rows=39 width=185) (actual time=30.382..30.387 rows=201.00 loops=1)
+         Sort Key: workflow_runs.created_at DESC, workflow_runs.id DESC
+         Sort Method: top-N heapsort  Memory: 127kB
+         Buffers: local hit=121622 read=6349
+         ->  Nested Loop  (cost=34.85..2235.13 rows=39 width=185) (actual time=0.050..29.995 rows=2084.00 loops=1)
+               Buffers: local hit=121622 read=6349
+               ->  Bitmap Heap Scan on workflow_versions version  (cost=34.43..1762.17 rows=39 width=16) (actual time=0.042..0.182 rows=400.00 loops=1)
+                     Recheck Cond: (company_id = $1)
+                     Filter: ($2 = ANY (agent_ids))
+                     Rows Removed by Filter: 400
+                     Heap Blocks: exact=27
+                     Buffers: local read=36
+                     ->  Bitmap Index Scan on workflow_versions_pkey  (cost=0.00..34.42 rows=800 width=0) (actual time=0.032..0.032 rows=800.00 loops=1)
+                           Index Cond: (company_id = $1)
+                           Index Searches: 1
+                           Buffers: local read=9
+               ->  Limit  (cost=0.43..12.12 rows=1 width=185) (actual time=0.059..0.074 rows=5.21 loops=400)
+                     Buffers: local hit=121622 read=6313
+                     ->  Index Scan using workflow_runs_company_id_version_id_created_at_id_idx on workflow_runs  (cost=0.43..12.12 rows=1 width=185) (actual time=0.059..0.074 rows=5.21 loops=400)
+                           Index Cond: ((company_id = $3) AND (version_id = version.id))
+                           Filter: (state = $4)
+                           Rows Removed by Filter: 307
+                           Index Searches: 400
+                           Buffers: local hit=121622 read=6313
+ Planning Time: 0.016 ms
+ Execution Time: 30.408 ms
+(28 rows)
+
+== agent_state sparse failed (plan_cache_mode = force_generic_plan)
+                                                                                            QUERY PLAN                                                                                             
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=2236.16..2236.17 rows=4 width=185) (actual time=0.670..0.670 rows=0.00 loops=1)
+   Buffers: local hit=2 read=354
+   ->  Sort  (cost=2236.16..2236.26 rows=39 width=185) (actual time=0.670..0.670 rows=0.00 loops=1)
+         Sort Key: workflow_runs.created_at DESC, workflow_runs.id DESC
+         Sort Method: quicksort  Memory: 25kB
+         Buffers: local hit=2 read=354
+         ->  Nested Loop  (cost=34.85..2235.13 rows=39 width=185) (actual time=0.669..0.669 rows=0.00 loops=1)
+               Buffers: local hit=2 read=354
+               ->  Bitmap Heap Scan on workflow_versions version  (cost=34.43..1762.17 rows=39 width=16) (actual time=0.047..0.140 rows=1.00 loops=1)
+                     Recheck Cond: (company_id = $1)
+                     Filter: ($2 = ANY (agent_ids))
+                     Rows Removed by Filter: 799
+                     Heap Blocks: exact=27
+                     Buffers: local read=36
+                     ->  Bitmap Index Scan on workflow_versions_pkey  (cost=0.00..34.42 rows=800 width=0) (actual time=0.037..0.037 rows=800.00 loops=1)
+                           Index Cond: (company_id = $1)
+                           Index Searches: 1
+                           Buffers: local read=9
+               ->  Limit  (cost=0.43..12.12 rows=1 width=185) (actual time=0.528..0.528 rows=0.00 loops=1)
+                     Buffers: local hit=2 read=318
+                     ->  Index Scan using workflow_runs_company_id_version_id_created_at_id_idx on workflow_runs  (cost=0.43..12.12 rows=1 width=185) (actual time=0.528..0.528 rows=0.00 loops=1)
+                           Index Cond: ((company_id = $3) AND (version_id = version.id))
+                           Filter: (state = $4)
+                           Rows Removed by Filter: 313
+                           Index Searches: 1
+                           Buffers: local hit=2 read=318
+ Planning Time: 0.015 ms
+ Execution Time: 0.679 ms
+(28 rows)
+
+== agent_state sparse queued (plan_cache_mode = force_generic_plan)
+                                                                                             QUERY PLAN                                                                                              
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=2236.16..2236.17 rows=4 width=185) (actual time=0.166..0.172 rows=105.00 loops=1)
+   Buffers: local hit=356
+   ->  Sort  (cost=2236.16..2236.26 rows=39 width=185) (actual time=0.166..0.168 rows=105.00 loops=1)
+         Sort Key: workflow_runs.created_at DESC, workflow_runs.id DESC
+         Sort Method: quicksort  Memory: 52kB
+         Buffers: local hit=356
+         ->  Nested Loop  (cost=34.85..2235.13 rows=39 width=185) (actual time=0.021..0.151 rows=105.00 loops=1)
+               Buffers: local hit=356
+               ->  Bitmap Heap Scan on workflow_versions version  (cost=34.43..1762.17 rows=39 width=16) (actual time=0.017..0.085 rows=1.00 loops=1)
+                     Recheck Cond: (company_id = $1)
+                     Filter: ($2 = ANY (agent_ids))
+                     Rows Removed by Filter: 799
+                     Heap Blocks: exact=27
+                     Buffers: local hit=36
+                     ->  Bitmap Index Scan on workflow_versions_pkey  (cost=0.00..34.42 rows=800 width=0) (actual time=0.013..0.013 rows=800.00 loops=1)
+                           Index Cond: (company_id = $1)
+                           Index Searches: 1
+                           Buffers: local hit=9
+               ->  Limit  (cost=0.43..12.12 rows=1 width=185) (actual time=0.003..0.061 rows=105.00 loops=1)
+                     Buffers: local hit=320
+                     ->  Index Scan using workflow_runs_company_id_version_id_created_at_id_idx on workflow_runs  (cost=0.43..12.12 rows=1 width=185) (actual time=0.003..0.056 rows=105.00 loops=1)
+                           Index Cond: ((company_id = $3) AND (version_id = version.id))
+                           Filter: (state = $4)
+                           Rows Removed by Filter: 208
+                           Index Searches: 1
+                           Buffers: local hit=320
+ Planning Time: 0.010 ms
+ Execution Time: 0.181 ms
+(28 rows)
+
+== agent_cursor dense (plan_cache_mode = force_generic_plan)
+                                                                                              QUERY PLAN                                                                                              
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=2093.14..2093.15 rows=4 width=185) (actual time=41.316..41.328 rows=201.00 loops=1)
+   Buffers: local hit=78559 read=4285
+   ->  Sort  (cost=2093.14..2093.24 rows=39 width=185) (actual time=41.316..41.320 rows=201.00 loops=1)
+         Sort Key: workflow_runs.created_at DESC, workflow_runs.id DESC
+         Sort Method: top-N heapsort  Memory: 103kB
+         Buffers: local hit=78559 read=4285
+         ->  Nested Loop  (cost=34.85..2092.11 rows=39 width=185) (actual time=0.051..30.314 rows=80400.00 loops=1)
+               Buffers: local hit=78559 read=4285
+               ->  Bitmap Heap Scan on workflow_versions version  (cost=34.43..1762.17 rows=39 width=16) (actual time=0.041..0.169 rows=400.00 loops=1)
+                     Recheck Cond: (company_id = $1)
+                     Filter: ($2 = ANY (agent_ids))
+                     Rows Removed by Filter: 400
+                     Heap Blocks: exact=27
+                     Buffers: local read=36
+                     ->  Bitmap Index Scan on workflow_versions_pkey  (cost=0.00..34.42 rows=800 width=0) (actual time=0.031..0.031 rows=800.00 loops=1)
+                           Index Cond: (company_id = $1)
+                           Index Searches: 1
+                           Buffers: local read=9
+               ->  Limit  (cost=0.43..8.45 rows=1 width=185) (actual time=0.005..0.066 rows=201.00 loops=400)
+                     Buffers: local hit=78559 read=4249
+                     ->  Index Scan using workflow_runs_company_id_version_id_created_at_id_idx on workflow_runs  (cost=0.43..8.45 rows=1 width=185) (actual time=0.005..0.058 rows=201.00 loops=400)
+                           Index Cond: ((company_id = $3) AND (version_id = version.id) AND (ROW(created_at, id) < ROW($4, $5)))
+                           Index Searches: 400
+                           Buffers: local hit=78559 read=4249
+ Planning:
+   Buffers: local read=2
+ Planning Time: 0.146 ms
+ Execution Time: 41.347 ms
+(28 rows)
+
+== agent_cursor sparse (plan_cache_mode = force_generic_plan)
+                                                                                             QUERY PLAN                                                                                             
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=2093.14..2093.15 rows=4 width=185) (actual time=0.147..0.154 rows=113.00 loops=1)
+   Buffers: local hit=145 read=9
+   ->  Sort  (cost=2093.14..2093.24 rows=39 width=185) (actual time=0.147..0.149 rows=113.00 loops=1)
+         Sort Key: workflow_runs.created_at DESC, workflow_runs.id DESC
+         Sort Method: quicksort  Memory: 54kB
+         Buffers: local hit=145 read=9
+         ->  Nested Loop  (cost=34.85..2092.11 rows=39 width=185) (actual time=0.034..0.132 rows=113.00 loops=1)
+               Buffers: local hit=145 read=9
+               ->  Bitmap Heap Scan on workflow_versions version  (cost=34.43..1762.17 rows=39 width=16) (actual time=0.031..0.098 rows=1.00 loops=1)
+                     Recheck Cond: (company_id = $1)
+                     Filter: ($2 = ANY (agent_ids))
+                     Rows Removed by Filter: 799
+                     Heap Blocks: exact=27
+                     Buffers: local hit=27 read=9
+                     ->  Bitmap Index Scan on workflow_versions_pkey  (cost=0.00..34.42 rows=800 width=0) (actual time=0.028..0.028 rows=800.00 loops=1)
+                           Index Cond: (company_id = $1)
+                           Index Searches: 1
+                           Buffers: local read=9
+               ->  Limit  (cost=0.43..8.45 rows=1 width=185) (actual time=0.003..0.028 rows=113.00 loops=1)
+                     Buffers: local hit=118
+                     ->  Index Scan using workflow_runs_company_id_version_id_created_at_id_idx on workflow_runs  (cost=0.43..8.45 rows=1 width=185) (actual time=0.003..0.024 rows=113.00 loops=1)
+                           Index Cond: ((company_id = $3) AND (version_id = version.id) AND (ROW(created_at, id) < ROW($4, $5)))
+                           Index Searches: 1
+                           Buffers: local hit=118
+ Planning Time: 0.014 ms
+ Execution Time: 0.165 ms
+(26 rows)
+

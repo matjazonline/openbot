@@ -188,6 +188,12 @@ pub struct RunDetail {
 pub struct RunFilter {
     pub binding: Option<WorkflowBindingId>,
     pub state: Option<String>,
+    /// Runs of versions that *use* this agent: its id is in the version's `agent_ids` display
+    /// index, directly or through a pinned child, including branches a run never took. Not the
+    /// agents a run actually called: `model_usage_calls.agent_id` exists only once a model call
+    /// has happened, so a queued run would never match. The route resolves the id
+    /// company-scoped before it gets here.
+    pub agent: Option<Uuid>,
 }
 
 #[async_trait]
@@ -369,7 +375,8 @@ pub trait AuthoringReads: Send + Sync {
     async fn channel_usage(&self, company: CompanyId, channel: Uuid) -> AppResult<WorkflowUsage>;
     /// The bindings whose bound version froze `agent`, directly or through a pinned child, at
     /// most [`MAX_AGENT_USES`] by binding id (`truncated` says more exist). Reads the version's
-    /// `agent_ids` display index (p09 gate P09-B1b-D1).
+    /// `agent_ids` display index (p09 gate P09-B1b-D1), as the run list's agent filter
+    /// ([`RunFilter::agent`]) does; nothing decides or authorizes on it.
     async fn agent_usage(&self, company: CompanyId, agent: Uuid) -> AppResult<WorkflowUsage>;
     async fn binding_options(&self, company: CompanyId) -> AppResult<BindingOptions>;
     /// The agent's ordered workflow tool grants; `None` when the company has no such agent.

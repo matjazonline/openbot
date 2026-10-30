@@ -286,7 +286,8 @@ impl AuthoringReads for PostgresPersistence {
     }
 
     async fn agent_usage(&self, company: CompanyId, agent: Uuid) -> AppResult<WorkflowUsage> {
-        // `agent_ids` is a display index (gate P09-B1b-D1): this listing is all that reads it.
+        // `agent_ids` is a display index (gate P09-B1b-D1): this listing and the run list's agent
+        // filter (`reads.rs`, `run_list_query`) read it; nothing decides or authorizes on it.
         let rows = sqlx::query_as::<_, BindingRow>(&format!(
             "SELECT {BINDING_COLUMNS} {BINDING_FROM} \
               WHERE binding.company_id = $1 AND $2 = ANY(version.agent_ids) \

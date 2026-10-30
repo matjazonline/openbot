@@ -337,6 +337,7 @@ fn run_filter(binding: Option<Uuid>, state: Option<String>) -> RunFilter {
     RunFilter {
         binding: binding.map(WorkflowBindingId::new),
         state,
+        agent: None,
     }
 }
 

@@ -386,6 +386,8 @@ mod decision_tests;
 mod lifecycle_tests;
 #[path = "reconciliation_tests.rs"]
 mod reconciliation_tests;
+#[path = "run_filter_tests.rs"]
+mod run_filter_tests;
 #[path = "tenancy_tests.rs"]
 mod tenancy_tests;
 #[path = "tool_tests.rs"]
