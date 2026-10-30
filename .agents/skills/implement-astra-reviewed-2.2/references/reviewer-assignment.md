@@ -1,7 +1,7 @@
 # Reviewer (B) assignment template
 
 Root fills the placeholders and passes the result to Codex `spawn_agent` using
-`model: "gpt-6-astra"`, `reasoning_effort: "medium"`, `fork_context: false`
+`model: "gpt-6.1-sol"`, `reasoning_effort: "xhigh"`, `fork_context: false`
 (or the host's equivalent no-history controls described in SKILL.md). Keep it
 compact: link artifacts, never include A's reasoning or conversation history.
 For later batches and rechecks, send the assignment via `send_input` to the same

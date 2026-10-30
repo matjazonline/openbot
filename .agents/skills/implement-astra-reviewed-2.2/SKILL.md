@@ -1,39 +1,41 @@
 ---
 name: implement-astra-reviewed-2.2
-description: "Execute complex implementation with Astra authorship and independent Astra review, using large cohesive batches, selective architecture gates, phase-local progress and review evidence, isolated concurrent workstreams, and context continuity. Use when an implementation request selects this workflow; not for standalone planning or review."
+description: "Execute complex implementation with GPT-6.1 Sol xhigh authorship and independent review, using large cohesive batches, selective architecture gates, phase-local progress and review evidence, isolated concurrent workstreams, and context continuity. Use when an implementation request selects this workflow; not for standalone planning or review."
 ---
 
-# Implement Astra Reviewed 2.2
+# Implement Sol Reviewed 2.2
 
-Successor to `implement-astra-reviewed-2.1`, retaining its Astra roles, large review
-batches, selective gates, and context continuity. Each independently scheduled
-phase has its own records, artifact identity, and resource ownership. This skill
-is self-contained; do not load the other variants. Savings and quality must be
-measured, not assumed. User preferences override these defaults.
+Successor to `implement-astra-reviewed-2.1`, retaining its independent author and
+reviewer roles, large review batches, selective gates, and context continuity.
+Each independently scheduled phase has its own records, artifact identity, and
+resource ownership. This skill is self-contained; do not load the other variants.
+Savings and quality must be measured, not assumed. User preferences override these
+defaults.
 
 ## Roles and settings
 
 | Role | Model / effort | Ownership |
 | --- | --- | --- |
-| Author (A) | `gpt-6-astra` / `medium` | Investigation, consequential decisions, implementation, fixtures, tests, and every correction. |
-| Reviewer (B) | `gpt-6-astra` / `medium` | Independent review of requirements, architecture, code, and verification; review notes and findings. Does not edit project files or author the design. |
+| Author (A) | `gpt-6.1-sol` / `xhigh` | Investigation, consequential decisions, implementation, fixtures, tests, and every correction. |
+| Reviewer (B) | `gpt-6.1-sol` / `xhigh` | Independent review of requirements, architecture, code, and verification; review notes and findings. Does not edit project files or author the design. |
 | Root | Actual session settings | Scope, assignments, resources, acceptance, and user updates. |
 
 - When authoritative session information or the user confirms root runs
-  `gpt-6-astra` at `high` effort, root acts as A and spawns only B.
+  `gpt-6.1-sol` at `xhigh` effort, root acts as A and spawns only B.
   If root's model or effort is unknown or uncertain, ask the user to confirm
-  whether root is Astra/high or choose a separate Astra author **before spawning
-  any new sub-agent**. Wait for the answer; missing metadata is not evidence that
-  a separate author is needed. Reuse confirmation already provided in the session.
-  When root is confirmed not to be Astra/high, use a separate A unless the user
-  authorizes root authorship. With a separate A, root stays a thin coordinator
+  whether root is GPT-6.1 Sol/xhigh or choose a separate GPT-6.1 Sol author
+  **before spawning any new sub-agent**. Wait for the answer; missing metadata is
+  not evidence that a separate author is needed. Reuse confirmation already
+  provided in the session.
+  When root is confirmed not to be GPT-6.1 Sol/xhigh, use a separate A unless the
+  user authorizes root authorship. With a separate A, root stays a thin coordinator
   without repeating implementation or technical review. Keep and record root's
   actual settings; never infer them from a role label or claim instructions
   changed them.
 - After resolving root's role, spawn B and, only if needed, A as direct children
-  with `model: "gpt-6-astra"` and medium effort.
+  with `model: "gpt-6.1-sol"` and xhigh effort.
   Use the available Codex tool schema: `spawn_agent` with
-  `reasoning_effort: "medium"` and `fork_context: false`; on hosts exposing
+  `reasoning_effort: "xhigh"` and `fork_context: false`; on hosts exposing
   `fork_turns` instead, use `fork_turns: "none"`. Never pass unsupported fields.
   This workflow explicitly requests delegation and those worker settings.
 - **Start workers without inherited conversation.** In particular, B must not
@@ -43,10 +45,10 @@ measured, not assumed. User preferences override these defaults.
   for later batches and rechecks. Spawn B when its first review is needed. Wait
   for actual completion before reporting results; use bounded waits and keep user
   updates flowing. Use `close_agent` when workers are no longer needed.
-- Record actual model/effort when reported. If Astra, requested effort, independent
-  context, or delegation is unavailable, disclose the limitation and obtain an
-  authorized alternative before substituting another workflow. Honor alternatives
-  already authorized in the session.
+- Record actual model/effort when reported. If GPT-6.1 Sol, requested effort,
+  independent context, or delegation is unavailable, disclose the limitation and
+  obtain an authorized alternative before substituting another workflow. Honor
+  alternatives already authorized in the session.
 
 Give workers compact assignments: original requirements and artifact paths,
 applicable `AGENTS.md` files, scope, acceptance criteria, and resolved record paths.

@@ -1,4 +1,4 @@
 interface:
-  display_name: "Implement Astra Reviewed 2.2"
-  short_description: "Astra review with isolated async phase progress"
-  default_prompt: "Use $implement-astra-reviewed-2.2 to implement this phase with independent Astra review, phase-local progress, and an isolated worktree when other phases run concurrently."
+  display_name: "Implement Sol Reviewed 2.2"
+  short_description: "GPT-6.1 Sol xhigh review with isolated phase progress"
+  default_prompt: "Use $implement-astra-reviewed-2.2 to implement this phase with GPT-6.1 Sol xhigh authorship and independent review, phase-local progress, and an isolated worktree when other phases run concurrently."
