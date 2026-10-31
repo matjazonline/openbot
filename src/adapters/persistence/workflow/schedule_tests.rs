@@ -888,7 +888,7 @@ async fn claiming_anchors_the_next_run_on_the_slot_not_the_clock() {
 }
 
 /// What the schema refuses on its own: occurrence scope at capture, its identity afterwards,
-/// a snapshot naming another scope, a run that is not this occurrence's, and the state shape.
+/// a run that is not this occurrence's, and the state shape.
 #[tokio::test]
 async fn schedule_occurrence_schema_keeps_scope_identity_and_run() {
     let s = Schedules::new().await;
@@ -896,7 +896,7 @@ async fn schedule_occurrence_schema_keeps_scope_identity_and_run() {
     let other = s.schedule("Other").await;
     let mut tx = s.pool().begin().await.unwrap();
     let occurrence = Uuid::new_v4();
-    sqlx::query("INSERT INTO schedule_runs (id, schedule_id, scheduled_for, schedule_snapshot) VALUES ($1, $2, clock_timestamp(), '{}')")
+    sqlx::query("INSERT INTO schedule_runs (id, schedule_id, scheduled_for) VALUES ($1, $2, clock_timestamp())")
         .bind(occurrence)
         .bind(schedule.id)
         .execute(&mut *tx)
@@ -939,7 +939,7 @@ async fn schedule_occurrence_schema_keeps_scope_identity_and_run() {
     ] {
         refused(
             &mut tx,
-            &format!("INSERT INTO schedule_runs (id, schedule_id, scheduled_for, schedule_snapshot, {column}) VALUES (gen_random_uuid(), '{}', clock_timestamp(), '{{}}', $1)", schedule.id),
+            &format!("INSERT INTO schedule_runs (id, schedule_id, scheduled_for, {column}) VALUES (gen_random_uuid(), '{}', clock_timestamp(), $1)", schedule.id),
             value,
             "schedule_occurrence_owner_scope",
         )
@@ -969,13 +969,6 @@ async fn schedule_occurrence_schema_keeps_scope_identity_and_run() {
         )
         .await;
     }
-    refused(
-        &mut tx,
-        &format!("INSERT INTO schedule_runs (id, schedule_id, scheduled_for, schedule_snapshot) VALUES (gen_random_uuid(), '{}', clock_timestamp(), jsonb_build_object('binding_id', $1::text))", schedule.id),
-        Uuid::new_v4(),
-        "schedule_occurrence_snapshot_scope",
-    )
-    .await;
     // A run of another trigger, or of another binding, is not this occurrence's run.
     let manual = manual::start(
         &admission(s.p()),
@@ -1042,7 +1035,7 @@ async fn schedule_capture_serializes_with_a_rejected_channel_move() {
     let schedule = s.schedule("Hourly").await;
     let moved = channel_of(&s).await;
     let mut capture = s.pool().begin().await.unwrap();
-    sqlx::query("INSERT INTO schedule_runs (id, schedule_id, scheduled_for, schedule_snapshot) VALUES (gen_random_uuid(), $1, clock_timestamp(), '{}')")
+    sqlx::query("INSERT INTO schedule_runs (id, schedule_id, scheduled_for) VALUES (gen_random_uuid(), $1, clock_timestamp())")
         .bind(schedule.id)
         .execute(&mut *capture)
         .await
@@ -1146,10 +1139,52 @@ async fn manual_start_returns_its_run_replays_its_key_and_links_a_rerun() {
     ));
 }
 
+/// A claim page of N due occurrences returns all N, each carrying the scope captured on its row:
+/// the claim decodes relational columns only, so no stored schedule shape can fail the page after
+/// the claim committed (and charge every occurrence on it an attempt).
+#[tokio::test]
+async fn schedule_claim_page_of_n_occurrences_returns_n() {
+    let s = Schedules::new().await;
+    let mut due = Vec::new();
+    for n in 0..3 {
+        let schedule = s.schedule(&format!("Hourly {n}")).await;
+        let slot = s.due(schedule.id).await;
+        due.push((schedule.id, slot));
+    }
+    let worker = ScheduleWorkerId(Uuid::new_v4());
+    let claimed = s
+        .p()
+        .claim_due(worker, Utc::now() + chrono::Duration::minutes(1), 10)
+        .await
+        .unwrap();
+    assert_eq!(
+        claimed.len(),
+        due.len(),
+        "a page of N returns N: {claimed:?}"
+    );
+    for (schedule, slot) in due {
+        let occurrence = claimed
+            .iter()
+            .find(|occurrence| occurrence.schedule_id == schedule)
+            .expect("every due schedule's occurrence is claimed");
+        assert_eq!(
+            (
+                occurrence.company_id,
+                occurrence.channel_id,
+                occurrence.binding_id,
+                occurrence.scheduled_for
+            ),
+            (s.company(), s.channel, s.binding, slot)
+        );
+        let (_, status, _, _, attempts) = s.occurrences(schedule).await[0].clone();
+        assert_eq!((status.as_str(), attempts), ("materializing", 1));
+    }
+}
+
 /// F032 (`src/application/AGENTS.md` poison batch): a full page of failing occurrences is moved
 /// out of the claimable set, so the next iteration, without time advancing, claims none of them.
 #[tokio::test]
-async fn schedule_poison_batch_is_not_reclaimed_by_the_next_iteration() {
+async fn schedule_claim_poison_batch_is_not_reclaimed_by_the_next_iteration() {
     let s = Schedules::new().await;
     let mut schedules = Vec::new();
     for n in 0..SCHEDULE_PAGE {
@@ -1402,7 +1437,7 @@ async fn schedule_terminal_failures_and_lost_claims_are_observable() {
         .unwrap();
     let mine = claimed
         .iter()
-        .find(|row| row.schedule.id == contested.id)
+        .find(|row| row.schedule_id == contested.id)
         .unwrap();
     sqlx::query("UPDATE schedule_runs SET materialization_locked_at = clock_timestamp() - interval '2 minutes', materialization_lock_expires_at = clock_timestamp() - interval '1 second' WHERE id = $1")
         .bind(mine.id)

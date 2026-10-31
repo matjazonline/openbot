@@ -107,24 +107,39 @@ struct ClaimedRow {
     materialization_generation: Uuid,
     scheduled_for: DateTime<Utc>,
     binding_id: Uuid,
-    schedule_snapshot: serde_json::Value,
+    schedule_id: Uuid,
+    company_id: Uuid,
+    channel_id: Uuid,
 }
 
-impl ClaimedRow {
-    fn claimed(self) -> AppResult<ClaimedScheduleRun> {
-        Ok(ClaimedScheduleRun {
-            id: self.id,
-            materialization_generation: self.materialization_generation,
-            scheduled_for: self.scheduled_for,
-            binding_id: self.binding_id,
-            schedule: serde_json::from_value(self.schedule_snapshot).map_err(|_| invalid())?,
-        })
+impl From<ClaimedRow> for ClaimedScheduleRun {
+    fn from(row: ClaimedRow) -> Self {
+        Self {
+            id: row.id,
+            materialization_generation: row.materialization_generation,
+            scheduled_for: row.scheduled_for,
+            binding_id: row.binding_id,
+            schedule_id: row.schedule_id,
+            company_id: row.company_id,
+            channel_id: row.channel_id,
+        }
     }
 }
 
-/// The claim's returned shape, shared by the cadence and run-now claims.
+/// The claim's returned shape, shared by the cadence and run-now claims: relational columns
+/// only, so nothing about a claimed row can fail to decode after the claim committed.
 const CLAIMED: &str = "RETURNING run.id, run.materialization_generation, run.scheduled_for, \
-    run.binding_id, run.schedule_snapshot";
+    run.binding_id, run.schedule_id, run.company_id, run.channel_id";
+
+/// What the cadence capture needs of a due schedule: its scope and the slot that is due.
+#[derive(sqlx::FromRow)]
+struct DueSchedule {
+    id: Uuid,
+    company_id: Uuid,
+    channel_id: Uuid,
+    binding_id: Uuid,
+    next_run_at: DateTime<Utc>,
+}
 
 fn channel_association(channel: Uuid) -> RelatedAssociation {
     RelatedAssociation::Channel(RelatedChannelId::new(channel))
@@ -419,16 +434,14 @@ impl SchedulePersistence for PostgresPersistence {
     ) -> AppResult<Uuid> {
         let mut tx = self.pool.begin().await?;
         let schedule = managed(&mut tx, company, actor, id).await?;
-        let snapshot = serde_json::to_value(&schedule).map_err(|_| invalid())?;
         let captured = sqlx::query(
-            "INSERT INTO schedule_runs (id, schedule_id, scheduled_for, schedule_snapshot, \
+            "INSERT INTO schedule_runs (id, schedule_id, scheduled_for, \
                company_id, channel_id, binding_id, command_key) \
-             VALUES ($1, $2, clock_timestamp(), $3, $4, $5, $6, $7) \
+             VALUES ($1, $2, clock_timestamp(), $3, $4, $5, $6) \
              ON CONFLICT (company_id, schedule_id, command_key) DO NOTHING",
         )
         .bind(Uuid::new_v4())
         .bind(id)
-        .bind(snapshot)
         .bind(company.as_uuid())
         .bind(schedule.channel_id)
         .bind(schedule.binding_id)
@@ -626,27 +639,25 @@ impl ScheduleOccurrences for PostgresPersistence {
         page: i64,
     ) -> AppResult<Vec<ClaimedScheduleRun>> {
         let mut tx = self.pool.begin().await?;
-        let due = sqlx::query_as::<_, ScheduleRow>(&format!(
-            "SELECT {COLUMNS} FROM channel_schedules \
+        // Only the columns the capture writes: decoding the whole schedule here would let one row
+        // that no longer parses fail capture and claim for every tenant.
+        let due = sqlx::query_as::<_, DueSchedule>(
+            "SELECT id, company_id, channel_id, binding_id, next_run_at FROM channel_schedules \
              WHERE enabled AND next_run_at IS NOT NULL AND next_run_at <= CURRENT_TIMESTAMP \
-             ORDER BY next_run_at, id FOR UPDATE SKIP LOCKED LIMIT $1"
-        ))
+             ORDER BY next_run_at, id FOR UPDATE SKIP LOCKED LIMIT $1",
+        )
         .bind(page.max(1))
         .fetch_all(&mut *tx)
         .await?;
-        for row in due {
-            let schedule = row.schedule()?;
-            let scheduled_for = schedule.next_run_at.ok_or_else(invalid)?;
-            let snapshot = serde_json::to_value(&schedule).map_err(|_| invalid())?;
+        for schedule in due {
             sqlx::query(
-                "INSERT INTO schedule_runs (id, schedule_id, scheduled_for, schedule_snapshot, \
-                   company_id, channel_id, binding_id) VALUES ($1, $2, $3, $4, $5, $6, $7) \
+                "INSERT INTO schedule_runs (id, schedule_id, scheduled_for, \
+                   company_id, channel_id, binding_id) VALUES ($1, $2, $3, $4, $5, $6) \
                  ON CONFLICT (schedule_id, scheduled_for) WHERE command_key IS NULL DO NOTHING",
             )
             .bind(Uuid::new_v4())
             .bind(schedule.id)
-            .bind(scheduled_for)
-            .bind(snapshot)
+            .bind(schedule.next_run_at)
             .bind(schedule.company_id)
             .bind(schedule.channel_id)
             .bind(schedule.binding_id)
@@ -707,7 +718,7 @@ impl ScheduleOccurrences for PostgresPersistence {
         .fetch_all(&mut *tx)
         .await?;
         tx.commit().await?;
-        claimed.into_iter().map(ClaimedRow::claimed).collect()
+        Ok(claimed.into_iter().map(ClaimedScheduleRun::from).collect())
     }
 
     async fn claim_occurrence(
@@ -736,9 +747,9 @@ impl ScheduleOccurrences for PostgresPersistence {
         .bind(worker.0)
         .bind(lease_until)
         .fetch_optional(&self.pool)
-        .await?
-        .map(ClaimedRow::claimed)
-        .transpose()
+        .await
+        .map(|row| row.map(ClaimedScheduleRun::from))
+        .map_err(Into::into)
     }
 
     async fn schedule_binding(

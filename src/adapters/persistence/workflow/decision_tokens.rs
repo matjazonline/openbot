@@ -32,7 +32,7 @@ pub(in crate::adapters::persistence::workflow) async fn park(
     notices: &DecisionNotices,
 ) -> AppResult<TokenParked> {
     let scope = pause.fence.scope;
-    let head: Head = sqlx::query_as("SELECT execution.step_id,run.deadline,(job.continuation_count<63) AS remaining,
+    let head: Head = sqlx::query_as("SELECT execution.step_id,run.deadline,(job.continuation_count<workflow_job_continuation_limit()) AS remaining,
         ARRAY(SELECT (reviewer->>'id')::uuid FROM jsonb_array_elements(budget.token_policy->'reviewers') AS reviewer) AS reviewers
         FROM workflow_executions AS execution JOIN workflow_runs AS run ON run.company_id=execution.company_id AND run.id=execution.run_id
         JOIN background_tasks AS job ON job.company_id=execution.company_id AND job.workflow_execution_id=execution.id

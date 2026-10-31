@@ -85,6 +85,11 @@ use sqlx::{PgConnection, Postgres, Transaction};
 use std::sync::Arc;
 use uuid::Uuid;
 
+/// The most continuations one workflow job may take, mirroring the SQL
+/// `workflow_job_continuation_limit()` that the job guards and the CHECK use. A database test
+/// asserts the two are equal. Every park that needs its job reopened refuses at this count.
+pub(crate) const WORKFLOW_JOB_CONTINUATION_LIMIT: i16 = 63;
+
 fn conflict() -> AppError {
     AppError::Conflict("Workflow lifecycle revision or command conflict".into())
 }

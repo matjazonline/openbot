@@ -527,24 +527,43 @@ async fn locked_event(
     row.map(|row| row.event()).transpose()
 }
 
+/// Hand a projection whose source moved under it back to the queue.
+///
+/// A stale projection is legitimate work, but the claim already charged it an attempt, so it
+/// takes the fail path's rules: dead-lettered once its attempts are spent, otherwise backed off.
+/// Without them a source that keeps changing hot-loops, and the last attempt coming back stale
+/// leaves a `pending` row that can never be claimed again.
 async fn release_stale_projection(
     tx: &mut Transaction<'_, Postgres>,
     fence: &ExecutionLease<NotificationEventId>,
 ) -> AppResult<()> {
-    sqlx::query(
+    let released: Option<(String, i32)> = sqlx::query_as(
         r#"UPDATE notification_events
-              SET status = 'pending', available_at = CURRENT_TIMESTAMP,
+              SET status = CASE WHEN attempt_count >= max_attempts
+                                THEN 'dead_letter' ELSE 'pending' END,
+                  available_at = CURRENT_TIMESTAMP
+                      + (2 * POWER(2, LEAST(attempt_count, 8))) * INTERVAL '1 second',
                   execution_id = NULL, owner_worker_id = NULL,
                   locked_at = NULL, lock_expires_at = NULL
             WHERE id = $1 AND status = 'processing'
-              AND execution_id = $2 AND owner_worker_id = $3"#,
+              AND execution_id = $2 AND owner_worker_id = $3
+        RETURNING status, attempt_count"#,
     )
     .bind(fence.row.as_uuid())
     .bind(fence.execution.as_uuid())
     .bind(fence.owner.as_uuid())
-    .execute(&mut **tx)
+    .fetch_optional(&mut **tx)
     .await
     .map_err(AppError::from)?;
+    if let Some((status, attempts)) = released
+        && status == "dead_letter"
+    {
+        tracing::warn!(
+            event_id = %fence.row,
+            attempts,
+            "A notification event went stale on its last attempt and was dead-lettered"
+        );
+    }
     Ok(())
 }
 

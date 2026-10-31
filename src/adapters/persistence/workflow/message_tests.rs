@@ -21,6 +21,8 @@ mod delivery_tests;
 mod ingress_tests;
 #[path = "message_intent_tests.rs"]
 mod intent_tests;
+#[path = "message_park_continuation_tests.rs"]
+mod park_continuation_tests;
 #[path = "message_race_tests.rs"]
 mod race_tests;
 #[path = "message_reconcile_tests.rs"]

@@ -120,7 +120,7 @@ impl Occurrence {
         let occurrence = Uuid::new_v4();
         sqlx::query("INSERT INTO channel_schedules (id,company_id,channel_id,binding_id,name,schedule_type) VALUES ($1,$2,$3,$4,'Admission','one_off')")
             .bind(schedule).bind(company.as_uuid()).bind(channel).bind(binding).execute(f.persistence().pool()).await.unwrap();
-        sqlx::query("INSERT INTO schedule_runs (id,schedule_id,scheduled_for,schedule_snapshot,company_id,channel_id,binding_id) VALUES ($1,$2,CURRENT_TIMESTAMP,'{}',$3,$4,$5)")
+        sqlx::query("INSERT INTO schedule_runs (id,schedule_id,scheduled_for,company_id,channel_id,binding_id) VALUES ($1,$2,CURRENT_TIMESTAMP,$3,$4,$5)")
             .bind(occurrence).bind(schedule).bind(company.as_uuid()).bind(channel).bind(binding).execute(f.persistence().pool()).await.unwrap();
         Self {
             schedule,

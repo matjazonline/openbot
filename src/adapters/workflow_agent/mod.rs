@@ -16,7 +16,7 @@ use crate::{
         mcp::McpToolCall,
         message::{MessageObservation, MessageToolCall},
         provisioning::ProvisioningToolCall,
-        tools::{WorkflowToolCall, WorkflowToolDispatch},
+        tools::{TOOL_LIMIT, WorkflowToolCall, WorkflowToolDispatch, tool_error},
     },
     domain::workflow::ToolCallId,
 };
@@ -183,6 +183,12 @@ fn message(observation: MessageObservation) -> AppResult<AgentToolObservation> {
         MessageObservation::ActionLimit => {
             Err(AppError::BadRequest("Message action limit reached".into()))
         }
+        // The same refusal a workflow tool call gets at the limit: the model is told, and the
+        // step goes on without the email.
+        MessageObservation::ContinuationLimit => Ok(AgentToolObservation::Completed(tool_error(
+            TOOL_LIMIT,
+            "This agent step cannot send another email",
+        ))),
         MessageObservation::Pending => {
             Err(AppError::Conflict("Message delivery is pending".into()))
         }
@@ -192,4 +198,22 @@ fn message(observation: MessageObservation) -> AppResult<AgentToolObservation> {
 /// A protected action without an `agent.run` approval policy fails closed.
 fn approval_required() -> AppError {
     AppError::BadRequest("Protected tool requires an agent.run approval policy".into())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A model-tool email the job has no continuation left for reaches the model as the same
+    /// tool-limit result a workflow tool call gets at the limit, not as an error that fails the
+    /// step (fix-app 02 §1).
+    #[test]
+    fn message_park_continuation_limit_is_the_tool_limit_observation() {
+        let Ok(AgentToolObservation::Completed(result)) =
+            message(MessageObservation::ContinuationLimit)
+        else {
+            panic!("the continuation limit is a completed tool result");
+        };
+        assert_eq!(result["error"]["code"], TOOL_LIMIT);
+    }
 }
