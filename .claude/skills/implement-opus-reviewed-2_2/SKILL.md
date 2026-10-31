@@ -1,6 +1,6 @@
 ---
 name: implement-opus-reviewed-2_2
-description: "Execute complex implementation in Claude Code with an Opus 5.5/xhigh author and an independent Opus 5.5/xhigh reviewer subagent, using large cohesive batches, selective architecture gates, phase-local progress and review evidence, isolated concurrent workstreams, and context continuity with 75% auto-compaction. Use when an implementation request selects this workflow; not for standalone planning or review."
+description: "Execute complex implementation in Claude Code with an Opus 5.5 author at `high` effort or above and an independent Opus 5.5/xhigh reviewer subagent, using large cohesive batches, selective architecture gates, phase-local progress and review evidence, isolated concurrent workstreams, and context continuity with 75% auto-compaction. Use when an implementation request selects this workflow; not for standalone planning or review."
 ---
 
 # Implement Opus Reviewed 2.2
@@ -16,27 +16,29 @@ measured, not assumed. User preferences override these defaults.
 
 | Role | Model / effort | Ownership |
 | --- | --- | --- |
-| Author (A) | Opus 5.5 / `xhigh` | Investigation, consequential decisions, implementation, fixtures, tests, and every correction. |
+| Author (A) | Opus 5.5 / `high` or above | Investigation, consequential decisions, implementation, fixtures, tests, and every correction. |
 | Reviewer (B) | Opus 5.5 / `xhigh` | Independent review of requirements, architecture, code, and verification; review notes and findings. Does not edit project files or author the design. |
 | Root | Actual session settings | Scope, assignments, resources, acceptance, and user updates. |
 
 - When authoritative session information or the user confirms root runs Opus 5.5
-  at `xhigh` effort, root acts as A and spawns only B. Claude Code's system prompt
-  names root's model but normally not its effort, and `/effort` can override the
-  `effortLevel` setting or `CLAUDE_CODE_EFFORT_LEVEL` mid-session. If root's model
-  or effort is unknown or uncertain, ask the user with `AskUserQuestion` to confirm
-  whether root is Opus/xhigh (`/effort status` prints the level in effect) or choose
-  a separate Opus author **before spawning any new sub-agent**. Wait for the answer;
+  at `high` effort or above (`high`, `xhigh`, or `max`), root acts as A and spawns
+  only B. Claude Code's system prompt names root's model but normally not its
+  effort, and `/effort` can override the `effortLevel` setting or
+  `CLAUDE_CODE_EFFORT_LEVEL` mid-session. If root's model or effort is unknown or
+  uncertain, ask the user with `AskUserQuestion` to confirm whether root is Opus at
+  `high` or above (`/effort status` prints the level in effect) or choose a
+  separate Opus author **before spawning any new sub-agent**. Wait for the answer;
   missing metadata is not evidence that a separate author is needed. Reuse
   confirmation already provided in the session. When root is confirmed not to be
-  Opus/xhigh, use a separate A unless the user authorizes root authorship. With a
-  separate A, root stays a thin coordinator without repeating implementation or
-  technical review. Keep and record root's actual settings; never infer them from
-  a role label or claim instructions changed them.
+  Opus or to run below `high`, use a separate A unless the user authorizes root
+  authorship. With a separate A, root stays a thin coordinator without repeating
+  implementation or technical review. Keep and record root's actual settings; never
+  infer them from a role label or claim instructions changed them.
 - After resolving root's role, spawn B and, only if needed, A with the Agent tool:
-  `subagent_type: "general-purpose"`, `model: "opus"`, `effort: "xhigh"`. Do not
-  pass `isolation`; phase worktrees are set up explicitly. This workflow explicitly
-  requests delegation and those worker settings, so passing them is authorized.
+  `subagent_type: "general-purpose"`, `model: "opus"`, and `effort: "xhigh"` for B
+  or `effort: "high"` for A. Do not pass `isolation`; phase worktrees are set up
+  explicitly. This workflow explicitly requests delegation and those worker
+  settings, so passing them is authorized.
 - **Start workers without inherited conversation.** Never spawn a worker, least of
   all B, with `subagent_type: "fork"`: a fork inherits root's history and A's
   reasoning. Claude Code subagents can spawn agents, so every assignment states
@@ -48,10 +50,11 @@ measured, not assumed. User preferences override these defaults.
   completion notification before reporting results, never predict or summarize a
   pending result, and keep user updates flowing. Stop a worker that is still
   running but no longer needed with `TaskStop`.
-- Record actual model/effort when reported. If Opus 5.5, xhigh effort, independent
-  context, or delegation is unavailable, disclose the limitation and obtain an
-  authorized alternative before substituting another workflow. Honor alternatives
-  already authorized in the session.
+- Record actual model/effort when reported. If Opus 5.5, the required effort (A at
+  `high` or above, B at `xhigh`), independent context, or delegation is
+  unavailable, disclose the limitation and obtain an authorized alternative before
+  substituting another workflow. Honor alternatives already authorized in the
+  session.
 
 Give workers compact assignments: original requirements and artifact paths,
 applicable `AGENTS.md`/`CLAUDE.md` files, scope, acceptance criteria, and resolved
@@ -136,7 +139,7 @@ resolve routine implementation choices from the system.
 
 ## Large batches and review cadence
 
-Review is expensive at Opus/xhigh; spend it on fewer, larger artifacts that remain
+Review is expensive at Opus/xhigh for B; spend it on fewer, larger artifacts that remain
 reviewable.
 
 - **Batch size.** A batch is a whole plan phase, milestone, or cohesive feature
