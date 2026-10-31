@@ -344,3 +344,136 @@ async fn run_agent_filter_finds_only_an_agent_of_the_company() {
     let (filtered, page) = f.runs_page(f.stranger, company, by_agent(mine)).await;
     assert_ne!(filtered, StatusCode::OK, "{page}");
 }
+
+/// Plan `fix-02-run-child-duplicates`: an agent reached only through a child workflow is in both
+/// runs' versions, so the agent filter lists the parent and its child, `top_level` lists the
+/// parent once, and the parent's rollup counts the child — which carries the parent's channel, so
+/// whoever sees the parent may see that count. The child freezes the agent on a branch it never
+/// takes, so the workers run the whole tree without calling a model.
+#[tokio::test]
+async fn run_top_level_lists_a_parent_once_and_rolls_up_its_child() {
+    use crate::application::workflow::reads::{ChildCounts, RunLineage};
+    use crate::domain::workflow::{CompanyId, RunId};
+    let Some(f) = Fixture::new().await else {
+        return;
+    };
+    let (owner, company) = (f.owner, f.company);
+    let assistant = f.model_agent(company, "assistant").await;
+    let text_input = json!({"type": "object", "properties": {"text": {"type": "string", "maxLength": 128}}, "required": ["text"]});
+
+    let child = Uuid::new_v4();
+    let mut source = example("decision.rule", child);
+    source["input_schema"] = text_input.clone();
+    source["steps"]["start"]["routes"]["choices"]["revise"] = json!("draft");
+    source["steps"]["draft"] = agent_source(Uuid::new_v4(), "assistant")["steps"]["start"].clone();
+    let (_, child_version) = f.published(owner, company, source).await;
+    let parent = Uuid::new_v4();
+    let mut source = example("workflow.call", parent);
+    source["input_schema"] = text_input;
+    source["steps"]["start"]["child_workflow_id"] = json!(child.to_string());
+    source["steps"]["start"]["child_version_id"] = json!(child_version.to_string());
+    let (_, parent_version) = f.published(owner, company, source).await;
+
+    let channel = ChannelPersistence::create(
+        &f.persistence,
+        company,
+        ChannelWrite {
+            name: "Desk".into(),
+            slug: "desk".into(),
+            enabled: true,
+            ..ChannelWrite::default()
+        },
+    )
+    .await
+    .unwrap()
+    .id;
+    let binding = Uuid::new_v4();
+    let (status, configured) = f
+        .configure_on(
+            owner,
+            company,
+            binding,
+            None,
+            parent_version,
+            json!({"kind": "channel", "channel_id": channel}),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{configured}");
+    let revision = configured["state_revision"].as_u64().unwrap();
+    let (status, active) = f.activate(owner, company, binding, revision).await;
+    assert_eq!(status, StatusCode::OK, "{active}");
+    let root = f
+        .started(owner, company, binding, "root", json!({"text": "hello"}))
+        .await;
+    let child_of = async || -> Option<Uuid> {
+        sqlx::query_scalar("SELECT id FROM workflow_runs WHERE parent_run_id = $1")
+            .bind(root)
+            .fetch_optional(f.persistence.pool())
+            .await
+            .unwrap()
+    };
+    f.run_until("the parent finishes its child", async || {
+        child_of().await.is_some() && f.run_state(root).await == "succeeded"
+    })
+    .await;
+    let child_run = child_of().await.unwrap();
+
+    let association = async |run: Uuid| -> (Option<Uuid>, Option<Uuid>) {
+        sqlx::query_as("SELECT channel_id, thread_id FROM workflow_runs WHERE id = $1")
+            .bind(run)
+            .fetch_one(f.persistence.pool())
+            .await
+            .unwrap()
+    };
+    assert_eq!(association(root).await, (Some(channel), None));
+    assert_eq!(association(child_run).await, association(root).await);
+
+    assert_eq!(
+        f.listed(owner, company, by_agent(assistant)).await,
+        [child_run, root]
+    );
+    let top_level = RunsQuery {
+        lineage: Some(RunLineage::TopLevel),
+        ..by_agent(assistant)
+    };
+    assert_eq!(f.listed(owner, company, top_level).await, [root]);
+
+    let rollup = f
+        .engine
+        .reads()
+        .child_rollup(
+            CompanyId::new(company),
+            &[RunId::new(root), RunId::new(child_run)],
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        rollup.get(&RunId::new(root)),
+        Some(&ChildCounts {
+            total: 1,
+            open: 0,
+            failed: 0
+        })
+    );
+    assert_eq!(rollup.get(&RunId::new(child_run)), None, "no grandchildren");
+}
+
+/// The documented `lineage` values decode from a query string, and anything else is refused,
+/// before the handler sees the request.
+#[test]
+fn run_top_level_query_decodes_the_documented_lineage_values() {
+    use crate::application::workflow::reads::RunLineage;
+    let decode = |query: &str| {
+        let uri: axum::http::Uri = format!("/runs?{query}").parse().unwrap();
+        Query::<RunsQuery>::try_from_uri(&uri).map(|Query(query)| query.lineage)
+    };
+    assert_eq!(
+        decode("lineage=top_level").unwrap(),
+        Some(RunLineage::TopLevel)
+    );
+    assert_eq!(decode("lineage=any").unwrap(), Some(RunLineage::Any));
+    assert_eq!(decode("agent_id=").ok(), None, "an empty id is refused too");
+    assert_eq!(decode("").unwrap(), None);
+    assert!(decode("lineage=children").is_err());
+    assert!(decode("lineage=TopLevel").is_err());
+}

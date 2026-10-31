@@ -1,0 +1,98 @@
+6,7c6,7
+<  pg_toast_204466897_index                                        |       0 | 8192 bytes
+<  pg_toast_204466931_index                                        |       0 | 8192 bytes
+---
+>  pg_toast_218819091_index                                        |       0 | 8192 bytes
+>  pg_toast_218819125_index                                        |       0 | 8192 bytes
+9c9
+<  workflow_runs_company_id_channel_id_state_idx                   |   54618 | 448 kB
+---
+>  workflow_runs_company_id_channel_id_state_idx                   |   51951 | 448 kB
+18c18
+<  workflow_runs_company_id_state_created_at_idx                   |  369864 | 31 MB
+---
+>  workflow_runs_company_id_state_created_at_idx                   |  365005 | 31 MB
+132c132
+<                      ->  Bitmap Index Scan on workflow_versions_company_id_command_key_key  (rows=800.00 loops=1)
+---
+>                      ->  Bitmap Index Scan on workflow_versions_pkey  (rows=800.00 loops=1)
+152c152
+<                      ->  Bitmap Index Scan on workflow_versions_company_id_command_key_key  (rows=800.00 loops=1)
+---
+>                      ->  Bitmap Index Scan on workflow_versions_pkey  (rows=800.00 loops=1)
+172c172
+<                      ->  Bitmap Index Scan on workflow_versions_company_id_command_key_key  (rows=800.00 loops=1)
+---
+>                      ->  Bitmap Index Scan on workflow_versions_pkey  (rows=800.00 loops=1)
+192c192
+<                      ->  Bitmap Index Scan on workflow_versions_company_id_command_key_key  (rows=800.00 loops=1)
+---
+>                      ->  Bitmap Index Scan on workflow_versions_pkey  (rows=800.00 loops=1)
+212c212
+<                      ->  Bitmap Index Scan on workflow_versions_company_id_command_key_key  (rows=800.00 loops=1)
+---
+>                      ->  Bitmap Index Scan on workflow_versions_pkey  (rows=800.00 loops=1)
+234c234
+<                      ->  Bitmap Index Scan on workflow_versions_company_id_command_key_key  (rows=800.00 loops=1)
+---
+>                      ->  Bitmap Index Scan on workflow_versions_pkey  (rows=800.00 loops=1)
+256c256
+<                      ->  Bitmap Index Scan on workflow_versions_company_id_command_key_key  (rows=800.00 loops=1)
+---
+>                      ->  Bitmap Index Scan on workflow_versions_pkey  (rows=800.00 loops=1)
+278c278
+<                      ->  Bitmap Index Scan on workflow_versions_company_id_command_key_key  (rows=800.00 loops=1)
+---
+>                      ->  Bitmap Index Scan on workflow_versions_pkey  (rows=800.00 loops=1)
+300c300
+<                      ->  Bitmap Index Scan on workflow_versions_company_id_command_key_key  (rows=800.00 loops=1)
+---
+>                      ->  Bitmap Index Scan on workflow_versions_pkey  (rows=800.00 loops=1)
+388c388
+<                      ->  Bitmap Index Scan on workflow_versions_company_id_command_key_key  (rows=800.00 loops=1)
+---
+>                      ->  Bitmap Index Scan on workflow_versions_pkey  (rows=800.00 loops=1)
+393c393
+<                            Index Cond: ((company_id = 'df655f97-6f7c-9d32-6381-5bd981225cd9'::uuid) AND (version_id = version.id) AND (ROW(created_at, id) < ROW('2026-09-23 10:02:27.496174+02'::timestamp with time zone, '7f510339-d0c4-418d-4411-92012d177a43'::uuid)))
+---
+>                            Index Cond: ((company_id = 'df655f97-6f7c-9d32-6381-5bd981225cd9'::uuid) AND (version_id = version.id) AND (ROW(created_at, id) < ROW('2026-09-23 10:30:06.087472+02'::timestamp with time zone, '7f510339-d0c4-418d-4411-92012d177a43'::uuid)))
+408c408
+<                      ->  Bitmap Index Scan on workflow_versions_company_id_command_key_key  (rows=800.00 loops=1)
+---
+>                      ->  Bitmap Index Scan on workflow_versions_pkey  (rows=800.00 loops=1)
+413c413
+<                            Index Cond: ((company_id = 'df655f97-6f7c-9d32-6381-5bd981225cd9'::uuid) AND (version_id = version.id) AND (ROW(created_at, id) < ROW('2026-09-23 10:02:27.496174+02'::timestamp with time zone, '7f510339-d0c4-418d-4411-92012d177a43'::uuid)))
+---
+>                            Index Cond: ((company_id = 'df655f97-6f7c-9d32-6381-5bd981225cd9'::uuid) AND (version_id = version.id) AND (ROW(created_at, id) < ROW('2026-09-23 10:30:06.087472+02'::timestamp with time zone, '7f510339-d0c4-418d-4411-92012d177a43'::uuid)))
+428c428
+<                      ->  Bitmap Index Scan on workflow_versions_company_id_command_key_key  (rows=800.00 loops=1)
+---
+>                      ->  Bitmap Index Scan on workflow_versions_pkey  (rows=800.00 loops=1)
+433c433
+<                            Index Cond: ((company_id = 'df655f97-6f7c-9d32-6381-5bd981225cd9'::uuid) AND (version_id = version.id) AND (ROW(created_at, id) < ROW('2024-11-13 00:17:14.536174+01'::timestamp with time zone, '3e0d5b8e-e511-e7d4-4d08-e448ca4fa62d'::uuid)))
+---
+>                            Index Cond: ((company_id = 'df655f97-6f7c-9d32-6381-5bd981225cd9'::uuid) AND (version_id = version.id) AND (ROW(created_at, id) < ROW('2024-11-13 00:44:53.127472+01'::timestamp with time zone, '3e0d5b8e-e511-e7d4-4d08-e448ca4fa62d'::uuid)))
+448c448
+<                      ->  Bitmap Index Scan on workflow_versions_company_id_command_key_key  (rows=800.00 loops=1)
+---
+>                      ->  Bitmap Index Scan on workflow_versions_pkey  (rows=800.00 loops=1)
+453c453
+<                            Index Cond: ((company_id = 'df655f97-6f7c-9d32-6381-5bd981225cd9'::uuid) AND (version_id = version.id) AND (ROW(created_at, id) < ROW('2024-11-13 00:17:14.536174+01'::timestamp with time zone, '3e0d5b8e-e511-e7d4-4d08-e448ca4fa62d'::uuid)))
+---
+>                            Index Cond: ((company_id = 'df655f97-6f7c-9d32-6381-5bd981225cd9'::uuid) AND (version_id = version.id) AND (ROW(created_at, id) < ROW('2024-11-13 00:44:53.127472+01'::timestamp with time zone, '3e0d5b8e-e511-e7d4-4d08-e448ca4fa62d'::uuid)))
+488c488
+<                      ->  Bitmap Index Scan on workflow_versions_company_id_command_key_key  (rows=800.00 loops=1)
+---
+>                      ->  Bitmap Index Scan on workflow_versions_pkey  (rows=800.00 loops=1)
+510c510
+<                      ->  Bitmap Index Scan on workflow_versions_company_id_command_key_key  (rows=800.00 loops=1)
+---
+>                      ->  Bitmap Index Scan on workflow_versions_pkey  (rows=800.00 loops=1)
+532c532
+<                      ->  Bitmap Index Scan on workflow_versions_company_id_command_key_key  (rows=800.00 loops=1)
+---
+>                      ->  Bitmap Index Scan on workflow_versions_pkey  (rows=800.00 loops=1)
+553c553
+<                      ->  Bitmap Index Scan on workflow_versions_company_id_command_key_key  (rows=800.00 loops=1)
+---
+>                      ->  Bitmap Index Scan on workflow_versions_pkey  (rows=800.00 loops=1)

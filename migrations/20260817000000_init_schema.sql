@@ -7319,6 +7319,10 @@ CREATE INDEX workflow_runs_binding_newest ON public.workflow_runs(company_id, bi
 -- One version's runs in keyset order: the agent filter reads one range per version that uses the
 -- agent, cut at the page size (fix-01; evidence in docs/performance/run-list.md).
 CREATE INDEX workflow_runs_version_newest ON public.workflow_runs(company_id, version_id, created_at DESC, id DESC);
+-- The same ranges without child runs, for the agent filter on top-level reads (fix-02): a version
+-- whose runs are all children, such as a workflow only ever called as a child, is then an empty
+-- range instead of one read to its end on every page.
+CREATE INDEX workflow_runs_version_top_level ON public.workflow_runs(company_id, version_id, created_at DESC, id DESC) WHERE parent_run_id IS NULL;
 -- The retargeted surfaces (P08-D4): attention, run counts and thread activity.
 CREATE INDEX workflow_runs_attention ON public.workflow_runs(company_id, state, created_at DESC) WHERE state IN ('waiting', 'failed');
 CREATE INDEX workflow_runs_reruns ON public.workflow_runs(company_id, rerun_of_run_id) WHERE rerun_of_run_id IS NOT NULL;

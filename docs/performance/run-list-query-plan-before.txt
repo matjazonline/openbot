@@ -1,5 +1,5 @@
 == Table and index sizes (temporary clones)
-                             relname                             |  rows   |    size    
+                             relname                             |  rows   |    size
 -----------------------------------------------------------------+---------+------------
  workflow_runs                                                   | 1096000 | 268 MB
  workflow_versions                                               |   80000 | 21 MB
@@ -24,7 +24,7 @@
 (20 rows)
 
 == Shipped indexes on public.workflow_runs and public.workflow_versions
-                                                                                           indexdef                                                                                           
+                                                                                           indexdef
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
  CREATE INDEX workflow_runs_attention ON public.workflow_runs USING btree (company_id, state, created_at DESC) WHERE (state = ANY (ARRAY['waiting'::text, 'failed'::text]))
  CREATE INDEX workflow_runs_binding_newest ON public.workflow_runs USING btree (company_id, binding_id, created_at DESC, id DESC)
@@ -45,7 +45,7 @@
 (16 rows)
 
 == company (plan_cache_mode = auto)
-                                                                                   QUERY PLAN                                                                                   
+                                                                                   QUERY PLAN
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
  Limit  (cost=0.43..29.41 rows=51 width=185) (actual time=0.049..0.087 rows=51.00 loops=1)
    Buffers: local read=6 written=6
@@ -60,7 +60,7 @@
 (10 rows)
 
 == binding (plan_cache_mode = auto)
-                                                                                     QUERY PLAN                                                                                     
+                                                                                     QUERY PLAN
 ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
  Limit  (cost=0.55..182.05 rows=48 width=185) (actual time=0.054..0.507 rows=51.00 loops=1)
    Buffers: local hit=2 read=53 dirtied=7 written=53
@@ -75,7 +75,7 @@
 (10 rows)
 
 == agent dense (plan_cache_mode = auto)
-                                                                                     QUERY PLAN                                                                                      
+                                                                                     QUERY PLAN
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
  Limit  (cost=49913.39..49913.42 rows=13 width=185) (actual time=91.559..91.564 rows=51.00 loops=1)
    Buffers: local read=9879 dirtied=954 written=1785
@@ -114,7 +114,7 @@
 (34 rows)
 
 == agent sparse (plan_cache_mode = auto)
-                                                                                             QUERY PLAN                                                                                              
+                                                                                             QUERY PLAN
 -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
  Limit  (cost=18397.07..18397.08 rows=3 width=185) (actual time=11.610..11.615 rows=51.00 loops=1)
    Buffers: shared hit=3, local read=3759 written=125
@@ -145,7 +145,7 @@
 (26 rows)
 
 == agent_state dense (plan_cache_mode = auto)
-                                                                                      QUERY PLAN                                                                                      
+                                                                                      QUERY PLAN
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
  Limit  (cost=41768.31..41768.32 rows=4 width=185) (actual time=35.799..35.803 rows=51.00 loops=1)
    Buffers: local hit=31 read=8672
@@ -184,7 +184,7 @@
 (34 rows)
 
 == agent_state sparse (plan_cache_mode = auto)
-                                                                                             QUERY PLAN                                                                                             
+                                                                                             QUERY PLAN
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
  Limit  (cost=18396.88..18396.89 rows=1 width=185) (actual time=10.716..10.717 rows=0.00 loops=1)
    Buffers: local read=3759
@@ -217,7 +217,7 @@
 (28 rows)
 
 == agent_cursor dense (plan_cache_mode = auto)
-                                                                                              QUERY PLAN                                                                                              
+                                                                                              QUERY PLAN
 ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
  Limit  (cost=50590.34..50590.37 rows=12 width=185) (actual time=3914.693..3914.699 rows=51.00 loops=1)
    Buffers: local hit=4376 read=1485059
@@ -250,7 +250,7 @@
 (28 rows)
 
 == agent_cursor sparse (plan_cache_mode = auto)
-                                                                                                                 QUERY PLAN                                                                                                                  
+                                                                                                                 QUERY PLAN
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
  Limit  (cost=15154.65..15154.66 rows=1 width=185) (actual time=0.896..0.899 rows=51.00 loops=1)
    Buffers: local hit=54 read=184
@@ -287,7 +287,7 @@
 (32 rows)
 
 == company (plan_cache_mode = force_generic_plan)
-                                                                                  QUERY PLAN                                                                                  
+                                                                                  QUERY PLAN
 ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
  Limit  (cost=0.43..3545.54 rows=1096 width=185) (actual time=0.014..0.026 rows=51.00 loops=1)
    Buffers: local hit=1 read=5
@@ -302,7 +302,7 @@
 (10 rows)
 
 == binding (plan_cache_mode = force_generic_plan)
-                                                                                    QUERY PLAN                                                                                    
+                                                                                    QUERY PLAN
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
  Limit  (cost=0.55..5.11 rows=1 width=185) (actual time=0.016..0.127 rows=51.00 loops=1)
    Buffers: local hit=2 read=53
@@ -317,7 +317,7 @@
 (10 rows)
 
 == agent dense (plan_cache_mode = force_generic_plan)
-                                                                                      QUERY PLAN                                                                                       
+                                                                                      QUERY PLAN
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
  Limit  (cost=34.85..8752.98 rows=1 width=185) (actual time=232.873..233.765 rows=51.00 loops=1)
    Buffers: local hit=82 read=508
@@ -349,7 +349,7 @@
 (27 rows)
 
 == agent sparse (plan_cache_mode = force_generic_plan)
-                                                                                       QUERY PLAN                                                                                        
+                                                                                       QUERY PLAN
 -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
  Limit  (cost=34.85..8752.98 rows=1 width=185) (actual time=59.613..60.124 rows=51.00 loops=1)
    Buffers: local hit=1967 read=9966
@@ -379,7 +379,7 @@
 (25 rows)
 
 == agent_state dense (plan_cache_mode = force_generic_plan)
-                                                                          QUERY PLAN                                                                           
+                                                                          QUERY PLAN
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------
  Limit  (cost=25273.80..25273.81 rows=1 width=185) (actual time=57.620..57.624 rows=51.00 loops=1)
    Buffers: local read=9880
@@ -420,7 +420,7 @@
 (36 rows)
 
 == agent_state sparse (plan_cache_mode = force_generic_plan)
-                                                                          QUERY PLAN                                                                           
+                                                                          QUERY PLAN
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------
  Limit  (cost=25273.80..25273.81 rows=1 width=185) (actual time=46.829..46.830 rows=0.00 loops=1)
    Buffers: local read=9880
@@ -459,7 +459,7 @@
 (34 rows)
 
 == agent_cursor dense (plan_cache_mode = force_generic_plan)
-                                                                                    QUERY PLAN                                                                                     
+                                                                                    QUERY PLAN
 -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
  Limit  (cost=34.85..8467.00 rows=1 width=185) (actual time=0.214..1.116 rows=51.00 loops=1)
    Buffers: local hit=2 read=40
@@ -491,7 +491,7 @@
 (27 rows)
 
 == agent_cursor sparse (plan_cache_mode = force_generic_plan)
-                                                                                     QUERY PLAN                                                                                      
+                                                                                     QUERY PLAN
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
  Limit  (cost=34.85..8467.00 rows=1 width=185) (actual time=0.136..0.624 rows=51.00 loops=1)
    Buffers: local hit=38 read=92

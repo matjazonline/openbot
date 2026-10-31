@@ -40,22 +40,26 @@ fn parameters(shape: &Shape) -> Vec<(&'static str, &'static str)> {
 fn shapes() -> Vec<Shape> {
     let binding = Some(WorkflowBindingId::new(Uuid::from_u128(2)));
     let agent = Some(Uuid::from_u128(3));
-    let shape = |name, binding, state: Option<&str>, agent, cursor| Shape {
+    let (any, top) = (RunLineage::Any, RunLineage::TopLevel);
+    let shape = |name, binding, state: Option<&str>, agent, lineage, cursor| Shape {
         name,
         filter: RunFilter {
             binding,
             state: state.map(str::to_owned),
             agent,
+            lineage,
         },
         cursor,
     };
     vec![
-        shape("company", None, None, None, false),
-        shape("binding", binding, None, None, false),
-        shape("state", None, Some("failed"), None, false),
-        shape("agent", None, None, agent, false),
-        shape("agent_state", None, Some("failed"), agent, false),
-        shape("agent_cursor", None, None, agent, true),
+        shape("company", None, None, None, any, false),
+        shape("binding", binding, None, None, any, false),
+        shape("state", None, Some("failed"), None, any, false),
+        shape("agent", None, None, agent, any, false),
+        shape("agent_state", None, Some("failed"), agent, any, false),
+        shape("agent_cursor", None, None, agent, any, true),
+        shape("top_level", None, None, None, top, false),
+        shape("agent_top_level", None, None, agent, top, false),
     ]
 }
 
@@ -103,6 +107,14 @@ fn run_list_query_binds_each_present_filter_once_in_placeholder_order() {
             "{}: {sql}",
             shape.name
         );
+        // Filtered in SQL, so pages stay full and the cursor never passes rows nobody saw; inside
+        // each version's range when an agent is present.
+        assert_eq!(
+            sql.matches(" AND parent_run_id IS NULL").count(),
+            usize::from(shape.filter.lineage == RunLineage::TopLevel),
+            "{}: {sql}",
+            shape.name
+        );
         assert!(sql.ends_with(&format!(
             "ORDER BY created_at DESC, id DESC LIMIT ${}",
             parameters.len()
@@ -125,6 +137,12 @@ fn the_slow_read_log_names_a_run_state_and_never_the_callers_text() {
     assert_eq!(logged_state(None), "none");
     assert_eq!(logged_state(Some("failed\nforged line")), "other");
     assert_eq!(logged_state(Some("FAILED")), "other");
+}
+
+#[test]
+fn the_slow_read_log_names_the_lineage() {
+    assert_eq!(logged_lineage(RunLineage::Any), "any");
+    assert_eq!(logged_lineage(RunLineage::TopLevel), "top_level");
 }
 
 #[test]

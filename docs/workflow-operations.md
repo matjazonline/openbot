@@ -34,9 +34,16 @@ A large database can exceed the query budget; collection failure is explicit, ne
 Use the company Workflows/Runs page to filter failures/waits and open the exact run, execution,
 action and decision. The authenticated read API is
 `GET /api/companies/{company_id}/workflow-runs/{run_id}`; list runs under the same prefix at
-`/workflow-runs`, newest first, filtered by `binding_id`, `state` and `agent_id` (runs of versions
-that use that agent of the company, including branches a run never took; another company's agent is
-not found) and paged with `after` and `limit`. Decision links use `/ui/workflow-decisions/{decision_id}`. Visibility is checked
+`/workflow-runs`, newest first, paged with `after` and `limit`. The listing filters by:
+
+- `binding_id`;
+- `state`;
+- `agent_id`: runs of versions that use that agent of the company, including branches a run never
+  took. Another company's agent is not found.
+- `lineage`: `top_level` leaves out child runs. Without it, child runs are listed with their
+  parent named.
+
+Decision links use `/ui/workflow-decisions/{decision_id}`. Visibility is checked
 against current company/channel membership. Keep identifiers in restricted incident records and
 links, not metric labels. Retain receipts and audit events; never repair status with SQL updates.
 

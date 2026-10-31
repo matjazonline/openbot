@@ -5,7 +5,9 @@ use crate::application::workflow::lifecycle::{
     BindingState, BindingTarget, ConfigureBinding, SetBindingActivity,
 };
 use crate::application::workflow::manual::{StartRun, start};
-use crate::application::workflow::reads::{BindingSummary, PageRequest, RunFilter, RunSummary};
+use crate::application::workflow::reads::{
+    BindingSummary, PageRequest, RunFilter, RunLineage, RunSummary,
+};
 use crate::application::workflow::{
     CancelResult, CancelWorkflowRequest, IdempotencyKey, RetryResult, RetryWorkflowRequest,
     RunRevision,
@@ -449,6 +451,8 @@ pub struct RunsQuery {
     /// took — not the agents a run actually called (see [`RunFilter::agent`]). Another
     /// company's agent, or one deleted, is not found.
     pub agent_id: Option<Uuid>,
+    /// `top_level` leaves out child runs (the board's view); absent or `any` lists every run.
+    pub lineage: Option<RunLineage>,
     /// The id of the last run of the previous page.
     pub after: Option<Uuid>,
     pub limit: Option<i64>,
@@ -487,6 +491,7 @@ pub async fn runs(
         binding: query.binding_id.map(WorkflowBindingId::new),
         state: query.state,
         agent,
+        lineage: query.lineage.unwrap_or_default(),
     };
     let page = engine
         .reads()

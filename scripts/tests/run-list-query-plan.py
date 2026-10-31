@@ -138,6 +138,48 @@ def measurements(shapes: list) -> str:
     return "".join(sql)
 
 
+# A workflow only ever called as a child, with a long history: every run of workflow 5 is a child
+# (run n is a child when n % 10 = 5), and its version 18 uses the dense agent. Run last, after the
+# main measurements, because it changes the data.
+CHILD_HISTORY = r"""
+INSERT INTO workflow_runs
+    (company_id, id, binding_id, binding_revision, workflow_id, version_id, actor_id, trigger_id,
+     correlation_id, bundle, input, params, resources, max_steps, max_context_bytes, deadline,
+     created_at, state, parent_run_id, parent_execution_id)
+SELECT md5('company1')::uuid, md5('extra-run1-' || n)::uuid, md5('binding1-5')::uuid, 1,
+       md5('workflow1-5')::uuid, md5('version1-5-18')::uuid, md5('actor1')::uuid,
+       md5('extra-trigger1-' || n)::uuid, md5('extra-correlation1-' || n)::uuid, '\x00'::bytea,
+       '{}', '{}', '{}', 100, 65536, created + interval '1 day', created, 'succeeded',
+       md5('run1-4')::uuid, md5('extra-execution1-' || n)::uuid
+FROM (SELECT n, now() - interval '30 days' + n * interval '1 second' AS created
+      FROM generate_series(1, 100000) AS extra(n)) AS seed;
+ANALYZE workflow_runs;
+SET plan_cache_mode = force_generic_plan;
+"""
+# The temporary clone of `workflow_runs_version_top_level`, dropped to show what it saves.
+DROP_TOP_LEVEL_INDEX = r"""
+SELECT format('DROP INDEX %I.%I', schemaname, indexname) FROM pg_indexes
+ WHERE schemaname LIKE 'pg_temp%' AND tablename = 'workflow_runs'
+   AND indexdef LIKE '%WHERE (parent_run_id IS NULL)%' \gexec
+"""
+
+
+def child_history(shapes: list) -> str:
+    """The dense agent's top-level first page after 100,000 child runs land on one of its
+    versions, with and without `workflow_runs_version_top_level`."""
+    shape = next(shape for shape in shapes if shape["name"] == "agent_top_level")
+    values = dict(VALUES, agent=AGENTS["dense"], limit=LIMITS["page 50"])
+    arguments = ", ".join(values[role] for role in shape["parameters"])
+    measure = (f"DEALLOCATE ALL;\nPREPARE agent_top_level AS {shape['sql']};\n"
+               f"EXPLAIN (ANALYZE, BUFFERS) EXECUTE agent_top_level({arguments});\n")
+    return (CHILD_HISTORY
+            + "\\echo '== child-only history: agent_top_level dense page 50"
+              " (plan_cache_mode = force_generic_plan)'\n" + measure
+            + DROP_TOP_LEVEL_INDEX
+            + "\\echo '== child-only history without workflow_runs_version_top_level:"
+              " agent_top_level dense page 50 (plan_cache_mode = force_generic_plan)'\n" + measure)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("database_url")
@@ -145,10 +187,12 @@ def main() -> int:
     parser.add_argument("--out", help="also write the output here")
     args = parser.parse_args()
     shapes = json.loads(pathlib.Path(args.shapes).read_text()) if args.shapes else dump_shapes()
-    script = SEED + measurements(shapes)
+    script = SEED + measurements(shapes) + child_history(shapes)
     result = subprocess.run(["psql", args.database_url, "-X", "-q", "-v", "ON_ERROR_STOP=1"],
                             input=script, text=True, capture_output=True)
-    output = result.stdout + result.stderr
+    # psql pads its column headers; strip the padding so the committed evidence passes
+    # `git diff --check`.
+    output = "".join(line.rstrip() + "\n" for line in (result.stdout + result.stderr).splitlines())
     if args.out:
         pathlib.Path(args.out).write_text(output)
     sys.stdout.write(output)

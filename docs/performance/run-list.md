@@ -1,6 +1,7 @@
 # Run list access paths
 
-Measured on 2026-10-30, PostgreSQL 18.6 / Apple arm64, using
+Measured on 2026-10-30 (re-measured with the top-level shapes for `fix-02-run-child-duplicates`),
+PostgreSQL 18.6 / Apple arm64, using
 `scripts/tests/run-list-query-plan.py`. The script measures the statements `list_runs` actually
 issues: it runs `dump_run_list_query_shapes` (`src/adapters/persistence/workflow/reads_tests.rs`),
 which writes each shape the builder (`run_list_query`) can produce and what each `$n` binds, and
@@ -75,12 +76,12 @@ options:
 
 | Shape | 50-row page | 200-row page |
 | --- | --- | --- |
-| Company, binding, `state` | 0.03–0.38 ms; about a page of their keyset index | 0.05–1.7 ms; the same; unchanged by this work |
-| Dense agent, first page | 11.5 ms; 20,400 rows (16% of its history) | **41.3 ms; 80,400 rows (64%)** |
-| Dense agent, page at depth 200 | 11.0 ms; 20,400 rows | 43.1 ms; 80,400 rows |
-| Sparse agent, first page / at depth 200 | 0.27 / 0.13 ms; 51 rows | 0.43 / 0.15 ms; 201 / 113 rows |
-| Dense agent + `failed` | 24.7 ms; 66,100 buffers | **42.8 ms; 128,000 buffers: its whole history** |
-| Dense agent + `queued` | 30.3 ms; 124,700 buffers: its whole history | 30.7 ms; the same |
+| Company, binding, `state` | 0.03–0.40 ms; about a page of their keyset index | 0.06–1.7 ms; the same; unchanged by this work |
+| Dense agent, first page | 11.1 ms; 20,400 rows (16% of its history) | **42.2 ms; 80,400 rows (64%)** |
+| Dense agent, page at depth 200 | 12.0 ms; 20,400 rows | 42.3 ms; 80,400 rows |
+| Sparse agent, first page / at depth 200 | 0.28 / 0.13 ms; 51 rows | 0.46 / 0.16 ms; 201 / 113 rows |
+| Dense agent + `failed` | 25.2 ms; 66,100 buffers | **42.5 ms; 128,000 buffers: its whole history** |
+| Dense agent + `queued` | 30.3 ms; 124,700 buffers: its whole history | 32.0 ms; the same |
 
 A page reads at most a page of runs from each version that uses the agent. So one read touches the
 smaller of two things: (versions using the agent × page size), or the agent's whole history. At
@@ -88,8 +89,42 @@ smaller of two things: (versions using the agent × page size), or the agent's w
 version is read, and with any state filter all of it. Agents whose workflows are published often,
 so that each version holds no more runs than a page, are read in full on every page. At the
 50-row pages measured before, the read is an order of magnitude better than before. The dense
-agent's first page fell from 234 ms to 11.5 ms (generic plan). Its page at depth 200 fell from
-3.9 s to 11.5 ms (custom plan). But the read is **not** independent of run history.
+agent's first page fell from 234 ms to 11.1 ms (generic plan). Its page at depth 200 fell from
+3.9 s to 11.3 ms (custom plan). But the read is **not** independent of run history.
+
+## Top-level runs only
+
+`RunLineage::TopLevel` (plan `fix-02-run-child-duplicates`) adds `parent_run_id IS NULL` to each
+range, so a page stays full and the cursor never passes a skipped root. About 10% of these runs are
+children; every run of workflows 5, 15, 25 and 35 is one, so 40 of the dense agent's 400 versions
+hold only children.
+
+With an agent, each version's range comes from `workflow_runs_version_top_level`, a partial copy of
+`workflow_runs_version_newest` restricted to `WHERE parent_run_id IS NULL`. A version whose runs are
+all children (a workflow only ever called as a child) is then an empty range. On the full index,
+it would be read to its end on every page, a cost that grows with that workflow's history. The
+predicate is a literal, so the generic plan uses the partial index too. Generic plan:
+
+| Shape | 50-row page | 200-row page |
+| --- | --- | --- |
+| Company, top-level | 0.03 ms; 6 buffers, the same index range as without the filter | 0.06 ms; 13 buffers |
+| Dense agent, top-level | 10.1 ms; 18,360 rows from 360 versions, none from the 40 child-only ones; 19,600 buffers | 37.3 ms; 72,360 rows; 74,700 buffers |
+| Sparse agent, top-level | 0.26 ms; 90 buffers | 0.44 ms; 243 buffers |
+
+The last section of the output adds 100,000 child runs to one child-only version of the dense agent
+(workflow 5, version 18), then measures the same top-level first page twice:
+
+| Index on the version ranges | 50-row page, generic plan |
+| --- | --- |
+| `workflow_runs_version_top_level` | 13.4 ms; 19,630 buffers, unchanged by the new children |
+| `workflow_runs_version_newest` only (partial index dropped) | 40.9 ms; 37,584 buffers: all 100,000 children read and discarded |
+
+Before the partial index, the plain top-level dense page read 32,300 buffers (17.5 ms). Each child
+run was read from `workflow_runs_version_newest` and discarded on the heap.
+
+The partial index holds one entry per top-level run: 122 MB for these 983,770 top-level runs. Each
+entry is written on insert and again on every state change (state changes are never HOT; see
+below).
 
 ## The remaining bound
 
@@ -124,6 +159,7 @@ index, which every state change rewrites. The run board's open columns do not us
 - `elapsed_ms` and `company_id`;
 - whether a `binding` or `agent` filter was present, as booleans;
 - `state`: the state asked for, `none`, or `other` for text that is not a run state;
+- `lineage`: `any`, or `top_level` when child runs are left out;
 - `page_size` and `page_rows`. `page_rows` is the rows the statement returned: `page_size` + 1 when
   the page filled, fewer when the matches ran out. It is not the index entries read, which are what
   the tables above count.
@@ -134,6 +170,8 @@ index, which every state change rewrites. The run board's open columns do not us
 | `agent=true`, `state` `none` or a terminal state, `page_rows` = `page_size` + 1, rising | The bound above: build the deferred link table. |
 | `agent=true`, `state` `queued`, `running` or `waiting`, `page_rows` short | The rare-state shape; the link table does not help. |
 | `agent=false`, `state` `queued` or `running` | The same rare-state shape without an agent. |
+| `lineage=top_level`, `agent=false`, rising | Child runs crowd the company's range. Each is skipped by a heap check, because no keyset index carries `parent_run_id`. Measure their share of runs. If children have become most of the range, give the index the read uses a top-level partial twin (`WHERE parent_run_id IS NULL`), measured as above. |
+| `lineage=top_level`, `agent=true` | Read it as the agent rows above. Child runs are not in the ranges the read takes (`workflow_runs_version_top_level`), so children no longer explain a slow line. If the plan has stopped using that index, re-measure: the child-only history section shows the cost without it. |
 | Every shape slow | Check pool acquisition (`database_acquire_duration_ms`) and contention before the query. |
 
 If the line is absent because the warning is not deployed, that is not evidence of health.

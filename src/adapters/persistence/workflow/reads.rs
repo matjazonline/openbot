@@ -6,7 +6,11 @@ use crate::application::workflow::reads::*;
 use chrono::{DateTime, Utc};
 use serde_json::Value;
 use sqlx::QueryBuilder;
+use std::collections::HashMap;
 use std::time::{Duration, Instant};
+
+/// One parent's children in one state, as `child_rollup` groups them.
+type ChildStateCount = (Uuid, String, i64);
 
 pub(super) fn revision_of(value: i64) -> AppResult<u64> {
     u64::try_from(value).map_err(|_| invalid())
@@ -160,8 +164,10 @@ fn run_summary(row: RunRow) -> AppResult<RunSummary> {
 /// `workflow_runs_version_newest` cut at `limit` before the ranges are merged. A page therefore
 /// reads at most `limit` runs per such version — never more than the agent's history, but all of
 /// it once its versions each hold no more runs than a page. A plain `version_id IN (...)` read and
-/// sorted the whole history on every page. Measurements, and the deferred run-to-agent link table
-/// that would read one page, are in `docs/performance/run-list.md`.
+/// sorted the whole history on every page. A top-level read takes its ranges from
+/// `workflow_runs_version_top_level`, which leaves child runs out, so a version whose runs are all
+/// children is empty rather than read to its end. Measurements, and the deferred run-to-agent link
+/// table that would read one page, are in `docs/performance/run-list.md`.
 fn run_list_query(
     company: CompanyId,
     filter: &RunFilter,
@@ -224,6 +230,9 @@ fn push_run_page(
     if let Some(state) = &filter.state {
         query.push(" AND state = ").push_bind(state.clone());
     }
+    if filter.lineage == RunLineage::TopLevel {
+        query.push(" AND parent_run_id IS NULL");
+    }
     if let Some((created, id)) = cursor {
         query
             .push(" AND (created_at, id) < (")
@@ -261,11 +270,19 @@ fn logged_state(state: Option<&str>) -> &'static str {
     }
 }
 
+/// The lineage filter as the slow-read log names it: `any` or `top_level`.
+fn logged_lineage(lineage: RunLineage) -> &'static str {
+    match lineage {
+        RunLineage::Any => "any",
+        RunLineage::TopLevel => "top_level",
+    }
+}
+
 /// Log a run-list read past [`RUN_LIST_QUERY_WARN_THRESHOLD`] with the shape that ran — which
-/// binding and agent filters were present (not their ids) and the state asked for — and
-/// `page_rows`, the rows the statement returned: `page_size` plus one look-ahead row when the
+/// binding and agent filters were present (not their ids), the state asked for and the lineage —
+/// and `page_rows`, the rows the statement returned: `page_size` plus one look-ahead row when the
 /// page filled, fewer when it ran out of matches. That is the evidence for revisiting the index
-/// decision in `docs/performance/run-list.md`.
+/// decisions in `docs/performance/run-list.md`.
 fn warn_if_run_list_is_slow(
     company: CompanyId,
     filter: &RunFilter,
@@ -282,6 +299,7 @@ fn warn_if_run_list_is_slow(
         binding = filter.binding.is_some(),
         state = logged_state(filter.state.as_deref()),
         agent = filter.agent.is_some(),
+        lineage = logged_lineage(filter.lineage),
         page_size,
         page_rows,
         "Workflow run list is slow"
@@ -448,6 +466,47 @@ impl WorkflowReads for PostgresPersistence {
         .await?
         .map(run_summary)
         .transpose()
+    }
+
+    async fn child_rollup(
+        &self,
+        company: CompanyId,
+        parents: &[RunId],
+    ) -> AppResult<HashMap<RunId, ChildCounts>> {
+        if parents.len() > MAX_ROLLUP_PARENTS {
+            return Err(AppError::BadRequest(format!(
+                "A child rollup counts at most {MAX_ROLLUP_PARENTS} parent runs"
+            )));
+        }
+        let parents: Vec<Uuid> = parents.iter().map(|run| run.as_uuid()).collect();
+        // One grouped read over the parent index (`workflow_run_parents_by_parent`), never one per
+        // card. `workflow_run_parents` holds direct links only, so grandchildren stay with their
+        // own parent.
+        let rows: Vec<ChildStateCount> = sqlx::query_as(
+            "SELECT link.parent_run_id, child.state, COUNT(*)::bigint \
+               FROM workflow_run_parents AS link \
+               JOIN workflow_runs AS child ON child.company_id = link.company_id \
+                AND child.id = link.child_run_id \
+              WHERE link.company_id = $1 AND link.parent_run_id = ANY($2) \
+              GROUP BY link.parent_run_id, child.state",
+        )
+        .bind(company.as_uuid())
+        .bind(&parents)
+        .fetch_all(self.pool())
+        .await?;
+        let mut rollup: HashMap<RunId, ChildCounts> = HashMap::new();
+        for (parent, state, count) in rows {
+            let count = u64::try_from(count).map_err(|_| invalid())?;
+            let counts = rollup.entry(RunId::new(parent)).or_default();
+            counts.total += count;
+            match state.as_str() {
+                "queued" | "running" | "waiting" => counts.open += count,
+                "failed" => counts.failed += count,
+                "succeeded" | "cancelled" => {}
+                _ => return Err(invalid()),
+            }
+        }
+        Ok(rollup)
     }
 
     async fn run_detail(&self, company: CompanyId, run: RunId) -> AppResult<Option<RunDetail>> {

@@ -184,6 +184,20 @@ pub struct RunDetail {
     pub actions_truncated: bool,
 }
 
+/// Which runs of a lineage a read includes.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RunLineage {
+    /// Every run, children included: the run list, the forensic feed, which labels each child
+    /// with its parent.
+    #[default]
+    Any,
+    /// Runs no other run started (`parent_run_id IS NULL`); a rerun is one. The run board reads
+    /// only these, so a parent and the child it started are one piece of work, and the parent's
+    /// card carries its children's counts instead ([`WorkflowReads::child_rollup`]).
+    TopLevel,
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct RunFilter {
     pub binding: Option<WorkflowBindingId>,
@@ -194,6 +208,23 @@ pub struct RunFilter {
     /// has happened, so a queued run would never match. The route resolves the id
     /// company-scoped before it gets here.
     pub agent: Option<Uuid>,
+    pub lineage: RunLineage,
+}
+
+/// The most parents one [`WorkflowReads::child_rollup`] takes: six board columns of 50 cards
+/// (`fix-03-run-board-finished-columns` defines the column cap and keeps the two in step).
+pub const MAX_ROLLUP_PARENTS: usize = 300;
+
+/// A parent run's direct children, counted by state. Grandchildren are not counted: they belong
+/// to their own parent, and the child's pane lists them. A child carries its parent's channel
+/// association (`children::create_on` copies it, and associations never change), so whoever may
+/// see the parent may see these counts.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct ChildCounts {
+    pub total: u64,
+    /// Queued, running or waiting.
+    pub open: u64,
+    pub failed: u64,
 }
 
 #[async_trait]
@@ -228,6 +259,13 @@ pub trait WorkflowReads: Send + Sync {
         page: PageRequest,
     ) -> AppResult<Page<RunSummary>>;
     async fn run_summary(&self, company: CompanyId, run: RunId) -> AppResult<Option<RunSummary>>;
+    /// The direct children of each of `parents` that has any, counted by state, in one read.
+    /// More than [`MAX_ROLLUP_PARENTS`] parents is refused rather than cut.
+    async fn child_rollup(
+        &self,
+        company: CompanyId,
+        parents: &[RunId],
+    ) -> AppResult<std::collections::HashMap<RunId, ChildCounts>>;
     async fn run_detail(&self, company: CompanyId, run: RunId) -> AppResult<Option<RunDetail>>;
     /// The company a decision belongs to, for the notice link that names only the decision.
     async fn decision_company(&self, decision: Uuid) -> AppResult<Option<CompanyId>>;

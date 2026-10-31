@@ -23,6 +23,8 @@ mod history_reader_tests;
 pub(in crate::adapters::persistence::workflow) mod lease_tests;
 #[path = "model_usage_tests.rs"]
 mod model_usage_tests;
+#[path = "run_lineage_tests.rs"]
+mod run_lineage_tests;
 use crate::domain::entities::correlation::CorrelationId;
 use binding_tests::BindingFixture;
 use serde_json::{Value, json};

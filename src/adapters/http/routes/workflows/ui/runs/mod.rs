@@ -5,7 +5,9 @@
 use super::super::bindings::Visibility;
 use super::*;
 use crate::application::workflow::authoring::workflow_graph;
-use crate::application::workflow::reads::{MAX_LISTED, PageRequest, RunFilter, RunSummary};
+use crate::application::workflow::reads::{
+    MAX_LISTED, PageRequest, RunFilter, RunLineage, RunSummary,
+};
 use crate::application::workflow::run_views::{RunView, StepView};
 use crate::domain::workflow::{RunId, WorkflowBindingId};
 use axum::extract::{Path, Query};
@@ -338,6 +340,8 @@ fn run_filter(binding: Option<Uuid>, state: Option<String>) -> RunFilter {
         binding: binding.map(WorkflowBindingId::new),
         state,
         agent: None,
+        // The list is the forensic feed: children stay in it, labelled with their parent.
+        lineage: RunLineage::Any,
     }
 }
 
