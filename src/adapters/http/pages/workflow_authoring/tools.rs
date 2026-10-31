@@ -290,6 +290,8 @@ pub fn agent_tools_card(card: &AgentToolsCard<'_>) -> String {
 
 pub struct AgentUsageCard<'a> {
     pub company_id: Uuid,
+    /// The agent the card describes; its board is linked.
+    pub agent: Uuid,
     pub bindings: &'a [BindingUse],
     /// Of the listed bindings, those on channels the viewer cannot see.
     pub hidden: usize,
@@ -341,10 +343,12 @@ pub fn agent_usage_card(card: &AgentUsageCard<'_>) -> String {
     };
     format!(
         r#"<section id="agent-workflow-usage" class="mt-6 space-y-2 rounded-box border border-base-300 p-4">
-            <div><h3 class="font-semibold">Used by</h3>
+            <div class="flex flex-wrap items-start gap-2"><div class="min-w-0 flex-1"><h3 class="font-semibold">Used by</h3>
             <p class="text-sm opacity-70">Bindings whose published version froze this agent, directly or through a child workflow.</p></div>
+            <a class="btn btn-ghost btn-xs" href="/ui/workflow-runs?company_id={company_id}&amp;view=board&amp;agent_id={agent}">Runs board</a></div>
             {list}{hidden}{cut}
         </section>"#,
+        agent = card.agent,
         hidden = if card.hidden > 0 {
             format!(
                 r#"<p class="text-xs opacity-70">{} more of the listed binding{} {} on channels you cannot see.</p>"#,

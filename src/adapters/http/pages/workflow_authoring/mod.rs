@@ -54,7 +54,7 @@ pub fn workflow_workspace_page(page: &WorkflowWorkspace<'_>) -> String {
             "Workflows",
             "Drafts, published versions and where they run.",
             &format!(
-                r##"<div class="flex shrink-0 gap-1"><a class="btn btn-ghost btn-xs" href="/ui/workflow-runs?company_id={company_id}">Runs</a><button type="button" class="btn btn-ghost btn-xs"
+                r##"<div class="flex shrink-0 gap-1"><a class="btn btn-ghost btn-xs" href="/ui/workflow-runs?company_id={company_id}&amp;view=board">Runs</a><button type="button" class="btn btn-ghost btn-xs"
                     hx-get="/ui/workflows/tools?company_id={company_id}"
                     hx-target="#workflow-pane" hx-swap="outerHTML" hx-sync="#workflow-pane:replace">Tools</button>
                 <button type="button" class="btn btn-primary btn-xs"
@@ -279,6 +279,7 @@ pub fn workflow_pane(header: &WorkflowHeader<'_>, tab: WorkflowTab, body: &str) 
             <div class="border-b border-base-300 px-4 pt-4 sm:px-6">
                 <div class="flex flex-wrap items-center gap-2">
                     <h2 class="min-w-0 truncate text-xl font-bold">{title}</h2>{archived}
+                    <a class="btn btn-ghost btn-xs ml-auto" href="/ui/workflow-runs?company_id={company_id}&amp;view=board&amp;workflow_id={workflow}">Runs board</a>
                 </div>
                 <p class="mt-1 text-xs opacity-60">Draft revision {revision} · {versions} published version{plural}{origin}</p>
                 <nav role="tablist" class="tabs tabs-border mt-3" aria-label="Workflow views">{editor}{sample_tab}{versions_tab}{bindings_tab}</nav>

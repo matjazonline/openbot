@@ -27,6 +27,8 @@ use tower::ServiceExt;
 
 #[path = "authorization_tests.rs"]
 mod authorization_tests;
+#[path = "board_view_tests.rs"]
+mod board_view_tests;
 #[path = "controls_tests.rs"]
 mod controls_tests;
 #[path = "events_tests.rs"]
@@ -223,6 +225,8 @@ impl Fixture {
             Query(ListQuery {
                 company_id: self.company,
                 binding_id: None,
+                workflow_id: None,
+                agent_id: None,
                 state: None,
                 after: after.map(|(after, _)| after),
                 run_id: None,
@@ -242,6 +246,8 @@ impl Fixture {
             Query(ListQuery {
                 company_id: self.company,
                 binding_id: None,
+                workflow_id: None,
+                agent_id: None,
                 state: None,
                 after: None,
                 run_id: Some(selected),
@@ -515,7 +521,7 @@ async fn the_list_pages_over_runs_an_admin_cannot_see_and_labels_reruns_and_chil
     assert!(owner_first.contains(r#"hx-trigger="sse:runs, sse:resync, run-selected from:body""#));
     assert!(owner_first.contains(
         r##"hx-target="#run-list-entries" hx-swap="innerHTML" hx-sync="#run-list:replace"
-                hx-include="#run-list-shown, #run-selected"></span>"##
+                hx-include="#run-list-shown, #run-selected, #run-list-filters"></span>"##
     ));
     assert!(owner_first.contains(r#"id="run-list-shown" name="shown" value="50""#));
     assert!(!owner_first.contains("this:replace"));
@@ -524,7 +530,13 @@ async fn the_list_pages_over_runs_an_admin_cannot_see_and_labels_reruns_and_chil
     let admin_first = f.list(f.admin, None).await;
     assert!(admin_first.contains("Load more"), "{admin_first}");
     assert!(admin_first.contains("2 runs of these are on channels you cannot see"));
-    let next = field_after(&admin_first, "&amp;after=");
+    // "Load more" names only its cursor; the filter form supplies the rest.
+    assert!(
+        admin_first.contains(
+            r##"hx-include="#run-list-shown, #run-selected, #run-list-filters">Load more"##
+        )
+    );
+    let next = field_after(&admin_first, "list?after=");
     let admin_second = f.list(f.admin, Some((next, 50))).await;
     assert!(!admin_second.contains(r#"id="run-list""#), "entries only");
     assert!(admin_second.contains("1 run of these is on channels you cannot see"));
@@ -729,6 +741,8 @@ async fn other_tenants_and_plain_members_reach_no_run_and_hostile_content_is_esc
             Query(ListQuery {
                 company_id: company,
                 binding_id: None,
+                workflow_id: None,
+                agent_id: None,
                 state: None,
                 after: None,
                 run_id: Some(run),

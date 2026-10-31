@@ -278,6 +278,9 @@ pub struct OutstandingTask {
     pub channel_name: Option<String>,
     /// `None` for a job outside a conversation, which has no thread to open.
     pub thread_id: Option<Uuid>,
+    /// The run the job is a step of (`background_tasks.workflow_execution_id` → its execution's
+    /// run); `None` only if the execution is gone.
+    pub run_id: Option<Uuid>,
     pub task_type: String,
     pub status: TaskStatus,
     /// Claimed, but its lease has lapsed. Derived rather than stored — there is no `stalled`

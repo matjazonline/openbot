@@ -825,6 +825,81 @@ fn icon_rail_lights_the_workspace_the_response_belongs_to() {
         r##"<a href="/ui/channels?company_id={}" class="btn btn-square btn-md btn-ghost"##,
         company.id
     )));
+
+    // Plan new-board-view 04: every destination keeps its exact href, and Runs, whose link carries
+    // a query of its own, still ends on the company; it is lit on both runs views, not Workflows.
+    let company_id = company.id;
+    for (membership, offered) in [
+        (CompanyMembership::Owner, true),
+        (CompanyMembership::Admin, true),
+        (CompanyMembership::Member, false),
+    ] {
+        let user = MailboxUser {
+            company_membership: membership,
+            ..mailbox_user(&email)
+        };
+        let shell = |section| {
+            ui_shell(&UiShell {
+                title: "Rail",
+                user: &user,
+                company: Some(&company),
+                section,
+                content: "",
+            })
+        };
+        let rail = shell(UiSection::Mailbox);
+        let runs = format!(r#"href="/ui/workflow-runs?view=board&amp;company_id={company_id}""#);
+        assert_eq!(rail.contains(&runs), offered, "{membership:?}: {rail}");
+        if !offered {
+            assert!(!rail.contains("/ui/workflow-runs"), "{rail}");
+            continue;
+        }
+        for path in [
+            "/ui",
+            "/ui/channels",
+            "/ui/agents",
+            "/ui/workflows",
+            "/ui/schedules",
+            "/ui/work",
+            "/ui/deliveries",
+            "/ui/dashboard",
+            "/ui/companies",
+        ] {
+            assert!(
+                rail.contains(&format!(
+                    r#"<a href="{path}?company_id={company_id}" class="btn"#
+                )),
+                "{membership:?} {path}: {rail}"
+            );
+        }
+        let list = runs_workspace_page(&RunsWorkspace {
+            user: &user,
+            company: &company,
+            list_html: "",
+            pane_html: "",
+        });
+        let board = runs_board_page(&RunsBoardPage {
+            user: &user,
+            company: &company,
+            board_html: "",
+            pane_html: None,
+        });
+        for page in [&list, &board] {
+            assert!(
+                page.contains(&format!(
+                    r#"<a {runs} class="btn btn-square btn-md btn-primary" title="Runs" aria-label="Runs" data-action="navigate-workspace" aria-current="page">"#
+                )),
+                "{page}"
+            );
+            assert!(page.contains(&format!(
+                r#"<a href="/ui/workflows?company_id={company_id}" class="btn btn-square btn-md btn-ghost""#
+            )));
+        }
+        let workflows = shell(UiSection::Workflows);
+        assert!(workflows.contains(&format!(
+            r#"<a {runs} class="btn btn-square btn-md btn-ghost""#
+        )));
+    }
 }
 
 #[test]

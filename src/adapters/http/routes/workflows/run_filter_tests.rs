@@ -477,3 +477,75 @@ fn run_top_level_query_decodes_the_documented_lineage_values() {
     assert!(decode("lineage=children").is_err());
     assert!(decode("lineage=TopLevel").is_err());
 }
+
+/// Plan `new-board-view` 02: `workflow_id` on the JSON run list and board keeps one workflow's
+/// runs, any version, and another tenant's workflow is not found rather than an empty listing.
+#[tokio::test]
+async fn run_board_view_filter_json_routes_take_a_workflow_of_the_company() {
+    let Some(f) = Fixture::new().await else {
+        return;
+    };
+    let (owner, company) = (f.owner, f.company);
+    let ours = f.resources(owner, company).await;
+    let other = {
+        let (workflow, version) = f
+            .published(owner, company, example("data.map", Uuid::new_v4()))
+            .await;
+        let binding = f.bound(owner, company, version).await;
+        (
+            workflow,
+            f.started(owner, company, binding, "other", json!({})).await,
+        )
+    };
+    let theirs = f.resources(f.stranger, f.other).await;
+    let by_workflow = |workflow| RunsQuery {
+        workflow_id: Some(workflow),
+        ..Default::default()
+    };
+    assert_eq!(
+        f.listed(owner, company, by_workflow(ours.workflow)).await,
+        [ours.run]
+    );
+    assert_eq!(
+        f.listed(owner, company, by_workflow(other.0)).await,
+        [other.1]
+    );
+    let (status, page) = f
+        .runs_page(owner, company, by_workflow(theirs.workflow))
+        .await;
+    assert_eq!(status, StatusCode::NOT_FOUND, "{page}");
+
+    let board = |workflow| board::BoardQuery {
+        workflow_id: Some(workflow),
+        ..Default::default()
+    };
+    let (status, scoped) = answer(
+        board::board(
+            f.state(),
+            by(owner),
+            Path(company),
+            Query(board(ours.workflow)),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{scoped}");
+    let queued: Vec<Uuid> = scoped["columns"][0]["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|item| uuid(&item["run_id"]))
+        .collect();
+    assert_eq!(queued, [ours.run], "{scoped}");
+    let (status, refused) = answer(
+        board::board(
+            f.state(),
+            by(owner),
+            Path(company),
+            Query(board(theirs.workflow)),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(status, StatusCode::NOT_FOUND, "{refused}");
+}

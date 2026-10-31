@@ -109,3 +109,42 @@ async fn workflow_job_projection_dashboard_counts_every_workflow_job() {
         assert_eq!(snapshot.tasks.count_of(TaskStatus::Completed), 3);
     }
 }
+
+/// Plan new-board-view 04: each outstanding job names the run it is a step of, through its
+/// execution, so the Dashboard can link a job outside a conversation to its run.
+#[tokio::test]
+async fn workflow_job_projection_dashboard_outstanding_jobs_name_their_run() {
+    let (f, _) = scoped_fixture().await;
+    let p = &f.binding.fixture.persistence;
+    let company = f.binding.target.company.as_uuid();
+    let expected: std::collections::HashMap<Uuid, Uuid> = sqlx::query_as::<_, (Uuid, Uuid)>(
+        "SELECT job.id, execution.run_id FROM background_tasks AS job \
+           JOIN workflow_executions AS execution \
+             ON execution.company_id = job.company_id AND execution.id = job.workflow_execution_id \
+          WHERE job.company_id = $1 AND job.queue_kind = 'workflow'",
+    )
+    .bind(company)
+    .fetch_all(p.pool())
+    .await
+    .unwrap()
+    .into_iter()
+    .collect();
+    assert_eq!(expected.len(), 3, "the fixture's three jobs");
+    for scope in [None, Some(company)] {
+        let snapshot = p
+            .dashboard_snapshot(scope, DashboardWindow::last_hour())
+            .await
+            .unwrap();
+        let named: std::collections::HashMap<Uuid, Uuid> = snapshot
+            .outstanding
+            .iter()
+            .map(|job| {
+                (
+                    job.id,
+                    job.run_id.expect("a job of an execution names its run"),
+                )
+            })
+            .collect();
+        assert_eq!(named, expected, "{scope:?}");
+    }
+}

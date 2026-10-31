@@ -447,6 +447,8 @@ pub(super) fn run_json(run: &RunSummary) -> Value {
 #[serde(deny_unknown_fields)]
 pub struct RunsQuery {
     pub binding_id: Option<Uuid>,
+    /// Runs of this workflow of the company, any version; another company's is not found.
+    pub workflow_id: Option<Uuid>,
     pub state: Option<String>,
     /// Runs of versions that use this agent of the company — including branches a run never
     /// took — not the agents a run actually called (see [`RunFilter::agent`]). Another
@@ -474,6 +476,22 @@ pub(super) async fn company_agent(
         .ok_or_else(|| AppError::NotFound("Agent not found".into()))
 }
 
+/// `workflow` when it is a workflow of `company`; another company's, or none, is not found rather
+/// than an empty listing.
+pub(super) async fn company_workflow(
+    engine: &WorkflowEngine,
+    company: CompanyId,
+    workflow: Uuid,
+) -> AppResult<crate::domain::workflow::WorkflowId> {
+    let workflow = crate::domain::workflow::WorkflowId::new(workflow);
+    engine
+        .reads()
+        .definition(company, workflow)
+        .await?
+        .map(|_| workflow)
+        .ok_or_else(|| AppError::NotFound("Workflow not found".into()))
+}
+
 /// The newest runs the caller may see, a page at a time, children labelled with their parent;
 /// `agent_id` keeps those of versions that use that agent of the company ("uses", not "ran").
 pub async fn runs(
@@ -488,8 +506,13 @@ pub async fn runs(
         Some(agent) => Some(company_agent(&engine, company, agent).await?),
         None => None,
     };
+    let workflow = match query.workflow_id {
+        Some(workflow) => Some(company_workflow(&engine, company, workflow).await?),
+        None => None,
+    };
     let filter = RunFilter {
         binding: query.binding_id.map(WorkflowBindingId::new),
+        workflow,
         state: query.state,
         agent,
         lineage: query.lineage.unwrap_or_default(),

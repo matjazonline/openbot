@@ -301,6 +301,29 @@ impl AuthoringReads for PostgresPersistence {
         self.binding_uses(company, rows, MAX_AGENT_USES).await
     }
 
+    async fn agent_options(&self, company: CompanyId) -> AppResult<(Vec<ChoiceOption>, bool)> {
+        let rows = sqlx::query_as::<_, (Uuid, String)>(
+            "SELECT id, name FROM agents WHERE company_id = $1 ORDER BY name, id LIMIT $2",
+        )
+        .bind(company.as_uuid())
+        .bind(MAX_BINDING_OPTIONS + 1)
+        .fetch_all(self.pool())
+        .await?;
+        let truncated = rows.len() as i64 > MAX_BINDING_OPTIONS;
+        Ok((
+            rows.into_iter()
+                .take(MAX_BINDING_OPTIONS as usize)
+                .map(|(id, label)| ChoiceOption {
+                    id,
+                    label,
+                    enabled: true,
+                    detail: String::new(),
+                })
+                .collect(),
+            truncated,
+        ))
+    }
+
     async fn binding_options(&self, company: CompanyId) -> AppResult<BindingOptions> {
         let bound = MAX_BINDING_OPTIONS + 1;
         let choices = |rows: Vec<(Uuid, String, bool, String)>| {

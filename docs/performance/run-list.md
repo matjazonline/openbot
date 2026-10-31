@@ -2,7 +2,9 @@
 
 Measured on 2026-10-30, re-measured with the top-level shapes for `fix-02-run-child-duplicates`,
 and on 2026-10-31 with the run board's statements and the dataset additions for
-`fix-03-run-board-finished-columns`. PostgreSQL 18.6 / Apple arm64, using
+`fix-03-run-board-finished-columns`, and again that day with the workflow filter's shapes for
+`new-board-view` 02 (the full output files are from that last run; tables above it keep the numbers
+of the run that measured them). PostgreSQL 18.6 / Apple arm64, using
 `scripts/tests/run-list-query-plan.py`. The script measures the statements `list_runs`,
 `run_board_counts` and `run_board_cards` actually issue: it runs `dump_run_list_query_shapes`
 (`src/adapters/persistence/workflow/reads_tests.rs`), which writes each shape the builders
@@ -158,6 +160,42 @@ because its open runs are spread through history rather than clustered recently.
 Neither the link table nor anything else measured here fixes it. That would need state in a keyed
 index, which every state change rewrites. The run board's open columns do not use this read.
 
+## Workflow filter (`new-board-view` 02)
+
+The run list and the board both take a workflow scope (`RunFilter::workflow`,
+`RunBoardScope::workflow`): `AND workflow_id = $n` on the list, and the same filter on the board's
+materialized working set, like a binding scope. Measured on the heavy tenant for workflow 0 (a
+fortieth of its runs, 6,250, every one open) and for a workflow of the tenant with no runs, the
+sparsest scope. Before is the migrated schema with `workflow_runs_workflow_newest` dropped; after
+is the shipped schema. Times are `force_generic_plan` at 50-row pages, buffers are the whole
+statement's:
+
+| Shape | Before | After |
+| --- | --- | --- |
+| Workflow, a fortieth | 23.6 ms; 8,844 buffers. Walks the tenant's whole `(company_id, id, workflow_id)` unique index, then reads and sorts the workflow's history | 0.11 ms; 54. A page of `workflow_runs_workflow_newest` |
+| Workflow, no runs | 7.5 ms; 2,594. The same unique-index walk, for nothing | 0.01 ms; 4 |
+| Workflow + `queued` | 20.1 ms; 8,844 | 0.28 ms; 155 |
+| Workflow + `failed` (matches nothing in workflow 0) | 19.6 ms; 8,844 | 10.5 ms; 6,268. The workflow's range read to its end |
+| No runs + any state | 6.9–7.1 ms; 2,594 | 0.004–0.012 ms |
+
+`auto` plans agree, except that before, the first page of the dense workflow stopped early on
+`workflow_runs_newest` (0.36 ms) and every larger page or sparser scope fell into the full walk.
+Before, every workflow-filtered page read the whole tenant, whatever the workflow's size. That is
+the access-path failure fix-01 measured for the sparse agent, so the index is added, as fix-01 added
+`workflow_runs_version_newest`: `workflow_runs_workflow_newest (company_id, workflow_id,
+created_at DESC, id DESC)`, 143 MB for these 1,096,078 runs, the size of the binding index beside
+it. Every insert writes it, and so does every state change: `state` is in other indexes, so a state
+change is never a HOT update and writes an entry into every index, this one included (as for
+`workflow_runs_version_newest`, above). `workflow_id` itself never changes.
+
+What remains is the "agent + a rare state" shape below in its workflow form: a workflow with a
+state that matches few of its runs reads the workflow's range to its end, bounded by that
+workflow's history rather than the company's.
+
+The board needs nothing new: its workflow scope filters the materialized working set as a binding
+scope does, and costs the same (16.6 ms counts, 29.5 ms cards in the week with the shipped finished
+index; "Run board" below).
+
 ## Run board
 
 The run board (plan `fix-03-run-board-finished-columns`) shows one column per state over top-level
@@ -247,7 +285,7 @@ production, open runs are the work in progress, not history.
 (500 ms). The line carries:
 
 - `elapsed_ms` and `company_id`;
-- whether a `binding` or `agent` filter was present, as booleans;
+- whether a `binding`, `workflow` or `agent` filter was present, as booleans;
 - `state`: the state asked for, `none`, or `other` for text that is not a run state;
 - `lineage`: `any`, or `top_level` when child runs are left out;
 - `page_size` and `page_rows`. `page_rows` is the rows the statement returned: `page_size` + 1 when
@@ -260,6 +298,8 @@ production, open runs are the work in progress, not history.
 | `agent=true`, `state` `none` or a terminal state, `page_rows` = `page_size` + 1, rising | The bound above: build the deferred link table. |
 | `agent=true`, `state` `queued`, `running` or `waiting`, `page_rows` short | The rare-state shape; the link table does not help. |
 | `agent=false`, `state` `queued` or `running` | The same rare-state shape without an agent. |
+| `workflow=true`, `state` `none`, rising | `workflow_runs_workflow_newest` should read a page ("Workflow filter" above). Check the plan still uses it. |
+| `workflow=true`, `state` rare | The rare-state shape within one workflow's range. |
 | `lineage=top_level`, `agent=false`, rising | Child runs crowd the company's range. Each is skipped by a heap check, because no keyset index carries `parent_run_id`. Measure their share of runs. If children have become most of the range, give the index the read uses a top-level partial twin (`WHERE parent_run_id IS NULL`), measured as above. |
 | `lineage=top_level`, `agent=true` | Read it as the agent rows above. Child runs are not in the ranges the read takes (`workflow_runs_version_top_level`), so children no longer explain a slow line. If the plan has stopped using that index, re-measure: the child-only history section shows the cost without it. |
 | Every shape slow | Check pool acquisition (`database_acquire_duration_ms`) and contention before the query. |
@@ -271,7 +311,7 @@ The board logs `Workflow run board is slow` at `warn` when its reads together pa
 carries:
 
 - `elapsed_ms`, and each phase's share: `counts_ms`, `visibility_ms`, `cards_ms`, `rollup_ms`;
-- `company_id`; whether a `binding` or `agent` scope was given, as booleans; `window`;
+- `company_id`; whether a `binding`, `workflow` or `agent` scope was given, as booleans; `window`;
 - `eligible_runs`: every counted run, hidden channels included;
 - `channels_checked`: the distinct associations authorized;
 - `cards_read`, look-ahead cards included, and `cards_shown`.
@@ -281,7 +321,7 @@ carries:
 | `eligible_runs` small, `elapsed_ms` high | Not the working set. Check pool acquisition (`database_acquire_duration_ms`) and contention, then `visibility_ms`. |
 | `counts_ms` leads, `eligible_runs` high in every window | Open runs: the counts and open columns read every one. Look for runs stuck open before indexing anything. |
 | `counts_ms` leads, `eligible_runs` high and rising, `window=month` worst | The finished window itself, a working-set problem. Write a deferred rollup plan for the board (plan `fix-03-run-board-finished-columns` 03, step 3): the live query is its specification and test oracle, measured before anything is built. |
-| `cards_ms` leads, `binding` or `agent` true | Scoped columns read the company's working set of their state and filter it (materialized, above). If the scope is a small share of a large window, measure a scoped finished index, e.g. `(company_id, binding_id, state, finished_at DESC)`, as above. |
+| `cards_ms` leads, `binding`, `workflow` or `agent` true | Scoped columns read the company's working set of their state and filter it (materialized, above). If the scope is a small share of a large window, measure a scoped finished index, e.g. `(company_id, binding_id, state, finished_at DESC)`, as above. |
 | `cards_ms` leads, no scope | Unscoped columns should stop at 51 entries. Check that the plan still uses `workflow_runs_finished_by_state`; a viewer who sees few channels reads past hidden runs. |
 | `visibility_ms` leads, `channels_checked` high | One authorization per channel, as in the list: batch the visibility read. |
 | `rollup_ms` leads | The child rollup over at most 300 shown cards; measure children per parent. |

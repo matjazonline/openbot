@@ -2,14 +2,17 @@
 //! it, the controls (cancel, retry, rerun, the reconciliation annotation) through the JSON
 //! routes' own commands, and the run event stream the page reloads on. A run is shown to whoever
 //! the JSON routes show it to: an owner or admin of the company who can see the run's channel.
-use super::super::bindings::Visibility;
+use super::super::bindings::{Visibility, company_agent, company_workflow, visible_binding};
+use super::super::board::visible_board;
 use super::*;
+use crate::adapters::http::routes::deserialize_empty_string_as_none;
 use crate::application::workflow::authoring::workflow_graph;
+use crate::application::workflow::board::{BoardWindow, RunBoardScope};
 use crate::application::workflow::reads::{
-    MAX_LISTED, PageRequest, RunFilter, RunLineage, RunStateName, RunSummary,
+    MAX_BINDING_OPTIONS, MAX_LISTED, PageRequest, RunFilter, RunLineage, RunStateName, RunSummary,
 };
 use crate::application::workflow::run_views::{RunView, StepView};
-use crate::domain::workflow::{RunId, WorkflowBindingId};
+use crate::domain::workflow::{RunId, WorkflowBindingId, WorkflowId};
 use axum::extract::{Path, Query};
 use serde::Deserialize;
 use std::collections::{BTreeMap, HashMap};
@@ -46,13 +49,32 @@ pub struct WorkspaceQuery {
     pub company_id: Option<Uuid>,
     pub run_id: Option<Uuid>,
     pub binding_id: Option<Uuid>,
+    /// A workflow of the company; "" (the select's "any") is none.
+    #[serde(default, deserialize_with = "deserialize_empty_string_as_none")]
+    pub workflow_id: Option<Uuid>,
+    /// An agent of the company; "" is none.
+    #[serde(default, deserialize_with = "deserialize_empty_string_as_none")]
+    pub agent_id: Option<Uuid>,
     pub state: Option<String>,
+    /// `board` for the board; anything else, or nothing, is the list.
+    pub view: Option<String>,
+    /// The board's finished-column window (see [`pages::board_window`]).
+    pub window: Option<String>,
+    /// With `view=board`, `columns` answers only the `#run-board` region.
+    pub part: Option<String>,
+    /// `columns` from the board's reload leaf, which keeps only the columns: the toolbar's
+    /// options are not read.
+    pub reload: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct ListQuery {
     pub company_id: Uuid,
     pub binding_id: Option<Uuid>,
+    #[serde(default, deserialize_with = "deserialize_empty_string_as_none")]
+    pub workflow_id: Option<Uuid>,
+    #[serde(default, deserialize_with = "deserialize_empty_string_as_none")]
+    pub agent_id: Option<Uuid>,
     pub state: Option<String>,
     pub after: Option<Uuid>,
     /// The run open in the pane, highlighted in the entries.
@@ -86,6 +108,67 @@ impl RunPage {
     fn read(&self) -> usize {
         self.items.len() + self.hidden
     }
+}
+
+/// The scope a request names: binding, workflow and agent ids as given.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct ScopeIds {
+    pub binding: Option<Uuid>,
+    pub workflow: Option<Uuid>,
+    pub agent: Option<Uuid>,
+}
+
+impl ScopeIds {
+    fn of_workspace(query: &WorkspaceQuery) -> Self {
+        Self {
+            binding: query.binding_id,
+            workflow: query.workflow_id,
+            agent: query.agent_id,
+        }
+    }
+
+    fn of_list(query: &ListQuery) -> Self {
+        Self {
+            binding: query.binding_id,
+            workflow: query.workflow_id,
+            agent: query.agent_id,
+        }
+    }
+
+    fn view<'a>(&self, state: Option<&'a str>) -> pages::RunFilterView<'a> {
+        pages::RunFilterView {
+            binding: self.binding,
+            workflow: self.workflow,
+            agent: self.agent,
+            state,
+        }
+    }
+}
+
+/// What a board read renders: the whole region with the toolbar's options, or (the reload leaf's
+/// `reload=columns`) only what the leaf keeps, the columns, leaving the options unread.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum BoardRead {
+    Region,
+    Columns,
+}
+
+impl BoardRead {
+    fn of(query: &WorkspaceQuery) -> Self {
+        match query.reload.as_deref() {
+            Some("columns") => Self::Columns,
+            _ => Self::Region,
+        }
+    }
+}
+
+/// A scope resolved company-scoped: a binding the caller may see, a workflow and an agent of the
+/// company. Any other id is not found, never ignored.
+#[derive(Debug, Clone, Copy, Default)]
+struct Scope {
+    binding: Option<WorkflowBindingId>,
+    workflow: Option<WorkflowId>,
+    agent: Option<Uuid>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -195,6 +278,133 @@ impl Ui {
         })
     }
 
+    /// `ids` resolved company-scoped (see [`Scope`]).
+    async fn scope(&self, company: Uuid, ids: ScopeIds) -> AppResult<Scope> {
+        let company_id = super::company(company);
+        Ok(Scope {
+            binding: match ids.binding {
+                Some(binding) => Some(
+                    visible_binding(&self.engine, company_id, self.actor()?, binding)
+                        .await?
+                        .binding,
+                ),
+                None => None,
+            },
+            workflow: match ids.workflow {
+                Some(workflow) => Some(company_workflow(&self.engine, company_id, workflow).await?),
+                None => None,
+            },
+            agent: match ids.agent {
+                Some(agent) => Some(company_agent(&self.engine, company_id, agent).await?),
+                None => None,
+            },
+        })
+    }
+
+    /// The workflows and agents the scope controls offer, each at most [`MAX_BINDING_OPTIONS`]
+    /// by label, with whether it was cut.
+    async fn scope_options(&self, company: Uuid) -> AppResult<pages::ScopeOptions> {
+        let definitions = self
+            .engine
+            .reads()
+            .list_definitions(
+                super::company(company),
+                PageRequest::new(None, Some(MAX_BINDING_OPTIONS))?,
+            )
+            .await?;
+        let workflows = definitions
+            .items
+            .into_iter()
+            .map(|definition| pages::ScopeOption {
+                id: definition.workflow.as_uuid(),
+                label: match (definition.title.is_empty(), definition.archived) {
+                    (true, _) => "(untitled workflow)".to_owned(),
+                    (false, true) => format!("{} (archived)", definition.title),
+                    (false, false) => definition.title,
+                },
+            })
+            .collect();
+        let (agents, agents_cut) = self
+            .engine
+            .authoring_reads()
+            .agent_options(super::company(company))
+            .await?;
+        let agents = agents
+            .into_iter()
+            .map(|agent| pages::ScopeOption {
+                id: agent.id,
+                label: agent.label,
+            })
+            .collect();
+        Ok(pages::ScopeOptions {
+            workflows,
+            workflows_cut: definitions.more,
+            agents,
+            agents_cut,
+        })
+    }
+
+    /// The `#run-board` region of `company`'s top-level runs in the scope `ids` names (resolved
+    /// company-scoped; an id outside it is not found), read now, with `selected` highlighted.
+    async fn board_html(
+        &self,
+        company: Uuid,
+        ids: ScopeIds,
+        window: BoardWindow,
+        selected: Option<Uuid>,
+        read: BoardRead,
+    ) -> AppResult<String> {
+        self.board_html_at(company, ids, window, selected, read, chrono::Utc::now())
+            .await
+    }
+
+    /// [`Self::board_html`] read as of `as_of`: the window's cutoff and the cards' ages count from
+    /// it, so every read (each wake-up) recomputes them.
+    async fn board_html_at(
+        &self,
+        company: Uuid,
+        ids: ScopeIds,
+        window: BoardWindow,
+        selected: Option<Uuid>,
+        read: BoardRead,
+        as_of: chrono::DateTime<chrono::Utc>,
+    ) -> AppResult<String> {
+        let company_id = super::company(company);
+        let actor = self.actor()?;
+        let resolved = self.scope(company, ids).await?;
+        let scope = RunBoardScope {
+            binding: resolved.binding,
+            workflow: resolved.workflow,
+            agent: resolved.agent,
+        };
+        let board = visible_board(&self.engine, company_id, actor, &scope, window, as_of).await?;
+        let workflows: Vec<Uuid> = board
+            .columns
+            .iter()
+            .flat_map(|column| column.cards.iter().map(|card| card.workflow.as_uuid()))
+            .collect();
+        let titles = self
+            .engine
+            .run_views()
+            .workflow_titles(company_id, &workflows)
+            .await?;
+        let options = match read {
+            BoardRead::Region => self.scope_options(company).await?,
+            BoardRead::Columns => pages::ScopeOptions::default(),
+        };
+        Ok(pages::run_board(&pages::RunBoardView {
+            company_id: company,
+            columns: &board.columns,
+            children: &board.children,
+            titles: &titles,
+            window,
+            scope: ids.view(None),
+            options: &options,
+            selected,
+            as_of,
+        }))
+    }
+
     /// Up to `size` rows of the list after `after`, as the caller may see them.
     async fn run_page(
         &self,
@@ -239,22 +449,29 @@ impl Ui {
     }
 }
 
-/// GET /ui/workflow-runs — the workspace, with `run_id` open when given.
+/// GET /ui/workflow-runs — the workspace, with `run_id` open when given: the list, or with
+/// `view=board` the board.
 async fn workspace(ui: Ui, Query(query): Query<WorkspaceQuery>) -> AppResult<Html<String>> {
+    if pages::RunsView::parse(query.view.as_deref()) == pages::RunsView::Board {
+        return board_workspace(ui, query).await;
+    }
     let frame = ui.frame(query.company_id).await?;
     let Some(company) = frame.company.as_ref() else {
         return Ok(Html(frame.render(&ui.config, |_, _| String::new())));
     };
     let company_id = company.id;
     let state = state_filter(query.state.as_deref());
+    let ids = ScopeIds::of_workspace(&query);
+    let scope = ui.scope(company_id, ids).await?;
     let page = ui
         .run_page(
             company_id,
-            run_filter(query.binding_id, state.clone()),
+            run_filter(scope, state.clone()),
             None,
             LIST_PAGE,
         )
         .await?;
+    let options = ui.scope_options(company_id).await?;
     let list_html = pages::run_list(&pages::RunListView {
         company_id,
         items: &page.items,
@@ -262,11 +479,9 @@ async fn workspace(ui: Ui, Query(query): Query<WorkspaceQuery>) -> AppResult<Htm
         next: page.next,
         selected: query.run_id,
         read: page.read(),
-        filter: pages::RunFilterView {
-            binding: query.binding_id,
-            state: state.as_deref(),
-        },
+        filter: ids.view(state.as_deref()),
         titles: &page.titles,
+        options: &options,
     });
     let pane_html = match query.run_id {
         Some(run) => ui.run_pane_html(company_id, run, None).await?,
@@ -278,6 +493,54 @@ async fn workspace(ui: Ui, Query(query): Query<WorkspaceQuery>) -> AppResult<Htm
             company,
             list_html: &list_html,
             pane_html: &pane_html,
+        })
+    })))
+}
+
+/// The board workspace, or with `part=columns` its `#run-board` region alone (a filter change
+/// or a wake-up), for a company the caller manages.
+async fn board_workspace(ui: Ui, query: WorkspaceQuery) -> AppResult<Html<String>> {
+    let window = pages::board_window(query.window.as_deref());
+    if query.part.as_deref() == Some("columns") {
+        let requested = query
+            .company_id
+            .ok_or_else(|| AppError::NotFound("Company not found".into()))?;
+        let company = ui.company(requested).await?.id;
+        return Ok(Html(
+            ui.board_html(
+                company,
+                ScopeIds::of_workspace(&query),
+                window,
+                query.run_id,
+                BoardRead::of(&query),
+            )
+            .await?,
+        ));
+    }
+    let frame = ui.frame(query.company_id).await?;
+    let Some(company) = frame.company.as_ref() else {
+        return Ok(Html(frame.render(&ui.config, |_, _| String::new())));
+    };
+    let company_id = company.id;
+    let board_html = ui
+        .board_html(
+            company_id,
+            ScopeIds::of_workspace(&query),
+            window,
+            query.run_id,
+            BoardRead::Region,
+        )
+        .await?;
+    let pane_html = match query.run_id {
+        Some(run) => Some(ui.run_pane_html(company_id, run, None).await?),
+        None => None,
+    };
+    Ok(Html(frame.render(&ui.config, |user, company| {
+        pages::runs_board_page(&pages::RunsBoardPage {
+            user,
+            company,
+            board_html: &board_html,
+            pane_html: pane_html.as_deref(),
         })
     })))
 }
@@ -300,14 +563,16 @@ async fn list(ui: Ui, Query(query): Query<ListQuery>) -> AppResult<Html<String>>
         ),
         None => (None, LIST_PAGE),
     };
+    let ids = ScopeIds::of_list(&query);
+    let scope = ui.scope(company, ids).await?;
     let page = ui
-        .run_page(
-            company,
-            run_filter(query.binding_id, state.clone()),
-            after,
-            size,
-        )
+        .run_page(company, run_filter(scope, state.clone()), after, size)
         .await?;
+    // Only the whole region shows the controls; a wake-up or "Load more" reads no options.
+    let options = match query.part {
+        None => ui.scope_options(company).await?,
+        Some(_) => pages::ScopeOptions::default(),
+    };
     let view = pages::RunListView {
         company_id: company,
         items: &page.items,
@@ -318,11 +583,9 @@ async fn list(ui: Ui, Query(query): Query<ListQuery>) -> AppResult<Html<String>>
             Some(ListPart::More) => shown + page.read(),
             _ => page.read(),
         },
-        filter: pages::RunFilterView {
-            binding: query.binding_id,
-            state: state.as_deref(),
-        },
+        filter: ids.view(state.as_deref()),
         titles: &page.titles,
+        options: &options,
     };
     Ok(Html(match query.part {
         Some(ListPart::More | ListPart::Entries) => pages::run_list_update(&view),
@@ -330,11 +593,12 @@ async fn list(ui: Ui, Query(query): Query<ListQuery>) -> AppResult<Html<String>>
     }))
 }
 
-fn run_filter(binding: Option<Uuid>, state: Option<String>) -> RunFilter {
+fn run_filter(scope: Scope, state: Option<String>) -> RunFilter {
     RunFilter {
-        binding: binding.map(WorkflowBindingId::new),
+        binding: scope.binding,
+        workflow: scope.workflow,
         state,
-        agent: None,
+        agent: scope.agent,
         // The list is the forensic feed: children stay in it, labelled with their parent.
         lineage: RunLineage::Any,
     }

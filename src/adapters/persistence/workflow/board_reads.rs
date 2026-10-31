@@ -5,7 +5,7 @@
 //! the partial indexes whose predicates name them apply to generic plans too. Synchronous so
 //! `dump_run_list_query_shapes` hands `scripts/tests/run-list-query-plan.py` the shipped text.
 //!
-//! A binding or agent scope filters a `MATERIALIZED` working set, which Postgres runs at most once.
+//! A binding, workflow or agent scope filters a `MATERIALIZED` working set, which Postgres runs at most once.
 //! With the filter beside the working set, the planner drove the read from
 //! `workflow_runs_binding_newest` or from each of the agent's versions and read that scope's whole
 //! history: 230,378 buffers over a dense agent's 400 versions where the working set took 12,652.
@@ -31,7 +31,7 @@ fn open_states() -> String {
 }
 
 fn scoped(scope: &RunBoardScope) -> bool {
-    scope.binding.is_some() || scope.agent.is_some()
+    scope.binding.is_some() || scope.workflow.is_some() || scope.agent.is_some()
 }
 
 /// The scope's filters on the materialized working set, the first after `WHERE`. The agent is
@@ -47,6 +47,13 @@ fn push_scope(
             .push(keyword)
             .push("binding_id = ")
             .push_bind(binding.as_uuid());
+        keyword = " AND ";
+    }
+    if let Some(workflow) = scope.workflow {
+        query
+            .push(keyword)
+            .push("workflow_id = ")
+            .push_bind(workflow.as_uuid());
         keyword = " AND ";
     }
     if let Some(agent) = scope.agent {
@@ -69,7 +76,8 @@ pub(super) fn board_counts_query(
     scope: &RunBoardScope,
     cutoff: DateTime<Utc>,
 ) -> QueryBuilder<'static, Postgres> {
-    let working = "SELECT state, channel_id, binding_id, version_id FROM workflow_runs";
+    let working =
+        "SELECT state, channel_id, binding_id, workflow_id, version_id FROM workflow_runs";
     let mut query = QueryBuilder::new(format!(
         "WITH working AS MATERIALIZED ({working} WHERE company_id = "
     ));

@@ -7318,6 +7318,8 @@ ALTER TABLE ONLY public.workflow_runs
 -- The run listings' keyset order, company-wide and by binding (p08 B3b-1).
 CREATE INDEX workflow_runs_newest ON public.workflow_runs(company_id, created_at DESC, id DESC);
 CREATE INDEX workflow_runs_binding_newest ON public.workflow_runs(company_id, binding_id, created_at DESC, id DESC);
+-- The run list's workflow filter (plan new-board-view 02, docs/performance/run-list.md "Workflow filter").
+CREATE INDEX workflow_runs_workflow_newest ON public.workflow_runs(company_id, workflow_id, created_at DESC, id DESC);
 -- One version's runs in keyset order: the agent filter reads one range per version that uses the
 -- agent, cut at the page size (fix-01; evidence in docs/performance/run-list.md).
 CREATE INDEX workflow_runs_version_newest ON public.workflow_runs(company_id, version_id, created_at DESC, id DESC);

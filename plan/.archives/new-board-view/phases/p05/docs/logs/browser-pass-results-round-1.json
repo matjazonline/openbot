@@ -1,0 +1,72 @@
+[
+  {
+    "name": "board: six columns in state order with totals",
+    "ok": true,
+    "detail": "[[\"queued\",1],[\"running\",1],[\"waiting\",3],[\"succeeded\",5],[\"failed\",57],[\"cancelled\",3]]"
+  },
+  {
+    "name": "board: cut failed column says \"Showing 50 of N\" and opens the list with state",
+    "ok": true,
+    "detail": "http://localhost:3001/ui/workflow-runs?company_id=4aad013c-3a61-476d-88ae-21fa8e792a4d&state=failed"
+  },
+  {
+    "name": "toggle: List ↔ Board keeps the scope",
+    "ok": true,
+    "detail": "kept workflow_id both ways"
+  },
+  {
+    "name": "filters: workflow, agent and window each narrow the board",
+    "ok": true,
+    "detail": "workflow 2, agent 2, window day"
+  },
+  {
+    "name": "cards: parent rollup, escaped hostile title",
+    "ok": true,
+    "detail": "Parent waiting for a child run run bc736bb1 · created 3m ago1 child run · 1 open"
+  },
+  {
+    "name": "rail: Runs lit on the board, other rail links unchanged",
+    "ok": true,
+    "detail": "Mailbox, Channels, Agents, Workflows, Runs, Schedules, Work, Deliveries, Dashboard, Companies, Board Co"
+  },
+  {
+    "name": "agent pane: \"Runs board\" opens the single-agent board",
+    "ok": true,
+    "detail": "http://localhost:3001/ui/workflow-runs?company_id=4aad013c-3a61-476d-88ae-21fa8e792a4d&view=board&agent_id=ff737df9-4d3a-4b11-b5ba-a48a9bec5de0"
+  },
+  {
+    "name": "live: cancel from the pane moves the card without a reload",
+    "ok": true,
+    "detail": "moved to cancelled"
+  },
+  {
+    "name": "live: retry from the pane moves a failed card out of failed",
+    "ok": true,
+    "detail": "retry answered 200; banner \"Nothing was done: This run cannot be retried: only a failed run whose failed step is safe to repeat can be (revision 12). This is the run as it is now.\"; card now in failed (failed again: the fixture provider key is not real)"
+  },
+  {
+    "name": "dashboard: step-job panel and board link",
+    "ok": true,
+    "detail": "board link /ui/workflow-runs?company_id=4aad013c-3a61-476d-88ae-21fa8e792a4d&view=board; outstanding job rows linking a run: 0"
+  },
+  {
+    "name": "themes: board tokens resolve in dark and light",
+    "ok": true,
+    "detail": "{\"theme\":\"light\",\"column\":\"oklch(0.98 0 0)\",\"card\":\"oklch(1 0 0)\",\"border\":\"oklch(0.95 0 0)\",\"text\":\"oklch(0.21 0.006 285.885)\"} / {\"theme\":\"dark\",\"column\":\"oklch(0.2326 0.014 253.1)\",\"card\":\"oklch(0.2533 0.016 252.42)\",\"border\":\"oklch(0.2115 0.012 254.09)\",\"text\":\"oklch(0.97807 0.029 256.847)\"}"
+  },
+  {
+    "name": "owner pages raised no script errors",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "admin: runs on a channel they cannot see are left out",
+    "ok": true,
+    "detail": "succeeded 3 (owner 5)"
+  },
+  {
+    "name": "phone: a card opens the pane full width, back returns to the board",
+    "ok": true,
+    "detail": "pane 390px; board 390px after back; column fits"
+  }
+]

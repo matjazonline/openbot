@@ -206,7 +206,7 @@ pub fn dashboard_panels(page: &DashboardPage<'_>) -> String {
         "##,
         chart_style = chart::STYLE,
         alerts = health_alerts(&page.snapshot.tasks, &page.snapshot.deliveries),
-        tasks = task_queue_panel(&page.snapshot.tasks),
+        tasks = task_queue_panel(&page.snapshot.tasks, linked_company),
         deliveries = delivery_panel(&page.snapshot.deliveries, linked_company),
         outstanding = outstanding_panel(page),
         window_label = page.window.label(),
@@ -297,7 +297,7 @@ fn alert_row(headline: &str, detail: &str) -> String {
 fn outstanding_panel(page: &DashboardPage<'_>) -> String {
     if page.snapshot.outstanding.is_empty() {
         return panel(
-            "Outstanding workflow jobs",
+            "Outstanding workflow step jobs",
             r##"<div class="px-4 py-6 text-sm opacity-60">
                 Nothing outstanding — every job has finished.
             </div>"##,
@@ -323,7 +323,7 @@ fn outstanding_panel(page: &DashboardPage<'_>) -> String {
     };
 
     panel(
-        "Outstanding workflow jobs",
+        "Outstanding workflow step jobs",
         &format!(r##"<div class="divide-y divide-base-300">{rows}</div>{capped}"##),
     )
 }
@@ -334,16 +334,20 @@ fn outstanding_panel(page: &DashboardPage<'_>) -> String {
 /// operator rollup. The row still shows everything it knows; it just does not offer a link that
 /// would land on "Create a company".
 fn outstanding_row(task: &OutstandingTask, show_company: bool, openable: bool) -> String {
-    // A job in a conversation links to its thread. Any other has no page until the run page
-    // (p09), so it stays plain rather than pointing somewhere it is not.
-    let destination = match (openable, task.channel_id, task.thread_id) {
-        (true, Some(channel_id), Some(thread_id)) => Some((
+    // A job in a conversation links to its thread; any other to the run it is a step of. The run
+    // page re-checks company and channel access itself (`RunLinkAccess`), so a run on a channel
+    // the caller cannot see answers not found rather than showing it.
+    let destination = match (openable, task.channel_id, task.thread_id, task.run_id) {
+        (true, Some(channel_id), Some(thread_id), _) => Some((
             format!(
                 "/ui?company_id={company_id}&channel_id={channel_id}&thread_id={thread_id}",
                 company_id = task.company_id,
             ),
             "Open thread",
         )),
+        (true, _, None, Some(run_id)) => {
+            Some((super::run_href(task.company_id, run_id), "Open run"))
+        }
         _ => None,
     };
 
@@ -447,12 +451,24 @@ fn outstanding_icon(task: &OutstandingTask) -> Icon {
     }
 }
 
-/// The workflow queue's jobs (p08 D4.5). The figures are plain: no page lists jobs by status.
-fn task_queue_panel(tasks: &TaskQueueHealth) -> String {
-    stat_row(
-        "Workflow jobs",
+/// The workflow queue's jobs (p08 D4.5): `background_tasks`, one per step a run takes, not runs.
+/// The figures are plain: no page lists jobs by status. Run-level state is the runs board, linked
+/// when the page is scoped to a company the caller can open.
+fn task_queue_panel(tasks: &TaskQueueHealth, company_id: Option<Uuid>) -> String {
+    let board = company_id
+        .map(|company_id| {
+            format!(
+                r##"<div class="px-4 pb-2 text-xs opacity-70">Each job is one step of a run. <a class="link" href="/ui/workflow-runs?company_id={company_id}&amp;view=board">Runs by state</a></div>"##
+            )
+        })
+        .unwrap_or_else(|| {
+            r##"<div class="px-4 pb-2 text-xs opacity-70">Each job is one step of a run.</div>"##
+                .to_owned()
+        });
+    panel(
+        "Workflow step jobs",
         &format!(
-            "{due}{processing}{stalled}{total}",
+            r##"<div class="stats stats-horizontal w-full overflow-x-auto">{due}{processing}{stalled}{total}</div>{board}"##,
             due = stat(Stat::new(
                 "Due now",
                 &tasks.due_now.to_string(),
@@ -1075,7 +1091,7 @@ pub(super) fn stat(stat: Stat<'_>) -> String {
 ///
 /// Split from the clock so it can be tested: "how long between these two instants" is a decision,
 /// and reading `Utc::now()` inside it would make every assertion about it a race.
-fn elapsed_label(since: DateTime<Utc>, now: DateTime<Utc>) -> String {
+pub(super) fn elapsed_label(since: DateTime<Utc>, now: DateTime<Utc>) -> String {
     let seconds = (now - since).num_seconds();
     // A clock that disagrees with the database's is not worth rendering as a negative age.
     if seconds < 60 {
@@ -1316,6 +1332,7 @@ mod tests {
             channel_name: Some("support".into()),
             channel_id: Some(Uuid::nil()),
             thread_id: Some(Uuid::nil()),
+            run_id: Some(Uuid::nil()),
             task_type: "email_agent_dispatch".into(),
             status,
             stalled,
@@ -1460,15 +1477,20 @@ mod tests {
         assert!(html.contains("Queued"), "{html}");
     }
 
-    /// A job outside a conversation, or of a run without a channel, has no thread to open and no
-    /// page of its own until p09: it is plain, without a chevron promising somewhere to go.
+    /// A job outside a conversation, or of a run without a channel, has no thread to open: it links
+    /// to the run it is a step of (plan new-board-view 04). A job whose execution is gone has no
+    /// run either, and stays plain, without a chevron promising somewhere to go.
     #[test]
-    fn a_job_with_no_thread_is_not_a_link() {
+    fn a_job_with_no_thread_links_to_its_run() {
+        let run = Uuid::from_u128(7);
         let mut threadless = outstanding(TaskStatus::Processing, true);
         threadless.thread_id = None;
+        threadless.run_id = Some(run);
         let mut company_wide = outstanding(TaskStatus::Processing, true);
         company_wide.channel_id = None;
         company_wide.channel_name = None;
+        company_wide.thread_id = None;
+        company_wide.run_id = Some(run);
         let companies = [company()];
         let mut snapshot = snapshot();
         snapshot.outstanding = vec![threadless, company_wide];
@@ -1478,13 +1500,54 @@ mod tests {
             &companies,
             &snapshot,
         );
-        assert!(!html.contains("/ui/tasks"), "{html}");
+        let href = format!(
+            r#"href="/ui/workflow-runs?company_id={}&amp;run_id={run}" title="Open run""#,
+            Uuid::nil()
+        );
+        assert_eq!(html.matches(&href).count(), 2, "{html}");
         assert!(!html.contains("/ui?company_id="), "no thread link: {html}");
         assert!(html.contains("Company-wide"), "{html}");
+
+        let mut orphan = outstanding(TaskStatus::Processing, true);
+        orphan.thread_id = None;
+        orphan.run_id = None;
+        snapshot.outstanding = vec![orphan];
+        let html = rendered_for(
+            DashboardScopeView::Company(&companies[0]),
+            &companies,
+            &snapshot,
+        );
+        assert!(!html.contains("Open run"), "{html}");
         assert!(
             !html.contains(&icon(Icon::ChevronRight, "h-3 w-3")),
             "no chevron without somewhere to go: {html}"
         );
+    }
+
+    /// The job figures count `background_tasks` step jobs, which read easily as runs: the panel
+    /// says so and, for a company the caller can open, points at the runs board.
+    #[test]
+    fn the_job_panel_counts_step_jobs_and_links_the_board() {
+        let companies = [company()];
+        let scoped = rendered_for(
+            DashboardScopeView::Company(&companies[0]),
+            &companies,
+            &snapshot(),
+        );
+        assert!(scoped.contains("Workflow step jobs"), "{scoped}");
+        assert!(scoped.contains("Each job is one step of a run."));
+        assert!(scoped.contains(&format!(
+            r#"href="/ui/workflow-runs?company_id={}&amp;view=board">Runs by state</a>"#,
+            companies[0].id
+        )));
+        // The rollup and a company the caller cannot open name no board.
+        for html in [
+            rendered_for(DashboardScopeView::Global, &companies, &snapshot()),
+            rendered_for(DashboardScopeView::Company(&companies[0]), &[], &snapshot()),
+        ] {
+            assert!(html.contains("Workflow step jobs"), "{html}");
+            assert!(!html.contains("Runs by state"), "{html}");
+        }
     }
 
     /// "Stalled" is `processing` with a lapsed lease, and that is the fact worth showing.
@@ -1525,6 +1588,10 @@ mod tests {
             "an unreachable row must not offer a thread link: {html}"
         );
         assert!(
+            !html.contains("/ui/workflow-runs"),
+            "nor a run link: {html}"
+        );
+        assert!(
             html.contains("You are not a member of this company"),
             "and it should say why: {html}"
         );
@@ -1540,8 +1607,9 @@ mod tests {
         assert!(html.contains("Nothing outstanding"), "{html}");
     }
 
-    /// No page lists workflow jobs by status, so the job figures are plain text; the delivery
-    /// figures still link to the company's deliveries.
+    /// No page lists workflow jobs by status, so the job figures themselves are plain text (the
+    /// panel's note links the runs board); the delivery figures still link to the company's
+    /// deliveries.
     #[test]
     fn job_figures_are_plain_and_delivery_figures_link_for_a_company() {
         let companies = [company()];
@@ -1552,7 +1620,7 @@ mod tests {
             &companies,
             &snapshot,
         );
-        assert!(scoped.contains("Workflow jobs"), "{scoped}");
+        assert!(scoped.contains("Workflow step jobs"), "{scoped}");
         assert!(!scoped.contains("/ui/tasks"), "{scoped}");
         assert!(scoped.contains("/ui/deliveries?company_id="), "{scoped}");
 

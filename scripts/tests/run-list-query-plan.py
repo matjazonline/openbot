@@ -12,6 +12,7 @@ no application rows are read or modified. The database must be migrated: the tem
 `LIKE public.<table> INCLUDING ALL`, so they carry the shipped constraints and indexes.
 """
 import argparse
+import itertools
 import json
 import os
 import pathlib
@@ -82,10 +83,13 @@ SELECT indexdef FROM pg_indexes
  WHERE schemaname = 'public' AND tablename IN ('workflow_runs', 'workflow_versions') ORDER BY indexdef;
 """
 
-# Fixed values: tenant 1 is heavy; binding of workflow 0; dense agent 0, sparse agent 63.
+# Fixed values: tenant 1 is heavy; binding of workflow 0; workflow 0 (a fortieth of the tenant's
+# runs, every one of them open, so its `failed` list matches nothing and reads to the end); dense
+# agent 0, sparse agent 63.
 VALUES = {
     "company": "md5('company1')::uuid",
     "binding": "md5('binding1-0')::uuid",
+    "workflow": "md5('workflow1-0')::uuid",
 }
 # Both page sizes the code reads, each plus its look-ahead row: the UI's 50-row pages
 # (`LIST_PAGE`), and 200 (`MAX_LISTED`), the JSON route's default and the UI's refresh of a list
@@ -95,6 +99,9 @@ AGENTS = {"dense": "md5('agent1-0')::uuid", "sparse": "md5('agent1-63')::uuid"}
 # A common terminal state (a third of runs) and a rare open one (under 2%), which no keyset index
 # serves: a range that holds fewer matches than a page is read to its end.
 STATES = {"failed": "'failed'", "queued": "'queued'"}
+# The workflow filter: workflow 0 (a fortieth of the tenant's runs), and a workflow of the tenant
+# with no runs at all, the sparsest scope: without its own index it reads the company's history.
+WORKFLOWS = {"a fortieth": VALUES["workflow"], "no runs": "md5('workflow1-99')::uuid"}
 CURSOR_DEPTH = 200
 
 
@@ -128,20 +135,23 @@ def measurements(shapes: list) -> str:
             name = shape["name"]
             sql.append(f"DEALLOCATE ALL;\nPREPARE {name} AS {shape['sql']};\n")
             agents = AGENTS if "agent" in shape["parameters"] else {"": None}
+            workflows = WORKFLOWS if "workflow" in shape["parameters"] else {"": None}
             states = STATES if "state" in shape["parameters"] else {"": None}
-            for label, agent in agents.items():
-                for state_label, state in states.items():
-                    for limit_label, limit in LIMITS.items():
-                        values = dict(VALUES, agent=agent, state=state, limit=limit)
-                        if "cursor_created" in shape["parameters"]:
-                            sql.append(cursor_lookup(agent, f"cursor_{label}"))
-                            values["cursor_created"] = f":'cursor_{label}_created_at'::timestamptz"
-                            values["cursor_id"] = f":'cursor_{label}_id'::uuid"
-                        arguments = ", ".join(values[role] for role in shape["parameters"])
-                        title = " ".join(
-                            part for part in (name, label, state_label, limit_label) if part)
-                        sql.append(f"\\echo '== {title} (plan_cache_mode = {mode})'\n")
-                        sql.append(f"EXPLAIN (ANALYZE, BUFFERS) EXECUTE {name}({arguments});\n")
+            for (label, agent), (workflow_label, workflow), (state_label, state), (
+                    limit_label, limit) in itertools.product(
+                        agents.items(), workflows.items(), states.items(), LIMITS.items()):
+                values = dict(VALUES, agent=agent, state=state, limit=limit)
+                if workflow:
+                    values["workflow"] = workflow
+                if "cursor_created" in shape["parameters"]:
+                    sql.append(cursor_lookup(agent, f"cursor_{label}"))
+                    values["cursor_created"] = f":'cursor_{label}_created_at'::timestamptz"
+                    values["cursor_id"] = f":'cursor_{label}_id'::uuid"
+                arguments = ", ".join(values[role] for role in shape["parameters"])
+                title = " ".join(part for part in
+                                 (name, label, workflow_label, state_label, limit_label) if part)
+                sql.append(f"\\echo '== {title} (plan_cache_mode = {mode})'\n")
+                sql.append(f"EXPLAIN (ANALYZE, BUFFERS) EXECUTE {name}({arguments});\n")
     return "".join(sql)
 
 
@@ -155,6 +165,8 @@ BOARD_COMPANIES = {"heavy": "md5('company1')::uuid", "light": "md5('company5')::
 # workflows 1 and 32, so it has finished runs in every window.
 BOARD_BINDINGS = {"open-only": VALUES["binding"], "finished": "md5('binding1-1')::uuid"}
 BOARD_AGENTS = dict(AGENTS, recent="md5('agent1-40')::uuid")
+# The workflow-scoped boards: the same two workflows as the bindings above, by workflow id.
+BOARD_WORKFLOWS = {"open-only": VALUES["workflow"], "finished": "md5('workflow1-1')::uuid"}
 # The cards' visible channels, as psql variables set by VISIBLE: every channel and the company's
 # runs, or 8 of the 32 channels and not the company's runs, so each column reads past hidden runs.
 VISIBLE = r"""
@@ -195,7 +207,8 @@ BOARD_START, BOARD_END = "#### run board", "#### end of run board"
 
 def board_cases(shape: dict) -> list:
     """(title, values) for each read of `shape`: the company scope of the heavy tenant in every
-    window, the light tenant's month, and the binding and agent scopes in the default week."""
+    window, the light tenant's month, and the binding, workflow and agent scopes in the default
+    week."""
     family, name = shape["family"], shape["name"]
     visibilities = VISIBILITY if family == "board_cards" else {"": None}
     cases = []
@@ -217,6 +230,9 @@ def board_cases(shape: dict) -> list:
     elif "agent" in shape["parameters"]:
         for label, agent in BOARD_AGENTS.items():
             add(label, "heavy", "week", agent=agent)
+    elif "workflow" in shape["parameters"]:
+        for label, workflow in BOARD_WORKFLOWS.items():
+            add(label, "heavy", "week", workflow=workflow)
     else:
         for label, binding in BOARD_BINDINGS.items():
             add(label, "heavy", "week", binding=binding)

@@ -5,7 +5,7 @@
 //! [`BOARD_COLUMN_CAP`](crate::application::workflow::board::BOARD_COLUMN_CAP); each shown card
 //! counts its children. No transaction spans the reads: a run that moves between them shows up on
 //! the next read.
-use super::bindings::{Visibility, company_agent, run_json, visible_binding};
+use super::bindings::{Visibility, company_agent, company_workflow, run_json, visible_binding};
 use super::*;
 use crate::application::workflow::RelatedChannelId;
 use crate::application::workflow::board::{
@@ -146,7 +146,7 @@ async fn visible_channels(
 }
 
 /// Log a board read past [`RUN_BOARD_QUERY_WARN_THRESHOLD`] with each phase's share, the scope
-/// that ran (whether a binding and an agent were given, not their ids), the window and the working
+/// that ran (whether a binding, a workflow and an agent were given, not their ids), the window and the working
 /// set: the evidence for revisiting the board's statements and index in
 /// `docs/performance/run-list.md`.
 fn warn_if_run_board_is_slow(
@@ -167,6 +167,7 @@ fn warn_if_run_board_is_slow(
         rollup_ms = ms(trace.rollup),
         company_id = %company.as_uuid(),
         binding = scope.binding.is_some(),
+        workflow = scope.workflow.is_some(),
         agent = scope.agent.is_some(),
         window = window.as_str(),
         eligible_runs = trace.eligible_runs,
@@ -182,6 +183,8 @@ fn warn_if_run_board_is_slow(
 pub struct BoardQuery {
     /// A binding the caller may see; another one is not found.
     pub binding_id: Option<Uuid>,
+    /// A workflow of the company; another company's is not found.
+    pub workflow_id: Option<Uuid>,
     /// Runs of versions that use this agent of the company, as the run list's `agent_id`.
     pub agent_id: Option<Uuid>,
     /// `day`, `week` (the default) or `month`: how far back the finished columns reach.
@@ -213,7 +216,15 @@ pub async fn board(
         Some(agent) => Some(company_agent(&engine, company, agent).await?),
         None => None,
     };
-    let scope = RunBoardScope { binding, agent };
+    let workflow = match query.workflow_id {
+        Some(workflow) => Some(company_workflow(&engine, company, workflow).await?),
+        None => None,
+    };
+    let scope = RunBoardScope {
+        binding,
+        workflow,
+        agent,
+    };
     let board = visible_board(&engine, company, actor, &scope, query.window, Utc::now()).await?;
     Ok(ok(board_json(&board)))
 }

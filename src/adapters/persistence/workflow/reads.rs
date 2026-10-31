@@ -218,6 +218,11 @@ fn push_run_page(
             .push(" AND binding_id = ")
             .push_bind(binding.as_uuid());
     }
+    if let Some(workflow) = filter.workflow {
+        query
+            .push(" AND workflow_id = ")
+            .push_bind(workflow.as_uuid());
+    }
     if let Some(state) = &filter.state {
         query.push(" AND state = ").push_bind(state.clone());
     }
@@ -264,7 +269,7 @@ fn logged_lineage(lineage: RunLineage) -> &'static str {
 }
 
 /// Log a run-list read past [`RUN_LIST_QUERY_WARN_THRESHOLD`] with the shape that ran — which
-/// binding and agent filters were present (not their ids), the state asked for and the lineage —
+/// binding, workflow and agent filters were present (not their ids), the state asked for and the lineage —
 /// and `page_rows`, the rows the statement returned: `page_size` plus one look-ahead row when the
 /// page filled, fewer when it ran out of matches. That is the evidence for revisiting the index
 /// decisions in `docs/performance/run-list.md`.
@@ -282,6 +287,7 @@ fn warn_if_run_list_is_slow(
         elapsed_ms = u64::try_from(elapsed.as_millis()).unwrap_or(u64::MAX),
         company_id = %company.as_uuid(),
         binding = filter.binding.is_some(),
+        workflow = filter.workflow.is_some(),
         state = logged_state(filter.state.as_deref()),
         agent = filter.agent.is_some(),
         lineage = logged_lineage(filter.lineage),

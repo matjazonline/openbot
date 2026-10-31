@@ -1,0 +1,122 @@
+{
+  "company": "4aad013c-3a61-476d-88ae-21fa8e792a4d",
+  "ownerId": "39ef412f-d829-4056-aeeb-6fac939543ec",
+  "adminId": "a2475f00-37ad-4fd8-80d0-129d2119b05f",
+  "privateChannel": "567a726a-d81a-4659-beac-fcb671d890e6",
+  "agents": {
+    "assistant": "ff737df9-4d3a-4b11-b5ba-a48a9bec5de0",
+    "reviewer": "06c587a1-1466-4add-9867-e6f0484fa347"
+  },
+  "mapper": {
+    "workflow": "25b8f136-18f8-4104-a85b-e8bf47c86a59",
+    "version": "449c9999-53d2-86b8-8dfb-33570e680072"
+  },
+  "assistant": {
+    "workflow": "56b7f425-5a93-4853-8c7f-eabc6ed59caf",
+    "version": "b9764ffa-f12b-8ee1-9028-878031a49583"
+  },
+  "reviewed": {
+    "workflow": "82541c59-2d8d-4c2f-83c0-ad4ff1f55330",
+    "version": "94e55abd-5021-834c-8fbc-e651e747f565"
+  },
+  "parent": {
+    "workflow": "8acb4d6d-5180-4309-b0f0-efc3c1fdc358",
+    "version": "5399b6db-4d71-8167-800f-6573b8b6e745"
+  },
+  "mapperBinding": "58988fde-22eb-4c2b-9330-8515dda240f6",
+  "mapped": [
+    "fb6e31f2-9eed-4492-9100-0460dc00ba48",
+    "7b90deee-bd37-410c-a5e3-518bb22141fe",
+    "72af557a-a844-4294-97bf-98d0cb7b2ab6",
+    "194b8253-f646-4884-9287-719a376d520f",
+    "ce774de1-0ceb-45b9-887c-8fadc857c373",
+    "f87781fd-8e04-4970-b167-af7ecfe87134",
+    "8ccee3bc-3f75-49a3-bba4-510ad2e05d67",
+    "6868e8d0-9ef5-4ea8-92e2-3bdafcdb6b04",
+    "2dc222c4-970a-4660-81ab-57400df44877",
+    "44e1012a-4989-4356-b8c9-c576602c263b",
+    "1078f0a6-cfae-4e2b-b351-4740d89643a7",
+    "373676fa-653d-440f-b53e-c60184737dce",
+    "82f0545d-4ba7-48ba-9de4-9f79a3c0af7f",
+    "0f3a9c05-5b4a-4fdc-b318-6eae6fcc69df",
+    "b100eed1-96ef-4fd9-bb8f-6ddc8467c567",
+    "951d44ff-11d7-433f-baae-52b79ee0ac5a",
+    "9c2c1879-6316-415d-b440-3dcf9f72626a",
+    "d4df112a-5e7c-4fe8-9583-8225a4251870",
+    "a6c7ce05-ecf3-4b4b-84ce-d9157ada27bb",
+    "119e1127-fca9-4c96-ae62-6a1d96308f47",
+    "02bc38f3-a35a-4a71-a30b-16755c4dcd33",
+    "30ecb160-48ff-4bea-8fb1-5a1aeefcc4e3",
+    "077428e0-f4c9-49fc-9f48-0a9bd2328530",
+    "54356bae-3412-4de7-ae9f-63046cd7c8ba",
+    "3e514bc4-b923-480b-ac02-9608fc516895",
+    "82a73a59-d6b3-4212-b3d9-b113f46c5be4",
+    "79c530b0-17e2-4062-b1cf-ddd7d74553c8",
+    "20e52d3b-f29d-4dc1-82ce-e95d5e57807c",
+    "2833be7e-4855-4cd2-8ce3-ca242be114f6",
+    "297bbe16-9462-47eb-8558-4fecc1a5d74b",
+    "09ad13a7-99e0-4ebe-a182-a11047c07651",
+    "091183ac-1683-4969-aa0c-e8aa2321ba61",
+    "5cfcc6de-6860-41b8-b929-b1a0a5f153da",
+    "bcc6053b-0e06-4120-8dea-f8b9dbef1994",
+    "9cb11e12-d4be-4b6c-b8e3-340154e59ee2",
+    "fd37428d-aeee-4577-90ce-cb124e407642",
+    "8ff81593-9b01-426b-a501-e7c9550a6b77",
+    "5ebc285b-ff46-4f83-bd1b-a3a8d3127971",
+    "bb843b74-93da-4757-af5f-b24fc961cde0",
+    "bc7424df-aba8-401e-8871-16e14f840885",
+    "6ee7451f-d11b-4a48-8003-2a0d807950e2",
+    "4a158b5f-9b1f-4702-904d-16107c056f32",
+    "d48a1337-8cb3-40e4-98c5-b0d2dda8fbe9",
+    "cd16e22c-96c1-476b-b2e1-0781f8925998",
+    "186b2989-0a05-4ddd-9f44-a777fdc0e73a",
+    "799dca8a-ed9f-412d-a470-236e3354b581",
+    "a32fc647-f6d8-4f93-9cf6-02af7e2764a7",
+    "f7862aec-2a0c-40b2-88e9-c6086547bd4a",
+    "fa16e9ac-88ea-4f43-9514-f114e1163449",
+    "fafe3984-9a96-43db-b452-6f0caf809c74",
+    "f6aa8d28-8c47-40be-8cef-e5f7943e37d9",
+    "4e6dc718-d937-4861-8e0f-abeed7b76a55",
+    "218e8ca3-0af9-43d1-a22d-a91a6af01272",
+    "3ded2a9a-863c-4fe2-8e01-4c4d48d4a522",
+    "debb4a8a-6d27-48e2-8b97-24960e13557d",
+    "751e6cf2-a385-4df1-b4bd-312a61cb45ac",
+    "d9fcc6dc-a5a8-4745-9a06-675899023732",
+    "e0573526-bdb9-4911-9a43-da1f35f7b6b5",
+    "4ea96329-3ed7-40ee-9e4f-b4d6c9a9b0a5",
+    "0c8c5028-3af0-4b94-ab9c-c0ff1e0bf2c3",
+    "c7139122-d97a-4ab8-a84b-45f0133a5232",
+    "ab154165-d456-49cc-b759-fa58c06bb55d"
+  ],
+  "hidden": [
+    "6c76f954-6a1c-4d4c-8a1f-e520792832e3",
+    "db30c86a-3fbc-4d52-8e29-35ce4733f9f7"
+  ],
+  "hostileRun": "dcc97e40-0ae2-4bb8-9774-6d3be36e1931",
+  "assistantRuns": [
+    "f46ac7b5-1dc2-433d-84a4-bda133d236e8",
+    "7e593aa7-7a4e-4ab9-aa7a-a23b5ffb74ed",
+    "f46ac7b5-1dc2-433d-84a4-bda133d236e8",
+    "f46ac7b5-1dc2-433d-84a4-bda133d236e8"
+  ],
+  "reviewRuns": [
+    "f2eb66ae-1e62-4fc7-ae43-a9deaa29f0c6",
+    "4f68774b-a02f-4493-b77a-8fa4503a4571"
+  ],
+  "parentRun": "bc736bb1-f6d0-43db-a5c7-a14f41208c45",
+  "childRun": "ec0370fc-7237-4dec-a28f-bbd50624cd0a",
+  "running": [
+    "e0573526-bdb9-4911-9a43-da1f35f7b6b5",
+    "4ea96329-3ed7-40ee-9e4f-b4d6c9a9b0a5",
+    "ab154165-d456-49cc-b759-fa58c06bb55d",
+    "c7139122-d97a-4ab8-a84b-45f0133a5232"
+  ],
+  "states": [
+    "cancelled:2",
+    "failed:57",
+    "queued:1",
+    "running:2",
+    "succeeded:5",
+    "waiting:3"
+  ]
+}

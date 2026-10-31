@@ -39,6 +39,8 @@ pub enum UiSection {
     Agents,
     /// Workflow authoring: library, editor, versions and bindings (p09).
     Workflows,
+    /// The runs workspace, board and list (plan new-board-view).
+    Runs,
     Schedules,
     Work,
     Deliveries,
@@ -411,6 +413,12 @@ pub(crate) const MAILBOX_SCRIPT: &str = r##"        // The `theme-controller` ch
             // Only a request the reader made is navigation. A live stream writing into the pane
             // they are not looking at must not drag them over to it, and carries no `xhr`.
             if (!event.detail.xhr) return;
+            // Nor is a refresh: a read the stream triggered (`hx-trigger="sse:…"`), or one with no
+            // triggering event at all -- htmx issues a poll (`every …`) and a `load` read without
+            // one. Only something the reader did, a click or a submit, opens a pane.
+            var trigger = event.detail.requestConfig && event.detail.requestConfig.triggeringEvent;
+            var type = trigger && typeof trigger.type === 'string' ? trigger.type : '';
+            if (!type || type.indexOf('sse:') === 0) return;
             var target = event.detail.target;
             if (!target || !target.closest || !target.closest('.ui-pane-detail')) return;
             var empty = (event.detail.serverResponse || '').indexOf('data-pane-empty') !== -1;
@@ -1527,39 +1535,63 @@ pub fn account_chip(user: &MailboxUser<'_>, swap: FragmentSwap) -> String {
 /// The workspace the response belongs to is lit, so the rail says where you are as well as where
 /// you can go.
 fn icon_rail(user: &MailboxUser<'_>, company: &Company, section: UiSection) -> String {
-    let company_id = company.id;
+    let destination = |section, path, query, glyph, title| RailDestination {
+        section,
+        path,
+        query,
+        glyph,
+        title,
+    };
     let destinations = [
-        (UiSection::Mailbox, "/ui", Icon::Mail, "Mailbox"),
-        (UiSection::Channels, "/ui/channels", Icon::Hash, "Channels"),
-        (UiSection::Agents, "/ui/agents", Icon::Hubot, "Agents"),
-        (
+        destination(UiSection::Mailbox, "/ui", &[], Icon::Mail, "Mailbox"),
+        destination(
+            UiSection::Channels,
+            "/ui/channels",
+            &[],
+            Icon::Hash,
+            "Channels",
+        ),
+        destination(UiSection::Agents, "/ui/agents", &[], Icon::Hubot, "Agents"),
+        destination(
             UiSection::Workflows,
             "/ui/workflows",
+            &[],
             Icon::Workflow,
             "Workflows",
         ),
-        (
+        destination(
+            UiSection::Runs,
+            "/ui/workflow-runs",
+            &[("view", "board")],
+            Icon::Project,
+            "Runs",
+        ),
+        destination(
             UiSection::Schedules,
             "/ui/schedules",
+            &[],
             Icon::Stopwatch,
             "Schedules",
         ),
-        (UiSection::Work, "/ui/work", Icon::Alert, "Work"),
-        (
+        destination(UiSection::Work, "/ui/work", &[], Icon::Alert, "Work"),
+        destination(
             UiSection::Deliveries,
             "/ui/deliveries",
+            &[],
             Icon::PaperAirplane,
             "Deliveries",
         ),
-        (
+        destination(
             UiSection::Dashboard,
             "/ui/dashboard",
+            &[],
             Icon::Graph,
             "Dashboard",
         ),
-        (
+        destination(
             UiSection::Companies,
             "/ui/companies",
+            &[],
             Icon::Organization,
             "Companies",
         ),
@@ -1567,17 +1599,16 @@ fn icon_rail(user: &MailboxUser<'_>, company: &Company, section: UiSection) -> S
 
     let links: String = destinations
         .iter()
-        .filter(|(destination, _, _, _)| rail_section_visible(user, *destination))
-        .map(|(destination, path, glyph, title)| {
+        .filter(|destination| rail_section_visible(user, destination.section))
+        .map(|destination| {
+            let lit = section == destination.section;
             format!(
-                r##"<a href="{path}?company_id={company_id}" class="btn btn-square btn-md {style}" title="{title}" aria-label="{title}" data-action="navigate-workspace"{current}>{glyph}<span class="rail-label">{title}</span></a>"##,
-                style = if section == *destination {
-                    "btn-primary"
-                } else {
-                    "btn-ghost"
-                },
-                current = if section == *destination { r##" aria-current="page""## } else { "" },
-                glyph = icon(*glyph, RAIL_ICON),
+                r##"<a href="{href}" class="btn btn-square btn-md {style}" title="{title}" aria-label="{title}" data-action="navigate-workspace"{current}>{glyph}<span class="rail-label">{title}</span></a>"##,
+                href = destination.href(company.id),
+                style = if lit { "btn-primary" } else { "btn-ghost" },
+                current = if lit { r##" aria-current="page""## } else { "" },
+                title = destination.title,
+                glyph = icon(destination.glyph, RAIL_ICON),
             )
         })
         .collect();
@@ -1597,6 +1628,29 @@ fn icon_rail(user: &MailboxUser<'_>, company: &Company, section: UiSection) -> S
     )
 }
 
+/// One rail entry: the workspace it lights, where it goes, and how it looks.
+struct RailDestination {
+    section: UiSection,
+    path: &'static str,
+    /// Query pairs of the destination's own, before the company it is scoped to.
+    query: &'static [(&'static str, &'static str)],
+    glyph: Icon,
+    title: &'static str,
+}
+
+impl RailDestination {
+    /// `path?<query>&company_id=<company>`, encoded and escaped for the attribute. Every
+    /// destination's link is built here, so one with a query of its own cannot drop the company.
+    fn href(&self, company_id: Uuid) -> String {
+        let company = company_id.to_string();
+        let query = url::form_urlencoded::Serializer::new(String::new())
+            .extend_pairs(self.query.iter().copied())
+            .append_pair("company_id", &company)
+            .finish();
+        escape_html_attr(&format!("{}?{query}", self.path))
+    }
+}
+
 /// The rail mirrors route authorization instead of advertising workspaces the caller cannot open.
 fn rail_section_visible(user: &MailboxUser<'_>, section: UiSection) -> bool {
     match section {
@@ -1604,6 +1658,8 @@ fn rail_section_visible(user: &MailboxUser<'_>, section: UiSection) -> bool {
         UiSection::Channels
         | UiSection::Agents
         | UiSection::Workflows
+        // `ui.company` on the runs routes: owners and admins.
+        | UiSection::Runs
         | UiSection::Schedules
         | UiSection::Deliveries => user.company_membership.manages_company_operations(),
         UiSection::Dashboard => {

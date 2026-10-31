@@ -416,6 +416,7 @@ pub(super) async fn agent_usage(
         .await?;
     Ok(Html(pages::agent_usage_card(&pages::AgentUsageCard {
         company_id: company,
+        agent,
         bindings: &bindings,
         hidden,
         truncated,

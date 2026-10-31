@@ -353,6 +353,7 @@ const OUTSTANDING_SQL: &str = r#"
            task.channel_id,
            channel.name AS channel_name,
            task.thread_id,
+           execution.run_id,
            task.task_type,
            task.status,
            task.retry_count,
@@ -364,6 +365,8 @@ const OUTSTANDING_SQL: &str = r#"
       FROM background_tasks AS task
       JOIN companies AS company ON company.id = task.company_id
       LEFT JOIN channels AS channel ON channel.id = task.channel_id
+      LEFT JOIN workflow_executions AS execution
+             ON execution.company_id = task.company_id AND execution.id = task.workflow_execution_id
      WHERE task.queue_kind = 'workflow' AND (
              task.status = 'processing'
              OR (task.status = 'pending' AND task.run_at <= CURRENT_TIMESTAMP)
@@ -638,6 +641,7 @@ impl PostgresPersistence {
                     channel_id: row.try_get("channel_id").map_err(AppError::from)?,
                     channel_name: row.try_get("channel_name").map_err(AppError::from)?,
                     thread_id: row.try_get("thread_id").map_err(AppError::from)?,
+                    run_id: row.try_get("run_id").map_err(AppError::from)?,
                     task_type: row.try_get("task_type").map_err(AppError::from)?,
                     status: TaskStatus::from_str(&raw)
                         .map_err(|err| AppError::Internal(err.to_string()))?,

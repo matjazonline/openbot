@@ -251,6 +251,9 @@ pub enum RunLineage {
 #[derive(Debug, Clone, Default)]
 pub struct RunFilter {
     pub binding: Option<WorkflowBindingId>,
+    /// Runs of one workflow, any of its versions. The route resolves the id company-scoped (a
+    /// definition of the company) before it gets here.
+    pub workflow: Option<WorkflowId>,
     pub state: Option<String>,
     /// Runs of versions that *use* this agent: its id is in the version's `agent_ids` display
     /// index, directly or through a pinned child, including branches a run never took. Not the
@@ -486,6 +489,9 @@ pub trait AuthoringReads: Send + Sync {
     /// ([`RunFilter::agent`]) does; nothing decides or authorizes on it.
     async fn agent_usage(&self, company: CompanyId, agent: Uuid) -> AppResult<WorkflowUsage>;
     async fn binding_options(&self, company: CompanyId) -> AppResult<BindingOptions>;
+    /// The company's agents by name, at most [`MAX_BINDING_OPTIONS`], and whether there were more:
+    /// what the runs workspace's agent filter offers.
+    async fn agent_options(&self, company: CompanyId) -> AppResult<(Vec<ChoiceOption>, bool)>;
     /// The agent's ordered workflow tool grants; `None` when the company has no such agent.
     async fn agent_tool_grants(
         &self,

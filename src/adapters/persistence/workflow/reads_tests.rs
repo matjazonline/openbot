@@ -23,6 +23,9 @@ fn parameters(shape: &Shape) -> Vec<(&'static str, &'static str)> {
     if shape.filter.binding.is_some() {
         parameters.push(("binding", " AND binding_id = "));
     }
+    if shape.filter.workflow.is_some() {
+        parameters.push(("workflow", " AND workflow_id = "));
+    }
     if shape.filter.state.is_some() {
         parameters.push(("state", " AND state = "));
     }
@@ -41,11 +44,13 @@ fn parameters(shape: &Shape) -> Vec<(&'static str, &'static str)> {
 fn shapes() -> Vec<Shape> {
     let binding = Some(WorkflowBindingId::new(Uuid::from_u128(2)));
     let agent = Some(Uuid::from_u128(3));
+    let workflow = Some(WorkflowId::new(Uuid::from_u128(6)));
     let (any, top) = (RunLineage::Any, RunLineage::TopLevel);
     let shape = |name, binding, state: Option<&str>, agent, lineage, cursor| Shape {
         name,
         filter: RunFilter {
             binding,
+            workflow: None,
             state: state.map(str::to_owned),
             agent,
             lineage,
@@ -61,6 +66,23 @@ fn shapes() -> Vec<Shape> {
         shape("agent_cursor", None, None, agent, any, true),
         shape("top_level", None, None, None, top, false),
         shape("agent_top_level", None, None, agent, top, false),
+        Shape {
+            name: "workflow",
+            filter: RunFilter {
+                workflow,
+                ..RunFilter::default()
+            },
+            cursor: false,
+        },
+        Shape {
+            name: "workflow_state",
+            filter: RunFilter {
+                workflow,
+                state: Some("failed".into()),
+                ..RunFilter::default()
+            },
+            cursor: false,
+        },
     ]
 }
 
@@ -133,11 +155,15 @@ struct BoardShape {
 fn board_shapes() -> Vec<BoardShape> {
     let binding = RunBoardScope {
         binding: Some(WorkflowBindingId::new(Uuid::from_u128(2))),
-        agent: None,
+        ..RunBoardScope::default()
+    };
+    let workflow = RunBoardScope {
+        workflow: Some(WorkflowId::new(Uuid::from_u128(6))),
+        ..RunBoardScope::default()
     };
     let agent = RunBoardScope {
-        binding: None,
         agent: Some(Uuid::from_u128(3)),
+        ..RunBoardScope::default()
     };
     let shape = |name, cards, scope| BoardShape { name, cards, scope };
     vec![
@@ -145,6 +171,8 @@ fn board_shapes() -> Vec<BoardShape> {
         shape("board_cards", true, RunBoardScope::default()),
         shape("board_counts_binding", false, binding),
         shape("board_cards_binding", true, binding),
+        shape("board_counts_workflow", false, workflow),
+        shape("board_cards_workflow", true, workflow),
         shape("board_counts_agent", false, agent),
         shape("board_cards_agent", true, agent),
     ]
@@ -158,6 +186,9 @@ fn board_scope_parameters(
 ) {
     if scope.binding.is_some() {
         parameters.push(("binding", "binding_id = "));
+    }
+    if scope.workflow.is_some() {
+        parameters.push(("workflow", "workflow_id = "));
     }
     if scope.agent.is_some() {
         parameters.push(("company", "WHERE version.company_id = "));
@@ -246,7 +277,9 @@ fn run_board_queries_bind_each_scope_filter_once_in_placeholder_order() {
             "{}: {sql}",
             shape.name
         );
-        let scoped = shape.scope.binding.is_some() || shape.scope.agent.is_some();
+        let scoped = shape.scope.binding.is_some()
+            || shape.scope.workflow.is_some()
+            || shape.scope.agent.is_some();
         let filtered = if shape.cards { parts } else { 1 };
         assert_eq!(
             sql.matches("agent_ids").count(),

@@ -161,7 +161,7 @@ async fn run_board_read_leaves_out_children_other_bindings_and_other_tenants() {
 
     let scope = RunBoardScope {
         binding: Some(f.binding.target.binding),
-        agent: None,
+        ..RunBoardScope::default()
     };
     let (counts, cards) = read(&f, &scope, cutoff, &visible).await;
     assert_eq!(counts.len(), 1);

@@ -5,7 +5,7 @@
 //! may see between the two reads and assembles the columns here.
 use super::reads::{MAX_ROLLUP_PARENTS, RunStateName, RunSummary};
 use crate::app_error::{AppError, AppResult};
-use crate::domain::workflow::WorkflowBindingId;
+use crate::domain::workflow::{WorkflowBindingId, WorkflowId};
 use std::collections::HashMap;
 use uuid::Uuid;
 
@@ -51,6 +51,8 @@ impl BoardWindow {
 #[derive(Debug, Clone, Copy, Default)]
 pub struct RunBoardScope {
     pub binding: Option<WorkflowBindingId>,
+    /// A workflow of the company, already resolved company-scoped: runs of any of its versions.
+    pub workflow: Option<WorkflowId>,
     /// An agent of the company, already resolved company-scoped: runs of versions that use it.
     pub agent: Option<Uuid>,
 }

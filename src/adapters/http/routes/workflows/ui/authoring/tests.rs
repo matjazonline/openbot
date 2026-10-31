@@ -587,3 +587,39 @@ mod sample_tests;
 
 #[path = "jev_tests.rs"]
 mod jev_tests;
+
+/// Plan `new-board-view` 02: the Workflows page's "Runs" opens the board, and a workflow's pane
+/// links to that workflow's board.
+#[tokio::test]
+async fn run_board_view_filter_workflow_pages_link_to_the_board() {
+    let Some(f) = Fixture::new().await else {
+        return;
+    };
+    let workflow = Uuid::new_v4();
+    f.draft(workflow, "Linked", &blank_source(workflow)).await;
+    let Html(page) = workspace(
+        f.ui(f.owner),
+        Query(WorkspaceQuery {
+            company_id: Some(f.company),
+            workflow_id: Some(workflow),
+            tab: None,
+            new: None,
+            tools: None,
+        }),
+    )
+    .await
+    .unwrap();
+    let company = f.company;
+    assert!(
+        page.contains(&format!(
+            r#"href="/ui/workflow-runs?company_id={company}&amp;view=board">Runs</a>"#
+        )),
+        "{page}"
+    );
+    assert!(
+        page.contains(&format!(
+            r#"href="/ui/workflow-runs?company_id={company}&amp;view=board&amp;workflow_id={workflow}">Runs board</a>"#
+        )),
+        "{page}"
+    );
+}

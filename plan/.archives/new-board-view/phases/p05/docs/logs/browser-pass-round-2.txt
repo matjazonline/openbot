@@ -1,0 +1,16 @@
+round 2
+PASS  board: six columns in state order with totals — [["queued",1],["running",1],["waiting",3],["succeeded",4],["failed",57],["cancelled",4]]
+PASS  board: cut failed column says "Showing 50 of N" and opens the list with state — http://localhost:3001/ui/workflow-runs?company_id=4aad013c-3a61-476d-88ae-21fa8e792a4d&state=failed
+PASS  toggle: List ↔ Board keeps the scope — kept workflow_id both ways
+FAIL  filters: workflow, agent and window each narrow the board — workflow [["queued",0],["running",0],["waiting",0],["succeeded",0],["failed",2],["cancelled",0]]
+PASS  cards: parent rollup, escaped hostile title — Parent waiting for a child run run bc736bb1 · created 37m ago1 child run · 1 open
+PASS  rail: Runs lit on the board, other rail links unchanged — Mailbox, Channels, Agents, Workflows, Runs, Schedules, Work, Deliveries, Dashboard, Companies, Board Co
+PASS  agent pane: "Runs board" opens the single-agent board — http://localhost:3001/ui/workflow-runs?company_id=4aad013c-3a61-476d-88ae-21fa8e792a4d&view=board&agent_id=ff737df9-4d3a-4b11-b5ba-a48a9bec5de0
+PASS  live: cancel from the pane moves the card without a reload — moved to cancelled
+NOT EXERCISED  live: retry from the pane moves a failed card out of failed — the engine refused the retry, so no card moved: retry answered 200; banner "Nothing was done: This run cannot be retried: only a failed run whose failed step is safe to repeat can be (revision 12). This is the run as it is now."; card now in failed
+PASS  dashboard: step-job panel and board link — board link /ui/workflow-runs?company_id=4aad013c-3a61-476d-88ae-21fa8e792a4d&view=board; outstanding job rows linking a run: 0
+NOT EXERCISED  dashboard: an outstanding job opens its run — no workflow job was outstanding during the pass (the workers drain the queue at once)
+PASS  themes: board tokens resolve in dark and light — {"theme":"light","column":"oklch(0.98 0 0)","card":"oklch(1 0 0)","border":"oklch(0.95 0 0)","text":"oklch(0.21 0.006 285.885)"} / {"theme":"dark","column":"oklch(0.2326 0.014 253.1)","card":"oklch(0.2533 0.016 252.42)","border":"oklch(0.2115 0.012 254.09)","text":"oklch(0.97807 0.029 256.847)"}
+PASS  owner pages raised no script errors — 
+PASS  admin: runs on a channel they cannot see are left out — succeeded 2 (owner 4)
+PASS  phone: a card opens the pane full width, back returns to the board — pane 390px; board 390px after back; page 844px; last of 50 failed cards reached at y=742
