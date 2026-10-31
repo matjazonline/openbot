@@ -1,26 +1,33 @@
-# Run list access paths
+# Run list and run board access paths
 
-Measured on 2026-10-30 (re-measured with the top-level shapes for `fix-02-run-child-duplicates`),
-PostgreSQL 18.6 / Apple arm64, using
-`scripts/tests/run-list-query-plan.py`. The script measures the statements `list_runs` actually
-issues: it runs `dump_run_list_query_shapes` (`src/adapters/persistence/workflow/reads_tests.rs`),
-which writes each shape the builder (`run_list_query`) can produce and what each `$n` binds, and
-checks that order against the builder. It creates temporary copies of the migrated tables,
+Measured on 2026-10-30, re-measured with the top-level shapes for `fix-02-run-child-duplicates`,
+and on 2026-10-31 with the run board's statements and the dataset additions for
+`fix-03-run-board-finished-columns`. PostgreSQL 18.6 / Apple arm64, using
+`scripts/tests/run-list-query-plan.py`. The script measures the statements `list_runs`,
+`run_board_counts` and `run_board_cards` actually issue: it runs `dump_run_list_query_shapes`
+(`src/adapters/persistence/workflow/reads_tests.rs`), which writes each shape the builders
+(`run_list_query`, `board_counts_query`, `board_cards_query`) can produce and what each `$n` binds,
+and checks that order against the builders. It creates temporary copies of the migrated tables,
 constraints and indexes and writes no application data. Run it against a migrated database:
 
 ```sh
-python3 scripts/tests/run-list-query-plan.py postgres://$(whoami)@localhost:5432/mail_agents_test
+python3 scripts/tests/run-list-query-plan.py postgres://$(whoami)@localhost:5432/mail_agents_test \
+  --out docs/performance/run-list-query-plan.txt \
+  --board-out docs/performance/run-board-query-plan.txt
 ```
 
 ## Dataset
 
-1,096,000 runs (268 MB heap) and 80,000 versions (21 MB), analyzed before measuring:
+1,096,000 runs (289 MB heap) and 80,000 versions (21 MB), analyzed before measuring:
 
 - 100 tenants, each with 40 workflows × 20 published versions. Four heavy tenants have 250,000
   runs each over two years; 96 light tenants have 1,000.
 - A run belongs to one workflow and, as time passes, to that workflow's later versions, so a
   version's runs are one contiguous slice of history (about 312 runs per version).
-- About 95% of runs are terminal (succeeded, failed or cancelled in thirds) and 10% are child runs.
+- About 95% of runs are terminal (succeeded, failed or cancelled in thirds), each finished ten
+  minutes after it was created. 10% are child runs, all through history.
+- Workflows 0–31 of a tenant are bound to its channels 0–31; workflows 32–39 to the company (no
+  channel).
 - Agents per heavy tenant:
   - The **dense** agent is in every even version: half of all runs, 125,000, across 400 versions.
   - The **sparse** agent is in one version (workflow 0's first): 313 runs, 0.125%, all at the old end
@@ -76,12 +83,12 @@ options:
 
 | Shape | 50-row page | 200-row page |
 | --- | --- | --- |
-| Company, binding, `state` | 0.03–0.40 ms; about a page of their keyset index | 0.06–1.7 ms; the same; unchanged by this work |
-| Dense agent, first page | 11.1 ms; 20,400 rows (16% of its history) | **42.2 ms; 80,400 rows (64%)** |
-| Dense agent, page at depth 200 | 12.0 ms; 20,400 rows | 42.3 ms; 80,400 rows |
-| Sparse agent, first page / at depth 200 | 0.28 / 0.13 ms; 51 rows | 0.46 / 0.16 ms; 201 / 113 rows |
-| Dense agent + `failed` | 25.2 ms; 66,100 buffers | **42.5 ms; 128,000 buffers: its whole history** |
-| Dense agent + `queued` | 30.3 ms; 124,700 buffers: its whole history | 32.0 ms; the same |
+| Company, binding, `state` | 0.03–0.43 ms; about a page of their keyset index | 0.06–1.8 ms; the same; unchanged by this work |
+| Dense agent, first page | 11.5 ms; 20,400 rows (16% of its history) | **43.2 ms; 80,400 rows (64%)** |
+| Dense agent, page at depth 200 | 11.7 ms; 20,400 rows | 43.8 ms; 80,400 rows |
+| Sparse agent, first page / at depth 200 | 0.27 / 0.13 ms; 51 rows | 0.47 / 0.16 ms; 201 / 113 rows |
+| Dense agent + `failed` | 26.3 ms; 66,100 buffers | **44.5 ms; 127,900 buffers: its whole history** |
+| Dense agent + `queued` | 31.5 ms; 124,700 buffers: its whole history | 33.1 ms; the same |
 
 A page reads at most a page of runs from each version that uses the agent. So one read touches the
 smaller of two things: (versions using the agent × page size), or the agent's whole history. At
@@ -89,8 +96,8 @@ smaller of two things: (versions using the agent × page size), or the agent's w
 version is read, and with any state filter all of it. Agents whose workflows are published often,
 so that each version holds no more runs than a page, are read in full on every page. At the
 50-row pages measured before, the read is an order of magnitude better than before. The dense
-agent's first page fell from 234 ms to 11.1 ms (generic plan). Its page at depth 200 fell from
-3.9 s to 11.3 ms (custom plan). But the read is **not** independent of run history.
+agent's first page fell from 234 ms to 11.5 ms (generic plan). Its page at depth 200 fell from
+3.9 s to 11.7 ms (custom plan). But the read is **not** independent of run history.
 
 ## Top-level runs only
 
@@ -107,22 +114,22 @@ predicate is a literal, so the generic plan uses the partial index too. Generic 
 
 | Shape | 50-row page | 200-row page |
 | --- | --- | --- |
-| Company, top-level | 0.03 ms; 6 buffers, the same index range as without the filter | 0.06 ms; 13 buffers |
-| Dense agent, top-level | 10.1 ms; 18,360 rows from 360 versions, none from the 40 child-only ones; 19,600 buffers | 37.3 ms; 72,360 rows; 74,700 buffers |
-| Sparse agent, top-level | 0.26 ms; 90 buffers | 0.44 ms; 243 buffers |
+| Company, top-level | 0.03 ms; 5 buffers, the same index range as without the filter | 0.08 ms; 13 buffers |
+| Dense agent, top-level | 10.4 ms; 18,360 rows from 360 versions, none from the 40 child-only ones; 19,600 buffers | 39.3 ms; 72,360 rows; 74,600 buffers |
+| Sparse agent, top-level | 0.29 ms; 89 buffers | 0.48 ms; 240 buffers |
 
 The last section of the output adds 100,000 child runs to one child-only version of the dense agent
 (workflow 5, version 18), then measures the same top-level first page twice:
 
 | Index on the version ranges | 50-row page, generic plan |
 | --- | --- |
-| `workflow_runs_version_top_level` | 13.4 ms; 19,630 buffers, unchanged by the new children |
-| `workflow_runs_version_newest` only (partial index dropped) | 40.9 ms; 37,584 buffers: all 100,000 children read and discarded |
+| `workflow_runs_version_top_level` | 13.8 ms; 19,620 buffers, unchanged by the new children |
+| `workflow_runs_version_newest` only (partial index dropped) | 43.0 ms; 37,849 buffers: all 100,000 children read and discarded |
 
 Before the partial index, the plain top-level dense page read 32,300 buffers (17.5 ms). Each child
 run was read from `workflow_runs_version_newest` and discarded on the heap.
 
-The partial index holds one entry per top-level run: 122 MB for these 983,770 top-level runs. Each
+The partial index holds one entry per top-level run: 122 MB for these 986,400 top-level runs. Each
 entry is written on insert and again on every state change (state changes are never HOT; see
 below).
 
@@ -151,6 +158,89 @@ because its open runs are spread through history rather than clustered recently.
 Neither the link table nor anything else measured here fixes it. That would need state in a keyed
 index, which every state change rewrites. The run board's open columns do not use this read.
 
+## Run board
+
+The run board (plan `fix-03-run-board-finished-columns`) shows one column per state over top-level
+runs: every open run, and runs finished inside a window (a day, a week or 30 days). It makes two
+reads with an authorization step between them (`src/adapters/persistence/workflow/board_reads.rs`):
+
+- **Counts**, by state and channel: the open runs (`state IN ('queued', 'running', 'waiting')`)
+  `UNION ALL` the runs with `finished_at >= cutoff`, both `parent_run_id IS NULL`.
+- **Cards**, once the route knows which counted channels the viewer may see: one subquery per state
+  with the literal state, the visible channels, and `LIMIT 51` (`BOARD_COLUMN_CAP` + 1). Open
+  columns are oldest first; finished columns most recently finished first.
+
+[Full output](run-board-query-plan.txt). Every statement was measured in both plan modes:
+
+- under three finished-run indexes: none, (A) `(company_id, finished_at DESC, id DESC)` and (B)
+  `(company_id, state, finished_at DESC, id DESC)`, both `WHERE finished_at IS NOT NULL AND
+  parent_run_id IS NULL`;
+- for the heavy tenant in each window, and the light tenant in the 30-day window;
+- with the cards seeing every channel and the company's runs, or 8 of the 32 channels and not the
+  company's runs;
+- for two bindings and three agents in the default week. In this dataset, workflow 0's binding
+  holds only open runs and workflow 1's only finished ones (about 60 in a week). The dense and
+  sparse agents have no runs in any window, because their versions end before it. The "recent"
+  agent is in the last versions of workflows 1 and 32, so it has finished runs in every window.
+
+Heavy tenant, week window; each cell is time, buffers (largest plan node) and rows removed by a
+filter:
+
+| Read | No index, generic | (A), generic | (A), auto | **(B), generic** | (B), auto |
+| --- | --- | --- | --- | --- | --- |
+| Counts | 61.8 ms; 19,217; 223,228 | 18.9 ms; 8,524; 0 | 19.1 ms; 8,524; 0 | **18.1 ms; 8,540; 0** | 18.7 ms; 8,540; 0 |
+| Counts, 30-day window | 63.9 ms; 19,217; 216,439 | 21.4 ms; 8,842; 0 | 21.6 ms; 8,842; 0 | **21.3 ms; 8,871; 0** | 21.6 ms; 8,871; 0 |
+| Cards, all visible | 235.7 ms; 55,135; 748,228 | 29.2 ms; 12,574; 303 | 19.9 ms; 8,453; 303 | **29.1 ms; 12,574; 0** | 18.9 ms; 8,453; 0 |
+| Cards, 8 of 32 channels | 159.7 ms; 48,869; 299,688 | 14.6 ms; 6,408; 2,458 | 13.7 ms; 6,530; 5,004 | **14.3 ms; 6,397; 719** | 13.6 ms; 6,508; 1,460 |
+| Finished binding: counts | 64.0 ms; 19,217; 237,448 | 16.3 ms; 8,524; 14,220 | 17.1 ms; 8,524; 14,220 | **17.5 ms; 8,540; 14,220** | 16.5 ms; 8,540; 14,220 |
+| Finished binding: cards | 228.6 ms; 55,135; 762,448 | 232.0 ms; 55,135; 762,448 | 30.9 ms; 12,802; 17,764 | **31.9 ms; 12,780; 14,220** | 30.4 ms; 12,780; 14,220 |
+| Dense agent: counts | 62.4 ms; 19,253; 223,628 | 19.9 ms; 8,560; 400 | 19.6 ms; 8,559; 400 | **19.5 ms; 8,576; 400** | 19.2 ms; 8,575; 400 |
+| Dense agent: cards | 243.8 ms; 112,223; 748,232 | 244.0 ms; 112,223; 748,232 | 34.9 ms; 19,995; 4,747 | **43.0 ms; 69,868; 4** | 34.9 ms; 19,973; 1,203 |
+| Recent agent: cards, 8 of 32 | 163.5 ms; 75,117; 299,694 | 162.5 ms; 75,117; 299,694 | 170.2 ms; 75,117; 299,694 | **20.0 ms; 32,762; 1,466** | 20.0 ms; 32,762; 1,466 |
+
+The light tenant's board reads under 0.3 ms and 80 buffers with (B) in every case.
+
+- **No index:** every read covers the tenant's history; the window cannot prune it.
+- **(A):** the company's board reads only the window. Scoped cards read history under generic
+  plans, and under auto plans for the recent agent with 8 of 32 channels visible; the other scoped
+  card reads stay in the window under auto plans. Without `state` in the key, the planner can
+  prefer a bitmap over the company's channel key, which reads every run of those channels.
+- **(B), adopted** as `workflow_runs_finished_by_state`. The gate's rule was to take the candidate
+  under which, in both plan modes, the counts read only the open runs and the window, and each
+  finished column stops at 51 matching rows. (B) meets it, and (A) does not under generic plans,
+  which are the ones a busy connection runs. The stop at 51 holds for unscoped columns, which read
+  their first 51 index entries. A scoped column reads its whole working set and filters it (below).
+  The index is 117 MB for these 934,800 top-level finished runs. Like the other state-keyed
+  indexes, it is written on every state change into or out of a terminal state, which is never HOT.
+
+**A scope filters a materialized working set.** With the binding or agent filter in the same
+`WHERE` as the working set, the planner drove the read from `workflow_runs_binding_newest` or from
+each of the agent's versions. It then read the scope's whole history and filtered it by state and
+window. In generic plans, with (B) in place, the dense agent's counts read 230,378 buffers over its
+400 versions and its cards 408,108
+([evidence](../../plan/fix-03-run-board-finished-columns/phases/f03/docs/logs/B1-unfenced-board.md)).
+Moving the working set into an `OFFSET 0` subquery kept the scope out of its scan, but not out of
+a rescan. With one version estimated where the recent agent has 13, the planner looped over the
+versions and re-ran the working set for each: 111,055 buffers
+([evidence](../../plan/fix-03-run-board-finished-columns/phases/f03/docs/logs/B1-offset0-rescan.md)).
+
+So both statements read the working set as `WITH … AS MATERIALIZED`, which runs at most once, and
+apply the scope to its rows:
+
+- Every read is then bounded by the company's working set, whatever a scope's history.
+- A scope with little history pays more than it would have: the sparse agent's counts read 702
+  buffers unfenced, 8,576 now.
+- A scoped column reads its whole working set: every open run of its state, or the window's runs
+  of its state (about 590 a week here). It then sorts the matches; it never stops at 51.
+- The agent cards' extra buffers are cache hits on the versions key, one probe per working-set row.
+  The dense agent's generic cards read 12,677 pages; the other 57,191 buffers are hits.
+
+**What the working set costs here.** About 8,450 of the ~8,540 buffers a heavy board's counts read
+are its open runs. 5% of this dataset's runs are open and spread through two years, 12,500 per
+heavy tenant, scattered over the heap. Open columns and the open half of the counts read every
+open run through `workflow_runs_open_by_channel` and check `parent_run_id` on the heap. In
+production, open runs are the work in progress, not history.
+
 ## Revisit when
 
 `list_runs` logs `Workflow run list is slow` at `warn` past `RUN_LIST_QUERY_WARN_THRESHOLD`
@@ -175,3 +265,23 @@ index, which every state change rewrites. The run board's open columns do not us
 | Every shape slow | Check pool acquisition (`database_acquire_duration_ms`) and contention before the query. |
 
 If the line is absent because the warning is not deployed, that is not evidence of health.
+
+The board logs `Workflow run board is slow` at `warn` when its reads together pass
+`RUN_BOARD_QUERY_WARN_THRESHOLD` (500 ms, `src/adapters/http/routes/workflows/board.rs`). The line
+carries:
+
+- `elapsed_ms`, and each phase's share: `counts_ms`, `visibility_ms`, `cards_ms`, `rollup_ms`;
+- `company_id`; whether a `binding` or `agent` scope was given, as booleans; `window`;
+- `eligible_runs`: every counted run, hidden channels included;
+- `channels_checked`: the distinct associations authorized;
+- `cards_read`, look-ahead cards included, and `cards_shown`.
+
+| Observation | Reading |
+| --- | --- |
+| `eligible_runs` small, `elapsed_ms` high | Not the working set. Check pool acquisition (`database_acquire_duration_ms`) and contention, then `visibility_ms`. |
+| `counts_ms` leads, `eligible_runs` high in every window | Open runs: the counts and open columns read every one. Look for runs stuck open before indexing anything. |
+| `counts_ms` leads, `eligible_runs` high and rising, `window=month` worst | The finished window itself, a working-set problem. Write a deferred rollup plan for the board (plan `fix-03-run-board-finished-columns` 03, step 3): the live query is its specification and test oracle, measured before anything is built. |
+| `cards_ms` leads, `binding` or `agent` true | Scoped columns read the company's working set of their state and filter it (materialized, above). If the scope is a small share of a large window, measure a scoped finished index, e.g. `(company_id, binding_id, state, finished_at DESC)`, as above. |
+| `cards_ms` leads, no scope | Unscoped columns should stop at 51 entries. Check that the plan still uses `workflow_runs_finished_by_state`; a viewer who sees few channels reads past hidden runs. |
+| `visibility_ms` leads, `channels_checked` high | One authorization per channel, as in the list: batch the visibility read. |
+| `rollup_ms` leads | The child rollup over at most 300 shown cards; measure children per parent. |

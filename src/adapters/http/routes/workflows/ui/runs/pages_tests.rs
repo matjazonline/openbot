@@ -131,6 +131,9 @@ fn sample_view(
                 rerun_of: None,
                 created_at: now,
                 deadline: now,
+                finished_at: crate::application::workflow::reads::RunStateName::parse(state)
+                    .filter(|state| !state.is_open())
+                    .map(|_| now),
             },
             executions,
             executions_truncated: false,

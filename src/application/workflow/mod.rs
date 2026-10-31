@@ -10,6 +10,7 @@ pub mod authoring;
 mod authorization;
 pub mod batch;
 pub mod binding;
+pub mod board;
 pub mod budget;
 mod canonical;
 pub mod capacity;

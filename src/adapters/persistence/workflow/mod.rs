@@ -31,6 +31,7 @@ mod batch;
 mod batch_commit;
 mod binding_rows;
 mod bindings;
+mod board_reads;
 mod budget;
 mod capacity;
 mod checkpoints;

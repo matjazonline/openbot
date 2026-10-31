@@ -43,6 +43,14 @@ action and decision. The authenticated read API is
 - `lineage`: `top_level` leaves out child runs. Without it, child runs are listed with their
   parent named.
 
+`/workflow-runs/board` reads the same runs as a board: one column per state, top-level runs only,
+each card with its `children` counted by `total`, `open` and `failed`. Open columns hold every open
+run, oldest first. Finished columns hold runs that finished inside `window`, most recently
+finished first: `day`, `week` (the default) or `month` (30 days). Each run carries its
+`finished_at`. A column shows at most 50 cards; its `total` counts the runs you may see, and
+`cut` says it showed only the first 50. It takes `binding_id` and `agent_id` as the listing does,
+and names the `window` and `cutoff` it read.
+
 Decision links use `/ui/workflow-decisions/{decision_id}`. Visibility is checked
 against current company/channel membership. Keep identifiers in restricted incident records and
 links, not metric labels. Retain receipts and audit events; never repair status with SQL updates.

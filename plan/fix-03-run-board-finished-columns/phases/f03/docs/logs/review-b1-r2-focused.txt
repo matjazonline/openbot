@@ -1,0 +1,45 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.30s
+     Running unittests src/lib.rs (target/debug/deps/mail_agents-e5e831b0f75261b3)
+
+running 38 tests
+test adapters::http::routes::workflows::board::tests::a_board_read_is_slow_only_when_its_phases_together_pass_the_threshold ... ok
+test adapters::http::routes::workflows::tests::run_board_tests::run_board_read_route_answers_the_board_not_a_run_and_refuses_an_unknown_window ... ok
+test adapters::http::routes::workflows::tests::run_board_tests::run_board_read_route_refuses_other_tenants_and_plain_members ... ok
+test adapters::http::routes::workflows::tests::run_board_tests::run_board_read_route_hides_channels_the_caller_cannot_see ... ok
+test adapters::http::routes::workflows::tests::run_filter_tests::run_agent_filter_finds_only_an_agent_of_the_company ... ok
+test adapters::http::routes::workflows::tests::run_filter_tests::run_agent_filter_combines_with_binding_state_and_the_cursor ... ok
+test adapters::http::routes::workflows::tests::run_filter_tests::run_agent_filter_follows_the_version_each_run_started_on ... ok
+test adapters::http::routes::workflows::tests::run_filter_tests::run_top_level_query_decodes_the_documented_lineage_values ... ok
+test adapters::persistence::workflow::reads::tests::dump_run_list_query_shapes ... ignored, writes the query-plan script's input; run on demand
+test adapters::persistence::workflow::reads::tests::run_board_queries_bind_each_scope_filter_once_in_placeholder_order ... ok
+test adapters::persistence::workflow::reads::tests::run_list_query_binds_each_present_filter_once_in_placeholder_order ... ok
+test adapters::http::routes::workflows::tests::run_filter_tests::run_agent_filter_matches_a_parent_through_its_pinned_child ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::run_finished_at_follows_failure_retry_and_cancel ... ok
+test adapters::http::routes::workflows::tests::run_board_tests::run_board_read_route_scopes_to_an_agent_and_counts_children ... ok
+test adapters::persistence::workflow::tests::admission_tests::run_board_tests::run_board_read_counts_a_run_that_arrives_between_its_reads_on_the_next_read ... ok
+test adapters::persistence::workflow::tests::admission_tests::run_board_tests::run_board_read_cuts_each_column_one_past_the_cap ... ok
+test adapters::persistence::workflow::tests::admission_tests::run_board_tests::run_board_read_moves_a_retried_run_back_to_its_open_column ... ok
+test adapters::persistence::workflow::tests::admission_tests::run_board_tests::run_board_read_leaves_out_children_other_bindings_and_other_tenants ... ok
+test adapters::persistence::workflow::tests::admission_tests::run_finished_at_tests::run_finished_at_clears_on_retry_and_restamps_later ... ok
+test adapters::persistence::workflow::tests::admission_tests::run_board_tests::run_board_read_windows_finished_columns_by_finished_at ... ok
+test adapters::persistence::workflow::tests::admission_tests::run_board_tests::run_board_read_reads_cards_only_from_the_visible_channels ... ok
+test adapters::persistence::workflow::tests::admission_tests::run_finished_at_tests::run_finished_at_is_stamped_on_success_failure_and_cancel ... ok
+test adapters::persistence::workflow::tests::admission_tests::run_finished_at_tests::run_finished_at_is_stamped_when_a_terminal_write_clears_it ... ok
+test adapters::persistence::workflow::tests::admission_tests::run_finished_at_tests::run_finished_at_is_set_exactly_in_the_states_that_are_not_open ... ok
+test adapters::http::routes::workflows::tests::run_filter_tests::run_top_level_lists_a_parent_once_and_rolls_up_its_child ... ok
+test adapters::persistence::workflow::tests::admission_tests::run_lineage_tests::run_top_level_leaves_out_children_and_keeps_reruns ... ok
+test adapters::persistence::workflow::tests::admission_tests::run_finished_at_tests::run_finished_at_keeps_the_revision_when_the_stamp_undoes_a_write ... ok
+test adapters::persistence::workflow::tests::admission_tests::run_finished_at_tests::run_finished_at_stamps_beside_a_snapshot_column ... ok
+test adapters::persistence::workflow::tests::admission_tests::run_finished_at_tests::run_finished_at_shape_rejects_a_stamped_open_run_and_an_unstamped_finished_one ... ok
+test adapters::persistence::workflow::tests::admission_tests::run_lineage_tests::run_top_level_pages_stay_full_with_children_interleaved ... ok
+test application::workflow::board::tests::a_card_in_an_unknown_state_is_an_error_not_a_dropped_card ... ok
+test application::workflow::board::tests::a_column_counts_only_the_channels_the_viewer_may_see ... ok
+test application::workflow::board::tests::a_column_past_the_cap_is_cut_and_reads_more_than_it_shows ... ok
+test application::workflow::board::tests::the_board_has_one_column_per_state_in_order_and_empty_ones_count_nothing ... ok
+test application::workflow::board::tests::the_windows_reach_back_a_day_a_week_and_thirty_days ... ok
+test adapters::persistence::workflow::tests::admission_tests::run_lineage_tests::run_top_level_rollup_refuses_more_parents_than_its_bound ... ok
+test adapters::persistence::workflow::tests::admission_tests::run_lineage_tests::run_top_level_rollup_counts_direct_children_by_state ... ok
+test adapters::persistence::workflow::tests::admission_tests::run_lineage_tests::run_top_level_rollup_reads_only_the_companys_runs ... ok
+
+test result: ok. 37 passed; 0 failed; 1 ignored; 0 measured; 2463 filtered out; finished in 10.36s
+

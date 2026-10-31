@@ -1,0 +1,27 @@
+   Compiling mail_agents v0.1.0 (/Users/mac02/.codex/worktrees/b109/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 47.80s
+     Running unittests src/lib.rs (target/debug/deps/mail_agents-e5e831b0f75261b3)
+
+running 19 tests
+test adapters::http::routes::workflows::tests::run_board_tests::run_board_read_route_answers_the_board_not_a_run_and_refuses_an_unknown_window ... ok
+test adapters::http::routes::workflows::tests::run_board_tests::run_board_read_route_refuses_other_tenants_and_plain_members ... ok
+test adapters::http::routes::workflows::tests::run_board_tests::run_board_read_route_hides_channels_the_caller_cannot_see ... ok
+test adapters::http::routes::workflows::tests::run_filter_tests::run_agent_filter_finds_only_an_agent_of_the_company ... ok
+test adapters::http::routes::workflows::tests::run_filter_tests::run_agent_filter_follows_the_version_each_run_started_on ... ok
+test adapters::http::routes::workflows::tests::run_filter_tests::run_agent_filter_combines_with_binding_state_and_the_cursor ... ok
+test adapters::http::routes::workflows::tests::run_filter_tests::run_top_level_query_decodes_the_documented_lineage_values ... ok
+test adapters::http::routes::workflows::tests::run_filter_tests::run_agent_filter_matches_a_parent_through_its_pinned_child ... ok
+test adapters::http::routes::workflows::tests::tenancy_tests::workflow_listings_hide_channels_an_admin_cannot_see ... ok
+test adapters::http::routes::workflows::tests::run_board_tests::run_board_read_route_scopes_to_an_agent_and_counts_children ... ok
+test adapters::http::routes::workflows::tests::workflow_routes_mount_in_the_app_router ... ok
+test adapters::persistence::workflow::tests::admission_tests::run_lineage_tests::run_top_level_leaves_out_children_and_keeps_reruns ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::run_finished_at_follows_failure_retry_and_cancel ... ok
+test adapters::http::routes::workflows::tests::tenancy_tests::workflow_routes_refuse_other_tenants_and_members ... ok
+test adapters::persistence::workflow::tests::admission_tests::run_lineage_tests::run_top_level_rollup_reads_only_the_companys_runs ... ok
+test adapters::persistence::workflow::tests::admission_tests::run_lineage_tests::run_top_level_rollup_counts_direct_children_by_state ... ok
+test adapters::persistence::workflow::tests::admission_tests::run_lineage_tests::run_top_level_pages_stay_full_with_children_interleaved ... ok
+test adapters::http::routes::workflows::tests::run_filter_tests::run_top_level_lists_a_parent_once_and_rolls_up_its_child ... ok
+test adapters::persistence::workflow::tests::admission_tests::run_lineage_tests::run_top_level_rollup_refuses_more_parents_than_its_bound ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 2480 filtered out; finished in 6.17s
+

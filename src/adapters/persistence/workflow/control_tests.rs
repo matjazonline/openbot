@@ -158,6 +158,37 @@ async fn workflow_control_competing_retry_preserves_identity_facts_and_remaining
     assert_eq!(receipts(&f).await.as_array().unwrap().len(), 1);
 }
 
+/// Plan `fix-03-run-board-finished-columns`: the production transitions stamp and clear
+/// `finished_at` through `workflow_run_finished` without naming it. A classified failure stamps
+/// the run, a retry clears the stamp, and a cancel of the retried run stamps it again, later.
+#[tokio::test]
+async fn run_finished_at_follows_failure_retry_and_cancel() {
+    let (f, scope) = fixture().await;
+    let finished = async || -> Option<chrono::DateTime<chrono::Utc>> {
+        sqlx::query_scalar("SELECT finished_at FROM workflow_runs WHERE id = $1")
+            .bind(scope.run.as_uuid())
+            .fetch_one(f.persistence().pool())
+            .await
+            .unwrap()
+    };
+    failed(&f, scope, RetrySafety::SafeToRetry).await;
+    let failed_at = finished().await.expect("a failed run is stamped");
+    let retried = f
+        .persistence()
+        .retry(retry(command(&f, scope, "retry").await))
+        .await
+        .unwrap();
+    assert!(matches!(retried, RetryResult::Applied { .. }));
+    assert_eq!(finished().await, None, "a retried run is open again");
+    let cancelled = f
+        .persistence()
+        .cancel(command(&f, scope, "cancel").await)
+        .await
+        .unwrap();
+    assert!(matches!(cancelled, CancelResult::Applied { .. }));
+    assert!(finished().await.expect("a cancelled run is stamped") > failed_at);
+}
+
 #[tokio::test]
 async fn workflow_control_retry_refuses_unknown_exhaustion_deadline_completed_and_child() {
     for kind in 0..5 {

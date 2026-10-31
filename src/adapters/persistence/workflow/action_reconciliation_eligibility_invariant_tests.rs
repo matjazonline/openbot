@@ -248,7 +248,9 @@ fn retirement_delta(
     for field in ["status", "updated_at"] {
         unchanged["background_tasks"][0][field] = before["background_tasks"][0][field].clone();
     }
-    for field in ["state", "terminal_execution_id", "revision"] {
+    assert!(before["workflow_runs"][0]["finished_at"].is_null());
+    assert!(after["workflow_runs"][0]["finished_at"].is_string());
+    for field in ["state", "terminal_execution_id", "revision", "finished_at"] {
         unchanged["workflow_runs"][0][field] = before["workflow_runs"][0][field].clone();
     }
     assert_eq!(

@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use axum::{
     Json, Router,
-    extract::DefaultBodyLimit,
+    extract::{DefaultBodyLimit, FromRef},
     http::StatusCode,
     response::{IntoResponse, Response},
     routing::{get, post, put},
@@ -28,6 +28,7 @@ use crate::{
 };
 
 mod bindings;
+mod board;
 mod decisions;
 mod definitions;
 mod jev;
@@ -87,23 +88,7 @@ pub fn router() -> Router<AppState> {
             &format!("{company}/workflow-bindings/{{binding_id}}/runs"),
             post(bindings::start_run),
         )
-        .route(&format!("{company}/workflow-runs"), get(bindings::runs))
-        .route(
-            &format!("{company}/workflow-runs/{{run_id}}"),
-            get(bindings::run),
-        )
-        .route(
-            &format!("{company}/workflow-runs/{{run_id}}/cancel"),
-            post(bindings::cancel),
-        )
-        .route(
-            &format!("{company}/workflow-runs/{{run_id}}/retry"),
-            post(bindings::retry),
-        )
-        .route(
-            &format!("{company}/workflow-runs/{{run_id}}/reconciliations"),
-            post(reconciliations::reconcile),
-        )
+        .merge(run_routes())
         .route(
             &format!("{company}/workflow-decisions/{{decision_id}}"),
             get(decisions::read),
@@ -137,6 +122,26 @@ pub fn router() -> Router<AppState> {
         .merge(jev::router())
         .merge(ui::router())
         .layer(DefaultBodyLimit::max(BODY_LIMIT))
+}
+
+/// The run routes, over any state that holds the engine, so a test can mount them by themselves:
+/// the static `board` segment answers before `{run_id}` would refuse it as an id.
+fn run_routes<S>() -> Router<S>
+where
+    S: Clone + Send + Sync + 'static,
+    Engine: FromRef<S>,
+{
+    let runs = "/api/companies/{company_id}/workflow-runs";
+    Router::new()
+        .route(runs, get(bindings::runs))
+        .route(&format!("{runs}/board"), get(board::board))
+        .route(&format!("{runs}/{{run_id}}"), get(bindings::run))
+        .route(&format!("{runs}/{{run_id}}/cancel"), post(bindings::cancel))
+        .route(&format!("{runs}/{{run_id}}/retry"), post(bindings::retry))
+        .route(
+            &format!("{runs}/{{run_id}}/reconciliations"),
+            post(reconciliations::reconcile),
+        )
 }
 
 /// A route's failure: an application error as the app maps it, or a compiler diagnostic as a

@@ -150,7 +150,7 @@ impl<'a> Visibility<'a> {
     }
 }
 
-async fn visible_binding(
+pub(super) async fn visible_binding(
     engine: &WorkflowEngine,
     company: CompanyId,
     actor: WorkflowActor,
@@ -423,7 +423,7 @@ pub(super) async fn start_command(
     Ok((started.run, started.replayed))
 }
 
-fn run_json(run: &RunSummary) -> Value {
+pub(super) fn run_json(run: &RunSummary) -> Value {
     json!({
         "run_id": run.run.as_uuid(),
         "binding_id": run.binding.as_uuid(),
@@ -439,6 +439,7 @@ fn run_json(run: &RunSummary) -> Value {
         "rerun_of": run.rerun_of.map(|run| run.as_uuid()),
         "created_at": run.created_at,
         "deadline": run.deadline,
+        "finished_at": run.finished_at,
     })
 }
 

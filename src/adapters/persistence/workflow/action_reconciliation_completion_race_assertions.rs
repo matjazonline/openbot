@@ -208,9 +208,10 @@ pub(super) fn completed(h: &HeldTruth, before: &Value, after: &Value) {
         h,
         before,
         after,
-        &["state", "terminal_execution_id", "revision"],
+        &["state", "terminal_execution_id", "revision", "finished_at"],
     );
     assert_eq!(after["workflow_runs"][0]["state"], "succeeded");
+    assert!(after["workflow_runs"][0]["finished_at"].is_string());
     assert_eq!(
         after["workflow_runs"][0]["terminal_execution_id"],
         json!(h.request.scope().execution.as_uuid())

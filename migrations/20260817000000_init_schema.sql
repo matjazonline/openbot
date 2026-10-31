@@ -5559,7 +5559,9 @@ CREATE TABLE public.workflow_runs (
     revision bigint DEFAULT 1 NOT NULL,
     rerun_of_run_id uuid,
     delivery_policy text DEFAULT 'deliver'::text NOT NULL,
+    finished_at timestamp with time zone,
     CONSTRAINT workflow_run_delivery_policy CHECK ((delivery_policy = ANY (ARRAY['deliver'::text, 'in_app_only'::text]))),
+    CONSTRAINT workflow_run_finished_shape CHECK (((state = ANY (ARRAY['succeeded'::text, 'failed'::text, 'cancelled'::text])) = (finished_at IS NOT NULL))),
     CONSTRAINT workflow_rerun_shape CHECK (((rerun_of_run_id IS NULL) OR ((parent_run_id IS NULL) AND (rerun_of_run_id <> id)))),
     CONSTRAINT workflow_parent_shape CHECK ((((parent_run_id IS NULL) AND (parent_execution_id IS NULL)) OR ((parent_run_id IS NOT NULL) AND (parent_execution_id IS NOT NULL) AND (parent_run_id <> id)))),
     CONSTRAINT workflow_run_state CHECK ((state = ANY (ARRAY['queued'::text, 'running'::text, 'waiting'::text, 'succeeded'::text, 'failed'::text, 'cancelled'::text]))),
@@ -7323,6 +7325,11 @@ CREATE INDEX workflow_runs_version_newest ON public.workflow_runs(company_id, ve
 -- whose runs are all children, such as a workflow only ever called as a child, is then an empty
 -- range instead of one read to its end on every page.
 CREATE INDEX workflow_runs_version_top_level ON public.workflow_runs(company_id, version_id, created_at DESC, id DESC) WHERE parent_run_id IS NULL;
+-- The run board's finished columns (fix-03): one state's top-level runs, most recently finished
+-- first, so a column stops at its cap and the counts read only the window, never history.
+-- `state` leads `finished_at` because without it a generic plan for a scoped board read the
+-- company's history (evidence in docs/performance/run-list.md).
+CREATE INDEX workflow_runs_finished_by_state ON public.workflow_runs(company_id, state, finished_at DESC, id DESC) WHERE finished_at IS NOT NULL AND parent_run_id IS NULL;
 -- The retargeted surfaces (P08-D4): attention, run counts and thread activity.
 CREATE INDEX workflow_runs_attention ON public.workflow_runs(company_id, state, created_at DESC) WHERE state IN ('waiting', 'failed');
 CREATE INDEX workflow_runs_reruns ON public.workflow_runs(company_id, rerun_of_run_id) WHERE rerun_of_run_id IS NOT NULL;
@@ -8859,6 +8866,40 @@ CREATE TRIGGER workflow_run_budget_immutable BEFORE DELETE OR UPDATE ON public.w
 --
 
 CREATE TRIGGER workflow_run_revision BEFORE UPDATE ON public.workflow_runs FOR EACH ROW EXECUTE FUNCTION public.advance_workflow_run_revision();
+
+
+--
+-- Name: stamp_workflow_run_finished(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+-- When a run reached its terminal state, for the run board's finished columns (fix-03). Entering a
+-- terminal state stamps it; staying terminal keeps the first stamp; leaving one (retry) clears it.
+-- No writer sets the column; `workflow_run_finished_shape` catches a path this misses.
+CREATE FUNCTION public.stamp_workflow_run_finished() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF NEW.state IN ('succeeded','failed','cancelled') THEN
+        IF TG_OP = 'UPDATE' AND OLD.state IN ('succeeded','failed','cancelled') THEN
+            NEW.finished_at := OLD.finished_at;
+        ELSE
+            NEW.finished_at := clock_timestamp();
+        END IF;
+    ELSE
+        NEW.finished_at := NULL;
+    END IF;
+    RETURN NEW;
+END $$;
+
+
+--
+-- Name: workflow_runs workflow_run_finished; Type: TRIGGER; Schema: public; Owner: -
+--
+
+-- The name is load-bearing: row triggers of one timing fire in name order, and this one must fire
+-- before `workflow_run_revision` (which advances `revision` whenever the row differs from OLD), so
+-- a write the stamp undoes leaves the revision alone, and before `workflow_run_snapshot_immutable`.
+CREATE TRIGGER workflow_run_finished BEFORE INSERT OR UPDATE OF state ON public.workflow_runs FOR EACH ROW EXECUTE FUNCTION public.stamp_workflow_run_finished();
 
 
 --
@@ -11235,9 +11276,9 @@ CREATE TABLE public.workflow_history_snapshots (
 CREATE FUNCTION public.guard_workflow_run_snapshot() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
     IF (to_jsonb(NEW) - ARRAY['state','waiting_reason','terminal_execution_id',
-        'terminal_wakeup_sequence','revision']) IS DISTINCT FROM
+        'terminal_wakeup_sequence','revision','finished_at']) IS DISTINCT FROM
        (to_jsonb(OLD) - ARRAY['state','waiting_reason','terminal_execution_id',
-        'terminal_wakeup_sequence','revision']) THEN
+        'terminal_wakeup_sequence','revision','finished_at']) THEN
         RAISE EXCEPTION 'workflow run snapshot is immutable' USING ERRCODE='23514';
     END IF;
     RETURN NEW;

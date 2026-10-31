@@ -1,0 +1,59 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.27s
+     Running unittests src/lib.rs (target/debug/deps/mail_agents-e5e831b0f75261b3)
+
+running 52 tests
+test adapters::http::routes::workflows::ui::runs::tests::controls_tests::an_accepted_action_shows_its_receipt_and_cancel_names_it ... ok
+test adapters::http::routes::workflows::ui::runs::tests::controls_tests::a_redraw_repeats_its_keys_until_the_command_shows_on_the_page ... ok
+test adapters::http::routes::workflows::ui::runs::tests::controls_tests::controls_act_at_the_revision_seen_and_say_what_they_did ... ok
+test adapters::http::routes::workflows::ui::runs::tests::authorization_tests::reconciliation_and_step_refuse_foreign_and_hidden_channel_identities ... ok
+test adapters::http::routes::workflows::ui::runs::tests::controls_tests::an_uncertain_action_is_annotated_from_the_pane_and_its_step_shows_the_attempt ... ok
+test adapters::http::routes::workflows::ui::runs::tests::events_tests::the_event_stream_wakes_with_resync_first_and_names_only_visible_runs ... ok
+test adapters::http::routes::workflows::ui::runs::tests::events_tests::a_lagging_stream_asks_every_view_to_read_again ... ok
+test adapters::http::routes::workflows::ui::runs::tests::every_runs_write_refuses_a_cross_origin_cookie_post ... ok
+test adapters::http::routes::workflows::ui::runs::tests::pages_tests::an_unfinished_step_of_an_ended_run_reads_as_stopped ... ok
+test adapters::http::routes::workflows::ui::runs::tests::pages_tests::reconciliation_is_offered_as_an_annotation_and_a_step_shows_usage_and_receipts ... ok
+test adapters::http::routes::workflows::ui::runs::tests::events_tests::the_event_stream_ticks_while_access_holds_and_ends_when_it_is_lost ... ok
+test adapters::http::routes::workflows::ui::runs::tests::a_run_with_a_child_shows_its_lineage_steps_and_controls_through_the_parent ... ok
+test adapters::http::routes::workflows::ui::runs::tests::other_tenants_and_plain_members_reach_no_run_and_hostile_content_is_escaped ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::revision_tests::workflow_control_direct_retry_without_receipt_fails_own_guard ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::revision_tests::workflow_control_cancel_commit_crossing_lease_expiry_preserves_retirement ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::revision_tests::workflow_control_revision_overflow_refuses_without_partial_writes ... ok
+test adapters::http::routes::workflows::ui::runs::tests::the_list_pages_over_runs_an_admin_cannot_see_and_labels_reruns_and_children ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::wait_order_tests::workflow_control_resume_first_competing_cancel_preserves_completion ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::wait_order_tests::workflow_control_cancel_first_competing_resume_refuses_without_writes ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::revision_tests::workflow_control_revision_material_transitions_and_heartbeat_noops ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::workflow_control_cancel_deferred_faults_roll_back_complete_state ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::workflow_control_cancel_claim_competitors_have_one_owner_and_disposition ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::workflow_control_cancel_and_child_creation_both_deterministic_orders ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::revision_tests::workflow_control_forged_cancellation_retirement_fails_own_guard ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::workflow_control_foreign_scope_and_conflicting_authorized_actor_run_keys ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::workflow_control_ordinary_retry_owner_cascade_preserves_live_witnesses ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::workflow_control_owner_cascade_removes_immutable_receipt ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::workflow_control_cancel_failure_competitors_close_attempt_once ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::workflow_control_cancel_resume_competitors_preserve_event_and_notification ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::workflow_control_principal_revocation_and_authority_locks ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::workflow_control_wait_and_retry_deferred_faults_roll_back_complete_state ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::budget_runtime_tests::race_tests::workflow_budget_runtime_descendants_share_without_locking_root_or_parent ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::budget_runtime_tests::race_tests::workflow_budget_runtime_unknown_effect_exhaustion_reconciles ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::budget_runtime_tests::race_tests::workflow_budget_runtime_deferred_commit_failure_rolls_back_grant_and_refusal ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::budget_runtime_tests::race_tests::workflow_budget_runtime_reservation_competes_with_cancel_and_completion ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::budget_runtime_tests::workflow_budget_runtime_conflicting_competitors_debit_one_payload ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::budget_runtime_tests::workflow_budget_runtime_rollback_restart_and_safe_retry_preserve_charge ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::budget_runtime_tests::workflow_budget_runtime_duplicate_conflict_exact_and_exhausted_retry ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::budget_runtime_tests::workflow_budget_runtime_scope_fence_expiry_and_cancel ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::guard_tests::workflow_control_authority_lock_allows_runtime_fk_and_fences_owner_mutation ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::guard_tests::workflow_control_receipt_delete_and_deferred_fault_preserve_all_writes ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::budget_runtime_tests::race_tests::workflow_budget_runtime_usage_wait_crossing_lease_or_deadline_rolls_back ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::run_finished_at_follows_failure_retry_and_cancel ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::guard_tests::workflow_control_cancel_competes_with_child_creation ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::budget_runtime_tests::resolution_tests::workflow_budget_resolution_stalled_reservation_debits_once ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::workflow_control_competing_cancel_replay_closes_exact_expired_attempt ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::workflow_control_cancel_actual_handler_future_is_dropped_by_heartbeat ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::workflow_control_competing_retry_preserves_identity_facts_and_remaining_allowance ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::workflow_control_cancel_completion_competitors_preserve_winning_result ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::workflow_control_current_authority_is_checked_even_on_replay ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::workflow_control_revision_covers_claim_and_stale_caller_cannot_cancel ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::workflow_control_retry_refuses_unknown_exhaustion_deadline_completed_and_child ... ok
+
+test result: ok. 52 passed; 0 failed; 0 ignored; 0 measured; 2448 filtered out; finished in 23.21s
+

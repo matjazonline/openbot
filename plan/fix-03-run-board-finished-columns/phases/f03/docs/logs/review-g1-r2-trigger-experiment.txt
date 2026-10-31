@@ -1,0 +1,50 @@
+Pager usage is off.
+SET
+ALTER TABLE
+ALTER TABLE
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE TABLE
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+INSERT 0 3
+== R2-E4 running -> succeeded beside a snapshot column at its own value (F1 reproduction): must succeed
+   state   | stamped | revision
+-----------+---------+----------
+ succeeded | t       |        2
+(1 row)
+
+UPDATE 1
+== R2-E4b a real snapshot change beside a state change is still refused
+psql:plan/fix-03-run-board-finished-columns/phases/f03/docs/logs/review-g1-r2-trigger-experiment.sql:58: ERROR:  workflow run snapshot is immutable
+CONTEXT:  PL/pgSQL function guard_workflow_run_snapshot() line 7 at RAISE
+== R2-E2 same terminal with finished_at = NULL: stamp kept, revision unchanged
+ state  | revision
+--------+----------
+ failed |        2
+(1 row)
+
+UPDATE 1
+SELECT 1
+ kept_first_finish | revision_unchanged
+-------------------+--------------------
+ t                 | t
+(1 row)
+
+UPDATE 1
+== R2-E0 trigger name order on public.workflow_runs (BEFORE UPDATE)
+                  tgname
+------------------------------------------
+ workflow_action_capture_claim_retirement
+ workflow_action_capture_state_witness
+ workflow_allocate_wakeup
+ workflow_parent_immutable
+ workflow_run_finished
+ workflow_run_revision
+ workflow_run_snapshot_immutable
+ workflow_runs_preserve_association
+(8 rows)
+
+DROP TABLE

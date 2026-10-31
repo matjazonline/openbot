@@ -13,7 +13,7 @@ fn data_map() -> Value {
 }
 
 /// A root admitted on `f`'s binding under `key`: its entry scope.
-async fn admitted(f: &AdmissionFixture, key: &str) -> ActivationRequest {
+pub(super) async fn admitted(f: &AdmissionFixture, key: &str) -> ActivationRequest {
     let command = f.prepare(f.request(key, f.manual())).await;
     f.persistence().admit(&command).await.unwrap();
     entry(f, command.proposed_run_id()).await

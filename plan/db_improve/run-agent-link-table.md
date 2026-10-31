@@ -44,7 +44,11 @@ page is not a reason: see "Not solved by this".
   - a composite foreign key `(company_id, run_id) → workflow_runs(company_id, id)`;
   - no foreign key to `agents`: like `agent_ids`, it is a display index and outlives a deleted
     agent;
-  - an index `(company_id, agent_id, created_at DESC, run_id DESC)`.
+  - an index `(company_id, agent_id, created_at DESC, run_id DESC)`;
+  - lineage: a `top_level` column copied from `parent_run_id IS NULL` and a partial twin of that
+    index `WHERE top_level`, as `workflow_runs_version_top_level` is for the version ranges
+    (plan `fix-02-run-child-duplicates`, F02-B1-F6). Without it a top-level page steps over every
+    child entry of the agent.
 - **Write.** In the same transaction as the run row (`insert_run`,
   `src/adapters/persistence/workflow/admission_write.rs`), from the version's frozen agents. Nothing
   else writes it, and no execution, admission or authorization path reads it.

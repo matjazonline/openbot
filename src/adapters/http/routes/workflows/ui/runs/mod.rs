@@ -6,7 +6,7 @@ use super::super::bindings::Visibility;
 use super::*;
 use crate::application::workflow::authoring::workflow_graph;
 use crate::application::workflow::reads::{
-    MAX_LISTED, PageRequest, RunFilter, RunLineage, RunSummary,
+    MAX_LISTED, PageRequest, RunFilter, RunLineage, RunStateName, RunSummary,
 };
 use crate::application::workflow::run_views::{RunView, StepView};
 use crate::domain::workflow::{RunId, WorkflowBindingId};
@@ -96,13 +96,8 @@ pub struct CompanyQuery {
 /// A state filter value the list accepts; anything else lists every state.
 fn state_filter(state: Option<&str>) -> Option<String> {
     state
-        .filter(|state| {
-            matches!(
-                *state,
-                "queued" | "running" | "waiting" | "succeeded" | "failed" | "cancelled"
-            )
-        })
-        .map(str::to_owned)
+        .and_then(RunStateName::parse)
+        .map(|state| state.as_str().to_owned())
 }
 
 /// The graph's progress marks: a step whose newest activation finished is done; one that has not

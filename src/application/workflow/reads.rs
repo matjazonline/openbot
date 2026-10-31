@@ -2,6 +2,7 @@
 //! read grants nothing: the route authorizes the company, and the record's own association,
 //! before it shows a record.
 use super::RelatedAssociation;
+use super::board::{BoardCount, RunBoardScope, VisibleChannels};
 use crate::app_error::AppResult;
 use crate::domain::workflow::{
     CompanyId, MessageTrigger, RunId, VersionId, WorkflowBindingId, WorkflowId,
@@ -98,6 +99,55 @@ pub struct RunSummary {
     pub rerun_of: Option<RunId>,
     pub created_at: DateTime<Utc>,
     pub deadline: DateTime<Utc>,
+    /// When the run reached its terminal state; `None` while it is open. Stamped by the database
+    /// (`stamp_workflow_run_finished`), kept while terminal, cleared by a retry.
+    pub finished_at: Option<DateTime<Utc>>,
+}
+
+/// The six values `workflow_runs.state` stores, in the run board's column order. One list for the
+/// board, the child rollup, the slow-read logs and the list's state filter; the database's own
+/// terminal set (`workflow_run_finished_shape`, `stamp_workflow_run_finished`) is pinned to
+/// [`RunStateName::is_open`] by a database test.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum RunStateName {
+    Queued,
+    Running,
+    Waiting,
+    Succeeded,
+    Failed,
+    Cancelled,
+}
+
+impl RunStateName {
+    pub const ALL: [Self; 6] = [
+        Self::Queued,
+        Self::Running,
+        Self::Waiting,
+        Self::Succeeded,
+        Self::Failed,
+        Self::Cancelled,
+    ];
+
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Queued => "queued",
+            Self::Running => "running",
+            Self::Waiting => "waiting",
+            Self::Succeeded => "succeeded",
+            Self::Failed => "failed",
+            Self::Cancelled => "cancelled",
+        }
+    }
+
+    /// The state a stored or requested name names; `None` for anything else.
+    pub fn parse(name: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|state| state.as_str() == name)
+    }
+
+    /// Queued, running or waiting: not yet finished, so it has no `finished_at`.
+    pub const fn is_open(self) -> bool {
+        matches!(self, Self::Queued | Self::Running | Self::Waiting)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -259,6 +309,25 @@ pub trait WorkflowReads: Send + Sync {
         page: PageRequest,
     ) -> AppResult<Page<RunSummary>>;
     async fn run_summary(&self, company: CompanyId, run: RunId) -> AppResult<Option<RunSummary>>;
+    /// The board's working set — `scope`'s top-level runs that are open, or finished at or after
+    /// `cutoff` — counted by state and channel, hidden channels included: the caller decides
+    /// which it may show before it reads any card.
+    async fn run_board_counts(
+        &self,
+        company: CompanyId,
+        scope: &RunBoardScope,
+        cutoff: DateTime<Utc>,
+    ) -> AppResult<Vec<BoardCount>>;
+    /// Up to `BOARD_COLUMN_CAP + 1` cards of each state, of `scope`'s top-level runs on `visible`
+    /// channels only: open states oldest first, finished states finished at or after `cutoff`,
+    /// most recently finished first.
+    async fn run_board_cards(
+        &self,
+        company: CompanyId,
+        scope: &RunBoardScope,
+        cutoff: DateTime<Utc>,
+        visible: &VisibleChannels,
+    ) -> AppResult<Vec<RunSummary>>;
     /// The direct children of each of `parents` that has any, counted by state, in one read.
     /// More than [`MAX_ROLLUP_PARENTS`] parents is refused rather than cut.
     async fn child_rollup(

@@ -1,0 +1,59 @@
+   Compiling mail_agents v0.1.0 (/Users/mac02/.codex/worktrees/b109/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 56s
+     Running unittests src/lib.rs (target/debug/deps/mail_agents-e5e831b0f75261b3)
+
+running 51 tests
+test adapters::http::pages::dashboard::tests::a_lapsed_lease_outranks_the_stored_status ... ok
+test adapters::http::pages::dashboard::tests::a_healthy_system_raises_no_alerts ... ok
+test adapters::http::pages::dashboard::tests::a_queued_job_is_not_treated_as_trouble ... ok
+test adapters::http::pages::dashboard::tests::a_lapsed_lease_is_called_out ... ok
+test adapters::http::pages::dashboard::tests::an_empty_window_says_so_instead_of_drawing_an_empty_chart ... ok
+test adapters::http::pages::dashboard::tests::an_expired_delivery_lease_is_called_out ... ok
+test adapters::http::pages::dashboard::tests::an_empty_outstanding_list_says_so ... ok
+test adapters::http::pages::dashboard::tests::an_outstanding_task_links_to_its_thread ... ok
+test adapters::http::pages::dashboard::tests::a_row_in_a_company_the_caller_cannot_open_is_not_a_link ... ok
+test adapters::http::pages::dashboard::tests::a_job_with_no_thread_is_not_a_link ... ok
+test adapters::http::pages::dashboard::tests::counts_come_from_the_matching_status ... ok
+test adapters::http::pages::dashboard::tests::elapsed_reads_in_the_coarsest_useful_unit ... ok
+test adapters::http::pages::dashboard::tests::latencies_render_as_a_dash_before_anything_finishes ... ok
+test adapters::http::pages::dashboard::tests::job_figures_are_plain_and_delivery_figures_link_for_a_company ... ok
+test adapters::http::pages::dashboard::tests::one_stalled_task_reads_singular ... ok
+test adapters::http::pages::dashboard::tests::infrastructure_panels_are_operator_only_and_missing_samples_render_safely ... ok
+test adapters::http::pages::dashboard::tests::thousands_groups_digits ... ok
+test adapters::http::pages::dashboard::tests::truncation_marks_what_it_cut_and_leaves_short_text_alone ... ok
+test adapters::http::pages::dashboard::tests::attempt_summary_and_chart_report_actual_retries ... ok
+test adapters::http::routes::ui_dashboard::tests::dashboard_responses_are_private_and_not_stored ... ok
+test adapters::http::routes::ui_dashboard::tests::dashboard_connection_gauge_increments_and_cleans_up_on_drop ... ok
+test adapters::http::pages::dashboard::tests::the_global_view_streams_unscoped_and_can_switch_back_to_the_company ... ok
+test adapters::http::routes::ui_dashboard::tests::only_an_operator_may_resolve_the_global_dashboard_scope ... ok
+test adapters::http::routes::ui_dashboard::tests::infrastructure_is_not_queried_until_operator_authorization_succeeds ... ok
+test adapters::http::pages::dashboard::tests::the_page_subscribes_to_the_event_the_stream_sends ... ok
+test adapters::http::routes::workflows::board::tests::a_board_read_is_slow_only_when_its_phases_together_pass_the_threshold ... ok
+test adapters::http::routes::ui_dashboard::tests::query_health_is_read_only_for_an_operator_in_system_scope ... ok
+test adapters::persistence::dashboard::tests::no_statement_tests_a_parameter_for_null ... ok
+test adapters::persistence::dashboard::tests::the_company_is_the_last_parameter_and_only_the_company_form_binds_it ... ok
+test adapters::persistence::dashboard::tests::the_global_snapshot_runs ... ok
+test adapters::persistence::dashboard::tests::a_company_scoped_snapshot_runs_and_stays_inside_its_company ... ok
+test adapters::persistence::dashboard::tests::every_global_form_reads_both_companies ... ok
+test adapters::persistence::dashboard::tests::every_company_form_reads_only_its_own_company ... ok
+test adapters::persistence::dashboard::tests::the_snapshot_cache_never_serves_one_view_to_another ... ok
+test adapters::persistence::workflow::tests::admission_tests::run_board_tests::run_board_read_reads_cards_only_from_the_visible_channels ... ok
+test adapters::persistence::workflow::tests::admission_tests::run_board_tests::run_board_read_moves_a_retried_run_back_to_its_open_column ... ok
+test adapters::persistence::workflow::tests::admission_tests::run_board_tests::run_board_read_leaves_out_children_other_bindings_and_other_tenants ... ok
+test adapters::persistence::workflow::tests::admission_tests::run_board_tests::run_board_read_cuts_each_column_one_past_the_cap ... ok
+test adapters::persistence::workflow::tests::admission_tests::run_board_tests::run_board_read_windows_finished_columns_by_finished_at ... ok
+test adapters::persistence::workflow::tests::admission_tests::run_finished_at_tests::run_finished_at_clears_on_retry_and_restamps_later ... ok
+test adapters::persistence::workflow::tests::admission_tests::run_finished_at_tests::run_finished_at_is_set_exactly_in_the_states_that_are_not_open ... ok
+test adapters::persistence::workflow::tests::admission_tests::run_finished_at_tests::run_finished_at_is_stamped_on_success_failure_and_cancel ... ok
+test adapters::persistence::workflow::tests::admission_tests::run_finished_at_tests::run_finished_at_shape_rejects_a_stamped_open_run_and_an_unstamped_finished_one ... ok
+test application::workflow::board::tests::a_card_in_an_unknown_state_is_an_error_not_a_dropped_card ... ok
+test application::workflow::board::tests::a_column_counts_only_the_channels_the_viewer_may_see ... ok
+test application::workflow::board::tests::a_column_past_the_cap_is_cut_and_reads_more_than_it_shows ... ok
+test application::workflow::board::tests::the_board_has_one_column_per_state_in_order_and_empty_ones_count_nothing ... ok
+test application::workflow::board::tests::the_windows_reach_back_a_day_a_week_and_thirty_days ... ok
+test adapters::persistence::workflow::tests::admission_tests::run_finished_at_tests::run_finished_at_is_stamped_when_a_terminal_write_clears_it ... ok
+test adapters::persistence::workflow::tests::admission_tests::run_finished_at_tests::run_finished_at_keeps_the_revision_when_the_stamp_undoes_a_write ... ok
+test adapters::persistence::workflow::tests::admission_tests::run_finished_at_tests::run_finished_at_stamps_beside_a_snapshot_column ... ok
+
+test result: ok. 51 passed; 0 failed; 0 ignored; 0 measured; 2443 filtered out; finished in 3.53s
+

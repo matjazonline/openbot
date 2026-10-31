@@ -1,0 +1,26 @@
+# check.sh run 2 (summary; the full 2-run log, check-2.log, is local only: *.log is gitignored)
+
+Command: RUST_TEST_THREADS=4 DATABASE_URL=postgres://$(whoami)@localhost:5432/mail_agents_f03 ./scripts/check.sh
+
+```
+test result: ok. 2494 passed; 0 failed; 6 ignored; 0 measured; 0 filtered out; finished in 553.80s
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 2494 passed; 0 failed; 6 ignored; 0 measured; 0 filtered out; finished in 535.61s
+==> Summary
+PASS 1s    Generated CSS is current
+PASS 0s    SSE navigation lifecycle
+PASS 0s    Deployment script tests
+PASS 2s    Formatting
+PASS 0s    Patch whitespace
+PASS 4s    Transport abstraction boundary
+PASS 1s    Fetch locked Rust dependencies
+PASS 12s   Offline compilation
+PASS 25s   Clippy
+PASS 0s    Migrations
+PASS 10s   SQLx metadata matches migrated schema
+PASS 18s   Compile tests
+PASS 1s    Test database for this run
+PASS 556s  Database-backed test suite (isolated network)
+PASS 536s  Stack budget
+check exit=0
+```

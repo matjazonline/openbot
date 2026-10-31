@@ -1,0 +1,57 @@
+   Compiling mail_agents v0.1.0 (/Users/mac02/.codex/worktrees/b109/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 47.70s
+     Running unittests src/lib.rs (target/debug/deps/mail_agents-e5e831b0f75261b3)
+
+running 19 tests
+PROVEN scenario=completion_race order=Receipt attempt=1
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::late_truth_tests::live_boundary_tests::completion_race_tests::workflow_action_reconciliation_completion_race_actual_receipt_first ... ok
+PROVEN scenario=completion_race order=Completion attempt=1
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::cancellation_boundary_tests::completion_tests::workflow_action_cancellation_completion_race_cancel_first ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::cancellation_boundary_tests::completion_tests::workflow_action_cancellation_completion_race_completion_first ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::late_truth_tests::live_boundary_tests::completion_race_tests::workflow_action_reconciliation_completion_race_completion_first ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::cancellation_boundary_tests::completion_tests::workflow_action_cancellation_completion_race_resolved_commit_fails_ordinary_oracle ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::remaining_tests::invariant_tests::workflow_action_reconciliation_eligibility_activation_immutable ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::remaining_tests::history_tests::workflow_action_reconciliation_eligibility_completed_route_successor_history_is_retained ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::remaining_tests::history_tests::workflow_action_reconciliation_eligibility_adversarial_max_steps_projection_blocks ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::remaining_tests::invariant_tests::workflow_action_reconciliation_eligibility_coupled_output_route_shapes ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::remaining_tests::invariant_tests::workflow_action_reconciliation_eligibility_exhausted_pending_has_no_retired_attempt ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::remaining_tests::invariant_tests::workflow_action_reconciliation_eligibility_unactivated_has_no_scoped_action ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::remaining_tests::workflow_action_reconciliation_eligibility_failed_lease_fields_are_schema_rejected ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::remaining_tests::workflow_action_reconciliation_eligibility_extra_pending_sibling_records_truth_only ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::workflow_action_reconciliation_eligibility_claim_rechecks_shared_root_budget ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::workflow_action_reconciliation_eligibility_root_model_budget_blocks_schedule ... ok
+PHASE scenario=mixed phase=claimed_snapshot elapsed_ms=4 owner=true attempt=2 lease_remaining_ms=2988 run_remaining_ms=86399340 db_now=2026-10-31 01:41:39.449457+00
+PHASE scenario=mixed phase=live_recovery elapsed_ms=45 owner=true attempt=2 lease_remaining_ms=2947 run_remaining_ms=86399299 db_now=2026-10-31 01:41:39.490527+00
+PHASE scenario=mixed phase=receipt_only_dispatches:renew elapsed_ms=46 owner=true attempt=2 lease_remaining_ms=2946 run_remaining_ms=86399299 db_now=2026-10-31 01:41:39.491094+00
+PHASE scenario=mixed phase=receipt_only_dispatches:renewed elapsed_ms=49 owner=true attempt=2 lease_remaining_ms=2999 run_remaining_ms=86399296 db_now=2026-10-31 01:41:39.494247+00
+PHASE scenario=mixed phase=receipt_only_dispatches elapsed_ms=66 owner=true attempt=2 lease_remaining_ms=2981 run_remaining_ms=86399278 db_now=2026-10-31 01:41:39.511598+00
+PHASE scenario=mixed phase=receipt_only_snapshot elapsed_ms=92 owner=true attempt=2 lease_remaining_ms=2956 run_remaining_ms=86399253 db_now=2026-10-31 01:41:39.537129+00
+PHASE scenario=mixed phase=supported_dispatch:renew elapsed_ms=92 owner=true attempt=2 lease_remaining_ms=2955 run_remaining_ms=86399252 db_now=2026-10-31 01:41:39.537612+00
+PHASE scenario=mixed phase=supported_dispatch:renewed elapsed_ms=96 owner=true attempt=2 lease_remaining_ms=2999 run_remaining_ms=86399249 db_now=2026-10-31 01:41:39.540931+00
+PHASE scenario=mixed phase=supported_dispatch elapsed_ms=134 owner=true attempt=2 lease_remaining_ms=2960 run_remaining_ms=86399211 db_now=2026-10-31 01:41:39.579259+00
+PHASE scenario=mixed phase=applied_snapshot elapsed_ms=142 owner=true attempt=2 lease_remaining_ms=2953 run_remaining_ms=86399203 db_now=2026-10-31 01:41:39.586706+00
+PHASE scenario=mixed phase=completion:renew elapsed_ms=142 owner=true attempt=2 lease_remaining_ms=2953 run_remaining_ms=86399203 db_now=2026-10-31 01:41:39.587002+00
+PHASE scenario=mixed phase=completion:renewed elapsed_ms=145 owner=true attempt=2 lease_remaining_ms=2998 run_remaining_ms=86399200 db_now=2026-10-31 01:41:39.590409+00
+PHASE scenario=mixed phase=before_completion elapsed_ms=146 owner=true attempt=2 lease_remaining_ms=2998 run_remaining_ms=86399199 db_now=2026-10-31 01:41:39.591062+00
+PHASE scenario=mixed phase=completed elapsed_ms=159 owner=false attempt=2 lease_remaining_ms=0 run_remaining_ms=86399185 db_now=2026-10-31 01:41:39.60491+00
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::poison_tests::workflow_action_reconciliation_eligibility_poison_codes_preserve_history ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::runtime_tests::mixed_tests::truth_tests::workflow_action_reconciliation_runtime_mixed_invalid_then_same_genuine_result ... ok
+PHASE scenario=mixed phase=claimed_snapshot elapsed_ms=4 owner=true attempt=2 lease_remaining_ms=2990 run_remaining_ms=86399435 db_now=2026-10-31 01:41:39.926393+00
+PHASE scenario=mixed phase=live_recovery elapsed_ms=24 owner=true attempt=2 lease_remaining_ms=2970 run_remaining_ms=86399415 db_now=2026-10-31 01:41:39.946369+00
+PHASE scenario=mixed phase=receipt_only_dispatches:renew elapsed_ms=24 owner=true attempt=2 lease_remaining_ms=2969 run_remaining_ms=86399414 db_now=2026-10-31 01:41:39.946897+00
+PHASE scenario=mixed phase=receipt_only_dispatches:renewed elapsed_ms=27 owner=true attempt=2 lease_remaining_ms=2999 run_remaining_ms=86399412 db_now=2026-10-31 01:41:39.949365+00
+PHASE scenario=mixed phase=receipt_only_dispatches elapsed_ms=43 owner=true attempt=2 lease_remaining_ms=2983 run_remaining_ms=86399396 db_now=2026-10-31 01:41:39.964974+00
+PHASE scenario=mixed phase=receipt_only_snapshot elapsed_ms=50 owner=true attempt=2 lease_remaining_ms=2976 run_remaining_ms=86399389 db_now=2026-10-31 01:41:39.971974+00
+PHASE scenario=mixed phase=supported_dispatch:renew elapsed_ms=50 owner=true attempt=2 lease_remaining_ms=2976 run_remaining_ms=86399389 db_now=2026-10-31 01:41:39.972448+00
+PHASE scenario=mixed phase=supported_dispatch:renewed elapsed_ms=52 owner=true attempt=2 lease_remaining_ms=2999 run_remaining_ms=86399387 db_now=2026-10-31 01:41:39.974378+00
+PHASE scenario=mixed phase=supported_dispatch elapsed_ms=86 owner=true attempt=2 lease_remaining_ms=2966 run_remaining_ms=86399353 db_now=2026-10-31 01:41:40.008152+00
+PHASE scenario=mixed phase=applied_snapshot elapsed_ms=93 owner=true attempt=2 lease_remaining_ms=2958 run_remaining_ms=86399346 db_now=2026-10-31 01:41:40.015207+00
+PHASE scenario=mixed phase=completion:renew elapsed_ms=93 owner=true attempt=2 lease_remaining_ms=2958 run_remaining_ms=86399346 db_now=2026-10-31 01:41:40.015477+00
+PHASE scenario=mixed phase=completion:renewed elapsed_ms=96 owner=true attempt=2 lease_remaining_ms=2999 run_remaining_ms=86399343 db_now=2026-10-31 01:41:40.018455+00
+PHASE scenario=mixed phase=before_completion elapsed_ms=97 owner=true attempt=2 lease_remaining_ms=2998 run_remaining_ms=86399342 db_now=2026-10-31 01:41:40.019048+00
+PHASE scenario=mixed phase=completed elapsed_ms=107 owner=false attempt=2 lease_remaining_ms=0 run_remaining_ms=86399332 db_now=2026-10-31 01:41:40.029262+00
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::remaining_tests::workflow_action_reconciliation_eligibility_genuine_root_reservation_exhaustion_blocks ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::runtime_tests::mixed_tests::truth_tests::workflow_action_reconciliation_runtime_mixed_missing_then_same_genuine_result ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 2481 filtered out; finished in 11.79s
+

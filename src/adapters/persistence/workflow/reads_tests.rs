@@ -1,5 +1,6 @@
-//! The run list's statement shapes and its slow-read threshold. The shapes are also what
-//! `scripts/tests/run-list-query-plan.py` measures, through `dump_run_list_query_shapes`.
+//! The run list's and the run board's statement shapes, and the list's slow-read threshold. The
+//! shapes are also what `scripts/tests/run-list-query-plan.py` measures, through
+//! `dump_run_list_query_shapes`.
 use super::*;
 
 /// One statement shape the run list can issue, and what each of its parameters carries.
@@ -122,6 +123,171 @@ fn run_list_query_binds_each_present_filter_once_in_placeholder_order() {
     }
 }
 
+/// One board statement: the counts or the cards of a scope.
+struct BoardShape {
+    name: &'static str,
+    cards: bool,
+    scope: RunBoardScope,
+}
+
+fn board_shapes() -> Vec<BoardShape> {
+    let binding = RunBoardScope {
+        binding: Some(WorkflowBindingId::new(Uuid::from_u128(2))),
+        agent: None,
+    };
+    let agent = RunBoardScope {
+        binding: None,
+        agent: Some(Uuid::from_u128(3)),
+    };
+    let shape = |name, cards, scope| BoardShape { name, cards, scope };
+    vec![
+        shape("board_counts", false, RunBoardScope::default()),
+        shape("board_cards", true, RunBoardScope::default()),
+        shape("board_counts_binding", false, binding),
+        shape("board_cards_binding", true, binding),
+        shape("board_counts_agent", false, agent),
+        shape("board_cards_agent", true, agent),
+    ]
+}
+
+/// The `$n` a board scope binds on the materialized working set, in placeholder order, each with
+/// the text it follows.
+fn board_scope_parameters(
+    scope: &RunBoardScope,
+    parameters: &mut Vec<(&'static str, &'static str)>,
+) {
+    if scope.binding.is_some() {
+        parameters.push(("binding", "binding_id = "));
+    }
+    if scope.agent.is_some() {
+        parameters.push(("company", "WHERE version.company_id = "));
+        parameters.push(("agent", " AND "));
+    }
+}
+
+/// The counts bind the company for their open part, then the company and the cutoff for their
+/// finished part, then the scope. The cards bind, per state, the company, the visible channels and
+/// the cutoff for a finished state; scoped, those are the materialized columns, and each column's
+/// scope follows them all.
+fn board_parameters(shape: &BoardShape) -> Vec<(&'static str, &'static str)> {
+    let mut parameters = vec![("company", "FROM workflow_runs WHERE company_id = ")];
+    if !shape.cards {
+        parameters.push(("company", "FROM workflow_runs WHERE company_id = "));
+        parameters.push(("cutoff", " AND finished_at >= "));
+        board_scope_parameters(&shape.scope, &mut parameters);
+        return parameters;
+    }
+    for (index, state) in RunStateName::ALL.into_iter().enumerate() {
+        if index > 0 {
+            parameters.push(("company", "FROM workflow_runs WHERE company_id = "));
+        }
+        parameters.push(("channels", " AND (channel_id = ANY("));
+        parameters.push(("company_visible", ") OR (channel_id IS NULL AND "));
+        if !state.is_open() {
+            parameters.push(("cutoff", " AND finished_at >= "));
+        }
+    }
+    for _ in RunStateName::ALL {
+        board_scope_parameters(&shape.scope, &mut parameters);
+    }
+    parameters
+}
+
+fn board_statement(shape: &BoardShape) -> String {
+    let (company, cutoff) = (
+        CompanyId::new(Uuid::from_u128(1)),
+        DateTime::<Utc>::UNIX_EPOCH,
+    );
+    if !shape.cards {
+        return board_reads::board_counts_query(company, &shape.scope, cutoff)
+            .sql()
+            .to_owned();
+    }
+    let visible = VisibleChannels {
+        channels: vec![Uuid::from_u128(5)],
+        company: true,
+    };
+    board_reads::board_cards_query(company, &shape.scope, cutoff, &visible)
+        .sql()
+        .to_owned()
+}
+
+/// Every board statement reads top-level runs only, names its states as literals (so the partial
+/// indexes on them serve generic plans) and binds each scope filter once per part, in placeholder
+/// order, outside the materialized working set. A column reads the cap plus one, the limit written into
+/// the text.
+#[test]
+fn run_board_queries_bind_each_scope_filter_once_in_placeholder_order() {
+    use crate::application::workflow::board::BOARD_COLUMN_CAP;
+    for shape in board_shapes() {
+        let sql = board_statement(&shape);
+        let parameters = board_parameters(&shape);
+        for (index, (role, after)) in parameters.iter().enumerate() {
+            let placeholder = format!("{after}${}", index + 1);
+            assert!(
+                sql.contains(&placeholder),
+                "{}: {role} {placeholder} in {sql}",
+                shape.name
+            );
+        }
+        assert!(
+            !sql.contains(&format!("${}", parameters.len() + 1)),
+            "{}: more placeholders than parameters in {sql}",
+            shape.name
+        );
+        let parts = if shape.cards {
+            RunStateName::ALL.len()
+        } else {
+            2
+        };
+        assert_eq!(
+            sql.matches(" AND parent_run_id IS NULL").count(),
+            parts,
+            "{}: {sql}",
+            shape.name
+        );
+        let scoped = shape.scope.binding.is_some() || shape.scope.agent.is_some();
+        let filtered = if shape.cards { parts } else { 1 };
+        assert_eq!(
+            sql.matches("agent_ids").count(),
+            if shape.scope.agent.is_some() {
+                filtered
+            } else {
+                0
+            },
+            "{}: {sql}",
+            shape.name
+        );
+        assert_eq!(
+            sql.matches(" AS MATERIALIZED (").count(),
+            if shape.cards && !scoped { 0 } else { filtered },
+            "{}: {sql}",
+            shape.name
+        );
+        if shape.cards {
+            for state in RunStateName::ALL {
+                assert!(
+                    sql.contains(&format!(" AND state = '{}'", state.as_str())),
+                    "{}: {sql}",
+                    shape.name
+                );
+            }
+            let limit = format!(" LIMIT {})", BOARD_COLUMN_CAP + 1);
+            assert_eq!(sql.matches(&limit).count(), parts, "{}: {sql}", shape.name);
+        } else {
+            assert!(
+                sql.contains(
+                    " AND state IN ('queued', 'running', 'waiting') AND parent_run_id IS NULL \
+                     UNION ALL "
+                ),
+                "{}: {sql}",
+                shape.name
+            );
+            assert!(!sql.contains("LIMIT"), "{}: {sql}", shape.name);
+        }
+    }
+}
+
 #[test]
 fn the_slow_read_log_names_a_run_state_and_never_the_callers_text() {
     for state in [
@@ -153,8 +319,8 @@ fn run_list_is_slow_only_past_the_threshold() {
     assert!(is_slow(threshold + Duration::from_millis(1), threshold));
 }
 
-/// Writes every shipped run-list shape, with what each `$n` binds, as JSON to the file named by
-/// `RUN_LIST_QUERY_SHAPES`, for `scripts/tests/run-list-query-plan.py`:
+/// Writes every shipped run-list and run-board shape, with its family and what each `$n` binds, as
+/// JSON to the file named by `RUN_LIST_QUERY_SHAPES`, for `scripts/tests/run-list-query-plan.py`:
 ///
 /// ```sh
 /// RUN_LIST_QUERY_SHAPES=/tmp/shapes.json \
@@ -165,15 +331,25 @@ fn run_list_is_slow_only_past_the_threshold() {
 fn dump_run_list_query_shapes() {
     let path = std::env::var("RUN_LIST_QUERY_SHAPES")
         .expect("RUN_LIST_QUERY_SHAPES names the output file");
-    let shapes: Vec<Value> = shapes()
-        .iter()
-        .map(|shape| {
-            serde_json::json!({
-                "name": shape.name,
-                "sql": statement(shape),
-                "parameters": parameters(shape).iter().map(|(role, _)| *role).collect::<Vec<_>>(),
-            })
+    let roles = |parameters: Vec<(&'static str, &'static str)>| -> Vec<&'static str> {
+        parameters.into_iter().map(|(role, _)| role).collect()
+    };
+    let lists = shapes().into_iter().map(|shape| {
+        serde_json::json!({
+            "family": "list",
+            "name": shape.name,
+            "sql": statement(&shape),
+            "parameters": roles(parameters(&shape)),
         })
-        .collect();
+    });
+    let boards = board_shapes().into_iter().map(|shape| {
+        serde_json::json!({
+            "family": if shape.cards { "board_cards" } else { "board_counts" },
+            "name": shape.name,
+            "sql": board_statement(&shape),
+            "parameters": roles(board_parameters(&shape)),
+        })
+    });
+    let shapes: Vec<Value> = lists.chain(boards).collect();
     std::fs::write(path, serde_json::to_string_pretty(&shapes).unwrap()).unwrap();
 }

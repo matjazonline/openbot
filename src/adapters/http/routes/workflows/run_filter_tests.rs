@@ -6,7 +6,7 @@ use super::*;
 
 impl Fixture {
     /// An agent of `company` on an enabled model connection, as publication requires.
-    async fn model_agent(&self, company: Uuid, slug: &str) -> Uuid {
+    pub(super) async fn model_agent(&self, company: Uuid, slug: &str) -> Uuid {
         sqlx::query(
             "INSERT INTO company_model_connections(company_id, provider, api_key, models) \
              VALUES ($1, 'openai', 'fixture-key', '{gpt-test}') ON CONFLICT DO NOTHING",
@@ -53,7 +53,7 @@ impl Fixture {
     }
 
     /// A run started on `binding` under `key`: its id.
-    async fn started(
+    pub(super) async fn started(
         &self,
         owner: Uuid,
         company: Uuid,
@@ -83,7 +83,7 @@ impl Fixture {
 use bindings::RunsQuery;
 
 /// `example("agent.run")` with its agent handle replaced by `slug`.
-fn agent_source(workflow: Uuid, slug: &str) -> Value {
+pub(super) fn agent_source(workflow: Uuid, slug: &str) -> Value {
     let mut source = example("agent.run", workflow);
     source["steps"]["start"]["with"]["agent"] = json!({"literal": slug});
     source

@@ -4,7 +4,7 @@
 //! events are wake-ups only, and the list and the pane each read their own current state again,
 //! with `hx-sync` replace so the last read wins.
 use super::*;
-use crate::application::workflow::reads::{MAX_LISTED, RunSummary};
+use crate::application::workflow::reads::{MAX_LISTED, RunStateName, RunSummary};
 use std::collections::HashMap;
 
 mod detail;
@@ -58,16 +58,6 @@ document.addEventListener('htmx:beforeRequest', function (event) {
     element.addEventListener('htmx:beforeOnLoad', discardDetachedRunResponse, { once: true });
 });
 "#;
-
-/// The states the sidebar can filter by, as stored.
-const STATES: [&str; 6] = [
-    "queued",
-    "running",
-    "waiting",
-    "succeeded",
-    "failed",
-    "cancelled",
-];
 
 /// A run state as a badge: what it is, and for a waiting run what it waits on.
 pub fn run_state_badge(state: &str, waiting_reason: Option<&str>) -> String {
@@ -221,7 +211,11 @@ pub fn run_list_update(view: &RunListView<'_>) -> String {
 pub fn run_list(view: &RunListView<'_>) -> String {
     let company_id = view.company_id;
     let states: String = std::iter::once(("", "Any state"))
-        .chain(STATES.iter().map(|state| (*state, *state)))
+        .chain(
+            RunStateName::ALL
+                .iter()
+                .map(|state| (state.as_str(), state.as_str())),
+        )
         .map(|(value, label)| {
             format!(
                 r#"<option value="{value}"{selected}>{label}</option>"#,

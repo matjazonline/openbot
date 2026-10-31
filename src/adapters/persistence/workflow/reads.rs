@@ -1,7 +1,9 @@
 //! The workflow routes' read models (p08 B3b-1): plain company-scoped reads with no locks. A
 //! route authorizes before it shows any of them.
 use super::binding_rows::association_from_columns;
+use super::board_reads;
 use super::*;
+use crate::application::workflow::board::{BoardCount, RunBoardScope, VisibleChannels};
 use crate::application::workflow::reads::*;
 use chrono::{DateTime, Utc};
 use serde_json::Value;
@@ -102,57 +104,46 @@ pub(super) fn binding_summary(row: BindingRow) -> AppResult<BindingSummary> {
     })
 }
 
-type RunRow = (
-    Uuid,
-    Uuid,
-    Uuid,
-    Uuid,
-    Option<Uuid>,
-    Option<Uuid>,
-    String,
-    Option<String>,
-    i64,
-    Uuid,
-    Option<Uuid>,
-    Option<Uuid>,
-    DateTime<Utc>,
-    DateTime<Utc>,
-);
+/// A `workflow_runs` row as the run reads select it ([`RUN_COLUMNS`]), matched by column name.
+#[derive(sqlx::FromRow)]
+pub(super) struct RunRow {
+    id: Uuid,
+    binding_id: Uuid,
+    workflow_id: Uuid,
+    version_id: Uuid,
+    channel_id: Option<Uuid>,
+    thread_id: Option<Uuid>,
+    state: String,
+    waiting_reason: Option<String>,
+    revision: i64,
+    actor_id: Uuid,
+    parent_run_id: Option<Uuid>,
+    rerun_of_run_id: Option<Uuid>,
+    created_at: DateTime<Utc>,
+    deadline: DateTime<Utc>,
+    finished_at: Option<DateTime<Utc>>,
+}
 
-const RUN_COLUMNS: &str = "id, binding_id, workflow_id, version_id, channel_id, thread_id, state, \
-    waiting_reason, revision, actor_id, parent_run_id, rerun_of_run_id, created_at, deadline";
+pub(super) const RUN_COLUMNS: &str = "id, binding_id, workflow_id, version_id, channel_id, thread_id, state, \
+    waiting_reason, revision, actor_id, parent_run_id, rerun_of_run_id, created_at, deadline, \
+    finished_at";
 
-fn run_summary(row: RunRow) -> AppResult<RunSummary> {
-    let (
-        id,
-        binding,
-        workflow,
-        version,
-        channel,
-        thread,
-        state,
-        waiting,
-        revision,
-        actor,
-        parent,
-        rerun,
-        created,
-        deadline,
-    ) = row;
+pub(super) fn run_summary(row: RunRow) -> AppResult<RunSummary> {
     Ok(RunSummary {
-        run: RunId::new(id),
-        binding: WorkflowBindingId::new(binding),
-        workflow: WorkflowId::new(workflow),
-        version: VersionId::new(version),
-        association: association_from_columns(channel, thread)?,
-        state,
-        waiting_reason: waiting,
-        revision: revision_of(revision)?,
-        actor,
-        parent: parent.map(RunId::new),
-        rerun_of: rerun.map(RunId::new),
-        created_at: created,
-        deadline,
+        run: RunId::new(row.id),
+        binding: WorkflowBindingId::new(row.binding_id),
+        workflow: WorkflowId::new(row.workflow_id),
+        version: VersionId::new(row.version_id),
+        association: association_from_columns(row.channel_id, row.thread_id)?,
+        state: row.state,
+        waiting_reason: row.waiting_reason,
+        revision: revision_of(row.revision)?,
+        actor: row.actor_id,
+        parent: row.parent_run_id.map(RunId::new),
+        rerun_of: row.rerun_of_run_id.map(RunId::new),
+        created_at: row.created_at,
+        deadline: row.deadline,
+        finished_at: row.finished_at,
     })
 }
 
@@ -260,13 +251,7 @@ fn is_slow(elapsed: Duration, threshold: Duration) -> bool {
 fn logged_state(state: Option<&str>) -> &'static str {
     match state {
         None => "none",
-        Some("queued") => "queued",
-        Some("running") => "running",
-        Some("waiting") => "waiting",
-        Some("succeeded") => "succeeded",
-        Some("failed") => "failed",
-        Some("cancelled") => "cancelled",
-        Some(_) => "other",
+        Some(state) => RunStateName::parse(state).map_or("other", RunStateName::as_str),
     }
 }
 
@@ -468,6 +453,46 @@ impl WorkflowReads for PostgresPersistence {
         .transpose()
     }
 
+    async fn run_board_counts(
+        &self,
+        company: CompanyId,
+        scope: &RunBoardScope,
+        cutoff: DateTime<Utc>,
+    ) -> AppResult<Vec<BoardCount>> {
+        board_reads::board_counts_query(company, scope, cutoff)
+            .build_query_as::<board_reads::BoardCountRow>()
+            .fetch_all(self.pool())
+            .await?
+            .into_iter()
+            .map(|row| {
+                Ok(BoardCount {
+                    state: RunStateName::parse(&row.state).ok_or_else(invalid)?,
+                    channel: row.channel_id,
+                    runs: u64::try_from(row.runs).map_err(|_| invalid())?,
+                })
+            })
+            .collect()
+    }
+
+    async fn run_board_cards(
+        &self,
+        company: CompanyId,
+        scope: &RunBoardScope,
+        cutoff: DateTime<Utc>,
+        visible: &VisibleChannels,
+    ) -> AppResult<Vec<RunSummary>> {
+        if visible.is_empty() {
+            return Ok(Vec::new());
+        }
+        board_reads::board_cards_query(company, scope, cutoff, visible)
+            .build_query_as::<RunRow>()
+            .fetch_all(self.pool())
+            .await?
+            .into_iter()
+            .map(run_summary)
+            .collect()
+    }
+
     async fn child_rollup(
         &self,
         company: CompanyId,
@@ -499,11 +524,11 @@ impl WorkflowReads for PostgresPersistence {
             let count = u64::try_from(count).map_err(|_| invalid())?;
             let counts = rollup.entry(RunId::new(parent)).or_default();
             counts.total += count;
-            match state.as_str() {
-                "queued" | "running" | "waiting" => counts.open += count,
-                "failed" => counts.failed += count,
-                "succeeded" | "cancelled" => {}
-                _ => return Err(invalid()),
+            match RunStateName::parse(&state) {
+                Some(state) if state.is_open() => counts.open += count,
+                Some(RunStateName::Failed) => counts.failed += count,
+                Some(_) => {}
+                None => return Err(invalid()),
             }
         }
         Ok(rollup)

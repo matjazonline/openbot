@@ -1,0 +1,117 @@
+Pager usage is off.
+SET
+== B0 baseline at 3793244 (no finished_at): a state change in an UPDATE that also names a snapshot column at its own value
+CREATE TABLE
+CREATE TRIGGER
+CREATE TRIGGER
+INSERT 0 1
+   state   | revision
+-----------+----------
+ succeeded |        2
+(1 row)
+
+UPDATE 1
+DROP TABLE
+ALTER TABLE
+ALTER TABLE
+CREATE FUNCTION
+CREATE TRIGGER
+== E0 BEFORE row triggers on public.workflow_runs in firing (name) order, after G1-D1
+                  tgname                  | on_insert | on_update | column_list
+------------------------------------------+-----------+-----------+-------------
+ workflow_action_capture_claim_retirement | f         | t         | f
+ workflow_action_capture_state_witness    | f         | t         | f
+ workflow_allocate_wakeup                 | t         | t         | f
+ workflow_parent_immutable                | f         | t         | t
+ workflow_parent_link                     | t         | f         | f
+ workflow_rerun_original                  | t         | f         | f
+ workflow_root_budget_link                | t         | f         | f
+ workflow_run_finished                    | t         | t         | t
+ workflow_run_revision                    | f         | t         | f
+ workflow_run_snapshot_immutable          | f         | t         | t
+ workflow_runs_preserve_association       | f         | t         | t
+(11 rows)
+
+== E0b capture_catalog query (action_reconciliation_claim_sql_candidate_support.rs:104) now returns
+                  tgname
+------------------------------------------
+ workflow_action_capture_claim_retirement
+ workflow_action_capture_state_witness
+ workflow_allocate_wakeup
+ workflow_parent_immutable
+ workflow_run_finished
+ workflow_run_revision
+ workflow_run_snapshot_immutable
+ workflow_runs_preserve_association
+(8 rows)
+
+CREATE TABLE
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+INSERT 0 4
+== E1 running -> failed stamps, revision 1 -> 2
+ state  | stamped | revision
+--------+---------+----------
+ failed | t       |        2
+(1 row)
+
+UPDATE 1
+== E2 failed -> failed with finished_at = NULL keeps the stamp and does not bump revision
+SELECT 1
+ state  | kept_first_finish | revision
+--------+-------------------+----------
+ failed | t                 |        2
+(1 row)
+
+UPDATE 1
+== E3 retry: failed -> running clears it
+  state  | finished_at | revision
+---------+-------------+----------
+ running |             |        3
+(1 row)
+
+UPDATE 1
+== E4 running -> succeeded in an UPDATE that also names a snapshot column at its own value
+psql:plan/fix-03-run-board-finished-columns/phases/f03/docs/logs/review-g1-r1-trigger-experiment.sql:91: ERROR:  workflow run snapshot is immutable
+CONTEXT:  PL/pgSQL function guard_workflow_run_snapshot() line 7 at RAISE
+== E5 a direct write of finished_at alone (no state in SET): allowed on a terminal row
+   state   | revision
+-----------+----------
+ cancelled |        2
+(1 row)
+
+UPDATE 1
+   state   |      finished_at       | revision
+-----------+------------------------+----------
+ cancelled | 2000-01-01 00:00:00+01 |        3
+(1 row)
+
+UPDATE 1
+== E5b ... and rejected by the CHECK on an open row
+psql:plan/fix-03-run-board-finished-columns/phases/f03/docs/logs/review-g1-r1-trigger-experiment.sql:97: ERROR:  new row for relation "scratch_runs" violates check constraint "workflow_run_finished_shape"
+DETAIL:  Failing row contains (4a8a08f0-9d37-b737-9564-9038408b5f33, 44379f2b-1a56-11f6-2559-2bbf6e596a47, 92eb5ffe-e6ae-2fec-3ad7-1c777531578f, 1, f1290186-a5d0-b1ce-ab27-f4e77c0c5d68, 9e3669d1-9b67-5bd5-7058-fd4664205d2a, null, null, 0cc175b9-c0f1-b6a8-31c3-99e269772661, 10515276-38b9-da6f-e99e-4242795a10ea, c90b440e-841a-6b82-e1f9-b3299164296b, \x00, {}, {}, {}, 10, 1024, 2026-11-01 01:18:49.939778+01, 2026-10-31 01:18:49.939778+01, running, null, null, null, null, null, 2, null, deliver, 2026-10-31 01:18:49.94288+01).
+== E6 INSERT straight into a terminal state stamps; a supplied finished_at is overwritten
+ state  | stamped_now
+--------+-------------
+ failed | t
+(1 row)
+
+INSERT 0 1
+== E7 ordering dependency: the same stamp under a name that sorts after workflow_run_revision
+DROP TRIGGER
+CREATE TRIGGER
+ state  | revision
+--------+----------
+ failed |        2
+(1 row)
+
+UPDATE 1
+SELECT 1
+ state  | kept_first_finish | revision_after | revision_before
+--------+-------------------+----------------+-----------------
+ failed | t                 |              3 |               2
+(1 row)
+
+UPDATE 1
+DROP TABLE

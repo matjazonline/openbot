@@ -445,6 +445,9 @@ pub(super) fn completed_boundary(before: &Value, after: &Value, fence: WorkflowF
 }
 
 fn completed_owners(before: &Value, normalized: &mut Value, fence: WorkflowFence) {
+    assert!(
+        by_id(normalized, "workflow_runs", fence.scope.run.as_uuid())["finished_at"].is_string()
+    );
     owner(
         normalized,
         before,
@@ -455,6 +458,7 @@ fn completed_owners(before: &Value, normalized: &mut Value, fence: WorkflowFence
             "waiting_reason",
             "revision",
             "terminal_execution_id",
+            "finished_at",
         ],
     );
     owner(

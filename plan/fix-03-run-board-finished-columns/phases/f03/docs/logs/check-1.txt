@@ -1,0 +1,29 @@
+# check.sh run 1 (summary; the full 1-run log, check-1.log, is local only: *.log is gitignored)
+
+Command: RUST_TEST_THREADS=4 DATABASE_URL=postgres://$(whoami)@localhost:5432/mail_agents_f03 ./scripts/check.sh
+
+```
+test result: FAILED. 2490 passed; 4 failed; 6 ignored; 0 measured; 0 filtered out; finished in 523.44s
+test result: FAILED. 2490 passed; 4 failed; 6 ignored; 0 measured; 0 filtered out; finished in 534.12s
+adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::late_truth_tests::live_boundary_tests::completion_race_tests::workflow_action_reconciliation_completion_race_completion_first
+adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::remaining_tests::invariant_tests::workflow_action_reconciliation_eligibility_exhausted_pending_has_no_retired_attempt
+adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::runtime_tests::mixed_tests::truth_tests::workflow_action_reconciliation_runtime_mixed_invalid_then_same_genuine_result
+adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::runtime_tests::mixed_tests::truth_tests::workflow_action_reconciliation_runtime_mixed_missing_then_same_genuine_result
+==> Summary
+PASS 1s    Generated CSS is current
+PASS 0s    SSE navigation lifecycle
+PASS 0s    Deployment script tests
+PASS 2s    Formatting
+PASS 0s    Patch whitespace
+PASS 4s    Transport abstraction boundary
+PASS 0s    Fetch locked Rust dependencies
+PASS 13s   Offline compilation
+PASS 0s    Clippy
+PASS 0s    Migrations
+PASS 10s   SQLx metadata matches migrated schema
+PASS 60s   Compile tests
+PASS 0s    Test database for this run
+FAIL 525s  Database-backed test suite (isolated network)
+FAIL 535s  Stack budget
+check exit=1
+```
