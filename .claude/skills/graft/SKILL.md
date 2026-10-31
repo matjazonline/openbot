@@ -41,7 +41,7 @@ enclosing symbol** and ranked by coupling; it also reports files it couldn't rea
 - Search a **short symbol name or literal**, not a full guessed signature: an
   over-specific regex (`func (s *Server) GenerateHandler`) returns nothing even
   when the code is indexed. If a grep misses, **loosen it** (drop the receiver
-  and signature, keep the bare name) and retry `graft grep` — do NOT switch to
+  and signature, keep the bare name) and retry `graft grep`. Do NOT switch to
   raw `grep -rn`, which is slower and unranked.
 - `-i` case-insensitive; `--in <path>` scopes to a subtree. Raw `grep -rn` is
   only for files graft genuinely doesn't index (docs, configs, brand-new files).
@@ -61,7 +61,7 @@ Precomputed call/reference edges, not a text search. Symbol can be bare
 - `--direction out`: **what this symbol itself calls/depends on** (the old `callees`).
 - `--depth N`: walk transitively N hops for the **full blast radius** (the old
   `impact`); `--depth 2` is the usual "what breaks if I touch this".
-- `--depth all`: the **entire connected closure** — every source reachable
+- `--depth all`: the **entire connected closure**: every source reachable
   through the edges. Reach for this before a **refactor, rename, or any
   multi-file change**: it surfaces the sibling and downstream files (platform
   variants, a module you must split out) that a single-file edit would miss.
@@ -75,12 +75,12 @@ hotspots, straight from the wiring graph.
 
 ### 6 · Lifecycle: `graft build` / `graft check`
 Every tool above refreshes the graph itself before answering, so what those tools
-return always describes the code as it is right now — including edits you just made
+return always describes the code as it is right now, including edits you just made
 and have not committed. You do **not** need to run `build` after editing.
 
 One caveat, if you `grep` the markdown under `graft/` directly: those cards are a
 projection, rebuilt at the end of the turn rather than on each query, so after an edit
-they can lag. The tools above never do — prefer them, and treat a card's spans as
+they can lag. The tools above never do: prefer them, and treat a card's spans as
 stale if you have edited that file this turn.
 
 `build` is for the LLM layer (`--deep` adds a concept map; skip unless asked);
@@ -93,9 +93,9 @@ stale if you have edited that file this turn.
 | Onboarding / "explain this codebase" | `graft map`, then read the named hub cards | 1 |
 | Understanding a flow ("how does X work") | `graft ask "<flow>" --source` | 1 |
 | Finding where a change belongs | `graft ask "where is <behavior>" --source` | 1 |
-| Editing a symbol you can already name | `graft grep "<symbol>"`, edit at the `file:line` (skip `ask` — you know where it is) | 1 |
+| Editing a symbol you can already name | `graft grep "<symbol>"`, edit at the `file:line` (skip `ask`: you know where it is) | 1 |
 | Renaming / deleting / changing a signature | `graft callers <sym> --depth 2` first | 1 |
-| Refactor / multi-file change (before editing) | `graft callers <sym> --depth all` — map every connected file, don't stop at the first | 1 |
+| Refactor / multi-file change (before editing) | `graft callers <sym> --depth all`: map every connected file, don't stop at the first | 1 |
 | "What does this depend on?" | `graft callers <sym> --direction out` | 1 |
 | Finding every occurrence of a pattern | `graft grep "<literal>"` | 1 |
 | "What's the API of this file?" | `graft skeleton <file>` | 1 |
@@ -113,12 +113,12 @@ you already know where you're working, narrow with `graft ask "<task>" --in <sco
   don't re-open or re-grep files to "double-check".
 - When the task already names the file or symbol to change, go straight there:
   `graft grep "<symbol>"` for the exact `file:line`, then edit. Reserve
-  `graft ask` for when you don't yet know where the code lives — an `ask`
+  `graft ask` for when you don't yet know where the code lives: an `ask`
   round-trip is wasted on a target you can already name.
 - Trust the answer and act. Reach for a second tool only when the first genuinely
   fell short: weak hits, a truncated span, or a need to be exhaustive.
 - If graft names a path that isn't on disk, its index is ahead of your checkout
-  (a branch switch or unpulled move). Don't read the missing file — `graft grep`
+  (a branch switch or unpulled move). Don't read the missing file: `graft grep`
   the symbol to find where it lives now, or run `graft build` to refresh.
 
 ## Report what graft saved, every turn
@@ -132,7 +132,7 @@ skip it. This is the per-turn figure; the statusline carries the running
 session total.
 
 Once a turn has been billed, each line also states what that call was worth in
-dollars, at the rate this session is actually paying for input tokens — include
+dollars, at the rate this session is actually paying for input tokens; include
 that total alongside the tokens, e.g. `🌱 graft saved ~12,400 tokens (~$0.04)
 this turn`. When a line carries no dollar figure, report tokens alone rather
 than pricing them yourself.
