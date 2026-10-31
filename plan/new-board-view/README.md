@@ -34,11 +34,11 @@ The tasks Kanban (`/ui/tasks?view=board`) went away with the task system in `5d4
 
 The prerequisites are backend plans, each verified on its own before this one starts:
 
-1. [fix-01-run-agent-query](../fix-01-run-agent-query/01-agent-run-filter.md) — agent filter,
+1. [fix-01-run-agent-query](../.archives/fix-01-run-agent-query/01-agent-run-filter.md) — agent filter,
    query-plan evidence, slow-list tripwire.
-2. [fix-02-run-child-duplicates](../fix-02-run-child-duplicates/01-top-level-filter.md) — top-level
+2. [fix-02-run-child-duplicates](../.archives/fix-02-run-child-duplicates/01-top-level-filter.md) — top-level
    filter, child rollup.
-3. [fix-03-run-board-finished-columns](../fix-03-run-board-finished-columns/01-run-finished-at.md) —
+3. [fix-03-run-board-finished-columns](../.archives/fix-03-run-board-finished-columns/01-run-finished-at.md) —
    `finished_at`, the bounded board read, truncation report and tripwire.
 4. This plan:
    [01](01-board-view-and-layout.md) view and layout ·

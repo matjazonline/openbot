@@ -16,7 +16,7 @@ Depends on [01](01-board-view-and-layout.md) through [04](04-runs-in-navigation.
    the pass cannot run, say so.
 2. Confirm the tripwires from the fix plans are in place — `warn_if_run_list_is_slow` and
    `warn_if_run_board_is_slow` — and that `docs/performance/run-list.md` says how to read them
-   ([fix-03-run-board-finished-columns 03](../fix-03-run-board-finished-columns/03-truncation-signal-and-release.md)).
+   ([fix-03-run-board-finished-columns 03](../.archives/fix-03-run-board-finished-columns/03-truncation-signal-and-release.md)).
 3. When this plan and its prerequisites are done, remove their entries from
    `NO_BACKWARD_COMPATIBILITY_NOTES` in `src/main.rs` along with the plan directories, as was done
    for the earlier `fix-*` plans.

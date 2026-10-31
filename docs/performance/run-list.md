@@ -63,12 +63,12 @@ element statistics.
 
 ## Options measured
 
-The plan's ladder (`plan/fix-01-run-agent-query/02-query-plan-evidence-and-index.md`) had three
+The plan's ladder (`plan/.archives/fix-01-run-agent-query/02-query-plan-evidence-and-index.md`) had three
 options:
 
 - **No change** fails: the tables above.
 - **`workflow_runs (company_id, version_id, created_at DESC, id DESC)`**, measured two ways
-  (`plan/fix-01-run-agent-query/phases/f01/docs/logs/option2-experiment.txt`, 50-row pages):
+  (`plan/.archives/fix-01-run-agent-query/phases/f01/docs/logs/option2-experiment.txt`, 50-row pages):
   - With the same `IN`: the dense agent still read and sorted its whole history on every page,
     whatever the page size (58–63 ms, 127,000 buffers, in both plan modes).
   - **Adopted:** one ordered range per version, cut at the page size and then merged
@@ -218,11 +218,11 @@ The light tenant's board reads under 0.3 ms and 80 buffers with (B) in every cas
 each of the agent's versions. It then read the scope's whole history and filtered it by state and
 window. In generic plans, with (B) in place, the dense agent's counts read 230,378 buffers over its
 400 versions and its cards 408,108
-([evidence](../../plan/fix-03-run-board-finished-columns/phases/f03/docs/logs/B1-unfenced-board.md)).
+([evidence](../../plan/.archives/fix-03-run-board-finished-columns/phases/f03/docs/logs/B1-unfenced-board.md)).
 Moving the working set into an `OFFSET 0` subquery kept the scope out of its scan, but not out of
 a rescan. With one version estimated where the recent agent has 13, the planner looped over the
 versions and re-ran the working set for each: 111,055 buffers
-([evidence](../../plan/fix-03-run-board-finished-columns/phases/f03/docs/logs/B1-offset0-rescan.md)).
+([evidence](../../plan/.archives/fix-03-run-board-finished-columns/phases/f03/docs/logs/B1-offset0-rescan.md)).
 
 So both statements read the working set as `WITH … AS MATERIALIZED`, which runs at most once, and
 apply the scope to its rows:

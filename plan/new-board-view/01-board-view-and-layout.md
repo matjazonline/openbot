@@ -20,7 +20,7 @@ new path.
    only the `#run-board` region, as the pane route answers `part=body`. Authorization is the
    workspace's own `Ui` / `ui.company`: company managers only.
 2. The handler reads the board as
-   [fix-03-run-board-finished-columns 02](../fix-03-run-board-finished-columns/02-bounded-board-read.md)
+   [fix-03-run-board-finished-columns 02](../.archives/fix-03-run-board-finished-columns/02-bounded-board-read.md)
    describes — counts, visibility, cards — with `as_of` taken per request, then child rollups and
    workflow titles (`run_views().workflow_titles`, as `run_page` does).
 3. Page in a new `src/adapters/http/pages/workflow_runs/board.rs`. `<main>` keeps

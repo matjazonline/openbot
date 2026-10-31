@@ -16,7 +16,7 @@ The places that name an agent or a workflow link to its board.
 1. **Workflow filter.** Add `workflow: Option<WorkflowId>` to `RunFilter`
    (`AND workflow_id = $n`), resolved company-scoped through a definition read; another tenant's
    id is not found. Add its list and board shapes to `scripts/tests/run-list-query-plan.py` and
-   decide on an index as [fix-01-run-agent-query 02](../fix-01-run-agent-query/02-query-plan-evidence-and-index.md)
+   decide on an index as [fix-01-run-agent-query 02](../.archives/fix-01-run-agent-query/02-query-plan-evidence-and-index.md)
    does, recording the result in `docs/performance/run-list.md`.
 2. **Query parameters** on both views: `binding_id`, `workflow_id`, `agent_id`; the board also
    takes `window` (`day`, `week`, `month`). Extend `WorkspaceQuery` and `ListQuery`
