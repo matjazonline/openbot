@@ -487,10 +487,13 @@ async fn one_thread_is_reachable_through_several_bindings() {
     let mut connection = fixture.pool.acquire().await.unwrap();
     external::upsert_external_thread(
         &mut connection,
-        fixture.company_id,
-        slack,
-        &slack_key,
-        fixture.thread.id,
+        external::ExternalThreadMapping {
+            company_id: fixture.company_id,
+            channel_id: fixture.channel_id,
+            binding_id: slack,
+            key: &slack_key,
+            thread_id: fixture.thread.id,
+        },
     )
     .await
     .unwrap();
@@ -513,10 +516,13 @@ async fn one_thread_is_reachable_through_several_bindings() {
     let rival = fixture.extra_thread(fixture.channel_id, "Rival").await;
     let collision = external::upsert_external_thread(
         &mut connection,
-        fixture.company_id,
-        slack,
-        &slack_key,
-        rival.id,
+        external::ExternalThreadMapping {
+            company_id: fixture.company_id,
+            channel_id: fixture.channel_id,
+            binding_id: slack,
+            key: &slack_key,
+            thread_id: rival.id,
+        },
     )
     .await;
     assert!(
@@ -1197,4 +1203,183 @@ async fn a_deleted_association_takes_an_orphaned_payload_with_it() {
     assert_eq!(remaining, 0, "the last association takes the payload");
 
     fixture.cleanup().await;
+}
+
+async fn owner_principal(fixture: &Fixture) -> crate::entities::transport::PrincipalId {
+    crate::entities::transport::PrincipalId::new(
+        sqlx::query_scalar::<_, Uuid>(
+            "SELECT id FROM principals WHERE company_id = $1 AND user_id = $2",
+        )
+        .bind(fixture.company_id)
+        .bind(fixture.owner_id)
+        .fetch_one(&fixture.pool)
+        .await
+        .unwrap(),
+    )
+}
+
+/// A note on the fixture's thread; returns its command id, which names the `internal_notes` row.
+async fn note(fixture: &Fixture) -> Uuid {
+    let command_id = Uuid::new_v4();
+    fixture
+        .persistence
+        .create_internal_note(
+            &AddInternalNote {
+                company_id: fixture.company_id,
+                channel_id: fixture.channel_id,
+                thread_id: fixture.thread.id,
+                text: "Checked with finance.".into(),
+                command_id,
+                supersedes_note_id: None,
+                provenance: InternalNoteProvenance::Api,
+            },
+            owner_principal(fixture).await,
+        )
+        .await
+        .unwrap();
+    command_id
+}
+
+/// fix-app 05 batch 4: an internal note's message is filed in the note's own thread. The key is
+/// deferred like the note's message key, so the violation is reported at commit.
+#[tokio::test]
+async fn message_thread_fk_internal_note_message_is_filed_in_its_own_thread() {
+    // Its own database: disabling the audit trigger locks `internal_notes` until the commit.
+    let Some(fixture) = Fixture::isolated("note_thread_fk").await else {
+        return;
+    };
+    let command = note(&fixture).await;
+    let rival = fixture.extra_thread(fixture.channel_id, "Rival").await;
+    let mut tx = fixture.pool.begin().await.unwrap();
+    // Only the audit trigger stands between this test and a moved note; the key must hold alone.
+    sqlx::query("ALTER TABLE internal_notes DISABLE TRIGGER internal_notes_immutable")
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    let moved = sqlx::query(
+        "UPDATE internal_notes SET thread_id = $3 WHERE company_id = $1 AND command_id = $2",
+    )
+    .bind(fixture.company_id)
+    .bind(command)
+    .bind(rival.id)
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+    assert_eq!(moved.rows_affected(), 1);
+    let refused = tx.commit().await.unwrap_err();
+    assert_eq!(
+        refused.as_database_error().unwrap().constraint(),
+        Some("internal_notes_thread_message_fk"),
+        "{refused}"
+    );
+    fixture.cleanup().await;
+}
+
+/// fix-app 05 batch 3: a provider conversation maps into a thread of the binding's own channel.
+#[tokio::test]
+async fn channel_path_fk_external_thread_stays_on_its_binding_channel() {
+    let Some(fixture) = Fixture::new("external_thread_channel").await else {
+        return;
+    };
+    let slack = fixture.slack_binding(&format!("C{}", fixture.suffix)).await;
+    let other_channel = fixture.extra_channel("other").await;
+    let elsewhere = fixture.extra_thread(other_channel, "Elsewhere").await;
+    let insert = |channel: Uuid, thread: Uuid| {
+        sqlx::query(
+            "INSERT INTO external_threads (id, company_id, channel_id, binding_id, external_thread_key, thread_id) \
+             VALUES ($1, $2, $3, $4, $5, $6)",
+        )
+        .bind(Uuid::new_v4())
+        .bind(fixture.company_id)
+        .bind(channel)
+        .bind(slack.as_uuid())
+        .bind(format!("1712345678.{}", Uuid::new_v4().simple()))
+        .bind(thread)
+    };
+    for (channel, thread, constraint) in [
+        // The binding's channel named, the thread from another channel.
+        (
+            fixture.channel_id,
+            elsewhere.id,
+            "external_threads_thread_fk",
+        ),
+        // The thread's channel named, the binding from another channel.
+        (other_channel, elsewhere.id, "external_threads_binding_fk"),
+    ] {
+        let error = insert(channel, thread)
+            .execute(&fixture.pool)
+            .await
+            .unwrap_err();
+        assert_eq!(
+            error.as_database_error().unwrap().constraint(),
+            Some(constraint),
+            "{error}"
+        );
+    }
+    insert(fixture.channel_id, fixture.thread.id)
+        .execute(&fixture.pool)
+        .await
+        .unwrap();
+    fixture.cleanup().await;
+}
+
+async fn scoped_count(fixture: &Fixture, table: &str) -> i64 {
+    sqlx::query_scalar(&format!(
+        "SELECT count(*) FROM {table} WHERE company_id = $1"
+    ))
+    .bind(fixture.company_id)
+    .fetch_one(&fixture.pool)
+    .await
+    .unwrap()
+}
+
+/// External threads and internal notes leave with their channel (raw SQL; the application refuses
+/// a channel with conversations earlier) and with their company.
+#[tokio::test]
+async fn channel_path_fk_external_threads_and_notes_leave_with_channel_and_company() {
+    for whole_company in [false, true] {
+        let Some(fixture) = Fixture::new("external_thread_delete").await else {
+            return;
+        };
+        let slack = fixture.slack_binding(&format!("C{}", fixture.suffix)).await;
+        let mut connection = fixture.pool.acquire().await.unwrap();
+        external::upsert_external_thread(
+            &mut connection,
+            external::ExternalThreadMapping {
+                company_id: fixture.company_id,
+                channel_id: fixture.channel_id,
+                binding_id: slack,
+                key: &ExternalThreadKey::parse("1712345678.000200").unwrap(),
+                thread_id: fixture.thread.id,
+            },
+        )
+        .await
+        .unwrap();
+        drop(connection);
+        note(&fixture).await;
+        assert_eq!(scoped_count(&fixture, "external_threads").await, 1);
+        assert_eq!(scoped_count(&fixture, "internal_notes").await, 1);
+        if whole_company {
+            fixture.cleanup().await;
+        } else {
+            sqlx::query("DELETE FROM channels WHERE company_id = $1 AND id = $2")
+                .bind(fixture.company_id)
+                .bind(fixture.channel_id)
+                .execute(&fixture.pool)
+                .await
+                .unwrap();
+        }
+        assert_eq!(scoped_count(&fixture, "external_threads").await, 0);
+        assert_eq!(scoped_count(&fixture, "internal_notes").await, 0);
+        if whole_company {
+            let left: i64 = sqlx::query_scalar("SELECT count(*) FROM companies WHERE id = $1")
+                .bind(fixture.company_id)
+                .fetch_one(&fixture.pool)
+                .await
+                .unwrap();
+            assert_eq!(left, 0, "the company deletion went through");
+        } else {
+            fixture.cleanup().await;
+        }
+    }
 }

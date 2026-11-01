@@ -158,8 +158,9 @@ async fn resend_api_inbound_webhook(
     }
 
     // The Resend email id, not the `svix-id`: `inbound_events` is unique on
-    // `(transport, external_event_key)`, so keying on the mail collapses a Svix redelivery *and* a
-    // second webhook for the same mail into one row. The delivery id is kept as a header fact so
+    // `(company_id, transport, external_event_key)`, so keying on the mail collapses a Svix
+    // redelivery *and* a second webhook for the same mail into one row for this company, while a
+    // second company authenticated for the same Resend account keeps its own row. The delivery id is kept as a header fact so
     // an operator can still join a row to one provider attempt.
     let external_event_key =
         crate::entities::transport::ExternalEventKey::parse(envelope.data.email_id.clone())

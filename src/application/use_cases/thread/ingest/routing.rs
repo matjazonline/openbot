@@ -209,9 +209,11 @@ impl ThreadUseCases {
             }
         }
 
-        if let Some(kind) = undeliverable.kind() {
+        // An undeliverable slug is only ever recorded after its selector matched a company, so a
+        // bounce always has one to belong to.
+        if let (Some(kind), Some(company)) = (undeliverable.kind(), matched_company.as_ref()) {
             return Ok(Err(self
-                .undeliverable_rejection(draft, kind, undeliverable, matched_company, directory)
+                .undeliverable_rejection(draft, kind, undeliverable, company, directory)
                 .await?));
         }
         let Some(company) = matched_company.filter(|_| !candidates.is_empty()) else {
@@ -570,7 +572,8 @@ impl ThreadUseCases {
         Err(IngestRejection::ThreadInjection(Box::new(BounceInfo {
             source_message_key: draft.message_key.clone(),
             recipient_to: EmailAddress::from(sender.address()),
-            company_slug: Some(candidate.company.slug.clone()),
+            company_id: candidate.company.id,
+            company_slug: candidate.company.slug.clone(),
             invalid_slugs: vec![ChannelSlug::from(format!(
                 "Thread {} (Unauthorized Sender: {})",
                 thread.id,
@@ -640,24 +643,19 @@ impl ThreadUseCases {
         draft: &InboundDraft,
         kind: UndeliverableKind,
         undeliverable: UndeliverableSlugs,
-        matched_company: Option<Company>,
+        company: &Company,
         directory: &mut DirectoryCache<'_>,
     ) -> AppResult<IngestRejection> {
-        let (company_slug, available_channels) = match matched_company {
-            Some(ref company) => (
-                Some(company.slug.clone()),
-                self.writable_channel_directory(company, &draft.author, directory)
-                    .await?,
-            ),
-            None => (None, Vec::new()),
-        };
+        let available_channels = self
+            .writable_channel_directory(company, &draft.author, directory)
+            .await?;
         Ok(IngestRejection::Undeliverable(Box::new(
             UndeliverableReason {
                 kind,
                 bounce: undeliverable.into_bounce(
                     draft.message_key.clone(),
                     sender_address(draft),
-                    company_slug,
+                    company,
                     available_channels,
                     draft.content.subject().to_string(),
                 ),
@@ -778,6 +776,7 @@ impl ThreadUseCases {
         let delivery = self
             .deliveries
             .compose_standalone(StandaloneDeliveryRequest {
+                company_id: company.id,
                 correlation_id: draft.correlation_id,
                 purpose: DeliveryPurpose::Notification,
                 source_key,

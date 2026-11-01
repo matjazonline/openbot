@@ -11,6 +11,14 @@ struct RunAssociation {
     thread: Option<Uuid>,
 }
 
+/// A binding with its first configuration saved: a run names a real binding revision
+/// (`workflow_runs_binding_revision_fk`).
+async fn configured_binding() -> BindingFixture {
+    let f = BindingFixture::new(json!([])).await;
+    f.service().configure(f.request(None)).await.unwrap();
+    f
+}
+
 async fn insert_run(
     db: &mut PgConnection,
     f: &BindingFixture,
@@ -46,9 +54,8 @@ fn foreign_key(error: sqlx::Error) {
 }
 
 #[tokio::test]
-async fn workflow_run_schema_preserves_snapshot_after_binding_removal_and_scopes_children() {
-    let f = BindingFixture::new(json!([])).await;
-    f.service().configure(f.request(None)).await.unwrap();
+async fn workflow_run_schema_preserves_snapshot_refuses_binding_removal_and_scopes_children() {
+    let f = configured_binding().await;
     let company = f.target.company.as_uuid();
     let pool = f.fixture.persistence.pool();
     let run = Uuid::new_v4();
@@ -64,12 +71,16 @@ async fn workflow_run_schema_preserves_snapshot_after_binding_removal_and_scopes
     insert_execution(&mut db, company, run, execution)
         .await
         .unwrap();
-    sqlx::query("DELETE FROM workflow_bindings WHERE company_id = $1 AND id = $2")
-        .bind(company)
-        .bind(f.target.binding.as_uuid())
-        .execute(&mut *db)
-        .await
-        .unwrap();
+    // A run's binding revision is proven by a foreign key, so the binding cannot be hard-deleted
+    // under it (application code never does); the run keeps its own snapshot regardless.
+    foreign_key(
+        sqlx::query("DELETE FROM workflow_bindings WHERE company_id = $1 AND id = $2")
+            .bind(company)
+            .bind(f.target.binding.as_uuid())
+            .execute(&mut *db)
+            .await
+            .unwrap_err(),
+    );
     #[derive(sqlx::FromRow)]
     struct Snapshot {
         input: serde_json::Value,
@@ -128,7 +139,7 @@ async fn compete_admission(
 
 #[tokio::test]
 async fn workflow_run_schema_competing_source_claims_rollback_losing_run_and_scope_aliases() {
-    let f = BindingFixture::new(json!([])).await;
+    let f = configured_binding().await;
     let company = f.target.company.as_uuid();
     let barrier = tokio::sync::Barrier::new(2);
     let (a, b) = tokio::time::timeout(std::time::Duration::from_secs(5), async {
@@ -172,7 +183,7 @@ async fn workflow_run_schema_competing_source_claims_rollback_losing_run_and_sco
 
 #[tokio::test]
 async fn workflow_run_schema_final_audit_failure_rolls_back_all_admission_records() {
-    let f = BindingFixture::new(json!([])).await;
+    let f = configured_binding().await;
     let company = f.target.company.as_uuid();
     let pool = f.fixture.persistence.pool();
     let run = Uuid::new_v4();
@@ -274,7 +285,7 @@ impl HistoryFixture {
 
 #[tokio::test]
 async fn workflow_run_schema_history_membership_roundtrip_scope_and_bounds() {
-    let f = BindingFixture::new(json!([])).await;
+    let f = configured_binding().await;
     let history = HistoryFixture::new(&f).await;
     let company = f.target.company.as_uuid();
     let run = Uuid::new_v4();

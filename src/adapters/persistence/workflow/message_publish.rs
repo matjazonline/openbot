@@ -147,6 +147,35 @@ async fn admission_full_on(
     Ok(usize::try_from(held).map_err(|_| invalid())? >= MAX_MESSAGE_ACTIONS_PER_EXECUTION)
 }
 
+/// A destination's id in the one column its kind names, so each kind's target is a foreign key.
+/// `workflow_message_destinations.destination_id` is generated from these.
+struct DestinationTarget {
+    channel: Option<Uuid>,
+    user: Option<Uuid>,
+    replied_message: Option<Uuid>,
+}
+impl DestinationTarget {
+    const fn of(kind: DestinationKind, id: Uuid) -> Self {
+        match kind {
+            DestinationKind::Channel => Self {
+                channel: Some(id),
+                user: None,
+                replied_message: None,
+            },
+            DestinationKind::User => Self {
+                channel: None,
+                user: Some(id),
+                replied_message: None,
+            },
+            DestinationKind::Reply => Self {
+                channel: None,
+                user: None,
+                replied_message: Some(id),
+            },
+        }
+    }
+}
+
 /// Every thread, canonical message and delivery of the plan, in destination order.
 async fn write_destinations_on(
     tx: &mut Transaction<'_, Postgres>,
@@ -199,16 +228,20 @@ async fn write_destinations_on(
             },
             None => None,
         };
+        let target = DestinationTarget::of(destination.kind, destination.destination_id);
         sqlx::query(
-            "INSERT INTO workflow_message_destinations (company_id,run_id,invocation_id,ordinal,kind,destination_id,thread_id,message_id,delivery_id,principal_id,recipient_address) \
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)",
+            "INSERT INTO workflow_message_destinations (company_id,run_id,invocation_id,ordinal,kind,destination_channel_id,destination_user_id,replied_message_id,channel_id,thread_id,message_id,delivery_id,principal_id,recipient_address) \
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)",
         )
         .bind(scope.company.as_uuid())
         .bind(scope.run.as_uuid())
         .bind(request.subject.invocation.as_uuid())
         .bind(i16::try_from(ordinal).map_err(|_| invalid())?)
         .bind(destination.kind.as_str())
-        .bind(destination.destination_id)
+        .bind(target.channel)
+        .bind(target.user)
+        .bind(target.replied_message)
+        .bind(destination.channel_id)
         .bind(destination.thread_id)
         .bind(destination.message.id.as_uuid())
         .bind(delivery)

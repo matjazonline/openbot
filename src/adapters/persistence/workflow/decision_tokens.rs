@@ -46,7 +46,7 @@ pub(in crate::adapters::persistence::workflow) async fn park(
     let reviewers = approvals::approvers(tx, scope, &head.reviewers)
         .await?
         .ok_or_else(missing)?;
-    let context: NoticeContext = sqlx::query_as("SELECT version.title,company.name AS company_label,run.correlation_id
+    let context: NoticeContext = sqlx::query_as("SELECT run.company_id,version.title,company.name AS company_label,run.correlation_id
         FROM workflow_runs AS run JOIN workflow_versions AS version ON version.company_id=run.company_id AND version.workflow_id=run.workflow_id AND version.id=run.version_id
         JOIN companies AS company ON company.id=run.company_id WHERE run.company_id=$1 AND run.id=$2")
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).fetch_one(&mut **tx).await?;

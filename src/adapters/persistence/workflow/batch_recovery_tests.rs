@@ -151,6 +151,12 @@ async fn workflow_batch_first_successor_link_enforces_run_and_company_scope() {
     // All targets are real, valid executions. Only ownership differs; IDs are
     // never mutated after a committed route has made them immutable.
     let mut targets = Vec::new();
+    // The copied run names its binding revision, which must exist in its own company
+    // (`workflow_runs_binding_revision_fk`): copy the binding and its revision across too.
+    sqlx::query("INSERT INTO workflow_bindings (company_id,id,state_revision,configuration_revision,active,channel_id,thread_id,activated_at) SELECT $2,binding.id,binding.state_revision,binding.configuration_revision,binding.active,binding.channel_id,binding.thread_id,binding.activated_at FROM workflow_runs AS run JOIN workflow_bindings AS binding ON binding.company_id=run.company_id AND binding.id=run.binding_id WHERE run.id=$1")
+        .bind(request.run.as_uuid()).bind(foreign.id).execute(&mut *tx).await.unwrap();
+    sqlx::query("INSERT INTO workflow_binding_revisions SELECT (jsonb_populate_record(NULL::workflow_binding_revisions,to_jsonb(configuration) || jsonb_build_object('company_id',$2::uuid))).* FROM workflow_runs AS run JOIN workflow_binding_revisions AS configuration ON configuration.company_id=run.company_id AND configuration.binding_id=run.binding_id WHERE run.id=$1")
+        .bind(request.run.as_uuid()).bind(foreign.id).execute(&mut *tx).await.unwrap();
     for company in [request.company.as_uuid(), foreign.id] {
         let run = Uuid::new_v4();
         sqlx::query("INSERT INTO workflow_runs SELECT (jsonb_populate_record(NULL::workflow_runs,to_jsonb(original) || jsonb_build_object('id',$2::uuid,'company_id',$3::uuid))).* FROM workflow_runs AS original WHERE original.id = $1")

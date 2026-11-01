@@ -74,7 +74,7 @@ pub(in crate::adapters::persistence::workflow) async fn park(
     let Some(reviewers) = approvers(tx, scope, &users).await? else {
         return Ok(None);
     };
-    let context: NoticeContext = sqlx::query_as("SELECT version.title,company.name AS company_label,run.correlation_id FROM workflow_runs AS run JOIN workflow_versions AS version ON version.company_id=run.company_id AND version.workflow_id=run.workflow_id AND version.id=run.version_id JOIN companies AS company ON company.id=run.company_id WHERE run.company_id=$1 AND run.id=$2")
+    let context: NoticeContext = sqlx::query_as("SELECT run.company_id,version.title,company.name AS company_label,run.correlation_id FROM workflow_runs AS run JOIN workflow_versions AS version ON version.company_id=run.company_id AND version.workflow_id=run.workflow_id AND version.id=run.version_id JOIN companies AS company ON company.id=run.company_id WHERE run.company_id=$1 AND run.id=$2")
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).fetch_one(&mut **tx).await?;
     let (decision, wait) = (Uuid::new_v4(), Uuid::new_v4());
     let step = StepId::parse(head.step_id).map_err(|_| invalid())?;

@@ -890,7 +890,8 @@ mod answer_tests {
             )
             .unwrap(),
             recipient_to: "sender@example.com".into(),
-            company_slug: None,
+            company_id: uuid::Uuid::new_v4(),
+            company_slug: "acme".into(),
             invalid_slugs: Vec::new(),
             disabled_slugs: Vec::new(),
             suggestions: Vec::new(),

@@ -76,8 +76,8 @@ async fn sql_publication_for(
     )
     .bind(source).bind(message).bind(thread).execute(&mut *db).await?;
     sqlx::query(
-        "INSERT INTO workflow_message_destinations (company_id,run_id,invocation_id,ordinal,kind,destination_id,thread_id,message_id) \
-         SELECT company_id,run_id,$2,ordinal,kind,destination_id,$3,$4 FROM workflow_message_destinations WHERE invocation_id=$1",
+        "INSERT INTO workflow_message_destinations (company_id,run_id,invocation_id,ordinal,kind,destination_channel_id,destination_user_id,replied_message_id,channel_id,thread_id,message_id) \
+         SELECT company_id,run_id,$2,ordinal,kind,destination_channel_id,destination_user_id,replied_message_id,channel_id,$3,$4 FROM workflow_message_destinations WHERE invocation_id=$1",
     )
     .bind(source).bind(invocation).bind(thread).bind(message).execute(&mut *db).await?;
     sqlx::query(
@@ -369,6 +369,16 @@ async fn workflow_message_sql_destination_links_reject_foreign_rows() {
     parked(&setup).await;
     let (pool, run) = (setup.pool(), setup.scope().run);
     let invocation = source_invocation(&setup).await;
+    // A second user (the destination's user key is to `users`), so the probe row differs from the
+    // stored one only where intended.
+    let other_user = Uuid::new_v4();
+    sqlx::query("INSERT INTO users(id,username,email,password_hash) VALUES($1,$2,$3,'test')")
+        .bind(other_user)
+        .bind(other_user.simple().to_string())
+        .bind(format!("{}@example.test", other_user.simple()))
+        .execute(pool)
+        .await
+        .unwrap();
     for (delivery, message, expected) in [
         // No such delivery or message in this tenant: the composite keys refuse it.
         ("gen_random_uuid()", "gen_random_uuid()", "23503"),
@@ -376,10 +386,11 @@ async fn workflow_message_sql_destination_links_reject_foreign_rows() {
         ("target.delivery_id", "gen_random_uuid()", "23505"),
     ] {
         let result = sqlx::query(&format!(
-            "INSERT INTO workflow_message_destinations (company_id,run_id,invocation_id,ordinal,kind,destination_id,thread_id,message_id,delivery_id,principal_id,recipient_address) \
-             SELECT company_id,run_id,invocation_id,1,'user',gen_random_uuid(),thread_id,{message},{delivery},principal_id,recipient_address FROM workflow_message_destinations AS target WHERE invocation_id=$1"
+            "INSERT INTO workflow_message_destinations (company_id,run_id,invocation_id,ordinal,kind,destination_user_id,channel_id,thread_id,message_id,delivery_id,principal_id,recipient_address) \
+             SELECT company_id,run_id,invocation_id,1,'user',$2,channel_id,thread_id,{message},{delivery},principal_id,recipient_address FROM workflow_message_destinations AS target WHERE invocation_id=$1"
         ))
         .bind(invocation)
+        .bind(other_user)
         .execute(pool)
         .await;
         assert_eq!(code(&result.unwrap_err()), expected);

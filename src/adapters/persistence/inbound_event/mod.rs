@@ -148,7 +148,7 @@ impl InboundEventInbox for PostgresPersistence {
                     correlation_id, raw_payload, content_type, content_hash, safe_header_facts,
                     received_at)
                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-               ON CONFLICT (transport, external_event_key) DO NOTHING
+               ON CONFLICT (company_id, transport, external_event_key) DO NOTHING
                RETURNING id"#,
         )
         .bind(id.as_uuid())
@@ -172,23 +172,26 @@ impl InboundEventInbox for PostgresPersistence {
             )));
         }
 
-        let existing: Option<(Uuid, Uuid, Option<Uuid>, Vec<u8>)> = sqlx::query_as(
-            r#"SELECT id, company_id, installation_id, content_hash
+        // The key is per tenant: two companies authenticated for the same provider account each
+        // store the event under their own scope. Within one company a replay must match the
+        // original installation and payload.
+        let existing: Option<(Uuid, Option<Uuid>, Vec<u8>)> = sqlx::query_as(
+            r#"SELECT id, installation_id, content_hash
                  FROM inbound_events
-                WHERE transport = $1 AND external_event_key = $2"#,
+                WHERE company_id = $1 AND transport = $2 AND external_event_key = $3"#,
         )
+        .bind(event.company_id)
         .bind(event.transport.as_str())
         .bind(event.external_event_key.as_str())
         .fetch_optional(&self.pool)
         .await
         .map_err(AppError::from)?;
-        let Some((existing_id, company_id, installation_id, content_hash)) = existing else {
+        let Some((existing_id, installation_id, content_hash)) = existing else {
             return Err(AppError::Internal(
                 "Inbound event deduplication conflict vanished before it could be read".into(),
             ));
         };
-        if company_id != event.company_id
-            || installation_id != event.installation_id.map(InstallationId::as_uuid)
+        if installation_id != event.installation_id.map(InstallationId::as_uuid)
             || content_hash.as_slice() != digest.as_bytes()
         {
             return Err(AppError::Conflict(format!(

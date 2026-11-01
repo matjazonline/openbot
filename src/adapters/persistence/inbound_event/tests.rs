@@ -404,3 +404,56 @@ async fn storing_an_event_announces_it_on_the_channel_the_listener_subscribes_to
 
     cleanup(&persistence, scope).await;
 }
+
+/// fix-app 05 batch 5: the dedup key is per tenant. Two companies authenticated for the same
+/// provider account each store the same provider event; within one company a replay is still one
+/// row, and a replay with another payload is still a conflict.
+#[tokio::test]
+async fn tenant_fk_small_inbound_event_dedup_is_per_company() {
+    let Some(pool) = crate::adapters::persistence::test_support::test_pool().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(pool);
+    let first = scope(&persistence).await;
+    let second = scope(&persistence).await;
+    let key = format!("event-{}", Uuid::new_v4());
+    // Out of every claim's reach, so a neighbouring test's global claim never takes them.
+    let parked = |company| AuthenticatedInboundEvent {
+        received_at: Utc::now(),
+        ..event(company, &key)
+    };
+
+    let mine = persistence
+        .store_authenticated(parked(first.company_id))
+        .await
+        .unwrap();
+    let theirs = persistence
+        .store_authenticated(parked(second.company_id))
+        .await
+        .unwrap();
+    assert!(mine.was_stored() && theirs.was_stored());
+    assert_ne!(mine.event_id(), theirs.event_id());
+    sqlx::query(
+        "UPDATE inbound_events SET available_at = CURRENT_TIMESTAMP + INTERVAL '10 years' \
+         WHERE external_event_key = $1",
+    )
+    .bind(&key)
+    .execute(persistence.pool())
+    .await
+    .unwrap();
+
+    let replay = persistence
+        .store_authenticated(parked(first.company_id))
+        .await
+        .unwrap();
+    assert!(!replay.was_stored());
+    assert_eq!(replay.event_id(), mine.event_id());
+    let altered = AuthenticatedInboundEvent {
+        payload: InboundEventPayload::parse(br#"{"type":"other"}"#.to_vec()).unwrap(),
+        ..parked(first.company_id)
+    };
+    assert!(persistence.store_authenticated(altered).await.is_err());
+
+    cleanup(&persistence, first).await;
+    cleanup(&persistence, second).await;
+}

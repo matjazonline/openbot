@@ -354,12 +354,21 @@ async fn workflow_admit_sql_stale_selection_conflicts_and_saved_replay_survives_
     same_key_wrong.input = json!({"value":3});
     let wrong = f.prepare(same_key_wrong).await;
     assert_eq!(p.admit(&wrong).await.unwrap(), AdmissionResult::Conflict);
-    sqlx::query("DELETE FROM workflow_bindings WHERE company_id=$1 AND id=$2")
+    // A binding with runs cannot be hard-deleted (`workflow_runs_binding_revision_fk`); the
+    // application never does, so the removed head is the archived definition alone.
+    let removal = sqlx::query("DELETE FROM workflow_bindings WHERE company_id=$1 AND id=$2")
         .bind(f.binding.target.company.as_uuid())
         .bind(f.binding.target.binding.as_uuid())
         .execute(p.pool())
         .await
-        .unwrap();
+        .unwrap_err();
+    assert!(
+        removal
+            .as_database_error()
+            .unwrap()
+            .is_foreign_key_violation(),
+        "{removal}"
+    );
     sqlx::query("UPDATE workflow_definitions SET archived=true WHERE company_id=$1")
         .bind(f.binding.target.company.as_uuid())
         .execute(p.pool())

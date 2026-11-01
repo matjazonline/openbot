@@ -3493,7 +3493,8 @@ fn the_bounce_body_omits_the_directory_section_when_there_is_nothing_to_list() {
     let bounce = BounceInfo {
         source_message_key: ExternalMessageKey::parse("<missing@example.com>").unwrap(),
         recipient_to: EmailAddress::from("team@acme.com"),
-        company_slug: Some(CompanySlug::from("acme")),
+        company_id: uuid::Uuid::new_v4(),
+        company_slug: CompanySlug::from("acme"),
         invalid_slugs: vec![ChannelSlug::from("suport")],
         disabled_slugs: Vec::new(),
         suggestions: vec![BounceSuggestion {

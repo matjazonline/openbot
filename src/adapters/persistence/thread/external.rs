@@ -192,6 +192,19 @@ pub(super) async fn insert_or_verify_external_message(
     Ok(())
 }
 
+/// One provider conversation and the internal thread it resolves to, on one channel.
+///
+/// The channel is named once for both the binding and the thread: `external_threads` proves each
+/// against it, so a conversation on one channel's interface can never map into another channel's
+/// thread.
+pub(super) struct ExternalThreadMapping<'a> {
+    pub company_id: Uuid,
+    pub channel_id: Uuid,
+    pub binding_id: ChannelBindingId,
+    pub key: &'a ExternalThreadKey,
+    pub thread_id: Uuid,
+}
+
 /// Bind a provider conversation to an internal thread, if it is not bound already.
 ///
 /// `DO NOTHING` rather than `DO UPDATE` is the invariant: one provider conversation resolves to
@@ -199,19 +212,24 @@ pub(super) async fn insert_or_verify_external_message(
 /// and the root then joins the thread the reply started rather than moving it.
 pub(super) async fn upsert_external_thread(
     connection: &mut sqlx::PgConnection,
-    company_id: Uuid,
-    binding_id: ChannelBindingId,
-    key: &ExternalThreadKey,
-    thread_id: Uuid,
+    mapping: ExternalThreadMapping<'_>,
 ) -> AppResult<()> {
+    let ExternalThreadMapping {
+        company_id,
+        channel_id,
+        binding_id,
+        key,
+        thread_id,
+    } = mapping;
     sqlx::query(
         r#"INSERT INTO external_threads (
-                id, company_id, binding_id, external_thread_key, thread_id
-           ) VALUES ($1, $2, $3, $4, $5)
+                id, company_id, channel_id, binding_id, external_thread_key, thread_id
+           ) VALUES ($1, $2, $3, $4, $5, $6)
            ON CONFLICT (binding_id, external_thread_key) DO NOTHING"#,
     )
     .bind(Uuid::new_v4())
     .bind(company_id)
+    .bind(channel_id)
     .bind(binding_id.as_uuid())
     .bind(key.as_str())
     .bind(thread_id)

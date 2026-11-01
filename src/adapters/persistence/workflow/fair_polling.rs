@@ -27,7 +27,7 @@ impl WorkflowFairPolling for PostgresPersistence {
                 Some(row) => (vec![row.candidate], Some(DemandTicket(row.ticket))),
                 None => (discover(&mut tx, worker, after, limit).await?, None),
             };
-            clean_cursors(&mut tx, worker).await?;
+            clean_cursors(&mut tx).await?;
             tx.commit().await?;
             Ok(FairPollPage { candidates: rows.into_iter().map(candidate).collect::<AppResult<_>>()?, demand })
         }).await.map_err(|_| lease::timed_out())?
@@ -88,11 +88,8 @@ pub(super) fn company_query() -> String {
     )
 }
 
-async fn clean_cursors(db: &mut PgConnection, worker: WorkflowWorkerId) -> AppResult<()> {
-    // Our parent is already locked. Retire deleted-company hints even for a
-    // continuously active worker; they otherwise survive every stale-worker sweep.
-    sqlx::query("DELETE FROM workflow_poll_companies WHERE worker_id=$1 AND company_id IN (SELECT cursor.company_id FROM workflow_poll_companies AS cursor WHERE cursor.worker_id=$1 AND NOT EXISTS (SELECT 1 FROM companies AS company WHERE company.id=cursor.company_id) ORDER BY cursor.company_id LIMIT 32)")
-        .bind(worker.0).execute(&mut *db).await?;
+async fn clean_cursors(db: &mut PgConnection) -> AppResult<()> {
+    // Deleted-company hints need no sweep: `workflow_poll_companies_company_fk` cascades them.
     // Responsive workers touch within <=60s handler +30s poll, far below one day.
     // Delete a bounded number of children before empty parents; no large cascade.
     sqlx::query("WITH stale AS MATERIALIZED (SELECT worker.worker_id FROM workflow_poll_workers AS worker WHERE worker.touched_at<clock_timestamp()-interval '1 day' ORDER BY worker.touched_at,worker.worker_id LIMIT 32 FOR UPDATE SKIP LOCKED) DELETE FROM workflow_poll_companies WHERE (worker_id,company_id) IN (SELECT cursor.worker_id,cursor.company_id FROM workflow_poll_companies AS cursor JOIN stale ON stale.worker_id=cursor.worker_id ORDER BY cursor.worker_id,cursor.company_id LIMIT 32)")

@@ -131,7 +131,7 @@ async fn insert_part_on(
     insert_part_values(
         tx,
         delivery.id,
-        Some(delivery.company_id),
+        delivery.company_id,
         delivery.transport,
         part,
     )
@@ -146,8 +146,8 @@ pub async fn insert_standalone_delivery_on(
     let inserted: Option<Uuid> = sqlx::query_scalar(
         r#"INSERT INTO message_deliveries (
                 id, external_destination, correlation_id, transport, purpose,
-                idempotency_key, max_attempts
-           ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+                idempotency_key, max_attempts, company_id
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
            ON CONFLICT DO NOTHING
            RETURNING id"#,
     )
@@ -158,18 +158,22 @@ pub async fn insert_standalone_delivery_on(
     .bind(delivery.purpose.as_str())
     .bind(delivery.idempotency_key.as_str())
     .bind(delivery.max_attempts)
+    .bind(delivery.company_id)
     .fetch_optional(&mut **tx)
     .await
     .map_err(AppError::from)?;
 
     let Some(id) = inserted else {
+        // The key is unique across the deployment, but only this company's notice may absorb the
+        // insert: a collision with another tenant's row is an error, never a shared delivery.
         let existing: Option<Uuid> = sqlx::query_scalar(
             r#"SELECT id FROM message_deliveries
                 WHERE destination_binding_id IS NULL
-                  AND transport = $1 AND idempotency_key = $2"#,
+                  AND transport = $1 AND idempotency_key = $2 AND company_id = $3"#,
         )
         .bind(delivery.transport.as_str())
         .bind(delivery.idempotency_key.as_str())
+        .bind(delivery.company_id)
         .fetch_optional(&mut **tx)
         .await
         .map_err(AppError::from)?;
@@ -184,7 +188,14 @@ pub async fn insert_standalone_delivery_on(
     };
 
     for part in delivery.parts.iter() {
-        insert_part_values(tx, delivery.id, None, delivery.transport, part).await?;
+        insert_part_values(
+            tx,
+            delivery.id,
+            delivery.company_id,
+            delivery.transport,
+            part,
+        )
+        .await?;
     }
     Ok(DeliveryCreation::Created(DeliveryId::new(id)))
 }
@@ -192,7 +203,7 @@ pub async fn insert_standalone_delivery_on(
 async fn insert_part_values(
     tx: &mut Transaction<'_, Postgres>,
     delivery_id: DeliveryId,
-    company_id: Option<Uuid>,
+    company_id: Uuid,
     transport: crate::entities::transport::TransportKind,
     part: &RenderedPart,
 ) -> AppResult<()> {

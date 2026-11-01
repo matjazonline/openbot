@@ -673,8 +673,8 @@ async fn workflow_message_thread_user_send_opens_a_thread_the_member_takes_part_
         // The guard, not only the planner: a deliver run's member destination has a delivery.
         let refused = sqlx::query(
             "INSERT INTO workflow_message_destinations (company_id, run_id, invocation_id, ordinal, \
-               kind, destination_id, thread_id, message_id, principal_id) \
-             SELECT company_id, run_id, invocation_id, ordinal + 1, kind, destination_id, thread_id, \
+               kind, destination_user_id, channel_id, thread_id, message_id, principal_id) \
+             SELECT company_id, run_id, invocation_id, ordinal + 1, kind, destination_user_id, channel_id, thread_id, \
                message_id, principal_id FROM workflow_message_destinations WHERE run_id = $1",
         )
         .bind(setup.scope().run.as_uuid())
@@ -688,8 +688,8 @@ async fn workflow_message_thread_user_send_opens_a_thread_the_member_takes_part_
         // And the shape check: a delivery always names its address.
         let shapeless = sqlx::query(
             "INSERT INTO workflow_message_destinations (company_id, run_id, invocation_id, ordinal, \
-               kind, destination_id, thread_id, message_id, delivery_id, principal_id) \
-             SELECT company_id, run_id, invocation_id, ordinal + 1, kind, destination_id, thread_id, \
+               kind, destination_user_id, channel_id, thread_id, message_id, delivery_id, principal_id) \
+             SELECT company_id, run_id, invocation_id, ordinal + 1, kind, destination_user_id, channel_id, thread_id, \
                message_id, delivery_id, principal_id FROM workflow_message_destinations WHERE run_id = $1",
         )
         .bind(setup.scope().run.as_uuid())
@@ -730,4 +730,181 @@ async fn workflow_message_thread_in_app_reply_stays_in_the_source_thread() {
         ("reply", conversation.thread, true, None, None)
     );
     assert_eq!(rows(setup.pool(), setup.scope().run).await.deliveries, 0);
+}
+
+/// fix-app 05 (FIXAPP-P05-G1-F4/F6): rows a company deletion must take, scoped to that company.
+async fn company_rows(pool: &sqlx::PgPool, company: Uuid) -> Vec<(&'static str, i64)> {
+    let mut counts = Vec::new();
+    for table in [
+        "workflow_message_destinations",
+        "message_deliveries",
+        "message_delivery_parts",
+        "workflow_runs",
+        "thread_messages",
+        "messages",
+    ] {
+        let count: i64 = sqlx::query_scalar(&format!(
+            "SELECT count(*) FROM {table} WHERE company_id = $1"
+        ))
+        .bind(company)
+        .fetch_one(pool)
+        .await
+        .unwrap();
+        counts.push((table, count));
+    }
+    counts
+}
+
+fn emptied(counts: Vec<(&'static str, i64)>) {
+    for (table, count) in counts {
+        assert_eq!(count, 0, "{table} outlived its company");
+    }
+}
+
+/// A channel destination and a member destination with its email delivery leave with their
+/// company. Before fix-app 05 the destination's message, delivery and principal keys were checked
+/// before the cascade reached the destination, so this company could not be deleted at all.
+#[tokio::test]
+async fn message_thread_fk_company_deletion_removes_channel_and_user_destinations() {
+    let setup = Box::pin(send(&[To::Channel, To::User])).await;
+    assert!(matches!(
+        setup.runtime().execute(&setup.kind, &setup.claim).await,
+        WorkflowHandlerOutcome::Suspended(_)
+    ));
+    let company = setup.fixture.target.company.as_uuid();
+    let kinds: Vec<String> = sqlx::query_scalar(
+        "SELECT kind FROM workflow_message_destinations WHERE company_id = $1 ORDER BY ordinal",
+    )
+    .bind(company)
+    .fetch_all(setup.pool())
+    .await
+    .unwrap();
+    assert_eq!(kinds, ["channel", "user"]);
+    // The member destination carries an email delivery, which must leave with the company too.
+    let delivered: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM workflow_message_destinations AS target \
+           JOIN message_delivery_parts AS part ON part.company_id = target.company_id AND part.delivery_id = target.delivery_id \
+          WHERE target.company_id = $1 AND target.kind = 'user'",
+    )
+    .bind(company)
+    .fetch_one(setup.pool())
+    .await
+    .unwrap();
+    assert!(
+        delivered > 0,
+        "the user destination has a delivery with parts"
+    );
+    crate::application::use_cases::company::CompanyPersistence::delete(
+        &setup.fixture.persistence,
+        company,
+    )
+    .await
+    .unwrap();
+    emptied(company_rows(setup.pool(), company).await);
+}
+
+/// The same for a reply destination, whose replied-to message is proven within the reply's own
+/// thread.
+#[tokio::test]
+async fn message_thread_fk_company_deletion_removes_a_reply_destination() {
+    let conversation = Box::pin(conversation(
+        |_, _, source, _, _| reply(source),
+        Source::Question,
+    ))
+    .await;
+    let setup = &conversation.setup;
+    assert!(matches!(
+        setup.runtime().execute(&setup.kind, &setup.claim).await,
+        WorkflowHandlerOutcome::Suspended(_)
+    ));
+    let company = setup.fixture.target.company.as_uuid();
+    let (kind, replied, thread): (String, Option<Uuid>, Uuid) = sqlx::query_as(
+        "SELECT kind, replied_message_id, thread_id FROM workflow_message_destinations WHERE company_id = $1",
+    )
+    .bind(company)
+    .fetch_one(setup.pool())
+    .await
+    .unwrap();
+    assert_eq!(
+        (kind.as_str(), replied, thread),
+        (
+            "reply",
+            Some(conversation.question.as_uuid()),
+            conversation.thread
+        )
+    );
+    let delivered: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM workflow_message_destinations AS target \
+           JOIN message_delivery_parts AS part ON part.company_id = target.company_id AND part.delivery_id = target.delivery_id \
+          WHERE target.company_id = $1 AND target.kind = 'reply'",
+    )
+    .bind(company)
+    .fetch_one(setup.pool())
+    .await
+    .unwrap();
+    assert!(
+        delivered > 0,
+        "the reply destination has a delivery with parts"
+    );
+    crate::application::use_cases::company::CompanyPersistence::delete(
+        &setup.fixture.persistence,
+        company,
+    )
+    .await
+    .unwrap();
+    emptied(company_rows(setup.pool(), company).await);
+}
+
+/// A destination's message is filed in the destination's own thread of its own channel.
+#[tokio::test]
+async fn message_thread_fk_destination_names_a_message_of_its_own_thread() {
+    let setup = Box::pin(send(&[To::Channel])).await;
+    let _ = setup.runtime().execute(&setup.kind, &setup.claim).await;
+    let company = setup.fixture.target.company.as_uuid();
+    let (run, invocation, posted_thread): (Uuid, Uuid, Uuid) = sqlx::query_as(
+        "SELECT run_id, invocation_id, thread_id FROM workflow_message_destinations WHERE company_id = $1",
+    )
+    .bind(company)
+    .fetch_one(setup.pool())
+    .await
+    .unwrap();
+    // A message filed in another thread of the same channel.
+    let elsewhere = setup
+        .fixture
+        .persistence
+        .create_thread(setup.channel, "Elsewhere", &[EmailAddress::from(CUSTOMER)])
+        .await
+        .unwrap()
+        .id;
+    let message = setup
+        .fixture
+        .persistence
+        .create_message(&inbound(elsewhere, "<elsewhere@partner.test>", &[], "Hi"))
+        .await
+        .unwrap()
+        .canonical_id;
+    let insert = |thread: Uuid| {
+        sqlx::query(
+            "INSERT INTO workflow_message_destinations (company_id, run_id, invocation_id, ordinal, \
+               kind, destination_channel_id, channel_id, thread_id, message_id) \
+             VALUES ($1, $2, $3, 1, 'channel', $4, $4, $5, $6)",
+        )
+        .bind(company)
+        .bind(run)
+        .bind(invocation)
+        .bind(setup.channel)
+        .bind(thread)
+        .bind(message.as_uuid())
+    };
+    let mut tx = setup.pool().begin().await.unwrap();
+    let crossed = insert(posted_thread).execute(&mut *tx).await.unwrap_err();
+    assert_eq!(
+        crossed.as_database_error().unwrap().constraint(),
+        Some("workflow_message_destination_message"),
+        "{crossed}"
+    );
+    tx.rollback().await.unwrap();
+    let mut tx = setup.pool().begin().await.unwrap();
+    insert(elsewhere).execute(&mut *tx).await.unwrap();
+    tx.rollback().await.unwrap();
 }

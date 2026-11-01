@@ -194,6 +194,7 @@ impl NotificationWorker {
         );
         self.deliveries
             .compose_standalone(StandaloneDeliveryRequest {
+                company_id: projection.event.company_id,
                 correlation_id: recipient.correlation_id,
                 purpose: DeliveryPurpose::Notification,
                 source_key,

@@ -141,7 +141,7 @@ pub(crate) fn attempt_failed_set(class_sql: &str, detail_sql: &str) -> String {
 #[derive(sqlx::FromRow, Debug, Clone)]
 pub(crate) struct DeliveryDb {
     pub id: Uuid,
-    pub company_id: Option<Uuid>,
+    pub company_id: Uuid,
     pub channel_id: Option<Uuid>,
     pub message_id: Option<Uuid>,
     pub source_binding_id: Option<Uuid>,
@@ -225,22 +225,20 @@ impl DeliveryDb {
                 ))
             })?;
         let attribution = match (
-            self.company_id,
             self.channel_id,
             self.message_id,
             self.source_binding_id,
             self.destination_binding_id,
         ) {
-            (Some(company), Some(channel), Some(message), Some(source), Some(destination)) => {
+            (Some(channel), Some(message), Some(source), Some(destination)) => {
                 Some(DeliveryAttribution {
-                    company_id: company,
                     channel_id: channel,
                     message_id: CanonicalMessageId::new(message),
                     source_binding_id: ChannelBindingId::new(source),
                     destination_binding_id: ChannelBindingId::new(destination),
                 })
             }
-            (None, None, None, None, None) => None,
+            (None, None, None, None) => None,
             _ => {
                 return Err(AppError::Internal(format!(
                     "Delivery {} has partial canonical attribution",
@@ -250,6 +248,7 @@ impl DeliveryDb {
         };
         Ok(DeliveryRecord {
             id: DeliveryId::new(self.id),
+            company_id: self.company_id,
             attribution,
             external_destination,
             correlation_id: CorrelationId::from(self.correlation_id),
@@ -283,7 +282,7 @@ impl DeliveryDb {
 #[derive(sqlx::FromRow, Debug, Clone)]
 pub(crate) struct PartDb {
     pub id: Uuid,
-    pub company_id: Option<Uuid>,
+    pub company_id: Uuid,
     pub delivery_id: Uuid,
     pub part_index: i32,
     pub part_key: String,

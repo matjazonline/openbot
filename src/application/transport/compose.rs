@@ -55,8 +55,11 @@ pub struct DeliveryRequest<'a> {
 }
 
 /// One provider notification that has no canonical message, channel, or binding to attribute.
+///
+/// It still has a company: the tenant whose mail or workflow caused it, which owns the row.
 #[derive(Debug, Clone)]
 pub struct StandaloneDeliveryRequest<'a> {
+    pub company_id: Uuid,
     pub correlation_id: CorrelationId,
     pub purpose: DeliveryPurpose,
     pub source_key: String,
@@ -209,6 +212,7 @@ impl DeliveryComposer {
         };
         Ok(NewStandaloneDelivery {
             id,
+            company_id: request.company_id,
             external_destination,
             correlation_id: request.correlation_id,
             transport,

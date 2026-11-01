@@ -335,6 +335,7 @@ pub(crate) fn hex_digest(value: &Value) -> AppResult<String> {
 /// One reviewer's notice, as the park transaction resolved it.
 #[derive(Debug, Clone)]
 pub(crate) struct DecisionNotice<'a> {
+    pub company: Uuid,
     pub decision: Uuid,
     pub principal: Uuid,
     pub recipient: EmailAddress,
@@ -398,6 +399,7 @@ impl DecisionNotices {
         let delivery = self
             .deliveries
             .compose_standalone(StandaloneDeliveryRequest {
+                company_id: notice.company,
                 correlation_id: notice.correlation.into(),
                 purpose: DeliveryPurpose::Notification,
                 source_key: format!(

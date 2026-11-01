@@ -110,6 +110,46 @@ pub(crate) async fn cancel_workflow_deliveries_on(
     cancel_locked_deliveries_on(db, &locked, reason).await
 }
 
+/// The notices a removed member was owed, cancelled in the transaction that removes them.
+///
+/// Reached through the two rows that name a member's notice: their notifications' emails and
+/// their decision-reviewer notices. The caller (`remove_member`) has already demoted the member's
+/// principal and locked the member row, which is the order every notice producer locks them in,
+/// so no new notice for this member can commit after this statement's snapshot. Unsent notices are
+/// superseded; one a worker holds keeps its lease and gets only the intent, which that worker's
+/// next fenced write settles.
+pub(crate) async fn cancel_member_notices_on(
+    db: &mut PgConnection,
+    company_id: Uuid,
+    user_id: Uuid,
+) -> AppResult<CancelledDeliveries> {
+    let claimable = claimable_statuses_sql();
+    let in_flight =
+        sql_status_list([DeliveryStatus::Sending, DeliveryStatus::OutcomeUnknown].iter());
+    let locked: Vec<Uuid> = sqlx::query_scalar(&format!(
+        r#"SELECT delivery.id FROM message_deliveries AS delivery
+            WHERE delivery.company_id = $1
+              AND delivery.id IN (
+                  SELECT notification.email_delivery_id FROM notifications AS notification
+                   WHERE notification.company_id = $1 AND notification.recipient_user_id = $2
+                     AND notification.email_delivery_id IS NOT NULL
+                  UNION
+                  SELECT reviewer.notice_delivery_id FROM workflow_decision_reviewers AS reviewer
+                   WHERE reviewer.company_id = $1 AND reviewer.user_id = $2
+                     AND reviewer.notice_delivery_id IS NOT NULL)
+              AND delivery.status IN ({claimable}, {in_flight})
+              AND delivery.cancellation_requested_at IS NULL
+            ORDER BY delivery.id
+              FOR UPDATE OF delivery"#
+    ))
+    .bind(company_id)
+    .bind(user_id)
+    .fetch_all(&mut *db)
+    .await
+    .map_err(AppError::from)?;
+    cancel_locked_deliveries_on(db, &locked, DeliveryCancellationReason::RecipientRevoked).await
+}
+
 /// [`cancel_workflow_deliveries_on`]'s lock-then-settle, keyed by delivery id, for the worker-path
 /// tests that need a cancellation without a workflow run to own the deliveries.
 #[cfg(test)]

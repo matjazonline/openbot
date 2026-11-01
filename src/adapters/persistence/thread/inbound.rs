@@ -577,10 +577,13 @@ async fn bind_conversations(
     for thread in threads {
         external::upsert_external_thread(
             tx,
-            request.company_id,
-            thread.binding_id,
-            thread_key,
-            thread.thread_id,
+            external::ExternalThreadMapping {
+                company_id: request.company_id,
+                channel_id: thread.channel_id,
+                binding_id: thread.binding_id,
+                key: thread_key,
+                thread_id: thread.thread_id,
+            },
         )
         .await?;
     }

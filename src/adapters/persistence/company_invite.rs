@@ -412,6 +412,12 @@ impl CompanyInvitePersistence for PostgresPersistence {
     /// principal's foreign key hangs on, so deleting it alone would cascade the principal away and
     /// take its identities, grants and thread participation with it -- a former colleague would
     /// vanish from every thread they ever wrote in.
+    ///
+    /// Lock order is principal, then member, then the member's notices -- the order the notice
+    /// producers take them (the notification projection locks `principal, member` `FOR SHARE`; the
+    /// decision-reviewer guard locks the principal). A producer already holding them commits its
+    /// notice before this transaction proceeds, so the cancellation below sees it; one arriving
+    /// later finds an external principal and no member, and composes nothing.
     async fn remove_member(&self, company_id: Uuid, user_id: Uuid) -> AppResult<()> {
         let mut transaction = self.pool.begin().await.map_err(AppError::from)?;
         sqlx::query!(
@@ -429,6 +435,27 @@ impl CompanyInvitePersistence for PostgresPersistence {
         .execute(&mut *transaction)
         .await
         .map_err(AppError::from)?;
+        let removable = sqlx::query_scalar!(
+            "SELECT id FROM company_members
+             WHERE company_id = $1 AND user_id = $2 AND role <> 'owner'
+             FOR UPDATE",
+            company_id,
+            user_id
+        )
+        .fetch_optional(&mut *transaction)
+        .await
+        .map_err(AppError::from)?;
+        if removable.is_none() {
+            // An owner, or nobody: removal is a no-op, and so was the demotion above.
+            transaction.commit().await.map_err(AppError::from)?;
+            return Ok(());
+        }
+        super::delivery::cancellation::cancel_member_notices_on(
+            &mut transaction,
+            company_id,
+            user_id,
+        )
+        .await?;
         sqlx::query!(
             "DELETE FROM company_members
              WHERE company_id = $1 AND user_id = $2 AND role <> 'owner'",
