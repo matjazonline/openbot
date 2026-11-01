@@ -1,8 +1,9 @@
 //! The workflow every agent channel runs: three base steps, and the slots where one workflow adds
 //! its own. The base is the autonomous-response template as it ships: `context` (the thread
 //! history) → `draft` (the agent) → `reply`. A reviewed channel is the base with a `review` gate
-//! before the reply. Custom steps go into the same slots, and the history step can be replaced
-//! by another implementation; the base's own steps are never edited.
+//! before the reply. Custom steps go into the same slots; the base's own steps are never edited.
+//! Another history implementation is a change to the base's `context` step, which the composer
+//! takes as it finds it.
 use super::REPLY_AGENT_STEP;
 use crate::application::workflow::compiler::{
     Diagnostic, LocatedNode, NodeValue, SourceDecoder, SourceNode, json_value, scalar_string,
@@ -47,7 +48,6 @@ pub struct CustomStep {
 /// The base and what one workflow adds to it, composed against the base source.
 #[derive(Debug, Clone, Default)]
 pub struct AgentWorkflow {
-    history: Option<Map<String, Value>>,
     reviewed: bool,
     steps: Vec<CustomStep>,
 }
@@ -69,13 +69,6 @@ impl AgentWorkflow {
         self
     }
 
-    /// Another history implementation in place of `context.history`. The step keeps its id, so
-    /// its output still reaches the agent as `untrusted_history`.
-    pub fn with_history(mut self, step: Map<String, Value>) -> Self {
-        self.history = Some(step);
-        self
-    }
-
     pub fn compose(
         &self,
         decoder: &impl SourceDecoder,
@@ -87,10 +80,7 @@ impl AgentWorkflow {
         self.check_steps()?;
         let custom = |slot| self.steps.iter().filter(move |step| step.slot == slot);
 
-        let mut history = base_steps.take(HISTORY_STEP)?;
-        if let Some(replacement) = &self.history {
-            history = replacement.clone();
-        }
+        let history = base_steps.take(HISTORY_STEP)?;
         let mut draft = base_steps.take(REPLY_AGENT_STEP)?;
         let mut reply = base_steps.take(REPLY_STEP)?;
         base_steps.finish()?;

@@ -35,7 +35,7 @@ Every agent channel's workflow is composed from one base of three steps: `contex
 | `before_reply` | after the agent, before any review and the reply | `decision.rule`, `decision.agent` |
 | `after_reply` | after the reply | `data.map` |
 
-A custom step's routes name only `$next` (whichever step follows it) or `$end`, and default to `{success: $next}`, so a gate can stop a reply but cannot reorder the base. `create_agent_channel` accepts up to six such steps in `steps`, of the types `ai.classify`, `decision.agent`, `decision.rule` and `data.map`; every other step type is added afterwards in the workflow editor. The history step can be replaced by another implementation that keeps the id `context`, and its output still reaches the agent as `untrusted_history`.
+A custom step's routes name only `$next` (whichever step follows it) or `$end`, and default to `{success: $next}`, so a gate can stop a reply but cannot reorder the base. `create_agent_channel` accepts up to six such steps in `steps`, of the types `ai.classify`, `decision.agent`, `decision.rule` and `data.map`; every other step type is added afterwards in the workflow editor. To use another history implementation, change the base's `context` step in the autonomous template; the agent reads its output as `untrusted_history` either way.
 
 ## Design workflow steps
 

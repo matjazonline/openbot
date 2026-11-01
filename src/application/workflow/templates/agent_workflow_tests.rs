@@ -147,31 +147,6 @@ fn custom_steps_join_the_base_in_their_slots() {
     );
 }
 
-/// Another history implementation takes the `context` step's place; the agent still reads its
-/// output as `untrusted_history`.
-#[test]
-fn a_replacement_history_step_keeps_its_place_and_reaches_the_agent() {
-    let Value::Object(history) = json!({"type": "data.map", "with": {
-        "value": {"object": {"items": {"literal": []}}},
-        "output_schema": {"literal": {"type": "object", "required": ["items"],
-            "additionalProperties": false,
-            "properties": {"items": {"type": "array", "maxItems": 0}}}}}})
-    else {
-        unreachable!()
-    };
-    let source = plain(&composed(&AgentWorkflow::base().with_history(history)));
-    assert_eq!(source["entry"], "context");
-    assert_eq!(source["steps"]["context"]["type"], "data.map");
-    assert_eq!(
-        source["steps"]["context"]["routes"],
-        json!({"success": "draft"})
-    );
-    assert_eq!(
-        source["steps"]["draft"]["with"]["context"]["object"]["untrusted_history"],
-        json!({"ref": "/steps/context/output"})
-    );
-}
-
 /// A custom step cannot replace, reorder or crowd out the base.
 #[test]
 fn custom_steps_that_would_break_the_base_are_refused() {
