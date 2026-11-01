@@ -114,5 +114,5 @@ on restart. Metrics never label tokens, cookies, session IDs or user IDs. A vali
 
 The startup default, `fly.toml` and `.env.example` enable `monitoring::counter=info` and
 `monitoring::gauge=info` in `RUST_LOG`. Keep both directives when supplying a custom filter;
-`mail_agents=info` alone does not include these separate metric targets. These directives do not
+`open_bots=info` alone does not include these separate metric targets. These directives do not
 enable the `monitoring::smtp` or `monitoring::ai` event targets.

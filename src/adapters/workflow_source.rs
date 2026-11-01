@@ -1,6 +1,6 @@
 //! Bounded, span-aware YAML decoding at the adapter boundary.
 use crate::application::workflow::compiler::{
-    DecodedSource, Diagnostic, LocatedNode, NodeValue, SourceSpan,
+    DecodedSource, Diagnostic, LocatedNode, NodeValue, SourceNode, SourceSpan,
 };
 use serde::Deserialize;
 use serde::de::{self, MapAccess, SeqAccess, Visitor};
@@ -10,11 +10,17 @@ use std::fmt;
 
 pub use crate::application::workflow::compiler::MAX_SOURCE_BYTES;
 
-/// Bounded production YAML decoder supplied to application composition.
+/// Bounded production YAML decoder supplied to application composition, and the encoder that
+/// writes a composed source back as YAML.
 pub struct WorkflowSourceDecoder;
 impl crate::application::workflow::compiler::SourceDecoder for WorkflowSourceDecoder {
     fn decode(&self, source: &str) -> Result<DecodedSource, Diagnostic> {
         decode(source)
+    }
+}
+impl crate::application::workflow::compiler::SourceEncoder for WorkflowSourceDecoder {
+    fn encode(&self, source: &SourceNode) -> Result<String, Diagnostic> {
+        encode(source)
     }
 }
 const MAX_NODES: usize = 8192;
@@ -166,9 +172,92 @@ pub fn decode(source: &str) -> Result<DecodedSource, Diagnostic> {
     })
 }
 
+/// Block YAML in the node's own order. The text is decoded again before it is returned, so
+/// anything the decoder would refuse or read differently fails here instead.
+pub fn encode(source: &SourceNode) -> Result<String, Diagnostic> {
+    let failed = || {
+        Diagnostic::at(
+            "source.encode",
+            "The composed source cannot be written as supported YAML",
+            "",
+            SourceSpan {
+                start: 0,
+                end: 0,
+                line: 1,
+                column: 1,
+            },
+        )
+    };
+    let text = serde_yaml::to_string(&yaml(source).map_err(|_| failed())?).map_err(|_| failed())?;
+    let decoded = decode(&text)?;
+    if crate::application::workflow::compiler::json_value(&decoded.root, "")? != plain(source) {
+        return Err(failed());
+    }
+    Ok(text)
+}
+
+fn yaml(node: &SourceNode) -> Result<serde_yaml::Value, serde_yaml::Error> {
+    match node {
+        SourceNode::Value(value) => serde_yaml::to_value(value),
+        SourceNode::Mapping(entries) => {
+            let mut mapping = serde_yaml::Mapping::with_capacity(entries.len());
+            for (key, value) in entries {
+                mapping.insert(serde_yaml::Value::String(key.clone()), yaml(value)?);
+            }
+            Ok(serde_yaml::Value::Mapping(mapping))
+        }
+    }
+}
+
+fn plain(node: &SourceNode) -> Value {
+    match node {
+        SourceNode::Value(value) => value.clone(),
+        SourceNode::Mapping(entries) => Value::Object(
+            entries
+                .iter()
+                .map(|(key, value)| (key.clone(), plain(value)))
+                .collect(),
+        ),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn workflow_yaml_encoding_keeps_order_and_decodes_to_the_same_values() {
+        let source = SourceNode::Mapping(vec![
+            (
+                "entry".into(),
+                SourceNode::Value(serde_json::json!("start")),
+            ),
+            (
+                "steps".into(),
+                SourceNode::Mapping(vec![
+                    (
+                        "start".into(),
+                        SourceNode::Value(serde_json::json!({"routes": {"success": "$end"}})),
+                    ),
+                    (
+                        "after".into(),
+                        SourceNode::Value(serde_json::json!({
+                            "with": {"text": {"literal": "two\nlines"}, "flag": {"literal": "true"},
+                                "count": {"literal": 3}, "path": {"ref": "/input/message"}}
+                        })),
+                    ),
+                ]),
+            ),
+        ]);
+        let text = encode(&source).unwrap();
+        assert!(text.find("entry:").unwrap() < text.find("steps:").unwrap());
+        assert!(text.find("start:").unwrap() < text.find("after:").unwrap());
+        let decoded = decode(&text).unwrap();
+        assert_eq!(
+            crate::application::workflow::compiler::json_value(&decoded.root, "").unwrap(),
+            plain(&source)
+        );
+    }
 
     #[test]
     fn workflow_yaml_locations_and_rejections() {

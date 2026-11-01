@@ -13,7 +13,7 @@ and checks that order against the builders. It creates temporary copies of the m
 constraints and indexes and writes no application data. Run it against a migrated database:
 
 ```sh
-python3 scripts/tests/run-list-query-plan.py postgres://$(whoami)@localhost:5432/mail_agents_test \
+python3 scripts/tests/run-list-query-plan.py postgres://$(whoami)@localhost:5432/open_bots_test \
   --out docs/performance/run-list-query-plan.txt \
   --board-out docs/performance/run-board-query-plan.txt
 ```

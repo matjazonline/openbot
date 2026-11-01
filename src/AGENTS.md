@@ -176,7 +176,7 @@ state. `src/adapters/persistence/AGENTS.md` has the rules either choice commits 
 **Whenever you add or change a SQL query, regenerate it and commit the result:**
 
 ```sh
-DATABASE_URL="postgres://$(whoami)@localhost:5432/mail_agents" \
+DATABASE_URL="postgres://$(whoami)@localhost:5432/open_bots" \
   cargo sqlx prepare -- --all-targets
 ```
 

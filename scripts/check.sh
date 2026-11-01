@@ -38,7 +38,7 @@ for argument in "$@"; do
   esac
 done
 
-export DATABASE_URL="${DATABASE_URL:-postgres://$(whoami)@localhost:5432/mail_agents}"
+export DATABASE_URL="${DATABASE_URL:-postgres://$(whoami)@localhost:5432/open_bots}"
 # As in CI: compile from the checked-in .sqlx cache, except where a gate needs the live schema.
 export SQLX_OFFLINE=true
 

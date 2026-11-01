@@ -65,11 +65,23 @@ async fn person(d: &Deployment, role: &str) -> (Uuid, String) {
 
 /// `from` writes `text` to the channel `to`: signed in through the app, or by email.
 async fn write(d: &Deployment, from: &str, to: &str, text: &str, origin: IngressOrigin) {
+    let headers = format!("Message-ID: <{}@example.test>\n", Uuid::new_v4());
+    write_with(d, from, to, text, origin, headers).await;
+}
+
+async fn write_with(
+    d: &Deployment,
+    from: &str,
+    to: &str,
+    text: &str,
+    origin: IngressOrigin,
+    headers: String,
+) {
     let ingested = d
         .threads
         .ingest_test_email_as(
             RawInboundPayload {
-                headers: Some(format!("Message-ID: <{}@example.test>\n", Uuid::new_v4())),
+                headers: Some(headers),
                 to: d.address(to),
                 from: from.into(),
                 subject: Some("Assistant".into()),
@@ -223,6 +235,213 @@ async fn builder_provisions_an_assistant_for_a_signed_in_admin() {
         "the Builder's reply and the helper's"
     );
     assert_eq!(d.llm.finish().await.unwrap(), 4);
+}
+
+/// The Builder holds a conversation: a follow-up in the same thread reaches the agent with the
+/// thread so far, so the earlier message is still in front of it.
+#[tokio::test]
+async fn builder_sees_the_conversation_so_far() {
+    let mut d = Deployment::new(vec![
+        LlmTurn::text(r#"{"body": "What should the new agent handle?"}"#),
+        LlmTurn::text(r#"{"body": "A billing agent, then."}"#),
+    ])
+    .await;
+    let builder = builder(&d).await;
+    let (_, email) = person(&d, "admin").await;
+    let first = format!("{}@example.test", Uuid::new_v4());
+    write_with(
+        &d,
+        &email,
+        "builder",
+        "Make me an agent for the finance team.",
+        IngressOrigin::TrustedApplication,
+        format!("Message-ID: <{first}>\n"),
+    )
+    .await;
+    d.run_until("the first answer", async || {
+        finished_runs(&d, builder).await == 1
+    })
+    .await;
+    write_with(
+        &d,
+        &email,
+        "builder",
+        "Billing questions.",
+        IngressOrigin::TrustedApplication,
+        format!(
+            "Message-ID: <{}@example.test>\nIn-Reply-To: <{first}>\nReferences: <{first}>\n",
+            Uuid::new_v4()
+        ),
+    )
+    .await;
+    d.run_until("the follow-up answer", async || {
+        finished_runs(&d, builder).await == 2
+    })
+    .await;
+
+    let requests = d.llm.observed();
+    let follow_up = requests[1].to_string();
+    assert!(
+        follow_up.contains(r#"\"untrusted_message\":\"Billing questions.\""#),
+        "{follow_up}"
+    );
+    assert!(
+        follow_up.contains("untrusted_history")
+            && follow_up.contains("Make me an agent for the finance team."),
+        "the follow-up sees the first message: {follow_up}"
+    );
+    assert!(
+        !requests[0].to_string().contains("Billing questions."),
+        "history is frozen when a run starts"
+    );
+    assert_eq!(d.llm.finish().await.unwrap(), 2);
+}
+
+/// The Builder's spec adds its own steps to the reply mode's: a classifier before the draft,
+/// whose label the agent reads, and a rule before the reply that lets only billing questions
+/// through. The new channel runs them in that order.
+#[tokio::test]
+async fn builder_adds_custom_steps_to_the_new_agents_workflow() {
+    let mut spec = spec("helper", ReplyMode::Autonomous);
+    let labels = json!({"literal": {"type": "string", "enum": ["billing", "other"]}});
+    spec["steps"] = json!([
+        {"id": "topic", "slot": "before_draft", "type": "ai.classify", "with": {
+            "agent": {"literal": "helper"},
+            "context": {"object": {"untrusted_message": {"ref": "/input/message"}}},
+            "output_schema": labels}},
+        {"id": "billing_only", "slot": "before_reply", "type": "decision.rule",
+            "with": {"data": {"ref": "/steps/topic/output"}, "data_schema": labels},
+            "rule": {"cases": [{"when": {"eq": [{"ref": "/steps/topic/output"},
+                {"literal": "billing"}]}, "choice": "send"}], "default": "hold"},
+            "routes": {"choices": {"send": "$next", "hold": "$end"}}}
+    ]);
+    let mut d = Deployment::new(vec![
+        LlmTurn::tool_call(CREATE_AGENT_CHANNEL, spec),
+        LlmTurn::text(r#"{"body": "Created helper."}"#),
+        LlmTurn::text(r#""billing""#),
+        LlmTurn::text(r#"{"body": "Your invoice is attached."}"#),
+    ])
+    .await;
+    let builder = builder(&d).await;
+    let (_, email) = person(&d, "admin").await;
+    write(
+        &d,
+        &email,
+        "builder",
+        "Make me a billing helper.",
+        IngressOrigin::TrustedApplication,
+    )
+    .await;
+    d.run_until("the Builder's run finished", async || {
+        finished_runs(&d, builder).await == 1
+    })
+    .await;
+    let created = receipts(&d, builder).await.remove(0);
+    assert_eq!(created["agent"]["slug"], "helper", "{created}");
+    let binding = Uuid::parse_str(created["binding_id"].as_str().unwrap()).unwrap();
+
+    register_scripted_agent_base_url(
+        Uuid::parse_str(created["agent"]["id"].as_str().unwrap()).unwrap(),
+        &d.llm.base_url,
+    );
+    write(
+        &d,
+        &email,
+        "helper",
+        "Where is my invoice?",
+        IngressOrigin::TrustedApplication,
+    )
+    .await;
+    d.run_until("the helper answered", async || {
+        finished_runs(&d, binding).await == 1
+    })
+    .await;
+    assert_eq!(replied(&d, binding).await, 1, "billing passes the rule");
+    let steps: Vec<String> = sqlx::query_scalar(
+        "SELECT execution.step_id FROM workflow_executions AS execution \
+         JOIN workflow_runs AS run \
+           ON run.company_id = execution.company_id AND run.id = execution.run_id \
+         WHERE run.binding_id = $1 ORDER BY execution.activation",
+    )
+    .bind(binding)
+    .fetch_all(d.p().pool())
+    .await
+    .unwrap();
+    assert_eq!(
+        steps,
+        ["context", "topic", "draft", "billing_only", "reply"],
+        "the custom steps run in their slots"
+    );
+    let draft = d.llm.observed().remove(3).to_string();
+    assert!(
+        draft.contains(r#"\"untrusted_topic\":\"billing\""#),
+        "{draft}"
+    );
+    assert_eq!(d.llm.finish().await.unwrap(), 4);
+}
+
+/// An admin's message the Builder cannot act on yet, and a model that keeps listing: the listing
+/// runs twice, the third identical request is refused before it runs, and the step fails as a
+/// repeated call after three model calls instead of spending its whole allowance. The model saw
+/// the message's subject as well as its body.
+#[tokio::test]
+async fn builder_stops_a_listing_loop_once_its_result_repeats() {
+    let mut d = Deployment::new(vec![
+        LlmTurn::tool_call(LIST_COMPANY_AGENTS, json!({})),
+        LlmTurn::tool_call(LIST_COMPANY_AGENTS, json!({})),
+        LlmTurn::tool_call(LIST_COMPANY_AGENTS, json!({})),
+    ])
+    .await;
+    let builder = builder(&d).await;
+    let (_, email) = person(&d, "admin").await;
+    write(
+        &d,
+        &email,
+        "builder",
+        "we are in CET",
+        IngressOrigin::TrustedApplication,
+    )
+    .await;
+    d.run_until("the Builder's run finished", async || {
+        finished_runs(&d, builder).await == 1
+    })
+    .await;
+
+    let failure: (String, String) = sqlx::query_as(
+        "SELECT run.state, attempt.workflow_failure_code FROM workflow_runs AS run \
+         JOIN workflow_executions AS execution \
+           ON execution.company_id = run.company_id AND execution.run_id = run.id \
+         JOIN background_tasks AS job \
+           ON job.company_id = execution.company_id AND job.workflow_execution_id = execution.id \
+         JOIN task_attempts AS attempt ON attempt.task_id = job.id \
+         WHERE run.binding_id = $1",
+    )
+    .bind(builder)
+    .fetch_one(d.p().pool())
+    .await
+    .unwrap();
+    assert_eq!(
+        failure,
+        ("failed".into(), "agent.repeated_tool_call".into())
+    );
+    let (turns, invocations): (i32, i32) = sqlx::query_as(
+        "SELECT jsonb_array_length(harness.checkpoint->'turns'), \
+           jsonb_array_length(harness.checkpoint->'invocations') \
+         FROM task_harness_runs AS harness JOIN workflow_runs AS run \
+           ON run.company_id = harness.company_id AND run.id = harness.workflow_run_id \
+         WHERE run.binding_id = $1",
+    )
+    .bind(builder)
+    .fetch_one(d.p().pool())
+    .await
+    .unwrap();
+    assert_eq!((turns, invocations), (3, 2), "the third listing never ran");
+    let first = d.llm.observed().remove(0).to_string();
+    assert!(
+        first.contains(r#"\"untrusted_subject\":\"Assistant\""#),
+        "{first}"
+    );
+    assert_eq!(d.llm.finish().await.unwrap(), 3);
 }
 
 /// F037/F039: a plain member in the app, and an admin by email, get the forbidden refusal from

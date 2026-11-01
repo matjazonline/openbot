@@ -111,9 +111,9 @@ fn test_database_url() -> Option<String> {
         None => panic!(
             "DATABASE_URL is not set, so this test would silently skip and be counted as passing.\n\n\
              Run the suite with a database:\n\n    \
-             DATABASE_URL=\"postgres://$(whoami)@localhost:5432/mail_agents\" cargo test\n\n\
+             DATABASE_URL=\"postgres://$(whoami)@localhost:5432/open_bots\" cargo test\n\n\
              (Tests never use that database directly — they are redirected onto its `_test` \
-             sibling. Create it once with `createdb mail_agents_test`.)\n\n\
+             sibling. Create it once with `createdb open_bots_test`.)\n\n\
              To skip them on purpose, set {ALLOW_MISSING_URL_VAR}=1."
         ),
     }
@@ -130,7 +130,7 @@ fn with_test_database_name(url: &str) -> String {
 
     // Nothing to rename: no database name at all, or already a test database — a
     // `TEST_DATABASE_URL` that went through `DATABASE_URL`, or a second call. Suffixing again
-    // would invent `mail_agents_test_test`. Hand the URL back and let the connection report why.
+    // would invent `open_bots_test_test`. Hand the URL back and let the connection report why.
     if name.is_empty() || name.ends_with(TEST_DB_SUFFIX) {
         return url.to_string();
     }
@@ -207,7 +207,7 @@ pub async fn test_pool() -> Option<PgPool> {
         Ok(pool) => pool,
         Err(error) => panic!(
             "DATABASE_URL is set, so these tests are meant to run, but the test database could not \
-             be reached: {error}\n\nCreate it once with:\n\n    createdb mail_agents_test\n\n\
+             be reached: {error}\n\nCreate it once with:\n\n    createdb open_bots_test\n\n\
              (Tests never use the development database: they claim from the same queues a running \
              server polls. Set TEST_DATABASE_URL to override the derived name.)"
         ),
@@ -262,7 +262,7 @@ impl Drop for OwnDatabase {
         .join();
         if dropped.is_err() {
             // Reported, not raised: a test that is already failing keeps its own panic, and a
-            // `mail_agents_own_%` database left behind shows up in `psql -l`.
+            // `open_bots_own_%` database left behind shows up in `psql -l`.
             eprintln!("could not drop this test's database; it is left behind");
         }
     }
@@ -283,7 +283,7 @@ async fn migrated_own_database() -> Option<OwnDatabase> {
     let url = test_database_url()?;
     // Generated, so it needs no quoting beyond the identifier quotes: `CREATE DATABASE` takes no
     // parameters.
-    let name = format!("mail_agents_own_{}", Uuid::new_v4().simple());
+    let name = format!("open_bots_own_{}", Uuid::new_v4().simple());
     let admin_url = with_database_name(&url, "postgres");
     admin_statement(&admin_url, &format!(r#"CREATE DATABASE "{name}""#)).await;
 
@@ -718,8 +718,8 @@ mod tests {
     #[test]
     fn a_development_url_is_redirected_to_its_test_sibling() {
         assert_eq!(
-            with_test_database_name("postgres://mac03@localhost:5432/mail_agents"),
-            "postgres://mac03@localhost:5432/mail_agents_test"
+            with_test_database_name("postgres://mac03@localhost:5432/open_bots"),
+            "postgres://mac03@localhost:5432/open_bots_test"
         );
     }
 
@@ -727,16 +727,16 @@ mod tests {
     fn query_parameters_survive_the_rename() {
         // The rename must land on the database name, not on the last path-looking thing in the URL.
         assert_eq!(
-            with_test_database_name("postgres://user:pw@host:5432/mail_agents?sslmode=require"),
-            "postgres://user:pw@host:5432/mail_agents_test?sslmode=require"
+            with_test_database_name("postgres://user:pw@host:5432/open_bots?sslmode=require"),
+            "postgres://user:pw@host:5432/open_bots_test?sslmode=require"
         );
     }
 
     #[test]
     fn a_test_database_is_not_suffixed_twice() {
         assert_eq!(
-            with_test_database_name("postgres://localhost/mail_agents_test"),
-            "postgres://localhost/mail_agents_test"
+            with_test_database_name("postgres://localhost/open_bots_test"),
+            "postgres://localhost/open_bots_test"
         );
     }
 

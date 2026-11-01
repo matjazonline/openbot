@@ -160,7 +160,7 @@ pub fn agents_page(company: &Company, agents: &[Agent]) -> String {
                         <div>
                             <label for="agent_model" class="block text-xs font-medium text-base-content/80 mb-1">Model</label>
                             <input type="text" id="agent_model" name="model"
-                                placeholder="gpt-4o, claude-3-5-sonnet" class="w-full bg-base-100 border border-base-300 rounded-lg px-3 py-2 text-sm text-base-content placeholder-base-content/60 focus:outline-none focus:border-primary transition">
+                                placeholder="gpt-4o, claude-sonnet-5-5"class="w-full bg-base-100 border border-base-300 rounded-lg px-3 py-2 text-sm text-base-content placeholder-base-content/60 focus:outline-none focus:border-primary transition">
                         </div>
                     </div>
 

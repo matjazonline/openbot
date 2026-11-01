@@ -112,7 +112,12 @@ fn workflow_fixtures_taking_a_message_accept_the_standard_message_input() {
 #[test]
 fn workflow_fixtures_autonomous_omission_uses_frozen_saved_defaults() {
     let bundle = bundle(Fixture::AutonomousResponse);
-    let inputs = prepare(&bundle, "draft", &BTreeMap::new());
+    let history = json!({"items": [], "token_count": 0, "omitted": 0});
+    let inputs = prepare(
+        &bundle,
+        "draft",
+        &BTreeMap::from([(step("context"), history)]),
+    );
     assert!(inputs.value().get("capability_profile").is_none());
     assert!(
         bundle
@@ -143,6 +148,56 @@ fn workflow_fixtures_autonomous_omission_uses_frozen_saved_defaults() {
             .instructions
             .starts_with("Draft")
     );
+}
+
+/// Both shipped reply templates give the agent the message's subject beside its body, so a
+/// question asked only in the subject still reaches it; a message without one gives "".
+/// Both reply templates hand the agent the thread so far beside the message and its subject, so
+/// a conversational agent such as the Agent Builder sees its earlier questions and answers.
+#[test]
+fn workflow_fixtures_reply_templates_pass_the_subject_and_history_to_the_agent() {
+    let source_message = "00000000-0000-0000-0000-0000000000c1";
+    for (fixture, params) in [
+        (Fixture::AutonomousResponse, json!({})),
+        (
+            Fixture::ReviewedSupport,
+            json!({"reviewer":"00000000-0000-0000-0000-0000000000b1"}),
+        ),
+    ] {
+        let bundle = bundle(fixture);
+        for (input, subject) in [
+            (
+                json!({"message":"we are in CET","subject":"date today","source_message":source_message}),
+                "date today",
+            ),
+            (
+                json!({"message":"Help","source_message":source_message}),
+                "",
+            ),
+        ] {
+            let history = json!({"items": [{
+                "message_id": "00000000-0000-0000-0000-0000000000c0",
+                "at": "2026-11-01T09:00:00.000000Z", "role": "agent",
+                "audience": "external_conversation", "entry_kind": "conversation",
+                "author": "Agent Builder", "subject": "date today",
+                "body": "What should the new agent handle?", "truncated": false}],
+                "token_count": 200, "omitted": 0});
+            let outputs = BTreeMap::from([(step("context"), history.clone())]);
+            let inputs = bundle
+                .prepare_step_inputs(&step("draft"), &context(&input, &params, &outputs))
+                .unwrap();
+            assert_eq!(
+                inputs.value()["context"]["untrusted_subject"],
+                subject,
+                "{fixture:?}"
+            );
+            assert_eq!(inputs.value()["context"]["untrusted_history"], history);
+            assert_eq!(
+                inputs.value()["context"]["untrusted_message"],
+                input["message"]
+            );
+        }
+    }
 }
 
 #[test]

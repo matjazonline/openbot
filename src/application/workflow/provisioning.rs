@@ -15,6 +15,7 @@ use crate::application::workflow::publication::{
     ActionEffect, ActionRecovery, ApprovedActionPolicy, ToolSnapshot,
 };
 use crate::application::workflow::registry::ToolContract;
+use crate::application::workflow::templates::{AgentWorkflow, CustomStep, MAX_CUSTOM_STEPS};
 use crate::application::workflow::tools::tool_error;
 use crate::domain::workflow::{CompanyId, TypeName};
 use async_trait::async_trait;
@@ -29,6 +30,12 @@ pub const PROVISIONING: &str = "provisioning";
 pub const PROVISIONING_FORBIDDEN: &str = "workflow.provisioning_forbidden";
 pub const PROVISIONING_CONFLICT: &str = "workflow.provisioning_conflict";
 pub const PROVISIONING_INVALID: &str = "workflow.invalid_input";
+
+/// The step types the Agent Builder may add to a new agent's workflow: model-only or pure steps,
+/// which need no connection, parameter or outbound destination. Any other step is added in the
+/// workflow editor.
+pub const BUILDER_STEP_TYPES: [&str; 4] =
+    ["ai.classify", "decision.agent", "decision.rule", "data.map"];
 
 /// The most agents `list_company_agents` returns, by slug.
 pub const MAX_LISTED_AGENTS: usize = 200;
@@ -151,7 +158,23 @@ pub fn provisioning_tool_schemas(kind: ProvisioningKind) -> (Value, Value) {
                 "tools": {"type": "array", "maxItems": 32,
                     "items": {"type": "string", "minLength": 1, "maxLength": 128}},
                 "skills": {"type": "array", "maxItems": 16,
-                    "items": {"type": "string", "minLength": 1, "maxLength": 128}}
+                    "items": {"type": "string", "minLength": 1, "maxLength": 128}},
+                "steps": {"type": "array", "maxItems": MAX_CUSTOM_STEPS,
+                    "description": "Optional workflow steps added to the base, which reads the thread history, runs the new agent and sends its reply. A before_draft step's output reaches the agent as untrusted_<id>. Routes name only $next or $end and default to {success: $next}.",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "string", "minLength": 1, "maxLength": 64,
+                                "pattern": "^[A-Za-z_][A-Za-z0-9_-]*$"},
+                            "slot": {"enum": ["before_draft", "before_reply", "after_reply"]},
+                            "type": {"enum": BUILDER_STEP_TYPES},
+                            "with": {"type": "object"},
+                            "rule": {"type": "object"},
+                            "routes": {"type": "object"}
+                        },
+                        "required": ["id", "slot", "type", "with"],
+                        "additionalProperties": false
+                    }}
             },
             "required": ["name", "slug", "system_prompt", "provider", "model", "reply_mode"],
             "additionalProperties": false
@@ -230,6 +253,13 @@ impl ReplyMode {
             Self::Reviewed => "reviewed",
         }
     }
+    /// The agent workflow behind this mode, before any custom step.
+    pub fn agent_workflow(self) -> AgentWorkflow {
+        match self {
+            Self::Autonomous => AgentWorkflow::base(),
+            Self::Reviewed => AgentWorkflow::base().reviewed(),
+        }
+    }
 }
 
 /// `create_agent_channel` arguments, already valid against the input schema.
@@ -252,6 +282,9 @@ pub struct CreateAgentChannel {
     pub tools: Vec<String>,
     #[serde(default)]
     pub skills: Vec<String>,
+    /// Added to the reply mode's workflow, in their slots.
+    #[serde(default)]
+    pub steps: Vec<CustomStep>,
 }
 impl CreateAgentChannel {
     pub fn parse(arguments: &Value) -> AppResult<Self> {

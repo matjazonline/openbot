@@ -329,8 +329,8 @@ The tests use those same paths, so later runtime/handler tests can reuse and ext
 
 | Source under `src/application/workflow/fixtures/` | Demonstrated contract |
 | --- | --- |
-| `reviewed-support.yaml` | Draft → human review → reply using human-edited data; rejection ends without reply |
-| `autonomous-response.yaml` | Agent → reply, no classifier; the captured agent's saved tools and skills include a tool and a skill |
+| `reviewed-support.yaml` | The agent base with a human review before the reply, which sends the human-edited data; rejection ends without reply. A copy of what `AgentWorkflow::reviewed` composes |
+| `autonomous-response.yaml` | The agent base: thread history → agent → reply, no classifier; the captured agent's saved tools and skills include a tool and a skill |
 | `triage-routing.yaml` | Finite classifier → ordered support/sales rule cases with required default |
 | `repeated-human-revision.yaml` | Three-round bounded child pin → accepted reply or escalation |
 | `human-revision-round.yaml` | Draft with prior body/feedback → human accept/revise with required revision feedback |

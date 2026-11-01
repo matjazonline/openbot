@@ -21,6 +21,14 @@ pub struct LocatedNode {
     pub span: SourceSpan,
 }
 
+/// A workflow source as ordered data, for a [`super::SourceEncoder`] to write as text. Mappings
+/// keep their order, so a composed source reads in step order.
+#[derive(Debug, Clone, PartialEq)]
+pub enum SourceNode {
+    Value(Value),
+    Mapping(Vec<(String, SourceNode)>),
+}
+
 #[derive(Debug, Clone)]
 pub struct DecodedSource {
     pub(crate) source: String,

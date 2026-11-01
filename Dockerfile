@@ -16,7 +16,7 @@ COPY src ./src
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/app/target \
     cargo build --release --locked \
-    && cp target/release/mail_agents /app/mail_agents
+    && cp target/release/open_bots /app/open_bots
 
 # ---- runtime ----
 FROM debian:bookworm-slim
@@ -28,12 +28,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
     && useradd --system --gid mailagents --home-dir /app --shell /usr/sbin/nologin mailagents
 
 WORKDIR /app
-COPY --from=builder /app/mail_agents /app/mail_agents
-RUN chown mailagents:mailagents /app/mail_agents
+COPY --from=builder /app/open_bots /app/open_bots
+RUN chown mailagents:mailagents /app/open_bots
 
 # 3001 = axum HTTP, 2525 = inbound SMTP listener
 EXPOSE 3001 2525
 
 USER mailagents
 
-CMD ["/app/mail_agents"]
+CMD ["/app/open_bots"]

@@ -308,7 +308,7 @@ mod tests {
         let output = Arc::new(Mutex::new(Vec::new()));
         let subscriber = tracing_subscriber::registry()
             .with(tracing_subscriber::EnvFilter::new(
-                "mail_agents=info,tower_http=info,sqlx=warn",
+                "open_bots=info,tower_http=info,sqlx=warn",
             ))
             .with(
                 tracing_subscriber::fmt::layer()

@@ -18,7 +18,9 @@ use crate::application::use_cases::agent::{AgentWrite, model_allowed};
 use crate::application::use_cases::channel::ChannelWrite;
 use crate::application::workflow::actions::*;
 use crate::application::workflow::binding::{ResourceReadiness, ResourceStatus};
-use crate::application::workflow::compiler::{SourceDecoder, rebase_workflow_id, retarget_agent};
+use crate::application::workflow::compiler::{
+    SourceDecoder, SourceEncoder, rebase_workflow_id, retarget_agent,
+};
 use crate::application::workflow::provisioning::*;
 use crate::entities::creation::CreationProvenance;
 use serde_json::{Value, json};
@@ -189,6 +191,7 @@ impl SqlLocalAction for ProvisioningEffects {
                         .clone()
                         .unwrap_or_else(|| spec.name.clone()),
                     reply_mode: spec.reply_mode,
+                    steps: spec.steps.clone(),
                     key: ProvisioningKey::invocation(subject.invocation.as_uuid()),
                 };
                 Ok(
@@ -436,6 +439,8 @@ pub(crate) struct Provisioning {
     pub channel_slug: String,
     pub channel_name: String,
     pub reply_mode: ReplyMode,
+    /// What the workflow adds to its reply mode's steps.
+    pub steps: Vec<CustomStep>,
     pub key: ProvisioningKey,
 }
 
@@ -616,7 +621,8 @@ async fn provision_on(
     .await?;
     write_channel_email_binding(tx, company.as_uuid(), channel_id, &channel).await?;
 
-    // 4. The workflow, published from the reply-mode template.
+    // 4. The workflow: the reply mode's steps on the agent base, plus the spec's own, published
+    // as a copy of the reply-mode template.
     let workflow = WorkflowId::new(key.id("workflow"));
     let version = VersionId::new(key.id("version"));
     let decoder = crate::adapters::workflow_source::WorkflowSourceDecoder;
@@ -628,7 +634,13 @@ async fn provision_on(
         .catalogue
         .template(template_id)
         .ok_or_else(|| AppError::Internal(format!("Template {template_id} is not shipped")))?;
-    let source = retarget_agent(&decoder, template.source(), REPLY_AGENT_STEP, &agent_slug)
+    let source = provisioning
+        .reply_mode
+        .agent_workflow()
+        .with_steps(provisioning.steps.clone())
+        .compose(&decoder, AGENT_BASE_SOURCE)
+        .and_then(|source| decoder.encode(&source))
+        .and_then(|source| retarget_agent(&decoder, &source, REPLY_AGENT_STEP, &agent_slug))
         .and_then(|source| rebase_workflow_id(&decoder, &source, workflow));
     let source = match source {
         Ok(source) => source,
@@ -955,6 +967,7 @@ impl AssistantChannels for AssistantChannelService {
             channel_slug: request.channel_slug,
             channel_name: request.channel_name,
             reply_mode: request.reply_mode,
+            steps: vec![],
             key: ProvisioningKey::command(company, &request.command_key),
         };
         let provisioned = match provision_guarded(&mut tx, &self.templates, &provisioning).await? {

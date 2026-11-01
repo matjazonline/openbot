@@ -303,7 +303,7 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
 }
 
 const DEFAULT_LOG_FILTER: &str =
-    "mail_agents=info,tower_http=info,monitoring::counter=info,monitoring::gauge=info";
+    "open_bots=info,tower_http=info,monitoring::counter=info,monitoring::gauge=info";
 
 pub fn init_tracing() {
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| DEFAULT_LOG_FILTER.into());

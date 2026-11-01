@@ -212,9 +212,9 @@ Reuse `truncate_memory_text` (`memory.rs:41`) for every text bound rather than h
 both databases are recreated because the file's checksum changes.
 
 ```sh
-dropdb --if-exists mail_agents      && createdb mail_agents
-dropdb --if-exists mail_agents_test && createdb mail_agents_test
-DATABASE_URL="postgres://mac03@localhost:5432/mail_agents" sqlx migrate run
+dropdb --if-exists open_bots      && createdb open_bots
+dropdb --if-exists open_bots_test && createdb open_bots_test
+DATABASE_URL="postgres://mac03@localhost:5432/open_bots" sqlx migrate run
 ```
 
 `src/adapters/persistence/AGENTS.md` §1 describes additive migrations instead; the reset workflow in
@@ -269,7 +269,7 @@ From `src/adapters/persistence/AGENTS.md`, and these have all cost real debuggin
   pre-existing.
 
 ```sh
-DATABASE_URL="postgres://mac03@localhost:5432/mail_agents" cargo test --lib   # lands on _test
+DATABASE_URL="postgres://mac03@localhost:5432/open_bots" cargo test --lib   # lands on _test
 ```
 
 ---
@@ -279,14 +279,14 @@ DATABASE_URL="postgres://mac03@localhost:5432/mail_agents" cargo test --lib   # 
 ```sh
 cargo fmt --check
 
-dropdb --if-exists mail_agents      && createdb mail_agents
-dropdb --if-exists mail_agents_test && createdb mail_agents_test
-DATABASE_URL="postgres://mac03@localhost:5432/mail_agents" sqlx migrate run
-psql "postgres://mac03@localhost:5432/mail_agents" -c '\d memory_documents' -c '\d memory_document_jobs'
+dropdb --if-exists open_bots      && createdb open_bots
+dropdb --if-exists open_bots_test && createdb open_bots_test
+DATABASE_URL="postgres://mac03@localhost:5432/open_bots" sqlx migrate run
+psql "postgres://mac03@localhost:5432/open_bots" -c '\d memory_documents' -c '\d memory_document_jobs'
 
 # agent.rs `delete` becomes a transaction and is a compile-time macro query, so the cache moves.
-DATABASE_URL="postgres://mac03@localhost:5432/mail_agents" cargo sqlx prepare -- --all-targets
-DATABASE_URL="postgres://mac03@localhost:5432/mail_agents" cargo test
+DATABASE_URL="postgres://mac03@localhost:5432/open_bots" cargo sqlx prepare -- --all-targets
+DATABASE_URL="postgres://mac03@localhost:5432/open_bots" cargo test
 SQLX_OFFLINE=true cargo build          # the offline path CI and Fly.io use
 ./scripts/stack-budget.sh              # the worker gains a third async chain
 ```

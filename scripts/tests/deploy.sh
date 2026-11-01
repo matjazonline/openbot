@@ -50,7 +50,7 @@ fi
 : >"$FLY_TEST_LOG"
 export FLY_APP_EXISTS=0
 export FLY_SECRET_JSON='[{"Name":"DATABASE_URL"},{"Name":"JWT_SECRET"},{"Name":"CREDENTIAL_ENCRYPTION_KEYS"},{"Name":"CREDENTIAL_ENCRYPTION_ACTIVE_VERSION"}]'
-printf 'postgres://mail_agents:password@db/mail_agents\nrelay-user\nrelay-password\n' | \
+printf 'postgres://open_bots:password@db/open_bots\nrelay-user\nrelay-password\n' | \
   "$ROOT_DIR/scripts/deploy.sh" --bootstrap app >"$TEST_DIR/bootstrap.out" 2>&1
 grep -q 'CREDENTIAL_ENCRYPTION_KEYS=<redacted>' "$FLY_TEST_LOG"
 grep -q 'CREDENTIAL_ENCRYPTION_ACTIVE_VERSION=1' "$FLY_TEST_LOG"

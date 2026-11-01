@@ -24,8 +24,8 @@ reproducible, and revoke credentials previously exposed during development.
   already prevents a healthy startup.
 - `CREDENTIAL_ENCRYPTION_ACTIVE_VERSION` selects the write key independently of the highest readable
   version, and startup rejects an active version absent from the ring.
-- Rotation no longer runs at process boot. `mail_agents credentials status` and
-  `mail_agents credentials rotate` are explicit subcommands; rotation scans in keyset-cursored
+- Rotation no longer runs at process boot. `open_bots credentials status` and
+  `open_bots credentials rotate` are explicit subcommands; rotation scans in keyset-cursored
   batches under a PostgreSQL advisory lock, updates compare-and-swap, and emits a JSON convergence
   report.
 - AES-256-GCM uses a random 96-bit nonce and records a key version in the stored string.

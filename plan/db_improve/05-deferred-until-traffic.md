@@ -268,7 +268,7 @@ SUMMARY OFF` wherever `ANALYZE` was used. Captured 2026-09-11.
 
 ### Shape check against an empty database
 
-`mail_agents_schema_audit`, built from the migration (before: `HEAD`; after: the edited file), no
+`open_bots_schema_audit`, built from the migration (before: `HEAD`; after: the edited file), no
 `ANALYZE`. Custom and generic plans were identical in both, so one of each is shown.
 
 Before:
@@ -339,7 +339,7 @@ with no rows; with data it probes `background_tasks_pkey`, below.)
 
 ### Shape check against a synthetic seed
 
-`mail_agents_claim_seed`, built from the same migration, then seeded with triggers and foreign keys
+`open_bots_claim_seed`, built from the same migration, then seeded with triggers and foreign keys
 off (`session_replication_role = replica`), then `ANALYZE`d. **Not representative of production.**
 It exists to count rows and buffers per plan node. Distribution: one company with 20,000 due agent
 tasks spread over an hour, plus 1,000 not yet due; 59 companies with one to three due tasks each,
@@ -442,7 +442,7 @@ Neither can commit unless the release has cleared every task the principal owned
 demotion violates it just as the delete does.
 
 **Environment for every capture in this section.** Local Homebrew PostgreSQL 16.14; CI and
-production run 18.6 (see "Verification Gaps"). `mail_agents_schema_audit`, built from
+production run 18.6 (see "Verification Gaps"). `open_bots_schema_audit`, built from
 `migrations/20260817000000_init_schema.sql` — never from the development database, which has
 drifted. `COSTS OFF`; no timing was taken anywhere. Captured 2026-09-12. **These are shape checks,
 not measurements.**
@@ -494,7 +494,7 @@ cannot prove the partial index applies. This is the same fact as §6.2 below, on
 
 #### The statement shape, seeded
 
-`mail_agents_schema_audit`, seeded with triggers and foreign keys off
+`open_bots_schema_audit`, seeded with triggers and foreign keys off
 (`session_replication_role = replica`) and then `ANALYZE`d: 20,000 `background_tasks` rows in one
 company, 5,000 `task_attempts`. **Not representative of production** — it exists to show which join
 shapes the planner reaches for at two selectivities, nothing more.

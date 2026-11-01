@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Measure the shipped run-list and run-board statements on temporary tables with the migrated columns and indexes.
 
-Usage: python3 scripts/tests/run-list-query-plan.py postgres:///mail_agents_test [--shapes FILE] [--out FILE]
+Usage: python3 scripts/tests/run-list-query-plan.py postgres:///open_bots_test [--shapes FILE] [--out FILE]
            [--board-out FILE]
 
 The statements come from the code, not from a copy: without --shapes the script runs

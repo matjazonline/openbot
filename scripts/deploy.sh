@@ -65,7 +65,7 @@ bootstrap_db() {
   fly volumes create pgdata --app openbots-db --region "$region" --size 5 --yes
 
   echo "==> Setting POSTGRES_PASSWORD"
-  read -rsp "Postgres password for mail_agents (leave empty to generate one): " PG_PASSWORD
+  read -rsp "Postgres password for open_bots (leave empty to generate one): " PG_PASSWORD
   echo
   if [[ -z "$PG_PASSWORD" ]]; then
     PG_PASSWORD="$(openssl rand -base64 32)"
@@ -89,10 +89,10 @@ bootstrap_app() {
 
   local database_url
   if [[ -n "$PG_PASSWORD" ]]; then
-    database_url="postgres://mail_agents:${PG_PASSWORD}@openbots-db.internal:5432/mail_agents"
+    database_url="postgres://open_bots:${PG_PASSWORD}@openbots-db.internal:5432/open_bots"
     echo "==> Building DATABASE_URL from the POSTGRES_PASSWORD just set on openbots-db"
   else
-    read -rp "DATABASE_URL (postgres://mail_agents:<POSTGRES_PASSWORD>@openbots-db.internal:5432/mail_agents): " database_url
+    read -rp "DATABASE_URL (postgres://open_bots:<POSTGRES_PASSWORD>@openbots-db.internal:5432/open_bots): " database_url
   fi
 
   echo "==> Generating JWT_SECRET"
@@ -160,7 +160,7 @@ deploy_app() {
   echo "==> Verifying .sqlx/ is up to date (offline build check)"
   (cd "$ROOT_DIR" && env -u DATABASE_URL SQLX_OFFLINE=true cargo check --locked) || {
     echo "Offline build check failed. Regenerate .sqlx/ and commit it:" >&2
-    echo "  DATABASE_URL=\"postgres://\$(whoami)@localhost:5432/mail_agents\" cargo sqlx prepare -- --all-targets" >&2
+    echo "  DATABASE_URL=\"postgres://\$(whoami)@localhost:5432/open_bots\" cargo sqlx prepare -- --all-targets" >&2
     exit 1
   }
 

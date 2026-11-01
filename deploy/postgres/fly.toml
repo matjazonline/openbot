@@ -17,8 +17,8 @@ primary_region = "fra"
   # run in a non-empty directory (the volume ships with lost+found), so PGDATA
   # points at a subdirectory the entrypoint creates itself.
   PGDATA = "/var/lib/postgresql/data/pgdata"
-  POSTGRES_USER = "mail_agents"
-  POSTGRES_DB = "mail_agents"
+  POSTGRES_USER = "open_bots"
+  POSTGRES_DB = "open_bots"
   # POSTGRES_PASSWORD is set via `fly secrets set` — never here.
 
 [mounts]

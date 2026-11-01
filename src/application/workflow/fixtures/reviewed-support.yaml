@@ -1,3 +1,5 @@
+# The agent base with a review gate before the reply, as `AgentWorkflow::reviewed` composes it.
+# The catalogue ships the composed source; the templates tests keep this copy equal to it.
 format_version: 1
 workflow_id: 00000000-0000-0000-0000-000000000001
 input_schema:
@@ -17,13 +19,22 @@ parameter_schema:
   additionalProperties: false
 output_schema: true
 resources: []
-entry: draft
+entry: context
 steps:
+  context:
+    type: context.history
+    with:
+      max_tokens: {literal: 8000}
+    routes: {success: draft}
   draft:
     type: agent.run
     with:
       agent: {literal: assistant}
-      context: {object: {untrusted_message: {ref: /input/message}}}
+      context:
+        object:
+          untrusted_message: {ref: /input/message}
+          untrusted_subject: {default: {ref: /input/subject, value: {literal: ""}}}
+          untrusted_history: {ref: /steps/context/output}
       output_schema:
         literal:
           type: object

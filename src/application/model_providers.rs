@@ -15,6 +15,7 @@ pub fn preset_models(provider: &str) -> &'static [&'static str] {
     match provider {
         "google" => &["gemini-3.6-flash", "gemini-3.7-flash"],
         "openai" => &["gpt-5.6-sol", "gpt-5.6-terra"],
+        "anthropic" => &["claude-opus-5-5", "claude-sonnet-5-5"],
         "xai" => &["grok-4.6"],
         _ => &[],
     }
@@ -24,7 +25,7 @@ pub fn preset_models(provider: &str) -> &'static [&'static str] {
 pub fn default_model_for(provider: &str) -> &'static str {
     match provider {
         "openai" => "gpt-4o",
-        "anthropic" => "claude-3-5-sonnet-20241022",
+        "anthropic" => "claude-sonnet-5-5",
         "groq" => "llama-3.3-70b-versatile",
         "xai" => "grok-4.6",
         // Unsupported providers are rejected before execution. Keep Google's historical default
@@ -42,5 +43,15 @@ mod tests {
         assert!(is_supported_model_provider("xai"));
         assert_eq!(preset_models("xai"), ["grok-4.6"]);
         assert_eq!(default_model_for("xai"), "grok-4.6");
+    }
+
+    #[test]
+    fn anthropic_offers_the_latest_opus_and_sonnet_and_defaults_to_a_preset() {
+        assert!(is_supported_model_provider("anthropic"));
+        assert_eq!(
+            preset_models("anthropic"),
+            ["claude-opus-5-5", "claude-sonnet-5-5"]
+        );
+        assert!(preset_models("anthropic").contains(&default_model_for("anthropic")));
     }
 }

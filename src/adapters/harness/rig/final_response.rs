@@ -28,22 +28,23 @@ pub(super) fn repair_reservation(
     }))
 }
 
-/// `base` is the owner's rendered instructions; the final-answer contract and repair
-/// suffix are shared so every binding asks for the same validated candidate.
-pub(super) fn response_preamble(
-    checkpoint: &RunCheckpoint,
-    mut preamble: String,
-    repair: Option<&RepairReservation>,
-) -> AppResult<String> {
+/// `base` is the owner's rendered instructions; the final-answer contract is shared so every
+/// binding asks for the same validated candidate. A repair leaves it unchanged.
+pub(super) fn response_preamble(checkpoint: &RunCheckpoint, mut preamble: String) -> String {
     if let Some(contract) = &checkpoint.identity.response_contract {
         preamble.push_str("\nFinal answer: return exactly one JSON value conforming to this Draft 2020-12 schema. No prose or code fences. Apply this only to the final answer, after tools finish.\n");
         preamble.push_str(&contract.schema().to_string());
     }
-    if let Some(repair) = repair {
-        preamble.push_str("\nReplace the invalid final answer with a complete JSON answer. Tools are disabled. Validation reason: ");
-        preamble.push_str(repair.reason.code());
-    }
-    Ok(preamble)
+    preamble
+}
+
+/// The user turn that answers an invalid final candidate. A repair request must end on it:
+/// providers read a trailing assistant turn as a prefill, which current models reject.
+pub(super) fn repair_prompt(reason: InvalidResponse) -> String {
+    format!(
+        "Replace the invalid final answer with a complete JSON answer. Tools are disabled. Validation reason: {}",
+        reason.code()
+    )
 }
 
 pub(super) fn assess_candidate(
@@ -93,7 +94,7 @@ pub(super) fn assess_candidate(
     Ok(())
 }
 
-fn candidate_replay(text: &str) -> AppResult<serde_json::Value> {
+pub(super) fn candidate_replay(text: &str) -> AppResult<serde_json::Value> {
     serde_json::to_value(AssistantReplay {
         message_id: None,
         response_id: None,

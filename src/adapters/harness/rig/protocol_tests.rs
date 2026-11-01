@@ -101,6 +101,105 @@ async fn every_supported_provider_replays_call_and_item_ids_from_application_jso
     }
 }
 
+/// A repair request ends on its instruction, never on the invalid candidate: providers read a
+/// trailing assistant turn as a prefill, which current models reject. Each earlier candidate
+/// keeps the instruction it was answered with.
+#[tokio::test]
+async fn every_supported_provider_receives_a_repair_as_a_trailing_user_turn() {
+    use super::super::final_response::{candidate_replay, repair_prompt};
+    use crate::services::response_contract::InvalidResponse::{MalformedJson, SchemaMismatch};
+    let registry = ProviderRegistry::standard().unwrap();
+    for provider in KEYS {
+        let mut saved = RunCheckpoint::new(
+            RunIdentity {
+                response_contract: Some(
+                    serde_json::from_value(
+                        json!({"version":1,"format":"json_schema","schema":{"type":"object"}}),
+                    )
+                    .unwrap(),
+                ),
+                company_id: Uuid::new_v4(),
+                task_id: Uuid::new_v4(),
+                agent_id: Uuid::new_v4(),
+                harness: HarnessKind::Rig,
+                provider: provider.into(),
+                model: "fixture".into(),
+                capability_fingerprint: "c".repeat(64),
+            },
+            "Answer in JSON".into(),
+            RigExecutionPolicy::default(),
+        )
+        .unwrap();
+        let mut previous: Option<SavedModelTurn> = None;
+        for reason in [MalformedJson, SchemaMismatch] {
+            let budget = ModelReservation {
+                repair: previous.map(|turn| RepairReservation {
+                    candidate: turn.request_id,
+                    reason: turn.invalid_response.unwrap(),
+                }),
+                request_id: ModelRequestId(Uuid::new_v4()),
+                input_tokens: 100,
+                output_tokens: 100,
+            };
+            let candidate = SavedModelTurn {
+                token_usage_source: TokenUsageSource::Reported,
+                invalid_response: Some(reason),
+                request_id: budget.request_id,
+                text: "not json".into(),
+                calls: vec![],
+                continuation: vec![ContinuationBlock {
+                    schema_version: 1,
+                    provider: provider.into(),
+                    kind: "assistant_v1".into(),
+                    data: candidate_replay("not json").unwrap(),
+                }],
+                input_tokens: 10,
+                output_tokens: 10,
+            };
+            saved = saved.apply(Mutation::Reserve(budget)).unwrap().0;
+            saved = saved.apply(Mutation::Model(candidate.clone())).unwrap().0;
+            previous = Some(candidate);
+        }
+        let messages = history(&saved).unwrap();
+        assert_eq!(messages.len(), 5);
+        assert_eq!(messages[2], Message::user(repair_prompt(MalformedJson)));
+        assert_eq!(messages[4], Message::user(repair_prompt(SchemaMismatch)));
+
+        let llm = scripted_scenario(vec![ScriptedExchange::new(
+            move |request| {
+                check_request(request, provider, "tenant-key")?;
+                check_trailing_repair(&request.body, provider)
+            },
+            ScriptedResponse::json(response(provider, Reply::Text)),
+        )])
+        .await;
+        let model = model(&registry, provider, "tenant-key", &llm.base_url);
+        let response = model.completion(request(messages)).await;
+        assert_eq!(llm.finish().await, Ok(1), "provider: {provider}");
+        response.unwrap();
+    }
+}
+
+fn check_trailing_repair(body: &serde_json::Value, provider: &str) -> Result<(), &'static str> {
+    let turns = match provider {
+        "google" => &body["contents"],
+        "xai" => &body["input"],
+        _ => &body["messages"],
+    };
+    let last = turns
+        .as_array()
+        .and_then(|turns| turns.last())
+        .ok_or("turns")?;
+    if last["role"] != "user"
+        || !last
+            .to_string()
+            .contains("Validation reason: schema_mismatch")
+    {
+        return Err("the repair is not the trailing user turn");
+    }
+    Ok(())
+}
+
 fn check_replayed_result(body: &serde_json::Value, provider: &str) -> Result<(), &'static str> {
     let mut body = body.clone();
     let encoded = json!({"value":"record-value"}).to_string();

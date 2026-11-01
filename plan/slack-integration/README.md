@@ -141,12 +141,12 @@ Run the narrow unit/database tests named by that step, then run:
 ```sh
 cargo fmt --check
 git diff --check
-DATABASE_URL="postgres://$(whoami)@localhost:5432/mail_agents_test" cargo sqlx migrate run
-DATABASE_URL="postgres://$(whoami)@localhost:5432/mail_agents" cargo sqlx prepare --check -- --all-targets
+DATABASE_URL="postgres://$(whoami)@localhost:5432/open_bots_test" cargo sqlx migrate run
+DATABASE_URL="postgres://$(whoami)@localhost:5432/open_bots" cargo sqlx prepare --check -- --all-targets
 SQLX_OFFLINE=true cargo check --all-targets
-DATABASE_URL="postgres://$(whoami)@localhost:5432/mail_agents_test" cargo test --locked --all-targets
+DATABASE_URL="postgres://$(whoami)@localhost:5432/open_bots_test" cargo test --locked --all-targets
 cargo clippy --all-targets -- -D warnings
-DATABASE_URL="postgres://$(whoami)@localhost:5432/mail_agents_test" scripts/stack-budget.sh
+DATABASE_URL="postgres://$(whoami)@localhost:5432/open_bots_test" scripts/stack-budget.sh
 ```
 
 When a step changes SQL, run `cargo sqlx prepare -- --all-targets` first and commit the resulting

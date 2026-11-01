@@ -99,6 +99,11 @@ impl Execution<'_> {
                         crate::app_error::ExecutionFailure::IndeterminateEffect,
                     ));
                 }
+                if self.checkpoint.repeats_settled_calls() {
+                    return Err(AppError::Execution(
+                        crate::app_error::ExecutionFailure::RepeatedToolCall,
+                    ));
+                }
                 match self.binding.tool(&self.checkpoint, call).await? {
                     Progress::Continue(checkpoint) => self.checkpoint = checkpoint,
                     Progress::Suspend(checkpoint, wait) => {
@@ -161,8 +166,7 @@ impl Execution<'_> {
             preamble: Some(super::final_response::response_preamble(
                 &self.checkpoint,
                 self.binding.preamble(),
-                repair.as_ref(),
-            )?),
+            )),
             chat_history: super::protocol::history(&self.checkpoint)?,
             documents: vec![],
             tools: if repair.is_some() {

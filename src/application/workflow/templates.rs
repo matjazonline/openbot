@@ -1,7 +1,9 @@
 //! Immutable operator starter catalogue and authorized independent draft copies.
 //! No production distribution, draft storage, publication or resource grants.
+mod agent_workflow;
 mod catalogue;
 mod contracts;
+pub use agent_workflow::*;
 pub use catalogue::*;
 pub use contracts::*;
 
