@@ -64,6 +64,7 @@ pub(crate) fn model_connection_fields(fields: &ModelConnectionFields<'_>) -> Str
                     <option value="">Server default</option>
                     <option value="google"{google_selected}>google</option>
                     <option value="openai"{openai_selected}>openai</option>
+                    <option value="anthropic"{anthropic_selected}>anthropic</option>
                     <option value="xai"{xai_selected}>xai</option>
                     <option value="__custom__"{custom_selected}>Custom…</option>
                 </select>
@@ -87,6 +88,7 @@ pub(crate) fn model_connection_fields(fields: &ModelConnectionFields<'_>) -> Str
         api_key_id = field_id("api-key"),
         google_selected = selected("google"),
         openai_selected = selected("openai"),
+        anthropic_selected = selected("anthropic"),
         xai_selected = selected("xai"),
         custom_selected = custom_selected,
         custom_hidden = custom_hidden,
@@ -123,6 +125,16 @@ mod tests {
         assert!(xai.contains(r#"value="xai" selected"#));
         assert!(xai.contains(r#"value="grok-4.6" selected"#));
         assert!(!xai.contains(r#"value="__custom__" selected"#));
+
+        let anthropic = model_connection_fields(&ModelConnectionFields {
+            agent_id_suffix: None,
+            provider: "anthropic",
+            model: "claude-sonnet-5-5",
+        });
+        assert!(anthropic.contains(r#"value="anthropic" selected"#));
+        assert!(anthropic.contains(r#"value="claude-opus-5-5""#));
+        assert!(anthropic.contains(r#"value="claude-sonnet-5-5" selected"#));
+        assert!(!anthropic.contains(r#"value="__custom__" selected"#));
 
         let custom = model_connection_fields(&ModelConnectionFields {
             agent_id_suffix: None,

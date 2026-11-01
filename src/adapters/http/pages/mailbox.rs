@@ -965,7 +965,7 @@ document.addEventListener('change', function (event) {
             var modelSelect = grid.querySelector('[data-model-select]');
             var modelInput = grid.querySelector('[data-model-input]');
             var custom = control.value === '__custom__';
-            var models = control.value === 'google' ? ['gemini-3.6-flash', 'gemini-3.7-flash'] : control.value === 'openai' ? ['gpt-5.6-sol', 'gpt-5.6-terra'] : control.value === 'xai' ? ['grok-4.6'] : [];
+            var models = control.value === 'google' ? ['gemini-3.6-flash', 'gemini-3.7-flash'] : control.value === 'openai' ? ['gpt-5.6-sol', 'gpt-5.6-terra'] : control.value === 'anthropic' ? ['claude-opus-5-5', 'claude-sonnet-5-5'] : control.value === 'xai' ? ['grok-4.6'] : [];
             providerInput.value = custom ? '' : control.value;
             providerInput.classList.toggle('hidden', !custom);
             modelSelect.replaceChildren(new Option(control.value ? 'Select model' : 'Select provider first', ''), ...models.map(function (model) { return new Option(model, model); }));
