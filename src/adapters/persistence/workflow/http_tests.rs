@@ -195,12 +195,12 @@ async fn workflow_http_current_revocation_and_protection_prevent_network() {
                 .unwrap();
             }
             _ => {
-                sqlx::query("DELETE FROM company_members WHERE company_id=$1 AND user_id=$2")
-                    .bind(company.as_uuid())
-                    .bind(actor.user_id())
-                    .execute(p.pool())
-                    .await
-                    .unwrap();
+                crate::adapters::persistence::test_support::revoke_membership_now(
+                    p.pool(),
+                    company.as_uuid(),
+                    actor.user_id(),
+                )
+                .await;
             }
         }
         let failure = runtime(&setup)
@@ -395,18 +395,13 @@ async fn workflow_http_foreign_credential_fk_and_nonadmin_authority_fail_closed(
         .await
         .is_err()
     );
-    sqlx::query("UPDATE companies SET user_id=$2 WHERE id=$1")
-        .bind(setup.fixture.target.company.as_uuid())
-        .bind(foreign.target.actor.user_id())
-        .execute(p.pool())
-        .await
-        .unwrap();
-    sqlx::query("UPDATE company_members SET role='member' WHERE company_id=$1 AND user_id=$2")
-        .bind(setup.fixture.target.company.as_uuid())
-        .bind(setup.fixture.target.actor.user_id())
-        .execute(p.pool())
-        .await
-        .unwrap();
+    crate::adapters::persistence::test_support::transfer_company_ownership(
+        p.pool(),
+        setup.fixture.target.company.as_uuid(),
+        foreign.target.actor.user_id(),
+        crate::entities::company_member::CompanyAccessRole::Member,
+    )
+    .await;
     assert!(
         p.set_http_enabled(
             setup.fixture.target.company,

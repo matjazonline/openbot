@@ -221,18 +221,13 @@ async fn jev_assets_current_actor_channel_visibility_and_missing_file() {
         Err(JevAssetError::Missing)
     ));
     let other = Fixture::in_database(f._db.clone(), "newowner").await;
-    sqlx::query("UPDATE companies SET user_id=$2 WHERE id=$1")
-        .bind(f.target.company.as_uuid())
-        .bind(other.target.actor.user_id())
-        .execute(f.persistence.pool())
-        .await
-        .unwrap();
-    sqlx::query("UPDATE company_members SET role='admin' WHERE company_id=$1 AND user_id=$2")
-        .bind(f.target.company.as_uuid())
-        .bind(f.target.actor.user_id())
-        .execute(f.persistence.pool())
-        .await
-        .unwrap();
+    crate::adapters::persistence::test_support::transfer_company_ownership(
+        f.persistence.pool(),
+        f.target.company.as_uuid(),
+        other.target.actor.user_id(),
+        crate::entities::company_member::CompanyAccessRole::Admin,
+    )
+    .await;
     sqlx::query("UPDATE channels SET access_mode='allowlist' WHERE company_id=$1 AND id=$2")
         .bind(f.target.company.as_uuid())
         .bind(

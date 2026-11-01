@@ -4,7 +4,7 @@ use serde::Serialize;
 use uuid::Uuid;
 
 use crate::{
-    adapters::persistence::PostgresPersistence,
+    adapters::persistence::{PostgresPersistence, account_identity::rekey_account_identity_on},
     app_error::{AppError, AppResult},
     entities::{
         notification::NotificationPreferences,
@@ -307,11 +307,18 @@ impl UserPersistence for PostgresPersistence {
         Ok(result.map(Into::into))
     }
 
+    /// Writes the profile, address included, without proving the address first (the unverified
+    /// bypass). A changed address re-keys the account's identity in every company in the same
+    /// transaction, exactly as a confirmed change does.
     async fn update_profile(
         &self,
         id: Uuid,
         profile: ProfileUpdate<'_>,
     ) -> AppResult<Option<User>> {
+        let mut transaction = self.pool.begin().await.map_err(AppError::from)?;
+        let Some(previous_email) = locked_account_email(&mut transaction, id).await? else {
+            return Ok(None);
+        };
         let result = sqlx::query_as!(
             UserDb,
             r#"UPDATE users
@@ -325,9 +332,14 @@ impl UserPersistence for PostgresPersistence {
             profile.email.as_str(),
             profile.avatar_url.map(AvatarUrl::as_str)
         )
-        .fetch_optional(&self.pool)
+        .fetch_optional(&mut *transaction)
         .await
         .map_err(|err| taken_identity_error(err, &profile))?;
+        if let Some(updated) = &result {
+            rekey_account_identity_on(&mut transaction, id, &previous_email, &updated.email)
+                .await?;
+        }
+        transaction.commit().await.map_err(AppError::from)?;
 
         Ok(result.map(Into::into))
     }
@@ -718,7 +730,12 @@ impl AccountChangePersistence for PostgresPersistence {
 
         let updated = match kind {
             AccountChangeKind::Email => {
-                sqlx::query_as!(
+                let Some(previous_email) = locked_account_email(&mut transaction, user_id).await?
+                else {
+                    transaction.commit().await.map_err(AppError::from)?;
+                    return Ok(None);
+                };
+                let updated = sqlx::query_as!(
                     UserDb,
                     r#"UPDATE users SET email = $2, email_verified_at = CURRENT_TIMESTAMP WHERE id = $1
                        RETURNING id, username, email, password_hash, avatar_url, email_verified_at, auth_revision, created_at as "created_at!""#,
@@ -727,7 +744,17 @@ impl AccountChangePersistence for PostgresPersistence {
                 )
                 .fetch_optional(&mut *transaction)
                 .await
-                .map_err(|err| taken_address_error(err, claimed.new_email.as_deref()))?
+                .map_err(|err| taken_address_error(err, claimed.new_email.as_deref()))?;
+                if let Some(updated) = &updated {
+                    rekey_account_identity_on(
+                        &mut transaction,
+                        user_id,
+                        &previous_email,
+                        &updated.email,
+                    )
+                    .await?;
+                }
+                updated
             }
             AccountChangeKind::Password => {
                 let updated = sqlx::query_as!(
@@ -793,6 +820,22 @@ impl AccountChangePersistence for PostgresPersistence {
 
         Ok(())
     }
+}
+
+/// The account's current address, read under the row lock its address change will hold. Company
+/// creation and invite acceptance lock the same row before registering the address, so the re-key
+/// that follows sees every principal they made with the old one.
+async fn locked_account_email(
+    connection: &mut sqlx::PgConnection,
+    user_id: Uuid,
+) -> AppResult<Option<String>> {
+    sqlx::query_scalar!(
+        r#"SELECT email::text AS "email!" FROM users WHERE id = $1 FOR UPDATE"#,
+        user_id
+    )
+    .fetch_optional(&mut *connection)
+    .await
+    .map_err(AppError::from)
 }
 
 /// The address having been taken in the fifteen minutes since the code went out is the one thing

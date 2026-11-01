@@ -357,26 +357,61 @@ impl AgentPersistence for PostgresPersistence {
         update_agent(self, id, write).await
     }
 
+    /// Retire the agent: its principal becomes an outsider and keeps everything it wrote and took
+    /// part in, then the agent row goes. The database refuses a delete that would take history
+    /// with it, so this is the only way an agent that has spoken can be deleted.
     async fn delete(&self, id: Uuid) -> AppResult<()> {
-        sqlx::query!("DELETE FROM agents WHERE id = $1", id)
-            .execute(&self.pool)
+        let mut transaction = self.pool.begin().await.map_err(AppError::from)?;
+        // Locking the agent first means a concurrent `create_agent_principal_on` -- whose foreign
+        // key check needs a share lock on this row -- either committed before us, so its principal
+        // is demoted below, or waits and then fails against the deleted agent. It cannot slip a
+        // fresh agent principal in between the demotion and the delete.
+        let company_id: Option<Option<Uuid>> =
+            sqlx::query_scalar!("SELECT company_id FROM agents WHERE id = $1 FOR UPDATE", id)
+                .fetch_optional(&mut *transaction)
+                .await
+                .map_err(AppError::from)?;
+        let Some(company_id) = company_id else {
+            return Ok(());
+        };
+        // A library agent has no company and so no principal. Grants stay on the demoted
+        // principal, as `remove_member` leaves a removed member's: with no identity left, no
+        // inbound address can reach them.
+        if let Some(company_id) = company_id {
+            sqlx::query!(
+                r#"UPDATE principals
+                   SET kind = 'external', agent_id = NULL, updated_at = CURRENT_TIMESTAMP
+                   WHERE company_id = $1 AND agent_id = $2"#,
+                company_id,
+                id
+            )
+            .execute(&mut *transaction)
             .await
-            .map_err(|error| {
-                if error
-                    .as_database_error()
-                    .and_then(|db| db.code())
-                    .as_deref()
-                    .is_some_and(|code| code == "23503" || code == "23514")
-                {
-                    AppError::Conflict(
-                        "This agent is active on an enabled channel. Disable or reassign the channel before deleting it.".into(),
-                    )
-                } else {
-                    AppError::from(error)
-                }
-            })?;
+            .map_err(AppError::from)?;
+        }
+        sqlx::query!("DELETE FROM agents WHERE id = $1", id)
+            .execute(&mut *transaction)
+            .await
+            .map_err(agent_delete_error)?;
+        // Run history is held by deferred foreign keys, so it is refused here, at commit.
+        transaction.commit().await.map_err(agent_delete_error)?;
 
         Ok(())
+    }
+}
+
+/// Name what still holds an agent instead of reporting every refusal as one cause.
+fn agent_delete_error(error: sqlx::Error) -> AppError {
+    let constraint = error
+        .as_database_error()
+        .and_then(|database| database.constraint())
+        .map(str::to_owned);
+    match constraint.as_deref() {
+        Some(
+            "task_harness_runs_company_id_agent_id_fkey"
+            | "model_usage_calls_company_id_agent_id_fkey",
+        ) => AppError::Conflict("This agent has run history and cannot be deleted.".into()),
+        _ => AppError::from(error),
     }
 }
 
@@ -593,3 +628,7 @@ mod tests {
         let _ = CompanyPersistence::delete(&persistence, company.id).await;
     }
 }
+
+#[cfg(test)]
+#[path = "agent_retire_tests.rs"]
+mod retire_tests;

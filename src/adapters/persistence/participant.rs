@@ -187,22 +187,88 @@ async fn load_resolution(
     }))
 }
 
-pub(crate) async fn resolve_or_create_external_identity_on(
+/// Serialize every writer of one tenant-qualified identity: the outsider resolver, account
+/// registration and an account's address change all take this lock before reading the identity.
+pub(super) async fn lock_identity_key(
     connection: &mut sqlx::PgConnection,
     company_id: Uuid,
-    observation: IdentityObservation,
-) -> AppResult<IdentityResolution> {
+    identity: &QualifiedIdentity,
+) -> AppResult<()> {
     sqlx::query(
         r#"SELECT pg_advisory_xact_lock(hashtextextended(
                $1::text || ':' || $2 || ':' || $3 || ':' || $4, 0))"#,
     )
     .bind(company_id)
-    .bind(observation.identity.transport().as_str())
-    .bind(observation.identity.namespace().as_str())
-    .bind(observation.identity.subject().as_str())
+    .bind(identity.transport().as_str())
+    .bind(identity.namespace().as_str())
+    .bind(identity.subject().as_str())
     .execute(&mut *connection)
     .await
     .map_err(AppError::from)?;
+    Ok(())
+}
+
+/// An account's registered mailbox as the email identity it is known by in every company.
+pub(super) fn account_email_identity(email: &str) -> AppResult<QualifiedIdentity> {
+    EmailIdentity::parse(EmailAddress::from(email))
+        .map(EmailIdentity::qualify_default)
+        .map_err(|error| AppError::BadRequest(format!("Invalid account email: {error}")))
+}
+
+/// Attach `identity` to the account's person principal as its verified account identity.
+///
+/// When the identity was somebody else's -- an outsider's address the account has just taken --
+/// the messages sent from it move with it in the same statement: a message's author and its
+/// authored identity must name the same principal, and the address is what sent them.
+pub(super) async fn upsert_account_identity_on(
+    connection: &mut sqlx::PgConnection,
+    company_id: Uuid,
+    principal_id: PrincipalId,
+    identity: &QualifiedIdentity,
+    display_label: &str,
+) -> AppResult<()> {
+    let claims = serde_json::to_value(IdentityClaimMetadata::account())
+        .map_err(|error| AppError::Internal(error.to_string()))?;
+    sqlx::query(
+        r#"WITH account_identity AS (
+               INSERT INTO participant_identities
+                   (id, company_id, principal_id, transport, namespace, subject, display_label,
+                    status, claim_metadata, provenance)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, 'verified', $8, 'account')
+               ON CONFLICT (company_id, transport, namespace, subject) DO UPDATE SET
+                   principal_id = EXCLUDED.principal_id,
+                   display_label = EXCLUDED.display_label,
+                   status = 'verified', claim_metadata = EXCLUDED.claim_metadata,
+                   provenance = 'account', updated_at = CURRENT_TIMESTAMP
+               RETURNING id
+           )
+           UPDATE messages AS message
+           SET author_principal_id = $3
+           FROM account_identity
+           WHERE message.company_id = $2
+             AND message.authored_identity_id = account_identity.id
+             AND message.author_principal_id <> $3"#,
+    )
+    .bind(ParticipantIdentityId::random().as_uuid())
+    .bind(company_id)
+    .bind(principal_id.as_uuid())
+    .bind(identity.transport().as_str())
+    .bind(identity.namespace().as_str())
+    .bind(identity.subject().as_str())
+    .bind(display_label)
+    .bind(claims)
+    .execute(&mut *connection)
+    .await
+    .map_err(AppError::from)?;
+    Ok(())
+}
+
+pub(crate) async fn resolve_or_create_external_identity_on(
+    connection: &mut sqlx::PgConnection,
+    company_id: Uuid,
+    observation: IdentityObservation,
+) -> AppResult<IdentityResolution> {
+    lock_identity_key(connection, company_id, &observation.identity).await?;
 
     if let Some(existing) = load_resolution(connection, company_id, &observation.identity).await? {
         return Ok(existing);
@@ -264,20 +330,8 @@ pub(crate) async fn create_person_principal_on(
     display_label: &str,
     email: &str,
 ) -> AppResult<PrincipalId> {
-    let qualified = EmailIdentity::parse(EmailAddress::from(email))
-        .map(EmailIdentity::qualify_default)
-        .map_err(|error| AppError::BadRequest(format!("Invalid account email: {error}")))?;
-    sqlx::query(
-        r#"SELECT pg_advisory_xact_lock(hashtextextended(
-               $1::text || ':' || $2 || ':' || $3 || ':' || $4, 0))"#,
-    )
-    .bind(company_id)
-    .bind(qualified.transport().as_str())
-    .bind(qualified.namespace().as_str())
-    .bind(qualified.subject().as_str())
-    .execute(&mut *connection)
-    .await
-    .map_err(AppError::from)?;
+    let qualified = account_email_identity(email)?;
+    lock_identity_key(connection, company_id, &qualified).await?;
 
     let existing: Option<(Uuid, String, Option<Uuid>)> = sqlx::query_as(
         r#"SELECT principal.id, principal.kind, principal.user_id
@@ -341,29 +395,14 @@ pub(crate) async fn create_person_principal_on(
         }
     };
 
-    let claims = serde_json::to_value(IdentityClaimMetadata::account())
-        .map_err(|error| AppError::Internal(error.to_string()))?;
-    sqlx::query(
-        r#"INSERT INTO participant_identities
-               (id, company_id, principal_id, transport, namespace, subject, display_label,
-                status, claim_metadata, provenance)
-           VALUES ($1, $2, $3, 'email', $4, $5, $6, 'verified', $7, 'account')
-           ON CONFLICT (company_id, transport, namespace, subject) DO UPDATE SET
-               principal_id = EXCLUDED.principal_id,
-               display_label = EXCLUDED.display_label,
-               status = 'verified', claim_metadata = EXCLUDED.claim_metadata,
-               provenance = 'account', updated_at = CURRENT_TIMESTAMP"#,
+    upsert_account_identity_on(
+        connection,
+        company_id,
+        principal_id,
+        &qualified,
+        display_label,
     )
-    .bind(ParticipantIdentityId::random().as_uuid())
-    .bind(company_id)
-    .bind(principal_id.as_uuid())
-    .bind(qualified.namespace().as_str())
-    .bind(qualified.subject().as_str())
-    .bind(display_label)
-    .bind(claims)
-    .execute(&mut *connection)
-    .await
-    .map_err(AppError::from)?;
+    .await?;
     Ok(principal_id)
 }
 

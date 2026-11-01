@@ -54,12 +54,12 @@ async fn workflow_admit_sql_actor_revocation_blocks_new_replay_and_alias() {
         let f = AdmissionFixture::new().await;
         let command = delivery(&f, mode, f.request("original", f.manual())).await;
         let mut revoked = f.persistence().pool().begin().await.unwrap();
-        sqlx::query("DELETE FROM company_members WHERE company_id=$1 AND user_id=$2")
-            .bind(f.binding.target.company.as_uuid())
-            .bind(f.binding.target.actor.user_id())
-            .execute(&mut *revoked)
-            .await
-            .unwrap();
+        crate::adapters::persistence::test_support::revoke_membership(
+            &mut revoked,
+            f.binding.target.company.as_uuid(),
+            f.binding.target.actor.user_id(),
+        )
+        .await;
         rejected_after_commit(&f, &command, revoked).await;
     }
 }
@@ -80,18 +80,13 @@ async fn restrict_channel(f: &AdmissionFixture, c: &Conversation) -> Uuid {
         .await
         .unwrap()
         .unwrap();
-    sqlx::query("UPDATE companies SET user_id=$2 WHERE id=$1")
-        .bind(f.binding.target.company.as_uuid())
-        .bind(owner.id)
-        .execute(p.pool())
-        .await
-        .unwrap();
-    sqlx::query("UPDATE company_members SET role='admin' WHERE company_id=$1 AND user_id=$2")
-        .bind(f.binding.target.company.as_uuid())
-        .bind(f.binding.target.actor.user_id())
-        .execute(p.pool())
-        .await
-        .unwrap();
+    crate::adapters::persistence::test_support::transfer_company_ownership(
+        p.pool(),
+        f.binding.target.company.as_uuid(),
+        owner.id,
+        crate::entities::company_member::CompanyAccessRole::Admin,
+    )
+    .await;
     sqlx::query("UPDATE channels SET access_mode='allowlist' WHERE id=$1")
         .bind(c.channel)
         .execute(p.pool())

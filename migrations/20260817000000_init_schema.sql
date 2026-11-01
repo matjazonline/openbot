@@ -534,6 +534,49 @@ $$;
 
 
 --
+-- Name: enforce_company_owner_agreement(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+-- Ownership is two columns, companies.user_id and the owner role in company_members, enforced as
+-- one fact at commit: the member row of companies.user_id is that company's owner row. With
+-- company_members_one_owner_idx there is then exactly one owner row, and it is the owner's.
+CREATE FUNCTION public.enforce_company_owner_agreement() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    checked_companies UUID[];
+BEGIN
+    -- Separate branches, because an expression naming a column the firing table lacks (NEW.id on
+    -- company_members, OLD.company_id on companies) fails even where it would not be evaluated.
+    -- A member row moved to another company leaves both companies to check.
+    IF TG_TABLE_NAME = 'companies' THEN
+        checked_companies := ARRAY[NEW.id];
+    ELSIF TG_OP = 'DELETE' THEN
+        checked_companies := ARRAY[OLD.company_id];
+    ELSIF TG_OP = 'UPDATE' THEN
+        checked_companies := ARRAY[NEW.company_id, OLD.company_id];
+    ELSE
+        checked_companies := ARRAY[NEW.company_id];
+    END IF;
+    IF EXISTS (
+        SELECT 1 FROM companies AS company
+        WHERE company.id = ANY (checked_companies)
+          AND NOT EXISTS (
+              SELECT 1 FROM company_members AS member
+              WHERE member.company_id = company.id
+                AND member.user_id = company.user_id
+                AND member.role = 'owner'
+          )
+    ) THEN
+        RAISE EXCEPTION 'company owner must be the owner member of that company'
+            USING ERRCODE = '23514', CONSTRAINT = 'companies_owner_member_agreement';
+    END IF;
+    RETURN NULL;
+END;
+$$;
+
+
+--
 -- Name: enqueue_actionable_notification_event(uuid, text, uuid, text, uuid); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -8112,6 +8155,20 @@ CREATE TRIGGER binding_audit_events_append_only BEFORE DELETE OR UPDATE ON publi
 
 
 --
+-- Name: companies companies_owner_agreement; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE CONSTRAINT TRIGGER companies_owner_agreement AFTER INSERT OR UPDATE OF user_id ON public.companies DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.enforce_company_owner_agreement();
+
+
+--
+-- Name: company_members company_members_owner_agreement; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE CONSTRAINT TRIGGER company_members_owner_agreement AFTER INSERT OR DELETE OR UPDATE OF company_id, user_id, role ON public.company_members DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.enforce_company_owner_agreement();
+
+
+--
 -- Name: company_mcp_connections company_mcp_endpoint_immutable; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -9163,6 +9220,16 @@ ALTER TABLE ONLY public.companies
 
 
 --
+-- Name: companies companies_owner_member_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+-- The owner is also a member: companies.user_id always names a company_members row of the same
+-- company. Deferred, because company creation writes the company before its owner row.
+ALTER TABLE ONLY public.companies
+    ADD CONSTRAINT companies_owner_member_fk FOREIGN KEY (id, user_id) REFERENCES public.company_members(company_id, user_id) DEFERRABLE INITIALLY DEFERRED;
+
+
+--
 -- Name: company_invites company_invites_company_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -9438,8 +9505,12 @@ ALTER TABLE ONLY public.message_delivery_parts
 -- Name: message_participants message_participants_identity_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
+-- NO ACTION rather than CASCADE: removing an author, an address or an agent must never delete the
+-- history it took part in (agents are retired and members demoted instead). NO ACTION is checked at
+-- the end of the statement, so a company delete that removes both sides in one statement passes
+-- whatever order its cascades run in.
 ALTER TABLE ONLY public.message_participants
-    ADD CONSTRAINT message_participants_identity_fk FOREIGN KEY (company_id, participant_identity_id) REFERENCES public.participant_identities(company_id, id) ON DELETE CASCADE;
+    ADD CONSTRAINT message_participants_identity_fk FOREIGN KEY (company_id, participant_identity_id) REFERENCES public.participant_identities(company_id, id);
 
 
 --
@@ -9454,8 +9525,12 @@ ALTER TABLE ONLY public.message_participants
 -- Name: messages messages_author_principal_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
+-- NO ACTION rather than CASCADE: removing an author, an address or an agent must never delete the
+-- history it took part in (agents are retired and members demoted instead). NO ACTION is checked at
+-- the end of the statement, so a company delete that removes both sides in one statement passes
+-- whatever order its cascades run in.
 ALTER TABLE ONLY public.messages
-    ADD CONSTRAINT messages_author_principal_fk FOREIGN KEY (company_id, author_principal_id) REFERENCES public.principals(company_id, id) ON DELETE CASCADE;
+    ADD CONSTRAINT messages_author_principal_fk FOREIGN KEY (company_id, author_principal_id) REFERENCES public.principals(company_id, id);
 
 
 --
@@ -9574,8 +9649,12 @@ ALTER TABLE ONLY public.pending_account_changes
 -- Name: principals principals_company_agent_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
+-- NO ACTION rather than CASCADE: removing an author, an address or an agent must never delete the
+-- history it took part in (agents are retired and members demoted instead). NO ACTION is checked at
+-- the end of the statement, so a company delete that removes both sides in one statement passes
+-- whatever order its cascades run in.
 ALTER TABLE ONLY public.principals
-    ADD CONSTRAINT principals_company_agent_fk FOREIGN KEY (company_id, agent_id) REFERENCES public.agents(company_id, id) ON DELETE CASCADE;
+    ADD CONSTRAINT principals_company_agent_fk FOREIGN KEY (company_id, agent_id) REFERENCES public.agents(company_id, id);
 
 
 --

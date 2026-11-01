@@ -135,20 +135,29 @@ impl CompanyInvitePersistence for MockCompanyInvitePersistence {
             .collect())
     }
 
+    /// No test here invites an owner; the refusal is covered against Postgres in
+    /// `persistence/company_owner_tests.rs`.
+    async fn is_company_owner_address(&self, _company_id: Uuid, _email: &str) -> AppResult<bool> {
+        Ok(false)
+    }
+
     async fn update_invite(
         &self,
+        company_id: Uuid,
         id: Uuid,
         new_email: &str,
         role: CompanyAccessRole,
-    ) -> AppResult<CompanyInvite> {
+    ) -> AppResult<Option<CompanyInvite>> {
         let mut list = self.invites.lock().unwrap();
-        let invite = list
+        let Some(invite) = list
             .iter_mut()
-            .find(|i| i.id == id)
-            .ok_or_else(|| AppError::Internal("Not found".into()))?;
+            .find(|i| i.id == id && i.company_id == company_id && i.status == "pending")
+        else {
+            return Ok(None);
+        };
         invite.email = new_email.to_string();
         invite.role = role;
-        Ok(invite.clone())
+        Ok(Some(invite.clone()))
     }
 
     async fn delete_invite(&self, id: Uuid) -> AppResult<()> {

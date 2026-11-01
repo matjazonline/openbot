@@ -24,6 +24,22 @@ fn unverified_email_error() -> AppError {
     AppError::BadRequest("Verify your current email address before using invitations.".into())
 }
 
+fn not_pending_error() -> AppError {
+    AppError::BadRequest("Only a pending invitation can be changed.".into())
+}
+
+/// The address an invite is written to: trimmed and lower-cased, and refused as a form error when
+/// it is plainly not an address.
+fn invite_address(raw: &str) -> AppResult<String> {
+    let email = raw.trim().to_lowercase();
+    if email.is_empty() || !email.contains('@') {
+        return Err(AppError::BadRequest(
+            "Please provide a valid email address.".into(),
+        ));
+    }
+    Ok(email)
+}
+
 #[async_trait]
 pub trait CompanyInvitePersistence: Send + Sync {
     async fn create_invite(
@@ -34,12 +50,17 @@ pub trait CompanyInvitePersistence: Send + Sync {
     ) -> AppResult<CompanyInvite>;
     async fn get_invite_by_id(&self, id: Uuid) -> AppResult<Option<CompanyInvite>>;
     async fn list_invites_by_company(&self, company_id: Uuid) -> AppResult<Vec<CompanyInvite>>;
+    /// Whether `email` is the address of this company's owner.
+    async fn is_company_owner_address(&self, company_id: Uuid, email: &str) -> AppResult<bool>;
+    /// Rewrites the invite only while it is still pending and belongs to `company_id`; `None`
+    /// when it no longer is.
     async fn update_invite(
         &self,
+        company_id: Uuid,
         id: Uuid,
         new_email: &str,
         role: CompanyAccessRole,
-    ) -> AppResult<CompanyInvite>;
+    ) -> AppResult<Option<CompanyInvite>>;
     async fn delete_invite(&self, id: Uuid) -> AppResult<()>;
     async fn list_invites_for_user(
         &self,
@@ -90,6 +111,21 @@ impl CompanyInviteUseCases {
         Ok(())
     }
 
+    /// The owner already holds the company; an invite to their own address could only demote
+    /// them, so it is refused as a form error rather than written.
+    async fn refuse_owner_address(&self, company_id: Uuid, email: &str) -> AppResult<()> {
+        if self
+            .invite_persistence
+            .is_company_owner_address(company_id, email)
+            .await?
+        {
+            return Err(AppError::BadRequest(
+                "The company owner cannot be invited to their own company.".into(),
+            ));
+        }
+        Ok(())
+    }
+
     #[instrument(skip_all)]
     pub async fn create_company_invite(
         &self,
@@ -99,17 +135,12 @@ impl CompanyInviteUseCases {
         role: CompanyAccessRole,
     ) -> AppResult<CompanyInvite> {
         self.verify_company_owner(user_id, company_id).await?;
-
-        let email_trimmed = email.trim().to_lowercase();
-        if email_trimmed.is_empty() || !email_trimmed.contains('@') {
-            return Err(AppError::Internal(
-                "Please provide a valid email address.".into(),
-            ));
-        }
+        let email = invite_address(email)?;
+        self.refuse_owner_address(company_id, &email).await?;
 
         info!(%company_id, "Creating invite");
         self.invite_persistence
-            .create_invite(company_id, &email_trimmed, role)
+            .create_invite(company_id, &email, role)
             .await
     }
 
@@ -163,22 +194,18 @@ impl CompanyInviteUseCases {
             return Err(invite_not_found());
         }
         if invite.status != "pending" {
-            return Err(AppError::BadRequest(
-                "Only a pending invitation can be changed.".into(),
-            ));
+            return Err(not_pending_error());
         }
-
-        let email_trimmed = new_email.trim().to_lowercase();
-        if email_trimmed.is_empty() || !email_trimmed.contains('@') {
-            return Err(AppError::Internal(
-                "Please provide a valid email address.".into(),
-            ));
-        }
+        let email = invite_address(new_email)?;
+        self.refuse_owner_address(company_id, &email).await?;
 
         info!(%invite_id, "Updating invite email");
+        // The status read above is only for the error message: the write itself is conditional on
+        // the invite still being pending, so an acceptance in between is not overwritten.
         self.invite_persistence
-            .update_invite(invite_id, &email_trimmed, role.unwrap_or(invite.role))
-            .await
+            .update_invite(company_id, invite_id, &email, role.unwrap_or(invite.role))
+            .await?
+            .ok_or_else(not_pending_error)
     }
 
     #[instrument(skip_all)]

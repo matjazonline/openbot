@@ -418,12 +418,12 @@ async fn workflow_control_current_authority_is_checked_even_on_replay() {
         .execute(&mut *tx)
         .await
         .unwrap();
-    sqlx::query("DELETE FROM company_members WHERE company_id=$1 AND user_id=$2")
-        .bind(scope.company.as_uuid())
-        .bind(cmd.actor.user_id())
-        .execute(&mut *tx)
-        .await
-        .unwrap();
+    crate::adapters::persistence::test_support::revoke_membership(
+        &mut tx,
+        scope.company.as_uuid(),
+        cmd.actor.user_id(),
+    )
+    .await;
     let revoke = async {
         tokio::time::sleep(Duration::from_millis(50)).await;
         tx.commit().await.unwrap();

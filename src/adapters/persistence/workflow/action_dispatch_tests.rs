@@ -367,20 +367,33 @@ async fn workflow_action_dispatch_remote_marker_crash_response_and_no_replay() {
     assert_eq!(provider.calls.load(Ordering::SeqCst), 0);
 }
 
+/// Not SQL: the actor losing its membership, which for the owner also hands the company to a
+/// replacement (see `test_support::revoke_membership`).
+const REVOKE_ACTOR_MEMBERSHIP: &str = "revoke the actor's membership";
+
 #[tokio::test]
 async fn workflow_action_dispatch_waiting_revokers_recheck_current_authority() {
     for sql in [
         "UPDATE fixture_action_resources SET enabled=false WHERE company_id=$1",
         "UPDATE fixture_action_policies SET enabled=false WHERE company_id=$1",
-        "DELETE FROM company_members WHERE company_id=$1",
+        REVOKE_ACTOR_MEMBERSHIP,
     ] {
         let (f, request) = setup().await;
         let mut revoke = f.persistence().pool().begin().await.unwrap();
-        sqlx::query(sql)
-            .bind(request.scope().company.as_uuid())
-            .execute(&mut *revoke)
-            .await
-            .unwrap();
+        if sql == REVOKE_ACTOR_MEMBERSHIP {
+            crate::adapters::persistence::test_support::revoke_membership(
+                &mut revoke,
+                request.scope().company.as_uuid(),
+                f.binding.target.actor.user_id(),
+            )
+            .await;
+        } else {
+            sqlx::query(sql)
+                .bind(request.scope().company.as_uuid())
+                .execute(&mut *revoke)
+                .await
+                .unwrap();
+        }
         let writer = adapter(&f, 0);
         let release = async {
             crate::adapters::persistence::test_support::wait_until_backends_are_blocked(

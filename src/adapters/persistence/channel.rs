@@ -237,13 +237,14 @@ pub(crate) async fn insert_email_allowlist_grants(
         )
         .await?;
 
+        // A grant this principal already holds from another provenance stays that provenance's:
+        // relabelling it would let the next allowlist edit delete access the allowlist never gave.
         for capability in [PrincipalCapability::Participate, PrincipalCapability::View] {
             sqlx::query(
                 r#"INSERT INTO channel_principal_grants
                        (company_id, channel_id, principal_id, capability, provenance)
                    VALUES ($1, $2, $3, $4, 'configured_allowlist')
-                   ON CONFLICT (company_id, channel_id, principal_id, capability)
-                   DO UPDATE SET provenance = EXCLUDED.provenance"#,
+                   ON CONFLICT (company_id, channel_id, principal_id, capability) DO NOTHING"#,
             )
             .bind(company_id)
             .bind(channel_id)
@@ -1127,3 +1128,7 @@ mod tests {
         let _ = CompanyPersistence::delete(&persistence, company.id).await;
     }
 }
+
+#[cfg(test)]
+#[path = "channel_allowlist_tests.rs"]
+mod allowlist_tests;

@@ -159,18 +159,37 @@ impl CompanyInvitePersistence for PostgresPersistence {
         db_list.into_iter().map(TryInto::try_into).collect()
     }
 
+    async fn is_company_owner_address(&self, company_id: Uuid, email: &str) -> AppResult<bool> {
+        let owned = sqlx::query_scalar!(
+            r#"SELECT EXISTS (
+                   SELECT 1 FROM companies AS company
+                   JOIN users AS account ON account.id = company.user_id
+                   WHERE company.id = $1 AND account.email = $2::text::citext
+               ) AS "owned!""#,
+            company_id,
+            email
+        )
+        .fetch_one(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+        Ok(owned)
+    }
+
+    /// Rewrites a pending invite of this company. The status and company are matched in the
+    /// `UPDATE` itself, so an invite accepted after the caller read it is left as it was accepted.
     async fn update_invite(
         &self,
+        company_id: Uuid,
         id: Uuid,
         new_email: &str,
         role: CompanyAccessRole,
-    ) -> AppResult<CompanyInvite> {
+    ) -> AppResult<Option<CompanyInvite>> {
         let db = sqlx::query_as::<_, CompanyInviteDb>(
             r#"
             WITH invite AS (
                 UPDATE company_invites
                 SET email = $1, role = $2
-                WHERE id = $3
+                WHERE id = $3 AND company_id = $4 AND status = 'pending'
                 RETURNING id, company_id, email, role, status, created_at
             )
             SELECT invite.id, invite.company_id, company.name AS company_name, invite.email,
@@ -182,13 +201,12 @@ impl CompanyInvitePersistence for PostgresPersistence {
         .bind(new_email)
         .bind(role.as_str())
         .bind(id)
+        .bind(company_id)
         .fetch_optional(&self.pool)
         .await
         .map_err(AppError::from)?;
 
-        db.map(TryInto::try_into)
-            .transpose()?
-            .ok_or_else(|| AppError::Internal("Invite not found.".into()))
+        db.map(TryInto::try_into).transpose()
     }
 
     async fn delete_invite(&self, id: Uuid) -> AppResult<()> {
@@ -244,17 +262,20 @@ impl CompanyInvitePersistence for PostgresPersistence {
                 WHERE id = $1 AND status = 'pending' AND email = $2
                 RETURNING id, company_id, email, role, status, created_at
             ), membership AS (
+                -- An invite never rewrites the owner's row: accepting one addressed to the owner
+                -- leaves them the owner (the database also refuses an owner row that disagrees
+                -- with companies.user_id). A data-modifying CTE runs whether or not it is read, so
+                -- the invite still reads back accepted when this writes nothing.
                 INSERT INTO company_members (id, company_id, user_id, role)
                 SELECT $3, company_id, $4, role
                 FROM accepted
                 ON CONFLICT (company_id, user_id)
-                DO UPDATE SET role = EXCLUDED.role
+                DO UPDATE SET role = EXCLUDED.role WHERE company_members.role <> 'owner'
                 RETURNING company_id
             )
             SELECT accepted.id, accepted.company_id, company.name AS company_name, accepted.email,
                    accepted.role, accepted.status, accepted.created_at
             FROM accepted
-            JOIN membership ON membership.company_id = accepted.company_id
             JOIN companies AS company ON company.id = accepted.company_id
             "#,
         )
@@ -447,3 +468,7 @@ impl CompanyInvitePersistence for PostgresPersistence {
 #[cfg(test)]
 #[path = "company_invite_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "company_owner_tests.rs"]
+mod owner_tests;

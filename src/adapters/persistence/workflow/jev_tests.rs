@@ -466,11 +466,11 @@ async fn jev_binding_forged_inputs_and_current_actor_revocation_are_refused() {
     let mut forged = claim.clone();
     forged.activation.inputs["model"] = json!("jev-1.13.0");
     assert!(f.persistence.authorize_jev(&forged).await.is_err());
-    sqlx::query("DELETE FROM company_members WHERE company_id=$1 AND user_id=$2")
-        .bind(target.company.as_uuid())
-        .bind(target.actor.user_id())
-        .execute(f.persistence.pool())
-        .await
-        .unwrap();
+    crate::adapters::persistence::test_support::revoke_membership_now(
+        f.persistence.pool(),
+        target.company.as_uuid(),
+        target.actor.user_id(),
+    )
+    .await;
     assert!(f.persistence.authorize_jev(&claim).await.is_err());
 }

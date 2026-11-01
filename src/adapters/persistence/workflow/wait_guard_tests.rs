@@ -283,13 +283,19 @@ async fn workflow_wait_event_scope_and_consumption_foreign_keys() {
         Some("23503")
     );
     let foreign = Uuid::new_v4();
-    sqlx::query("INSERT INTO companies(id,name,slug,user_id) SELECT $1,'Foreign',$2,user_id FROM companies WHERE id=$3")
-        .bind(foreign)
-        .bind(format!("foreign-{foreign}"))
+    let owner: Uuid = sqlx::query_scalar("SELECT user_id FROM companies WHERE id=$1")
         .bind(a.company.as_uuid())
-        .execute(p.pool())
+        .fetch_one(p.pool())
         .await
         .unwrap();
+    crate::adapters::persistence::test_support::insert_company_with_owner(
+        p.pool(),
+        foreign,
+        "Foreign",
+        &format!("foreign-{foreign}"),
+        owner,
+    )
+    .await;
     for (company, run) in [
         (foreign, a.run.as_uuid()),
         (a.company.as_uuid(), b.run.as_uuid()),

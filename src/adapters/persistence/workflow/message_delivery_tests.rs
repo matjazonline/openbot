@@ -81,18 +81,13 @@ async fn workflow_message_delivery_begin_part_refuses_a_recipient_no_longer_a_me
 async fn workflow_message_delivery_begin_part_refuses_a_revoked_actor() {
     let (setup, delivery) = Box::pin(parked_user(&[To::User])).await;
     // Ownership moves to the recipient; the run actor is left a plain member.
-    sqlx::query("UPDATE companies SET user_id=$2 WHERE id=$1")
-        .bind(setup.fixture.target.company.as_uuid())
-        .bind(setup.user)
-        .execute(setup.pool())
-        .await
-        .unwrap();
-    sqlx::query("UPDATE company_members SET role='member' WHERE company_id=$1 AND user_id=$2")
-        .bind(setup.fixture.target.company.as_uuid())
-        .bind(setup.owner)
-        .execute(setup.pool())
-        .await
-        .unwrap();
+    crate::adapters::persistence::test_support::transfer_company_ownership(
+        setup.pool(),
+        setup.fixture.target.company.as_uuid(),
+        setup.user,
+        crate::entities::company_member::CompanyAccessRole::Member,
+    )
+    .await;
     let outcome = begin(&setup, delivery).await;
     assert_refused(&setup, delivery, outcome, "workflow_revoked").await;
 }

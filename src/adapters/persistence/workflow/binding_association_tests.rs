@@ -302,18 +302,13 @@ async fn workflow_binding_sql_grant_revocation_thread_scope_and_fixed_associatio
         .await
         .unwrap()
         .unwrap();
-    sqlx::query("UPDATE companies SET user_id = $2 WHERE id = $1")
-        .bind(f.target.company.as_uuid())
-        .bind(new_owner.id)
-        .execute(p.pool())
-        .await
-        .unwrap();
-    sqlx::query("UPDATE company_members SET role = 'admin' WHERE company_id = $1 AND user_id = $2")
-        .bind(f.target.company.as_uuid())
-        .bind(f.target.actor.user_id())
-        .execute(p.pool())
-        .await
-        .unwrap();
+    crate::adapters::persistence::test_support::transfer_company_ownership(
+        p.pool(),
+        f.target.company.as_uuid(),
+        new_owner.id,
+        crate::entities::company_member::CompanyAccessRole::Admin,
+    )
+    .await;
     sqlx::query("UPDATE users SET email_verified_at = CURRENT_TIMESTAMP WHERE id = $1")
         .bind(f.target.actor.user_id())
         .execute(p.pool())

@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT EXISTS (\n                   SELECT 1 FROM companies AS company\n                   JOIN users AS account ON account.id = company.user_id\n                   WHERE company.id = $1 AND account.email = $2::text::citext\n               ) AS \"owned!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "owned!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "8e723de5f2484a3d774a5509d1baf51401c9c726ac8e049db18a705b39111208"
+}

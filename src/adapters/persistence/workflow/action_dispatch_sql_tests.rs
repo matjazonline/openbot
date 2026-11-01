@@ -138,12 +138,16 @@ impl SqlLocalAction for BlockedEffect<'_> {
         Ok(result)
     }
 }
+/// Not SQL: the actor losing its membership, which for the owner also hands the company to a
+/// replacement (see `test_support::revoke_membership`).
+const REVOKE_ACTOR_MEMBERSHIP: &str = "revoke the actor's membership";
+
 #[tokio::test]
 async fn workflow_action_dispatch_revokers_wait_for_local_effect_and_receipt_commit() {
     for sql in [
         "UPDATE fixture_action_resources SET enabled=false WHERE company_id=$1",
         "UPDATE fixture_action_policies SET enabled=false WHERE company_id=$1",
-        "DELETE FROM company_members WHERE company_id=$1",
+        REVOKE_ACTOR_MEMBERSHIP,
     ] {
         let (f, request) = setup().await;
         let entered = Notify::new();
@@ -159,11 +163,20 @@ async fn workflow_action_dispatch_revokers_wait_for_local_effect_and_receipt_com
         let revoke = async {
             entered.notified().await;
             let mut tx = f.persistence().pool().begin().await.unwrap();
-            sqlx::query(sql)
-                .bind(request.scope().company.as_uuid())
-                .execute(&mut *tx)
-                .await
-                .unwrap();
+            if sql == REVOKE_ACTOR_MEMBERSHIP {
+                crate::adapters::persistence::test_support::revoke_membership(
+                    &mut tx,
+                    request.scope().company.as_uuid(),
+                    f.binding.target.actor.user_id(),
+                )
+                .await;
+            } else {
+                sqlx::query(sql)
+                    .bind(request.scope().company.as_uuid())
+                    .execute(&mut *tx)
+                    .await
+                    .unwrap();
+            }
             assert_eq!(
                 facts(&f).await,
                 (1, 1, 1),
