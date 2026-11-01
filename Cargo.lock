@@ -4744,61 +4744,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "mail_agents"
-version = "0.1.0"
-dependencies = [
- "ammonia",
- "anyhow",
- "argon2",
- "async-stream",
- "async-trait",
- "axum",
- "axum-extra",
- "base64 0.22.1",
- "bigdecimal",
- "bytes",
- "chrono",
- "chrono-tz",
- "dotenvy",
- "futures",
- "hmac",
- "htmd",
- "image",
- "jsonschema",
- "jsonwebtoken",
- "lettre",
- "mail-auth",
- "mail-parser 0.9.4",
- "p256",
- "pulldown-cmark",
- "regex",
- "reqwest 0.13.4",
- "rig",
- "ring",
- "rmcp",
- "secrecy",
- "serde",
- "serde-saphyr",
- "serde_json",
- "serde_path_to_error",
- "serde_yaml",
- "sha2",
- "sqlx",
- "sse-stream",
- "thiserror 2.0.20",
- "time",
- "tokio",
- "tokio-stream",
- "tokio-util",
- "tower",
- "tower-http",
- "tracing",
- "tracing-subscriber",
- "url",
- "uuid",
-]
-
-[[package]]
 name = "maplit"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5290,6 +5235,61 @@ checksum = "1e68317604e77e53b85896388e1a803c1d21b74c899ec9e5e1112db90735edd7"
 dependencies = [
  "cc",
  "pkg-config",
+]
+
+[[package]]
+name = "open_bots"
+version = "0.1.0"
+dependencies = [
+ "ammonia",
+ "anyhow",
+ "argon2",
+ "async-stream",
+ "async-trait",
+ "axum",
+ "axum-extra",
+ "base64 0.22.1",
+ "bigdecimal",
+ "bytes",
+ "chrono",
+ "chrono-tz",
+ "dotenvy",
+ "futures",
+ "hmac",
+ "htmd",
+ "image",
+ "jsonschema",
+ "jsonwebtoken",
+ "lettre",
+ "mail-auth",
+ "mail-parser 0.9.4",
+ "p256",
+ "pulldown-cmark",
+ "regex",
+ "reqwest 0.13.4",
+ "rig",
+ "ring",
+ "rmcp",
+ "secrecy",
+ "serde",
+ "serde-saphyr",
+ "serde_json",
+ "serde_path_to_error",
+ "serde_yaml",
+ "sha2",
+ "sqlx",
+ "sse-stream",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "tokio-stream",
+ "tokio-util",
+ "tower",
+ "tower-http",
+ "tracing",
+ "tracing-subscriber",
+ "url",
+ "uuid",
 ]
 
 [[package]]

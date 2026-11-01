@@ -129,9 +129,9 @@ The database is reset rather than migrated, so edit in place and recreate both d
 file's checksum changes):
 
 ```sh
-dropdb --if-exists mail_agents && createdb mail_agents
-dropdb --if-exists mail_agents_test && createdb mail_agents_test
-DATABASE_URL="postgres://mac03@localhost:5432/mail_agents" cargo sqlx migrate run
+dropdb --if-exists open_bots && createdb open_bots
+dropdb --if-exists open_bots_test && createdb open_bots_test
+DATABASE_URL="postgres://mac03@localhost:5432/open_bots" cargo sqlx migrate run
 ```
 
 *No `cargo sqlx prepare` needed*: the memory persistence layer uses runtime `sqlx::query(...)` /
@@ -223,8 +223,8 @@ unclaimable past the end of a run.
 
 ```sh
 cargo fmt --check
-DATABASE_URL="postgres://mac03@localhost:5432/mail_agents" cargo sqlx migrate run
-DATABASE_URL="postgres://mac03@localhost:5432/mail_agents" cargo test
+DATABASE_URL="postgres://mac03@localhost:5432/open_bots" cargo sqlx migrate run
+DATABASE_URL="postgres://mac03@localhost:5432/open_bots" cargo test
 SQLX_OFFLINE=true cargo build            # the offline path CI and Fly.io use
 ```
 

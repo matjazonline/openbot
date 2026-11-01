@@ -277,7 +277,7 @@ adding the field 44 times again next release.
 # 7. Regenerate the sqlx cache — and know whether it can tell you anything
 
 ```sh
-DATABASE_URL="postgres://$(whoami)@localhost:5432/mail_agents" \
+DATABASE_URL="postgres://$(whoami)@localhost:5432/open_bots" \
   cargo sqlx prepare -- --all-targets
 ```
 
@@ -313,16 +313,16 @@ twice a second, and `reap_expired_deliveries` can charge real deliveries an atte
 Create the database once:
 
 ```sh
-createdb mail_agents_test
+createdb open_bots_test
 ```
 
 Then every model change must be run as:
 
 ```sh
-DATABASE_URL="postgres://$(whoami)@localhost:5432/mail_agents" cargo test --lib
+DATABASE_URL="postgres://$(whoami)@localhost:5432/open_bots" cargo test --lib
 ```
 
-The command is unchanged; it now lands on `mail_agents_test`. **Run it with the variable set.**
+The command is unchanged; it now lands on `open_bots_test`. **Run it with the variable set.**
 `cargo test` does not read `.env` — only `main.rs` does, at runtime — so an unexported `DATABASE_URL`
 is the normal accident, not an exotic one.
 
@@ -343,7 +343,7 @@ as passing* and the suite reports the same total either way, so nothing about th
 Use `ALLOW_MISSING_DATABASE_URL=1` when you genuinely want the non-DB tests only.
 
 **A test that sweeps the whole database gets a database of its own.** `test_pool` hands every test
-the same `mail_agents_test`; `own_database` (also `test_support.rs`) creates a uniquely named
+the same `open_bots_test`; `own_database` (also `test_support.rs`) creates a uniquely named
 database, migrates it, and drops it when the handle falls out of scope — panic or not:
 
 ```rust

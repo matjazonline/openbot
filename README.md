@@ -266,7 +266,7 @@ pass/fail summary; add `--fail-fast` to stop at the first failure.
 ```
 
 It needs the local database running, `sqlx-cli` installed and `npm ci` run once. `DATABASE_URL`
-defaults to `postgres://$(whoami)@localhost:5432/mail_agents`, which migrations are applied to. The
+defaults to `postgres://$(whoami)@localhost:5432/open_bots`, which migrations are applied to. The
 test suites run against a database the script creates for the run and drops on exit, so a
-`cargo test` started elsewhere against the shared `mail_agents_test` cannot truncate fixtures out
+`cargo test` started elsewhere against the shared `open_bots_test` cannot truncate fixtures out
 from under it.

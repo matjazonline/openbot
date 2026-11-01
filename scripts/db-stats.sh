@@ -135,8 +135,8 @@ if ! command -v fly >/dev/null 2>&1; then
 fi
 
 fly_app="${DATABASE_FLY_APP:-openbots-db}"
-database_user="${POSTGRES_USER:-mail_agents}"
-database_name="${POSTGRES_DB:-mail_agents}"
+database_user="${POSTGRES_USER:-open_bots}"
+database_name="${POSTGRES_DB:-open_bots}"
 encoded_sql="$(printf '%s\n' "$snapshot_sql" | base64 | tr -d '\n')"
 remote_command="printf '%s' '$encoded_sql' | base64 -d | psql -U '$database_user' -d '$database_name' -X -v ON_ERROR_STOP=1 -P pager=off"
 fly ssh console --app "$fly_app" --command "$remote_command"

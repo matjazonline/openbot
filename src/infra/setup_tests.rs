@@ -48,7 +48,7 @@ fn security_session_metrics_export_under_startup_fly_and_example_filters() {
                 &[("reason", "store_unavailable")],
             );
             monitor.record_gauge("session_cleanup_backlog", 1001.0, &[]);
-            tracing::info!(target: "mail_agents::session_probe", "application-marker");
+            tracing::info!(target: "open_bots::session_probe", "application-marker");
             tracing::info!(target: "monitoring::smtp", "excluded-smtp-marker");
             tracing::info!(target: "monitoring::ai", "excluded-ai-marker");
         });

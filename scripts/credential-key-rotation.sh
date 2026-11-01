@@ -60,7 +60,7 @@ key_ring_has_version() {
 run_status() {
   local version="$1"
   fly ssh console --app "$APP_NAME" \
-    --command "/app/mail_agents credentials status --require-version $version"
+    --command "/app/open_bots credentials status --require-version $version"
 }
 
 verify_rollout() {
@@ -131,7 +131,7 @@ roll_out "$KEY_RING" "$OLD_VERSION" "Distribution"
 roll_out "$KEY_RING" "$NEW_VERSION" "Activation"
 
 echo "==> Converging stored credentials on version $NEW_VERSION"
-fly ssh console --app "$APP_NAME" --command "/app/mail_agents credentials rotate"
+fly ssh console --app "$APP_NAME" --command "/app/open_bots credentials rotate"
 run_status "$NEW_VERSION"
 
 echo "==> Rotation converged. Retain version $OLD_VERSION through the documented backup/recovery window."

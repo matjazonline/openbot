@@ -378,7 +378,7 @@ impl ThreadUseCases {
             }
             if should_warn_about_thread_index(*error) {
                 warn!(
-                    target: "mail_agents::thread_index",
+                    target: "open_bots::thread_index",
                     reason,
                     encoded_length,
                     "Ignoring a malformed Thread-Index header"

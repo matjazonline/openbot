@@ -16,7 +16,7 @@ enum DrainOutcome {
     DeadlineReached,
 }
 
-use mail_agents::{
+use open_bots::{
     adapters::{persistence::PostgresPersistence, smtp::SmtpServer},
     infra::{
         app::create_app,
@@ -108,7 +108,7 @@ fn parse_required_version(value: &str) -> anyhow::Result<u32> {
 }
 
 fn command_usage() -> &'static str {
-    "Usage:\n  mail_agents\n  mail_agents credentials status [--require-version <N>]\n  mail_agents credentials rotate"
+    "Usage:\n  open_bots\n  open_bots credentials status [--require-version <N>]\n  open_bots credentials rotate"
 }
 
 async fn run_credential_status(required_version: Option<u32>) -> anyhow::Result<()> {
@@ -119,7 +119,7 @@ async fn run_credential_status(required_version: Option<u32>) -> anyhow::Result<
 }
 
 fn ensure_credential_status(
-    status: &mail_agents::adapters::persistence::credential_rotation::CredentialStatus,
+    status: &open_bots::adapters::persistence::credential_rotation::CredentialStatus,
     required_version: Option<u32>,
 ) -> anyhow::Result<()> {
     if !status.is_valid() {

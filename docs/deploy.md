@@ -25,7 +25,7 @@ relies on the checked-in `.sqlx/` directory with `SQLX_OFFLINE=true`.
 **Whenever you add or change a SQL query, regenerate it and commit the result:**
 
 ```sh
-DATABASE_URL="postgres://$(whoami)@localhost:5432/mail_agents" \
+DATABASE_URL="postgres://$(whoami)@localhost:5432/open_bots" \
   cargo sqlx prepare -- --all-targets
 ```
 
@@ -108,7 +108,7 @@ fly apps create openbots
 fly ips allocate-v4          # dedicated IPv4, required for SMTP on port 25
 
 fly secrets set \
-  DATABASE_URL="postgres://mail_agents:<POSTGRES_PASSWORD>@openbots-db.internal:5432/mail_agents" \
+  DATABASE_URL="postgres://open_bots:<POSTGRES_PASSWORD>@openbots-db.internal:5432/open_bots" \
   JWT_SECRET="<random-64-chars>" \
   SMTP_USERNAME="<relay-user>" \
   SMTP_PASSWORD="<relay-password>" \
@@ -167,7 +167,7 @@ telemetry and provider-outage triage.
 Session validation and cleanup metrics use the separate `monitoring::counter` and
 `monitoring::gauge` targets. The startup default and supplied `fly.toml`/`.env.example` filters
 enable both at info. If overriding `RUST_LOG`, retain `monitoring::counter=info,monitoring::gauge=info`
-to export these signals; the application-only `mail_agents` directive does not include them.
+to export these signals; the application-only `open_bots` directive does not include them.
 See [authentication operations](authentication-operations.md#security-changes-and-session-cleanup)
 for session lifetime, revocation and backlog alerts.
 
@@ -342,7 +342,7 @@ For a version 1 to version 2 rotation, keep both versions through two separate r
 
    ```sh
    fly ssh console --app openbots \
-     --command "/app/mail_agents credentials status --require-version 1"
+     --command "/app/open_bots credentials status --require-version 1"
    ```
 
 2. **Distribute** version 2 without activating it. Set
@@ -355,9 +355,9 @@ For a version 1 to version 2 rotation, keep both versions through two separate r
 
    ```sh
    fly ssh console --app openbots \
-     --command "/app/mail_agents credentials rotate"
+     --command "/app/open_bots credentials rotate"
    fly ssh console --app openbots \
-     --command "/app/mail_agents credentials status --require-version 2"
+     --command "/app/open_bots credentials status --require-version 2"
    ```
 
    Output is JSON containing versions and counts only. `status` exits nonzero for malformed or
@@ -564,7 +564,7 @@ recycle a process that is otherwise serving traffic.
 fly logs                                  # app logs
 fly logs -a openbots-db                # database logs
 fly ssh console                           # shell into the app machine
-fly ssh console -a openbots-db -C "psql -U mail_agents mail_agents"
+fly ssh console -a openbots-db -C "psql -U open_bots open_bots"
 fly status                                # machine health
 fly secrets list                          # names only, never values
 ```

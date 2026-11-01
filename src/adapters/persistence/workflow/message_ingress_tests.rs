@@ -49,7 +49,7 @@ impl Deployment {
         // The engine's warnings land in this test's captured output, shown when it fails.
         let _ = tracing_subscriber::fmt()
             .with_test_writer()
-            .with_env_filter("mail_agents=warn")
+            .with_env_filter("open_bots=warn")
             .try_init();
         let fixture = Fixture::new().await;
         let p = fixture.persistence.clone();

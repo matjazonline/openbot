@@ -216,10 +216,10 @@ mod tests {
 
     #[test]
     fn process_status_parser_reads_vmrss_in_bytes() {
-        let fixture = "Name:\tmail_agents\nVmPeak:\t  999 kB\nVmRSS:\t  12345 kB\n";
+        let fixture = "Name:\topen_bots\nVmPeak:\t  999 kB\nVmRSS:\t  12345 kB\n";
         assert_eq!(parse_process_rss_bytes(fixture), Some(12_641_280));
         assert_eq!(parse_process_rss_bytes("VmRSS: nope kB"), None);
-        assert_eq!(parse_process_rss_bytes("Name: mail_agents"), None);
+        assert_eq!(parse_process_rss_bytes("Name: open_bots"), None);
     }
 
     #[test]

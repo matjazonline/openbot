@@ -54,7 +54,7 @@ mod tests {
     /// out to the pool's 10s+ connect/acquire timeouts.
     #[tokio::test]
     async fn probe_reports_down_promptly_when_database_is_unreachable() {
-        let pool = PgPool::connect_lazy("postgres://user:pass@127.0.0.1:1/mail_agents_test")
+        let pool = PgPool::connect_lazy("postgres://user:pass@127.0.0.1:1/open_bots_test")
             .expect("lazy pool construction never touches the network");
 
         let start = Instant::now();

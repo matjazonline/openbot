@@ -11,13 +11,13 @@
 # Usage:
 #   scripts/stack-frames.sh [binary] [threshold-kib]
 #
-# Defaults to target/debug/mail_agents and 32 KiB. Pass a lower threshold to see the tail.
+# Defaults to target/debug/open_bots and 32 KiB. Pass a lower threshold to see the tail.
 #
 # arm64/Mach-O only -- it decodes the prologue directly, so there is no extra tooling to install.
 
 set -euo pipefail
 
-BINARY="${1:-target/debug/mail_agents}"
+BINARY="${1:-target/debug/open_bots}"
 THRESHOLD_KIB="${2:-32}"
 
 if [[ ! -f "$BINARY" ]]; then
@@ -140,7 +140,7 @@ def demangle(symbol):
 
 rows = []
 for i, (addr, name) in enumerate(syms):
-    if "mail_agents" not in name:
+    if "open_bots" not in name:
         continue
     end = syms[i + 1][0] if i + 1 < len(syms) else addr + 0x1000
     size = frame_size(addr, end)
