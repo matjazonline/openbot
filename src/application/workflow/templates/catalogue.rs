@@ -1,6 +1,7 @@
 use super::contracts::{SourceIdentity, TemplateError};
 use crate::application::workflow::{
-    compiler::{MAX_SOURCE_BYTES, SourceDecoder},
+    compiler::{MAX_SOURCE_BYTES, SourceDecoder, SourceEncoder, rebase_workflow_id},
+    provisioning::ReplyMode,
     registry::{self, CatalogueFacts},
 };
 use crate::domain::workflow::{TemplateId, TemplateRevision, VersionId, WorkflowId};
@@ -11,6 +12,10 @@ pub const AUTONOMOUS_RESPONSE: &str = "autonomous-response";
 pub const REVIEWED_SUPPORT: &str = "reviewed-support";
 /// The `agent.run` step of every shipped reply-mode template.
 pub const REPLY_AGENT_STEP: &str = "draft";
+/// The agent base every agent channel's workflow is composed from: the autonomous template.
+pub const AGENT_BASE_SOURCE: &str = include_str!("../fixtures/autonomous-response.yaml");
+/// The reviewed template's own root identity; it is composed from the base, which has another.
+const REVIEWED_SUPPORT_WORKFLOW: uuid::Uuid = uuid::Uuid::from_u128(1);
 
 pub const MAX_TEMPLATES: usize = 64;
 pub const MAX_TITLE_BYTES: usize = 256;
@@ -112,17 +117,21 @@ impl TemplateCatalogue {
         Ok(Self { entries })
     }
     /// The templates this deployment ships (p08 D-5, D2.5): the two reply modes an assistant
-    /// channel is provisioned on. Validated once at composition; a template that does not
-    /// compile stops startup.
-    pub fn shipped(decoder: &impl SourceDecoder) -> Result<Self, TemplateError> {
-        const SOURCES: [&str; 2] = [
-            include_str!("../fixtures/autonomous-response.yaml"),
-            include_str!("../fixtures/reviewed-support.yaml"),
-        ];
+    /// channel is provisioned on, both composed from the agent base. Validated once at
+    /// composition; a template that does not compile stops startup.
+    pub fn shipped(decoder: &(impl SourceDecoder + SourceEncoder)) -> Result<Self, TemplateError> {
+        let reviewed = ReplyMode::Reviewed
+            .agent_workflow()
+            .compose(decoder, AGENT_BASE_SOURCE)
+            .and_then(|source| decoder.encode(&source))
+            .and_then(|source| {
+                rebase_workflow_id(decoder, &source, WorkflowId::new(REVIEWED_SUPPORT_WORKFLOW))
+            })?;
+        let sources: [&str; 2] = [AGENT_BASE_SOURCE, &reviewed];
         let facts = CatalogueFacts::default();
         // Each is a root with no children or workflow tools.
         let mut dependencies = BTreeMap::new();
-        for source in SOURCES {
+        for source in sources {
             let workflow = crate::application::workflow::compiler::parse_workflow(
                 &decoder.decode(source)?,
                 VersionId::new(uuid::Uuid::nil()),
@@ -148,13 +157,13 @@ impl TemplateCatalogue {
                     AUTONOMOUS_RESPONSE,
                     "Autonomous response",
                     "The agent drafts an answer to each inbound message and sends it as the reply.",
-                    SOURCES[0],
+                    sources[0],
                 )?,
                 offer(
                     REVIEWED_SUPPORT,
                     "Reviewed response",
                     "The agent drafts an answer; a reviewer approves or edits it before it is sent, or rejects it, before the run's deadline.",
-                    SOURCES[1],
+                    sources[1],
                 )?,
             ],
             decoder,

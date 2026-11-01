@@ -22,8 +22,20 @@ Agent Builder has no workflow-draft, publication, or arbitrary channel-creation 
 
 1. Look for an existing agent that already owns the job. Define the outcome, users, example requests, responsibilities, non-goals, escalation conditions, needed facts, output format, and tone.
 2. Choose a distinct name and lowercase hyphenated slug, a short description, a complete operational system prompt, and an explicit enabled provider/model. Request only needed workflow tools. Attach only existing skills identified by exact company skill slug.
-3. Decide who may use the channel, what messages should trigger work, and whether sending needs review. The Builder's creation tool supports a team-only channel and the two reply modes; other channel access or workflow designs need separate authoring.
-4. Show the final agent, channel, and reply-mode specification before asking for creation confirmation. Never imply a design is live merely because it was drafted.
+3. Decide who may use the channel, what messages should trigger work, and whether sending needs review. The Builder's creation tool supports a team-only channel, the two reply modes and the custom steps below; other channel access or workflow designs need separate authoring.
+4. Show the final agent, channel, reply-mode and custom-step specification before asking for creation confirmation. Never imply a design is live merely because it was drafted.
+
+## The agent base and custom steps
+
+Every agent channel's workflow is composed from one base of three steps: `context` (`context.history`, the thread so far, up to 8000 tokens), `draft` (`agent.run`, the agent, which reads `untrusted_message`, `untrusted_subject` and `untrusted_history`) and `reply` (`message.reply`). A reviewed channel is the base with a `review` gate (`decision.human`) before the reply. The base is [the autonomous template](../src/application/workflow/fixtures/autonomous-response.yaml); [the composer](../src/application/workflow/templates/agent_workflow.rs) adds a workflow's own steps in three slots and never edits the base steps:
+
+| Slot | Runs | Typical steps |
+| --- | --- | --- |
+| `before_draft` | after the history, before the agent; its output reaches the agent as `untrusted_<id>` | `ai.classify`, `data.map` |
+| `before_reply` | after the agent, before any review and the reply | `decision.rule`, `decision.agent` |
+| `after_reply` | after the reply | `data.map` |
+
+A custom step's routes name only `$next` (whichever step follows it) or `$end`, and default to `{success: $next}`, so a gate can stop a reply but cannot reorder the base. `create_agent_channel` accepts up to six such steps in `steps`, of the types `ai.classify`, `decision.agent`, `decision.rule` and `data.map`; every other step type is added afterwards in the workflow editor. The history step can be replaced by another implementation that keeps the id `context`, and its output still reaches the agent as `untrusted_history`.
 
 ## Design workflow steps
 
@@ -41,7 +53,7 @@ The registered step types are:
 
 Workflow source is YAML v1. Its root requires `format_version`, a fresh UUID `workflow_id`, `input_schema`, `parameter_schema`, `output_schema`, `resources`, `entry`, `steps`, and `limits` (`max_steps`, `max_context_bytes`). Each step requires `type`, `with`, and `routes`. Every `with` value is a binding such as `{literal: ...}`, `{ref: /input/message}`, or `{object: {key: {ref: ...}}}`. A step route declares `success` **or** `choices`, optionally `error`; targets are step IDs or `$end`. References to step output must be available on every incoming route. `decision.rule` also needs ordered `rule.cases` and a `rule.default`.
 
-This small shape follows the shipped autonomous reply template. Replace the UUID and agent slug, and keep the input contract compatible with the binding that will admit messages:
+This small shape is the shipped autonomous reply template, the agent base. Replace the UUID and agent slug, and keep the input contract compatible with the binding that will admit messages:
 
 ```yaml
 format_version: 1
@@ -58,13 +70,22 @@ input_schema:
 parameter_schema: {type: object, additionalProperties: false}
 output_schema: true
 resources: []
-entry: draft
+entry: context
 steps:
+  context:
+    type: context.history
+    with:
+      max_tokens: {literal: 8000}
+    routes: {success: draft}
   draft:
     type: agent.run
     with:
       agent: {literal: assistant}
-      context: {object: {untrusted_message: {ref: /input/message}}}
+      context:
+        object:
+          untrusted_message: {ref: /input/message}
+          untrusted_subject: {default: {ref: /input/subject, value: {literal: ""}}}
+          untrusted_history: {ref: /steps/context/output}
       output_schema:
         literal:
           type: object

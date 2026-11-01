@@ -404,6 +404,7 @@ fn failure(error: &AppError) -> WorkflowFailure {
     use FailureClass::{Retryable, Terminal};
     let (class, suffix) = match error {
         AppError::Execution(ExecutionFailure::Budget) => (Terminal, "budget"),
+        AppError::Execution(ExecutionFailure::RepeatedToolCall) => (Terminal, "repeated_tool_call"),
         AppError::Execution(ExecutionFailure::InvalidOutput) => (Terminal, "invalid_output"),
         AppError::Execution(ExecutionFailure::CheckpointDenied) => (Terminal, "tokens_refused"),
         AppError::Execution(ExecutionFailure::IndeterminateEffect) => (Terminal, "effect_unknown"),

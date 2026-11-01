@@ -94,7 +94,7 @@ async fn workflow_classify_answers_a_declared_label_with_a_tool_free_request() {
 async fn workflow_classify_repairs_an_undeclared_label_then_fails_terminally() {
     let setup = step_setup(classify).await;
     let calls = 1 + crate::services::response_contract::MAX_REPAIR_CALLS;
-    let llm = scripted_llm((0..calls).map(|_| LlmTurn::text("\"refund\"")).collect()).await;
+    let mut llm = scripted_llm((0..calls).map(|_| LlmTurn::text("\"refund\"")).collect()).await;
     register_scripted_agent_base_url(setup.agent, &llm.base_url);
     let runtime = agent_runtime(&setup);
     let failure = run(&runtime, &setup.claim)
@@ -104,6 +104,20 @@ async fn workflow_classify_repairs_an_undeclared_label_then_fails_terminally() {
         .failure;
     assert_eq!(failure.code().as_str(), "agent.invalid_output");
     assert_eq!(failure.class(), FailureClass::Terminal);
+    // Each repair ends on its instruction, never on the rejected label, and leaves the
+    // instructions as they were.
+    let requests = llm.observed();
+    for repair in &requests[1..] {
+        let messages = repair["messages"].as_array().unwrap();
+        let last = messages.last().unwrap();
+        assert_eq!(last["role"], "user");
+        assert!(
+            last.to_string()
+                .contains("Validation reason: schema_mismatch")
+        );
+        assert_eq!(messages[0]["role"], "system");
+        assert_eq!(messages[0], requests[0]["messages"][0]);
+    }
     assert_eq!(llm.finish().await.unwrap(), calls);
 }
 

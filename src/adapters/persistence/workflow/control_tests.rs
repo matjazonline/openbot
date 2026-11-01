@@ -31,6 +31,14 @@ async fn failed(
     scope: ActivationRequest,
     safety: RetrySafety,
 ) -> ClaimedWorkflow {
+    failed_with(f, scope, safety, "provider.rejected").await
+}
+async fn failed_with(
+    f: &AdmissionFixture,
+    scope: ActivationRequest,
+    safety: RetrySafety,
+    code: &str,
+) -> ClaimedWorkflow {
     let claim = f
         .persistence()
         .settled()
@@ -41,7 +49,7 @@ async fn failed(
     let cause = LeaseReleaseCause::Classified(WorkflowFailure {
         failure: StepFailure::new(
             FailureClass::Terminal,
-            FailureCode::parse("provider.rejected").unwrap(),
+            FailureCode::parse(code).unwrap(),
             None,
         )
         .unwrap(),
@@ -269,6 +277,40 @@ async fn workflow_control_retry_refuses_unknown_exhaustion_deadline_completed_an
         let saved:Value=sqlx::query_scalar("SELECT jsonb_agg(to_jsonb(event) ORDER BY run_id,sequence) FROM workflow_run_events AS event").fetch_one(f.persistence().pool()).await.unwrap();
         assert_eq!(events, saved);
     }
+}
+
+/// An agent step resumes its saved checkpoint, which keeps its spent allowance, its spent
+/// repairs and its repeated call, so retrying any of them would only fail again: retry refuses
+/// them and changes nothing, while another terminal agent failure stays retryable.
+#[tokio::test]
+async fn workflow_control_retry_refuses_agent_failures_a_resume_would_repeat() {
+    for code in [
+        "agent.budget",
+        "agent.invalid_output",
+        "agent.repeated_tool_call",
+    ] {
+        let (f, scope) = fixture().await;
+        failed_with(&f, scope, RetrySafety::SafeToRetry, code).await;
+        let before = snapshot(&f).await;
+        let result = f
+            .persistence()
+            .retry(retry(command(&f, scope, "agent").await))
+            .await
+            .unwrap();
+        assert!(
+            matches!(result, RetryResult::Unsafe { .. }),
+            "{code}: {result:?}"
+        );
+        assert_eq!(snapshot(&f).await, before, "{code}");
+    }
+    let (f, scope) = fixture().await;
+    failed_with(&f, scope, RetrySafety::SafeToRetry, "agent.rejected").await;
+    let result = f
+        .persistence()
+        .retry(retry(command(&f, scope, "agent").await))
+        .await
+        .unwrap();
+    assert!(matches!(result, RetryResult::Applied { .. }), "{result:?}");
 }
 
 #[tokio::test]

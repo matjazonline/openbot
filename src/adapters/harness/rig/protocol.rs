@@ -215,19 +215,59 @@ fn assistant(calls: &[SavedToolCall], blocks: &[ContinuationBlock]) -> AppResult
 }
 
 pub(super) fn history(run: &RunCheckpoint) -> AppResult<Vec<Message>> {
-    run.messages.iter().map(|message| match message {
-        ConversationMessage::User { text } => Ok(Message::user(text)),
-        ConversationMessage::Assistant { calls, continuation, .. } => assistant(calls, continuation),
-        ConversationMessage::Tool { invocation_id, result, .. } => {
-            let turn = run.turns.iter().find(|turn| turn.calls.iter().any(|call| call.invocation_id == *invocation_id)).ok_or_else(invalid)?;
-            let ordinal = turn.calls.iter().position(|call| call.invocation_id == *invocation_id).ok_or_else(invalid)?;
-            let replay = replay(&turn.continuation)?;
-            let part = replay.content.iter().find(|part| matches!(part, SavedAssistantContent::Call { ordinal: index, .. } if usize::from(*index) == ordinal)).ok_or_else(invalid)?;
-            let call = restore_call(&turn.calls[ordinal], part)?;
-            Ok(Message::User { content: vec![UserContent::tool_result_for(call.id, call.provider, call.function.name,
-                vec![ToolResultContent::Text(Text { text: result.to_string(), additional_params: None })])] })
+    // The checkpoint keeps one assistant message per turn, in turn order.
+    let mut turns = run.turns.iter();
+    let mut history = Vec::with_capacity(run.messages.len() + 1);
+    for message in &run.messages {
+        match message {
+            ConversationMessage::User { text } => history.push(Message::user(text)),
+            ConversationMessage::Assistant {
+                calls,
+                continuation,
+                ..
+            } => {
+                history.push(assistant(calls, continuation)?);
+                if let Some(reason) = turns.next().ok_or_else(invalid)?.invalid_response {
+                    history.push(Message::user(super::final_response::repair_prompt(reason)));
+                }
+            }
+            ConversationMessage::Tool {
+                invocation_id,
+                result,
+                ..
+            } => {
+                let turn = run
+                    .turns
+                    .iter()
+                    .find(|turn| {
+                        turn.calls
+                            .iter()
+                            .any(|call| call.invocation_id == *invocation_id)
+                    })
+                    .ok_or_else(invalid)?;
+                let ordinal = turn
+                    .calls
+                    .iter()
+                    .position(|call| call.invocation_id == *invocation_id)
+                    .ok_or_else(invalid)?;
+                let replay = replay(&turn.continuation)?;
+                let part = replay.content.iter().find(|part| matches!(part, SavedAssistantContent::Call { ordinal: index, .. } if usize::from(*index) == ordinal)).ok_or_else(invalid)?;
+                let call = restore_call(&turn.calls[ordinal], part)?;
+                history.push(Message::User {
+                    content: vec![UserContent::tool_result_for(
+                        call.id,
+                        call.provider,
+                        call.function.name,
+                        vec![ToolResultContent::Text(Text {
+                            text: result.to_string(),
+                            additional_params: None,
+                        })],
+                    )],
+                });
+            }
         }
-    }).collect()
+    }
+    Ok(history)
 }
 
 #[cfg(test)]

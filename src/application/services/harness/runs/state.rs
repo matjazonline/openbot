@@ -8,6 +8,9 @@ pub const MAX_ARGUMENT_BYTES: usize = 65_536;
 pub const MAX_CONTINUATIONS: u16 = 64;
 pub const MAX_CLAIM_MS: u64 = 300_000;
 pub const MAX_ACTIVE_EXECUTION_MS: u64 = 3_600_000;
+/// A call made this many times, each returning the same result, is not made again: the model
+/// has stopped learning from it, and repeating it only spends the remaining model calls.
+pub const REPEATED_CALL_LIMIT: usize = 2;
 
 /// Byte-per-token fallback deliberately overestimates ordinary text. Callers must include
 /// tool schemas, metadata and the complete restored history in the input reservation.
@@ -433,6 +436,39 @@ impl RunCheckpoint {
                 inv.call.invocation_id == call.invocation_id
                     && inv.state == InvocationState::Completed
             })
+        })
+    }
+
+    /// The latest turn has not started executing, and every call in it repeats a call whose
+    /// last `REPEATED_CALL_LIMIT` completed invocations returned one unchanged result. A call
+    /// whose results still vary, or a turn that also asks for something new, is not a repeat.
+    pub fn repeats_settled_calls(&self) -> bool {
+        let Some(turn) = self.turns.last() else {
+            return false;
+        };
+        let latest = self.turns.len() - 1;
+        if turn.calls.is_empty()
+            || self
+                .invocations
+                .iter()
+                .any(|inv| usize::from(inv.turn) == latest)
+        {
+            return false;
+        }
+        turn.calls.iter().all(|call| {
+            let recent: Vec<_> = self
+                .invocations
+                .iter()
+                .rev()
+                .filter(|inv| {
+                    inv.state == InvocationState::Completed
+                        && inv.call.tool_id == call.tool_id
+                        && inv.call.arguments == call.arguments
+                })
+                .take(REPEATED_CALL_LIMIT)
+                .map(|inv| &inv.result)
+                .collect();
+            recent.len() == REPEATED_CALL_LIMIT && recent.windows(2).all(|pair| pair[0] == pair[1])
         })
     }
 

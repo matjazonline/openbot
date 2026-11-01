@@ -19,9 +19,17 @@ const MCP: &str = include_str!("../fixtures/mcp-lookup.yaml");
 fn the_graph_layers_every_route_downward_and_ends_below_every_step() {
     let graph = workflow_graph(&definition(SUPPORT));
     let layer = |id: &str| graph.node(id).unwrap().layer;
-    assert!(graph.node("draft").unwrap().entry);
-    assert_eq!((layer("draft"), layer("review"), layer("reply")), (0, 1, 2));
-    assert_eq!(layer(END_NODE), 3);
+    assert!(graph.node("context").unwrap().entry);
+    assert_eq!(
+        [
+            layer("context"),
+            layer("draft"),
+            layer("review"),
+            layer("reply")
+        ],
+        [0, 1, 2, 3]
+    );
+    assert_eq!(layer(END_NODE), 4);
     // Every edge points strictly down, so the drawing never needs a back edge.
     for edge in &graph.edges {
         assert!(layer(&edge.from) < layer(&edge.to), "{edge:?}");
@@ -39,8 +47,8 @@ fn the_graph_layers_every_route_downward_and_ends_below_every_step() {
             ("reject", END_NODE, GraphEdgeKind::Choice)
         ]
     );
-    assert_eq!(graph.layers, 4);
-    assert_eq!(graph.nodes.len(), 4);
+    assert_eq!(graph.layers, 5);
+    assert_eq!(graph.nodes.len(), 5);
 }
 
 #[test]

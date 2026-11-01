@@ -145,6 +145,43 @@ fn arguments_are_held_to_the_input_contract() {
     assert!(!valid(&input, &json!({"company": "other"})));
 }
 
+/// The Builder may add model-only and pure steps to the new agent's workflow, in a named slot,
+/// and nothing else.
+#[test]
+fn custom_steps_are_held_to_the_builder_step_types() {
+    let (input, _) = provisioning_tool_schemas(ProvisioningKind::CreateAgentChannel);
+    let step = json!({"id": "topic", "slot": "before_draft", "type": "ai.classify",
+        "with": {"agent": {"literal": "helper"}}});
+    let spec = |steps: Value| {
+        json!({
+            "name": "Helper", "slug": "helper", "system_prompt": "Help.",
+            "provider": "anthropic", "model": "claude", "reply_mode": "autonomous",
+            "steps": steps
+        })
+    };
+    assert!(valid(&input, &spec(json!([step]))));
+    let parsed = CreateAgentChannel::parse(&spec(json!([step]))).unwrap();
+    assert_eq!(parsed.steps[0].id, "topic");
+    assert_eq!(parsed.steps[0].definition["type"], "ai.classify");
+
+    for (field, value) in [
+        ("type", json!("message.send")),
+        ("type", json!("http.request")),
+        ("slot", json!("after_draft")),
+        ("id", json!("1st")),
+        ("owner", json!("someone")),
+    ] {
+        let mut changed = step.clone();
+        changed[field] = value;
+        assert!(!valid(&input, &spec(json!([changed]))), "{field}");
+    }
+    let mut untyped = step.clone();
+    untyped.as_object_mut().unwrap().remove("with");
+    assert!(!valid(&input, &spec(json!([untyped]))));
+    let many: Vec<_> = (0..=MAX_CUSTOM_STEPS).map(|_| step.clone()).collect();
+    assert!(!valid(&input, &spec(json!(many))));
+}
+
 /// p08 D2.1: no company HTTP operation may take a built-in's name.
 #[test]
 fn http_operations_cannot_take_a_built_in_name() {

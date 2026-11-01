@@ -68,6 +68,8 @@ pub enum ExecutionFailure {
     InvalidOutput,
     #[error("execution budget exhausted")]
     Budget,
+    #[error("model repeated tool calls whose results no longer change")]
+    RepeatedToolCall,
     #[error("invalid provider or checkpoint protocol")]
     Protocol,
     #[error("indeterminate effect requires reconciliation")]

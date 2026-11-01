@@ -9,6 +9,12 @@ pub trait SourceDecoder: Send + Sync {
     fn decode(&self, source: &str) -> Result<super::DecodedSource, Diagnostic>;
 }
 
+/// Trusted encoder boundary, the decoder's inverse: the text decodes back to the same values in
+/// the same order, within `MAX_SOURCE_BYTES`.
+pub trait SourceEncoder: Send + Sync {
+    fn encode(&self, source: &super::SourceNode) -> Result<String, Diagnostic>;
+}
+
 /// Change only the located root scalar, then decode and type-check the result.
 /// Child pins and identical text in literals/comments are never rewritten.
 pub fn rebase_workflow_id(

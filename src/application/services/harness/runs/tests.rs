@@ -342,3 +342,72 @@ fn terminal_usage_state_cannot_legitimize_over_admitted_reservations() {
         assert!(saved.validate().is_err());
     }
 }
+fn listing() -> SavedToolCall {
+    let id = Uuid::new_v4();
+    SavedToolCall {
+        invocation_id: InvocationId(id),
+        call_id: format!("call_{id}"),
+        item_id: None,
+        tool_id: "list_company_agents".into(),
+        arguments: json!({}),
+    }
+}
+/// The model asked for `calls` in one turn; none of them has started.
+fn asked(saved: RunCheckpoint, calls: Vec<SavedToolCall>) -> RunCheckpoint {
+    let budget = reservation();
+    let saved = saved.apply(Mutation::Reserve(budget.clone())).unwrap().0;
+    saved
+        .apply(Mutation::Model(turn(&budget, calls)))
+        .unwrap()
+        .0
+}
+/// The model asked for `calls` in one turn, and each returned its paired result.
+fn settled(saved: RunCheckpoint, calls: Vec<(SavedToolCall, Value)>) -> RunCheckpoint {
+    let mut saved = asked(saved, calls.iter().map(|(call, _)| call.clone()).collect());
+    for (call, result) in calls {
+        saved = saved
+            .apply(Mutation::Prepare(call.invocation_id))
+            .unwrap()
+            .0;
+        saved = saved
+            .apply(Mutation::Result(call.invocation_id, result))
+            .unwrap()
+            .0;
+    }
+    saved
+}
+#[test]
+fn a_call_that_returned_the_same_result_twice_is_not_started_a_third_time() {
+    let listed = json!({"agents":[]});
+    let once = settled(run(), vec![(listing(), listed.clone())]);
+    assert!(
+        !asked(once.clone(), vec![listing()]).repeats_settled_calls(),
+        "a second identical call still runs"
+    );
+    let twice = settled(once, vec![(listing(), listed)]);
+    let looping = asked(twice, vec![listing()]);
+    assert!(looping.repeats_settled_calls());
+    // A turn whose execution has begun is finished, never abandoned mid-batch.
+    let pending = looping.pending_call().unwrap().invocation_id;
+    let started = looping.apply(Mutation::Prepare(pending)).unwrap().0;
+    assert!(!started.repeats_settled_calls());
+}
+#[test]
+fn changing_results_new_arguments_and_new_calls_are_not_repeats() {
+    let changing = settled(run(), vec![(listing(), json!({"status":"pending"}))]);
+    let changing = settled(changing, vec![(listing(), json!({"status":"done"}))]);
+    assert!(!asked(changing, vec![listing()]).repeats_settled_calls());
+
+    let mut saved = run();
+    for _ in 0..REPEATED_CALL_LIMIT {
+        saved = settled(saved, vec![(listing(), json!({"agents":[]}))]);
+    }
+    let mut other = listing();
+    other.arguments = json!({"page":2});
+    assert!(!asked(saved.clone(), vec![other.clone()]).repeats_settled_calls());
+    assert!(
+        !asked(saved.clone(), vec![listing(), other]).repeats_settled_calls(),
+        "a turn that also asks for something new runs"
+    );
+    assert!(asked(saved, vec![listing(), listing()]).repeats_settled_calls());
+}

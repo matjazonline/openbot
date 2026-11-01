@@ -224,8 +224,13 @@ fn the_shipped_catalogue_holds_the_reply_mode_templates() {
             "front-desk",
         )
         .unwrap();
-        assert!(
-            retargeted.contains("agent: {literal: \"front-desk\"}"),
+        let decoded = crate::adapters::workflow_source::WorkflowSourceDecoder
+            .decode(&retargeted)
+            .unwrap();
+        let source = crate::application::workflow::compiler::json_value(&decoded.root, "").unwrap();
+        assert_eq!(
+            source["steps"][REPLY_AGENT_STEP]["with"]["agent"],
+            serde_json::json!({"literal": "front-desk"}),
             "{retargeted}"
         );
     }

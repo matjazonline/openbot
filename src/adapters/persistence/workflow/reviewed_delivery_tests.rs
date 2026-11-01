@@ -15,6 +15,8 @@ fn reviewed_source(reviewer: Uuid) -> Value {
     ))
     .unwrap();
     source["parameter_schema"] = json!(true);
+    // Its own history step, read after the classifier, replaces the base's.
+    source["steps"].as_object_mut().unwrap().remove("context");
     source["entry"] = json!("classify");
     source["steps"]["classify"] = json!({"type":"ai.classify","with":{
         "agent":{"literal":"assistant"},"context":{"object":{"untrusted_message":{"ref":"/input/message"}}},

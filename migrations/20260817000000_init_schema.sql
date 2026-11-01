@@ -2796,6 +2796,9 @@ CREATE FUNCTION public.workflow_control_retry_safe(company uuid, run uuid, job u
             AND workflow_action_retry_safe(company,execution.id) IS DISTINCT FROM false
             AND attempt.workflow_retry_safety='safe' AND attempt.workflow_retirement IN ('live','expired')
             AND attempt.workflow_failure_code NOT IN ('workflow.activation_limit','workflow.invalid_result','workflow.run_deadline')
+            -- An agent step resumes its saved checkpoint, which keeps its spent allowance, its
+            -- spent repairs and its repeated call, so retrying any of them only fails again.
+            AND attempt.workflow_failure_code NOT IN ('agent.budget','agent.invalid_output','agent.repeated_tool_call')
             AND NOT EXISTS (SELECT 1 FROM workflow_budget_receipts AS receipt
                 WHERE receipt.company_id=company AND receipt.run_id=run AND receipt.disposition='exhausted')
             AND NOT EXISTS(SELECT 1 FROM workflow_action_claim_budget_refusals AS refusal

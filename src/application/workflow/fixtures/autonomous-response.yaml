@@ -1,4 +1,6 @@
-# Saved agent tools and skills apply: no classifier or capability_profile.
+# The agent base: every agent channel's workflow is these three steps plus whatever it adds in
+# the slots `templates::AgentWorkflow` composes. Saved agent tools and skills apply: no
+# classifier or capability_profile.
 format_version: 1
 workflow_id: 00000000-0000-0000-0000-000000000002
 input_schema:
@@ -13,13 +15,22 @@ input_schema:
 parameter_schema: {type: object, additionalProperties: false}
 output_schema: true
 resources: []
-entry: draft
+entry: context
 steps:
+  context:
+    type: context.history
+    with:
+      max_tokens: {literal: 8000}
+    routes: {success: draft}
   draft:
     type: agent.run
     with:
       agent: {literal: assistant}
-      context: {object: {untrusted_message: {ref: /input/message}}}
+      context:
+        object:
+          untrusted_message: {ref: /input/message}
+          untrusted_subject: {default: {ref: /input/subject, value: {literal: ""}}}
+          untrusted_history: {ref: /steps/context/output}
       output_schema:
         literal:
           type: object

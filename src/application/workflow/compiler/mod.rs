@@ -16,7 +16,9 @@ mod schema;
 mod schema_budget;
 mod shape;
 mod source;
-pub use rebase::{MAX_SOURCE_BYTES, SourceDecoder, rebase_workflow_id, retarget_agent};
+pub use rebase::{
+    MAX_SOURCE_BYTES, SourceDecoder, SourceEncoder, rebase_workflow_id, retarget_agent,
+};
 mod syntax;
 mod wire;
 
@@ -28,7 +30,7 @@ pub use compile::{
 };
 pub(crate) use schema::{PathGuarantee, Schema};
 pub(crate) use shape::check_binding_shape;
-pub use source::{DecodedSource, Diagnostic, LocatedNode, NodeValue, SourceSpan};
+pub use source::{DecodedSource, Diagnostic, LocatedNode, NodeValue, SourceNode, SourceSpan};
 pub(crate) use syntax::{fields, json_value, required, scalar_string, sequence};
 pub(crate) use wire::{ParsedWorkflow, parse_workflow};
 pub use wire::{RepeatBindings, StepControl};
