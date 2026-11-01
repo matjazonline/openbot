@@ -9,13 +9,14 @@ struct NoticeAssignment {
 async fn foreign_company(f: &DecisionFixture) -> (Uuid, Uuid) {
     let company = Uuid::new_v4();
     let principal = Uuid::new_v4();
-    sqlx::query("INSERT INTO companies(id,name,slug,user_id) VALUES($1,'Foreign',$2,$3)")
-        .bind(company)
-        .bind(format!("foreign-{company}"))
-        .bind(f.admission.binding.target.actor.user_id())
-        .execute(f.persistence().pool())
-        .await
-        .unwrap();
+    crate::adapters::persistence::test_support::insert_company_with_owner(
+        f.persistence().pool(),
+        company,
+        "Foreign",
+        &format!("foreign-{company}"),
+        f.admission.binding.target.actor.user_id(),
+    )
+    .await;
     sqlx::query("INSERT INTO company_members(id,company_id,user_id,role) VALUES($1,$2,$3,'admin')")
         .bind(Uuid::new_v4())
         .bind(company)

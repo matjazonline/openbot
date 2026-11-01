@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use crate::app_error::AppError;
 
+pub(crate) mod account_identity;
 pub mod agent;
 pub mod attention;
 mod auth_attempts;

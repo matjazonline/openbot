@@ -333,16 +333,28 @@ async fn postgres_company_invite_and_member_persistence_works() {
     // 3. Update Invite Email
     let updated_email = format!("new_{}", member_email);
     let updated = persistence
-        .update_invite(invite.id, &updated_email, CompanyAccessRole::Member)
+        .update_invite(
+            company.id,
+            invite.id,
+            &updated_email,
+            CompanyAccessRole::Member,
+        )
         .await
+        .unwrap()
         .unwrap();
     assert_eq!(updated.email, updated_email);
     assert_eq!(updated.role, CompanyAccessRole::Member);
 
     // Update back
     let _ = persistence
-        .update_invite(invite.id, &member_email, CompanyAccessRole::Admin)
+        .update_invite(
+            company.id,
+            invite.id,
+            &member_email,
+            CompanyAccessRole::Admin,
+        )
         .await
+        .unwrap()
         .unwrap();
 
     // 4. Accept invite and add the member atomically

@@ -291,3 +291,30 @@ async fn workflow_harness_owner_existing_foreign_agent_is_not_a_valid_owner() {
 #[cfg(test)]
 #[path = "harness_model_owner_tests.rs"]
 mod model_owner_tests;
+
+/// A checkpointed harness run is run history too: the agent's deletion is refused by name.
+#[tokio::test]
+async fn agent_retire_with_harness_runs_reports_run_history() {
+    let NativeFixture {
+        fixture: f,
+        fence: _,
+        row,
+    } = native_row().await;
+    let mut tx = f.persistence().pool().begin().await.unwrap();
+    insert(&mut tx, &row).await.unwrap();
+    tx.commit().await.unwrap();
+    let agent: Uuid = serde_json::from_value(row["agent_id"].clone()).unwrap();
+
+    match AgentPersistence::delete(f.persistence(), agent).await {
+        Err(AppError::Conflict(message)) => {
+            assert_eq!(message, "This agent has run history and cannot be deleted.")
+        }
+        other => panic!("expected the run-history refusal, got {other:?}"),
+    }
+    assert!(
+        AgentPersistence::get_by_id(f.persistence(), agent)
+            .await
+            .unwrap()
+            .is_some()
+    );
+}

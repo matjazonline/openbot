@@ -127,3 +127,48 @@ async fn reject_foreign(f: &AdmissionFixture, row: &Value, foreign: &Value) {
         }
     }
 }
+
+/// An agent whose model calls are on record cannot be deleted, and is told so by name rather than
+/// as a channel conflict; the refused retirement leaves its principal as it was.
+#[tokio::test]
+async fn agent_retire_with_usage_rows_reports_run_history() {
+    let f = AdmissionFixture::new().await;
+    let command = f.prepare(f.request("usage", f.manual())).await;
+    f.persistence().admit(&command).await.unwrap();
+    let company = command.company_id().as_uuid();
+    let agent = AgentPersistence::create(
+        f.persistence(),
+        company,
+        AgentWrite {
+            name: "Billed agent".into(),
+            slug: "billed-agent".into(),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+    let row = usage_row(
+        &f,
+        command.proposed_run_id().as_uuid(),
+        command.first_execution_id().as_uuid(),
+        agent.id,
+    )
+    .await;
+    sqlx::query("INSERT INTO model_usage_calls SELECT (jsonb_populate_record(NULL::model_usage_calls,$1)).*")
+        .bind(row).execute(f.persistence().pool()).await.unwrap();
+
+    match AgentPersistence::delete(f.persistence(), agent.id).await {
+        Err(AppError::Conflict(message)) => {
+            assert_eq!(message, "This agent has run history and cannot be deleted.")
+        }
+        other => panic!("expected the run-history refusal, got {other:?}"),
+    }
+    let kind: String =
+        sqlx::query_scalar("SELECT kind FROM principals WHERE company_id=$1 AND agent_id=$2")
+            .bind(company)
+            .bind(agent.id)
+            .fetch_one(f.persistence().pool())
+            .await
+            .unwrap();
+    assert_eq!(kind, "agent", "the refused retirement rolled back whole");
+}

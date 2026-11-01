@@ -359,12 +359,12 @@ async fn workflow_action_cancellation_return_lost_owner_precedes_denied_authorit
             .unwrap(),
         CancelResult::Applied { .. }
     ));
-    sqlx::query("DELETE FROM company_members WHERE company_id=$1 AND user_id=$2")
-        .bind(request.scope().company.as_uuid())
-        .bind(f.binding.target.actor.user_id())
-        .execute(f.persistence().pool())
-        .await
-        .unwrap();
+    crate::adapters::persistence::test_support::revoke_membership_now(
+        f.persistence().pool(),
+        request.scope().company.as_uuid(),
+        f.binding.target.actor.user_id(),
+    )
+    .await;
     assert!(!writer.return_authorized(&entry).await.unwrap());
     assert_eq!(facts(&f).await, (1, 0, 0));
     assert_cancelled(&f, &request).await;

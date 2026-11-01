@@ -34,10 +34,17 @@ impl RemoteDispatch for Intercept<'_> {
         let reserved = self.inner.reserve_remote(request, contract).await?;
         if matches!(reserved, RemoteReservationResult::Reserved(_)) {
             if let Some(sql) = self.after_marker {
-                sqlx::query(sql)
-                    .bind(request.scope().company.as_uuid())
-                    .execute(self.pool)
-                    .await?;
+                // The injected revocation must itself succeed: an error here would be returned as
+                // the dispatch error the cases expect, and pass without revoking anything.
+                if sql == REVOKE_ALL_MEMBERSHIPS {
+                    revoke_all_memberships(self.pool, request.scope().company.as_uuid()).await;
+                } else {
+                    sqlx::query(sql)
+                        .bind(request.scope().company.as_uuid())
+                        .execute(self.pool)
+                        .await
+                        .expect("the injected revocation applies");
+                }
             }
             if self.ambiguous_ack {
                 return Err(AppError::Timeout(
@@ -62,12 +69,32 @@ impl RemoteDispatch for Intercept<'_> {
     }
 }
 
+/// Not SQL: every member of the company loses its membership in one transaction. The owner row
+/// cannot simply be deleted (it is one fact with `companies.user_id`), so
+/// `test_support::revoke_membership` hands the company to a fresh replacement account first.
+const REVOKE_ALL_MEMBERSHIPS: &str = "revoke every membership";
+
+async fn revoke_all_memberships(pool: &sqlx::PgPool, company: Uuid) {
+    let mut tx = pool.begin().await.unwrap();
+    let members: Vec<Uuid> =
+        sqlx::query_scalar("SELECT user_id FROM company_members WHERE company_id=$1")
+            .bind(company)
+            .fetch_all(&mut *tx)
+            .await
+            .unwrap();
+    for member in members {
+        crate::adapters::persistence::test_support::revoke_membership(&mut tx, company, member)
+            .await;
+    }
+    tx.commit().await.expect("the revocation commits");
+}
+
 #[tokio::test]
 async fn workflow_action_dispatch_service_post_marker_revoke_cancel_zero_provider_polls() {
     for sql in [
         "UPDATE fixture_action_resources SET enabled=false WHERE company_id=$1",
         "UPDATE fixture_action_policies SET approval=true WHERE company_id=$1",
-        "DELETE FROM company_members WHERE company_id=$1",
+        REVOKE_ALL_MEMBERSHIPS,
         "UPDATE workflow_runs SET state='cancelled' WHERE company_id=$1",
     ] {
         let (f, request) = setup().await;

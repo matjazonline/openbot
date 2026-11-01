@@ -194,12 +194,12 @@ async fn workflow_action_authority_sql_scope_actor_and_current_membership() {
                 .is_err()
         );
     }
-    sqlx::query("DELETE FROM company_members WHERE company_id=$1 AND user_id=$2")
-        .bind(request.scope.company.as_uuid())
-        .bind(request.context.actor)
-        .execute(f.persistence().pool())
-        .await
-        .unwrap();
+    crate::adapters::persistence::test_support::revoke_membership_now(
+        f.persistence().pool(),
+        request.scope.company.as_uuid(),
+        request.context.actor,
+    )
+    .await;
     assert!(matches!(
         f.persistence()
             .action_authority(request.scope, &subject)

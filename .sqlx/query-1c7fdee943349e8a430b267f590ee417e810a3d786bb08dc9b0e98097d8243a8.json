@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE principals\n                   SET kind = 'external', agent_id = NULL, updated_at = CURRENT_TIMESTAMP\n                   WHERE company_id = $1 AND agent_id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "1c7fdee943349e8a430b267f590ee417e810a3d786bb08dc9b0e98097d8243a8"
+}

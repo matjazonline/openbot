@@ -72,12 +72,14 @@ fn revoking(
     )
 }
 
-/// The run actor (the owner) loses owner and admin authority.
+/// The run actor (the owner) loses owner and admin authority: ownership moves to the recipient in
+/// one script, demoting the old owner row before promoting the new one (one owner row at a time).
 fn demote(setup: &Setup) -> String {
     let company = setup.scope().company.as_uuid();
     format!(
-        "UPDATE companies SET user_id='{user}' WHERE id='{company}'; \
-         UPDATE company_members SET role='member' WHERE company_id='{company}' AND user_id='{owner}'",
+        "UPDATE company_members SET role='member' WHERE company_id='{company}' AND user_id='{owner}'; \
+         UPDATE company_members SET role='owner' WHERE company_id='{company}' AND user_id='{user}'; \
+         UPDATE companies SET user_id='{user}' WHERE id='{company}'",
         user = setup.user,
         owner = setup.owner,
     )

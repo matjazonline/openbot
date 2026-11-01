@@ -446,12 +446,12 @@ async fn workflow_mcp_refusals_and_protection_are_terminal_without_network() {
                 .unwrap();
             }
             _ => {
-                sqlx::query("DELETE FROM company_members WHERE company_id=$1 AND user_id=$2")
-                    .bind(company.as_uuid())
-                    .bind(setup.actor().user_id())
-                    .execute(p.pool())
-                    .await
-                    .unwrap();
+                crate::adapters::persistence::test_support::revoke_membership_now(
+                    p.pool(),
+                    company.as_uuid(),
+                    setup.actor().user_id(),
+                )
+                .await;
             }
         }
         let runtime = setup.runtime();

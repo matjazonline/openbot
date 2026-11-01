@@ -308,12 +308,12 @@ async fn workflow_sql_revocation_and_failed_final_statement_roll_back() {
         .unwrap();
     service.save(fixture.save(None)).await.unwrap();
     let mut revocation = fixture.persistence.pool().begin().await.unwrap();
-    sqlx::query("DELETE FROM company_members WHERE company_id = $1 AND user_id = $2")
-        .bind(fixture.target.company.as_uuid())
-        .bind(fixture.target.actor.user_id())
-        .execute(&mut *revocation)
-        .await
-        .unwrap();
+    crate::adapters::persistence::test_support::revoke_membership(
+        &mut revocation,
+        fixture.target.company.as_uuid(),
+        fixture.target.actor.user_id(),
+    )
+    .await;
     let (published, ()) = tokio::join!(service.publish(fixture.publish()), async {
         crate::adapters::persistence::test_support::wait_until_a_backend_is_blocked(
             fixture.persistence.pool(),
@@ -518,12 +518,12 @@ async fn workflow_sql_template_provenance_roundtrips_and_replay_reauthorizes() {
         .unwrap()
         .unwrap();
     assert_eq!(published.draft.origin(), copied.origin());
-    sqlx::query("DELETE FROM company_members WHERE company_id = $1 AND user_id = $2")
-        .bind(fixture.target.company.as_uuid())
-        .bind(fixture.target.actor.user_id())
-        .execute(fixture.persistence.pool())
-        .await
-        .unwrap();
+    crate::adapters::persistence::test_support::revoke_membership_now(
+        fixture.persistence.pool(),
+        fixture.target.company.as_uuid(),
+        fixture.target.actor.user_id(),
+    )
+    .await;
     assert!(service.publish(request).await.is_err());
 }
 

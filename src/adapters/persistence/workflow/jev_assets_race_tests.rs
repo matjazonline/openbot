@@ -68,18 +68,13 @@ async fn restrict_to_view_grant(f: &Fixture, attachment: &Attachment) -> Uuid {
         .unwrap()
         .parse()
         .unwrap();
-    sqlx::query("UPDATE companies SET user_id=$2 WHERE id=$1")
-        .bind(company)
-        .bind(owner.target.actor.user_id())
-        .execute(p.pool())
-        .await
-        .unwrap();
-    sqlx::query("UPDATE company_members SET role='admin' WHERE company_id=$1 AND user_id=$2")
-        .bind(company)
-        .bind(f.target.actor.user_id())
-        .execute(p.pool())
-        .await
-        .unwrap();
+    crate::adapters::persistence::test_support::transfer_company_ownership(
+        p.pool(),
+        company,
+        owner.target.actor.user_id(),
+        crate::entities::company_member::CompanyAccessRole::Admin,
+    )
+    .await;
     sqlx::query("UPDATE channels SET access_mode='allowlist' WHERE company_id=$1 AND id=$2")
         .bind(company)
         .bind(channel)

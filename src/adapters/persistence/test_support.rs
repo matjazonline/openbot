@@ -471,6 +471,147 @@ fn fixture_part(key: &DeliveryKey, index: u16, body: &str) -> RenderedPart {
     }
 }
 
+/// Write a bare company row and its owner's member row in one transaction, for fixtures that need
+/// a company without what `CompanyPersistence::create` also sets up (principals, identities).
+/// The two rows are one fact checked at commit, so neither can be written alone.
+pub async fn insert_company_with_owner(
+    pool: &PgPool,
+    company_id: Uuid,
+    name: &str,
+    slug: &str,
+    owner: Uuid,
+) {
+    let mut transaction = pool.begin().await.expect("a transaction");
+    sqlx::query("INSERT INTO companies (id, name, slug, user_id) VALUES ($1, $2, $3, $4)")
+        .bind(company_id)
+        .bind(name)
+        .bind(slug)
+        .bind(owner)
+        .execute(&mut *transaction)
+        .await
+        .expect("the company row");
+    sqlx::query(
+        "INSERT INTO company_members (id, company_id, user_id, role) VALUES ($1, $2, $3, 'owner')",
+    )
+    .bind(Uuid::new_v4())
+    .bind(company_id)
+    .bind(owner)
+    .execute(&mut *transaction)
+    .await
+    .expect("the owner's member row");
+    transaction
+        .commit()
+        .await
+        .expect("a company with its owner row commits");
+}
+
+/// Hand a company to `new_owner` the one way the schema allows: in one transaction, the previous
+/// owner's member row becomes `previous_owner_role`, the new owner gets the owner row (created if
+/// they were not a member yet), and `companies.user_id` follows.
+///
+/// `companies.user_id` and the owner member row are one fact, checked at commit
+/// (`companies_owner_member_fk`, `companies_owner_member_agreement`), so a fixture that changes
+/// either alone -- or in separate autocommit statements -- describes a state the database refuses.
+pub async fn transfer_company_ownership(
+    pool: &PgPool,
+    company_id: Uuid,
+    new_owner: Uuid,
+    previous_owner_role: crate::entities::company_member::CompanyAccessRole,
+) {
+    let mut transaction = pool.begin().await.expect("a transaction");
+    let previous_owner: Uuid =
+        sqlx::query_scalar("SELECT user_id FROM companies WHERE id = $1 FOR UPDATE")
+            .bind(company_id)
+            .fetch_one(&mut *transaction)
+            .await
+            .expect("the company exists");
+    sqlx::query("UPDATE company_members SET role = $3 WHERE company_id = $1 AND user_id = $2")
+        .bind(company_id)
+        .bind(previous_owner)
+        .bind(previous_owner_role.as_str())
+        .execute(&mut *transaction)
+        .await
+        .expect("the previous owner is demoted");
+    sqlx::query(
+        r#"INSERT INTO company_members (id, company_id, user_id, role)
+           VALUES ($1, $2, $3, 'owner')
+           ON CONFLICT (company_id, user_id) DO UPDATE SET role = 'owner'"#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(company_id)
+    .bind(new_owner)
+    .execute(&mut *transaction)
+    .await
+    .expect("the new owner holds the owner row");
+    sqlx::query("UPDATE companies SET user_id = $2 WHERE id = $1")
+        .bind(company_id)
+        .bind(new_owner)
+        .execute(&mut *transaction)
+        .await
+        .expect("the company names its new owner");
+    transaction
+        .commit()
+        .await
+        .expect("a complete ownership transfer commits");
+}
+
+/// Take `user_id` off the company inside the caller's transaction, as fixtures modelling "the actor
+/// lost every authority" need.
+///
+/// The member row goes first, so a competitor holding a lock on it still makes this wait exactly
+/// where a bare `DELETE` would. When the user is the owner, a fresh replacement account then takes
+/// the company in the same transaction: the owner row cannot simply disappear, because
+/// `companies.user_id` and the owner member row are one fact checked at commit.
+pub async fn revoke_membership(connection: &mut PgConnection, company_id: Uuid, user_id: Uuid) {
+    let owner: Uuid = sqlx::query_scalar("SELECT user_id FROM companies WHERE id = $1")
+        .bind(company_id)
+        .fetch_one(&mut *connection)
+        .await
+        .expect("the company exists");
+    sqlx::query("DELETE FROM company_members WHERE company_id = $1 AND user_id = $2")
+        .bind(company_id)
+        .bind(user_id)
+        .execute(&mut *connection)
+        .await
+        .expect("the member row is deleted");
+    if owner != user_id {
+        return;
+    }
+    let replacement = Uuid::new_v4();
+    let name = format!("replacement_{}", replacement.simple());
+    sqlx::query(
+        "INSERT INTO users (id, username, email, password_hash) VALUES ($1, $2, $3, 'hash')",
+    )
+    .bind(replacement)
+    .bind(&name)
+    .bind(format!("{name}@example.test"))
+    .execute(&mut *connection)
+    .await
+    .expect("a replacement owner account");
+    sqlx::query(
+        "INSERT INTO company_members (id, company_id, user_id, role) VALUES ($1, $2, $3, 'owner')",
+    )
+    .bind(Uuid::new_v4())
+    .bind(company_id)
+    .bind(replacement)
+    .execute(&mut *connection)
+    .await
+    .expect("the replacement holds the owner row");
+    sqlx::query("UPDATE companies SET user_id = $2 WHERE id = $1")
+        .bind(company_id)
+        .bind(replacement)
+        .execute(&mut *connection)
+        .await
+        .expect("the company names its replacement owner");
+}
+
+/// [`revoke_membership`] committed on its own.
+pub async fn revoke_membership_now(pool: &PgPool, company_id: Uuid, user_id: Uuid) {
+    let mut transaction = pool.begin().await.expect("a transaction");
+    revoke_membership(&mut transaction, company_id, user_id).await;
+    transaction.commit().await.expect("the revocation commits");
+}
+
 /// Wait until some backend of this test's database is blocked on a lock.
 ///
 /// The barrier for a concurrency test: hold a lock in one transaction, start the competing

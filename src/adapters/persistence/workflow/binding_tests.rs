@@ -319,12 +319,12 @@ async fn workflow_binding_sql_archive_and_actor_revocation_after_preflight() {
         .await
         .unwrap();
     let mut blocker = block_company(&f).await;
-    sqlx::query("DELETE FROM company_members WHERE company_id = $1 AND user_id = $2")
-        .bind(f.target.company.as_uuid())
-        .bind(f.target.actor.user_id())
-        .execute(&mut *blocker)
-        .await
-        .unwrap();
+    crate::adapters::persistence::test_support::revoke_membership(
+        &mut blocker,
+        f.target.company.as_uuid(),
+        f.target.actor.user_id(),
+    )
+    .await;
     let (result, ()) = tokio::join!(p.save_binding(capture.take()), async {
         crate::adapters::persistence::test_support::wait_until_backends_are_blocked(p.pool(), 1)
             .await;
