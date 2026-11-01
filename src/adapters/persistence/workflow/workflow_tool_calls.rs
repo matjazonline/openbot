@@ -115,7 +115,7 @@ pub(super) async fn call_on(
         )));
     }
     // 5. A parked call must be able to continue its job.
-    if continuations >= 63 {
+    if continuations >= super::WORKFLOW_JOB_CONTINUATION_LIMIT {
         return Ok(AgentToolObservation::Completed(tool_error(
             TOOL_LIMIT,
             "This agent step cannot start another workflow tool call",

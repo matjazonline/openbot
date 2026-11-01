@@ -206,7 +206,8 @@ async fn a_delivery_for_an_unregistered_transport_is_dead_lettered() {
     );
     let (_shutdown, mut receiver) = broadcast::channel(1);
 
-    worker.deliver(delivery, &mut receiver).await;
+    let mut batch = BatchLeases::of(std::slice::from_ref(&delivery));
+    worker.deliver(delivery, &mut batch, &mut receiver).await;
 
     let failures = queue.failures.lock().unwrap();
     assert_eq!(failures.len(), 1);
@@ -246,7 +247,8 @@ async fn shutdown_before_a_send_releases_the_claim_rather_than_stranding_it() {
         uuid::Uuid::new_v4(),
         vec![stored_part(0, DeliveryPartStatus::Prepared)],
     );
-    worker.deliver(delivery, &mut receiver).await;
+    let mut batch = BatchLeases::of(std::slice::from_ref(&delivery));
+    worker.deliver(delivery, &mut batch, &mut receiver).await;
 
     assert_eq!(
         *queue.released.lock().unwrap(),
@@ -278,18 +280,15 @@ async fn losing_the_lease_stops_the_worker_mid_send() {
     let worker = DeliveryWorker::new(queue.clone(), Arc::new(registry));
     let (_shutdown, mut receiver) = broadcast::channel(1);
 
-    worker
-        .deliver(
-            claimed(
-                uuid::Uuid::new_v4(),
-                vec![
-                    stored_part(0, DeliveryPartStatus::Prepared),
-                    stored_part(1, DeliveryPartStatus::Prepared),
-                ],
-            ),
-            &mut receiver,
-        )
-        .await;
+    let delivery = claimed(
+        uuid::Uuid::new_v4(),
+        vec![
+            stored_part(0, DeliveryPartStatus::Prepared),
+            stored_part(1, DeliveryPartStatus::Prepared),
+        ],
+    );
+    let mut batch = BatchLeases::of(std::slice::from_ref(&delivery));
+    worker.deliver(delivery, &mut batch, &mut receiver).await;
 
     assert_eq!(
         *queue.sends.lock().unwrap(),
@@ -302,6 +301,107 @@ async fn losing_the_lease_stops_the_worker_mid_send() {
     );
 }
 
+/// A renewal that reports the lease gone stops the delivery before its provider call, and the
+/// worker renews before every part it sends.
+#[tokio::test]
+async fn delivery_late_completion_a_lost_renewal_stops_the_send() {
+    let registry = || {
+        TransportRegistry::new()
+            .register(
+                Arc::new(NoopRenderer),
+                Arc::new(ScriptedSender::new(ProviderSendOutcome::Delivered {
+                    provider_key: None,
+                })),
+            )
+            .expect("one transport registers")
+    };
+    let two_parts = || {
+        claimed(
+            uuid::Uuid::new_v4(),
+            vec![
+                stored_part(0, DeliveryPartStatus::Prepared),
+                stored_part(1, DeliveryPartStatus::Prepared),
+            ],
+        )
+    };
+    let (_shutdown, mut receiver) = broadcast::channel(1);
+
+    let lost = Arc::new(ScriptedQueue {
+        lease_lost_on_renew: Mutex::new(true),
+        ..ScriptedQueue::default()
+    });
+    let worker = DeliveryWorker::new(lost.clone(), Arc::new(registry()));
+    let delivery = two_parts();
+    let mut batch = BatchLeases::of(std::slice::from_ref(&delivery));
+    worker.deliver(delivery, &mut batch, &mut receiver).await;
+    assert!(
+        lost.started.lock().unwrap().is_empty(),
+        "a lease renewal reported lost means no provider request starts"
+    );
+    assert!(batch.held.is_empty(), "the lost lease is no longer renewed");
+
+    let live = Arc::new(ScriptedQueue {
+        parts_still_sending: Mutex::new(1),
+        ..ScriptedQueue::default()
+    });
+    let worker = DeliveryWorker::new(live.clone(), Arc::new(registry()));
+    let delivery = two_parts();
+    let mut batch = BatchLeases::of(std::slice::from_ref(&delivery));
+    worker.deliver(delivery, &mut batch, &mut receiver).await;
+    assert_eq!(live.started.lock().unwrap().len(), 2);
+    assert_eq!(
+        *live.renewals.lock().unwrap(),
+        2,
+        "one renewal before each part"
+    );
+}
+
+/// A renewal that errors changes nothing: the delivery stays in the renewed set and the worker
+/// goes on to `begin_part`, whose live-lease fence decides whether the provider call starts
+/// (FIXAPP-P02-B1-F3; the G1 r2 F5 decision).
+#[tokio::test]
+async fn delivery_late_completion_a_renewal_error_still_sends() {
+    let queue = Arc::new(ScriptedQueue {
+        renewal_errors: Mutex::new(true),
+        ..ScriptedQueue::default()
+    });
+    let registry = TransportRegistry::new()
+        .register(
+            Arc::new(NoopRenderer),
+            Arc::new(ScriptedSender::new(ProviderSendOutcome::Delivered {
+                provider_key: None,
+            })),
+        )
+        .expect("one transport registers");
+    let worker = DeliveryWorker::new(queue.clone(), Arc::new(registry));
+    let (_shutdown, mut receiver) = broadcast::channel(1);
+
+    let delivery = claimed(
+        uuid::Uuid::new_v4(),
+        vec![stored_part(0, DeliveryPartStatus::Prepared)],
+    );
+    let row = delivery.lease.row;
+    let mut batch = BatchLeases::of(std::slice::from_ref(&delivery));
+    worker.deliver(delivery, &mut batch, &mut receiver).await;
+
+    assert_eq!(*queue.renewals.lock().unwrap(), 1, "the renewal was tried");
+    assert_eq!(
+        queue.started.lock().unwrap().len(),
+        1,
+        "a renewal error still lets begin_part decide"
+    );
+    assert_eq!(
+        queue.completions.lock().unwrap().len(),
+        1,
+        "and the send completes"
+    );
+    assert_eq!(
+        batch.held.iter().map(|lease| lease.row).collect::<Vec<_>>(),
+        vec![row],
+        "an error drops nothing from the renewed set"
+    );
+}
+
 /// A queue that records what the worker asked of it and answers as the test scripted.
 #[derive(Default)]
 struct ScriptedQueue {
@@ -311,6 +411,11 @@ struct ScriptedQueue {
     released: Mutex<usize>,
     sends: Mutex<usize>,
     lease_lost_on_begin: Mutex<bool>,
+    lease_lost_on_renew: Mutex<bool>,
+    renewal_errors: Mutex<bool>,
+    renewals: Mutex<usize>,
+    /// How many completions leave the delivery `sending`, i.e. with more parts to go.
+    parts_still_sending: Mutex<usize>,
 }
 
 #[async_trait::async_trait]
@@ -334,12 +439,21 @@ impl DeliveryQueue for ScriptedQueue {
         Ok(Vec::new())
     }
 
-    async fn renew_delivery_lease(
+    async fn renew_delivery_leases(
         &self,
-        _fence: &ExecutionLease<DeliveryId>,
-        _until: chrono::DateTime<Utc>,
-    ) -> AppResult<bool> {
-        Ok(true)
+        fences: &[ExecutionLease<DeliveryId>],
+        _lease_for: Duration,
+    ) -> AppResult<Vec<DeliveryId>> {
+        *self.renewals.lock().unwrap() += 1;
+        if *self.renewal_errors.lock().unwrap() {
+            return Err(crate::app_error::AppError::Internal(
+                "scripted renewal error".into(),
+            ));
+        }
+        if *self.lease_lost_on_renew.lock().unwrap() {
+            return Ok(Vec::new());
+        }
+        Ok(fences.iter().map(|fence| fence.row).collect())
     }
 
     async fn begin_part(
@@ -355,7 +469,11 @@ impl DeliveryQueue for ScriptedQueue {
     }
 
     async fn complete_part(&self, result: PartResult<'_>) -> AppResult<DeliveryOutcome> {
-        self.completions.lock().unwrap().push(result.part_id);
+        let mut completions = self.completions.lock().unwrap();
+        completions.push(result.part_id);
+        if completions.len() <= *self.parts_still_sending.lock().unwrap() {
+            return Ok(DeliveryOutcome::Applied(DeliveryStatus::Sending));
+        }
         Ok(DeliveryOutcome::Applied(DeliveryStatus::Delivered))
     }
 

@@ -225,9 +225,10 @@ async fn a_held_delivery_starts_no_further_part_once_cancelled() {
     );
     assert!(
         !persistence
-            .renew_delivery_lease(&claimed.lease, Utc::now() + chrono::Duration::minutes(5))
+            .renew_delivery_leases(&[claimed.lease], Duration::from_secs(300))
             .await
-            .unwrap(),
+            .unwrap()
+            .contains(&claimed.lease.row),
         "the settle released the lease rather than stranding it"
     );
 }

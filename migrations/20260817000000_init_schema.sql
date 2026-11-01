@@ -179,6 +179,7 @@ BEGIN
                     AND ((execution.completed_at IS NOT NULL AND execution.committed_route IS NOT NULL)
                         OR (attempt.stop_reason = 'effect_parked' AND execution.completed_at IS NULL
                             AND run.state = 'waiting' AND run.waiting_reason = 'effect'
+                            AND OLD.continuation_count < workflow_job_continuation_limit()
                             AND EXISTS (SELECT 1 FROM workflow_waits AS wait
                                 JOIN workflow_message_actions AS action ON action.company_id = wait.company_id
                                     AND action.execution_id = wait.execution_id AND action.wait_id = wait.id
@@ -186,7 +187,7 @@ BEGIN
                                     AND wait.reason = 'effect' AND wait.state = 'waiting'))
                         OR (attempt.stop_reason='approval_parked' AND execution.completed_at IS NULL
                             AND execution.committed_route IS NULL AND run.state='waiting' AND run.waiting_reason='decision'
-                            AND OLD.continuation_count < 63
+                            AND OLD.continuation_count < workflow_job_continuation_limit()
                             AND EXISTS (SELECT 1 FROM workflow_decisions AS decision
                                 JOIN workflow_waits AS wait ON wait.company_id=decision.company_id AND wait.id=decision.wait_id
                                 WHERE decision.company_id=execution.company_id AND decision.execution_id=execution.id
@@ -196,7 +197,7 @@ BEGIN
                         -- A workflow tool call parks its agent job on the call's child (07-D2 §D2.5).
                         OR (attempt.stop_reason='child_parked' AND execution.completed_at IS NULL
                             AND execution.committed_route IS NULL AND run.state='waiting' AND run.waiting_reason='child_run'
-                            AND OLD.continuation_count < 63
+                            AND OLD.continuation_count < workflow_job_continuation_limit()
                             AND EXISTS (SELECT 1 FROM workflow_waits AS wait
                                 WHERE wait.company_id=execution.company_id AND wait.execution_id=execution.id
                                     AND wait.reason='child_run' AND wait.state='waiting'
@@ -208,7 +209,8 @@ BEGIN
     END IF;
     IF OLD.queue_kind='workflow' AND OLD.status='completed' AND NEW.status='pending' THEN
         IF NEW.retry_count <> OLD.retry_count OR NEW.max_retries <> OLD.max_retries
-            OR NEW.continuation_count <> OLD.continuation_count + 1 OR NEW.continuation_count > 63
+            OR NEW.continuation_count <> OLD.continuation_count + 1
+            OR NEW.continuation_count > workflow_job_continuation_limit()
             OR (NEW.company_id,NEW.workflow_execution_id) IS DISTINCT FROM (OLD.company_id,OLD.workflow_execution_id)
             OR NEW.worker_id IS NOT NULL OR NEW.execution_generation IS NOT NULL OR NEW.lock_expires_at IS NOT NULL
             OR NOT (EXISTS (
@@ -1595,10 +1597,10 @@ BEGIN
         NEW.channel_id := owner_channel;
         NEW.binding_id := owner_binding;
     ELSE
-        IF (NEW.company_id, NEW.channel_id, NEW.binding_id, NEW.schedule_id, NEW.schedule_snapshot,
+        IF (NEW.company_id, NEW.channel_id, NEW.binding_id, NEW.schedule_id,
             NEW.scheduled_for, NEW.command_key)
             IS DISTINCT FROM
-           (OLD.company_id, OLD.channel_id, OLD.binding_id, OLD.schedule_id, OLD.schedule_snapshot,
+           (OLD.company_id, OLD.channel_id, OLD.binding_id, OLD.schedule_id,
             OLD.scheduled_for, OLD.command_key) THEN
             RAISE EXCEPTION 'Captured schedule occurrence identity is immutable'
                 USING ERRCODE = '23514', CONSTRAINT = 'schedule_occurrence_identity_immutable';
@@ -1610,15 +1612,6 @@ BEGIN
         IF NEW.run_id IS NOT DISTINCT FROM OLD.run_id THEN
             RETURN NEW;
         END IF;
-    END IF;
-    -- Incomplete snapshots already fail the application decoder. When an identity
-    -- is present it must agree with the relational occurrence, including raw SQL.
-    IF (NEW.schedule_snapshot ? 'id' AND NEW.schedule_snapshot->>'id' IS DISTINCT FROM NEW.schedule_id::text)
-       OR (NEW.schedule_snapshot ? 'company_id' AND NEW.schedule_snapshot->>'company_id' IS DISTINCT FROM NEW.company_id::text)
-       OR (NEW.schedule_snapshot ? 'channel_id' AND NEW.schedule_snapshot->>'channel_id' IS DISTINCT FROM NEW.channel_id::text)
-       OR (NEW.schedule_snapshot ? 'binding_id' AND NEW.schedule_snapshot->>'binding_id' IS DISTINCT FROM NEW.binding_id::text) THEN
-        RAISE EXCEPTION 'Schedule snapshot identity must match captured occurrence scope'
-            USING ERRCODE = '23514', CONSTRAINT = 'schedule_occurrence_snapshot_scope';
     END IF;
     -- The run must be the one admitted for this occurrence: its trigger is the occurrence and
     -- its association the occurrence's channel (the binding is the composite foreign key).
@@ -2968,6 +2961,19 @@ $$;
 
 
 --
+-- Name: workflow_job_continuation_limit(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+-- The most continuations one workflow job may take: every park that needs its job reopened
+-- (approval, token allowance, child call, model-tool delivery) checks it before parking, and the
+-- reopen may not pass it. Rust mirrors it as `WORKFLOW_JOB_CONTINUATION_LIMIT`, asserted equal by
+-- a database test.
+CREATE FUNCTION public.workflow_job_continuation_limit() RETURNS smallint
+    LANGUAGE sql IMMUTABLE
+    RETURN 63;
+
+
+--
 -- Name: workflow_message_action_capture(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -3378,7 +3384,7 @@ CREATE TABLE public.background_tasks (
     CONSTRAINT background_tasks_payload_object_check CHECK ((jsonb_typeof(payload) = 'object'::text)),
     CONSTRAINT background_tasks_queue_kind_check CHECK ((queue_kind = 'workflow'::text)),
     CONSTRAINT background_tasks_retry_count_check CHECK ((retry_count >= 0)),
-    CONSTRAINT background_tasks_continuation_count_check CHECK (continuation_count BETWEEN 0 AND 63),
+    CONSTRAINT background_tasks_continuation_count_check CHECK (continuation_count BETWEEN 0 AND public.workflow_job_continuation_limit()),
     CONSTRAINT background_tasks_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'processing'::text, 'completed'::text, 'failed'::text]))),
     CONSTRAINT background_tasks_workflow_shape_check CHECK (((workflow_execution_id IS NOT NULL) AND (task_type = 'workflow_execution'::text) AND (payload = jsonb_build_object('version', 1, 'execution_id', (workflow_execution_id)::text))))
 );
@@ -4108,7 +4114,6 @@ CREATE TABLE public.schedule_runs (
     id uuid NOT NULL,
     schedule_id uuid NOT NULL,
     scheduled_for timestamp with time zone NOT NULL,
-    schedule_snapshot jsonb NOT NULL,
     binding_id uuid NOT NULL,
     run_id uuid,
     command_key text,
@@ -4128,8 +4133,7 @@ CREATE TABLE public.schedule_runs (
     CONSTRAINT schedule_runs_materialization_attempts_check CHECK (((materialization_attempts >= 0) AND (materialization_attempts <= 5))),
     CONSTRAINT schedule_runs_command_key_check CHECK (((command_key IS NULL) OR ((length(command_key) >= 1) AND (length(command_key) <= 200)))),
     CONSTRAINT schedule_runs_materialization_state_check CHECK ((((materialization_status = 'pending'::text) AND (run_id IS NULL) AND (refusal IS NULL) AND (materialization_attempts < 5) AND (materialization_worker_id IS NULL) AND (materialization_generation IS NULL) AND (materialization_locked_at IS NULL) AND (materialization_lock_expires_at IS NULL)) OR ((materialization_status = 'materializing'::text) AND (run_id IS NULL) AND (refusal IS NULL) AND ((materialization_attempts >= 1) AND (materialization_attempts <= 5)) AND (materialization_worker_id IS NOT NULL) AND (materialization_generation IS NOT NULL) AND (materialization_locked_at IS NOT NULL) AND (materialization_lock_expires_at IS NOT NULL) AND (materialization_lock_expires_at > materialization_locked_at)) OR ((materialization_status = 'materialized'::text) AND (run_id IS NOT NULL) AND (refusal IS NULL) AND (materialization_worker_id IS NULL) AND (materialization_generation IS NULL) AND (materialization_locked_at IS NULL) AND (materialization_lock_expires_at IS NULL)) OR ((materialization_status = 'failed'::text) AND (run_id IS NULL) AND ((materialization_attempts = 5) OR (refusal IS NOT NULL)) AND (materialization_worker_id IS NULL) AND (materialization_generation IS NULL) AND (materialization_locked_at IS NULL) AND (materialization_lock_expires_at IS NULL)))),
-    CONSTRAINT schedule_runs_refusal_check CHECK (((refusal IS NULL) OR (refusal = ANY (ARRAY['unavailable'::text, 'input_rejected'::text, 'key_conflict'::text])))),
-    CONSTRAINT schedule_runs_snapshot_object_check CHECK ((jsonb_typeof(schedule_snapshot) = 'object'::text))
+    CONSTRAINT schedule_runs_refusal_check CHECK (((refusal IS NULL) OR (refusal = ANY (ARRAY['unavailable'::text, 'input_rejected'::text, 'key_conflict'::text]))))
 );
 
 

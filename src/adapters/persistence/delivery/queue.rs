@@ -12,7 +12,6 @@
 use std::{str::FromStr, time::Duration};
 
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
 use sqlx::{Postgres, Transaction};
 use uuid::Uuid;
 
@@ -144,27 +143,53 @@ impl DeliveryQueue for PostgresPersistence {
         Ok(claimed)
     }
 
-    async fn renew_delivery_lease(
+    async fn renew_delivery_leases(
         &self,
-        fence: &ExecutionLease<DeliveryId>,
-        until: DateTime<Utc>,
-    ) -> AppResult<bool> {
+        fences: &[ExecutionLease<DeliveryId>],
+        lease_for: Duration,
+    ) -> AppResult<Vec<DeliveryId>> {
+        if fences.is_empty() {
+            return Ok(Vec::new());
+        }
         let sending = DeliveryStatus::Sending.as_str();
-        let result = sqlx::query(&format!(
-            r#"UPDATE message_deliveries
-                  SET lock_expires_at = $4, updated_at = CURRENT_TIMESTAMP
-                WHERE id = $1 AND status = '{sending}'
-                  AND execution_id = $2 AND owner_worker_id = $3
-                  AND lock_expires_at > CURRENT_TIMESTAMP"#
+        let rows: Vec<Uuid> = fences.iter().map(|fence| fence.row.as_uuid()).collect();
+        let executions: Vec<Uuid> = fences
+            .iter()
+            .map(|fence| fence.execution.as_uuid())
+            .collect();
+        let owners: Vec<Uuid> = fences.iter().map(|fence| fence.owner.as_uuid()).collect();
+        // The rows are locked in id order before any is written, not in the order the worker
+        // listed them; and only a live lease is extended -- a lapsed one belongs to the reaper.
+        let renewed: Vec<Uuid> = sqlx::query_scalar(&format!(
+            r#"WITH held AS (
+                   SELECT delivery.id
+                     FROM message_deliveries AS delivery
+                     JOIN UNNEST($1::uuid[], $2::uuid[], $3::uuid[])
+                          AS fence(id, execution_id, owner_worker_id)
+                       ON fence.id = delivery.id
+                      AND fence.execution_id = delivery.execution_id
+                      AND fence.owner_worker_id = delivery.owner_worker_id
+                    WHERE delivery.status = '{sending}'
+                      AND delivery.lock_expires_at > CURRENT_TIMESTAMP
+                    ORDER BY delivery.id
+                      FOR UPDATE OF delivery
+               )
+               UPDATE message_deliveries AS delivery
+                  SET lock_expires_at = CURRENT_TIMESTAMP
+                          + make_interval(secs => $4::double precision),
+                      updated_at = CURRENT_TIMESTAMP
+                 FROM held
+                WHERE delivery.id = held.id
+            RETURNING delivery.id"#
         ))
-        .bind(fence.row.as_uuid())
-        .bind(fence.execution.as_uuid())
-        .bind(fence.owner.as_uuid())
-        .bind(until)
-        .execute(&self.pool)
+        .bind(&rows)
+        .bind(&executions)
+        .bind(&owners)
+        .bind(lease_for.as_secs_f64())
+        .fetch_all(&self.pool)
         .await
         .map_err(AppError::from)?;
-        Ok(result.rows_affected() == 1)
+        Ok(renewed.into_iter().map(DeliveryId::new).collect())
     }
 
     async fn begin_part(
@@ -269,10 +294,10 @@ impl DeliveryQueue for PostgresPersistence {
                  FROM message_deliveries AS delivery
                 WHERE part.id = $1 AND part.delivery_id = delivery.id
                   AND part.status = '{sending_part}'
-                  AND {live_fence}"#,
+                  AND {own_fence}"#,
             delivered_part = DeliveryPartStatus::Delivered.as_str(),
             sending_part = DeliveryPartStatus::Sending.as_str(),
-            live_fence = live_fence_sql(),
+            own_fence = own_fence_sql(),
         ))
         .bind(result.part_id.as_uuid())
         .bind(result.fence.row.as_uuid())
@@ -799,18 +824,31 @@ async fn orphan_stuck_dependents_on(tx: &mut Transaction<'_, Postgres>) -> AppRe
     Ok(result.rows_affected())
 }
 
-/// The parent-side half of a part transition's `WHERE` clause: this delivery, this execution, this
-/// worker, and a lease that has not lapsed.
-///
-/// Written once because it appears in every part statement, and because dropping any one of the
-/// four turns the fence into a suggestion. Reads `$2` as the delivery, `$3` as the execution and
+/// The parent-side half of a part transition's `WHERE` clause: this delivery, still `sending`,
+/// under this execution and this worker. Reads `$2` as the delivery, `$3` as the execution and
 /// `$4` as the worker; `$1` is the part the statement is about.
-fn live_fence_sql() -> String {
+///
+/// No expiry check, for the reason [`own_row_fence_sql`] gives: recording what a provider said
+/// must survive a lease that lapsed during the call. That is ownership, not a suggestion, because
+/// `message_deliveries_lease_check` clears `execution_id` whenever the row leaves `sending`, a
+/// claim mints a new one, and the reaper changes both under the parent's row lock -- which
+/// `complete_part` takes first.
+fn own_fence_sql() -> String {
     format!(
         r#"delivery.id = $2 AND delivery.status = '{sending}'
-           AND delivery.execution_id = $3 AND delivery.owner_worker_id = $4
-           AND delivery.lock_expires_at > CURRENT_TIMESTAMP"#,
+           AND delivery.execution_id = $3 AND delivery.owner_worker_id = $4"#,
         sending = DeliveryStatus::Sending.as_str(),
+    )
+}
+
+/// [`own_fence_sql`] plus a lease that has not lapsed: what starting a provider request needs.
+///
+/// Written once because it appears in every statement that may begin a send, and because dropping
+/// any one of the five turns the fence into a suggestion.
+fn live_fence_sql() -> String {
+    format!(
+        "{own} AND delivery.lock_expires_at > CURRENT_TIMESTAMP",
+        own = own_fence_sql()
     )
 }
 

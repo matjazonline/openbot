@@ -409,9 +409,10 @@ async fn two_claimants_never_own_the_same_delivery() {
     let owner = owners.remove(0);
     assert!(
         persistence
-            .renew_delivery_lease(&owner, Utc::now() + chrono::Duration::minutes(5))
+            .renew_delivery_leases(&[owner], Duration::from_secs(300))
             .await
             .unwrap()
+            .contains(&owner.row)
     );
     let impostor = ExecutionLease::new(
         owner.row,
@@ -420,9 +421,10 @@ async fn two_claimants_never_own_the_same_delivery() {
     );
     assert!(
         !persistence
-            .renew_delivery_lease(&impostor, Utc::now() + chrono::Duration::minutes(5))
+            .renew_delivery_leases(&[impostor], Duration::from_secs(300))
             .await
-            .unwrap(),
+            .unwrap()
+            .contains(&impostor.row),
         "a lease this run never held must renew nothing"
     );
 
@@ -469,9 +471,10 @@ async fn a_stale_execution_cannot_write_over_the_one_that_replaced_it() {
     // Nothing the first run does may land.
     assert!(
         !persistence
-            .renew_delivery_lease(&first.lease, Utc::now() + chrono::Duration::minutes(5))
+            .renew_delivery_leases(&[first.lease], Duration::from_secs(300))
             .await
             .unwrap()
+            .contains(&first.lease.row)
     );
     assert_eq!(
         persistence.begin_part(&first.lease, part_id).await.unwrap(),
@@ -1220,3 +1223,6 @@ async fn the_stuck_delivery_census_counts_each_stall_and_not_a_due_delivery() {
 
 #[path = "cancellation_tests.rs"]
 mod cancellation;
+
+#[path = "late_completion_tests.rs"]
+mod late_completion;

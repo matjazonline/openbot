@@ -85,6 +85,7 @@ where
             MessagePublication::ApprovalRequired => MessageObservation::ApprovalRequired,
             MessagePublication::ApprovalParked(wait) => MessageObservation::ApprovalParked(wait),
             MessagePublication::ActionLimit => MessageObservation::ActionLimit,
+            MessagePublication::ContinuationLimit => MessageObservation::ContinuationLimit,
         })
     }
 
@@ -551,6 +552,10 @@ where
             }
             Ok(MessagePublication::ApprovalRequired) => Outcome::ApprovalRequired,
             Ok(MessagePublication::ActionLimit) => Outcome::ActionLimit,
+            // Defensive: a step's delivery wait completes the step without reopening its job,
+            // and a step job takes at most one continuation (its approval), so this is never
+            // reached in practice. Terminal and observable rather than a park it cannot leave.
+            Ok(MessagePublication::ContinuationLimit) => Outcome::ActionLimit,
             Ok(
                 MessagePublication::Pending
                 | MessagePublication::Uncertain

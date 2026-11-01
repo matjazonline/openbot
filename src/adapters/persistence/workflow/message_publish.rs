@@ -147,6 +147,24 @@ async fn admission_full_on(
     Ok(usize::try_from(held).map_err(|_| invalid())? >= MAX_MESSAGE_ACTIONS_PER_EXECUTION)
 }
 
+/// Whether the fenced job has used every continuation, so a delivery park could never resume.
+async fn continuations_exhausted_on(
+    tx: &mut Transaction<'_, Postgres>,
+    request: &ActionDispatchRequest,
+) -> AppResult<bool> {
+    let scope = request.fence.scope;
+    let used: i16 = sqlx::query_scalar(
+        "SELECT continuation_count FROM background_tasks \
+         WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 AND queue_kind='workflow'",
+    )
+    .bind(scope.company.as_uuid())
+    .bind(scope.job.0)
+    .bind(scope.execution.as_uuid())
+    .fetch_one(&mut **tx)
+    .await?;
+    Ok(used >= super::super::WORKFLOW_JOB_CONTINUATION_LIMIT)
+}
+
 /// Every thread, canonical message and delivery of the plan, in destination order.
 async fn write_destinations_on(
     tx: &mut Transaction<'_, Postgres>,
@@ -344,6 +362,11 @@ impl<L: SqlLocalAction> PostgresActionDispatch<MessageActionAuthority, L> {
                 .map(End::Rollback);
         }
         super::super::persistence_bound::locks_held();
+        // Refused before any write: a delivery parks the job, and a park the job could never be
+        // reopened from would hold the run until its deadline. The SQL park guard backstops this.
+        if plan.has_delivery() && continuations_exhausted_on(tx, request).await? {
+            return Ok(End::Rollback(MessagePublication::ContinuationLimit));
+        }
         if admission_full_on(tx, request).await? {
             return Ok(End::Rollback(MessagePublication::ActionLimit));
         }

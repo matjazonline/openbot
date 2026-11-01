@@ -60,6 +60,8 @@ pub struct DeliveryWorker {
     transports: Arc<TransportRegistry>,
     monitoring: Option<Arc<dyn MonitoringService>>,
     worker_id: WorkerId,
+    /// How long a claim, and every renewal of it, lasts.
+    lease_for: Duration,
 }
 
 impl DeliveryWorker {
@@ -69,11 +71,19 @@ impl DeliveryWorker {
             transports,
             monitoring: None,
             worker_id: WorkerId::random(),
+            lease_for: Duration::from_secs(DELIVERY_LEASE_SECONDS as u64),
         }
     }
 
     pub fn with_monitoring(mut self, monitoring: Arc<dyn MonitoringService>) -> Self {
         self.monitoring = Some(monitoring);
+        self
+    }
+
+    /// A different lease length than [`DELIVERY_LEASE_SECONDS`]; a test shortens it to make a
+    /// batch outlive its claim.
+    pub fn with_lease(mut self, lease_for: Duration) -> Self {
+        self.lease_for = lease_for;
         self
     }
 
@@ -119,25 +129,35 @@ impl DeliveryWorker {
     }
 
     /// Claim one batch and send it, returning how many rows were claimed.
-    async fn drain_once(&self, shutdown: &broadcast::Receiver<()>) -> AppResult<usize> {
+    ///
+    /// The whole batch is claimed under one lease and sent in sequence, so the leases of the
+    /// deliveries still waiting are renewed as the batch goes (see [`BatchLeases`]); without that a
+    /// slow provider would let the tail of the batch lapse before its turn.
+    pub(crate) async fn drain_once(&self, shutdown: &broadcast::Receiver<()>) -> AppResult<usize> {
         let claimed = self
             .queue
-            .claim_deliveries(
-                self.worker_id,
-                Duration::from_secs(DELIVERY_LEASE_SECONDS as u64),
-                DELIVERY_CLAIM_BATCH,
-            )
+            .claim_deliveries(self.worker_id, self.lease_for, DELIVERY_CLAIM_BATCH)
             .await?;
         let count = claimed.len();
 
-        for delivery in fair_order(claimed) {
-            self.deliver(delivery, &mut shutdown.resubscribe()).await;
+        let ordered = fair_order(claimed);
+        let mut batch = BatchLeases::of(&ordered);
+        for delivery in ordered {
+            let row = delivery.lease.row;
+            self.deliver(delivery, &mut batch, &mut shutdown.resubscribe())
+                .await;
+            batch.finish(row);
         }
         Ok(count)
     }
 
     /// Send one claimed delivery's parts, in order, until it is finished or this run loses it.
-    async fn deliver(&self, claimed: ClaimedDelivery, shutdown: &mut broadcast::Receiver<()>) {
+    async fn deliver(
+        &self,
+        claimed: ClaimedDelivery,
+        batch: &mut BatchLeases,
+        shutdown: &mut broadcast::Receiver<()>,
+    ) {
         let ClaimedDelivery {
             lease,
             record,
@@ -164,6 +184,17 @@ impl DeliveryWorker {
             // to somebody else.
             if shutdown.try_recv().is_ok() {
                 self.release_on_shutdown(&lease, &record).await;
+                return;
+            }
+            // Before every provider call, keep this delivery and the rest of the batch live.
+            if !batch
+                .renew(self.queue.as_ref(), self.lease_for, lease.row)
+                .await
+            {
+                warn!(
+                    delivery_id = %record.id,
+                    "Lost the lease on a delivery before sending it; the execution that holds it now owns it"
+                );
                 return;
             }
 
@@ -430,6 +461,51 @@ impl DeliveryWorker {
                 &[("transport", transport.as_str()), ("outcome", kind)],
             );
         }
+    }
+}
+
+/// The leases of one claimed batch that this worker still holds and has not finished with.
+///
+/// One claim leases the whole batch for one period, and the batch is sent in sequence. Renewing
+/// only the delivery about to be sent cannot help one whose turn comes after the original expiry
+/// (a renewal extends live leases only), so every renewal covers every delivery still waiting.
+struct BatchLeases {
+    held: Vec<ExecutionLease<crate::entities::transport::DeliveryId>>,
+}
+
+impl BatchLeases {
+    fn of(batch: &[ClaimedDelivery]) -> Self {
+        Self {
+            held: batch.iter().map(|delivery| delivery.lease).collect(),
+        }
+    }
+
+    /// Renew every held lease, drop the ones that did not come back, and say whether `current`
+    /// is still held.
+    ///
+    /// A renewal that errors changes nothing: the caller goes on to `begin_part`, whose own
+    /// live-lease fence is the authority on whether this run may start a provider request.
+    async fn renew(
+        &mut self,
+        queue: &dyn DeliveryQueue,
+        lease_for: Duration,
+        current: crate::entities::transport::DeliveryId,
+    ) -> bool {
+        match queue.renew_delivery_leases(&self.held, lease_for).await {
+            Ok(renewed) => {
+                self.held.retain(|lease| renewed.contains(&lease.row));
+                self.held.iter().any(|lease| lease.row == current)
+            }
+            Err(error) => {
+                warn!(delivery_id = %current, %error, "Could not renew the batch's delivery leases");
+                true
+            }
+        }
+    }
+
+    /// A delivery this run is done with, however it ended, stops being renewed.
+    fn finish(&mut self, row: crate::entities::transport::DeliveryId) {
+        self.held.retain(|lease| lease.row != row);
     }
 }
 

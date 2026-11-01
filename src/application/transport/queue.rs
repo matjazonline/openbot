@@ -360,12 +360,16 @@ pub trait DeliveryQueue: Send + Sync {
         limit: i64,
     ) -> AppResult<Vec<ClaimedDelivery>>;
 
-    /// Extend a claim this execution still holds. `false` means it does not.
-    async fn renew_delivery_lease(
+    /// Extend, by `lease_for` from now, every claim in `fences` that its execution still holds
+    /// live, and return the deliveries that were renewed. A fence missing from the result is lost.
+    ///
+    /// One statement that locks the rows in id order, the order every other multi-row locker of
+    /// deliveries takes, so a renewal cannot deadlock with a cancellation or a receipt consumer.
+    async fn renew_delivery_leases(
         &self,
-        fence: &ExecutionLease<DeliveryId>,
-        until: DateTime<Utc>,
-    ) -> AppResult<bool>;
+        fences: &[ExecutionLease<DeliveryId>],
+        lease_for: Duration,
+    ) -> AppResult<Vec<DeliveryId>>;
 
     /// Record that the provider call for one part is about to be made.
     ///

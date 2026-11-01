@@ -374,6 +374,9 @@ pub enum MessagePublication {
     ApprovalParked(WaitId),
     /// `MAX_MESSAGE_ACTIONS_PER_EXECUTION` reached; nothing was written.
     ActionLimit,
+    /// The send would park its job on a delivery wait, but the job has no continuation left to
+    /// resume it with; nothing was written and nothing is sent.
+    ContinuationLimit,
     /// A step re-entered an unresolved marker it cannot replay.
     PossibleDispatchExists,
     /// A routing or authority refusal (`NotFound`/`BadRequest`/`InvalidCredentials`) while no
@@ -437,6 +440,8 @@ pub enum MessageObservation {
     ApprovalRequired,
     ApprovalParked(WaitId),
     ActionLimit,
+    /// The agent job has no continuation left for a delivery wait; nothing was written.
+    ContinuationLimit,
 }
 
 pub(crate) fn tool_scope(fence: WorkflowFence) -> ActionScope {

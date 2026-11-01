@@ -192,15 +192,18 @@ pub struct ScheduleWrite {
     pub enabled: bool,
 }
 
-/// A captured occurrence a materializer holds under its lease generation. The snapshot is the
-/// schedule as it was when the occurrence was captured; the binding is the one captured with it.
+/// A captured occurrence a materializer holds under its lease generation. Its scope (schedule,
+/// company, channel) and binding are the ones captured with it, read from the occurrence row:
+/// identifiers only, never a copy of the schedule (`src/adapters/persistence/AGENTS.md` §2).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ClaimedScheduleRun {
     pub id: Uuid,
     pub materialization_generation: Uuid,
     pub scheduled_for: DateTime<Utc>,
     pub binding_id: Uuid,
-    pub schedule: ChannelSchedule,
+    pub schedule_id: Uuid,
+    pub company_id: Uuid,
+    pub channel_id: Uuid,
 }
 
 /// Where one occurrence is in becoming a workflow run.

@@ -6,9 +6,11 @@ use super::*;
 use crate::{
     adapters::persistence::test_support::{own_database, test_pool},
     application::notification::{
-        NOTIFICATION_EVENT_CLAIM_BATCH, NOTIFICATION_EVENT_LEASE_SECONDS, NotificationPersistence,
+        ClaimedNotificationEvent, NOTIFICATION_EVENT_CLAIM_BATCH, NOTIFICATION_EVENT_LEASE_SECONDS,
+        NotificationPersistence, NotificationProjectionCommit, NotificationProjectionCommitOutcome,
         NotificationProjectionFailure,
     },
+    entities::notification::NotificationDisposition,
     transport::WorkerId,
     use_cases::{
         company::{CompanyPersistence, CompanyWrite},
@@ -168,4 +170,169 @@ async fn a_failed_projection_batch_backs_off_before_it_can_be_claimed_again() {
     CompanyPersistence::delete(&persistence, fixture.company_id)
         .await
         .unwrap();
+}
+
+/// Insert `count` due events, each already charged `attempts` of its ten attempts.
+async fn insert_events(
+    persistence: &PostgresPersistence,
+    company_id: Uuid,
+    count: i64,
+    attempts: i32,
+) -> Vec<Uuid> {
+    let source_ids = (0..count).map(|_| Uuid::new_v4()).collect::<Vec<_>>();
+    sqlx::query_scalar(
+        r#"INSERT INTO notification_events (
+               company_id, source_kind, source_id, action_kind, source_generation, available_at,
+               attempt_count
+           )
+           SELECT $1, 'delivery', source.source_id, 'delivery_failure', 1, '2000-01-01', $3
+             FROM UNNEST($2::uuid[]) AS source(source_id)
+           RETURNING id"#,
+    )
+    .bind(company_id)
+    .bind(&source_ids)
+    .bind(attempts)
+    .fetch_all(persistence.pool())
+    .await
+    .unwrap()
+}
+
+async fn claim_batch(persistence: &PostgresPersistence) -> Vec<ClaimedNotificationEvent> {
+    persistence
+        .claim_notification_events(
+            WorkerId::random(),
+            Duration::from_secs(NOTIFICATION_EVENT_LEASE_SECONDS as u64),
+            NOTIFICATION_EVENT_CLAIM_BATCH,
+        )
+        .await
+        .unwrap()
+}
+
+/// Commit a projection that no longer matches its source: the worker resolved it, and by commit
+/// time the source says something else.
+async fn commit_stale(
+    persistence: &PostgresPersistence,
+    claimed: &ClaimedNotificationEvent,
+) -> NotificationProjectionCommitOutcome {
+    let mut expected = persistence
+        .resolve_notification_projection(&claimed.event)
+        .await
+        .unwrap();
+    expected.disposition = match expected.disposition {
+        NotificationDisposition::Resolved => NotificationDisposition::Withdrawn,
+        _ => NotificationDisposition::Resolved,
+    };
+    persistence
+        .commit_notification_projection(NotificationProjectionCommit {
+            fence: &claimed.lease,
+            expected: &expected,
+            email: None,
+        })
+        .await
+        .unwrap()
+        .0
+}
+
+async fn event_state(persistence: &PostgresPersistence, event: Uuid) -> (String, i32, bool) {
+    sqlx::query_as(
+        "SELECT status, attempt_count, available_at > CURRENT_TIMESTAMP \
+           FROM notification_events WHERE id = $1",
+    )
+    .bind(event)
+    .fetch_one(persistence.pool())
+    .await
+    .unwrap()
+}
+
+/// The last attempt coming back stale is terminal: dead-lettered, never a `pending` row at 10/10
+/// that no claim can take and the census counts for ever.
+#[tokio::test]
+async fn notification_stale_last_attempt_is_dead_lettered() {
+    let Some(database) = own_database().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(database.pool.clone());
+    let fixture = make_fixture(&persistence).await;
+    let events = insert_events(&persistence, fixture.company_id, 1, 9).await;
+
+    let claimed = claim_batch(&persistence).await;
+    assert_eq!(claimed.len(), 1);
+    assert_eq!(claimed[0].event.id.as_uuid(), events[0]);
+    assert_eq!(
+        commit_stale(&persistence, &claimed[0]).await,
+        NotificationProjectionCommitOutcome::Stale
+    );
+
+    let (status, attempts, _) = event_state(&persistence, events[0]).await;
+    assert_eq!((status.as_str(), attempts), ("dead_letter", 10));
+    assert!(claim_batch(&persistence).await.is_empty());
+}
+
+/// Below the limit a stale projection is requeued, but behind the fail path's backoff rather than
+/// due now, so a source that keeps changing cannot hot-loop the projector.
+#[tokio::test]
+async fn notification_stale_below_the_limit_returns_to_pending_with_backoff() {
+    let Some(database) = own_database().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(database.pool.clone());
+    let fixture = make_fixture(&persistence).await;
+    let events = insert_events(&persistence, fixture.company_id, 1, 0).await;
+
+    let claimed = claim_batch(&persistence).await;
+    assert_eq!(claimed.len(), 1);
+    assert_eq!(
+        commit_stale(&persistence, &claimed[0]).await,
+        NotificationProjectionCommitOutcome::Stale
+    );
+
+    let (status, attempts, backed_off) = event_state(&persistence, events[0]).await;
+    assert_eq!((status.as_str(), attempts), ("pending", 1));
+    assert!(backed_off, "a stale projection is not due again at once");
+}
+
+/// `src/application/AGENTS.md` poison batch: a full batch that comes back stale is moved out of
+/// the claimable set, so the next iteration, without time advancing, claims none of it.
+#[tokio::test]
+async fn notification_stale_poison_batch_is_not_reclaimed_by_the_next_iteration() {
+    let Some(database) = own_database().await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(database.pool.clone());
+    let fixture = make_fixture(&persistence).await;
+    let events = insert_events(
+        &persistence,
+        fixture.company_id,
+        NOTIFICATION_EVENT_CLAIM_BATCH,
+        0,
+    )
+    .await;
+
+    let first = claim_batch(&persistence).await;
+    assert_eq!(
+        first.len() as i64,
+        NOTIFICATION_EVENT_CLAIM_BATCH,
+        "a full batch"
+    );
+    for claimed in &first {
+        assert!(events.contains(&claimed.event.id.as_uuid()));
+        assert_eq!(
+            commit_stale(&persistence, claimed).await,
+            NotificationProjectionCommitOutcome::Stale
+        );
+    }
+
+    let second = claim_batch(&persistence).await;
+    assert!(
+        second.is_empty(),
+        "the stale batch is not reclaimed: {} rows",
+        second.len()
+    );
+    for event in events {
+        let (status, attempts, backed_off) = event_state(&persistence, event).await;
+        assert_eq!(
+            (status.as_str(), attempts, backed_off),
+            ("pending", 1, true)
+        );
+    }
 }

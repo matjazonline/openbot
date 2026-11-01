@@ -191,7 +191,7 @@ where
         occurrence: &ClaimedScheduleRun,
     ) -> AppResult<Materialized> {
         let claim = OccurrenceClaim {
-            company: CompanyId::new(occurrence.schedule.company_id),
+            company: CompanyId::new(occurrence.company_id),
             occurrence: occurrence.id,
             worker,
             generation: occurrence.materialization_generation,
@@ -345,17 +345,16 @@ fn admission_request(
     binding: &ScheduleBinding,
     claim: OccurrenceClaim,
 ) -> AppResult<AdmitWorkflowRequest> {
-    let schedule = &occurrence.schedule;
-    let company = CompanyId::new(schedule.company_id);
+    let company = CompanyId::new(occurrence.company_id);
     Ok(AdmitWorkflowRequest {
         company_id: company,
         actor: binding.run_as,
-        association: RelatedAssociation::Channel(RelatedChannelId::new(schedule.channel_id)),
+        association: RelatedAssociation::Channel(RelatedChannelId::new(occurrence.channel_id)),
         trigger: TriggerRef::new(
             company,
             TriggerId::new(occurrence.id),
             TriggerSource::Schedule {
-                schedule_id: ScheduleId::new(schedule.id),
+                schedule_id: ScheduleId::new(occurrence.schedule_id),
                 occurrence_id: ScheduleOccurrenceId::new(occurrence.id),
             },
         )
