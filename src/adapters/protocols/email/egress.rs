@@ -515,7 +515,11 @@ impl TransportSender for EmailSender {
         // Which account this company sends through. A read failure is retryable and nothing else:
         // the alternative -- sending through the deployment relay because the lookup failed --
         // puts one tenant's mail out under another sender identity.
-        let transport = match self.transports.transport_for(delivery.company_id()).await {
+        let transport = match self
+            .transports
+            .transport_for(delivery.sending_company())
+            .await
+        {
             Ok(transport) => transport,
             Err(error) => {
                 warn!(

@@ -216,8 +216,8 @@ async fn sql_effect_park(setup: &Setup, source: Uuid) -> Result<(), sqlx::Error>
             vec![source, delivery],
         ),
         (
-            "INSERT INTO workflow_message_destinations (company_id,run_id,invocation_id,ordinal,kind,destination_id,thread_id,message_id,delivery_id,principal_id,recipient_address) \
-          SELECT company_id,run_id,$2,ordinal,kind,destination_id,$3,$4,$5,principal_id,recipient_address FROM workflow_message_destinations WHERE invocation_id=$1",
+            "INSERT INTO workflow_message_destinations (company_id,run_id,invocation_id,ordinal,kind,destination_channel_id,destination_user_id,replied_message_id,channel_id,thread_id,message_id,delivery_id,principal_id,recipient_address) \
+          SELECT company_id,run_id,$2,ordinal,kind,destination_channel_id,destination_user_id,replied_message_id,channel_id,$3,$4,$5,principal_id,recipient_address FROM workflow_message_destinations WHERE invocation_id=$1",
             vec![source, invocation, thread, message, delivery],
         ),
         // `park_on`, statement for statement.

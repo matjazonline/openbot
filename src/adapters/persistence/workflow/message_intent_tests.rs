@@ -19,6 +19,8 @@ use tokio_util::sync::CancellationToken;
 
 #[path = "message_reply_tests.rs"]
 mod reply_tests;
+#[path = "tenant_fk_intent_tests.rs"]
+mod tenant_fk_tests;
 
 type Admission = WorkflowService<
     PostgresPersistence,

@@ -100,6 +100,7 @@ struct ReviewerRow {
 }
 #[derive(sqlx::FromRow)]
 struct NoticeContext {
+    company_id: Uuid,
     title: String,
     company_label: String,
     correlation_id: Uuid,
@@ -163,7 +164,7 @@ async fn park_on(
             None => return unavailable(tx, scope).await,
         }
     }
-    let context: NoticeContext = sqlx::query_as("SELECT version.title,company.name AS company_label,run.correlation_id FROM workflow_runs AS run JOIN workflow_versions AS version ON version.company_id=run.company_id AND version.workflow_id=run.workflow_id AND version.id=run.version_id JOIN companies AS company ON company.id=run.company_id WHERE run.company_id=$1 AND run.id=$2")
+    let context: NoticeContext = sqlx::query_as("SELECT run.company_id,version.title,company.name AS company_label,run.correlation_id FROM workflow_runs AS run JOIN workflow_versions AS version ON version.company_id=run.company_id AND version.workflow_id=run.workflow_id AND version.id=run.version_id JOIN companies AS company ON company.id=run.company_id WHERE run.company_id=$1 AND run.id=$2")
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).fetch_one(&mut **tx).await?;
     let decision = Uuid::new_v4();
     let composed = match compose_notices(
@@ -244,6 +245,7 @@ fn compose_notices(
             }
             notices
                 .compose(&DecisionNotice {
+                    company: context.company_id,
                     decision,
                     principal: reviewer.principal_id,
                     recipient: reviewer.email.clone().into(),

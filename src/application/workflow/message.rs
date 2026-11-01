@@ -314,6 +314,9 @@ pub struct PlannedDestination {
     pub kind: DestinationKind,
     pub destination_id: Uuid,
     pub new_thread: Option<NewThread>,
+    /// The channel of `thread_id`, stored so the destination row proves its message is filed in
+    /// that thread of that channel.
+    pub channel_id: Uuid,
     pub thread_id: Uuid,
     pub message: MessageWrite,
     pub delivery: Option<NewDelivery>,

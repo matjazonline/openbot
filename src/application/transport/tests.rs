@@ -300,8 +300,8 @@ fn record(transport: TransportKind) -> DeliveryRecord {
     let message_id = CanonicalMessageId::random();
     DeliveryRecord {
         id: DeliveryId::random(),
+        company_id: uuid::Uuid::new_v4(),
         attribution: Some(DeliveryAttribution {
-            company_id: uuid::Uuid::new_v4(),
             channel_id: uuid::Uuid::new_v4(),
             message_id,
             source_binding_id: ChannelBindingId::random(),

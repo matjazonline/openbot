@@ -230,13 +230,15 @@ async fn incompatibility(
     }
 }
 
-/// Refuse a schedule write naming a binding that cannot drive it.
+/// Refuse a schedule write naming a binding that cannot drive it; otherwise return the binding's
+/// channel, or `None` for the company's binding, which `channel_schedules.binding_channel_id`
+/// records so its foreign keys prove the schedule and its binding name the same channel.
 async fn check_binding(
     tx: &mut Transaction<'_, Postgres>,
     company: CompanyId,
     binding: Uuid,
     channel: Uuid,
-) -> AppResult<()> {
+) -> AppResult<Option<Uuid>> {
     let state = binding_rows::read_binding(tx, company, WorkflowBindingId::new(binding))
         .await?
         .ok_or_else(|| {
@@ -255,7 +257,11 @@ async fn check_binding(
             "This workflow binding cannot run on this schedule: {reason}"
         )));
     }
-    Ok(())
+    Ok(match state.association {
+        RelatedAssociation::Company => None,
+        RelatedAssociation::Channel(bound) => Some(bound.as_uuid()),
+        RelatedAssociation::Thread { channel_id, .. } => Some(channel_id.as_uuid()),
+    })
 }
 
 /// A binding's new configuration must still drive every schedule that names it; the save is
@@ -325,11 +331,11 @@ impl SchedulePersistence for PostgresPersistence {
     ) -> AppResult<ChannelSchedule> {
         let mut tx = self.pool.begin().await?;
         authorize_channel(&mut tx, company, actor, channel_id).await?;
-        check_binding(&mut tx, company, write.binding_id, channel_id).await?;
+        let binding_channel = check_binding(&mut tx, company, write.binding_id, channel_id).await?;
         let schedule = sqlx::query_as::<_, ScheduleRow>(&format!(
             "INSERT INTO channel_schedules (id, company_id, channel_id, binding_id, name, \
-               schedule_type, interval_seconds, timezone, enabled, next_run_at) \
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING {COLUMNS}"
+               schedule_type, interval_seconds, timezone, enabled, next_run_at, binding_channel_id) \
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING {COLUMNS}"
         ))
         .bind(Uuid::new_v4())
         .bind(company.as_uuid())
@@ -341,6 +347,7 @@ impl SchedulePersistence for PostgresPersistence {
         .bind(write.timezone.name())
         .bind(write.enabled)
         .bind(first_run(&write))
+        .bind(binding_channel)
         .fetch_one(&mut *tx)
         .await?
         .schedule()?;
@@ -363,7 +370,7 @@ impl SchedulePersistence for PostgresPersistence {
                 "A schedule cannot change its channel".into(),
             ));
         }
-        check_binding(&mut tx, company, write.binding_id, channel_id).await?;
+        let binding_channel = check_binding(&mut tx, company, write.binding_id, channel_id).await?;
         // Only a changed cadence re-anchors the next run, and `enabled` belongs to
         // `set_enabled` alone, so renaming a paused schedule cannot resume it.
         let next_run_at = if cadence_changed(&existing, &write) {
@@ -373,7 +380,8 @@ impl SchedulePersistence for PostgresPersistence {
         };
         let schedule = sqlx::query_as::<_, ScheduleRow>(&format!(
             "UPDATE channel_schedules SET binding_id = $3, name = $4, schedule_type = $5, \
-               interval_seconds = $6, timezone = $7, next_run_at = $8, updated_at = CURRENT_TIMESTAMP \
+               interval_seconds = $6, timezone = $7, next_run_at = $8, binding_channel_id = $9, \
+               updated_at = CURRENT_TIMESTAMP \
              WHERE company_id = $1 AND id = $2 RETURNING {COLUMNS}"
         ))
         .bind(company.as_uuid())
@@ -384,6 +392,7 @@ impl SchedulePersistence for PostgresPersistence {
         .bind(write.interval_seconds)
         .bind(write.timezone.name())
         .bind(next_run_at)
+        .bind(binding_channel)
         .fetch_one(&mut *tx)
         .await?
         .schedule()?;

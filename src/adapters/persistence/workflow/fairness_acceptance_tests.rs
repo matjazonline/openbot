@@ -43,7 +43,9 @@ async fn workflow_fairness_schema_enforces_cursor_owner_and_single_offer() {
     );
     for i in 0..2 {
         let result=sqlx::query("INSERT INTO workflow_dispatch_demand (company_id,worker_id,run_id,execution_id,job_id,opportunity_until) VALUES ($1,$2,$3,$4,$5,clock_timestamp()+interval '45 seconds')")
-            .bind(Uuid::new_v4()).bind(worker().0).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(scope.job.0).execute(p.pool()).await;
+            // A real company first (`workflow_dispatch_demand_company_fk`); the second insert is
+            // refused by the single-offer key before its company is ever checked.
+            .bind(if i == 0 { scope.company.as_uuid() } else { Uuid::new_v4() }).bind(worker().0).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(scope.job.0).execute(p.pool()).await;
         if i == 0 {
             result.unwrap();
         } else {

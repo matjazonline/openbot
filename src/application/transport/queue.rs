@@ -132,12 +132,15 @@ pub struct NewDelivery {
 
 /// A durable notification with no canonical-message attribution.
 ///
-/// The frozen payload is still bounded and the destination is still explicit. Only the tenant,
-/// channel, message and binding tuple is absent, which is the honest state for a bounce caused by
-/// an address that resolved to no company.
+/// The frozen payload is still bounded and the destination is still explicit. The channel,
+/// message and binding tuple is absent; the tenant is not, because every notice -- a bounce, a
+/// help reply, a decision notice, a delivery-failure email -- is caused by one company's mail or
+/// workflow and must not outlive it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NewStandaloneDelivery {
     pub id: DeliveryId,
+    /// The tenant the notice belongs to: deleting the company removes it and its frozen parts.
+    pub company_id: Uuid,
     pub external_destination: ExternalDestination,
     pub correlation_id: CorrelationId,
     pub transport: TransportKind,
@@ -193,6 +196,10 @@ impl DeliveryCreation {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DeliveryRecord {
     pub id: DeliveryId,
+    /// The tenant the delivery belongs to. Every delivery has one, notices included; it is what
+    /// removes the row with its company. It does *not* choose the sending account: see
+    /// [`Self::sending_company`].
+    pub company_id: Uuid,
     pub attribution: Option<DeliveryAttribution>,
     pub external_destination: Option<ExternalDestination>,
     pub correlation_id: CorrelationId,
@@ -212,7 +219,6 @@ pub struct DeliveryRecord {
 /// representing a half-attributed delivery.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DeliveryAttribution {
-    pub company_id: Uuid,
     pub channel_id: Uuid,
     pub message_id: CanonicalMessageId,
     pub source_binding_id: ChannelBindingId,
@@ -220,14 +226,15 @@ pub struct DeliveryAttribution {
 }
 
 impl DeliveryRecord {
-    /// Which company this delivery is being sent on behalf of, when it is being sent on behalf of
-    /// one at all.
+    /// Which company's own sending account this delivery goes out through, if any.
     ///
-    /// `None` is a platform notice -- a confirmation code, an approval link -- which belongs to
-    /// the deployment rather than to a tenant, and so goes out over the deployment's own relay.
-    pub const fn company_id(&self) -> Option<Uuid> {
+    /// A channel-attributed delivery speaks for its company. `None` is a platform notice -- a
+    /// bounce, a decision notice, a delivery-failure email -- which still *belongs* to a tenant
+    /// (`company_id`) but is sent by the deployment, from deployment addresses, so it goes out over
+    /// the deployment's own relay rather than a tenant's connected account.
+    pub const fn sending_company(&self) -> Option<Uuid> {
         match self.attribution {
-            Some(attribution) => Some(attribution.company_id),
+            Some(_) => Some(self.company_id),
             None => None,
         }
     }
@@ -477,8 +484,8 @@ mod tests {
     fn record() -> DeliveryRecord {
         DeliveryRecord {
             id: DeliveryId::random(),
+            company_id: Uuid::new_v4(),
             attribution: Some(DeliveryAttribution {
-                company_id: Uuid::new_v4(),
                 channel_id: Uuid::new_v4(),
                 message_id: CanonicalMessageId::random(),
                 source_binding_id: ChannelBindingId::random(),

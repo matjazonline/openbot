@@ -42,6 +42,9 @@ use crate::{
     },
 };
 
+#[path = "tenant_tests.rs"]
+mod tenant_tests;
+
 /// A company, a channel with its canonical email interface, and a thread to hang messages on.
 struct Scope {
     company: crate::entities::company::Company,
@@ -209,9 +212,10 @@ fn detail(message: &str) -> FailureDetail {
     FailureDetail::parse(message).expect("a short test detail")
 }
 
-fn standalone(key: DeliveryKey) -> NewStandaloneDelivery {
+fn standalone(company_id: Uuid, key: DeliveryKey) -> NewStandaloneDelivery {
     NewStandaloneDelivery {
         id: DeliveryId::random(),
+        company_id,
         external_destination: ExternalDestination::Email(EmailAddress::from(
             "rejected-sender@example.com",
         )),
@@ -243,9 +247,10 @@ async fn competing_standalone_notification_enqueues_create_one_claimable_deliver
     };
     let pool = database.pool.clone();
     let persistence = PostgresPersistence::new(pool);
+    let scope = scope(&persistence).await;
     let key = DeliveryKey::parse(format!("notification:bounce:{}", Uuid::new_v4())).unwrap();
-    let first = standalone(key.clone());
-    let second = standalone(key);
+    let first = standalone(scope.company.id, key.clone());
+    let second = standalone(scope.company.id, key);
 
     let (first_result, second_result) = tokio::join!(
         persistence.enqueue_standalone_delivery(first),
@@ -264,6 +269,12 @@ async fn competing_standalone_notification_enqueues_create_one_claimable_deliver
         .await
         .expect("the standalone notification is claimable");
     assert!(claimed.record.attribution.is_none());
+    assert_eq!(claimed.record.company_id, scope.company.id);
+    assert_eq!(
+        claimed.record.sending_company(),
+        None,
+        "a notice belongs to its company but goes out over the deployment relay"
+    );
     assert_eq!(
         claimed
             .record

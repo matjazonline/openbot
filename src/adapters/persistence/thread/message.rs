@@ -672,10 +672,13 @@ async fn store_email_correlated(
     // before its root is what creates the binding the root later joins.
     external::upsert_external_thread(
         connection,
-        scope.company_id,
-        binding_id,
-        &thread_key,
-        payload.write.thread_id,
+        external::ExternalThreadMapping {
+            company_id: scope.company_id,
+            channel_id: scope.channel_id,
+            binding_id,
+            key: &thread_key,
+            thread_id: payload.write.thread_id,
+        },
     )
     .await?;
     Ok(canonical_id)

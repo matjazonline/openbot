@@ -183,7 +183,7 @@ fn entry(row: DeliveryViewDb, parts: Vec<DeliveryPartEntry>) -> AppResult<Delive
     })?;
     Ok(DeliveryEntry {
         id: DeliveryId::new(delivery.id),
-        company_id: attribution.company_id,
+        company_id: delivery.company_id,
         channel_id: attribution.channel_id,
         message_id: attribution.message_id,
         correlation_id: CorrelationId::from(delivery.correlation_id),

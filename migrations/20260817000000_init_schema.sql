@@ -755,7 +755,9 @@ CREATE FUNCTION public.notification_from_delivery() RETURNS trigger
 DECLARE
     event_company UUID := COALESCE(NEW.company_id, OLD.company_id);
 BEGIN
-    IF event_company IS NULL THEN
+    -- A standalone notice has no channel to notify about, and a failed notice must never raise a
+    -- notice of its own.
+    IF COALESCE(NEW.channel_id, OLD.channel_id) IS NULL THEN
         RETURN COALESCE(NEW, OLD);
     END IF;
     IF TG_OP = 'DELETE' THEN
@@ -2932,7 +2934,7 @@ BEGIN
         RETURN NEW;
     END IF;
     IF NOT EXISTS (SELECT 1 FROM message_deliveries AS delivery WHERE delivery.id=NEW.notice_delivery_id
-            AND delivery.purpose='notification' AND delivery.company_id IS NULL AND delivery.channel_id IS NULL
+            AND delivery.purpose='notification' AND delivery.company_id=NEW.company_id AND delivery.channel_id IS NULL
             AND delivery.message_id IS NULL AND delivery.source_binding_id IS NULL
             AND delivery.destination_binding_id IS NULL AND delivery.external_destination IS NOT NULL
             AND starts_with(delivery.idempotency_key, 'notification:workflow-decision:' || NEW.decision_id
@@ -3461,6 +3463,9 @@ CREATE TABLE public.channel_schedules (
     company_id uuid NOT NULL,
     channel_id uuid NOT NULL,
     binding_id uuid NOT NULL,
+    -- The binding's channel, or NULL when the binding is the company's (p08 D1.9 allows both).
+    binding_channel_id uuid,
+    binding_company_wide boolean GENERATED ALWAYS AS ((binding_channel_id IS NULL)) STORED NOT NULL,
     name text NOT NULL,
     schedule_type text NOT NULL,
     interval_seconds bigint,
@@ -3471,6 +3476,7 @@ CREATE TABLE public.channel_schedules (
     last_error text,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT channel_schedules_binding_channel_check CHECK (((binding_channel_id IS NULL) OR (binding_channel_id = channel_id))),
     CONSTRAINT channel_schedules_interval_check CHECK ((((schedule_type = 'interval'::text) AND (interval_seconds IS NOT NULL) AND (interval_seconds >= 60)) OR ((schedule_type = 'one_off'::text) AND (interval_seconds IS NULL)))),
     CONSTRAINT channel_schedules_name_not_blank CHECK ((btrim(name) <> ''::text)),
     CONSTRAINT channel_schedules_timezone_check CHECK (((now() AT TIME ZONE timezone) IS NOT NULL)),
@@ -3659,6 +3665,7 @@ CREATE TABLE public.external_messages (
 CREATE TABLE public.external_threads (
     id uuid NOT NULL,
     company_id uuid NOT NULL,
+    channel_id uuid NOT NULL,
     binding_id uuid NOT NULL,
     external_thread_key text NOT NULL,
     thread_id uuid NOT NULL,
@@ -3802,7 +3809,7 @@ CREATE TABLE public.internal_notes (
 
 CREATE TABLE public.message_deliveries (
     id uuid NOT NULL,
-    company_id uuid,
+    company_id uuid NOT NULL,
     channel_id uuid,
     message_id uuid,
     source_binding_id uuid,
@@ -3832,7 +3839,7 @@ CREATE TABLE public.message_deliveries (
     settled_evidence_id uuid,
     reopen_id uuid,
     CONSTRAINT message_deliveries_attempt_check CHECK (((attempt_count >= 0) AND (max_attempts > 0) AND (attempt_count <= max_attempts))),
-    CONSTRAINT message_deliveries_attribution_check CHECK ((((company_id IS NOT NULL) AND (channel_id IS NOT NULL) AND (message_id IS NOT NULL) AND (source_binding_id IS NOT NULL) AND (destination_binding_id IS NOT NULL)) OR ((company_id IS NULL) AND (channel_id IS NULL) AND (message_id IS NULL) AND (source_binding_id IS NULL) AND (destination_binding_id IS NULL) AND (depends_on_delivery_id IS NULL) AND (external_destination IS NOT NULL) AND (purpose = 'notification'::text)))),
+    CONSTRAINT message_deliveries_attribution_check CHECK ((((channel_id IS NOT NULL) AND (message_id IS NOT NULL) AND (source_binding_id IS NOT NULL) AND (destination_binding_id IS NOT NULL)) OR ((channel_id IS NULL) AND (message_id IS NULL) AND (source_binding_id IS NULL) AND (destination_binding_id IS NULL) AND (depends_on_delivery_id IS NULL) AND (external_destination IS NOT NULL) AND (purpose = 'notification'::text)))),
     CONSTRAINT message_deliveries_cancellation_check CHECK ((((cancellation_requested_at IS NULL) = (cancellation_reason IS NULL)) AND ((cancellation_reason IS NULL) OR (cancellation_reason = ANY (ARRAY['workflow_cancelled'::text, 'workflow_expired'::text, 'workflow_revoked'::text, 'recipient_revoked'::text, 'evidence_conflict'::text]))) AND ((cancellation_requested_at IS NULL) OR (status <> ALL (ARRAY['pending'::text, 'retryable'::text]))))),
     CONSTRAINT message_deliveries_delivered_at_check CHECK (((status = 'delivered'::text) = (delivered_at IS NOT NULL))),
     CONSTRAINT message_deliveries_error_check CHECK ((((last_error_class IS NULL) OR public.valid_delivery_failure_class(last_error_class)) AND ((last_error_detail IS NULL) OR (octet_length(last_error_detail) <= 512)) AND ((last_error_detail IS NULL) OR (last_error_class IS NOT NULL)))),
@@ -3853,7 +3860,7 @@ CREATE TABLE public.message_deliveries (
 
 CREATE TABLE public.message_delivery_parts (
     id uuid NOT NULL,
-    company_id uuid,
+    company_id uuid NOT NULL,
     delivery_id uuid NOT NULL,
     part_index integer NOT NULL,
     part_key text NOT NULL,
@@ -4867,6 +4874,7 @@ CREATE TABLE public.workflow_bindings (
     channel_id uuid,
     thread_id uuid,
     activated_at timestamp with time zone,
+    company_wide boolean GENERATED ALWAYS AS ((channel_id IS NULL)) STORED NOT NULL,
     CONSTRAINT workflow_bindings_activation_shape CHECK ((active = (activated_at IS NOT NULL))),
     CONSTRAINT workflow_bindings_check CHECK (((thread_id IS NULL) OR (channel_id IS NOT NULL))),
     CONSTRAINT workflow_bindings_configuration_revision_check CHECK ((configuration_revision > 0)),
@@ -5313,7 +5321,12 @@ CREATE TABLE public.workflow_message_destinations (
     invocation_id uuid NOT NULL,
     ordinal smallint NOT NULL,
     kind text NOT NULL,
-    destination_id uuid NOT NULL,
+    -- One column per kind, so each target is a foreign key; `destination_id` is derived from them.
+    destination_channel_id uuid,
+    destination_user_id uuid,
+    replied_message_id uuid,
+    destination_id uuid GENERATED ALWAYS AS (COALESCE(destination_channel_id, destination_user_id, replied_message_id)) STORED NOT NULL,
+    channel_id uuid NOT NULL,
     thread_id uuid NOT NULL,
     message_id uuid NOT NULL,
     delivery_id uuid,
@@ -5324,6 +5337,7 @@ CREATE TABLE public.workflow_message_destinations (
     CONSTRAINT workflow_message_destinations_check CHECK ((((kind = 'channel'::text) AND (delivery_id IS NULL) AND (principal_id IS NULL) AND (recipient_address IS NULL)) OR ((kind = 'user'::text) AND (principal_id IS NOT NULL) AND ((delivery_id IS NULL) = (recipient_address IS NULL))) OR ((kind = 'reply'::text) AND (principal_id IS NULL) AND ((delivery_id IS NULL) = (recipient_address IS NULL))))),
     CONSTRAINT workflow_message_destinations_kind_check CHECK ((kind = ANY (ARRAY['channel'::text, 'user'::text, 'reply'::text]))),
     CONSTRAINT workflow_message_destinations_ordinal_check CHECK (((ordinal >= 0) AND (ordinal <= 19))),
+    CONSTRAINT workflow_message_destinations_target_check CHECK ((((kind = 'channel'::text) AND (destination_channel_id = channel_id) AND (destination_user_id IS NULL) AND (replied_message_id IS NULL)) OR ((kind = 'user'::text) AND (destination_user_id IS NOT NULL) AND (destination_channel_id IS NULL) AND (replied_message_id IS NULL)) OR ((kind = 'reply'::text) AND (replied_message_id IS NOT NULL) AND (destination_channel_id IS NULL) AND (destination_user_id IS NULL)))),
     CONSTRAINT workflow_message_destinations_recipient_address_check CHECK (((recipient_address IS NULL) OR ((btrim(recipient_address) <> ''::text) AND (octet_length(recipient_address) <= 998))))
 );
 
@@ -5792,11 +5806,18 @@ ALTER TABLE ONLY public.channel_bindings
 
 
 --
--- Name: channel_bindings channel_bindings_company_transport_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: channel_bindings channel_bindings_channel_transport_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.channel_bindings
-    ADD CONSTRAINT channel_bindings_company_transport_key UNIQUE (company_id, id, transport);
+    ADD CONSTRAINT channel_bindings_channel_transport_key UNIQUE (company_id, channel_id, id, transport);
+
+--
+-- Name: channel_bindings channel_bindings_channel_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.channel_bindings
+    ADD CONSTRAINT channel_bindings_channel_key UNIQUE (company_id, channel_id, id);
 
 
 --
@@ -6040,11 +6061,11 @@ ALTER TABLE ONLY public.inbound_events
 
 
 --
--- Name: inbound_events inbound_events_transport_external_event_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: inbound_events inbound_events_company_external_event_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.inbound_events
-    ADD CONSTRAINT inbound_events_transport_external_event_key UNIQUE (transport, external_event_key);
+    ADD CONSTRAINT inbound_events_company_external_event_key UNIQUE (company_id, transport, external_event_key);
 
 
 --
@@ -6253,6 +6274,13 @@ ALTER TABLE ONLY public.messages
 
 ALTER TABLE ONLY public.notification_events
     ADD CONSTRAINT notification_events_identity_key UNIQUE (company_id, source_kind, source_id, action_kind, source_generation);
+
+--
+-- Name: notification_events notification_events_event_identity_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.notification_events
+    ADD CONSTRAINT notification_events_event_identity_key UNIQUE (company_id, id, source_kind, source_id, action_kind, source_generation);
 
 
 --
@@ -6908,6 +6936,20 @@ ALTER TABLE ONLY public.workflow_binding_revisions
 
 ALTER TABLE ONLY public.workflow_bindings
     ADD CONSTRAINT workflow_bindings_pkey PRIMARY KEY (company_id, id);
+
+--
+-- Name: workflow_bindings workflow_bindings_channel_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_bindings
+    ADD CONSTRAINT workflow_bindings_channel_key UNIQUE (company_id, channel_id, id);
+
+--
+-- Name: workflow_bindings workflow_bindings_scope_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_bindings
+    ADD CONSTRAINT workflow_bindings_scope_key UNIQUE (company_id, id, company_wide);
 
 
 --
@@ -9196,7 +9238,14 @@ ALTER TABLE ONLY public.channel_schedules
 --
 
 ALTER TABLE ONLY public.channel_schedules
-    ADD CONSTRAINT channel_schedules_binding_fk FOREIGN KEY (company_id, binding_id) REFERENCES public.workflow_bindings(company_id, id) ON DELETE CASCADE;
+    ADD CONSTRAINT channel_schedules_binding_fk FOREIGN KEY (company_id, binding_id, binding_company_wide) REFERENCES public.workflow_bindings(company_id, id, company_wide) ON DELETE CASCADE;
+
+--
+-- Name: channel_schedules channel_schedules_binding_channel_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.channel_schedules
+    ADD CONSTRAINT channel_schedules_binding_channel_fk FOREIGN KEY (company_id, binding_channel_id, binding_id) REFERENCES public.workflow_bindings(company_id, channel_id, id) ON DELETE CASCADE;
 
 
 --
@@ -9334,7 +9383,7 @@ ALTER TABLE ONLY public.external_messages
 --
 
 ALTER TABLE ONLY public.external_threads
-    ADD CONSTRAINT external_threads_binding_fk FOREIGN KEY (company_id, binding_id) REFERENCES public.channel_bindings(company_id, id) ON DELETE CASCADE;
+    ADD CONSTRAINT external_threads_binding_fk FOREIGN KEY (company_id, channel_id, binding_id) REFERENCES public.channel_bindings(company_id, channel_id, id) ON DELETE CASCADE;
 
 
 --
@@ -9342,7 +9391,7 @@ ALTER TABLE ONLY public.external_threads
 --
 
 ALTER TABLE ONLY public.external_threads
-    ADD CONSTRAINT external_threads_thread_fk FOREIGN KEY (company_id, thread_id) REFERENCES public.threads(company_id, id) ON DELETE CASCADE;
+    ADD CONSTRAINT external_threads_thread_fk FOREIGN KEY (company_id, channel_id, thread_id) REFERENCES public.threads(company_id, channel_id, id) ON DELETE CASCADE;
 
 
 --
@@ -9424,6 +9473,13 @@ ALTER TABLE ONLY public.internal_notes
 ALTER TABLE ONLY public.internal_notes
     ADD CONSTRAINT internal_notes_thread_fk FOREIGN KEY (company_id, channel_id, thread_id) REFERENCES public.threads(company_id, channel_id, id) ON DELETE CASCADE;
 
+--
+-- Name: internal_notes internal_notes_thread_message_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.internal_notes
+    ADD CONSTRAINT internal_notes_thread_message_fk FOREIGN KEY (company_id, channel_id, thread_id, message_id) REFERENCES public.thread_messages(company_id, channel_id, thread_id, message_id) DEFERRABLE INITIALLY DEFERRED;
+
 
 --
 -- Name: message_deliveries message_deliveries_channel_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -9454,7 +9510,7 @@ ALTER TABLE ONLY public.message_deliveries
 --
 
 ALTER TABLE ONLY public.message_deliveries
-    ADD CONSTRAINT message_deliveries_destination_binding_fk FOREIGN KEY (company_id, destination_binding_id, transport) REFERENCES public.channel_bindings(company_id, id, transport) ON DELETE CASCADE;
+    ADD CONSTRAINT message_deliveries_destination_binding_fk FOREIGN KEY (company_id, channel_id, destination_binding_id, transport) REFERENCES public.channel_bindings(company_id, channel_id, id, transport) ON DELETE CASCADE;
 
 
 --
@@ -9486,7 +9542,7 @@ ALTER TABLE ONLY public.message_deliveries
 --
 
 ALTER TABLE ONLY public.message_deliveries
-    ADD CONSTRAINT message_deliveries_source_binding_fk FOREIGN KEY (company_id, source_binding_id) REFERENCES public.channel_bindings(company_id, id) ON DELETE CASCADE;
+    ADD CONSTRAINT message_deliveries_source_binding_fk FOREIGN KEY (company_id, channel_id, source_binding_id) REFERENCES public.channel_bindings(company_id, channel_id, id) ON DELETE CASCADE;
 
 
 --
@@ -9598,15 +9654,8 @@ ALTER TABLE ONLY public.notifications
 --
 
 ALTER TABLE ONLY public.notifications
-    ADD CONSTRAINT notifications_email_delivery_id_fkey FOREIGN KEY (email_delivery_id) REFERENCES public.message_deliveries(id) ON DELETE SET NULL;
+    ADD CONSTRAINT notifications_email_delivery_id_fkey FOREIGN KEY (company_id, email_delivery_id) REFERENCES public.message_deliveries(company_id, id) ON DELETE SET NULL (email_delivery_id);
 
-
---
--- Name: notifications notifications_event_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.notifications
-    ADD CONSTRAINT notifications_event_id_fkey FOREIGN KEY (event_id) REFERENCES public.notification_events(id) ON DELETE CASCADE;
 
 
 --
@@ -9614,7 +9663,7 @@ ALTER TABLE ONLY public.notifications
 --
 
 ALTER TABLE ONLY public.notifications
-    ADD CONSTRAINT notifications_event_identity_fk FOREIGN KEY (company_id, source_kind, source_id, action_kind, source_generation) REFERENCES public.notification_events(company_id, source_kind, source_id, action_kind, source_generation) ON DELETE CASCADE;
+    ADD CONSTRAINT notifications_event_identity_fk FOREIGN KEY (company_id, event_id, source_kind, source_id, action_kind, source_generation) REFERENCES public.notification_events(company_id, id, source_kind, source_id, action_kind, source_generation) ON DELETE CASCADE;
 
 
 --
@@ -9626,11 +9675,11 @@ ALTER TABLE ONLY public.notifications
 
 
 --
--- Name: notifications notifications_recipient_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: notifications notifications_recipient_member_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.notifications
-    ADD CONSTRAINT notifications_recipient_user_id_fkey FOREIGN KEY (recipient_user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+    ADD CONSTRAINT notifications_recipient_member_fk FOREIGN KEY (company_id, recipient_user_id) REFERENCES public.company_members(company_id, user_id) ON DELETE CASCADE;
 
 
 --
@@ -10385,7 +10434,7 @@ ALTER TABLE ONLY public.workflow_decision_reviewers
 --
 
 ALTER TABLE ONLY public.workflow_decision_reviewers
-    ADD CONSTRAINT workflow_decision_reviewers_notice_fkey FOREIGN KEY (notice_delivery_id) REFERENCES public.message_deliveries(id);
+    ADD CONSTRAINT workflow_decision_reviewers_notice_fkey FOREIGN KEY (company_id, notice_delivery_id) REFERENCES public.message_deliveries(company_id, id) DEFERRABLE INITIALLY DEFERRED;
 
 
 
@@ -10424,6 +10473,14 @@ ALTER TABLE ONLY public.workflow_definition_events
 
 ALTER TABLE ONLY public.workflow_definitions
     ADD CONSTRAINT workflow_definitions_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+
+
+--
+-- Name: workflow_dispatch_demand workflow_dispatch_demand_company_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_dispatch_demand
+    ADD CONSTRAINT workflow_dispatch_demand_company_fk FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
 
 
 --
@@ -10544,7 +10601,7 @@ ALTER TABLE ONLY public.workflow_message_destinations
 --
 
 ALTER TABLE ONLY public.workflow_message_destinations
-    ADD CONSTRAINT workflow_message_destination_delivery FOREIGN KEY (company_id, delivery_id, message_id) REFERENCES public.message_deliveries(company_id, id, message_id);
+    ADD CONSTRAINT workflow_message_destination_delivery FOREIGN KEY (company_id, delivery_id, message_id) REFERENCES public.message_deliveries(company_id, id, message_id) DEFERRABLE INITIALLY DEFERRED;
 
 
 --
@@ -10552,7 +10609,7 @@ ALTER TABLE ONLY public.workflow_message_destinations
 --
 
 ALTER TABLE ONLY public.workflow_message_destinations
-    ADD CONSTRAINT workflow_message_destination_message FOREIGN KEY (company_id, message_id) REFERENCES public.messages(company_id, id);
+    ADD CONSTRAINT workflow_message_destination_message FOREIGN KEY (company_id, channel_id, thread_id, message_id) REFERENCES public.thread_messages(company_id, channel_id, thread_id, message_id);
 
 
 --
@@ -10584,7 +10641,7 @@ ALTER TABLE ONLY public.workflow_message_intent_bindings
 --
 
 ALTER TABLE ONLY public.workflow_message_intent_bindings
-    ADD CONSTRAINT workflow_message_intent_binding_run FOREIGN KEY (company_id, run_id) REFERENCES public.workflow_runs(company_id, id) ON DELETE CASCADE;
+    ADD CONSTRAINT workflow_message_intent_binding_run FOREIGN KEY (company_id, run_id, binding_id) REFERENCES public.workflow_runs(company_id, id, binding_id) ON DELETE CASCADE;
 
 
 --
@@ -10608,7 +10665,7 @@ ALTER TABLE ONLY public.workflow_message_intents
 --
 
 ALTER TABLE ONLY public.workflow_message_intents
-    ADD CONSTRAINT workflow_message_intent_reply_to FOREIGN KEY (company_id, reply_to_message_id) REFERENCES public.messages(company_id, id) ON DELETE SET NULL (reply_to_message_id);
+    ADD CONSTRAINT workflow_message_intent_reply_to FOREIGN KEY (company_id, reply_to_message_id) REFERENCES public.messages(company_id, id) DEFERRABLE INITIALLY DEFERRED;
 
 
 --
@@ -10632,15 +10689,29 @@ ALTER TABLE ONLY public.workflow_message_intents
 --
 
 ALTER TABLE ONLY public.workflow_message_destinations
-    ADD CONSTRAINT workflow_message_destination_principal FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id);
+    ADD CONSTRAINT workflow_message_destination_principal FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
 
 
 --
--- Name: workflow_message_destinations workflow_message_destination_thread; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_message_destinations workflow_message_destination_channel; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.workflow_message_destinations
-    ADD CONSTRAINT workflow_message_destination_thread FOREIGN KEY (company_id, thread_id) REFERENCES public.threads(company_id, id);
+    ADD CONSTRAINT workflow_message_destination_channel FOREIGN KEY (company_id, destination_channel_id) REFERENCES public.channels(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+
+--
+-- Name: workflow_message_destinations workflow_message_destination_user; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_message_destinations
+    ADD CONSTRAINT workflow_message_destination_user FOREIGN KEY (destination_user_id) REFERENCES public.users(id);
+
+--
+-- Name: workflow_message_destinations workflow_message_destination_replied; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_message_destinations
+    ADD CONSTRAINT workflow_message_destination_replied FOREIGN KEY (company_id, channel_id, thread_id, replied_message_id) REFERENCES public.thread_messages(company_id, channel_id, thread_id, message_id);
 
 
 --
@@ -10713,6 +10784,13 @@ ALTER TABLE ONLY public.workflow_provisioning_commands
 
 ALTER TABLE ONLY public.workflow_poll_companies
     ADD CONSTRAINT workflow_poll_companies_worker_id_fkey FOREIGN KEY (worker_id) REFERENCES public.workflow_poll_workers(worker_id) ON DELETE CASCADE;
+
+--
+-- Name: workflow_poll_companies workflow_poll_companies_company_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_poll_companies
+    ADD CONSTRAINT workflow_poll_companies_company_fk FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
 
 
 --
@@ -10825,6 +10903,13 @@ ALTER TABLE ONLY public.workflow_runs
 
 ALTER TABLE ONLY public.workflow_runs
     ADD CONSTRAINT workflow_runs_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+
+--
+-- Name: workflow_runs workflow_runs_binding_revision_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_runs
+    ADD CONSTRAINT workflow_runs_binding_revision_fk FOREIGN KEY (company_id, binding_id, binding_revision) REFERENCES public.workflow_binding_revisions(company_id, binding_id, revision);
 
 
 --

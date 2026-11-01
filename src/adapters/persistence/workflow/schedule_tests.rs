@@ -1518,3 +1518,173 @@ async fn an_expired_occurrence_is_reported_when_its_schedule_cannot_name_it() {
         1
     );
 }
+
+/// fix-app 05 batch 3: the schedule records its binding's channel (`NULL` for a company binding),
+/// and its foreign keys prove the binding is that channel's or the company's.
+#[tokio::test]
+async fn channel_path_fk_schedule_binding_names_the_schedule_channel() {
+    let s = Schedules::new().await;
+    let (p, company, owner) = (s.p(), s.company(), s.owner());
+    let version = publish(p, company, owner, source(None)).await;
+    let this_channel = bind(
+        p,
+        company,
+        owner,
+        version,
+        RelatedAssociation::Channel(RelatedChannelId::new(s.channel)),
+        None,
+    )
+    .await
+    .as_uuid();
+    let other_channel = channel(&s.fixture, "elsewhere").await;
+    let elsewhere = bind(
+        p,
+        company,
+        owner,
+        version,
+        RelatedAssociation::Channel(RelatedChannelId::new(other_channel)),
+        None,
+    )
+    .await
+    .as_uuid();
+    let pool = s.pool().clone();
+    let stored = |id: Uuid| {
+        let pool = pool.clone();
+        async move {
+            sqlx::query_scalar::<_, Option<Uuid>>(
+                "SELECT binding_channel_id FROM channel_schedules WHERE id = $1",
+            )
+            .bind(id)
+            .fetch_one(&pool)
+            .await
+            .unwrap()
+        }
+    };
+
+    let schedule = s.schedule("Company bound").await;
+    assert_eq!(stored(schedule.id).await, None);
+    // Moving the schedule onto the channel's own binding records the channel; and back.
+    s.use_cases
+        .update_schedule(
+            owner,
+            company,
+            schedule.id,
+            s.channel,
+            s.write("Moved", this_channel),
+        )
+        .await
+        .unwrap();
+    assert_eq!(stored(schedule.id).await, Some(s.channel));
+    s.use_cases
+        .update_schedule(
+            owner,
+            company,
+            schedule.id,
+            s.channel,
+            s.write("Back", s.binding),
+        )
+        .await
+        .unwrap();
+    assert_eq!(stored(schedule.id).await, None);
+
+    let refused = |binding: Uuid, binding_channel: Option<Uuid>| {
+        let pool = pool.clone();
+        async move {
+            sqlx::query(
+            "UPDATE channel_schedules SET binding_id = $2, binding_channel_id = $3 WHERE id = $1",
+        )
+        .bind(schedule.id)
+        .bind(binding)
+        .bind(binding_channel)
+        .execute(&pool)
+        .await
+        .unwrap_err()
+        }
+    };
+    for (binding, binding_channel, constraint) in [
+        // Another channel's binding, recorded honestly: the schedule's channel differs.
+        (
+            elsewhere,
+            Some(other_channel),
+            "channel_schedules_binding_channel_check",
+        ),
+        // Another channel's binding, claimed as this channel's: that binding is not this channel's.
+        (
+            elsewhere,
+            Some(s.channel),
+            "channel_schedules_binding_channel_fk",
+        ),
+        // A channel binding passed off as a company binding.
+        (elsewhere, None, "channel_schedules_binding_fk"),
+        (this_channel, None, "channel_schedules_binding_fk"),
+        // A company binding passed off as this channel's: both keys are violated (its scope and its
+        // channel), and the scope key is checked first.
+        (s.binding, Some(s.channel), "channel_schedules_binding_fk"),
+    ] {
+        let error = refused(binding, binding_channel).await;
+        assert_eq!(
+            error.as_database_error().unwrap().constraint(),
+            Some(constraint),
+            "{error}"
+        );
+    }
+}
+
+async fn schedule_rows(s: &Schedules) -> i64 {
+    sqlx::query_scalar("SELECT count(*) FROM channel_schedules WHERE company_id = $1")
+        .bind(s.company())
+        .fetch_one(s.pool())
+        .await
+        .unwrap()
+}
+
+/// Schedules on both kinds of binding leave with their company. With their channel (raw SQL; the
+/// application refuses the channel delete earlier) only the company-bound schedule can go: a
+/// channel binding already blocks a channel delete through `workflow_bindings`' own channel key,
+/// as before fix-app 05.
+#[tokio::test]
+async fn channel_path_fk_schedules_of_both_binding_kinds_leave_with_channel_and_company() {
+    for whole_company in [false, true] {
+        let s = Schedules::new().await;
+        let (p, company, owner) = (s.p(), s.company(), s.owner());
+        s.schedule("Company bound").await;
+        if whole_company {
+            let version = publish(p, company, owner, source(None)).await;
+            let this_channel = bind(
+                p,
+                company,
+                owner,
+                version,
+                RelatedAssociation::Channel(RelatedChannelId::new(s.channel)),
+                None,
+            )
+            .await
+            .as_uuid();
+            s.use_cases
+                .create_schedule(
+                    owner,
+                    company,
+                    s.channel,
+                    s.write("Channel bound", this_channel),
+                )
+                .await
+                .unwrap();
+            assert_eq!(schedule_rows(&s).await, 2);
+        } else {
+            assert_eq!(schedule_rows(&s).await, 1);
+        }
+        if whole_company {
+            crate::application::use_cases::company::CompanyPersistence::delete(p, company)
+                .await
+                .unwrap();
+        } else {
+            sqlx::query("DELETE FROM channels WHERE company_id = $1 AND id = $2")
+                .bind(company)
+                .bind(s.channel)
+                .execute(s.pool())
+                .await
+                .unwrap();
+        }
+        assert_eq!(schedule_rows(&s).await, 0);
+    }
+}

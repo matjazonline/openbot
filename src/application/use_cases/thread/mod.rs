@@ -637,6 +637,7 @@ impl ThreadUseCases {
         let delivery = self
             .deliveries
             .compose_standalone(StandaloneDeliveryRequest {
+                company_id: bounce.company_id,
                 correlation_id: CorrelationId::new(),
                 purpose: crate::entities::transport::DeliveryPurpose::Notification,
                 source_key,
@@ -1145,7 +1146,10 @@ pub struct BounceInfo {
     /// subject.
     pub source_message_key: ExternalMessageKey,
     pub recipient_to: EmailAddress,
-    pub company_slug: Option<CompanySlug>,
+    /// The company whose address was mailed. A bounce is only ever earned once an address resolved
+    /// to a company, and the queued notice belongs to that company.
+    pub company_id: Uuid,
+    pub company_slug: CompanySlug,
     pub invalid_slugs: Vec<ChannelSlug>,
     /// Channels that exist but are switched off. Defaulted on deserialize so bounces queued
     /// before this field existed still re-hydrate.
@@ -1163,11 +1167,7 @@ pub struct BounceInfo {
 }
 
 pub fn format_bounce_email_body(bounce: &BounceInfo, app_domain: &str) -> String {
-    let domain_part = bounce
-        .company_slug
-        .as_deref()
-        .map(|c| format!("{c}.{app_domain}"))
-        .unwrap_or_else(|| app_domain.to_string());
+    let domain_part = format!("{}.{app_domain}", bounce.company_slug);
 
     let mut body = String::new();
     body.push_str("Undeliverable Mail Notification\n\n");
@@ -1176,9 +1176,7 @@ pub fn format_bounce_email_body(bounce: &BounceInfo, app_domain: &str) -> String
         bounce_cause(bounce)
     ));
 
-    if let Some(ref comp) = bounce.company_slug {
-        body.push_str(&format!("Company Domain: {comp}.{app_domain}\n\n"));
-    }
+    body.push_str(&format!("Company Domain: {domain_part}\n\n"));
 
     body.push_str("Details:\n");
     for s in &bounce.suggestions {

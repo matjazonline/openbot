@@ -40,13 +40,18 @@ fn guard(error: sqlx::Error) {
     assert_eq!(error.code().as_deref(), Some("23514"));
     assert!(error.message().contains("workflow decision"), "{error}");
 }
-async fn notice(tx: &mut Transaction<'_, Postgres>, decision: Uuid, principal: Uuid) -> Uuid {
+async fn notice(
+    tx: &mut Transaction<'_, Postgres>,
+    company: Uuid,
+    decision: Uuid,
+    principal: Uuid,
+) -> Uuid {
     let id = Uuid::new_v4();
     let key = format!(
         "notification:workflow-decision:{decision}:principal:{principal}:email:{id}@example.test"
     );
-    sqlx::query("INSERT INTO message_deliveries(id,external_destination,correlation_id,transport,purpose,idempotency_key,max_attempts) VALUES($1,'member@example.test',$2,'email','notification',$3,3)")
-        .bind(id).bind(Uuid::new_v4()).bind(key).execute(&mut **tx).await.unwrap();
+    sqlx::query("INSERT INTO message_deliveries(id,company_id,external_destination,correlation_id,transport,purpose,idempotency_key,max_attempts) VALUES($1,$2,'member@example.test',$3,'email','notification',$4,3)")
+        .bind(id).bind(company).bind(Uuid::new_v4()).bind(key).execute(&mut **tx).await.unwrap();
     id
 }
 
@@ -94,7 +99,7 @@ async fn workflow_decision_cross_tenant_relationships_and_access() {
         (f.scope.company.as_uuid(), foreign_principal, None),
     ] {
         let mut tx = f.persistence().pool().begin().await.unwrap();
-        let delivery = notice(&mut tx, view.decision.0, principal).await;
+        let delivery = notice(&mut tx, company, view.decision.0, principal).await;
         let error = sqlx::query("INSERT INTO workflow_decision_reviewers(company_id,decision_id,principal_id,ordinal,notice_delivery_id) VALUES($1,$2,$3,1,$4)")
             .bind(company).bind(view.decision.0).bind(principal).bind(delivery).execute(&mut *tx).await.unwrap_err();
         match expected {
@@ -120,11 +125,11 @@ async fn workflow_decision_cross_tenant_relationships_and_access() {
 async fn workflow_decision_notice_cross_company_and_unique_link() {
     let f = Box::pin(DecisionFixture::new(2, None)).await;
     let view = f.park().await;
-    let (_, foreign_principal) = foreign_company(&f).await;
+    let (foreign, foreign_principal) = foreign_company(&f).await;
     let rows: Vec<NoticeAssignment> = sqlx::query_as("SELECT principal_id,notice_delivery_id FROM workflow_decision_reviewers WHERE decision_id=$1 ORDER BY ordinal")
         .bind(view.decision.0).fetch_all(f.persistence().pool()).await.unwrap();
     let mut tx = f.persistence().pool().begin().await.unwrap();
-    let foreign_notice = notice(&mut tx, Uuid::new_v4(), foreign_principal).await;
+    let foreign_notice = notice(&mut tx, foreign, Uuid::new_v4(), foreign_principal).await;
     sqlx::query("DELETE FROM workflow_decision_reviewers WHERE decision_id=$1 AND principal_id=$2")
         .bind(view.decision.0)
         .bind(rows[0].principal_id)
@@ -185,4 +190,52 @@ async fn workflow_decision_notice_rejects_non_notification_independently() {
         .bind(f.scope.company.as_uuid()).bind(view.decision.0).bind(row.principal_id).bind(row.notice_delivery_id).execute(&mut *tx).await.unwrap_err();
     guard(error);
     tx.rollback().await.unwrap();
+}
+
+/// fix-app 05 (FIXAPP-P05-G1-F1): a parked decision's reviewers hold their notices, which now
+/// belong to the company. Deleting the company removes the decision, its reviewers and their
+/// notices together; the deferred notice key is checked once every cascade has run.
+#[tokio::test]
+async fn notification_delivery_tenant_company_deletion_removes_parked_decision_notices() {
+    let f = Box::pin(DecisionFixture::new(2, None)).await;
+    f.park().await;
+    let company = f.scope.company.as_uuid();
+    let pool = f.persistence().pool();
+    let count = |table: &'static str| async move {
+        sqlx::query_scalar::<_, i64>(&format!(
+            "SELECT count(*) FROM {table} WHERE company_id = $1"
+        ))
+        .bind(company)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    };
+    let noticed: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM workflow_decision_reviewers WHERE company_id = $1 AND notice_delivery_id IS NOT NULL",
+    )
+    .bind(company)
+    .fetch_one(pool)
+    .await
+    .unwrap();
+    assert_eq!(noticed, 2, "both reviewers hold a notice");
+    let standalone: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM message_deliveries WHERE company_id = $1 AND channel_id IS NULL",
+    )
+    .bind(company)
+    .fetch_one(pool)
+    .await
+    .unwrap();
+    assert_eq!(standalone, 2, "the notices are the company's");
+
+    crate::application::use_cases::company::CompanyPersistence::delete(f.persistence(), company)
+        .await
+        .unwrap();
+    for table in [
+        "workflow_decisions",
+        "workflow_decision_reviewers",
+        "message_deliveries",
+        "message_delivery_parts",
+    ] {
+        assert_eq!(count(table).await, 0, "{table} outlived its company");
+    }
 }

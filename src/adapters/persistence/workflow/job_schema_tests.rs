@@ -17,7 +17,7 @@ struct JobFixture {
 
 impl JobFixture {
     async fn new() -> Self {
-        let binding = BindingFixture::new(json!([])).await;
+        let binding = configured_binding().await;
         let channel = ChannelPersistence::create(
             &binding.fixture.persistence,
             binding.target.company.as_uuid(),

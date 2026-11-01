@@ -94,12 +94,21 @@ async fn workflow_admission_binding_replay_survives_changed_and_removed_heads() 
     );
     assert_eq!(saved.params(), alias.params());
     let pool = f.fixture.persistence.pool();
-    sqlx::query("DELETE FROM workflow_bindings WHERE company_id = $1 AND id = $2")
+    // A binding with runs cannot be hard-deleted (`workflow_runs_binding_revision_fk`; the
+    // application never deletes bindings), so the removed head is the archived definition alone.
+    let removal = sqlx::query("DELETE FROM workflow_bindings WHERE company_id = $1 AND id = $2")
         .bind(f.target.company.as_uuid())
         .bind(f.target.binding.as_uuid())
         .execute(pool)
         .await
-        .unwrap();
+        .unwrap_err();
+    assert!(
+        removal
+            .as_database_error()
+            .unwrap()
+            .is_foreign_key_violation(),
+        "{removal}"
+    );
     sqlx::query("UPDATE workflow_definitions SET archived = true WHERE company_id = $1")
         .bind(f.target.company.as_uuid())
         .execute(pool)
@@ -141,6 +150,8 @@ async fn workflow_admission_binding_replay_survives_changed_and_removed_heads() 
 #[tokio::test]
 async fn workflow_admission_binding_command_conflicts_and_company_scope() {
     let f = BindingFixture::new(json!([])).await;
+    // The seeded run names revision 1, which must exist (`workflow_runs_binding_revision_fk`).
+    f.service().configure(f.request(None)).await.unwrap();
     let event = trigger(
         f.target.company,
         TriggerSource::Message {

@@ -536,8 +536,8 @@ async fn an_internal_refusal_is_terminal() {
 fn record() -> DeliveryRecord {
     DeliveryRecord {
         id: crate::entities::transport::DeliveryId::random(),
+        company_id: Uuid::new_v4(),
         attribution: Some(crate::transport::DeliveryAttribution {
-            company_id: Uuid::new_v4(),
             channel_id: Uuid::new_v4(),
             message_id: CanonicalMessageId::random(),
             source_binding_id: ChannelBindingId::random(),
@@ -606,4 +606,69 @@ fn a_delivery_key_separates_purpose_source_and_destination() {
         std::sync::Arc<crate::transport::ports::TransportRenderers>,
         std::sync::Arc<dyn crate::use_cases::integration::ChannelBindingPersistence>,
     ) -> DeliveryComposer = DeliveryComposer::new;
+}
+
+/// One recording transport for one company's connected account, another for the deployment.
+struct CompanyAccount {
+    company_id: Uuid,
+    company: Arc<RecordingTransport>,
+    deployment: Arc<RecordingTransport>,
+}
+
+#[async_trait]
+impl crate::adapters::protocols::email::mail::CompanyMailTransports for CompanyAccount {
+    async fn transport_for(
+        &self,
+        company_id: Option<Uuid>,
+    ) -> AppResult<Arc<dyn crate::adapters::protocols::email::mail::MailTransport>> {
+        Ok(if company_id == Some(self.company_id) {
+            self.company.clone()
+        } else {
+            self.deployment.clone()
+        })
+    }
+}
+
+/// fix-app 05 (FIXAPP-P05-G1-F2): every delivery now carries its company, but only a
+/// channel-attributed delivery speaks through that company's connected account. A notice -- a
+/// bounce, a decision notice -- belongs to the same company yet keeps leaving through the
+/// deployment relay, from deployment addresses.
+#[tokio::test]
+async fn notification_delivery_tenant_notice_uses_the_deployment_relay() {
+    let attributed = record();
+    let accounts = Arc::new(CompanyAccount {
+        company_id: attributed.company_id,
+        company: Arc::new(RecordingTransport::default()),
+        deployment: Arc::new(RecordingTransport::default()),
+    });
+    let sender = EmailSender::new(accounts.clone(), Arc::new(NeverInternal::default()));
+    let parts = renderer()
+        .render(&envelope(EmailDeliveryContext {
+            relay: None,
+            ..context("outsider@example.com")
+        }))
+        .unwrap();
+
+    let notice = DeliveryRecord {
+        attribution: None,
+        external_destination: Some(crate::entities::transport::ExternalDestination::Email(
+            "outsider@example.com".into(),
+        )),
+        purpose: DeliveryPurpose::Notification,
+        ..attributed.clone()
+    };
+    assert_eq!(notice.sending_company(), None);
+    assert!(matches!(
+        sender.send(&notice, &parts[0]).await,
+        ProviderSendOutcome::Delivered { .. }
+    ));
+    assert_eq!(accounts.deployment.sent().len(), 1);
+    assert_eq!(accounts.company.sent().len(), 0);
+
+    assert_eq!(attributed.sending_company(), Some(attributed.company_id));
+    assert!(matches!(
+        sender.send(&attributed, &parts[0]).await,
+        ProviderSendOutcome::Delivered { .. }
+    ));
+    assert_eq!(accounts.company.sent().len(), 1);
 }

@@ -264,14 +264,15 @@ impl UndeliverableSlugs {
         self,
         source_message_key: ExternalMessageKey,
         recipient_to: EmailAddress,
-        company_slug: Option<crate::entities::value_objects::CompanySlug>,
+        company: &crate::entities::company::Company,
         available_channels: Vec<crate::use_cases::thread::ChannelDirectoryEntry>,
         original_subject: String,
     ) -> BounceInfo {
         BounceInfo {
             source_message_key,
             recipient_to,
-            company_slug,
+            company_id: company.id,
+            company_slug: company.slug.clone(),
             invalid_slugs: self.invalid,
             disabled_slugs: self.disabled,
             suggestions: self.suggestions,

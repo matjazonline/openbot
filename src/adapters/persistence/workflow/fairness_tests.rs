@@ -326,11 +326,28 @@ async fn workflow_fairness_invalid_offer_is_cleaned_before_older_invalid_history
     finish(p, &ca).await;
     denied(p, n, worker()).await;
     assert!(ticket(p, q.company).await.1.is_some());
-    // Simulate retained metadata whose companies have been deleted. The offered
+    // Simulate retained metadata whose runs and jobs no longer exist (deleted companies take
+    // their demand rows with them through `workflow_dispatch_demand_company_fk`). The offered
     // invalid row follows more than the cleanup batch; all rows satisfy the schema.
+    let owner: Uuid = sqlx::query_scalar("SELECT user_id FROM companies WHERE id=$1")
+        .bind(q.company.as_uuid())
+        .fetch_one(p.pool())
+        .await
+        .unwrap();
+    let mut stale = Vec::new();
     for old in 1..=33_i64 {
+        let company = Uuid::new_v4();
+        stale.push(company);
+        crate::adapters::persistence::test_support::insert_company_with_owner(
+            p.pool(),
+            company,
+            "Stale demand",
+            &format!("stale-demand-{}", company.simple()),
+            owner,
+        )
+        .await;
         sqlx::query("INSERT INTO workflow_dispatch_demand (company_id,ticket,worker_id,run_id,execution_id,job_id) OVERRIDING SYSTEM VALUE VALUES ($1,$2,$3,$4,$5,$6)")
-            .bind(Uuid::new_v4()).bind(old).bind(Uuid::new_v4()).bind(Uuid::new_v4())
+            .bind(company).bind(old).bind(Uuid::new_v4()).bind(Uuid::new_v4())
             .bind(Uuid::new_v4()).bind(Uuid::new_v4()).execute(p.pool()).await.unwrap();
     }
     sqlx::query(
@@ -353,4 +370,10 @@ async fn workflow_fairness_invalid_offer_is_cleaned_before_older_invalid_history
             .unwrap()
             .is_some()
     );
+    // Leave no stale companies behind in the shared database; their demand rows cascade.
+    sqlx::query("DELETE FROM companies WHERE id = ANY($1)")
+        .bind(&stale)
+        .execute(p.pool())
+        .await
+        .unwrap();
 }
