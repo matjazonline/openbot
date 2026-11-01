@@ -40,7 +40,7 @@
 
 use sqlx::postgres::PgPoolOptions;
 use sqlx::{Connection, PgConnection, PgPool};
-use tokio::sync::OnceCell;
+use tokio::sync::{Mutex, OnceCell};
 use uuid::Uuid;
 
 use crate::{
@@ -68,6 +68,11 @@ const TEST_DB_SUFFIX: &str = "_test";
 
 /// Migrations run once per test binary, not once per test.
 static MIGRATED: OnceCell<()> = OnceCell::const_new();
+
+// PostgreSQL shares its lock table across databases. Concurrent init schemas can exhaust the
+// default max_locks_per_transaction budget even though every fixture has a database of its own.
+// Serialize schema creation, then let the migrated fixtures run their tests concurrently.
+static MIGRATION_LOCK: Mutex<()> = Mutex::const_new(());
 
 /// The environment variable that buys back the old skip-when-unset behaviour.
 const ALLOW_MISSING_URL_VAR: &str = "ALLOW_MISSING_DATABASE_URL";
@@ -215,8 +220,7 @@ pub async fn test_pool() -> Option<PgPool> {
 
     MIGRATED
         .get_or_init(|| async {
-            sqlx::migrate!("./migrations")
-                .run(&pool)
+            Box::pin(migrate_test_database(&pool))
                 .await
                 .expect("the test database accepts this checkout's migrations");
             purge_fixtures(&pool).await;
@@ -300,12 +304,16 @@ async fn migrated_own_database() -> Option<OwnDatabase> {
         name,
         admin_url,
     };
-    sqlx::migrate!("./migrations")
-        .run(&database.pool)
+    Box::pin(migrate_test_database(&database.pool))
         .await
         .expect("a fresh database accepts the init schema");
     prewarm(&database.pool).await;
     Some(database)
+}
+
+async fn migrate_test_database(pool: &PgPool) -> Result<(), sqlx::migrate::MigrateError> {
+    let _migration = MIGRATION_LOCK.lock().await;
+    sqlx::migrate!("./migrations").run(pool).await
 }
 
 /// Opens every connection of a test's pool up front, concurrently, and returns them idle.
@@ -644,6 +652,30 @@ pub async fn wait_until_backends_are_blocked(pool: &PgPool, count: i64) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn competing_fixtures_migrate_independent_databases() {
+        if test_database_url().is_none() {
+            return;
+        }
+        let names = futures::future::join_all((0..16).map(|_| async {
+            let database = own_database().await.unwrap();
+            let applied: i64 =
+                sqlx::query_scalar("SELECT count(*) FROM _sqlx_migrations WHERE success")
+                    .fetch_one(&database.pool)
+                    .await
+                    .unwrap();
+            assert_eq!(applied, 1, "each contender receives a migrated database");
+            database.name.clone()
+        }))
+        .await;
+        let distinct: std::collections::HashSet<_> = names.iter().collect();
+        assert_eq!(
+            distinct.len(),
+            names.len(),
+            "fixtures never share a database"
+        );
+    }
 
     /// The checkout has one migration, the squashed init schema. A fresh database records exactly
     /// it, a rerun changes nothing, and it seeds no rows: there is no upgrade path to exercise.
