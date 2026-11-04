@@ -1,0 +1,32 @@
+[
+  {
+    "database": "open_bots",
+    "role": "mac02",
+    "port": "55400",
+    "data_directory": "/Users/mac02/dev/openbot-recovery/.worktrees/pg-main",
+    "version": "18.6 (Homebrew)",
+    "migrations": [
+      {
+        "version": 20260817000000,
+        "description": "init schema",
+        "success": true,
+        "checksum": "bd423e0e0e7c5e8490d04e9e3f1c3945a18735d34f26f06733d72580868851d67d665fbd2fc4997a9950877ebda93532"
+      }
+    ]
+  },
+  {
+    "database": "open_bots_test",
+    "role": "mac02",
+    "port": "55400",
+    "data_directory": "/Users/mac02/dev/openbot-recovery/.worktrees/pg-main",
+    "version": "18.6 (Homebrew)",
+    "migrations": [
+      {
+        "version": 20260817000000,
+        "description": "init schema",
+        "success": true,
+        "checksum": "bd423e0e0e7c5e8490d04e9e3f1c3945a18735d34f26f06733d72580868851d67d665fbd2fc4997a9950877ebda93532"
+      }
+    ]
+  }
+]

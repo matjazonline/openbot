@@ -1,0 +1,26 @@
+[
+  {
+    "check": "reset",
+    "exit_code": 0
+  },
+  {
+    "check": "test-migrations",
+    "exit_code": 0
+  },
+  {
+    "check": "sqlx",
+    "exit_code": 0
+  },
+  {
+    "check": "clippy",
+    "exit_code": 0
+  },
+  {
+    "check": "fmt",
+    "exit_code": 0
+  },
+  {
+    "check": "affected",
+    "exit_code": 0
+  }
+]

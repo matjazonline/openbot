@@ -1,0 +1,20 @@
+{
+  "checked_at": "2026-11-04T20:06:07.158768+00:00",
+  "head": "8152b869a55d49f45286739dd818a82e2b69995d",
+  "branch": "main",
+  "base": "9c205daad5c029229f0547dc137a9936c6b2b49c",
+  "producer": "c846bc1a3ad8bf9bfbb86709e689e7c7ef9b7572",
+  "exclusions": [
+    "plan/fix-app/integration/p06-main/docs/",
+    "plan/fix-app/COORDINATION.md"
+  ],
+  "diff_sha256": "a772e5810009bedf4b9a4d30e64c5ed664cf92a1c3e1715b143c8e8558bd81a7",
+  "tree_sha256": "bb0790aeabc1eaa806bbb8739fe6cb4c99b0035121655be9647ab027824b1ab2",
+  "files_count": 1930,
+  "coordination_equal": true,
+  "coordination_sha256": "0e4ee5b2b068aa6a8a38c014e5b2ee0d326d3df677f06f5874ba72bc6709cbae",
+  "accepted_producer_manifest_mismatches": [],
+  "committed_producer_diff_empty": true,
+  "source_dirty": "",
+  "g1_r3_sha256": "d611a10527f94097b560e1a563a1d4acfa3f839b7844ceaeba9bbc3f1e73a8da"
+}

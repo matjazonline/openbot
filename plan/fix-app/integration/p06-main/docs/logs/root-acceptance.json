@@ -1,0 +1,9 @@
+{
+  "status": "ACCEPTED_AND_INTEGRATED",
+  "review": "FIXAPP-P06-INT-R1-MAC02",
+  "head": "8152b869a55d49f45286739dd818a82e2b69995d",
+  "source_diff_sha256": "a772e5810009bedf4b9a4d30e64c5ed664cf92a1c3e1715b143c8e8558bd81a7",
+  "tree_sha256": "bb0790aeabc1eaa806bbb8739fe6cb4c99b0035121655be9647ab027824b1ab2",
+  "coordination_revision": 22,
+  "tests": "143passed/0failed/0ignored"
+}
