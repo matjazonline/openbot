@@ -14,7 +14,7 @@ establishes one selection boundary for that future work without implementing ove
 This is a proposed implementation plan, not implemented behavior. Implement the numbered files
 in order; every phase depends on its predecessors. The final verification gate is in phase 07.
 
-**Prerequisite:** phases 01 and 03 of [knowledge access levels](../knowledge-access-levels/README.md).
+**Prerequisite:** phases 01 and 03 of [knowledge access levels](../01-knowledge-access-levels/README.md).
 Those phases provide `AccessLevel`, member levels, each run's knowledge ceiling and content level,
 message stamps, and the release check on every egress. This plan stamps and filters exchanges
 with them from the first schema. History must never become a way for content above a reader's
@@ -115,8 +115,8 @@ and a lower-ceiling call sees only its part of that stream.
    independent of SQLx/Rig. A narrow application port is appropriate where persistence is needed;
    no provider abstraction, summary service, embeddings, search index, or generic strategy registry
    is needed. Workflow-supplied conversation and model-generated summaries remain future work.
-4. Coordinate shared types with [autonomous agent ownership](../autonomous-agent/01-capability-contracts-and-storage.md)
-   and [channel response ownership](../channel-handles-send/01-contracts-and-response-ownership.md).
+4. Coordinate shared types with [autonomous agent ownership](../02-autonomous-agent/01-capability-contracts-and-storage.md)
+   and [channel response ownership](../03-channel-handles-send/01-contracts-and-response-ownership.md).
    Their implementation is not claimed by this plan. Reconcile the checked-out state at execution
    time; use existing frozen agent selection if independent agent revisions have not landed yet.
    Avoid two competing definitions of identity, revision selection, or response authority.

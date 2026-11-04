@@ -38,7 +38,7 @@ contracts, including built-in agents, library copies, child workflows, and isola
    callers and existing admission ports. Route them all through the phase-03 selection contract;
    no entry point may build a private mutable snapshot or defer selection until worker claim.
 5. Keep message response/delivery ownership in the existing channel/workflow system. Coordinate
-   shared admission/context edits with [channel response work](../channel-handles-send/01-contracts-and-response-ownership.md)
+   shared admission/context edits with [channel response work](../03-channel-handles-send/01-contracts-and-response-ownership.md)
    if implemented concurrently; that plan is not a prerequisite for agent reuse.
 
 Focused checks: `autonomous_agent_provisioning_` and `autonomous_agent_entrypoints_` tests for

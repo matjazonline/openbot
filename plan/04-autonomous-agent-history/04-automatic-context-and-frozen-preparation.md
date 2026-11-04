@@ -17,7 +17,7 @@ Retries and continuations reproduce the originally selected context.
    Exclude the current exchange, queued/failed/cancelled exchanges, foreign/private branches,
    samples from another scope, and diagnostic/tool-only records. Exclude in SQL every exchange
    whose `access_level` is above the run's `knowledge_ceiling`
-   ([knowledge access levels 03A](../knowledge-access-levels/03-run-levels-history-and-egress.md)).
+   ([knowledge access levels 03A](../01-knowledge-access-levels/03-run-levels-history-and-egress.md)).
    Such an exchange is not a candidate at all. It does not stop the newest-to-oldest walk, it is
    not counted as omitted, and nothing in the prompt, the preparation record or the diagnostics
    marks its absence. The agent then answers "I don't have that" rather than "that is restricted".

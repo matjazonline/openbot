@@ -19,7 +19,7 @@ publication remains independent from the agent's accepted output.
 2. Carry trusted conversation/session identity through admission, run snapshots, activation,
    preparation, and retries. Select the stream for the actual resolved agent, not its source alias.
    Preserve the recorded agent revision and current authorization rules from the checked-out
-   implementation and [autonomous-agent plan](../autonomous-agent/03-workflow-references-and-run-snapshots.md).
+   implementation and [autonomous-agent plan](../02-autonomous-agent/03-workflow-references-and-run-snapshots.md).
 3. Sequential calls to the same agent in a root conversation share completed exchanges, even
    across different workflow runs. Different agents have separate histories. Repeated activations
    in one workflow are distinct exchanges; a retry of an activation is the same exchange.
@@ -73,8 +73,8 @@ Run affected admission, child-tool, provisioning, template, and sample-boundary 
    release (the audience is below the exchange's level) leaves the exchange completed and stamped.
    Only later calls whose ceiling admits it can select it. The refusal surfaces as
    `knowledge.audience_below_content`, never as a substituted or truncated reply.
-5. Coordinate with [channel publication](../channel-handles-send/04-channel-publication-and-delivery.md)
-   and [human continuation](../channel-handles-send/05-human-input-and-continuations.md) if those
+5. Coordinate with [channel publication](../03-channel-handles-send/04-channel-publication-and-delivery.md)
+   and [human continuation](../03-channel-handles-send/05-human-input-and-continuations.md) if those
    features have landed. Test raw output versus projected reply, explicit sends, `channel.no_reply`,
    and delivery failure independently. If that plan is still pending, test existing messaging and
    application boundaries and record its future integration cases as unexecuted dependencies;

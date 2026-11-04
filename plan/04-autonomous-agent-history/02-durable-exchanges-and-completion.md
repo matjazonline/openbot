@@ -26,7 +26,7 @@ the exchange independently of subsequent workflow business state and channel del
    input. A duplicate command returns the same exchange; changed input under that identity is a
    conflict. Do not use a timestamp as the only ordering or deduplication mechanism.
 4. Give each exchange `access_level public.access_level NOT NULL`, using the domain from
-   [knowledge access levels 01A](../knowledge-access-levels/01-access-levels-and-member-levels.md).
+   [knowledge access levels 01A](../01-knowledge-access-levels/01-access-levels-and-member-levels.md).
    At enqueue, set it to the run's `content_level`: the input is built from run data, so it is
    already that sensitive. The level only rises later (02B). Index it with the
    recent-history access path so the level filter in 04A stays in SQL.

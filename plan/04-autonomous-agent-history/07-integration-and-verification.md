@@ -181,7 +181,7 @@ the new limit is exhausted; preserve stack and lease budget checks.
 
 ## Planning-only verification record — 2026-11-03 (access-level integration)
 
-- Access levels from `plan/knowledge-access-levels/` were integrated into phases 01–07. This was
+- Access levels from `plan/01-knowledge-access-levels/` were integrated into phases 01–07. This was
   a documentation-only change: no Rust, database or browser suites were run.
 
 ## Planning-only verification record — 2026-11-03

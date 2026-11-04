@@ -71,7 +71,7 @@ confirmation before the group that uses it.
 | [01 — Access levels](01-access-levels-and-member-levels.md) | `AccessLevel` type and SQL domain, member and invite levels, reader-level resolution, level management | — |
 | [02 — Library and indexing](02-knowledge-library-and-indexing.md) | Documents, upload/override/delete with level rules, chunking, embedding port and adapter | 01 |
 | [03 — Run levels and egress](03-run-levels-history-and-egress.md) | Run knowledge ceiling and content level, history filtering, message stamps, the release check on every egress | 01 |
-| [04 — Search tool](04-knowledge-search-tool.md) | Built-in `search_knowledge` agent tool bounded by the run ceiling | 02, 03 |
+| [04 — Search tool](04-knowledge-search-tool.md) | Built-in `search_knowledge` agent tool bounded by the run ceiling | 02, 03, 05 |
 | [05 — Read paths](05-read-paths-ui-and-notifications.md) | Viewer-level filtering in the mailbox, previews, attachments, notifications and run views | 03 |
 | [06 — Verification](06-integration-and-verification.md) | End-to-end level journeys, races, and the final full-suite gate | all |
 
@@ -85,15 +85,34 @@ Implement the groups in the order **01 → 03 → 02 → 05 → 04 → 06**.
   stamps and egress (03), library filtering (02), and the UI and notifications (05).
 - Agents never get a knowledge read without its release check.
 
+### Order across plans
+
+The numeric prefix of each plan directory is its implementation order:
+
+1. **01-knowledge-access-levels** (this plan), in the group order above. It goes first because
+   the release check (03D) must exist before the later plans add egress paths and rewire tool
+   dispatch.
+2. **[02-autonomous-agent](../02-autonomous-agent/01-capability-contracts-and-storage.md).** It
+   rewires MCP dispatch, which must keep the P5 connection levels and the `search_knowledge`
+   built-in.
+3. **[03-channel-handles-send](../03-channel-handles-send/01-contracts-and-response-ownership.md).**
+   Its automatic replies and human-input prompts call `may_release` from the start.
+4. **[04-autonomous-agent-history](../04-autonomous-agent-history/01-contracts-and-conversation-identity.md).**
+   It goes last because it integrates with both 02 (agent revisions as exchange provenance) and
+   03 (publication and human continuation). Landing it earlier would leave those cases as
+   unexecuted dependencies that neither of the other plans owns.
+
+02 and 03 do not depend on each other and may be swapped.
+
 ### Related plans
 
 All are proposed; none is implemented yet.
 
 | Plan | Relationship |
 | --- | --- |
-| [autonomous-agent-history](../autonomous-agent-history/01-contracts-and-conversation-identity.md) | Requires 01 and 03. It stamps each remembered exchange with the run's content level and selects only exchanges at or below the ceiling. |
-| [channel-handles-send](../channel-handles-send/01-contracts-and-response-ownership.md) | Adds automatic reply publication and human-input prompts. Both are egress paths and must use the release check from 03D. |
-| [autonomous-agent](../autonomous-agent/01-capability-contracts-and-storage.md) | Binds MCP tools directly to company connections. Those connections carry the P5 level, and the `search_knowledge` built-in (04) must follow whichever tool-dispatch shape is current. |
+| [04-autonomous-agent-history](../04-autonomous-agent-history/01-contracts-and-conversation-identity.md) | Requires 01 and 03. It stamps each remembered exchange with the run's content level and selects only exchanges at or below the ceiling. |
+| [03-channel-handles-send](../03-channel-handles-send/01-contracts-and-response-ownership.md) | Adds automatic reply publication and human-input prompts. Both are egress paths and must use the release check from 03D. |
+| [02-autonomous-agent](../02-autonomous-agent/01-capability-contracts-and-storage.md) | Binds MCP tools directly to company connections. Those connections carry the P5 level, and the `search_knowledge` built-in (04) must follow whichever tool-dispatch shape is current. |
 
 ## Out of scope
 
