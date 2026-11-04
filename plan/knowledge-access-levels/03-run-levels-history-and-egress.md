@@ -22,7 +22,7 @@ through the next run's history, or a level-5 run posts its findings to a level-0
   - `knowledge_ceiling public.access_level NOT NULL`;
   - `content_level public.access_level NOT NULL DEFAULT 0`;
   - `CHECK (content_level <= knowledge_ceiling)`.
-  
+
   Every input to a run is filtered to its ceiling, so the check can only fail if there is a bug.
   Write both columns in `insert_run` (`src/adapters/persistence/workflow/admission_write.rs:94`).
 - The audience is computed by one pure function,
@@ -48,7 +48,7 @@ through the next run's history, or a level-5 run posts its findings to a level-0
   - the knowledge tool observation (04);
   - the `context.history` step output (03C);
   - a child result consumed by its parent (the child's content level).
-  
+
   Never call it in a separate transaction (invariant 4).
 - The release check (03D) locks the run row `FOR SHARE` and reads `content_level` in the
   transaction that freezes the action. A parallel branch's output and its rise commit together, so
@@ -98,14 +98,14 @@ through the next run's history, or a level-5 run posts its findings to a level-0
     No partial send, automatic regeneration or sender override (P6, option A). The withheld
     output stays in the run's step data, which the run view shows only to viewers at or above
     the run's content level (05D).
-  
+
   Neither the error nor the attention text contains content.
 - Logs and metrics record run, company, step and the two levels. They never record content or
   addresses.
 - Egress paths added by other plans use this same check:
   - automatic channel reply publication and human-input prompts (channel-handles-send 04 and 05);
   - publication of remembered agent outputs (autonomous-agent-history 05B).
-  
+
   Whichever plan lands second adds its call to `may_release` and a refusal test. It must not copy
   the rule.
 - Remembered agent exchanges (autonomous-agent-history) take their stamp from `content_level`,

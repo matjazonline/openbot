@@ -58,7 +58,7 @@ capture the actual model request. Include:
     - a child branch inherits the ceiling;
     - a lower-level session reuse loads only its part of the session;
     - a level-0 teammate sees "Restricted exchange" in history views.
-    
+
     Run this journey once the knowledge plan's 01 and 03 are integrated. Until its search tool
     (04) exists, raise the content level with a test fixture and record that substitution.
 

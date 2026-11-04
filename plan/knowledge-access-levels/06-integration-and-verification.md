@@ -30,9 +30,10 @@ public support channel.
    A level-9 CRM connection is allowed (P5).
 7. A level-3 member uploads `5_sales.md` and is refused. They upload `3_sales.md`, which adds a
    layer. A second `3_sales.md` overrides it. `sales.md` without a prefix is rejected (D6).
-8. Retrieval-quality fixture: 10–20 realistic sales questions, with the expected passage for each
-   (multilingual if P3 confirms it). This calibrates the similarity threshold (04B) and decides
-   P9.
+8. Retrieval-quality fixture: 10–20 realistic sales questions, with the expected passage for each.
+   It includes non-English questions and documents (P3), and questions naming codes that differ
+   by one character, such as `AX-4410` and `AX-4401` (P9). It calibrates the similarity threshold
+   and checks that the merge puts exact hits first (04B).
 
 Competing claimants (each with `own_database`):
 

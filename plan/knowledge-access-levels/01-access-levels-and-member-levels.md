@@ -18,7 +18,7 @@ resolved in the same place as their membership. This covers decisions D1, D2, D5
   - constants `PUBLIC` (`L0`) and `MAX` (`L9`), plus `ALL`;
   - `try_from(i16)` and `as_i16()` for SQL, and `label()` returning text such as "Level 5";
   - serde as an integer, rejecting out-of-range values.
-  
+
   It is an enum rather than a `u8` newtype so that every `match` is exhaustive and a value of 10
   cannot be constructed (D2).
 - Add one pure domain helper, `AccessLevel::lowest(iter) -> AccessLevel`. An empty audience yields
@@ -62,7 +62,7 @@ resolved in the same place as their membership. This covers decisions D1, D2, D5
   - the owner may assign any level to anyone except themselves (fixed at 9);
   - an admin may act only when `target_current <= actor.level` and `requested <= actor.level`;
   - a member may not assign levels.
-  
+
   The member-management route and the invite route both call it. An invite level is capped at the
   inviter's level by the same rule.
 - Member list and invite form: a level select showing only the levels the actor may assign.

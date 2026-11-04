@@ -43,6 +43,10 @@ CREATE TABLE public.knowledge_chunks (
     body text NOT NULL,
     embedding_model text NOT NULL,
     embedding real[] NOT NULL CHECK (array_length(embedding, 1) = 384),
+    -- Exact-term matching (P9). 'simple' does no stemming and drops no stopwords, so it suits a
+    -- multilingual corpus and keeps product codes as tokens.
+    search_text tsvector GENERATED ALWAYS AS
+        (to_tsvector('simple', coalesce(heading, '') || ' ' || body)) STORED,
     FOREIGN KEY (document_id, access_level)
         REFERENCES public.knowledge_documents (id, access_level)
         ON UPDATE CASCADE ON DELETE CASCADE,
@@ -54,6 +58,9 @@ CREATE INDEX knowledge_chunks_search_idx
 
 - The composite foreign key makes it impossible for a chunk's level to differ from its document's.
   Search filters on the chunk's own column, so the check needs no join.
+- `search_text` has no GIN index. Search already scans one company's visible chunks for the
+  vector ranking (04B) and computes the keyword match in that same scan. Add an index only if a
+  query-plan test shows the scan is a bottleneck.
 - Use the real `users` and `companies` key names from the init schema, and add a matching
   `company_id` foreign key in the style the persistence guide requires
   (`src/adapters/persistence/AGENTS.md`).
@@ -65,7 +72,7 @@ CREATE INDEX knowledge_chunks_search_idx
   2. Require exactly one ASCII digit, then `_` or `-`, then a non-empty remainder.
   3. The digit is the level and the remainder is the document name. The separator is not
      stored, so `6-sales.md` and `6_sales.md` are the same layer.
-  
+
   `10_sales.md`, `a_sales.md`, `5 sales.md`, `5.sales.md`, `sales.md`, `5_` and `5-` are all
   errors. The error names the file and gives an example: "`sales.md`: the name must start with a
   level 0–9 and `_` or `-`, for example `0_sales.md`".
@@ -90,7 +97,7 @@ CREATE INDEX knowledge_chunks_search_idx
      `INSERT … ON CONFLICT (company_id, lower(name), access_level) DO UPDATE` with the new
      content, `revision + 1` and `uploaded_by`; delete that document's chunks; insert the new
      chunks.
-  
+
   Every transaction writes a document together with exactly its own chunks, so the last
   committer wins consistently.
 - Delete: `may_write_document` checks the document's level, and the chunks cascade.
@@ -108,13 +115,13 @@ CREATE INDEX knowledge_chunks_search_idx
   - no overlap;
   - keep a short document as one chunk;
   - record each chunk's heading path.
-  
+
   A chunk never spans two documents, so it never mixes levels.
 - `TextEmbedder` is a port owned by the application layer:
   - `model_id() -> EmbeddingModelId`;
   - `embed_passages(&[&str]) -> AppResult<Vec<[f32; 384]>>`;
   - `embed_query(&str) -> AppResult<[f32; 384]>`.
-  
+
   Vectors are L2-normalised before storage, so search can use a dot product. Apply the
   passage/query prefixes that e5 models require inside the adapter.
 - The adapter goes in `src/adapters/embedding/`, using `fastembed` (P3):
@@ -122,7 +129,7 @@ CREATE INDEX knowledge_chunks_search_idx
   - bake the model files into the image and verify their checksum at startup;
   - disable runtime downloads;
   - the production image keeps running as non-root.
-  
+
   If the model is missing, or its checksum does not match, startup fails with an error naming the
   expected path. A test adapter returns deterministic vectors, so unit and database tests never
   load the model.
