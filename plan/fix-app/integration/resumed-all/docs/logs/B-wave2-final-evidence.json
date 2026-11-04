@@ -1,0 +1,36 @@
+{
+  "HEAD": "6ffe52a9fbdaffcfbfa7a5b4ddc5778945647426",
+  "coordination_revision": 18,
+  "coordination_sha256": "c06230f089e1388d177023f8e19ef13d056bd7afe1bf1b022e2f0d8e617ab87e",
+  "coordination_pin_matches": true,
+  "test_recount": {
+    "passed": 1600,
+    "failed": 0,
+    "ignored": 5
+  },
+  "selected_total": 1605,
+  "readonly_resource_checks": [
+    {
+      "database": "open_bots",
+      "role": "mac02",
+      "port": "55400",
+      "migration_success": true,
+      "migration_checksum": "a596b1552cf5c4bf0a158b53720c1810f6182d6b6b5653334b21a05b8b9f72a0a23002aaaf20ac89fd3fe907225767e2",
+      "skill_instructions_type": "text",
+      "root_budget_provenance_count": 0
+    },
+    {
+      "database": "open_bots_test",
+      "role": "mac02",
+      "port": "55400",
+      "migration_success": true,
+      "migration_checksum": "a596b1552cf5c4bf0a158b53720c1810f6182d6b6b5653334b21a05b8b9f72a0a23002aaaf20ac89fd3fe907225767e2",
+      "skill_instructions_type": "text",
+      "root_budget_provenance_count": 0
+    }
+  ],
+  "source_sha384": "a596b1552cf5c4bf0a158b53720c1810f6182d6b6b5653334b21a05b8b9f72a0a23002aaaf20ac89fd3fe907225767e2",
+  "source_diff_check": "PASS",
+  "original_plans_unchanged": true,
+  "snapshot": "base:   6ffe52a9fbdaffcfbfa7a5b4ddc5778945647426\ndigest: 408e2bedb3d1d4e15f2b1fa8c5211c9728cc99eb0b587e2c02edcb00d9c32004\nfiles:\n"
+}

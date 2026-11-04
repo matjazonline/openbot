@@ -1,0 +1,80 @@
+[
+  {
+    "phase": "p03",
+    "worktree": "/Users/mac02/dev/openbot-recovery/.worktrees/fix-app-p03",
+    "cluster": "/Users/mac02/dev/openbot-recovery/.worktrees/pg-p03",
+    "port": 55403,
+    "role": "mac02",
+    "database_url": "postgres://mac02@127.0.0.1:55403/mail_agents",
+    "test_database_url": "postgres://mac02@127.0.0.1:55403/mail_agents_test",
+    "log": "/Users/mac02/dev/openbot-recovery/plan/fix-app/integration/resumed-all/docs/logs/local-setup-20261104/p03-database-setup.log",
+    "verification": [
+      {
+        "url": "postgres://mac02@127.0.0.1:55403/mail_agents",
+        "identity": "mail_agents|mac02|55403|/Users/mac02/dev/openbot-recovery/.worktrees/pg-p03|127.0.0.1|256|114",
+        "migration_checksums": {
+          "20260817000000": "b71da1e2b3b3dd6d043b949f56800381bc36dce862b3a32ade8ff205bbbf6e3c0acd1af4502e15eab03bb80c304c4bb9"
+        }
+      },
+      {
+        "url": "postgres://mac02@127.0.0.1:55403/mail_agents_test",
+        "identity": "mail_agents_test|mac02|55403|/Users/mac02/dev/openbot-recovery/.worktrees/pg-p03|127.0.0.1|256|114",
+        "migration_checksums": {
+          "20260817000000": "b71da1e2b3b3dd6d043b949f56800381bc36dce862b3a32ade8ff205bbbf6e3c0acd1af4502e15eab03bb80c304c4bb9"
+        }
+      }
+    ]
+  },
+  {
+    "phase": "p04",
+    "worktree": "/Users/mac02/dev/openbot-recovery/.worktrees/fix-app-p04",
+    "cluster": "/Users/mac02/dev/openbot-recovery/.worktrees/pg-p04",
+    "port": 55404,
+    "role": "mac02",
+    "database_url": "postgres://mac02@127.0.0.1:55404/mail_agents",
+    "test_database_url": "postgres://mac02@127.0.0.1:55404/mail_agents_test",
+    "log": "/Users/mac02/dev/openbot-recovery/plan/fix-app/integration/resumed-all/docs/logs/local-setup-20261104/p04-database-setup.log",
+    "verification": [
+      {
+        "url": "postgres://mac02@127.0.0.1:55404/mail_agents",
+        "identity": "mail_agents|mac02|55404|/Users/mac02/dev/openbot-recovery/.worktrees/pg-p04|127.0.0.1|256|114",
+        "migration_checksums": {
+          "20260817000000": "1bd4351d395476a3517f3fe196ab1ba8899d52ddc2889f4f88280df0c89b15afa62ce5b3fa75cabbac4acc62772b97c7"
+        }
+      },
+      {
+        "url": "postgres://mac02@127.0.0.1:55404/mail_agents_test",
+        "identity": "mail_agents_test|mac02|55404|/Users/mac02/dev/openbot-recovery/.worktrees/pg-p04|127.0.0.1|256|114",
+        "migration_checksums": {
+          "20260817000000": "1bd4351d395476a3517f3fe196ab1ba8899d52ddc2889f4f88280df0c89b15afa62ce5b3fa75cabbac4acc62772b97c7"
+        }
+      }
+    ]
+  },
+  {
+    "phase": "integration",
+    "worktree": "/Users/mac02/dev/openbot-recovery",
+    "cluster": "/Users/mac02/dev/openbot-recovery/.worktrees/pg-main",
+    "port": 55400,
+    "role": "mac02",
+    "database_url": "postgres://mac02@127.0.0.1:55400/open_bots",
+    "test_database_url": "postgres://mac02@127.0.0.1:55400/open_bots_test",
+    "log": "/Users/mac02/dev/openbot-recovery/plan/fix-app/integration/resumed-all/docs/logs/local-setup-20261104/integration-database-setup.log",
+    "verification": [
+      {
+        "url": "postgres://mac02@127.0.0.1:55400/open_bots",
+        "identity": "open_bots|mac02|55400|/Users/mac02/dev/openbot-recovery/.worktrees/pg-main|127.0.0.1|256|114",
+        "migration_checksums": {
+          "20260817000000": "d82d28e55142810c3b7a236d067ae0a7b1f5b3682b89ff573825fd9be1f5c4200f45fcb936916f98a955d3c6ecebf926"
+        }
+      },
+      {
+        "url": "postgres://mac02@127.0.0.1:55400/open_bots_test",
+        "identity": "open_bots_test|mac02|55400|/Users/mac02/dev/openbot-recovery/.worktrees/pg-main|127.0.0.1|256|114",
+        "migration_checksums": {
+          "20260817000000": "d82d28e55142810c3b7a236d067ae0a7b1f5b3682b89ff573825fd9be1f5c4200f45fcb936916f98a955d3c6ecebf926"
+        }
+      }
+    ]
+  }
+]

@@ -1,0 +1,94 @@
+diff --git a/src/adapters/harness/rig/workflow.rs b/src/adapters/harness/rig/workflow.rs
+index 86db9b6..061256f 100644
+--- a/src/adapters/harness/rig/workflow.rs
++++ b/src/adapters/harness/rig/workflow.rs
+@@ -407,6 +407,7 @@ fn failure(error: &AppError) -> WorkflowFailure {
+     }
+     let (class, suffix) = match error {
+         AppError::Execution(ExecutionFailure::Budget) => (Terminal, "budget"),
++        AppError::Execution(ExecutionFailure::RepeatedToolCall) => (Terminal, "repeated_tool_call"),
+         AppError::Execution(ExecutionFailure::InvalidOutput) => (Terminal, "invalid_output"),
+         AppError::Execution(ExecutionFailure::CheckpointDenied) => (Terminal, "tokens_refused"),
+         AppError::Execution(ExecutionFailure::IndeterminateEffect) => (Terminal, "effect_unknown"),
+diff --git a/src/adapters/persistence/workflow/control_tests.rs b/src/adapters/persistence/workflow/control_tests.rs
+index b28bfd8..3e0f3d5 100644
+--- a/src/adapters/persistence/workflow/control_tests.rs
++++ b/src/adapters/persistence/workflow/control_tests.rs
+@@ -34,6 +34,14 @@ pub(super) async fn failed(
+     f: &AdmissionFixture,
+     scope: ActivationRequest,
+     safety: RetrySafety,
++) -> ClaimedWorkflow {
++    failed_with(f, scope, safety, "provider.rejected").await
++}
++async fn failed_with(
++    f: &AdmissionFixture,
++    scope: ActivationRequest,
++    safety: RetrySafety,
++    code: &str,
+ ) -> ClaimedWorkflow {
+     let claim = f
+         .persistence()
+@@ -45,7 +53,7 @@ pub(super) async fn failed(
+     let cause = LeaseReleaseCause::Classified(WorkflowFailure {
+         failure: StepFailure::new(
+             FailureClass::Terminal,
+-            FailureCode::parse("provider.rejected").unwrap(),
++            FailureCode::parse(code).unwrap(),
+             None,
+         )
+         .unwrap(),
+@@ -275,6 +283,40 @@ async fn workflow_control_retry_refuses_unknown_exhaustion_deadline_completed_an
+     }
+ }
+ 
++/// An agent step resumes its saved checkpoint, which keeps its spent allowance, its spent
++/// repairs and its repeated call, so retrying any of them would only fail again: retry refuses
++/// them and changes nothing, while another terminal agent failure stays retryable.
++#[tokio::test]
++async fn workflow_control_retry_refuses_agent_failures_a_resume_would_repeat() {
++    for code in [
++        "agent.budget",
++        "agent.invalid_output",
++        "agent.repeated_tool_call",
++    ] {
++        let (f, scope) = fixture().await;
++        failed_with(&f, scope, RetrySafety::SafeToRetry, code).await;
++        let before = snapshot(&f).await;
++        let result = f
++            .persistence()
++            .retry(retry(command(&f, scope, "agent").await))
++            .await
++            .unwrap();
++        assert!(
++            matches!(result, RetryResult::Unsafe { .. }),
++            "{code}: {result:?}"
++        );
++        assert_eq!(snapshot(&f).await, before, "{code}");
++    }
++    let (f, scope) = fixture().await;
++    failed_with(&f, scope, RetrySafety::SafeToRetry, "agent.rejected").await;
++    let result = f
++        .persistence()
++        .retry(retry(command(&f, scope, "agent").await))
++        .await
++        .unwrap();
++    assert!(matches!(result, RetryResult::Applied { .. }), "{result:?}");
++}
++
+ #[tokio::test]
+ async fn workflow_control_revision_covers_claim_and_stale_caller_cannot_cancel() {
+     let (f, scope) = fixture().await;
+diff --git a/src/application/app_error.rs b/src/application/app_error.rs
+index 4c93697..5dd6af3 100644
+--- a/src/application/app_error.rs
++++ b/src/application/app_error.rs
+@@ -73,6 +73,8 @@ pub enum ExecutionFailure {
+     InvalidOutput,
+     #[error("execution budget exhausted")]
+     Budget,
++    #[error("model repeated tool calls whose results no longer change")]
++    RepeatedToolCall,
+     #[error("invalid provider or checkpoint protocol")]
+     Protocol,
+     #[error("indeterminate effect requires reconciliation")]

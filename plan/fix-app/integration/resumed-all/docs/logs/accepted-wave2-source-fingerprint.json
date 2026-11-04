@@ -1,0 +1,8 @@
+{
+  "files": 1746,
+  "digest": "3ba1832478f3bbb230310985d35ec81161b598807fd6fae58586a0bb3be10958",
+  "exclusions": [
+    "plan/fix-app/integration/resumed-all/docs",
+    "plan/fix-app/COORDINATION.md"
+  ]
+}

@@ -1,0 +1,2 @@
+# Immutable logs, captured patches and manifests retain their original bytes.
+logs/** -whitespace

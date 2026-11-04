@@ -1,0 +1,14 @@
+{
+  "phase_base": "48626a1240f032ca3b99372bd3f5a05eb08c0c66",
+  "primary_head": "52f257a61baec3c1a3253f4e57a2b5eb96bea344",
+  "primary_changed_files": 134,
+  "phase_source_files": 87,
+  "overlapping_paths": [
+    "migrations/20260817000000_init_schema.sql",
+    "scripts/tests/run-list-query-plan.py",
+    "src/adapters/harness/rig/workflow.rs",
+    "src/adapters/persistence/workflow/control_tests.rs",
+    "src/application/app_error.rs"
+  ],
+  "status": "Read-only preparation only; no integration before phase acceptance."
+}

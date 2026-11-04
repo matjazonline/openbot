@@ -1,0 +1,21 @@
+{
+  "combined_changed_files": 159,
+  "identical_to_accepted_producer": 144,
+  "combined_files_differing_from_both_accepted_producers": [
+    "migrations/20260817000000_init_schema.sql",
+    "scripts/tests/run-list-query-plan.py",
+    "src/adapters/harness/rig/workflow.rs",
+    "src/adapters/http/app_error_impl.rs",
+    "src/adapters/http/pages/mailbox.rs",
+    "src/adapters/http/routes/skill_library.rs",
+    "src/adapters/persistence/mod.rs",
+    "src/adapters/persistence/onboarding/tests.rs",
+    "src/adapters/persistence/workflow/control_tests.rs",
+    "src/adapters/persistence/workflow/provisioning.rs",
+    "src/application/app_error.rs",
+    "src/application/services/inbound_event_worker.rs",
+    "src/application/use_cases/skill.rs",
+    "src/infra/setup.rs",
+    "src/infra/workflow.rs"
+  ]
+}

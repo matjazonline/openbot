@@ -1,0 +1,51 @@
+diff --git a/migrations/20260817000000_init_schema.sql b/migrations/20260817000000_init_schema.sql
+index 0811804..a3af639 100644
+--- a/migrations/20260817000000_init_schema.sql
++++ b/migrations/20260817000000_init_schema.sql
+@@ -2833,6 +2833,9 @@ CREATE FUNCTION public.workflow_control_retry_safe(company uuid, run uuid, job u
+             AND workflow_action_retry_safe(company,execution.id) IS DISTINCT FROM false
+             AND attempt.workflow_retry_safety='safe' AND attempt.workflow_retirement IN ('live','expired')
+             AND attempt.workflow_failure_code NOT IN ('workflow.activation_limit','workflow.invalid_result','workflow.run_deadline')
++            -- An agent step resumes its saved checkpoint, which keeps its spent allowance, its
++            -- spent repairs and its repeated call, so retrying any of them only fails again.
++            AND attempt.workflow_failure_code NOT IN ('agent.budget','agent.invalid_output','agent.repeated_tool_call')
+             AND NOT EXISTS (SELECT 1 FROM workflow_budget_receipts AS receipt
+                 WHERE receipt.company_id=company AND receipt.run_id=run AND receipt.disposition='exhausted')
+             AND NOT EXISTS(SELECT 1 FROM workflow_action_claim_budget_refusals AS refusal
+@@ -4156,8 +4159,8 @@ CREATE TABLE public.skills (
+     slug public.citext NOT NULL,
+     name text NOT NULL,
+     description text NOT NULL,
+-    trigger text NOT NULL,
+-    instructions jsonb NOT NULL,
++    -- One prompt text; its byte bound is the workflow publication bound on prompt text.
++    instructions text NOT NULL,
+     -- Workflow tools the agent must grant for this skill (06-D5); never a grant itself.
+     required_tools text[] DEFAULT '{}'::text[] NOT NULL CONSTRAINT skills_required_tools_shape CHECK (public.valid_workflow_type_names(required_tools)),
+     created_by jsonb NOT NULL,
+@@ -4165,10 +4168,9 @@ CREATE TABLE public.skills (
+     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+     CONSTRAINT skills_created_by_shape_check CHECK (public.valid_creation_provenance(created_by)),
+     CONSTRAINT skills_description_bounded CHECK (((btrim(description) <> ''::text) AND (char_length(description) <= 500))),
+-    CONSTRAINT skills_instructions_shape CHECK (((jsonb_typeof(instructions) = 'array'::text) AND ((jsonb_array_length(instructions) >= 1) AND (jsonb_array_length(instructions) <= 32)) AND (octet_length((instructions)::text) <= 524288))),
++    CONSTRAINT skills_instructions_bounded CHECK (((btrim(instructions) <> ''::text) AND (octet_length(instructions) <= 16384))),
+     CONSTRAINT skills_name_bounded CHECK (((btrim(name) <> ''::text) AND (char_length(name) <= 120))),
+-    CONSTRAINT skills_slug_format CHECK (((char_length((slug)::text) <= 120) AND ((slug)::text = lower((slug)::text)) AND ((slug)::text ~ '^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$'::text))),
+-    CONSTRAINT skills_trigger_bounded CHECK (((btrim(trigger) <> ''::text) AND (char_length(trigger) <= 500)))
++    CONSTRAINT skills_slug_format CHECK (((char_length((slug)::text) <= 120) AND ((slug)::text = lower((slug)::text)) AND ((slug)::text ~ '^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$'::text)))
+ );
+ 
+ 
+diff --git a/scripts/tests/run-list-query-plan.py b/scripts/tests/run-list-query-plan.py
+index 9246948..294d5f6 100644
+--- a/scripts/tests/run-list-query-plan.py
++++ b/scripts/tests/run-list-query-plan.py
+@@ -1,7 +1,7 @@
+ #!/usr/bin/env python3
+ """Measure the shipped run-list and run-board statements on temporary tables with the migrated columns and indexes.
+ 
+-Usage: python3 scripts/tests/run-list-query-plan.py postgres:///mail_agents_test [--shapes FILE] [--out FILE]
++Usage: python3 scripts/tests/run-list-query-plan.py postgres:///open_bots_test [--shapes FILE] [--out FILE]
+            [--board-out FILE]
+ 
+ The statements come from the code, not from a copy: without --shapes the script runs

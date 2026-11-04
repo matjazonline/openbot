@@ -1,0 +1,7 @@
+1f08764988319764f0f3b34e6282c339339c0bac
+
+Auto-merging migrations/20260817000000_init_schema.sql
+Auto-merging scripts/tests/run-list-query-plan.py
+Auto-merging src/adapters/harness/rig/workflow.rs
+Auto-merging src/adapters/persistence/workflow/control_tests.rs
+Auto-merging src/application/app_error.rs

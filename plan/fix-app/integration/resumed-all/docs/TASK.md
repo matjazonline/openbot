@@ -1,5 +1,30 @@
 # fix-app resumed integration — manager record
 
+## Local recovery environment — 2026-11-04, coordination revision 12
+
+- Current authority: `/Users/mac02/dev/openbot-recovery/plan/fix-app/COORDINATION.md`; sole writer and local setup owner: current Codex `/root`
+  in `/Users/mac02/dev/openbot-recovery` (Sol 6.1/xhigh confirmed by user). Historical managers/workers are stopped;
+  no author or reviewer was started for this environment-only request.
+- Current record root: `/Users/mac02/dev/openbot-recovery/plan/fix-app/integration/resumed-all/docs`. Historical absolute paths below are preserved as evidence;
+  map `/Users/mac03/dev/openbot` to `/Users/mac02/dev/openbot-recovery` for current operations.
+- Setup owner acknowledges I002/r2 and C009/r1 for this phase; technical instructions/notices are
+  unchanged. Fresh implementation workers must read/reacknowledge the current authority on resume.
+- Owned worktree `/Users/mac02/dev/openbot-recovery`; cluster `/Users/mac02/dev/openbot-recovery/.worktrees/pg-main` at
+  `127.0.0.1:55400`, role `mac02`, PostgreSQL 18.6, lock limit 256.
+- DATABASE_URL=`postgres://mac02@127.0.0.1:55400/open_bots`;
+  TEST_DATABASE_URL=`postgres://mac02@127.0.0.1:55400/open_bots_test`. Both are in the ignored mode-0600 `.env`.
+  Export these explicitly for cargo tests; Cargo does not read .env. Keep CARGO_INCREMENTAL=0
+  and this worktree's own target directory.
+- Both databases are freshly migrated using this checkout's migrations; migration ledger success,
+  exact SQL checksums and server identity verified. Evidence: `/Users/mac02/dev/openbot-recovery/plan/fix-app/integration/resumed-all/docs/logs/local-setup-20261104/integration-database-setup.log`;
+  common manifest `/Users/mac02/dev/openbot-recovery/plan/fix-app/integration/resumed-all/docs/logs/local-setup-20261104/resources.json`; pinned coordination
+  `/Users/mac02/dev/openbot-recovery/plan/fix-app/integration/resumed-all/docs/logs/local-setup-20261104/COORDINATION-r12-local-ready.md`.
+- Source remains unchanged and historical reviews/results remain historical. No new application
+  tests, implementation, reviews, commits, merges or phase acceptance. The user authorized local
+  setup only; implementation remains paused and its unfinished work below is preserved.
+- Next action: await explicit implementation resume, then reconcile historical gaps and rerun
+  affected checks against these new fixtures. No future phase has started.
+
 - Workflow: implement-astra-reviewed-2-2. Manager/root thread thr_gwccjxwzjt, actual root model/effort unavailable; user explicitly selected separate Sol6.1/xhigh authors on 2026-11-04.
 - Original request: continue thr_x6z73pvufc using selected workflow. Prior authorization retained: finish remaining numbered phases, accepted phase commits, local main merges, pull origin/main if new, no push. Focused tests only (I004); no full suite/scripts/check.sh.
 - Authority: /Users/mac03/dev/openbot/plan/fix-app/COORDINATION.md revision6; current manager is sole writer. I001-I004/r1, C001-C005/r1 historical; C006/r1 and C008/r1 proposed, C007/r1 active.
@@ -61,3 +86,70 @@
 - Publication preparation fetched origin and fast-forwarded primary to53bdc85 (new upstream skill-model simplification). No overlap with checkpoint files. Later phase integration must reconcile this additional upstream change too. Phase snapshot baselines/digests remain unchanged.
 
 - Initial staged diff whitespace check flagged required blank-context markers inside stored .patch data. Scoped checkpoint .gitattributes now preserves exact checksum bytes and treats patch payload whitespace as data; phase source/patch contents were not changed.
+
+## p03 accepted phase artifact, mac02
+
+- Independent B1-R2-MAC02 PASS, root acceptance saved; local commit `c42ae0432e3fc20eb8a03944d6c295797750ef53` on fix-app/p03.
+  Accepted sourceba772625;1465-file content fingerprint verified identical after commit; clean
+  phase worktree, no push. Source snapshot base remains48626a1 for the reviewed batch.
+- Final1104/0/1ignored plus all-target offline compile/SQLx, clippy, fmt/whitespace PASS.
+  Historical31 failures resolved, new compensation regression red/green and fixed reviewF1 retained.
+- Coordinationr14 records accepted-in-phase only; no integration acceptance. Next finishp04
+  preserved batches, then one reviewed wave2 integration against updated main. Downstream
+  dependencies remain blocked until their required producer is integrated.
+
+## p04 WB2 nearing review (2026-11-04, coordr16)
+- WB1 acceptedc5debdea by FIXAPP-P04-WB1-R2-MAC02. WB2 implementation complete under unchanged G1r6 D6/D7. No schema change.
+- Private phase affected union523passed/0failed/4ignored (527selected, all40filters nonzero). Proof includes injected second-channel rollback with two inserted agents and copied skills; refusal retention; keyed retries/deletion/rename/transfer; same-key custom company-lock contention with one classifier call; actual AgentUseCases one-connection path with library/custom/competitor; provider failure/timeout/cancellation rollback and progress; key/selection/access checks; SMTP error logging and alias trust.
+- Final audit corrected timeout error kind to existing ServiceUnavailable so browser sees503/retry guidance; focused correction and finalclippy/fmt active39588 in p04, recordsglobunder mac02-WB2. No current phase review digest until these checks finish.
+- Acceptedp03 remainsc42ae04; wave2 integration/dependentphases still pending. No push, deployment, productionreset or fullsuite.
+
+### Wave2 integration preparation while p04 B reviews
+- Fresh git fetch origin main succeeded; origin/main still52f257a61baec3c1a3253f4e57a2b5eb96bea344. Primary source/HEAD unchanged; only manager-owned workflow records dirty. No branch merge performed yet.
+- Primary had no graft graph; initial caller query unavailable and retained. Built deterministic source graph before any integration source work.
+- p04 frozenWB2 artifact9b1bfc76eb32f15cf6131b1ab55bebe375d49b2beb90b03d48a7dc71dcc29e91 under FIXAPP-P04-WB2-R1-MAC02, B /root/p04_reviewer. Current affectedchecks523passed/0failed/4ignored + timeoutcorrection16/16; all-targetclippy/fmt/whitespace PASS. No phase acceptance until actual B completion.
+
+## Wave2 assembly checkpoint — local p03 merge only
+- Fresh origin/main52f257a unchanged. Acceptedp03c42ae04 merged cleanly as text into localmainc242a742b6a5566098f83a39e257fb2891a57470. No push. No p04 source imported before its acceptance.
+- Root audited automatic overlaps: newer-main RepeatedToolCall variant/mapping and retry exclusions for agent.budget/invalid_output/repeated_tool_call coexist with p03 guard behavior. Newer-main schema/skill and query-plan changes retained (delta logs). Staged whitespace clean, no coordination/integration records in merge commit.
+- Only primary private PostgreSQL55400/open_bots and open_bots_test reset/migrated for the assembled schema. p03/p04 resources untouched. Exact reset/migrate results/logs recorded separately.
+- This is source assembly, NOT accepted combined integration. p04 stays frozen9b1bfc76 under independentWB2-R1-MAC02 review. Await B, resolve all findings in phase, accept/commit p04, merge acceptedp04 into primary, then focused combined checks and independent integration gate before downstream phases. Active technicalcoordnotices remainr16 unchanged.
+
+## Wave2 combined implementation artifact — assembly underway
+- Authoritycoordr17, same active technicalnotices asr16; only status/assembly changed. Accepted producer artifacts p03c42ae04 (ba772625), p04ced9cd8 (9b1bfc76), recorded phase-originalbases48626a1. Integration reviewbase52f257a; currentHEADc242a74 includes acceptedp03 merge, p04merge currently uncommitted.
+- Three explicit conflicts: skill library HTTP imports/save form/removed instruction-row endpoint, skill usecase imports + nonoperator fixture, assistant-channel extracted command includes newersteps empty-vector. Preserve newer main Skill.instructions String/bound and Caller guards, no compatibility decoder. New onboarding rollbackfixture uses same currenttextshape. Primaryroot owns every integration correction; phase branches/acceptance stay unchanged.
+- First combined alltargetoffline compile driver42070/logwave2-first-offline-check.log. No combinedtests/review/acceptance yet. Before final snapshot commit assembledp04 merge with originalparentced9, prepare exact affectedunion including newermain skill and retry contracts, reset alreadyperformed only private55400 forp03schema (p04nomigrationchange), SQLxmetadata/offline/fmt/clippy then independentB integrationreview.
+
+### Combined compile correction / verification manifest
+- First current-mainofflinealltargets failed only in the new onboarding rollback fixture: removedtrigger field and remaining oldSkillInstructionVec initializer. Corrected to newer boundedString instructions, preserving actual copiedskill and zeroresidue assertions. Failure retained in wave2-first-offline-check.log.
+- Resolved source conflicts staged; no conflict markers remain in source. SQLxprepare/alltargetlive-schema compile driver8561 active, logwave2-sqlx-prepare-r1.log. Exact combinedaffectedcommand savedwave2-affected-command.json (acceptedp03+p04 filters plus rigfailure mapping and currentskill persistence/domain contracts). Metadata changes, if any, must be included and reviewed before finalartifact.
+
+## Assembled wave2 source and active combined gate
+- LocalmainHEAD6ffe52a9fbdaffcfbfa7a5b4ddc5778945647426 (parentsc242a74/acceptedp04ced9cd8) contains both acceptedphases and current-main conflict resolutions. Reviewbase52f257a; no source worktree diff, only managerrecords dirty. No rootcoord/integrationrecords accidentallyincluded inmergecommits.
+- SQLxprepare/live-schema alltarget compilation PASS (wave2-sqlx-prepare-r1.log); .sqlx byte-identical/no changes. Private55400 freshdevelopment+test migrationsalreadyPASS. No p04schemachange; no siblingreset.
+- Combined affectedunion driver9169/logwave2-affected-r1.log running currentassembledsource with explicitownURLs and52filters; command/countmanifest generatedoncompletion. Main coldtargetcompilation ongoing, do not run competingheavybuild. Source frozen forcheck; subsequentfinalclippy/fmt/whitespace andindependentcombinedintegration review required.
+
+### Combined integration review identity convention
+- Integration records reuse manager root plan/fix-app/integration/resumed-all/docs (stable manager integration ID, currentbatchwave2); no separate progress tree. Root/A writes TASK/HANDOFF, independentB writes REVIEW/notes/findings/logs only.
+- Exact snapshot exclusions for combinedreview: plan/fix-app/integration/resumed-all/docs and plan/fix-app/COORDINATION.md (both workflow-only records). No source/deliverable/producer worktree exclusions. Installed snapshot script unchanged via localmacOSrealpath wrapperlogs/snapshot-mac02.sh. Producerphase records committed in sourceparents remain included; neitheracceptedphase worktree is altered byintegration.
+- Reviewbase52f257a, currentHEAD6ffe52a, acceptedparentsp03c42ae04 andp04ced9cd8. Existingaccepteddecisions apply; conflict resolutions preservecurrenttextskillmodel and commandsteps without new schema/authority/concurrency decisions. ArchitecturegateN/A for routineassembly; independentcombinedeffect review remainsrequired.
+
+## Wave2 affected verification completed
+- `wave2-affected-command.json` PASS:1600passed/0failed/5ignored,1605selected,418.49s. All52filters nonzero in recordedstatus-linecountmanifest. The simple parser recognized1601 finalstatuslines becausefourpassing `- should panic` lines useadifferentformat; this is notthetestselectiontotal. Final --list inventory recount is being saved separately and must match1605; preserveoriginalrawlog/countmanifest unchanged.
+- Own primarydev/test DB identity+successfulledger+exactsourceSHA384 verifiedPASS, wave2-migration-resource-identity.json. Both bind55400/pg-main. No resets or writes in siblingresources.
+- SQLxprepare/alltarget compilation PASS and metadata unchanged; combinedfinalofflinealltargetclippy/fmt/whitespace plusread-onlyinventory driver17047 active. No fullsuite/check.sh/stackbudget perI004. WholecombinedsourceunchangedHEAD6ffe52a.
+
+## FIXAPP-WAVE2-INT-R1-MAC02 freeze
+- Finalofflinealltargetclippy-Dwarnings/fmt/whitespacePASS; finalselectedinventory1605/all52nonzero, affectedresult1600passed/0failed/5ignored. Statusregexomittedonlyfourpassing `- should panic` tests; allrawlogs/countrecordsretainedandinventoryconfirmscompletescope. SQLx/migrationidentityPASS andnocachechanges. No failed/unavailableaffectedcheckremains.
+- Coordauthorityr18 (technicalnoticesunchanged), immutablepinlogs/COORDINATION-r18-integration-review.md. Integrationreviewbase52f257a, HEAD6ffe52a. Entireprimarysourcefrozen; onlymanagerworkflowrecords maychange. Acceptedphasebranchesunchanged. Snapshotexclusions exactlymanagerdocs plusCOORDINATION workflowfile; snapshotrecordtobegeneratednow.
+
+- Frozenartifactbase/currentHEAD6ffe52a9fbdaffcfbfa7a5b4ddc5778945647426, reviewbase52f257a, digest408e2bedb3d1d4e15f2b1fa8c5211c9728cc99eb0b587e2c02edcb00d9c32004; exactexclusionsmanagerdocs/COORDINATION unchanged. Existing independentB /root/p03_reviewer assigned FIXAPP-WAVE2-INT-R1-MAC02 with separateintegrationrecordownership and originalrequirements; no source/build/DB work byroot untilreviewcompletion.
+
+## Root combined integration acceptance
+- IndependentB FIXAPP-WAVE2-INT-R1-MAC02 PASS408e2bedb3d1d4e15f2b1fa8c5211c9728cc99eb0b587e2c02edcb00d9c32004, no newfindings; notes/disposition/evidence saved. Root recomputedidenticaldigest andverifiedbyte-identicalcoordr18 pin. SourceHEAD6ffe52a, reviewbase52f257a, exacttwo workflowexclusions retained.
+- Bothp03/p04 now ACCEPTED AND INTEGRATED at6ffe52a. Requiredtargetedverification1600pass0fail5ignored/all52filters nonzero, SQLx/offlinealltargets/clippy/fmt/whitespace/migrationidentity PASS. Fullsuite/check.sh/stackbudget/externalproviderverification notclaimed.
+- ProducerexportsC006/C008 cannowbeactive withacceptedidentity; authorizedremainingp06/p07/p08 maystart fromacceptedmain underisolatedresources. Nextphasep06. Preserve90dayretention/usage-costdecisionI005.
+
+### Retention scope clarification / durable integration records
+- User clarified90daywindowapplication-wide; maintenancecanremoveeligibleterminalworkflowtreesacrosscompanies. PublishedI005/r2 undercoordr20; protectedtreesandusage/costreportingremainrequired. This isfuturep06scope, notachange toacceptedwave2source.
+- Rootprepares localcommit ofacceptedcombinedintegration records only, excludingCOORDINATION perI003; no source change. NewmetadataHEAD maydifferfromaccepted6ffe52a; preserve fullsourcecontentfingerprint acrosscommit. Nextp06newworktree/resources andgateddesign fromacceptedmain.
