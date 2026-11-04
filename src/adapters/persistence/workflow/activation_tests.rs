@@ -108,9 +108,9 @@ async fn workflow_activation_abort_and_lost_ack_reuse_snapshot_across_attempts()
     }
     // Reconnect independently and corrupt the original resolution source. Replay
     // must use the saved snapshot rather than rebuild inputs from source/bundle.
-    sqlx::query("UPDATE workflow_runs SET bundle = $2, input = '{}' WHERE id = $1")
+    replace_run_bundle(f.persistence().pool(), request.run.as_uuid(), &[0]).await;
+    sqlx::query("UPDATE workflow_runs SET input='{}' WHERE id=$1")
         .bind(request.run.as_uuid())
-        .bind(vec![0_u8])
         .execute(f.persistence().pool())
         .await
         .unwrap();

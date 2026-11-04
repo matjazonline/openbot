@@ -535,7 +535,7 @@ impl RunViews for PostgresPersistence {
         run: RunId,
     ) -> AppResult<Option<Arc<PublishedBundle>>> {
         let bytes: Option<Vec<u8>> = sqlx::query_scalar(
-            "SELECT bundle FROM workflow_runs WHERE company_id = $1 AND id = $2",
+            "SELECT stored.bundle AS bundle FROM workflow_runs AS run LEFT JOIN workflow_bundles AS stored ON stored.company_id=run.company_id AND stored.digest=run.bundle_digest WHERE run.company_id = $1 AND id = $2",
         )
         .bind(company.as_uuid())
         .bind(run.as_uuid())

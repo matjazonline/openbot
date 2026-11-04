@@ -1,0 +1,28 @@
+{
+  "status": "PASS",
+  "expected_sha384": "a596b1552cf5c4bf0a158b53720c1810f6182d6b6b5653334b21a05b8b9f72a0a23002aaaf20ac89fd3fe907225767e2",
+  "databases": [
+    {
+      "database": "open_bots",
+      "port": 55406,
+      "directory": "/Users/mac02/dev/openbot-recovery/.worktrees/pg-p06",
+      "migrations": [
+        {
+          "success": true,
+          "checksum": "a596b1552cf5c4bf0a158b53720c1810f6182d6b6b5653334b21a05b8b9f72a0a23002aaaf20ac89fd3fe907225767e2"
+        }
+      ]
+    },
+    {
+      "database": "open_bots_test",
+      "port": 55406,
+      "directory": "/Users/mac02/dev/openbot-recovery/.worktrees/pg-p06",
+      "migrations": [
+        {
+          "success": true,
+          "checksum": "a596b1552cf5c4bf0a158b53720c1810f6182d6b6b5653334b21a05b8b9f72a0a23002aaaf20ac89fd3fe907225767e2"
+        }
+      ]
+    }
+  ]
+}

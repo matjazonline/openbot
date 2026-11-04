@@ -1,0 +1,68 @@
+{
+  "status": "PASS",
+  "expected_sha384": {
+    "20260817000000": "bd423e0e0e7c5e8490d04e9e3f1c3945a18735d34f26f06733d72580868851d67d665fbd2fc4997a9950877ebda93532"
+  },
+  "databases": [
+    {
+      "port": 55406,
+      "role": "mac02",
+      "database": "open_bots",
+      "migrations": [
+        {
+          "success": true,
+          "version": 20260817000000,
+          "checksum": "bd423e0e0e7c5e8490d04e9e3f1c3945a18735d34f26f06733d72580868851d67d665fbd2fc4997a9950877ebda93532"
+        }
+      ],
+      "history_fks": [
+        {
+          "name": "model_usage_history_company_id_agent_id_fkey",
+          "definition": "FOREIGN KEY (company_id, agent_id) REFERENCES agents(company_id, id) DEFERRABLE INITIALLY DEFERRED"
+        },
+        {
+          "name": "model_usage_history_company_id_fkey",
+          "definition": "FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE"
+        },
+        {
+          "name": "model_usage_history_company_id_workflow_id_version_id_fkey",
+          "definition": "FOREIGN KEY (company_id, workflow_id, version_id) REFERENCES workflow_versions(company_id, workflow_id, id) DEFERRABLE INITIALLY DEFERRED"
+        }
+      ],
+      "data_directory": "/Users/mac02/dev/openbot-recovery/.worktrees/pg-p06",
+      "run_bundle_columns": [
+        "bundle_digest"
+      ]
+    },
+    {
+      "port": 55406,
+      "role": "mac02",
+      "database": "open_bots_test",
+      "migrations": [
+        {
+          "success": true,
+          "version": 20260817000000,
+          "checksum": "bd423e0e0e7c5e8490d04e9e3f1c3945a18735d34f26f06733d72580868851d67d665fbd2fc4997a9950877ebda93532"
+        }
+      ],
+      "history_fks": [
+        {
+          "name": "model_usage_history_company_id_agent_id_fkey",
+          "definition": "FOREIGN KEY (company_id, agent_id) REFERENCES agents(company_id, id) DEFERRABLE INITIALLY DEFERRED"
+        },
+        {
+          "name": "model_usage_history_company_id_fkey",
+          "definition": "FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE"
+        },
+        {
+          "name": "model_usage_history_company_id_workflow_id_version_id_fkey",
+          "definition": "FOREIGN KEY (company_id, workflow_id, version_id) REFERENCES workflow_versions(company_id, workflow_id, id) DEFERRABLE INITIALLY DEFERRED"
+        }
+      ],
+      "data_directory": "/Users/mac02/dev/openbot-recovery/.worktrees/pg-p06",
+      "run_bundle_columns": [
+        "bundle_digest"
+      ]
+    }
+  ]
+}

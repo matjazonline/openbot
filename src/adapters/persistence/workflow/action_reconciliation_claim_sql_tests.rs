@@ -2,6 +2,11 @@
 use super::*;
 use sqlx::{Postgres, Transaction};
 
+#[path = "storage_reconciliation_tests.rs"]
+mod storage_reconciliation_tests;
+#[path = "storage_witness_tests.rs"]
+mod storage_witness_tests;
+
 #[path = "action_reconciliation_claim_sql_wrong_execution_tests.rs"]
 mod wrong_execution_tests;
 

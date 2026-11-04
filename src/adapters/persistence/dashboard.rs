@@ -312,7 +312,9 @@ const ATTEMPT_STATS_SQL: &str = r#"
 const TOKENS_SQL: &str = r#"
     SELECT COALESCE(SUM(usage.input_tokens), 0)::bigint AS prompt_tokens,
            COALESCE(SUM(usage.output_tokens), 0)::bigint AS completion_tokens
-      FROM model_usage_calls AS usage
+      FROM (SELECT company_id,requested_at,input_tokens,output_tokens FROM model_usage_calls
+            UNION ALL
+            SELECT company_id,requested_at,input_tokens,output_tokens FROM model_usage_history) AS usage
      WHERE usage.requested_at >= CURRENT_TIMESTAMP - make_interval(mins => $1)
        {scope}"#;
 

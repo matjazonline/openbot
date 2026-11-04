@@ -149,8 +149,13 @@ async fn load_calls(tx: &mut PgConnection, query: &UsageQuery) -> AppResult<Vec<
     Ok(sqlx::query_as(
         "WITH calls AS MATERIALIZED (
            SELECT requested_at,request_id,provider,model,workflow_id,agent_id,reserved_input,reserved_output,input_tokens,output_tokens,usage_source
-           FROM model_usage_calls WHERE company_id=$1 AND requested_at >= $2 AND requested_at < $3
-           ORDER BY requested_at,request_id LIMIT $4)
+           FROM (
+             SELECT requested_at,request_id,provider,model,workflow_id,agent_id,reserved_input,reserved_output,input_tokens,output_tokens,usage_source
+             FROM model_usage_calls WHERE company_id=$1 AND requested_at >= $2 AND requested_at < $3
+             UNION ALL
+             SELECT requested_at,request_id,provider,model,workflow_id,agent_id,reserved_input,reserved_output,input_tokens,output_tokens,usage_source
+             FROM model_usage_history WHERE company_id=$1 AND requested_at >= $2 AND requested_at < $3
+           ) AS sources ORDER BY requested_at,request_id LIMIT $4)
          SELECT calls.provider,calls.model,calls.workflow_id,calls.agent_id,
            COALESCE(calls.input_tokens,calls.reserved_input) AS input_tokens,
            COALESCE(calls.output_tokens,calls.reserved_output) AS output_tokens,calls.usage_source,

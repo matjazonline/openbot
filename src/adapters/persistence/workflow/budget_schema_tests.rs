@@ -219,7 +219,7 @@ async fn workflow_budget_schema_consumption_never_locks_root_run_or_execution() 
 #[tokio::test]
 async fn root_budget_admission_raw_root_without_budget_is_refused() {
     let (f, admitted) = limited().await;
-    let error = sqlx::query("INSERT INTO workflow_runs (company_id,id,binding_id,binding_revision,workflow_id,version_id,actor_id,trigger_id,correlation_id,bundle,input,params,resources,max_steps,max_context_bytes,deadline) SELECT company_id,$2,binding_id,binding_revision,workflow_id,version_id,actor_id,gen_random_uuid(),gen_random_uuid(),bundle,input,params,resources,max_steps,max_context_bytes,deadline FROM workflow_runs WHERE id=$1")
+    let error = sqlx::query("INSERT INTO workflow_runs (company_id,id,binding_id,binding_revision,workflow_id,version_id,actor_id,trigger_id,correlation_id,bundle_digest,input,params,resources,max_steps,max_context_bytes,deadline) SELECT company_id,$2,binding_id,binding_revision,workflow_id,version_id,actor_id,gen_random_uuid(),gen_random_uuid(),bundle_digest,input,params,resources,max_steps,max_context_bytes,deadline FROM workflow_runs WHERE id=$1")
         .bind(admitted.run.as_uuid()).bind(Uuid::new_v4())
         .execute(f.persistence().pool()).await.unwrap_err();
     let db = error.as_database_error().unwrap();
@@ -269,7 +269,7 @@ async fn workflow_budget_current_compiler_admission_activates() {
     let (f, scope) = limited().await;
     let activation = f.persistence().activate(scope).await.unwrap();
     assert_eq!(activation.execution, scope.execution);
-    let saved: Value = sqlx::query_scalar("SELECT jsonb_build_object('compiler',(convert_from(run.bundle,'UTF8')::jsonb)->'compiler_revision','activations',usage.activations) FROM workflow_runs AS run JOIN workflow_root_budgets AS budget ON budget.company_id=run.company_id AND budget.root_run_id=run.id JOIN workflow_root_budget_usage AS usage ON usage.company_id=run.company_id AND usage.root_run_id=run.id WHERE run.company_id=$1 AND run.id=$2")
+    let saved: Value = sqlx::query_scalar("SELECT jsonb_build_object('compiler',(convert_from((SELECT stored.bundle FROM workflow_bundles stored WHERE stored.company_id=run.company_id AND stored.digest=run.bundle_digest),'UTF8')::jsonb)->'compiler_revision','activations',usage.activations) FROM workflow_runs AS run JOIN workflow_root_budgets AS budget ON budget.company_id=run.company_id AND budget.root_run_id=run.id JOIN workflow_root_budget_usage AS usage ON usage.company_id=run.company_id AND usage.root_run_id=run.id WHERE run.company_id=$1 AND run.id=$2")
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).fetch_one(f.persistence().pool()).await.unwrap();
     assert_eq!(
         saved,

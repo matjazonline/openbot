@@ -178,13 +178,21 @@ async fn workflow_wakeup_parent_composite_fk_rejects_valid_foreign_parent() {
     let (f, _parent, child) = chained(example("data.map")).await;
     let foreign = admission_source_tests::ForeignSource::new(&f).await;
     let foreign = admission_source_tests::foreign_parent(&f, foreign.company).await;
+    // Exercise this FK's scoped identity directly, before the budget-link AFTER
+    // trigger derives a root from the deliberately foreign parent.
+    let mut tx = f.persistence().pool().begin().await.unwrap();
+    sqlx::query("SET CONSTRAINTS workflow_parent_execution_fk IMMEDIATE")
+        .execute(&mut *tx)
+        .await
+        .unwrap();
     let error = sqlx::query("INSERT INTO workflow_runs SELECT (jsonb_populate_record(NULL::workflow_runs,to_jsonb(run)||jsonb_build_object('id',$2::uuid,'parent_run_id',$3::uuid,'parent_execution_id',$4::uuid))).* FROM workflow_runs AS run WHERE run.id=$1")
         .bind(child.run.as_uuid()).bind(Uuid::new_v4()).bind(foreign.run_id().as_uuid()).bind(foreign.execution_id().as_uuid())
-        .execute(f.persistence().pool()).await.unwrap_err();
+        .execute(&mut *tx).await.unwrap_err();
     assert_eq!(
         error.as_database_error().unwrap().constraint(),
         Some("workflow_parent_execution_fk")
     );
+    tx.rollback().await.unwrap();
 }
 
 #[path = "wakeup_parent_link_tests.rs"]

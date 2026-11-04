@@ -34,7 +34,7 @@ async fn step_setup(step: fn(&mut Value)) -> AgentSetup {
 
 /// The run's frozen bundle accepts `output` as the step's committed result.
 async fn accepted(setup: &AgentSetup, output: &Value) -> bool {
-    let stored: Vec<u8> = sqlx::query_scalar("SELECT bundle FROM workflow_runs WHERE id=$1")
+    let stored: Vec<u8> = sqlx::query_scalar("SELECT (SELECT stored.bundle FROM workflow_bundles stored WHERE stored.company_id=workflow_runs.company_id AND stored.digest=workflow_runs.bundle_digest) AS bundle FROM workflow_runs WHERE id=$1")
         .bind(setup.claim.fence.scope.run.as_uuid())
         .fetch_one(setup.fixture.persistence.pool())
         .await

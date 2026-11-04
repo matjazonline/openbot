@@ -48,6 +48,12 @@ async fn live_run_owner_deletion_negatives(f: &AdmissionFixture) {
             "populated {table}"
         );
         let mut tx = f.persistence().pool().begin().await.unwrap();
+        // Probe the original immediate FK boundary explicitly; retention defers it only
+        // so one transaction can remove both owners in the required cascade order.
+        sqlx::query("SET CONSTRAINTS background_tasks_workflow_execution_fk IMMEDIATE")
+            .execute(&mut *tx)
+            .await
+            .unwrap();
         let error = sqlx::query(statement)
             .bind(f.binding.target.company.as_uuid())
             .execute(&mut *tx)
@@ -83,16 +89,30 @@ async fn live_run_owner_deletion_negatives(f: &AdmissionFixture) {
     }
 }
 
+fn fact_mutations(table: &str) -> Vec<String> {
+    let mut statements = vec![format!(
+        "UPDATE {table} SET run_id=run_id WHERE company_id=$1"
+    )];
+    // Committed transient proofs are now reclaimable. Permanent effect/audit facts remain append-only.
+    if ![
+        "workflow_action_state_witnesses",
+        "workflow_action_schedule_witnesses",
+        "workflow_action_claim_retirement_witnesses",
+    ]
+    .contains(&table)
+    {
+        statements.push(format!("DELETE FROM {table} WHERE company_id=$1"));
+    }
+    statements
+}
+
 async fn live_owner_negatives(f: &AdmissionFixture) {
     let before = all_tables(f).await;
     for table in OWNED_FACTS {
         if count(f, table).await == 0 {
             continue;
         }
-        for statement in [
-            format!("DELETE FROM {table} WHERE company_id=$1"),
-            format!("UPDATE {table} SET run_id=run_id WHERE company_id=$1"),
-        ] {
+        for statement in fact_mutations(table) {
             let error = sqlx::query(&statement)
                 .bind(f.binding.target.company.as_uuid())
                 .execute(f.persistence().pool())

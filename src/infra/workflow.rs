@@ -54,11 +54,11 @@ pub const UNHANDLED_STEP_KINDS: &[&str] = &["memory.load", "memory.save"];
 
 /// The default and bounds of `WORKFLOW_WORKER_SLOTS`, and the database connections everything
 /// else `serve` runs needs (listener, HTTP headroom, task, delivery, notification and inbound
-/// workers, the intent worker, the schedule materializer and metrics sampler). Each slot needs
+/// workers, the intent worker, the schedule materializer, metrics sampler and storage maintenance). Each slot needs
 /// two: its claim or handler transaction and its lease renewal.
 pub const DEFAULT_WORKFLOW_WORKER_SLOTS: usize = 2;
 pub const MAX_WORKFLOW_WORKER_SLOTS: usize = 16;
-pub const RESERVED_DATABASE_CONNECTIONS: u32 = 9;
+pub const RESERVED_DATABASE_CONNECTIONS: u32 = 10;
 
 const LEASE: Duration = Duration::from_secs(30);
 const POLL: Duration = Duration::from_secs(1);
@@ -474,7 +474,7 @@ impl WorkflowEngine {
     /// Start workflow slots, the intent worker, schedule materializer and metrics sampler
     /// under `shutdown`. The caller keeps the handles and joins them on shutdown.
     pub fn spawn(&self, shutdown: &CancellationToken) -> Vec<(&'static str, JoinHandle<()>)> {
-        let mut handles = Vec::with_capacity(self.slots + 3);
+        let mut handles = Vec::with_capacity(self.slots + 4);
         let metric_persistence = self.persistence.clone();
         let monitoring = self.monitoring.clone();
         let metric_shutdown = shutdown.clone();
@@ -534,6 +534,7 @@ impl WorkflowEngine {
                 worker.run(&intent_wakeup, &intent_shutdown).await;
             }),
         ));
+        handles.push(self.spawn_storage(shutdown));
         let materializer = self.schedule_materializer();
         let schedule_shutdown = shutdown.clone();
         handles.push((
@@ -548,6 +549,22 @@ impl WorkflowEngine {
             }),
         ));
         handles
+    }
+    fn spawn_storage(&self, shutdown: &CancellationToken) -> (&'static str, JoinHandle<()>) {
+        let persistence = self.persistence.clone();
+        let monitoring = self.monitoring.clone();
+        let shutdown = shutdown.clone();
+        (
+            "workflow storage maintenance",
+            tokio::spawn(async move {
+                crate::application::workflow::storage::run(
+                    &persistence,
+                    monitoring.as_ref(),
+                    &shutdown,
+                )
+                .await;
+            }),
+        )
     }
 }
 
@@ -808,8 +825,8 @@ mod tests {
                 .unwrap();
         }
         assert_eq!(
-            task_count, 4,
-            "one slot, metrics, the intent worker and the schedule materializer"
+            task_count, 5,
+            "one slot, metrics, intent, schedule and storage workers"
         );
     }
 
@@ -824,8 +841,8 @@ mod tests {
             worker_slots(None, crate::infra::db::DEFAULT_DATABASE_MAX_CONNECTIONS).unwrap(),
             2
         );
-        assert_eq!(worker_slots(Some("4"), 17).unwrap(), 4);
-        assert!(worker_slots(Some("4"), 16).is_err());
+        assert_eq!(worker_slots(Some("4"), 18).unwrap(), 4);
+        assert!(worker_slots(Some("4"), 17).is_err());
         assert!(worker_slots(Some("5"), 18).is_err());
         assert!(worker_slots(Some("0"), 64).is_err());
         assert!(worker_slots(Some("17"), 64).is_err());

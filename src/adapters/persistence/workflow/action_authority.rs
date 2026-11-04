@@ -59,9 +59,9 @@ pub(super) async fn load_on(
 ) -> AppResult<ActionRunAuthority> {
     let actor = actor.ok_or_else(missing)?;
     let run = sqlx::query_as::<_, RunAuthorityRow>(
-        "SELECT actor_id,version_id,workflow_id,bundle,resources FROM workflow_runs \
-             WHERE company_id=$1 AND id=$2 AND state IN ('queued','running') \
-             AND deadline > clock_timestamp() FOR UPDATE",
+        "SELECT actor_id,version_id,workflow_id,stored.bundle AS bundle,resources FROM workflow_runs AS run LEFT JOIN workflow_bundles AS stored ON stored.company_id=run.company_id AND stored.digest=run.bundle_digest \
+             WHERE run.company_id=$1 AND id=$2 AND state IN ('queued','running') \
+             AND deadline > clock_timestamp() FOR UPDATE OF run",
     )
     .bind(scope.company.as_uuid())
     .bind(scope.run.as_uuid())

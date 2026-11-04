@@ -74,7 +74,7 @@ async fn claimed(child: bool) -> (AdmissionFixture, ClaimedWorkflow) {
         .unwrap()
         .unwrap();
     // The run's frozen bundle carries the trusted built-ins, as a Builder's publication would.
-    let bundle: Vec<u8> = sqlx::query_scalar("SELECT bundle FROM workflow_runs WHERE id = $1")
+    let bundle: Vec<u8> = sqlx::query_scalar("SELECT (SELECT stored.bundle FROM workflow_bundles stored WHERE stored.company_id=workflow_runs.company_id AND stored.digest=workflow_runs.bundle_digest) AS bundle FROM workflow_runs WHERE id = $1")
         .bind(claim.fence.scope.run.as_uuid())
         .fetch_one(f.persistence().pool())
         .await
@@ -97,12 +97,12 @@ async fn claimed(child: bool) -> (AdmissionFixture, ClaimedWorkflow) {
         vec![],
     )
     .unwrap();
-    sqlx::query("UPDATE workflow_runs SET bundle = $2 WHERE id = $1")
-        .bind(claim.fence.scope.run.as_uuid())
-        .bind(store_bundle(&frozen).unwrap())
-        .execute(f.persistence().pool())
-        .await
-        .unwrap();
+    replace_run_bundle(
+        f.persistence().pool(),
+        claim.fence.scope.run.as_uuid(),
+        &store_bundle(&frozen).unwrap(),
+    )
+    .await;
     enable_model(&f).await;
     (f, claim)
 }

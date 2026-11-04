@@ -51,12 +51,12 @@ FROM generate_series(1, 100) AS tenants(t), generate_series(0, 39) AS workflows(
 -- their tenant (md5('channel' || t || '-' || w)); workflows 32..39 to the company.
 INSERT INTO workflow_runs
     (company_id, id, binding_id, binding_revision, workflow_id, version_id, actor_id, trigger_id,
-     correlation_id, bundle, input, params, resources, max_steps, max_context_bytes, deadline,
+     correlation_id, bundle_digest, input, params, resources, max_steps, max_context_bytes, deadline,
      created_at, state, waiting_reason, parent_run_id, parent_execution_id, channel_id, finished_at, terminal_execution_id)
 SELECT company, md5('run' || t || '-' || n)::uuid, md5('binding' || t || '-' || w)::uuid, 1,
        md5('workflow' || t || '-' || w)::uuid, md5('version' || t || '-' || w || '-' || v)::uuid,
        md5('actor' || t)::uuid, md5('trigger' || t || '-' || n)::uuid,
-       md5('correlation' || t || '-' || n)::uuid, '\x00'::bytea, '{}', '{}', '{}', 100, 65536,
+       md5('correlation' || t || '-' || n)::uuid, sha256('\x00'::bytea), '{}', '{}', '{}', 100, 65536,
        created + interval '1 day', created, state,
        CASE WHEN state = 'waiting' THEN 'decision' END,
        CASE WHEN n % 10 = 5 THEN md5('run' || t || '-' || (n - 1))::uuid END,
@@ -268,11 +268,11 @@ def board_measurements(shapes: list) -> str:
 CHILD_HISTORY = r"""
 INSERT INTO workflow_runs
     (company_id, id, binding_id, binding_revision, workflow_id, version_id, actor_id, trigger_id,
-     correlation_id, bundle, input, params, resources, max_steps, max_context_bytes, deadline,
+     correlation_id, bundle_digest, input, params, resources, max_steps, max_context_bytes, deadline,
      created_at, state, parent_run_id, parent_execution_id, channel_id, finished_at, terminal_execution_id)
 SELECT md5('company1')::uuid, md5('extra-run1-' || n)::uuid, md5('binding1-5')::uuid, 1,
        md5('workflow1-5')::uuid, md5('version1-5-18')::uuid, md5('actor1')::uuid,
-       md5('extra-trigger1-' || n)::uuid, md5('extra-correlation1-' || n)::uuid, '\x00'::bytea,
+       md5('extra-trigger1-' || n)::uuid, md5('extra-correlation1-' || n)::uuid, sha256('\x00'::bytea),
        '{}', '{}', '{}', 100, 65536, created + interval '1 day', created, 'succeeded',
        md5('run1-4')::uuid, md5('extra-execution1-' || n)::uuid, md5('channel1-5')::uuid,
        created + interval '10 minutes',md5('extra-terminal1-' || n)::uuid

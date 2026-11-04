@@ -115,6 +115,8 @@ async fn insert_root_budget(
 }
 
 pub(super) async fn insert_run(db: &mut PgConnection, row: &RunRow<'_>) -> AppResult<()> {
+    let bytes = store_bundle(row.binding.bundle())?;
+    let digest = super::bundle_store::insert_on(db, row.company, &bytes).await?;
     let (channel, thread) = binding_rows::association_columns(row.association);
     let definition = row.binding.bundle().compiled().graph().definition();
     if row.parent.is_none() {
@@ -128,7 +130,7 @@ pub(super) async fn insert_run(db: &mut PgConnection, row: &RunRow<'_>) -> AppRe
     };
     sqlx::query(
         "INSERT INTO workflow_runs (company_id, id, binding_id, binding_revision, workflow_id, version_id, \
-         channel_id, thread_id, actor_id, trigger_id, correlation_id, bundle, input, params, resources, \
+         channel_id, thread_id, actor_id, trigger_id, correlation_id, bundle_digest, input, params, resources, \
          max_steps, max_context_bytes, deadline, parent_run_id, parent_execution_id, rerun_of_run_id, \
          delivery_policy) \
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17, \
@@ -137,7 +139,7 @@ pub(super) async fn insert_run(db: &mut PgConnection, row: &RunRow<'_>) -> AppRe
         .bind(row.binding.id().as_uuid()).bind(revision(row.binding.revision().get())?)
         .bind(definition.workflow_id.as_uuid()).bind(definition.version_id.as_uuid()).bind(channel).bind(thread)
         .bind(row.actor_id).bind(row.trigger.as_uuid())
-        .bind(row.correlation).bind(store_bundle(row.binding.bundle())?)
+        .bind(row.correlation).bind(digest.as_bytes())
         .bind(row.input).bind(row.binding.params()).bind(resources)
         .bind(i32::try_from(definition.limits.max_steps).map_err(|_| invalid())?)
         .bind(i32::try_from(definition.limits.max_context_bytes).map_err(|_| invalid())?)
