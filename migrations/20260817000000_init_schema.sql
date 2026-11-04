@@ -4157,8 +4157,8 @@ CREATE TABLE public.skills (
     slug public.citext NOT NULL,
     name text NOT NULL,
     description text NOT NULL,
-    trigger text NOT NULL,
-    instructions jsonb NOT NULL,
+    -- One prompt text; its byte bound is the workflow publication bound on prompt text.
+    instructions text NOT NULL,
     -- Workflow tools the agent must grant for this skill (06-D5); never a grant itself.
     required_tools text[] DEFAULT '{}'::text[] NOT NULL CONSTRAINT skills_required_tools_shape CHECK (public.valid_workflow_type_names(required_tools)),
     created_by jsonb NOT NULL,
@@ -4166,10 +4166,9 @@ CREATE TABLE public.skills (
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     CONSTRAINT skills_created_by_shape_check CHECK (public.valid_creation_provenance(created_by)),
     CONSTRAINT skills_description_bounded CHECK (((btrim(description) <> ''::text) AND (char_length(description) <= 500))),
-    CONSTRAINT skills_instructions_shape CHECK (((jsonb_typeof(instructions) = 'array'::text) AND ((jsonb_array_length(instructions) >= 1) AND (jsonb_array_length(instructions) <= 32)) AND (octet_length((instructions)::text) <= 524288))),
+    CONSTRAINT skills_instructions_bounded CHECK (((btrim(instructions) <> ''::text) AND (octet_length(instructions) <= 16384))),
     CONSTRAINT skills_name_bounded CHECK (((btrim(name) <> ''::text) AND (char_length(name) <= 120))),
-    CONSTRAINT skills_slug_format CHECK (((char_length((slug)::text) <= 120) AND ((slug)::text = lower((slug)::text)) AND ((slug)::text ~ '^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$'::text))),
-    CONSTRAINT skills_trigger_bounded CHECK (((btrim(trigger) <> ''::text) AND (char_length(trigger) <= 500)))
+    CONSTRAINT skills_slug_format CHECK (((char_length((slug)::text) <= 120) AND ((slug)::text = lower((slug)::text)) AND ((slug)::text ~ '^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$'::text)))
 );
 
 

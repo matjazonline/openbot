@@ -2,9 +2,8 @@
 //! were removed in 06C; procedures that call tools are workflows, and a skill names the tools it
 //! needs as `required_tools` instead.
 //!
-//! The instructions are stored as one JSONB array of typed values rather than as a `steps` table.
-//! A skill is a handful of ordered items edited as a single document, and a second table would buy
-//! referential integrity nobody needs at the cost of a join on every agent run.
+//! The instructions are one text. Every linked skill is pasted into the agent's prompt in full, so
+//! the model never sees them as separate items, and a list would only be an editing affordance.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -12,12 +11,12 @@ use uuid::Uuid;
 
 use crate::entities::{creation::CreationProvenance, value_objects::SkillSlug};
 
-pub const MAX_SKILL_INSTRUCTIONS: usize = 32;
-pub const MAX_SKILL_INSTRUCTION_CHARS: usize = 8_000;
-pub const MAX_SKILL_TRIGGER_CHARS: usize = 500;
+/// The workflow publication bound on any one prompt text (`registry::MAX_TEXT`), in UTF-8 bytes.
+/// Checked here so a skill that saves is a skill that publishes; a static assertion beside the
+/// publication check keeps the two from drifting.
+pub const MAX_SKILL_INSTRUCTIONS_BYTES: usize = 16_384;
 pub const MAX_SKILL_DESCRIPTION_CHARS: usize = 500;
 pub const MAX_SKILL_NAME_CHARS: usize = 120;
-pub const MAX_SKILL_INSTRUCTIONS_JSON_BYTES: usize = 524_288;
 
 /// One skill as it is stored and edited.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -30,30 +29,10 @@ pub struct Skill {
     pub name: String,
     /// The subtitle a picker shows.
     pub description: String,
-    /// When an agent should reach for this skill.
-    pub trigger: String,
-    pub instructions: Vec<SkillInstruction>,
+    pub instructions: String,
     pub created_by: CreationProvenance,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
-}
-
-/// One instruction of a skill: prompt text.
-///
-/// Externally tagged so the stored shape (`{"kind":"prompt","text":...}`) names its kind; a new
-/// kind would be additive rather than a silent reinterpretation of stored rows.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "kind", rename_all = "snake_case")]
-pub enum SkillInstruction {
-    Prompt { text: String },
-}
-
-impl SkillInstruction {
-    pub fn text(&self) -> &str {
-        match self {
-            Self::Prompt { text } => text,
-        }
-    }
 }
 
 impl Skill {
@@ -73,21 +52,15 @@ impl Skill {
             &self.description,
             MAX_SKILL_DESCRIPTION_CHARS,
         )?;
-        validate_bounded_text("A skill trigger", &self.trigger, MAX_SKILL_TRIGGER_CHARS)?;
 
-        if self.instructions.is_empty() {
-            return Err("A skill needs at least one instruction.".to_string());
+        if self.instructions.trim().is_empty() {
+            return Err("A skill's instructions are required.".to_string());
         }
-        if self.instructions.len() > MAX_SKILL_INSTRUCTIONS {
+        if self.instructions.len() > MAX_SKILL_INSTRUCTIONS_BYTES {
             return Err(format!(
-                "A skill may have at most {MAX_SKILL_INSTRUCTIONS} instructions."
+                "A skill's instructions may be at most {MAX_SKILL_INSTRUCTIONS_BYTES} bytes."
             ));
         }
-
-        for (index, instruction) in self.instructions.iter().enumerate() {
-            validate_instruction(index, instruction)?;
-        }
-
         Ok(())
     }
 }
@@ -102,33 +75,18 @@ fn validate_bounded_text(subject: &str, value: &str, max_chars: usize) -> Result
     Ok(())
 }
 
-fn validate_instruction(index: usize, instruction: &SkillInstruction) -> Result<(), String> {
-    validate_bounded_text(
-        &format!("The prompt in instruction {}", index + 1),
-        instruction.text(),
-        MAX_SKILL_INSTRUCTION_CHARS,
-    )
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn prompt(text: &str) -> SkillInstruction {
-        SkillInstruction::Prompt {
-            text: text.to_string(),
-        }
-    }
-
-    fn skill(instructions: Vec<SkillInstruction>) -> Skill {
+    fn skill(instructions: &str) -> Skill {
         Skill {
             id: Uuid::new_v4(),
             company_id: Some(Uuid::new_v4()),
             slug: SkillSlug::parse("triage-invoice").expect("a well-formed slug"),
             name: "Triage an invoice".to_string(),
             description: "Decide whether an invoice needs a human.".to_string(),
-            trigger: "The message attaches or mentions an invoice.".to_string(),
-            instructions,
+            instructions: instructions.to_string(),
             created_by: CreationProvenance::system(),
             created_at: Utc::now(),
             updated_at: Utc::now(),
@@ -136,57 +94,37 @@ mod tests {
     }
 
     #[test]
-    fn a_skill_of_prompts_is_accepted() {
-        let skill = skill(vec![
-            prompt("Read the invoice."),
-            prompt("Summarise the invoice."),
-        ]);
-        assert_eq!(skill.validate(), Ok(()));
+    fn a_skill_with_instructions_is_accepted() {
+        assert_eq!(
+            skill("Read the invoice.\n\nSummarise it.").validate(),
+            Ok(())
+        );
     }
 
     #[test]
-    fn an_empty_instruction_list_is_refused() {
-        let error = skill(vec![]).validate().expect_err("no instructions");
-        assert!(error.contains("at least one"), "{error}");
+    fn blank_instructions_are_refused() {
+        let error = skill("   ").validate().expect_err("no instructions");
+        assert!(error.contains("required"), "{error}");
+    }
+
+    /// The bound is the publication one, in bytes: text that fits in characters but not in bytes
+    /// would save and then fail every workflow that names the skill.
+    #[test]
+    fn instructions_are_bounded_in_bytes_not_characters() {
+        assert_eq!(
+            skill(&"x".repeat(MAX_SKILL_INSTRUCTIONS_BYTES)).validate(),
+            Ok(())
+        );
+        let multibyte = "é".repeat(MAX_SKILL_INSTRUCTIONS_BYTES / 2 + 1);
+        assert!(multibyte.chars().count() < MAX_SKILL_INSTRUCTIONS_BYTES);
+        let error = skill(&multibyte).validate().expect_err("too many bytes");
+        assert!(error.contains("bytes"), "{error}");
     }
 
     #[test]
-    fn more_than_thirty_two_instructions_are_refused() {
-        let many = (0..=MAX_SKILL_INSTRUCTIONS)
-            .map(|index| prompt(&format!("Step {index}")))
-            .collect();
-        let error = skill(many).validate().expect_err("too many instructions");
-        assert!(error.contains("at most"), "{error}");
-    }
-
-    #[test]
-    fn a_blank_or_oversized_prompt_is_refused() {
-        assert!(skill(vec![prompt("   ")]).validate().is_err());
-        let long = "x".repeat(MAX_SKILL_INSTRUCTION_CHARS + 1);
-        assert!(skill(vec![prompt(&long)]).validate().is_err());
-    }
-
-    #[test]
-    fn a_blank_description_or_trigger_is_refused() {
-        let mut blank = skill(vec![prompt("Answer.")]);
+    fn a_blank_description_is_refused() {
+        let mut blank = skill("Answer.");
         blank.description = " ".into();
         assert!(blank.validate().is_err());
-        let mut blank = skill(vec![prompt("Answer.")]);
-        blank.trigger = String::new();
-        assert!(blank.validate().is_err());
-    }
-
-    /// 06C: a stored executable tool step is no longer a skill instruction.
-    #[test]
-    fn a_prompt_round_trips_and_a_tool_step_does_not_decode() {
-        let stored = serde_json::json!({"kind":"prompt","text":"Answer briefly."});
-        let decoded: SkillInstruction = serde_json::from_value(stored.clone()).unwrap();
-        assert_eq!(serde_json::to_value(&decoded).unwrap(), stored);
-        assert!(
-            serde_json::from_value::<SkillInstruction>(
-                serde_json::json!({"kind":"tool","tool":"datetime"})
-            )
-            .is_err()
-        );
     }
 }

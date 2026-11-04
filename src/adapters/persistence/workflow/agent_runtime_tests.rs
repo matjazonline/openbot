@@ -71,20 +71,20 @@ async fn agent_setup(origin: &str) -> AgentSetup {
     agent_setup_with(origin, None).await
 }
 
-async fn agent_setup_with(origin: &str, skill: Option<Value>) -> AgentSetup {
+async fn agent_setup_with(origin: &str, skill: Option<&str>) -> AgentSetup {
     agent_setup_full(origin, skill, false).await
 }
 
-async fn agent_setup_full(origin: &str, skill: Option<Value>, protected: bool) -> AgentSetup {
+async fn agent_setup_full(origin: &str, skill: Option<&str>, protected: bool) -> AgentSetup {
     agent_setup_source(origin, skill, protected, |_, _| {}).await
 }
 
-/// `skill` (instructions JSON) is created and linked to the agent before publication;
+/// `skill` (its instructions) is created and linked to the agent before publication;
 /// `protected` registers the tool as approval-required and gives the step an approval policy;
 /// `customize` edits the source (given the owner actor id) before publication.
 async fn agent_setup_source(
     origin: &str,
-    skill: Option<Value>,
+    skill: Option<&str>,
     protected: bool,
     customize: impl FnOnce(&mut Value, Uuid),
 ) -> AgentSetup {
@@ -130,7 +130,7 @@ async fn agent_setup_source(
     .unwrap();
     if let Some(instructions) = skill {
         let skill_id = Uuid::new_v4();
-        sqlx::query("INSERT INTO skills(id,company_id,slug,name,description,trigger,instructions,created_by,required_tools) VALUES($1,$2,'support','Support','Support policy','Support questions',$3,'{\"actor_type\":\"system\",\"actor_id\":null,\"actor_name\":\"Fixture\"}','{registered.request}')")
+        sqlx::query("INSERT INTO skills(id,company_id,slug,name,description,instructions,created_by,required_tools) VALUES($1,$2,'support','Support','Support policy',$3,'{\"actor_type\":\"system\",\"actor_id\":null,\"actor_name\":\"Fixture\"}','{registered.request}')")
             .bind(skill_id).bind(company.as_uuid()).bind(instructions).execute(p.pool()).await.unwrap();
         sqlx::query(
             "INSERT INTO agent_skills(company_id,agent_id,skill_id,position) VALUES($1,$2,$3,0)",
@@ -370,7 +370,6 @@ async fn workflow_agent_capability_writers_preserve_unsupplied_lists() {
     use crate::application::use_cases::skill::{
         SkillManagementPersistence as SkillPersistence, SkillWrite,
     };
-    use crate::entities::skill::SkillInstruction;
     let setup = Box::pin(agent_setup("http://127.0.0.1:1")).await;
     let p = &setup.fixture.persistence;
     let company = setup.fixture.target.company.as_uuid();
@@ -405,10 +404,7 @@ async fn workflow_agent_capability_writers_preserve_unsupplied_lists() {
         slug: "support".into(),
         name: "Support".into(),
         description: "Support policy".into(),
-        trigger: "Support questions".into(),
-        instructions: vec![SkillInstruction::Prompt {
-            text: "Be precise.".into(),
-        }],
+        instructions: "Be precise.".into(),
         required_tools: required,
         created_by: None,
     };
@@ -600,7 +596,7 @@ async fn workflow_agent_capture_refuses_slot_bound_http_grant() {
 /// 06-D5: unlinking a frozen skill revokes it before the next model admission.
 #[tokio::test]
 async fn workflow_agent_run_refuses_unlinked_skill_before_provider_entry() {
-    let prompt = json!([{"kind":"prompt","text":"Use the registered request for facts."}]);
+    let prompt = "Use the registered request for facts.";
     let setup = Box::pin(agent_setup_with("http://127.0.0.1:1", Some(prompt))).await;
     let llm = scripted_llm(vec![]).await;
     register_scripted_agent_base_url(setup.agent, &llm.base_url);
@@ -624,20 +620,6 @@ async fn workflow_agent_run_refuses_unlinked_skill_before_provider_entry() {
         "agent.rejected"
     );
     assert_eq!(llm.finish().await.unwrap(), 0);
-}
-
-/// 06-D5: a skill with legacy executable tool steps cannot be used by a workflow agent.
-#[tokio::test]
-async fn workflow_agent_capture_refuses_legacy_tool_step_skill() {
-    let steps = json!([{"kind":"tool","tool":"datetime"}]);
-    let result = tokio::spawn(async move {
-        Box::pin(agent_setup_with("http://127.0.0.1:1", Some(steps))).await;
-    })
-    .await;
-    assert!(
-        result.is_err(),
-        "publication of a legacy tool-step skill must fail"
-    );
 }
 
 /// 06-D5 F014: an agent edit committed while publish waits on the agent row fails publish.

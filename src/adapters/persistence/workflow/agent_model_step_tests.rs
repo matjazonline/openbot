@@ -188,7 +188,7 @@ async fn workflow_decision_agent_data_schema_local_references_resolve() {
 /// unlinked skill does not block them, a removed model does.
 #[tokio::test]
 async fn workflow_model_steps_check_only_the_capabilities_they_use() {
-    let prompt = json!([{"kind":"prompt","text":"Know the refund policy."}]);
+    let prompt = "Know the refund policy.";
     let setup = Box::pin(agent_setup_source(
         "http://127.0.0.1:1",
         Some(prompt),

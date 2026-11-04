@@ -896,9 +896,7 @@ mod capability_tests {
     use chrono::Utc;
 
     use super::*;
-    use crate::entities::{
-        creation::CreationProvenance, skill::SkillInstruction, value_objects::SkillSlug,
-    };
+    use crate::entities::{creation::CreationProvenance, value_objects::SkillSlug};
 
     fn skill(company_id: Option<Uuid>, name: &str) -> Skill {
         Skill {
@@ -907,10 +905,7 @@ mod capability_tests {
             slug: SkillSlug::parse(&name.to_ascii_lowercase()).unwrap(),
             name: name.into(),
             description: format!("{name} description"),
-            trigger: "When needed".into(),
-            instructions: vec![SkillInstruction::Prompt {
-                text: "Reply".into(),
-            }],
+            instructions: "Reply".into(),
             created_by: CreationProvenance::system(),
             created_at: Utc::now(),
             updated_at: Utc::now(),

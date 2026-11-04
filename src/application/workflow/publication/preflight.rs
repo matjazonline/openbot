@@ -1,6 +1,10 @@
 use super::*;
 use crate::domain::workflow::TypeName;
+use crate::entities::skill::MAX_SKILL_INSTRUCTIONS_BYTES;
 use std::collections::BTreeSet;
+
+// The skill editor refuses what this check would: a saved skill must publish.
+const _: () = assert!(MAX_SKILL_INSTRUCTIONS_BYTES == registry::MAX_TEXT);
 
 pub(super) fn validate(
     snapshots: &DependencySnapshots,

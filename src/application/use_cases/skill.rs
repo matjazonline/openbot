@@ -10,10 +10,7 @@ use uuid::Uuid;
 use crate::{
     app_error::{AppError, AppResult},
     entities::{
-        agent::Agent,
-        creation::CreationProvenance,
-        skill::{MAX_SKILL_INSTRUCTIONS_JSON_BYTES, Skill, SkillInstruction},
-        value_objects::SkillSlug,
+        agent::Agent, creation::CreationProvenance, skill::Skill, value_objects::SkillSlug,
     },
     use_cases::company::{CompanyPersistence, managed_company, owned_company},
 };
@@ -25,8 +22,7 @@ pub struct SkillWrite {
     pub slug: String,
     pub name: String,
     pub description: String,
-    pub trigger: String,
-    pub instructions: Vec<SkillInstruction>,
+    pub instructions: String,
     /// Workflow tools an agent must grant for this skill (06-D5); `None` keeps them.
     pub required_tools: Option<Vec<crate::domain::workflow::TypeName>>,
     pub created_by: Option<CreationProvenance>,
@@ -38,10 +34,7 @@ impl SkillWrite {
         self.slug = self.slug.trim().to_ascii_lowercase();
         self.name = self.name.trim().to_string();
         self.description = self.description.trim().to_string();
-        self.trigger = self.trigger.trim().to_string();
-        for SkillInstruction::Prompt { text } in &mut self.instructions {
-            *text = text.trim().to_string();
-        }
+        self.instructions = self.instructions.trim().to_string();
 
         let slug = SkillSlug::parse(&self.slug).map_err(AppError::BadRequest)?;
         let now = Utc::now();
@@ -51,21 +44,12 @@ impl SkillWrite {
             slug,
             name: self.name.clone(),
             description: self.description.clone(),
-            trigger: self.trigger.clone(),
             instructions: self.instructions.clone(),
             created_by: CreationProvenance::system(),
             created_at: now,
             updated_at: now,
         };
-        candidate.validate().map_err(AppError::BadRequest)?;
-        let encoded = serde_json::to_vec(&self.instructions)
-            .map_err(|error| AppError::Internal(error.to_string()))?;
-        if encoded.len() > MAX_SKILL_INSTRUCTIONS_JSON_BYTES {
-            return Err(AppError::BadRequest(format!(
-                "Skill instructions may be at most {MAX_SKILL_INSTRUCTIONS_JSON_BYTES} bytes."
-            )));
-        }
-        Ok(())
+        candidate.validate().map_err(AppError::BadRequest)
     }
 }
 
@@ -342,34 +326,25 @@ mod tests {
     use super::*;
     use crate::entities::skill::Skill;
 
-    fn write(instructions: Vec<SkillInstruction>) -> SkillWrite {
+    fn write(instructions: &str) -> SkillWrite {
         SkillWrite {
             required_tools: None,
             slug: "  REVIEW-Invoice  ".into(),
             name: " Review invoice ".into(),
             description: " Decide what it needs. ".into(),
-            trigger: " When an invoice arrives. ".into(),
-            instructions,
+            instructions: instructions.into(),
             created_by: None,
         }
     }
 
     #[test]
     fn normalize_lowercases_the_slug_and_trims_every_field() {
-        let mut candidate = write(vec![SkillInstruction::Prompt {
-            text: " Reply clearly. ".into(),
-        }]);
+        let mut candidate = write(" Reply clearly. ");
         candidate.normalize().unwrap();
         assert_eq!(candidate.slug, "review-invoice");
         assert_eq!(candidate.name, "Review invoice");
         assert_eq!(candidate.description, "Decide what it needs.");
-        assert_eq!(candidate.trigger, "When an invoice arrives.");
-        assert_eq!(
-            candidate.instructions,
-            [SkillInstruction::Prompt {
-                text: "Reply clearly.".into()
-            }]
-        );
+        assert_eq!(candidate.instructions, "Reply clearly.");
     }
 
     fn skill() -> Skill {
@@ -380,10 +355,7 @@ mod tests {
             slug: SkillSlug::parse("delegate").unwrap(),
             name: "Delegate".into(),
             description: "Delegate work.".into(),
-            trigger: "When specialist work is required.".into(),
-            instructions: vec![SkillInstruction::Prompt {
-                text: "Reply.".into(),
-            }],
+            instructions: "Reply.".into(),
             created_by: CreationProvenance::system(),
             created_at: now,
             updated_at: now,

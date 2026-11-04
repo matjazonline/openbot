@@ -1,20 +1,7 @@
 //! Shared skill-library editor for company owners and platform operators.
 
 use super::*;
-use crate::entities::skill::{Skill, SkillInstruction};
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum DraftInstruction {
-    Prompt { text: String },
-}
-
-impl DraftInstruction {
-    pub fn prompt() -> Self {
-        Self::Prompt {
-            text: String::new(),
-        }
-    }
-}
+use crate::entities::skill::{MAX_SKILL_INSTRUCTIONS_BYTES, Skill};
 
 #[derive(Debug, Clone, Default)]
 pub struct SkillDraft {
@@ -22,34 +9,17 @@ pub struct SkillDraft {
     pub slug: String,
     pub name: String,
     pub description: String,
-    pub trigger: String,
-    pub instructions: Vec<DraftInstruction>,
+    pub instructions: String,
 }
 
 impl SkillDraft {
-    pub fn blank() -> Self {
-        Self {
-            instructions: vec![DraftInstruction::prompt()],
-            ..Self::default()
-        }
-    }
-
     pub fn stored(skill: &Skill) -> Self {
         Self {
             id: Some(skill.id),
             slug: skill.slug.to_string(),
             name: skill.name.clone(),
             description: skill.description.clone(),
-            trigger: skill.trigger.clone(),
-            instructions: skill
-                .instructions
-                .iter()
-                .map(
-                    |SkillInstruction::Prompt { text }| DraftInstruction::Prompt {
-                        text: text.clone(),
-                    },
-                )
-                .collect(),
+            instructions: skill.instructions.clone(),
         }
     }
 }
@@ -77,14 +47,14 @@ pub fn company_skills_section(section: &SkillSection<'_>) -> String {
             .to_string();
     }
 
-    let draft = section.draft.cloned().unwrap_or_else(SkillDraft::blank);
+    let draft = section.draft.cloned().unwrap_or_default();
     format!(
         r##"<div id="skill-library-section" class="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
             {error}{notice}
             <div class="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(24rem,1.25fr)]">
                 <section class="space-y-3">
                     <div class="flex items-center justify-between gap-3">
-                        <div><h3 class="font-semibold">Skills</h3><p class="text-xs opacity-60">Reusable, ordered instructions for agents.</p></div>
+                        <div><h3 class="font-semibold">Skills</h3><p class="text-xs opacity-60">Reusable instructions for agents.</p></div>
                         {browse}
                     </div>
                     {list}
@@ -183,13 +153,6 @@ fn skill_url(company_id: Option<Uuid>, skill_id: Option<Uuid>) -> String {
     }
 }
 
-fn instruction_url(company_id: Option<Uuid>) -> String {
-    company_id.map_or_else(
-        || "/ui/skill-library/instruction-row".to_string(),
-        |id| format!("/ui/companies/{id}/skills/instruction-row"),
-    )
-}
-
 pub fn skill_editor_fragment(company_id: Option<Uuid>, draft: &SkillDraft) -> String {
     let save_url = skill_url(company_id, draft.id);
     let method = if draft.id.is_some() { "put" } else { "post" };
@@ -198,9 +161,6 @@ pub fn skill_editor_fragment(company_id: Option<Uuid>, draft: &SkillDraft) -> St
     } else {
         "New skill"
     };
-    let skill_id = draft.id.map_or_else(String::new, |id| {
-        format!(r#"<input type="hidden" name="skill_id" value="{id}">"#)
-    });
     let delete = draft.id.map_or_else(String::new, |skill_id| {
         format!(
             r##"<button type="button" class="btn btn-error btn-outline ml-auto"
@@ -215,7 +175,6 @@ pub fn skill_editor_fragment(company_id: Option<Uuid>, draft: &SkillDraft) -> St
             hx-{method}="{save_url}" hx-target="#skill-library-section" hx-swap="outerHTML"
             hx-disabled-elt="find button[type='submit']">
             <h3 class="font-semibold">{title}</h3>
-            {skill_id}
             <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <label class="form-control"><span class="label text-xs opacity-70">Name</span>
                     <input class="input w-full" name="name" required maxlength="120" value="{name}"></label>
@@ -224,9 +183,9 @@ pub fn skill_editor_fragment(company_id: Option<Uuid>, draft: &SkillDraft) -> St
             </div>
             <label class="form-control"><span class="label text-xs opacity-70">Description</span>
                 <textarea class="textarea w-full" name="description" maxlength="500" required>{description}</textarea></label>
-            <label class="form-control"><span class="label text-xs opacity-70">Trigger</span>
-                <textarea class="textarea w-full" name="trigger" maxlength="500" required>{trigger}</textarea></label>
-            {instructions}
+            <label class="form-control"><span class="label text-xs opacity-70">Instructions</span>
+                <textarea class="textarea min-h-48 w-full" name="instructions" maxlength="{max_instructions}" required>{instructions}</textarea>
+                <span class="label text-xs opacity-60">Added to the prompt of every agent given this skill. At most {max_instructions} bytes.</span></label>
             <div class="flex items-center gap-3 border-t border-base-300 pt-4">
                 <button type="submit" class="btn btn-primary">
                     <span class="loading loading-spinner loading-sm hidden [.htmx-request_&]:inline-block"></span>
@@ -240,77 +199,12 @@ pub fn skill_editor_fragment(company_id: Option<Uuid>, draft: &SkillDraft) -> St
         method = method,
         save_url = save_url,
         title = title,
-        skill_id = skill_id,
         name = escape_html_attr(&draft.name),
         slug = escape_html_attr(&draft.slug),
         description = escape_html_text(&draft.description),
-        trigger = escape_html_text(&draft.trigger),
-        instructions = skill_instruction_editor(company_id, draft),
+        instructions = escape_html_text(&draft.instructions),
+        max_instructions = MAX_SKILL_INSTRUCTIONS_BYTES,
         base_url = skill_url(company_id, None),
-    )
-}
-
-/// The fragment replaced by every add/remove/reorder action.
-pub fn skill_instruction_editor(company_id: Option<Uuid>, draft: &SkillDraft) -> String {
-    let rows = draft
-        .instructions
-        .iter()
-        .enumerate()
-        .map(|(index, instruction)| instruction_row(company_id, index, instruction))
-        .collect::<String>();
-    let url = instruction_url(company_id);
-    let add = instruction_action_button(&url, "add", "Add instruction", "btn btn-ghost btn-sm");
-    format!(
-        r##"<section id="skill-instruction-editor" class="space-y-3" aria-live="polite">
-            <div class="flex items-center justify-between"><div><h4 class="text-sm font-semibold">Instructions</h4>
-                <p class="text-xs opacity-60">At most 32 prompt instructions.</p></div>{add}</div>
-            <input type="hidden" name="instruction_count" value="{count}">
-            <div class="space-y-3">{rows}</div>
-        </section>"##,
-        count = draft.instructions.len(),
-    )
-}
-
-fn instruction_action_button(url: &str, action: &str, label: &str, class: &str) -> String {
-    format!(
-        r##"<button type="button" class="{class}" name="action" value="{action}"
-            hx-post="{url}" hx-include="#skill-editor" hx-target="#skill-editor"
-            hx-swap="outerHTML" hx-sync="#skill-editor:replace" hx-disabled-elt="this">{label}</button>"##,
-        action = escape_html_attr(action),
-        label = escape_html_text(label),
-    )
-}
-
-fn instruction_row(
-    company_id: Option<Uuid>,
-    index: usize,
-    instruction: &DraftInstruction,
-) -> String {
-    let url = instruction_url(company_id);
-    let DraftInstruction::Prompt { text } = instruction;
-    let body = format!(
-        r#"<textarea class="textarea min-h-24 w-full" name="instruction_{index}_text" maxlength="8000" required>{}</textarea>"#,
-        escape_html_text(text)
-    );
-    format!(
-        r##"<div class="rounded-box border border-base-300 bg-base-100 p-3" data-instruction-row="{index}">
-            <div class="mb-2 flex flex-wrap items-center gap-2">
-                <span class="text-xs opacity-70">Prompt {number}</span>
-                <span class="ml-auto flex gap-1">
-                    {up}{down}{remove}
-                </span>
-            </div>{body}
-        </div>"##,
-        number = index + 1,
-        up = instruction_action_button(&url, &format!("up:{index}"), "↑", "btn btn-ghost btn-xs"),
-        down =
-            instruction_action_button(&url, &format!("down:{index}"), "↓", "btn btn-ghost btn-xs"),
-        remove = instruction_action_button(
-            &url,
-            &format!("remove:{index}"),
-            "×",
-            "btn btn-ghost btn-xs"
-        ),
     )
 }
 
@@ -349,16 +243,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn a_skill_instruction_with_html_in_its_text_is_escaped() {
+    fn skill_instructions_with_html_in_their_text_are_escaped() {
         let draft = SkillDraft {
-            instructions: vec![DraftInstruction::Prompt {
-                text: ["</textarea><scr", "ipt>alert(1)</scr", "ipt>"].concat(),
-            }],
+            instructions: ["</textarea><scr", "ipt>alert(1)</scr", "ipt>"].concat(),
             ..SkillDraft::default()
         };
-        let html = skill_instruction_editor(Some(Uuid::nil()), &draft);
+        let html = skill_editor_fragment(Some(Uuid::nil()), &draft);
         assert!(!html.contains(&["<scr", "ipt>"].concat()));
-        assert!(!html.contains("</textarea><"));
-        assert!(html.contains("&lt;script&gt;"));
+        // The whole form has honest `</textarea></label>` closes; only the injected one must not appear.
+        assert!(!html.contains(&["</textarea><scr", "ipt>"].concat()));
+        assert!(html.contains("&lt;/textarea&gt;&lt;script&gt;"));
     }
 }

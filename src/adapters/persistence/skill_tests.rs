@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use crate::{
     adapters::persistence::test_support::test_pool,
-    entities::{creation::CreationProvenance, skill::SkillInstruction},
+    entities::creation::CreationProvenance,
     use_cases::{
         agent::{AgentPersistence, AgentWrite, LibraryAgentCopyPersistence},
         company::{CompanyPersistence, CompanyWrite},
@@ -50,10 +50,7 @@ fn skill_write(slug: impl Into<String>) -> SkillWrite {
         slug: slug.into(),
         name: "Review invoice".into(),
         description: "Review an invoice and report anomalies.".into(),
-        trigger: "An invoice is attached or mentioned.".into(),
-        instructions: vec![SkillInstruction::Prompt {
-            text: "Review the invoice and reply with the findings.".into(),
-        }],
+        instructions: "Review the invoice and reply with the findings.".into(),
         created_by: Some(CreationProvenance::system()),
     };
     write.normalize().unwrap();
@@ -490,7 +487,7 @@ async fn database_scope_trigger_refuses_live_cross_library_skill_links() {
 }
 
 #[tokio::test]
-async fn malformed_but_deserializable_skill_json_is_a_contextual_conversion_error() {
+async fn a_stored_skill_the_domain_refuses_is_a_contextual_conversion_error() {
     let Some(pool) = test_pool().await else {
         return;
     };
@@ -498,12 +495,13 @@ async fn malformed_but_deserializable_skill_json_is_a_contextual_conversion_erro
     let company_id = company(&persistence, "malformed").await;
     let id = Uuid::new_v4();
     sqlx::query(
-        "INSERT INTO skills (id, company_id, slug, name, description, trigger, instructions, created_by) \
-         VALUES ($1, $2, 'malformed', 'Malformed', 'Malformed row.', 'Always.', $3, $4)",
+        "INSERT INTO skills (id, company_id, slug, name, description, instructions, created_by) \
+         VALUES ($1, $2, 'malformed', 'Malformed', 'Malformed row.', $3, $4)",
     )
     .bind(id)
     .bind(company_id)
-    .bind(serde_json::json!([{"prompt": ""}]))
+    // `btrim` strips only spaces, so the CHECK admits this; the domain's `trim` does not.
+    .bind("\n\t")
     .bind(serde_json::to_value(CreationProvenance::system()).unwrap())
     .execute(&pool)
     .await

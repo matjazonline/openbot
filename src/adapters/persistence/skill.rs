@@ -7,17 +7,13 @@ use uuid::Uuid;
 use crate::{
     adapters::persistence::PostgresPersistence,
     app_error::{AppError, AppResult},
-    entities::{
-        creation::CreationProvenance,
-        skill::{Skill, SkillInstruction},
-        value_objects::SkillSlug,
-    },
+    entities::{creation::CreationProvenance, skill::Skill, value_objects::SkillSlug},
     use_cases::skill::{SkillManagementPersistence, SkillPage, SkillPageRequest, SkillWrite},
 };
 
 pub(crate) const SKILL_COLUMNS: &str = "\
     skill.id, skill.company_id, skill.slug::text AS slug, skill.name, skill.description, \
-    skill.trigger, skill.instructions, skill.created_by, skill.created_at, skill.updated_at";
+    skill.instructions, skill.created_by, skill.created_at, skill.updated_at";
 
 #[derive(Debug, sqlx::FromRow)]
 pub(crate) struct SkillDb {
@@ -26,8 +22,7 @@ pub(crate) struct SkillDb {
     slug: String,
     name: String,
     description: String,
-    trigger: String,
-    instructions: serde_json::Value,
+    instructions: String,
     created_by: serde_json::Value,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
@@ -45,11 +40,7 @@ impl TryFrom<SkillDb> for Skill {
                 .map_err(|error| AppError::Internal(format!("Invalid skill {id} slug: {error}")))?,
             name: row.name,
             description: row.description,
-            trigger: row.trigger,
-            instructions: serde_json::from_value::<Vec<SkillInstruction>>(row.instructions)
-                .map_err(|error| {
-                    AppError::Internal(format!("Invalid skill {id} instructions: {error}"))
-                })?,
+            instructions: row.instructions,
             created_by: serde_json::from_value(row.created_by).map_err(|error| {
                 AppError::Internal(format!("Invalid skill {id} creation provenance: {error}"))
             })?,
@@ -63,17 +54,14 @@ impl TryFrom<SkillDb> for Skill {
     }
 }
 
-fn encode_write(write: &SkillWrite) -> AppResult<(serde_json::Value, serde_json::Value)> {
-    let instructions = serde_json::to_value(&write.instructions)
-        .map_err(|error| AppError::Internal(error.to_string()))?;
-    let created_by = serde_json::to_value(
+fn encode_provenance(write: &SkillWrite) -> AppResult<serde_json::Value> {
+    serde_json::to_value(
         write
             .created_by
             .clone()
             .unwrap_or_else(CreationProvenance::system),
     )
-    .map_err(|error| AppError::Internal(error.to_string()))?;
-    Ok((instructions, created_by))
+    .map_err(|error| AppError::Internal(error.to_string()))
 }
 
 fn write_error(error: sqlx::Error) -> AppError {
@@ -116,11 +104,11 @@ where
 {
     let mut validated = write.clone();
     validated.normalize()?;
-    let (instructions, created_by) = encode_write(&validated)?;
+    let created_by = encode_provenance(&validated)?;
     let row = sqlx::query_as::<_, SkillDb>(&format!(
         "INSERT INTO skills AS skill \
-             (id, company_id, slug, name, description, trigger, instructions, created_by, required_tools) \
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE($9, '{{}}'::text[])) \
+             (id, company_id, slug, name, description, instructions, created_by, required_tools) \
+         VALUES ($1, $2, $3, $4, $5, $6, $7, COALESCE($8, '{{}}'::text[])) \
          RETURNING {SKILL_COLUMNS}"
     ))
     .bind(Uuid::new_v4())
@@ -128,10 +116,14 @@ where
     .bind(&validated.slug)
     .bind(&validated.name)
     .bind(&validated.description)
-    .bind(&validated.trigger)
-    .bind(instructions)
+    .bind(&validated.instructions)
     .bind(created_by)
-    .bind(validated.required_tools.as_ref().map(|names| names.iter().map(|name| name.as_str().to_owned()).collect::<Vec<_>>()))
+    .bind(validated.required_tools.as_ref().map(|names| {
+        names
+            .iter()
+            .map(|name| name.as_str().to_owned())
+            .collect::<Vec<_>>()
+    }))
     .fetch_one(executor)
     .await
     .map_err(write_error)?;
@@ -166,15 +158,13 @@ pub(crate) async fn copy_library_skill_on(
     let source: Skill = source.try_into()?;
     let provenance =
         serde_json::to_value(created_by).map_err(|error| AppError::Internal(error.to_string()))?;
-    let instructions = serde_json::to_value(&source.instructions)
-        .map_err(|error| AppError::Internal(error.to_string()))?;
 
     for suffix in 1..=100 {
         let candidate = copied_slug(source.slug.as_str(), suffix);
         let row = sqlx::query_as::<_, SkillDb>(&format!(
             "INSERT INTO skills AS skill \
-                 (id, company_id, slug, name, description, trigger, instructions, created_by, required_tools) \
-             SELECT $1, $2, $3, $4, $5, $6, $7, $8, source.required_tools FROM skills AS source WHERE source.id = $9 \
+                 (id, company_id, slug, name, description, instructions, created_by, required_tools) \
+             SELECT $1, $2, $3, $4, $5, $6, $7, source.required_tools FROM skills AS source WHERE source.id = $8 \
              ON CONFLICT (company_id, slug) DO NOTHING \
              RETURNING {SKILL_COLUMNS}"
         ))
@@ -183,8 +173,7 @@ pub(crate) async fn copy_library_skill_on(
         .bind(candidate)
         .bind(&source.name)
         .bind(&source.description)
-        .bind(&source.trigger)
-        .bind(&instructions)
+        .bind(&source.instructions)
         .bind(&provenance)
         .bind(skill_id)
         .fetch_optional(&mut **transaction)
@@ -360,20 +349,17 @@ where
 {
     let mut validated = write.clone();
     validated.normalize()?;
-    let instructions = serde_json::to_value(&validated.instructions)
-        .map_err(|error| AppError::Internal(error.to_string()))?;
     let row = sqlx::query_as::<_, SkillDb>(&format!(
-        "UPDATE skills AS skill SET slug = $1, name = $2, description = $3, trigger = $4, \
-             instructions = $5, required_tools = COALESCE($8, skill.required_tools), \
+        "UPDATE skills AS skill SET slug = $1, name = $2, description = $3, \
+             instructions = $4, required_tools = COALESCE($7, skill.required_tools), \
              updated_at = CURRENT_TIMESTAMP \
-         WHERE skill.id = $6 AND skill.company_id IS NOT DISTINCT FROM $7 \
+         WHERE skill.id = $5 AND skill.company_id IS NOT DISTINCT FROM $6 \
          RETURNING {SKILL_COLUMNS}"
     ))
     .bind(&validated.slug)
     .bind(&validated.name)
     .bind(&validated.description)
-    .bind(&validated.trigger)
-    .bind(instructions)
+    .bind(&validated.instructions)
     .bind(skill_id)
     .bind(company_id)
     .bind(validated.required_tools.as_ref().map(|names| {

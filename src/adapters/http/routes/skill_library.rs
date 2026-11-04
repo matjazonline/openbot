@@ -1,6 +1,6 @@
 //! Company-owned and operator-owned skill libraries.
 
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 use axum::{
     Form, Json, Router,
@@ -17,9 +17,7 @@ use crate::{
     adapters::http::{app_state::AppState, auth::AuthenticatedUser, pages},
     app_error::{AppError, AppResult},
     domain::entities::{
-        skill::{
-            MAX_SKILL_INSTRUCTIONS, MAX_SKILL_INSTRUCTIONS_JSON_BYTES, Skill, SkillInstruction,
-        },
+        skill::{MAX_SKILL_INSTRUCTIONS_BYTES, Skill},
         value_objects::EmailAddress,
     },
     infra::config::AppConfig,
@@ -37,20 +35,11 @@ use super::{
     ui::{load_account, workspace_user},
 };
 
-const SKILL_FORM_BODY_LIMIT: usize = MAX_SKILL_INSTRUCTIONS_JSON_BYTES + 64 * 1024;
+/// Room for the largest valid skill in its widest encoding (JSON's `\uXXXX` spends six bytes on
+/// one), plus the short fields.
+const SKILL_FORM_BODY_LIMIT: usize = 6 * MAX_SKILL_INSTRUCTIONS_BYTES + 64 * 1024;
 
 pub fn router() -> Router<AppState> {
-    let row_routes = Router::new()
-        .route(
-            "/ui/companies/{company_id}/skills/instruction-row",
-            post(company_instruction_row),
-        )
-        .route(
-            "/ui/skill-library/instruction-row",
-            post(library_instruction_row),
-        )
-        .layer(DefaultBodyLimit::max(SKILL_FORM_BODY_LIMIT));
-
     Router::new()
         .route(
             "/ui/companies/{company_id}/skills",
@@ -90,7 +79,6 @@ pub fn router() -> Router<AppState> {
                 .put(update_library_skill)
                 .delete(delete_library_skill),
         )
-        .merge(row_routes)
         .layer(DefaultBodyLimit::max(SKILL_FORM_BODY_LIMIT))
 }
 
@@ -174,7 +162,6 @@ fn page_urls(base: &str, query: &PageQuery, page: &SkillPage) -> (Option<String>
 
 #[derive(Debug, Clone, Default, Deserialize)]
 struct SkillForm {
-    skill_id: Option<Uuid>,
     #[serde(default)]
     slug: String,
     #[serde(default)]
@@ -182,108 +169,30 @@ struct SkillForm {
     #[serde(default)]
     description: String,
     #[serde(default)]
-    trigger: String,
-    #[serde(default)]
-    instruction_count: usize,
-    action: Option<String>,
-    #[serde(flatten)]
-    fields: HashMap<String, String>,
+    instructions: String,
 }
 
-fn parse_draft(form: &SkillForm, id: Option<Uuid>) -> Result<pages::SkillDraft, String> {
-    if form.instruction_count > MAX_SKILL_INSTRUCTIONS {
-        return Err(format!(
-            "A skill may have at most {MAX_SKILL_INSTRUCTIONS} instructions."
-        ));
+impl SkillForm {
+    fn into_draft(self, id: Option<Uuid>) -> pages::SkillDraft {
+        pages::SkillDraft {
+            id,
+            slug: self.slug,
+            name: self.name,
+            description: self.description,
+            instructions: self.instructions,
+        }
     }
-    let encoded_size = form.slug.len()
-        + form.name.len()
-        + form.description.len()
-        + form.trigger.len()
-        + form
-            .fields
-            .iter()
-            .map(|(key, value)| key.len() + value.len())
-            .sum::<usize>();
-    if encoded_size > MAX_SKILL_INSTRUCTIONS_JSON_BYTES {
-        return Err(format!(
-            "Skill instructions may be at most {MAX_SKILL_INSTRUCTIONS_JSON_BYTES} bytes."
-        ));
-    }
-
-    let mut instructions = Vec::with_capacity(form.instruction_count);
-    for index in 0..form.instruction_count {
-        let key = |suffix: &str| format!("instruction_{index}_{suffix}");
-        instructions.push(pages::DraftInstruction::Prompt {
-            text: form.fields.get(&key("text")).cloned().unwrap_or_default(),
-        });
-    }
-    Ok(pages::SkillDraft {
-        id,
-        slug: form.slug.clone(),
-        name: form.name.clone(),
-        description: form.description.clone(),
-        trigger: form.trigger.clone(),
-        instructions,
-    })
 }
 
-fn write_from_draft(draft: &pages::SkillDraft) -> Result<SkillWrite, String> {
-    let instructions = draft
-        .instructions
-        .iter()
-        .map(
-            |pages::DraftInstruction::Prompt { text }| SkillInstruction::Prompt {
-                text: text.clone(),
-            },
-        )
-        .collect();
-    Ok(SkillWrite {
+fn write_from_draft(draft: &pages::SkillDraft) -> SkillWrite {
+    SkillWrite {
         required_tools: None,
         slug: draft.slug.clone(),
         name: draft.name.clone(),
         description: draft.description.clone(),
-        trigger: draft.trigger.clone(),
-        instructions,
+        instructions: draft.instructions.clone(),
         created_by: None,
-    })
-}
-
-fn apply_action(draft: &mut pages::SkillDraft, action: Option<&str>) -> Result<(), String> {
-    let Some(action) = action else {
-        return Ok(());
-    };
-    if action == "add" {
-        if draft.instructions.len() >= MAX_SKILL_INSTRUCTIONS {
-            return Err(format!(
-                "A skill may have at most {MAX_SKILL_INSTRUCTIONS} instructions."
-            ));
-        }
-        draft.instructions.push(pages::DraftInstruction::prompt());
-        return Ok(());
     }
-    let mut parts = action.split(':');
-    let operation = parts.next().unwrap_or_default();
-    let index = parts
-        .next()
-        .and_then(|value| value.parse::<usize>().ok())
-        .ok_or_else(|| "The instruction action is invalid.".to_string())?;
-    if index >= draft.instructions.len() {
-        return Err("The instruction action is out of range.".to_string());
-    }
-    match operation {
-        "remove" => {
-            draft.instructions.remove(index);
-            if draft.instructions.is_empty() {
-                draft.instructions.push(pages::DraftInstruction::prompt());
-            }
-        }
-        "up" if index > 0 => draft.instructions.swap(index, index - 1),
-        "down" if index + 1 < draft.instructions.len() => draft.instructions.swap(index, index + 1),
-        "up" | "down" => {}
-        _ => return Err("The instruction action is invalid.".to_string()),
-    }
-    Ok(())
 }
 
 async fn company_page(
@@ -401,42 +310,8 @@ async fn save_company(
     skill_id: Option<Uuid>,
     form: SkillForm,
 ) -> AppResult<Response> {
-    let draft = match parse_draft(&form, skill_id) {
-        Ok(draft) => draft,
-        Err(message) => {
-            return Ok(Html(
-                company_page(
-                    skills,
-                    user_id,
-                    company_id,
-                    &PageQuery::default(),
-                    Some(&pages::SkillDraft::blank()),
-                    Some(&message),
-                    None,
-                )
-                .await?,
-            )
-            .into_response());
-        }
-    };
-    let write = match write_from_draft(&draft) {
-        Ok(write) => write,
-        Err(message) => {
-            return Ok(Html(
-                company_page(
-                    skills,
-                    user_id,
-                    company_id,
-                    &PageQuery::default(),
-                    Some(&draft),
-                    Some(&message),
-                    None,
-                )
-                .await?,
-            )
-            .into_response());
-        }
-    };
+    let draft = form.into_draft(skill_id);
+    let write = write_from_draft(&draft);
     let saved = match skill_id {
         Some(id) => skills.update_company(user_id, company_id, id, write).await,
         None => skills.create_company(user_id, company_id, write).await,
@@ -537,29 +412,12 @@ async fn company_library_browser(
     Ok(Html(pages::library_skill_browser(company_id, &page.items)))
 }
 
-async fn company_instruction_row(
-    State(skills): State<Arc<SkillUseCases>>,
-    user: AuthenticatedUser,
-    Path(company_id): Path<Uuid>,
-    Form(form): Form<SkillForm>,
-) -> AppResult<Html<String>> {
-    skills.verify_company_owner(user.id, company_id).await?;
-    row_fragment(Some(company_id), form)
-}
-
-fn row_fragment(company_id: Option<Uuid>, form: SkillForm) -> AppResult<Html<String>> {
-    let mut draft = parse_draft(&form, form.skill_id).map_err(AppError::BadRequest)?;
-    apply_action(&mut draft, form.action.as_deref()).map_err(AppError::BadRequest)?;
-    Ok(Html(pages::skill_editor_fragment(company_id, &draft)))
-}
-
 #[derive(Debug, Clone, Deserialize, Serialize)]
 struct SkillPayload {
     slug: String,
     name: String,
     description: String,
-    trigger: String,
-    instructions: Vec<SkillInstruction>,
+    instructions: String,
 }
 
 impl From<SkillPayload> for SkillWrite {
@@ -568,7 +426,6 @@ impl From<SkillPayload> for SkillWrite {
             slug: payload.slug,
             name: payload.name,
             description: payload.description,
-            trigger: payload.trigger,
             instructions: payload.instructions,
             // Required workflow tools are edited in phase 09; keep the stored list.
             required_tools: None,
@@ -751,38 +608,8 @@ async fn save_library(
     skill_id: Option<Uuid>,
     form: SkillForm,
 ) -> AppResult<Response> {
-    let draft = match parse_draft(&form, skill_id) {
-        Ok(draft) => draft,
-        Err(message) => {
-            return Ok(Html(
-                library_page(
-                    skills,
-                    &PageQuery::default(),
-                    Some(&pages::SkillDraft::blank()),
-                    Some(&message),
-                    None,
-                )
-                .await?,
-            )
-            .into_response());
-        }
-    };
-    let write = match write_from_draft(&draft) {
-        Ok(write) => write,
-        Err(message) => {
-            return Ok(Html(
-                library_page(
-                    skills,
-                    &PageQuery::default(),
-                    Some(&draft),
-                    Some(&message),
-                    None,
-                )
-                .await?,
-            )
-            .into_response());
-        }
-    };
+    let draft = form.into_draft(skill_id);
+    let write = write_from_draft(&draft);
     let saved = match skill_id {
         Some(id) => skills.update_library(id, write).await,
         None => skills.create_library(write).await,
@@ -835,84 +662,20 @@ async fn delete_library_skill(
     ))
 }
 
-async fn library_instruction_row(
-    State(users): State<Arc<UserUseCases>>,
-    State(config): State<Arc<AppConfig>>,
-    user: AuthenticatedUser,
-    Form(form): Form<SkillForm>,
-) -> AppResult<Html<String>> {
-    operator(&user, &users, &config).await?;
-    row_fragment(None, form)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn form(rows: &[&str]) -> SkillForm {
-        let mut fields = HashMap::new();
-        for (index, value) in rows.iter().enumerate() {
-            fields.insert(format!("instruction_{index}_text"), (*value).to_string());
-        }
-        SkillForm {
-            instruction_count: rows.len(),
-            fields,
-            ..SkillForm::default()
-        }
-    }
-
+    /// The body limit must admit every skill validation accepts, in its widest encoding.
     #[test]
-    fn removing_a_middle_instruction_row_reindexes_the_rest() {
-        let mut submitted = form(&["one", "two", "three"]);
-        submitted.action = Some("remove:1".into());
-        let mut draft = parse_draft(&submitted, None).unwrap();
-        apply_action(&mut draft, submitted.action.as_deref()).unwrap();
-        assert_eq!(
-            draft.instructions,
-            [
-                pages::DraftInstruction::Prompt { text: "one".into() },
-                pages::DraftInstruction::Prompt {
-                    text: "three".into()
-                }
-            ]
-        );
-        let html = pages::skill_instruction_editor(Some(Uuid::nil()), &draft);
-        assert!(html.contains("instruction_1_text"));
-        assert!(!html.contains("instruction_2_text"));
-    }
-
-    #[test]
-    fn moving_a_row_round_trips_the_complete_draft() {
-        let mut submitted = form(&["first", "second"]);
-        submitted.action = Some("up:1".into());
-        let mut draft = parse_draft(&submitted, None).unwrap();
-        apply_action(&mut draft, submitted.action.as_deref()).unwrap();
-        assert_eq!(
-            draft.instructions,
-            [
-                pages::DraftInstruction::Prompt {
-                    text: "second".into()
-                },
-                pages::DraftInstruction::Prompt {
-                    text: "first".into()
-                }
-            ]
-        );
-        let mut retired = form(&["only"]);
-        retired.action = Some("kind:0:__selected__".into());
-        let mut draft = parse_draft(&retired, None).unwrap();
-        assert!(apply_action(&mut draft, retired.action.as_deref()).is_err());
-    }
-
-    #[test]
-    fn an_instruction_action_keeps_the_existing_skill_identity() {
-        let skill_id = Uuid::new_v4();
-        let mut submitted = form(&["keep editing"]);
-        submitted.skill_id = Some(skill_id);
-        submitted.action = Some("add".into());
-
-        let Html(html) = row_fragment(None, submitted).expect("the editor round-trips");
-        assert!(html.contains(&format!(r#"hx-put="/ui/skill-library/{skill_id}""#)));
-        assert!(html.contains(&format!(r#"name="skill_id" value="{skill_id}""#)));
+    fn the_body_limit_admits_the_largest_valid_skill_as_json() {
+        let payload = SkillPayload {
+            slug: "s".repeat(120),
+            name: "\u{1}".repeat(120),
+            description: "\u{1}".repeat(500),
+            instructions: "\u{1}".repeat(MAX_SKILL_INSTRUCTIONS_BYTES),
+        };
+        let body = serde_json::to_vec(&payload).unwrap();
+        assert!(body.len() <= SKILL_FORM_BODY_LIMIT, "{} bytes", body.len());
     }
 }

@@ -9,7 +9,6 @@ use crate::application::workflow::provisioning::{
     ProvisioningKind, builtin_provisioning_snapshot, is_trusted_provisioning_snapshot,
 };
 use crate::application::workflow::templates::CompanyWorkflowDraft;
-use crate::entities::skill::SkillInstruction;
 use serde_json::Value;
 
 #[derive(sqlx::FromRow)]
@@ -26,7 +25,7 @@ struct AgentRow {
 struct SkillRow {
     id: Uuid,
     slug: String,
-    instructions: Value,
+    instructions: String,
     required_tools: Vec<String>,
 }
 
@@ -109,17 +108,11 @@ async fn derive_on(
                 skill.slug
             ))
         })?;
-        let steps: Vec<SkillInstruction> = serde_json::from_value(skill.instructions)
-            .map_err(|_| AppError::Internal("Invalid stored skill instructions".into()))?;
-        let texts: Vec<String> = steps
-            .into_iter()
-            .map(|SkillInstruction::Prompt { text }| text)
-            .collect();
         snapshots.push(SkillSnapshot {
             company_id: company,
             skill_id: skill.id,
             name,
-            instructions: texts.join("\n\n"),
+            instructions: skill.instructions,
             required_tools: type_names(&skill.required_tools, "required tool")?,
         });
     }
