@@ -81,13 +81,10 @@ pub struct CompanyResponse {
 async fn list_companies(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     user: AuthenticatedUser,
-) -> impl IntoResponse {
-    let companies = company_use_cases
-        .list_user_companies(user.id)
-        .await
-        .unwrap_or_default();
+) -> AppResult<Html<String>> {
+    let companies = company_use_cases.list_user_companies(user.id).await?;
 
-    Html(pages::companies_page(&companies))
+    Ok(Html(pages::companies_page(&companies)))
 }
 
 /// POST /companies - HTMX create company form submission (Protected).
@@ -96,101 +93,98 @@ async fn create_company(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     user: AuthenticatedUser,
     Form(form): Form<CompanyForm>,
-) -> impl IntoResponse {
+) -> AppResult<Html<String>> {
     let created = match form.write() {
         Ok(write) => company_use_cases.create_company(user.id, write).await,
         Err(err) => Err(err),
     };
 
-    match created {
+    Ok(match created {
         Ok(_) => {
-            let companies = company_use_cases
-                .list_user_companies(user.id)
-                .await
-                .unwrap_or_default();
+            let companies = company_use_cases.list_user_companies(user.id).await?;
             Html(pages::company_list_fragment(&companies))
         }
-        Err(err) => {
+        Err(err @ (AppError::BadRequest(_) | AppError::Conflict(_))) => {
             let error_html = pages::error_alert(&format!("Failed to create company: {err}"));
-            let companies = company_use_cases
-                .list_user_companies(user.id)
-                .await
-                .unwrap_or_default();
+            let companies = company_use_cases.list_user_companies(user.id).await?;
             Html(format!(
                 "{}{}",
                 error_html,
                 pages::company_list_fragment(&companies)
             ))
         }
-    }
+        Err(error) => return Err(error),
+    })
 }
 
 /// GET /companies/{id}/edit - Returns inline edit form fragment (Protected).
+///
+/// The owner's form; 404 for someone else's company, 403 for an admin or member, an error status
+/// for a failed read.
 #[instrument(skip_all)]
 async fn edit_company_form(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
-    _user: AuthenticatedUser,
+    user: AuthenticatedUser,
     Path(id): Path<Uuid>,
-) -> impl IntoResponse {
-    if let Ok(Some(company)) = company_use_cases.get_company(id).await
-        && company.user_id == _user.id
-    {
-        Html(pages::company_edit_fragment(&company))
-    } else {
-        Html(pages::error_alert("Company not found."))
-    }
+) -> AppResult<Html<String>> {
+    let company = company_use_cases.owned_company(user.id, id).await?;
+    Ok(Html(pages::company_edit_fragment(&company)))
 }
 
 /// GET /companies/{id}/cancel - Cancels edit and returns single row fragment (Protected).
 #[instrument(skip_all)]
 async fn cancel_company_edit(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
-    _user: AuthenticatedUser,
+    user: AuthenticatedUser,
     Path(id): Path<Uuid>,
-) -> impl IntoResponse {
-    if let Ok(Some(company)) = company_use_cases.get_company(id).await
-        && company.user_id == _user.id
-    {
-        Html(pages::company_row_fragment(&company))
-    } else {
-        Html(String::new())
-    }
+) -> AppResult<Html<String>> {
+    let company = company_use_cases.owned_company(user.id, id).await?;
+    Ok(Html(pages::company_row_fragment(&company)))
 }
 
 /// PUT /companies/{id} - Handles HTMX company update form submission (Protected).
+///
+/// Who may save is answered with a status before the form is read; only a rejected form or a
+/// failed write after that is shown inline.
 #[instrument(skip_all)]
 async fn update_company(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
-    _user: AuthenticatedUser,
+    user: AuthenticatedUser,
     Path(id): Path<Uuid>,
     Form(form): Form<CompanyForm>,
-) -> impl IntoResponse {
+) -> AppResult<Html<String>> {
+    company_use_cases.owned_company(user.id, id).await?;
     let saved = match form.write() {
         Ok(write) => {
             company_use_cases
-                .update_company_for_user(_user.id, id, write)
+                .update_company_for_user(user.id, id, write)
                 .await
         }
         Err(err) => Err(err),
     };
 
-    match saved {
+    Ok(match saved {
         Ok(company) => Html(pages::company_row_fragment(&company)),
-        Err(err) => Html(pages::error_alert(&format!("Update failed: {err}"))),
-    }
+        Err(err @ (AppError::BadRequest(_) | AppError::Conflict(_))) => {
+            Html(pages::error_alert(&format!("Update failed: {err}")))
+        }
+        Err(error) => return Err(error),
+    })
 }
 
 /// DELETE /companies/{id} - Handles HTMX company deletion (Protected).
+///
+/// A refusal or a failure is an error status, never an empty 200 that reads as "deleted".
 #[instrument(skip_all)]
 async fn delete_company(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
-    _user: AuthenticatedUser,
+    user: AuthenticatedUser,
     Path(id): Path<Uuid>,
-) -> impl IntoResponse {
-    let _ = company_use_cases
-        .delete_company_for_user(_user.id, id)
-        .await;
-    Html(String::new())
+) -> AppResult<Html<String>> {
+    company_use_cases
+        .delete_company_for_user(user.id, id)
+        .await?;
+    Ok(Html(String::new()))
 }
 
 /// JSON API: List companies for active user (Protected).
@@ -361,3 +355,7 @@ mod tests {
         assert!(script.contains("autoDetectAndSyncCompany"));
     }
 }
+
+#[cfg(test)]
+#[path = "company_authorization_tests.rs"]
+mod authorization_tests;

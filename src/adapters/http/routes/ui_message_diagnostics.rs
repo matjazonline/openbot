@@ -27,7 +27,7 @@ use crate::{
     use_cases::{channel::ChannelUseCases, company::CompanyUseCases, thread::ThreadUseCases},
 };
 
-use super::ui::{load_channel_thread, load_viewable_channel};
+use super::ui::load_viewable_channel;
 use super::ui_attachments::AttachmentQuery;
 
 pub fn router() -> Router<AppState> {
@@ -61,7 +61,8 @@ async fn message_diagnostics(
     )
     .await?;
 
-    let thread = load_channel_thread(&thread_use_cases, channel.id, thread_id)
+    let thread = thread_use_cases
+        .readable_thread(&viewer, channel.company_id, channel.id, thread_id)
         .await?
         .ok_or_else(missing)?;
 

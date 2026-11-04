@@ -87,7 +87,7 @@ const LIVE_UPDATE_STATUS: &str = r##"
 ///
 /// htmx does not swap a non-2xx response, so without somewhere for the reason to land a failed
 /// request leaves the page looking untouched. [`REQUEST_ERROR_SCRIPT`] fills this in.
-const REQUEST_ERROR_TOAST: &str = r##"
+pub(super) const REQUEST_ERROR_TOAST: &str = r##"
         <div id="request-error-toast" role="alert" aria-live="assertive" aria-atomic="true"
             class="toast toast-top toast-center z-50 hidden max-w-[calc(100vw-2rem)]">
             <div class="alert alert-error shadow-lg">

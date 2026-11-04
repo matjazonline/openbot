@@ -1,0 +1,29 @@
+   Compiling mail_agents v0.1.0 (/Users/mac02/dev/openbot-recovery/.worktrees/fix-app-p04)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 53s
+     Running unittests src/lib.rs (target/debug/deps/mail_agents-91c1847adc52f46f)
+
+running 2 tests
+test adapters::http::routes::ui_team::authorization_tests::team_mutations_propagate_database_errors_after_successful_readable_company_scope ... FAILED
+test adapters::http::routes::ui_team::authorization_tests::team_mutations_refuse_members_admins_foreign_and_unknown_company_scopes ... FAILED
+
+failures:
+
+---- adapters::http::routes::ui_team::authorization_tests::team_mutations_propagate_database_errors_after_successful_readable_company_scope stdout ----
+
+thread 'adapters::http::routes::ui_team::authorization_tests::team_mutations_propagate_database_errors_after_successful_readable_company_scope' (29409322) panicked at src/adapters/http/routes/ui_team_authorization_tests.rs:79:13:
+original database failure survives
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::http::routes::ui_team::authorization_tests::team_mutations_refuse_members_admins_foreign_and_unknown_company_scopes stdout ----
+
+thread 'adapters::http::routes::ui_team::authorization_tests::team_mutations_refuse_members_admins_foreign_and_unknown_company_scopes' (29409323) panicked at src/adapters/http/routes/authorization_test_support.rs:229:18:
+expected 403 Forbidden, got success
+
+
+failures:
+    adapters::http::routes::ui_team::authorization_tests::team_mutations_propagate_database_errors_after_successful_readable_company_scope
+    adapters::http::routes::ui_team::authorization_tests::team_mutations_refuse_members_admins_foreign_and_unknown_company_scopes
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 2597 filtered out; finished in 0.19s
+
+error: test failed, to rerun pass `--lib`

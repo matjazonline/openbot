@@ -30,6 +30,7 @@ use crate::{
             ChannelSelector, ExternalMessageKey, ExternalThreadKey, IdentityNamespace,
             IdentitySubject, QualifiedIdentity, TransportKind,
         },
+        user::Viewer,
         value_objects::{ChannelSlug, CompanySlug, EmailAddress, MessageId, ThreadIndex},
     },
     infra::config::AppConfig,
@@ -42,8 +43,10 @@ use crate::{
         ports::TransportRenderers,
     },
     use_cases::{
-        channel::ChannelPersistence, company::CompanyPersistence,
-        integration::ChannelBindingPersistence, participant::ParticipantPersistence,
+        channel::{ChannelPersistence, ChannelReaders, readable_channel},
+        company::CompanyPersistence,
+        integration::ChannelBindingPersistence,
+        participant::ParticipantPersistence,
     },
 };
 
@@ -57,6 +60,12 @@ pub use message_write::{
     AgentAuthor, MessageAuthorWrite, MessageCorrelation, MessageParticipantWrite, MessageWrite,
 };
 mod support;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SenderTrust {
+    Trusted,
+    Stranger,
+}
 
 /// Addressing role and multi-channel pipeline position are transport vocabulary; they are declared
 /// with the other transport contracts and re-exported here so call sites read unchanged.
@@ -291,12 +300,13 @@ pub trait ThreadPersistence: Send + Sync {
 
     /// The newest inbound email turn a human final response can safely answer, looking past
     /// internal notes and agent turns that have no external author address.
+    ///
+    /// Required: falling back to the newest turn would let an internal note or an agent turn
+    /// redirect a human's final response.
     async fn latest_replyable_email_context(
         &self,
         thread_id: Uuid,
-    ) -> AppResult<Option<EmailReplyContext>> {
-        self.latest_email_reply_context(thread_id).await
-    }
+    ) -> AppResult<Option<EmailReplyContext>>;
 
     /// The newest RFC Message-ID in a thread, looking back past turns with no email headers.
     async fn latest_thread_rfc_message_id(&self, thread_id: Uuid) -> AppResult<Option<MessageId>>;
@@ -394,20 +404,32 @@ impl ThreadUseCases {
         self
     }
 
-    pub fn channel_persistence(&self) -> &Arc<dyn ChannelPersistence> {
-        &self.channel_persistence
-    }
-
-    pub fn company_persistence(&self) -> &Arc<dyn CompanyPersistence> {
-        &self.company_persistence
-    }
-
-    pub fn participant_persistence(&self) -> &Arc<dyn ParticipantPersistence> {
-        &self.participant_persistence
-    }
-
-    pub fn thread_persistence(&self) -> &Arc<dyn ThreadPersistence> {
-        &self.thread_persistence
+    /// Read-only trust decision shared with routing; failures remain distinct from strangers.
+    pub async fn sender_trust(
+        &self,
+        selector: &ChannelSelector,
+        sender: &QualifiedIdentity,
+    ) -> AppResult<SenderTrust> {
+        let Some(slug) = selector.company() else {
+            return Ok(SenderTrust::Stranger);
+        };
+        let mut directory = support::DirectoryCache::new(self);
+        let Some(company) = directory.company(slug).await? else {
+            return Ok(SenderTrust::Stranger);
+        };
+        let channels = directory.channels(company.id).await?;
+        let Some(channel) = channels
+            .iter()
+            .find(|channel| channel.matches_slug(selector.channel()))
+        else {
+            return Ok(SenderTrust::Stranger);
+        };
+        let context = directory.access_context(company.id, sender).await?;
+        Ok(if channel.participant_access(context).trusted {
+            SenderTrust::Trusted
+        } else {
+            SenderTrust::Stranger
+        })
     }
 
     pub fn config(&self) -> &Arc<AppConfig> {
@@ -662,8 +684,32 @@ impl ThreadUseCases {
         Ok(())
     }
 
-    pub async fn get_thread(&self, thread_id: Uuid) -> AppResult<Option<Thread>> {
-        self.thread_persistence.get_thread_by_id(thread_id).await
+    /// A thread the viewer may read, found by its whole path: the channel must be one the viewer
+    /// may read in `company_id`, and the thread must belong to that channel.
+    ///
+    /// `None` for an unknown thread, another channel's, another company's and one in a channel the
+    /// viewer may not read alike, so a guessed id learns nothing. A lookup failure is an error.
+    pub async fn readable_thread(
+        &self,
+        viewer: &Viewer,
+        company_id: Uuid,
+        channel_id: Uuid,
+        thread_id: Uuid,
+    ) -> AppResult<Option<Thread>> {
+        let readers = ChannelReaders {
+            companies: self.company_persistence.as_ref(),
+            channels: self.channel_persistence.as_ref(),
+            participants: self.participant_persistence.as_ref(),
+        };
+        let Some(channel) = readable_channel(&readers, viewer, company_id, channel_id).await?
+        else {
+            return Ok(None);
+        };
+        Ok(self
+            .thread_persistence
+            .get_thread_by_id(thread_id)
+            .await?
+            .filter(|thread| thread.channel_id == channel.id))
     }
 
     pub async fn list_channel_threads(

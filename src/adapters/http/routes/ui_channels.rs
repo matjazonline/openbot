@@ -27,7 +27,10 @@ use crate::{
     },
     app_error::{AppError, AppResult},
     entities::{
-        channel::Channel, company::Company, schedule::ChannelSchedule, value_objects::EmailAddress,
+        channel::Channel,
+        company::{Company, CompanyAccess},
+        schedule::ChannelSchedule,
+        value_objects::EmailAddress,
     },
     infra::config::AppConfig,
     use_cases::{
@@ -40,7 +43,7 @@ use crate::{
 
 use super::{
     channel::{ChannelForm, parse_emails_form, parse_list_form, parse_text_form, slugify},
-    ui::{load_account, load_managed_company, managed_company_membership, workspace_user},
+    ui::{load_account, load_managed_company, workspace_user},
 };
 
 pub fn router() -> Router<AppState> {
@@ -117,9 +120,11 @@ impl Workspace {
     /// The company a request is scoped to, always picked from those the caller owns or administers
     /// so a guessed `company_id` cannot reach another company's channels.
     async fn scoped_company(&self, company_id: Uuid) -> AppResult<Company> {
-        let (_, company) =
-            load_managed_company(&self.company_use_cases, self.user_id, Some(company_id)).await?;
-        company.ok_or_else(|| AppError::NotFound("Company not found".into()))
+        Ok(self
+            .company_use_cases
+            .managed_company(self.user_id, company_id)
+            .await?
+            .company)
     }
 
     async fn view<'a>(&'a self, company: &'a Company) -> AppResult<ChannelSettingsView<'a>> {
@@ -149,11 +154,14 @@ async fn channels_page(
         query.company_id,
     )
     .await?;
-    let Some(company) = company else {
+    let Some(CompanyAccess {
+        company,
+        membership,
+    }) = company
+    else {
         return Ok(Html(pages::mailbox_no_company_page(&workspace_user)));
     };
-    let workspace_user = workspace_user
-        .with_company_membership(managed_company_membership(&company, workspace.user_id));
+    let workspace_user = workspace_user.with_company_membership(membership);
 
     let view = workspace.view(&company).await?;
     let channels = view.channels().await?;

@@ -1,0 +1,45 @@
+   Compiling mail_agents v0.1.0 (/Users/mac02/dev/openbot-recovery/.worktrees/fix-app-p04)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 53s
+     Running unittests src/lib.rs (target/debug/deps/mail_agents-91c1847adc52f46f)
+
+running 24 tests
+test adapters::http::routes::company_invite::tests::company_invites_page_renders_html_components ... ok
+test adapters::http::pages::layout::tests::legacy_layout_reports_and_dismisses_failed_fragment_requests ... ok
+test adapters::http::routes::ui_team::trace_tests::security_trace_redaction_team_query_is_not_a_handler_span_field ... ok
+test adapters::persistence::company_invite::owner_tests::company_owner_row_cannot_be_deleted_by_hand ... ok
+test adapters::persistence::company_invite::owner_tests::company_owner_row_cannot_be_demoted_by_hand ... ok
+test adapters::persistence::company_invite::owner_tests::company_owner_accepting_an_invite_to_own_company_stays_owner ... ok
+test adapters::persistence::company_invite::owner_tests::company_invite_refuses_the_owner_address_and_malformed_ones ... ok
+test adapters::http::routes::ui_team::authorization_tests::team_mutations_propagate_database_errors_after_successful_readable_company_scope ... ok
+test adapters::persistence::company_invite::owner_tests::company_owner_column_cannot_change_alone ... ok
+test adapters::http::routes::ui_team::authorization_tests::team_roles_come_from_membership_and_nonowners_get_forbidden ... ok
+test application::use_cases::company_invite::tests::members_may_list_the_team_and_everyone_else_is_told_nothing ... ok
+test application::use_cases::company_invite::tests::company_invites_crud_and_accept_flow ... ok
+test adapters::persistence::company_invite::owner_tests::company_invite_edit_of_an_invite_accepted_after_the_read_is_refused ... ok
+test application::use_cases::company_invite::tests::the_owner_removes_a_member ... ok
+test domain::entities::company_invite::tests::an_invite_without_a_stored_role_keeps_the_member_default ... ok
+test adapters::http::routes::company_invite::authorization_tests::invite_pages_and_fragments_hide_foreign_companies_and_propagate_failures ... ok
+test adapters::persistence::company_invite::owner_tests::company_invite_update_matches_only_a_pending_invite_of_its_company ... ok
+test adapters::http::routes::ui_team::authorization_tests::team_mutations_refuse_members_admins_foreign_and_unknown_company_scopes ... ok
+test adapters::persistence::company_invite::tests::security_email_identity_invite_decline_requires_current_account_even_for_terminal_result ... ok
+test adapters::persistence::company_invite::tests::security_email_identity_invite_accept_requires_current_account_even_for_terminal_result ... ok
+test adapters::persistence::company_invite::tests::security_email_identity_concurrent_address_change_defeats_stale_invite_acceptance ... ok
+test adapters::persistence::company_invite::tests::postgres_company_invite_and_member_persistence_works ... ok
+test adapters::persistence::company_invite::tests::removing_a_member_demotes_their_principal_and_spares_the_owner ... ok
+test adapters::http::routes::ui_team::authorization_tests::team_owner_business_refusals_keep_inline_feedback ... FAILED
+
+failures:
+
+---- adapters::http::routes::ui_team::authorization_tests::team_owner_business_refusals_keep_inline_feedback stdout ----
+
+thread 'adapters::http::routes::ui_team::authorization_tests::team_owner_business_refusals_keep_inline_feedback' (29412905) panicked at src/adapters/http/routes/ui_team_authorization_tests.rs:150:10:
+called `Result::unwrap()` on an `Err` value: NotFound("Team member not found")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::http::routes::ui_team::authorization_tests::team_owner_business_refusals_keep_inline_feedback
+
+test result: FAILED. 23 passed; 1 failed; 0 ignored; 0 measured; 2575 filtered out; finished in 0.21s
+
+error: test failed, to rerun pass `--lib`

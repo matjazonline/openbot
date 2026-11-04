@@ -83,6 +83,7 @@ pub struct OnboardingAgentDraft<'a> {
     pub name: &'a str,
     pub instructions: &'a str,
     pub library_ids: &'a [uuid::Uuid],
+    pub submission_key: uuid::Uuid,
 }
 
 pub fn onboarding_channel_page(
@@ -95,7 +96,10 @@ pub fn onboarding_channel_page(
         user,
         company,
         library_agents,
-        &OnboardingAgentDraft::default(),
+        &OnboardingAgentDraft {
+            submission_key: uuid::Uuid::new_v4(),
+            ..Default::default()
+        },
         error,
     )
 }
@@ -122,11 +126,13 @@ pub fn onboarding_channel_draft_page(
         r##"<div><h1 class="card-title text-2xl">Create your first email agent</h1><p class="mt-2 opacity-70">Choose ready-made agents, create a custom one, or do both for <strong>{company_name}</strong>.</p></div>
         {error_html}
         <form method="post" action="/ui/onboarding/companies/{company_id}/channel" class="space-y-5" {busy_handler}>
+            <input type="hidden" name="submission_key" value="{submission_key}">
             {library_html}
             <fieldset class="fieldset"><legend class="fieldset-legend">Custom agent and channel name</legend><input id="onboarding_channel_name" name="name" value="{draft_name}" type="text" class="input w-full" placeholder="Customer Support"><p class="label opacity-60">Required when creating a custom agent. For example: <span class="font-mono">customer-support@{company_slug}...</span></p></fieldset>
             <fieldset class="fieldset"><legend class="fieldset-legend">What should this custom agent do?</legend><textarea id="onboarding_instructions" name="instructions" rows="7" class="textarea w-full" placeholder="Read incoming customer emails, identify the request, draft a concise and friendly answer, ask for missing details, and clearly list any next actions.">{draft_instructions}</textarea><p class="label opacity-60">Required only when creating a custom agent.</p></fieldset>
             <div class="card-actions items-center justify-between"><a href="/ui" class="btn btn-ghost">Finish later</a>{submit_button}</div>
         </form>"##,
+        submission_key = draft.submission_key,
         draft_name = escape_html_attr(draft.name),
         draft_instructions = escape_html_text(draft.instructions),
         company_name = escape_html_text(&company.name),

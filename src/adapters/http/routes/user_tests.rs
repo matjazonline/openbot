@@ -325,6 +325,21 @@ impl crate::use_cases::user::UserPersistence for StubUserPersistence {
     ) -> AppResult<Option<crate::entities::user::User>> {
         Ok(None)
     }
+    async fn activate_password(
+        &self,
+        _: uuid::Uuid,
+        _: &str,
+    ) -> AppResult<Option<crate::entities::user::User>> {
+        unreachable!("registration fixture never activates a password on an existing account")
+    }
+
+    async fn has_login_method(
+        &self,
+        _: uuid::Uuid,
+        _: crate::use_cases::user::LoginMethod,
+    ) -> AppResult<bool> {
+        unreachable!("registration fixture never reads an existing account's login methods")
+    }
 }
 
 struct StubHasher;

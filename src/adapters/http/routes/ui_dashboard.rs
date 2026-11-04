@@ -35,26 +35,27 @@ use uuid::Uuid;
 use crate::{
     adapters::http::{
         app_state::AppState,
-        auth::{AuthError, AuthenticatedUser},
+        auth::{AuthError, AuthenticatedUser, caller_for},
         pages,
     },
     app_error::{AppError, AppResult},
     domain::monitoring::MonitoringService,
     entities::{
-        company::Company,
+        company::{Company, CompanyAccess},
         company_member::CompanyMembership,
         dashboard::{DashboardSnapshot, DashboardWindow, ProcessGauges},
         runtime_metrics::{MachineIdentity, RuntimeMetricSnapshot},
+        user::Caller,
         value_objects::EmailAddress,
     },
     infra::config::AppConfig,
     services::dashboard_snapshot::{DASHBOARD_TICK, DashboardSnapshotService},
     services::database_query_health::{DatabaseQueryHealth, DatabaseQueryHealthService},
     services::runtime_metrics::RuntimeMetricPersistence,
-    use_cases::{company::CompanyUseCases, user::UserUseCases},
+    use_cases::company::CompanyUseCases,
 };
 
-use super::ui::{load_account, load_managed_company, workspace_user};
+use super::ui::{load_managed_company, workspace_user};
 
 const PRIVATE_NO_STORE: &str = "private, no-store";
 
@@ -104,7 +105,6 @@ impl DashboardQuery {
 /// Everything a dashboard handler needs about its caller, resolved once.
 struct Dashboard {
     company_use_cases: Arc<CompanyUseCases>,
-    user_use_cases: Arc<UserUseCases>,
     dashboard_snapshots: Arc<DashboardSnapshotService>,
     database_query_health: Arc<DatabaseQueryHealthService>,
     dashboard_sse_connections: Arc<AtomicU64>,
@@ -113,6 +113,10 @@ struct Dashboard {
     monitoring: Arc<dyn MonitoringService>,
     config: Arc<AppConfig>,
     user_id: Uuid,
+    /// The signed-in account, loaded once for the shell.
+    account: crate::entities::user::User,
+    /// Operator status, decided once from that account.
+    caller: Caller,
 }
 
 impl FromRequestParts<AppState> for Dashboard {
@@ -123,10 +127,18 @@ impl FromRequestParts<AppState> for Dashboard {
         state: &AppState,
     ) -> Result<Self, Self::Rejection> {
         let user = AuthenticatedUser::from_request_parts(parts, state).await?;
+        let account = state
+            .user_use_cases
+            .get_user_by_id(user.id)
+            .await
+            .map_err(|_| AuthError::ServiceUnavailable)?
+            .ok_or(AuthError::RedirectToLogin)?;
+        let caller = caller_for(&account, &state.config);
 
         Ok(Self {
+            account,
+            caller,
             company_use_cases: state.company_use_cases.clone(),
-            user_use_cases: state.user_use_cases.clone(),
             dashboard_snapshots: state.dashboard_snapshots.clone(),
             database_query_health: state.database_query_health.clone(),
             dashboard_sse_connections: state.dashboard_sse_connections.clone(),
@@ -148,6 +160,8 @@ struct DashboardScope {
     selected_company: Option<Company>,
     companies: Vec<Company>,
     operator: bool,
+    /// What the caller is to `selected_company`, from their membership row.
+    membership: CompanyMembership,
 }
 
 impl DashboardScope {
@@ -156,30 +170,49 @@ impl DashboardScope {
     /// This is an authorization decision, so every fallible step propagates with `?`. Reading a
     /// database error as "not an operator" would fail closed silently, and reading it as "operator"
     /// would hand out every company's traffic — neither is a default worth having.
-    async fn resolve(
-        dashboard: &Dashboard,
-        account: &crate::entities::user::User,
-        query: &DashboardQuery,
-    ) -> AppResult<Self> {
+    async fn resolve(dashboard: &Dashboard, query: &DashboardQuery) -> AppResult<Self> {
         let requested = query.company_id;
-        let (companies, selected) =
-            load_managed_company(&dashboard.company_use_cases, dashboard.user_id, requested)
+        let caller = &dashboard.caller;
+        let operator = caller.is_operator();
+        let company_use_cases = &dashboard.company_use_cases;
+
+        let (companies, selected) = if operator {
+            // An operator asking for one company in particular gets that company unless
+            // `scope=system` explicitly selects the global rollup. It is read as the operator's,
+            // because an operator is not usually a member of the companies they are watching --
+            // and it discloses nothing new, since the global rollup already shows those
+            // companies' tasks by name. Their own managed companies only fill the switcher.
+            let managed = company_use_cases
+                .list_managed_companies(dashboard.user_id)
                 .await?;
-
-        let operator = dashboard.config.is_operator(account);
-
-        // An operator asking for one company in particular gets that company unless `scope=system`
-        // explicitly selects the global rollup. The lookup goes through `get_company` rather than
-        // the caller's own list, because an operator is not usually a member of the companies they
-        // are watching — and it discloses nothing new, since the global rollup already shows those
-        // companies' tasks by name.
-        //
-        // Everyone else stays pinned to `load_managed_company`'s answer, which only ever returns a
-        // company the caller owns or administers.
-        let selected_company = match (operator, requested) {
-            (true, Some(company_id)) => dashboard.company_use_cases.get_company(company_id).await?,
-            _ => selected,
+            let selected = match requested {
+                Some(company_id) => company_use_cases
+                    .operator_company(caller, company_id)
+                    .await?
+                    .map(|company| {
+                        let membership = managed
+                            .iter()
+                            .find(|access| access.company.id == company.id)
+                            .map_or(CompanyMembership::None, |access| access.membership);
+                        CompanyAccess {
+                            company,
+                            membership,
+                        }
+                    }),
+                None => managed.first().cloned(),
+            };
+            let companies = managed.into_iter().map(|access| access.company).collect();
+            (companies, selected)
+        } else {
+            // Everyone else gets a company they own or administer: a requested one is 404 when
+            // it is not theirs and 403 when they are only a member.
+            load_managed_company(company_use_cases, dashboard.user_id, requested).await?
         };
+
+        let membership = selected
+            .as_ref()
+            .map_or(CompanyMembership::None, |access| access.membership);
+        let selected_company = selected.map(|access| access.company);
         let company = match (operator, requested, query.requests_system_scope()) {
             (true, _, true) | (true, None, false) => None,
             (true, Some(_), false) | (false, _, _) => selected_company.clone(),
@@ -190,6 +223,7 @@ impl DashboardScope {
             selected_company,
             companies,
             operator,
+            membership,
         })
     }
 
@@ -207,21 +241,8 @@ impl DashboardScope {
     }
 
     /// What the caller is to the company anchoring the rail, if there is one.
-    fn membership(&self, user_id: Uuid) -> CompanyMembership {
-        let Some(company) = &self.selected_company else {
-            return CompanyMembership::None;
-        };
-        if company.user_id == user_id {
-            CompanyMembership::Owner
-        } else if self
-            .companies
-            .iter()
-            .any(|managed| managed.id == company.id)
-        {
-            CompanyMembership::Admin
-        } else {
-            CompanyMembership::None
-        }
+    fn membership(&self) -> CompanyMembership {
+        self.membership
     }
 
     fn view(&self) -> pages::DashboardScopeView<'_> {
@@ -322,12 +343,12 @@ async fn dashboard_page(
     dashboard: Dashboard,
     Query(query): Query<DashboardQuery>,
 ) -> AppResult<Response> {
-    let account = load_account(&dashboard.user_use_cases, dashboard.user_id).await?;
+    let account = &dashboard.account;
     let account_email = EmailAddress::from(account.email.as_str());
-    let user = workspace_user(&account, &account_email, &dashboard.config);
+    let user = workspace_user(account, &account_email, &dashboard.config);
 
-    let scope = DashboardScope::resolve(&dashboard, &account, &query).await?;
-    let user = user.with_company_membership(scope.membership(dashboard.user_id));
+    let scope = DashboardScope::resolve(&dashboard, &query).await?;
+    let user = user.with_company_membership(scope.membership());
 
     // A user with no company and no operator grant has nothing to show; the shell's own empty
     // state says so rather than rendering a page of zeroes.
@@ -357,11 +378,11 @@ async fn dashboard_panels_fragment(
     dashboard: Dashboard,
     Query(query): Query<DashboardQuery>,
 ) -> AppResult<Response> {
-    let account = load_account(&dashboard.user_use_cases, dashboard.user_id).await?;
+    let account = &dashboard.account;
     let account_email = EmailAddress::from(account.email.as_str());
-    let user = workspace_user(&account, &account_email, &dashboard.config);
+    let user = workspace_user(account, &account_email, &dashboard.config);
 
-    let scope = DashboardScope::resolve(&dashboard, &account, &query).await?;
+    let scope = DashboardScope::resolve(&dashboard, &query).await?;
     let company = scope.authorized_company_id()?;
     let window = query.window();
     let reading = dashboard.read(company, window, scope.operator).await?;
@@ -379,9 +400,9 @@ async fn dashboard_stream(
 ) -> AppResult<Response> {
     // Authorize once, here: the loop that follows re-reads under the scope decided now and never
     // re-checks it, exactly as the thread streams do.
-    let account = load_account(&dashboard.user_use_cases, dashboard.user_id).await?;
+    let account = dashboard.account.clone();
     let account_email = EmailAddress::from(account.email.as_str());
-    let scope = DashboardScope::resolve(&dashboard, &account, &query).await?;
+    let scope = DashboardScope::resolve(&dashboard, &query).await?;
     let company = scope.authorized_company_id()?;
     let operator = scope.operator;
     let window = query.window();
@@ -600,6 +621,7 @@ mod tests {
             selected_company: None,
             companies: Vec::new(),
             operator: false,
+            membership: CompanyMembership::None,
         };
         assert!(matches!(
             company_user_scope.authorized_company_id(),
@@ -613,3 +635,7 @@ mod tests {
         assert_eq!(operator_scope.authorized_company_id().unwrap(), None);
     }
 }
+
+#[cfg(test)]
+#[path = "ui_dashboard_authorization_tests.rs"]
+mod authorization_tests;

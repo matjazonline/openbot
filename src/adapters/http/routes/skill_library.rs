@@ -18,6 +18,7 @@ use crate::{
     app_error::{AppError, AppResult},
     domain::entities::{
         skill::{MAX_SKILL_INSTRUCTIONS_BYTES, Skill},
+        user::Caller,
         value_objects::EmailAddress,
     },
     infra::config::AppConfig,
@@ -30,10 +31,7 @@ use crate::{
     },
 };
 
-use super::{
-    agent_library::require_operator,
-    ui::{load_account, workspace_user},
-};
+use super::ui::{load_account, workspace_user};
 
 /// Room for the largest valid skill in its widest encoding (JSON's `\uXXXX` spends six bytes on
 /// one), plus the short fields.
@@ -222,13 +220,16 @@ async fn company_page(
 }
 
 async fn library_page(
+    caller: &Caller,
     skills: &SkillUseCases,
     query: &PageQuery,
     draft: Option<&pages::SkillDraft>,
     error: Option<&str>,
     notice: Option<&str>,
 ) -> AppResult<String> {
-    let page = skills.list_library_page(page_request(query)?).await?;
+    let page = skills
+        .library_page_for(caller, page_request(query)?)
+        .await?;
     let (previous, next) = page_urls("/ui/skill-library?view=skills", query, &page);
     Ok(pages::company_skills_section(&pages::SkillSection {
         company_id: None,
@@ -434,24 +435,15 @@ impl From<SkillPayload> for SkillWrite {
     }
 }
 
-async fn operator(
-    user: &AuthenticatedUser,
-    users: &UserUseCases,
-    config: &AppConfig,
-) -> AppResult<()> {
-    require_operator(user, users, config).await
-}
-
 async fn list_library_json(
     State(skills): State<Arc<SkillUseCases>>,
-    State(users): State<Arc<UserUseCases>>,
-    State(config): State<Arc<AppConfig>>,
-    user: AuthenticatedUser,
+    caller: Caller,
     Query(query): Query<PageQuery>,
 ) -> AppResult<Json<SkillPageResponse>> {
-    operator(&user, &users, &config).await?;
     Ok(Json(SkillPageResponse::from(
-        skills.list_library_page(page_request(&query)?).await?,
+        skills
+            .library_page_for(&caller, page_request(&query)?)
+            .await?,
     )))
 }
 
@@ -479,14 +471,11 @@ impl From<SkillPage> for SkillPageResponse {
 
 async fn get_library_json(
     State(skills): State<Arc<SkillUseCases>>,
-    State(users): State<Arc<UserUseCases>>,
-    State(config): State<Arc<AppConfig>>,
-    user: AuthenticatedUser,
+    caller: Caller,
     Path(skill_id): Path<Uuid>,
 ) -> AppResult<Json<Skill>> {
-    operator(&user, &users, &config).await?;
     skills
-        .get_library(skill_id)
+        .library_skill_for(&caller, skill_id)
         .await?
         .map(Json)
         .ok_or_else(|| AppError::NotFound("Library skill not found.".into()))
@@ -494,39 +483,34 @@ async fn get_library_json(
 
 async fn create_library_json(
     State(skills): State<Arc<SkillUseCases>>,
-    State(users): State<Arc<UserUseCases>>,
-    State(config): State<Arc<AppConfig>>,
-    user: AuthenticatedUser,
+    caller: Caller,
     Json(payload): Json<SkillPayload>,
 ) -> AppResult<(StatusCode, Json<Skill>)> {
-    operator(&user, &users, &config).await?;
     Ok((
         StatusCode::CREATED,
-        Json(skills.create_library(payload.into()).await?),
+        Json(skills.create_library(&caller, payload.into()).await?),
     ))
 }
 
 async fn update_library_json(
     State(skills): State<Arc<SkillUseCases>>,
-    State(users): State<Arc<UserUseCases>>,
-    State(config): State<Arc<AppConfig>>,
-    user: AuthenticatedUser,
+    caller: Caller,
     Path(skill_id): Path<Uuid>,
     Json(payload): Json<SkillPayload>,
 ) -> AppResult<Json<Skill>> {
-    operator(&user, &users, &config).await?;
-    Ok(Json(skills.update_library(skill_id, payload.into()).await?))
+    Ok(Json(
+        skills
+            .update_library(&caller, skill_id, payload.into())
+            .await?,
+    ))
 }
 
 async fn delete_library_json(
     State(skills): State<Arc<SkillUseCases>>,
-    State(users): State<Arc<UserUseCases>>,
-    State(config): State<Arc<AppConfig>>,
-    user: AuthenticatedUser,
+    caller: Caller,
     Path(skill_id): Path<Uuid>,
 ) -> AppResult<StatusCode> {
-    operator(&user, &users, &config).await?;
-    skills.delete_library(skill_id).await?;
+    skills.delete_library(&caller, skill_id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -534,15 +518,14 @@ async fn library_workspace(
     State(skills): State<Arc<SkillUseCases>>,
     State(users): State<Arc<UserUseCases>>,
     State(config): State<Arc<AppConfig>>,
-    user: AuthenticatedUser,
+    caller: Caller,
     headers: HeaderMap,
     Query(query): Query<PageQuery>,
 ) -> AppResult<Html<String>> {
-    operator(&user, &users, &config).await?;
-    let account = load_account(&users, user.id).await?;
+    let section = library_page(&caller, &skills, &query, None, None, None).await?;
+    let account = load_account(&users, caller.user_id).await?;
     let email = EmailAddress::from(account.email.as_str());
     let shell_user = workspace_user(&account, &email, &config);
-    let section = library_page(&skills, &query, None, None, None).await?;
     if crate::adapters::http::auth::is_htmx_request(&headers) {
         return Ok(Html(section));
     }
@@ -560,50 +543,50 @@ async fn library_workspace(
 
 async fn library_skill(
     State(skills): State<Arc<SkillUseCases>>,
-    State(users): State<Arc<UserUseCases>>,
-    State(config): State<Arc<AppConfig>>,
-    user: AuthenticatedUser,
+    caller: Caller,
     Path(skill_id): Path<Uuid>,
 ) -> AppResult<Html<String>> {
-    operator(&user, &users, &config).await?;
     let skill = skills
-        .get_library(skill_id)
+        .library_skill_for(&caller, skill_id)
         .await?
         .ok_or_else(|| AppError::NotFound("Library skill not found.".into()))?;
     let draft = pages::SkillDraft::stored(&skill);
     Ok(Html(
-        library_page(&skills, &PageQuery::default(), Some(&draft), None, None).await?,
+        library_page(
+            &caller,
+            &skills,
+            &PageQuery::default(),
+            Some(&draft),
+            None,
+            None,
+        )
+        .await?,
     ))
 }
 
 async fn create_library_skill(
     State(skills): State<Arc<SkillUseCases>>,
-    State(users): State<Arc<UserUseCases>>,
-    State(config): State<Arc<AppConfig>>,
-    user: AuthenticatedUser,
+    caller: Caller,
     Form(form): Form<SkillForm>,
 ) -> AppResult<Response> {
-    operator(&user, &users, &config).await?;
-    save_library(&skills, None, form).await
+    save_library(&caller, &skills, None, form).await
 }
 
 async fn update_library_skill(
     State(skills): State<Arc<SkillUseCases>>,
-    State(users): State<Arc<UserUseCases>>,
-    State(config): State<Arc<AppConfig>>,
-    user: AuthenticatedUser,
+    caller: Caller,
     Path(skill_id): Path<Uuid>,
     Form(form): Form<SkillForm>,
 ) -> AppResult<Response> {
-    operator(&user, &users, &config).await?;
     skills
-        .get_library(skill_id)
+        .library_skill_for(&caller, skill_id)
         .await?
         .ok_or_else(|| AppError::NotFound("Library skill not found.".into()))?;
-    save_library(&skills, Some(skill_id), form).await
+    save_library(&caller, &skills, Some(skill_id), form).await
 }
 
 async fn save_library(
+    caller: &Caller,
     skills: &SkillUseCases,
     skill_id: Option<Uuid>,
     form: SkillForm,
@@ -611,12 +594,13 @@ async fn save_library(
     let draft = form.into_draft(skill_id);
     let write = write_from_draft(&draft);
     let saved = match skill_id {
-        Some(id) => skills.update_library(id, write).await,
-        None => skills.create_library(write).await,
+        Some(id) => skills.update_library(caller, id, write).await,
+        None => skills.create_library(caller, write).await,
     };
     match saved {
         Ok(_) => Ok(Html(
             library_page(
+                caller,
                 skills,
                 &PageQuery::default(),
                 None,
@@ -628,6 +612,7 @@ async fn save_library(
         .into_response()),
         Err(AppError::BadRequest(message) | AppError::Conflict(message)) => Ok(Html(
             library_page(
+                caller,
                 skills,
                 &PageQuery::default(),
                 Some(&draft),
@@ -643,15 +628,13 @@ async fn save_library(
 
 async fn delete_library_skill(
     State(skills): State<Arc<SkillUseCases>>,
-    State(users): State<Arc<UserUseCases>>,
-    State(config): State<Arc<AppConfig>>,
-    user: AuthenticatedUser,
+    caller: Caller,
     Path(skill_id): Path<Uuid>,
 ) -> AppResult<Html<String>> {
-    operator(&user, &users, &config).await?;
-    skills.delete_library(skill_id).await?;
+    skills.delete_library(&caller, skill_id).await?;
     Ok(Html(
         library_page(
+            &caller,
             &skills,
             &PageQuery::default(),
             None,

@@ -159,7 +159,11 @@ async fn library_builder_copy_keeps_its_grants_on_an_explicit_model() {
     .unwrap();
     let mut builder = crate::use_cases::builtin_agent_library::agent_builder_definition().write;
     builder.slug = format!("builder-{}", Uuid::new_v4().simple());
-    let definition = f.agents.create_library_agent(builder).await.unwrap();
+    let definition = f
+        .agents
+        .create_library_agent(&crate::entities::user::Caller::operator(f.user), builder)
+        .await
+        .unwrap();
     let company_channels = || async {
         sqlx::query_scalar::<_, i64>("SELECT count(*) FROM channels WHERE company_id = $1")
             .bind(f.company)
@@ -235,6 +239,12 @@ async fn library_builder_copy_keeps_its_grants_on_an_explicit_model() {
         created["channel"]["address"],
         format!("builder-desk@{company}.agents.test")
     );
-    f.agents.delete_library_agent(definition.id).await.unwrap();
+    f.agents
+        .delete_library_agent(
+            &crate::entities::user::Caller::operator(f.user),
+            definition.id,
+        )
+        .await
+        .unwrap();
     f.cleanup().await;
 }

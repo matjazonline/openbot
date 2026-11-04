@@ -1,0 +1,81 @@
+   Compiling mail_agents v0.1.0 (/Users/mac02/dev/openbot-recovery/.worktrees/fix-app-p04)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 54s
+     Running unittests src/lib.rs (target/debug/deps/mail_agents-91c1847adc52f46f)
+
+running 73 tests
+test adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::an_archived_workflows_binding_can_still_be_paused_but_not_activated_or_configured ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::access_tests::every_workspace_write_refuses_a_cross_origin_cookie_post ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::configure_saves_at_the_revision_seen_and_a_stale_one_keeps_the_choices ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::channels_an_admin_cannot_see_stay_out_of_the_tab_the_form_and_the_card ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::a_resource_that_is_not_ready_is_refused_as_such_on_create_configure_and_activate ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::a_refused_binding_keeps_every_choice_and_says_why ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::a_blank_draft_is_created_once_per_key_and_validates_as_a_one_step_graph ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::access_tests::other_tenants_and_plain_members_reach_no_workflow_and_admins_do ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::a_version_change_renders_that_versions_fields_and_keeps_matching_values ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::a_template_copy_is_keyed_and_a_stale_catalogue_revision_is_refused ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::a_binding_is_created_once_paused_then_activated_at_the_revision_seen ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::access_tests::an_admin_of_another_company_reaches_no_write_or_version_of_this_one ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::access_tests::workflow_company_lookup_failures_remain_server_errors_on_pages_and_panes ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::access_tests::hostile_text_is_escaped_in_the_list_the_editor_and_the_preview ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::editor_tests::a_draft_naming_more_tools_than_are_offered_still_saves_and_renders ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::editor_tests::a_draft_that_moves_after_the_save_keeps_the_text_and_says_both ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::editor_tests::a_concurrent_save_keeps_the_authors_text_and_shows_what_the_other_saved ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::editor_tests::a_source_and_description_that_start_with_a_newline_keep_it ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::editor_tests::a_save_refreshes_the_sidebar_and_a_changed_publication_is_flagged ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::editor_tests::an_invalid_source_is_saved_kept_and_located ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::editor_tests::archiving_refuses_a_stale_revision_then_locks_the_draft ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::params_the_fields_cannot_carry_open_as_json_and_save_unchanged ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::other_tenants_and_plain_members_reach_no_binding ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::hostile_names_are_escaped_in_the_tab_the_form_and_the_card ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::destination_tests::binding_destinations_authorize_tenant_role_and_private_channel ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::editor_tests::the_editor_guards_unsaved_text_and_reports_only_the_work_it_does ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::publish_tests::a_publish_of_a_revision_that_is_no_longer_the_draft_is_refused_in_the_editor ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::publish_tests::an_mcp_step_validates_publishes_through_the_selected_slot_and_locates_bad_arguments ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::publish_tests::a_parameter_selected_agent_step_previews_every_frozen_candidate ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::selections_read_only_well_formed_connection_fields ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::jev_tests::workflow_authoring_jev_catalogue_binding_and_sample ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::publish_tests::a_publish_conflict_that_is_not_a_moved_draft_says_what_the_command_said ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::editor_tests::the_editor_offers_a_needed_mcp_tool_past_any_company_wide_count_and_cuts_per_tool ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::publish_tests::a_parameter_selected_step_lists_its_own_parameters_agents ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::sample_tests::sample_direct_workflow_tool_child_and_message_have_zero_production_effects ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::publish_tests::an_agent_step_previews_the_agents_frozen_tools_and_skills ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::publish_tests::publishing_moves_no_binding_and_versions_compare_line_by_line ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::jev_tests::workflow_authoring_jev_company_forms_permissions_rotation_and_readiness ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::run_board_view_filter_workflow_pages_link_to_the_board ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::the_catalogue_lists_every_runnable_type_and_the_agents_a_step_can_name ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::tools_tests::an_agents_grants_save_against_the_list_seen_and_say_what_each_name_is ... ok
+test adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_filter_reports_a_cut_option_list ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::sample_tests::samples_authorize_tenant_revision_and_preserve_invalid_hostile_text ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::tools_tests::used_by_lists_a_binding_that_reaches_the_agent_only_through_a_child_diamond ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::tools_tests::a_tool_name_is_registered_re_pinned_re_pointed_and_revoked_saying_what_each_does ... ok
+test adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_escapes_a_hostile_workflow_title ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::the_sidebar_pages_through_every_draft ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::sample_tests::sample_mcp_fixture_never_contacts_selected_endpoint_and_rejects_foreign_selection ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::tools_tests::revoking_or_re_pointing_a_frozen_tool_stops_its_versions_bindings_as_the_warning_says ... ok
+test adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_filter_refuses_another_tenants_ids ... ok
+test adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_refuses_plain_members_and_other_tenants ... ok
+test adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_live_reconciles_a_change_before_subscribing_on_the_first_resync ... ok
+test adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_live_moves_a_finished_run_out_of_the_window_on_a_later_read ... ok
+test adapters::http::routes::workflows::ui::runs::tests::authorization_tests::reconciliation_and_step_refuse_foreign_and_hidden_channel_identities ... ok
+test adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_filter_switch_and_links_keep_the_scope ... ok
+test adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_cut_column_links_to_the_list_with_its_scope ... ok
+test adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_filter_scopes_both_views_alone_and_combined ... ok
+test adapters::http::routes::workflows::ui::runs::tests::every_runs_write_refuses_a_cross_origin_cookie_post ... ok
+test adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_shows_six_columns_in_order_with_their_totals ... ok
+test adapters::http::routes::workflows::ui::runs::tests::pages_tests::an_unfinished_step_of_an_ended_run_reads_as_stopped ... ok
+test adapters::http::routes::workflows::ui::runs::tests::pages_tests::reconciliation_is_offered_as_an_annotation_and_a_step_shows_usage_and_receipts ... ok
+test adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_live_sends_no_wake_up_for_a_hidden_channel ... ok
+test adapters::http::routes::workflows::ui::runs::tests::events_tests::the_event_stream_ticks_while_access_holds_and_ends_when_it_is_lost ... ok
+test adapters::http::routes::workflows::ui::runs::tests::events_tests::the_event_stream_wakes_with_resync_first_and_names_only_visible_runs ... ok
+test adapters::http::routes::workflows::ui::runs::tests::events_tests::a_lagging_stream_asks_every_view_to_read_again ... ok
+test adapters::http::routes::workflows::ui::runs::tests::a_run_with_a_child_shows_its_lineage_steps_and_controls_through_the_parent ... ok
+test adapters::http::routes::workflows::ui::runs::tests::controls_tests::an_accepted_action_shows_its_receipt_and_cancel_names_it ... ok
+test adapters::http::routes::workflows::ui::runs::tests::controls_tests::controls_act_at_the_revision_seen_and_say_what_they_did ... ok
+test adapters::http::routes::workflows::ui::runs::tests::other_tenants_and_plain_members_reach_no_run_and_hostile_content_is_escaped ... ok
+test adapters::http::routes::workflows::ui::runs::tests::controls_tests::a_redraw_repeats_its_keys_until_the_command_shows_on_the_page ... ok
+test adapters::http::routes::workflows::ui::runs::tests::controls_tests::an_uncertain_action_is_annotated_from_the_pane_and_its_step_shows_the_attempt ... ok
+test adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_opens_the_pane_answers_its_region_and_leaves_the_list_alone ... ok
+test adapters::http::routes::workflows::ui::runs::tests::the_list_pages_over_runs_an_admin_cannot_see_and_labels_reruns_and_children ... ok
+
+test result: ok. 73 passed; 0 failed; 0 ignored; 0 measured; 2523 filtered out; finished in 14.72s
+

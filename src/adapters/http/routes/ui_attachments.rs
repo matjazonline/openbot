@@ -2,7 +2,7 @@
 //!
 //! Attachments are kept in a bucket nothing public can read, so a download is a request to *this*
 //! app, authorized the way opening the thread is authorized — through the very same guards
-//! ([`super::ui::load_viewable_channel`], [`super::ui::load_channel_thread`]). There is no link to
+//! ([`super::ui::load_viewable_channel`], [`crate::use_cases::thread::ThreadUseCases::readable_thread`]). There is no link to
 //! leak and nothing to expire: someone who loses access to a channel loses its files in the same
 //! instant.
 //!
@@ -36,7 +36,7 @@ use crate::{
     use_cases::{channel::ChannelUseCases, company::CompanyUseCases, thread::ThreadUseCases},
 };
 
-use super::ui::{load_channel_thread, load_viewable_channel};
+use super::ui::load_viewable_channel;
 
 /// Nothing an attachment is served with may be guessed at by the browser, and nothing may be kept.
 const NO_SNIFF: (&str, &str) = ("x-content-type-options", "nosniff");
@@ -79,7 +79,8 @@ async fn download_attachment(
     )
     .await?;
 
-    let thread = load_channel_thread(&thread_use_cases, channel.id, thread_id)
+    let thread = thread_use_cases
+        .readable_thread(&viewer, channel.company_id, channel.id, thread_id)
         .await?
         .ok_or_else(missing)?;
 

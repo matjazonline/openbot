@@ -1,0 +1,885 @@
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/adapters/http/routes/agent.rs:417:
+         Err(err) => return Ok(Html(pages::error_alert(&err))),
+     };
+ 
+-    Ok(match agent_use_cases
+-        .update_agent(
+-            user.id,
+-            company_id,
+-            agent_id,
+-            AgentWrite {
+-                // Workflow tool grants are edited in phase 09; keep the stored list.
+-                workflow_tools: None,
+-                name: form.name.clone(),
+-                slug: form.slug(),
+-                provider: form.provider.clone(),
+-                model: form.model.clone(),
+-                system_prompt: form.system_prompt.clone(),
+-                description: form.description.clone(),
+-                skill_ids: capabilities.skill_ids,
+-                avatar_url,
+-                created_by: None,
+-            },
+-        )
+-        .await
+-    {
+-        Ok(ag) => Html(pages::agent_row_fragment(&company, &ag)),
+-        Err(err @ (AppError::BadRequest(_) | AppError::Conflict(_))) => {
+-            Html(pages::error_alert(&format!("Update failed: {err}")))
+-        }
+-        Err(error) => return Err(error),
+-    })
++    Ok(
++        match agent_use_cases
++            .update_agent(
++                user.id,
++                company_id,
++                agent_id,
++                AgentWrite {
++                    // Workflow tool grants are edited in phase 09; keep the stored list.
++                    workflow_tools: None,
++                    name: form.name.clone(),
++                    slug: form.slug(),
++                    provider: form.provider.clone(),
++                    model: form.model.clone(),
++                    system_prompt: form.system_prompt.clone(),
++                    description: form.description.clone(),
++                    skill_ids: capabilities.skill_ids,
++                    avatar_url,
++                    created_by: None,
++                },
++            )
++            .await
++        {
++            Ok(ag) => Html(pages::agent_row_fragment(&company, &ag)),
++            Err(err @ (AppError::BadRequest(_) | AppError::Conflict(_))) => {
++                Html(pages::error_alert(&format!("Update failed: {err}")))
++            }
++            Err(error) => return Err(error),
++        },
++    )
+ }
+ 
+ /// DELETE /companies/{company_id}/agents/{id} - HTMX delete agent (Protected).
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/adapters/http/routes/agent_api_tests.rs:159:
+     .unwrap();
+     let mut builder = crate::use_cases::builtin_agent_library::agent_builder_definition().write;
+     builder.slug = format!("builder-{}", Uuid::new_v4().simple());
+-    let definition = f.agents.create_library_agent(&crate::entities::user::Caller::operator(f.user), builder).await.unwrap();
++    let definition = f
++        .agents
++        .create_library_agent(&crate::entities::user::Caller::operator(f.user), builder)
++        .await
++        .unwrap();
+     let company_channels = || async {
+         sqlx::query_scalar::<_, i64>("SELECT count(*) FROM channels WHERE company_id = $1")
+             .bind(f.company)
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/adapters/http/routes/agent_api_tests.rs:235:
+         created["channel"]["address"],
+         format!("builder-desk@{company}.agents.test")
+     );
+-    f.agents.delete_library_agent(&crate::entities::user::Caller::operator(f.user), definition.id).await.unwrap();
++    f.agents
++        .delete_library_agent(
++            &crate::entities::user::Caller::operator(f.user),
++            definition.id,
++        )
++        .await
++        .unwrap();
+     f.cleanup().await;
+ }
+ 
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/adapters/http/routes/agent_library.rs:148:
+     caller: Caller,
+     Json(payload): Json<AgentJsonPayload>,
+ ) -> AppResult<(StatusCode, Json<LibraryAgentResponse>)> {
+-    let agent = agents.create_library_agent(&caller, write(payload)?).await?;
++    let agent = agents
++        .create_library_agent(&caller, write(payload)?)
++        .await?;
+     let capabilities = skills
+         .library_agent_capabilities(agent.id)
+         .await?
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/adapters/http/routes/agent_library.rs:178:
+         .await?
+         .ok_or_else(|| AppError::NotFound("Library agent not found".into()))?;
+     payload.preserve_capabilities(&stored);
+-    let agent = agents.update_library_agent(&caller, id, write(payload)?).await?;
++    let agent = agents
++        .update_library_agent(&caller, id, write(payload)?)
++        .await?;
+     let capabilities = skills
+         .library_agent_capabilities(id)
+         .await?
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/adapters/http/routes/channel.rs:766:
+     // Everything past authorization answers with a fragment the page swaps in, including the
+     // simulated message's own failures.
+     Ok(async move {
+-
+         // The simulated envelope must address the very channel being simulated — otherwise the run
+         // would exercise a different channel's agent from inside this one's page.
+         if !simulation_recipient_matches(&form.to, &company, &channel, &config.app_domain_name) {
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/adapters/http/routes/channel.rs:823:
+                     );
+                 };
+                 let channel_slug = selector.channel().clone();
+-                let sender_identity = match EmailIdentity::parse(EmailAddress::from(sender.clone())) {
++                let sender_identity = match EmailIdentity::parse(EmailAddress::from(sender.clone()))
++                {
+                     Ok(identity) => identity.qualify_default(),
+                     Err(error) => return failure_fragment(&sender, error.to_string()),
+                 };
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/adapters/http/routes/channel.rs:868:
+ 
+                 // Queued like any other message: the worker runs the agent and the view below fills
+                 // itself in over its own stream.
+-                let ingest = match compose_and_ingest(
+-                    &thread_use_cases,
+-                    raw_payload,
+-                    delivery_for(mode),
+-                )
+-                .await
+-                {
+-                    Ok(ingest) => ingest,
+-                    Err(err) => {
+-                        return failure_fragment(
+-                            &sender,
+-                            format!("Simulation execution failed: {err}"),
+-                        );
+-                    }
+-                };
++                let ingest =
++                    match compose_and_ingest(&thread_use_cases, raw_payload, delivery_for(mode))
++                        .await
++                    {
++                        Ok(ingest) => ingest,
++                        Err(err) => {
++                            return failure_fragment(
++                                &sender,
++                                format!("Simulation execution failed: {err}"),
++                            );
++                        }
++                    };
+                 let Some(thread) = ingest.thread.as_ref() else {
+                     let reason = ingest
+                         .reason()
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/adapters/http/routes/company.rs:82:
+     State(company_use_cases): State<Arc<CompanyUseCases>>,
+     user: AuthenticatedUser,
+ ) -> AppResult<Html<String>> {
+-    let companies = company_use_cases
+-        .list_user_companies(user.id)
+-        .await?;
++    let companies = company_use_cases.list_user_companies(user.id).await?;
+ 
+     Ok(Html(pages::companies_page(&companies)))
+ }
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/adapters/http/routes/company.rs:103:
+ 
+     Ok(match created {
+         Ok(_) => {
+-            let companies = company_use_cases
+-                .list_user_companies(user.id)
+-                .await?;
++            let companies = company_use_cases.list_user_companies(user.id).await?;
+             Html(pages::company_list_fragment(&companies))
+         }
+         Err(err @ (AppError::BadRequest(_) | AppError::Conflict(_))) => {
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/adapters/http/routes/company.rs:112:
+             let error_html = pages::error_alert(&format!("Failed to create company: {err}"));
+-            let companies = company_use_cases
+-                .list_user_companies(user.id)
+-                .await?;
++            let companies = company_use_cases.list_user_companies(user.id).await?;
+             Html(format!(
+                 "{}{}",
+                 error_html,
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/adapters/http/routes/company_invite.rs:133:
+     Form(form): Form<InviteForm>,
+ ) -> AppResult<Html<String>> {
+     let error_html = match invite_use_cases
+-        .create_company_invite(user.id, company_id, &form.email, form.role.unwrap_or_default())
++        .create_company_invite(
++            user.id,
++            company_id,
++            &form.email,
++            form.role.unwrap_or_default(),
++        )
+         .await
+     {
+         Ok(_) => String::new(),
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/adapters/http/routes/company_invite.rs:142:
+         }
+         Err(error) => return Err(error),
+     };
+-    let invites = invite_use_cases.list_company_invites(user.id, company_id).await?;
+-    Ok(Html(format!("{error_html}{}", pages::company_invite_list_fragment(company_id, &invites))))
++    let invites = invite_use_cases
++        .list_company_invites(user.id, company_id)
++        .await?;
++    Ok(Html(format!(
++        "{error_html}{}",
++        pages::company_invite_list_fragment(company_id, &invites)
++    )))
+ }
+ 
+ /// GET /companies/{company_id}/invites/{invite_id}/edit - Edit form fragment.
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/adapters/http/routes/company_invite.rs:153:
+     user: AuthenticatedUser,
+     Path((company_id, invite_id)): Path<(Uuid, Uuid)>,
+ ) -> AppResult<Html<String>> {
+-    let invite = invite_use_cases.get_company_invite(user.id, company_id, invite_id).await?
++    let invite = invite_use_cases
++        .get_company_invite(user.id, company_id, invite_id)
++        .await?
+         .ok_or_else(|| AppError::NotFound("Invite not found.".into()))?;
+-    Ok(Html(pages::company_invite_edit_fragment(company_id, &invite)))
++    Ok(Html(pages::company_invite_edit_fragment(
++        company_id, &invite,
++    )))
+ }
+ 
+ /// GET /companies/{company_id}/invites/{invite_id}/cancel - Cancel edit fragment.
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/adapters/http/routes/company_invite.rs:165:
+     user: AuthenticatedUser,
+     Path((company_id, invite_id)): Path<(Uuid, Uuid)>,
+ ) -> AppResult<Html<String>> {
+-    let invite = invite_use_cases.get_company_invite(user.id, company_id, invite_id).await?
++    let invite = invite_use_cases
++        .get_company_invite(user.id, company_id, invite_id)
++        .await?
+         .ok_or_else(|| AppError::NotFound("Invite not found.".into()))?;
+-    Ok(Html(pages::company_invite_row_fragment(company_id, &invite)))
++    Ok(Html(pages::company_invite_row_fragment(
++        company_id, &invite,
++    )))
+ }
+ 
+ /// PUT /companies/{company_id}/invites/{invite_id} - Update invite email (HTMX).
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/adapters/http/routes/company_invite.rs:178:
+     Path((company_id, invite_id)): Path<(Uuid, Uuid)>,
+     Form(form): Form<InviteForm>,
+ ) -> AppResult<Html<String>> {
+-    Ok(match invite_use_cases
+-        .update_company_invite(user.id, company_id, invite_id, &form.email, form.role)
+-        .await
+-    {
+-        Ok(invite) => Html(pages::company_invite_row_fragment(company_id, &invite)),
+-        Err(err @ (AppError::BadRequest(_) | AppError::Conflict(_))) => {
+-            Html(pages::error_alert(&format!("Update failed: {err}")))
+-        }
+-        Err(error) => return Err(error),
+-    })
++    Ok(
++        match invite_use_cases
++            .update_company_invite(user.id, company_id, invite_id, &form.email, form.role)
++            .await
++        {
++            Ok(invite) => Html(pages::company_invite_row_fragment(company_id, &invite)),
++            Err(err @ (AppError::BadRequest(_) | AppError::Conflict(_))) => {
++                Html(pages::error_alert(&format!("Update failed: {err}")))
++            }
++            Err(error) => return Err(error),
++        },
++    )
+ }
+ 
+ /// PUT /companies/{company_id}/team/{user_id} - Update member access role (HTMX).
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/adapters/http/routes/company_invite.rs:198:
+     Path((company_id, member_user_id)): Path<(Uuid, Uuid)>,
+     Form(form): Form<MemberRoleForm>,
+ ) -> AppResult<Html<String>> {
+-    Ok(match invite_use_cases
+-        .update_company_team_member_role(user.id, company_id, member_user_id, form.role)
+-        .await
+-    {
+-        Ok(member) => Html(pages::company_team_row_fragment(company_id, &member)),
+-        Err(err @ (AppError::BadRequest(_) | AppError::Conflict(_))) => {
+-            Html(pages::error_alert(&format!("Failed to update member access: {err}")))
+-        }
+-        Err(error) => return Err(error),
+-    })
++    Ok(
++        match invite_use_cases
++            .update_company_team_member_role(user.id, company_id, member_user_id, form.role)
++            .await
++        {
++            Ok(member) => Html(pages::company_team_row_fragment(company_id, &member)),
++            Err(err @ (AppError::BadRequest(_) | AppError::Conflict(_))) => Html(
++                pages::error_alert(&format!("Failed to update member access: {err}")),
++            ),
++            Err(error) => return Err(error),
++        },
++    )
+ }
+ 
+ /// DELETE /companies/{company_id}/invites/{invite_id} - Delete invite (HTMX).
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/adapters/http/routes/company_invite.rs:217:
+     user: AuthenticatedUser,
+     Path((company_id, invite_id)): Path<(Uuid, Uuid)>,
+ ) -> AppResult<Html<String>> {
+-    invite_use_cases.delete_company_invite(user.id, company_id, invite_id).await?;
++    invite_use_cases
++        .delete_company_invite(user.id, company_id, invite_id)
++        .await?;
+     Ok(Html(String::new()))
+ }
+ 
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/adapters/http/routes/company_invite.rs:228:
+     user: AuthenticatedUser,
+     Path((company_id, member_user_id)): Path<(Uuid, Uuid)>,
+ ) -> AppResult<Html<String>> {
+-    invite_use_cases.remove_company_team_member(user.id, company_id, member_user_id).await?;
++    invite_use_cases
++        .remove_company_team_member(user.id, company_id, member_user_id)
++        .await?;
+     Ok(Html(String::new()))
+ }
+ 
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/adapters/http/routes/ui.rs:339:
+ 
+     let selected_thread = match (selected_channel, query.thread_id) {
+         (Some(channel), Some(thread_id)) => {
+-            thread_use_cases.readable_thread(&viewer, channel.company_id, channel.id, thread_id).await?
++            thread_use_cases
++                .readable_thread(&viewer, channel.company_id, channel.id, thread_id)
++                .await?
+         }
+         (Some(_), None) => thread_page.threads.first().cloned(),
+         (None, _) => None,
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/adapters/http/routes/ui.rs:477:
+         .get_readable_channel(&viewer, query.company_id, query.channel_id)
+         .await?
+         .ok_or_else(|| AppError::NotFound("Channel not found".into()))?;
+-    let thread = thread_use_cases.readable_thread(&viewer, channel.company_id, channel.id, query.thread_id)
++    let thread = thread_use_cases
++        .readable_thread(&viewer, channel.company_id, channel.id, query.thread_id)
+         .await?
+         .ok_or_else(|| AppError::NotFound("Thread not found".into()))?;
+ 
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/adapters/http/routes/ui.rs:535:
+         .get_readable_channel(&viewer, query.company_id, query.channel_id)
+         .await?
+         .ok_or_else(|| AppError::NotFound("Channel not found".into()))?;
+-    let thread = thread_use_cases.readable_thread(&viewer, channel.company_id, channel.id, query.thread_id)
++    let thread = thread_use_cases
++        .readable_thread(&viewer, channel.company_id, channel.id, query.thread_id)
+         .await?
+         .ok_or_else(|| AppError::NotFound("Thread not found".into()))?;
+ 
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/adapters/http/routes/ui.rs:950:
+         query.channel_id,
+     )
+     .await?;
+-    let thread = thread_use_cases.readable_thread(&viewer, channel.company_id, channel.id, query.thread_id)
++    let thread = thread_use_cases
++        .readable_thread(&viewer, channel.company_id, channel.id, query.thread_id)
+         .await?
+         .ok_or_else(|| AppError::NotFound("Thread not found".into()))?;
+     let sender_email = sender_email(&user_use_cases, viewer.user_id).await?;
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/adapters/http/routes/ui.rs:994:
+         form.channel_id,
+     )
+     .await?;
+-    let thread = thread_use_cases.readable_thread(&viewer, channel.company_id, channel.id, form.thread_id)
++    let thread = thread_use_cases
++        .readable_thread(&viewer, channel.company_id, channel.id, form.thread_id)
+         .await?
+         .ok_or_else(|| AppError::NotFound("Thread not found".into()))?;
+     let sender_email = sender_email(&user_use_cases, viewer.user_id).await?;
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/adapters/http/routes/ui_agents.rs:188:
+     else {
+         return Ok(Html(pages::mailbox_no_company_page(&workspace_user)));
+     };
+-    let workspace_user = workspace_user
+-        .with_company_membership(membership);
++    let workspace_user = workspace_user.with_company_membership(membership);
+ 
+     let view = workspace.view(&company);
+     let agents = view.agents().await?;
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/adapters/http/routes/ui_attachments.rs:79:
+     )
+     .await?;
+ 
+-    let thread = thread_use_cases.readable_thread(&viewer, channel.company_id, channel.id, thread_id)
++    let thread = thread_use_cases
++        .readable_thread(&viewer, channel.company_id, channel.id, thread_id)
+         .await?
+         .ok_or_else(missing)?;
+ 
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/adapters/http/routes/ui_channels.rs:29:
+     entities::{
+         channel::Channel,
+         company::{Company, CompanyAccess},
+-        schedule::ChannelSchedule, value_objects::EmailAddress,
++        schedule::ChannelSchedule,
++        value_objects::EmailAddress,
+     },
+     infra::config::AppConfig,
+     use_cases::{
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/adapters/http/routes/ui_channels.rs:160:
+     else {
+         return Ok(Html(pages::mailbox_no_company_page(&workspace_user)));
+     };
+-    let workspace_user = workspace_user
+-        .with_company_membership(membership);
++    let workspace_user = workspace_user.with_company_membership(membership);
+ 
+     let view = workspace.view(&company).await?;
+     let channels = view.channels().await?;
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/adapters/http/routes/ui_deliveries.rs:183:
+     else {
+         return Ok(Html(pages::mailbox_no_company_page(&workspace_user)));
+     };
+-    let workspace_user = workspace_user
+-        .with_company_membership(membership);
++    let workspace_user = workspace_user.with_company_membership(membership);
+ 
+     let view = workspace.view(&company);
+     let filter = query.filter();
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/adapters/http/routes/ui_internal_notes.rs:111:
+         channel_id,
+     )
+     .await?;
+-    let thread = thread_use_cases.readable_thread(viewer, channel.company_id, channel.id, thread_id)
++    let thread = thread_use_cases
++        .readable_thread(viewer, channel.company_id, channel.id, thread_id)
+         .await?
+         .ok_or_else(|| AppError::NotFound("Thread not found".into()))?;
+     let actor = thread_use_cases
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/adapters/http/routes/ui_message.rs:25:
+         query.channel_id,
+     )
+     .await?;
+-    let thread = threads.readable_thread(&viewer, channel.company_id, channel.id, query.thread_id)
++    let thread = threads
++        .readable_thread(&viewer, channel.company_id, channel.id, query.thread_id)
+         .await?
+         .ok_or_else(|| AppError::NotFound("Thread not found".into()))?;
+     let message = threads
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/adapters/http/routes/ui_message_diagnostics.rs:61:
+     )
+     .await?;
+ 
+-    let thread = thread_use_cases.readable_thread(&viewer, channel.company_id, channel.id, thread_id)
++    let thread = thread_use_cases
++        .readable_thread(&viewer, channel.company_id, channel.id, thread_id)
+         .await?
+         .ok_or_else(missing)?;
+ 
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/adapters/http/routes/ui_schedules.rs:250:
+     else {
+         return Ok(Html(pages::mailbox_no_company_page(&workspace_user)));
+     };
+-    let workspace_user = workspace_user
+-        .with_company_membership(membership);
++    let workspace_user = workspace_user.with_company_membership(membership);
+ 
+     let schedules = workspace
+         .schedule_use_cases
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/adapters/http/routes/ui_team.rs:433:
+ 
+     let saved = view
+         .invite_use_cases
+-        .update_company_invite(view.user_id, view.company.id, invite_id, &form.email, form.role)
++        .update_company_invite(
++            view.user_id,
++            view.company.id,
++            invite_id,
++            &form.email,
++            form.role,
++        )
+         .await;
+ 
+     match saved {
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/adapters/http/routes/user_tests.rs:340:
+     ) -> AppResult<bool> {
+         unreachable!("registration fixture never reads an existing account's login methods")
+     }
+-
+ }
+ 
+ struct StubHasher;
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/adapters/http/routes/workflows/ui/mod.rs:3:
+ //! caller owns or administers (`load_managed_company`), and every command authorizes again.
+ use super::*;
+ use crate::adapters::http::pages;
+-use crate::adapters::http::routes::ui::{
+-    load_account, load_managed_company, workspace_user,
+-};
++use crate::adapters::http::routes::ui::{load_account, load_managed_company, workspace_user};
+ use crate::entities::company::{Company, CompanyAccess};
+ use crate::entities::value_objects::EmailAddress;
+ use crate::infra::config::AppConfig;
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/adapters/smtp/server.rs:1123:
+     async fn submitted_authentication_headers_cannot_authorize_smtp_mail() {
+         let company_id = Uuid::new_v4();
+         let company_persistence = Arc::new(company_double(vec![Company {
+-                channel_defaults: Default::default(),
+-                id: company_id,
+-                user_id: Uuid::new_v4(),
+-                name: "Acme Corp".to_string(),
+-                slug: "acme".into(),
+-                avatar_url: None,
+-                created_at: Utc::now(),
+-            }]));
++            channel_defaults: Default::default(),
++            id: company_id,
++            user_id: Uuid::new_v4(),
++            name: "Acme Corp".to_string(),
++            slug: "acme".into(),
++            avatar_url: None,
++            created_at: Utc::now(),
++        }]));
+ 
+         let channel_persistence = Arc::new(MockChannelPersistence {
+             channels: Mutex::new(vec![Channel {
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/adapters/smtp/server.rs:1341:
+     async fn stale_dkim_and_submitted_auth_headers_do_not_authorize_smtp_mail() {
+         let company_id = Uuid::new_v4();
+         let company_persistence = Arc::new(company_double(vec![Company {
+-                channel_defaults: Default::default(),
+-                id: company_id,
+-                user_id: Uuid::new_v4(),
+-                name: "Populus Network".to_string(),
+-                slug: "populus".into(),
+-                avatar_url: None,
+-                created_at: Utc::now(),
+-            }]));
++            channel_defaults: Default::default(),
++            id: company_id,
++            user_id: Uuid::new_v4(),
++            name: "Populus Network".to_string(),
++            slug: "populus".into(),
++            avatar_url: None,
++            created_at: Utc::now(),
++        }]));
+ 
+         let channel_persistence = Arc::new(MockChannelPersistence {
+             channels: Mutex::new(vec![Channel {
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/application/use_cases/agent_tests.rs:143:
+ fn fixture() -> Fixture {
+     let owner_id = Uuid::new_v4();
+     let company_id = Uuid::new_v4();
+-    let company_persistence = Arc::new(company_double(vec![Company {
++    let company_persistence = Arc::new(company_double(
++        vec![Company {
+             channel_defaults: Default::default(),
+             id: company_id,
+             user_id: owner_id,
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/application/use_cases/agent_tests.rs:151:
+             slug: "acme".into(),
+             avatar_url: None,
+             created_at: Utc::now(),
+-        }], Vec::new()));
++        }],
++        Vec::new(),
++    ));
+     let agent_persistence = Arc::new(MockAgentPersistence {
+         agents: Mutex::new(Vec::new()),
+     });
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/application/use_cases/agent_tests.rs:235:
+     let owner_id = Uuid::new_v4();
+     let company_id = Uuid::new_v4();
+ 
+-    let company_persistence = Arc::new(company_double(vec![Company {
++    let company_persistence = Arc::new(company_double(
++        vec![Company {
+             channel_defaults: Default::default(),
+             id: company_id,
+             user_id: owner_id,
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/application/use_cases/agent_tests.rs:243:
+             slug: "acme".into(),
+             avatar_url: None,
+             created_at: Utc::now(),
+-        }], Vec::new()));
++        }],
++        Vec::new(),
++    ));
+ 
+     let agent_persistence = Arc::new(MockAgentPersistence {
+         agents: Mutex::new(Vec::new()),
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/application/use_cases/agent_tests.rs:413:
+         created_at: Utc::now(),
+     };
+ 
+-    let company_persistence = Arc::new(company_double(vec![
++    let company_persistence = Arc::new(company_double(
++        vec![
+             company(company_id, owner_id, "acme"),
+             company(other_company_id, Uuid::new_v4(), "other"),
+-        ], vec![
++        ],
++        vec![
+             (admin_id, company_id, CompanyMembership::Admin),
+             (member_id, company_id, CompanyMembership::Member),
+-        ]));
++        ],
++    ));
+     let agent_persistence = Arc::new(MockAgentPersistence {
+         agents: Mutex::new(Vec::new()),
+     });
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/application/use_cases/agent_tests.rs:549:
+ async fn a_library_pick_is_copied_into_the_company_with_a_model_it_can_run() {
+     let owner_id = Uuid::new_v4();
+     let company_id = Uuid::new_v4();
+-    let company_persistence = Arc::new(company_double(vec![Company {
++    let company_persistence = Arc::new(company_double(
++        vec![Company {
+             channel_defaults: Default::default(),
+             id: company_id,
+             user_id: owner_id,
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/application/use_cases/agent_tests.rs:557:
+             slug: "acme".into(),
+             avatar_url: None,
+             created_at: Utc::now(),
+-        }], Vec::new()));
++        }],
++        Vec::new(),
++    ));
+ 
+     // A library definition is one with no company of its own.
+     let definition = |name: &str, slug: &str, provider: &str, model: &str| Agent {
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/application/use_cases/channel.rs:574:
+     use crate::entities::channel::ChannelAccessMode;
+     use crate::entities::company::Company;
+     use crate::entities::company_member::CompanyMembership;
+-    use crate::use_cases::company_test_support::{MockCompanyPersistence, TeamByAddress};
+     use crate::entities::transport::ChannelSelector;
+     use crate::entities::value_objects::EmailAddress;
++    use crate::use_cases::company_test_support::{MockCompanyPersistence, TeamByAddress};
+     use crate::use_cases::participant::test_support::{
+         InMemoryParticipantDirectory, email_allowlist_policy,
+     };
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/application/use_cases/channel.rs:736:
+         let member_id = Uuid::new_v4();
+         let company_id = Uuid::new_v4();
+         let channel_id = Uuid::new_v4();
+-        let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
++        let company_persistence = Arc::new(
++            MockCompanyPersistence::new(vec![Company {
+                 id: company_id,
+                 user_id: owner_id,
+                 name: "Acme".into(),
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/application/use_cases/channel.rs:746:
+                 channel_defaults: Default::default(),
+             }])
+             .with_memberships(vec![(member_id, company_id, CompanyMembership::Member)])
+-            .with_team(TeamByAddress::EveryoneIsMember));
++            .with_team(TeamByAddress::EveryoneIsMember),
++        );
+         let channel = channel_from_write(
+             channel_id,
+             company_id,
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/application/use_cases/channel.rs:811:
+             avatar_url: None,
+             created_at: Utc::now(),
+         };
+-        let company_persistence = Arc::new(MockCompanyPersistence::new(vec![company(company_id), company(other_company_id)])
+-            .with_memberships(Vec::new())
+-            .with_team(TeamByAddress::EveryoneIsMember));
++        let company_persistence = Arc::new(
++            MockCompanyPersistence::new(vec![company(company_id), company(other_company_id)])
++                .with_memberships(Vec::new())
++                .with_team(TeamByAddress::EveryoneIsMember),
++        );
+         let channel_persistence = Arc::new(MockChannelPersistence {
+             channels: Mutex::new(Vec::new()),
+         });
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/application/use_cases/channel.rs:905:
+         let admin_id = Uuid::new_v4();
+         let member_id = Uuid::new_v4();
+         let company_id = Uuid::new_v4();
+-        let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
++        let company_persistence = Arc::new(
++            MockCompanyPersistence::new(vec![Company {
+                 channel_defaults: Default::default(),
+                 id: company_id,
+                 user_id: owner_id,
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/application/use_cases/channel.rs:918:
+                 (admin_id, company_id, CompanyMembership::Admin),
+                 (member_id, company_id, CompanyMembership::Member),
+             ])
+-            .with_team(TeamByAddress::EveryoneIsMember));
++            .with_team(TeamByAddress::EveryoneIsMember),
++        );
+         let channel_persistence = Arc::new(MockChannelPersistence {
+             channels: Mutex::new(Vec::new()),
+         });
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/application/use_cases/channel.rs:1000:
+         let owner_id = Uuid::new_v4();
+         let company_id = Uuid::new_v4();
+ 
+-        let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
++        let company_persistence = Arc::new(
++            MockCompanyPersistence::new(vec![Company {
+                 channel_defaults: Default::default(),
+                 id: company_id,
+                 user_id: owner_id,
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/application/use_cases/channel.rs:1010:
+                 created_at: Utc::now(),
+             }])
+             .with_memberships(Vec::new())
+-            .with_team(TeamByAddress::EveryoneIsMember));
++            .with_team(TeamByAddress::EveryoneIsMember),
++        );
+ 
+         let channel_persistence = Arc::new(MockChannelPersistence {
+             channels: Mutex::new(Vec::new()),
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/application/use_cases/channel.rs:1307:
+         let owner_id = Uuid::new_v4();
+         let company_id = Uuid::new_v4();
+ 
+-        let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
++        let company_persistence = Arc::new(
++            MockCompanyPersistence::new(vec![Company {
+                 channel_defaults: Default::default(),
+                 id: company_id,
+                 user_id: owner_id,
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/application/use_cases/channel.rs:1317:
+                 created_at: Utc::now(),
+             }])
+             .with_memberships(Vec::new())
+-            .with_team(TeamByAddress::EveryoneIsMember));
++            .with_team(TeamByAddress::EveryoneIsMember),
++        );
+ 
+         let channel_persistence = Arc::new(MockChannelPersistence {
+             channels: Mutex::new(Vec::new()),
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/application/use_cases/channel.rs:1411:
+         let owner_id = Uuid::new_v4();
+         let company_id = Uuid::new_v4();
+ 
+-        let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
++        let company_persistence = Arc::new(
++            MockCompanyPersistence::new(vec![Company {
+                 channel_defaults: Default::default(),
+                 id: company_id,
+                 user_id: owner_id,
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/application/use_cases/channel.rs:1421:
+                 created_at: Utc::now(),
+             }])
+             .with_memberships(Vec::new())
+-            .with_team(TeamByAddress::EveryoneIsMember));
++            .with_team(TeamByAddress::EveryoneIsMember),
++        );
+ 
+         let channel_persistence = Arc::new(MockChannelPersistence {
+             channels: Mutex::new(Vec::new()),
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/application/use_cases/company_invite_tests.rs:217:
+ 
+ fn acme(owner_id: Uuid, company_id: Uuid) -> Arc<MockCompanyPersistence> {
+     Arc::new(MockCompanyPersistence::new(vec![Company {
+-            channel_defaults: Default::default(),
+-            id: company_id,
+-            user_id: owner_id,
+-            name: "Acme Corp".to_string(),
+-            slug: "acme".into(),
+-            avatar_url: None,
+-            created_at: Utc::now(),
+-        }]))
++        channel_defaults: Default::default(),
++        id: company_id,
++        user_id: owner_id,
++        name: "Acme Corp".to_string(),
++        slug: "acme".into(),
++        avatar_url: None,
++        created_at: Utc::now(),
++    }]))
+ }
+ 
+ fn member_row(company_id: Uuid, user_id: Uuid) -> CompanyMember {
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/application/use_cases/company_invite_tests.rs:271:
+     let stranger_id = Uuid::new_v4();
+     let company_id = Uuid::new_v4();
+ 
+-    let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
++    let company_persistence = Arc::new(
++        MockCompanyPersistence::new(vec![Company {
+             channel_defaults: Default::default(),
+             id: company_id,
+             user_id: owner_id,
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/application/use_cases/company_invite_tests.rs:332:
+     let company_id = Uuid::new_v4();
+ 
+     let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
+-            channel_defaults: Default::default(),
+-            id: company_id,
+-            user_id: owner_id,
+-            name: "Acme Corp".to_string(),
+-            slug: "acme".into(),
+-            avatar_url: None,
+-            created_at: Utc::now(),
+-        }]));
++        channel_defaults: Default::default(),
++        id: company_id,
++        user_id: owner_id,
++        name: "Acme Corp".to_string(),
++        slug: "acme".into(),
++        avatar_url: None,
++        created_at: Utc::now(),
++    }]));
+ 
+     let invite_persistence = Arc::new(MockCompanyInvitePersistence::with_members(Vec::new()));
+ 
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/application/use_cases/company_invite_tests.rs:466:
+ 
+     // The two doubles stand for one `company_members` table: acceptance wrote the row the
+     // company double answers `company_access` from.
+-    company_persistence
+-        .memberships
+-        .lock()
+-        .unwrap()
+-        .push((user.id, company_id, CompanyMembership::Member));
++    company_persistence.memberships.lock().unwrap().push((
++        user.id,
++        company_id,
++        CompanyMembership::Member,
++    ));
+ 
+     // Verify member (non-owner) can also list company team members
+     let member_list = use_cases
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/application/use_cases/company_test_support.rs:301:
+         *self.model_connections.lock().unwrap() = Some(
+             connections
+                 .into_iter()
+-            .map(|connection| CompanyModelConnection {
+-                has_api_key: connection.api_key.is_some(),
+-                provider: connection.provider,
+-                models: connection.models,
+-                is_default: connection.is_default,
+-            })
+-            .collect(),
++                .map(|connection| CompanyModelConnection {
++                    has_api_key: connection.api_key.is_some(),
++                    provider: connection.provider,
++                    models: connection.models,
++                    is_default: connection.is_default,
++                })
++                .collect(),
+         );
+         Ok(())
+     }
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/application/use_cases/mod.rs:3:
+ pub mod caller;
+ pub mod channel;
+ pub mod company;
+-#[cfg(test)]
+-pub(crate) mod company_test_support;
+ pub mod company_invite;
+ pub mod company_resend_api;
++#[cfg(test)]
++pub(crate) mod company_test_support;
+ pub mod delivery;
+ pub mod integration;
+ pub mod participant;
+Diff in /Users/mac03/dev/openbot/.worktrees/fix-app-p04/src/application/use_cases/thread/mod.rs:45:
+     use_cases::{
+         channel::{ChannelPersistence, ChannelReaders, readable_channel},
+         company::CompanyPersistence,
+-        integration::ChannelBindingPersistence, participant::ParticipantPersistence,
++        integration::ChannelBindingPersistence,
++        participant::ParticipantPersistence,
+     },
+ };
+ 

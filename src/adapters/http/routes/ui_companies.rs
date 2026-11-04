@@ -169,9 +169,8 @@ impl Workspace {
     /// One company the caller may read, together with whether they own it.
     async fn scoped_company(&self, company_id: Uuid) -> AppResult<CompanyAccess> {
         self.company_use_cases
-            .company_access(self.user_id, company_id)
-            .await?
-            .ok_or_else(|| AppError::NotFound("Company not found".into()))
+            .readable_company(self.user_id, company_id)
+            .await
     }
 
     /// What the company holds, for the summary above its form.
@@ -268,10 +267,11 @@ impl Workspace {
     }
 
     /// The Team tab: the same pane, with the company's people in it instead of its settings.
-    async fn team_pane(&self, company: &Company, request: TeamRequest) -> AppResult<String> {
-        let editable = company.user_id == self.user_id;
+    async fn team_pane(&self, access: &CompanyAccess, request: TeamRequest) -> AppResult<String> {
+        let company = &access.company;
+        let editable = access.membership.is_owner();
         let counts = self.counts(company.id, editable).await?;
-        let team = team_tab_body(&self.invite_use_cases, self.user_id, company, request).await?;
+        let team = team_tab_body(&self.invite_use_cases, self.user_id, access, request).await?;
 
         Ok(pages::company_edit_pane(&pages::CompanyEditPane {
             company,
@@ -420,14 +420,14 @@ async fn companies_page(
     let selected = if creating_company {
         None
     } else {
-        access.as_ref().map(|access| &access.company)
+        access.as_ref()
     };
 
     let pane_html = match selected {
-        Some(company) if tab == CompanyTab::Team => {
+        Some(selected) if tab == CompanyTab::Team => {
             workspace
                 .team_pane(
-                    company,
+                    selected,
                     TeamRequest {
                         member_id: query.member_id,
                         invite_id: query.invite_id,
@@ -436,19 +436,15 @@ async fn companies_page(
                 )
                 .await?
         }
-        Some(company) if tab == CompanyTab::Skills => {
-            let editable = access
-                .as_ref()
-                .is_some_and(|access| access.membership.is_owner());
-            workspace.skills_pane(company, editable).await?
+        Some(selected) if tab == CompanyTab::Skills => {
+            let editable = selected.membership.is_owner();
+            workspace.skills_pane(&selected.company, editable).await?
         }
-        Some(company) => {
-            let editable = access
-                .as_ref()
-                .is_some_and(|access| access.membership.is_owner());
-            let counts = workspace.counts(company.id, editable).await?;
+        Some(selected) => {
+            let editable = selected.membership.is_owner();
+            let counts = workspace.counts(selected.company.id, editable).await?;
             workspace
-                .settings_pane(company, counts, None, None, editable)
+                .settings_pane(&selected.company, counts, None, None, editable)
                 .await?
         }
         None if creating_company => pages::company_create_pane(&pages::CompanyCreatePane {
@@ -463,7 +459,7 @@ async fn companies_page(
             user: &workspace_user,
             list: &pages::CompanySettingsList {
                 companies: &companies,
-                selected_company_id: selected.map(|company| company.id),
+                selected_company_id: selected.map(|selected| selected.company.id),
             },
             // The create form deselects the list, but the rail keeps pointing at the company the
             // request was scoped to, so the other workspaces stay one click away.

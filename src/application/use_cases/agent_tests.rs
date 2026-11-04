@@ -1,118 +1,30 @@
 use super::*;
 use crate::entities::{
-    company::{Company, CompanyAccess},
-    company_member::CompanyMembership,
-    value_objects::EmailAddress,
+    company::Company, company_member::CompanyMembership, value_objects::EmailAddress,
 };
-use crate::use_cases::company::CompanyWrite;
+use crate::use_cases::company_test_support::MockCompanyPersistence;
 use chrono::Utc;
 
 use std::sync::Mutex;
 
-struct MockCompanyPersistence {
-    companies: Mutex<Vec<Company>>,
-    /// Accepted memberships, as `(user_id, company_id, access)`.
-    members: Mutex<Vec<(Uuid, Uuid, CompanyMembership)>>,
-}
-
-#[async_trait]
-impl CompanyPersistence for MockCompanyPersistence {
-    async fn create(&self, _user_id: Uuid, _write: CompanyWrite) -> AppResult<Company> {
-        unimplemented!()
-    }
-
-    async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Company>> {
-        Ok(self
-            .companies
-            .lock()
-            .unwrap()
-            .iter()
-            .find(|c| c.id == id)
-            .cloned())
-    }
-
-    async fn get_by_slug(&self, slug: &str) -> AppResult<Option<Company>> {
-        Ok(self
-            .companies
-            .lock()
-            .unwrap()
-            .iter()
-            .find(|c| c.slug.eq_ignore_ascii_case(slug))
-            .cloned())
-    }
-
-    async fn list_by_user_id(&self, user_id: Uuid) -> AppResult<Vec<Company>> {
-        Ok(self
-            .companies
-            .lock()
-            .unwrap()
-            .iter()
-            .filter(|c| c.user_id == user_id)
-            .cloned()
-            .collect())
-    }
-
-    async fn list_accessible_by_user_id(&self, user_id: Uuid) -> AppResult<Vec<CompanyAccess>> {
-        let companies = self.companies.lock().unwrap();
-        let members = self.members.lock().unwrap();
-        Ok(companies
-            .iter()
-            .filter_map(|company| {
-                let membership = if company.user_id == user_id {
-                    CompanyMembership::Owner
-                } else if let Some((_, _, membership)) =
-                    members.iter().find(|(member_id, company_id, _)| {
-                        *member_id == user_id && *company_id == company.id
-                    })
-                {
-                    *membership
-                } else {
-                    return None;
-                };
-                Some(CompanyAccess {
-                    company: company.clone(),
-                    membership,
-                })
-            })
-            .collect())
-    }
-
-    async fn update(&self, _id: Uuid, _write: CompanyWrite) -> AppResult<Company> {
-        unimplemented!()
-    }
-
-    async fn delete(&self, _id: Uuid) -> AppResult<()> {
-        unimplemented!()
-    }
-
-    async fn list_model_connections(
-        &self,
-        _company_id: Uuid,
-    ) -> AppResult<Vec<crate::entities::company::CompanyModelConnection>> {
-        Ok(vec![crate::entities::company::CompanyModelConnection {
-            provider: "openai".into(),
-            models: vec!["gpt-4o".into()],
-            is_default: true,
-            has_api_key: true,
-        }])
-    }
-
-    async fn model_api_key(
-        &self,
-        _company_id: Uuid,
-        _provider: &crate::entities::value_objects::ModelProvider,
-    ) -> AppResult<Option<String>> {
-        Ok(Some("test-key".into()))
-    }
-
-    async fn replace_model_connections_for_user(
-        &self,
-        _user_id: Uuid,
-        _company_id: Uuid,
-        _connections: Vec<crate::use_cases::company::CompanyModelConnectionWrite>,
-    ) -> AppResult<()> {
-        unimplemented!("agent use cases read connections, they do not write them")
-    }
+/// The company double every agent test uses: the given companies (each with its owner's row),
+/// these memberships, and one OpenAI connection with a key -- agent creation validates models
+/// against it.
+fn company_double(
+    companies: Vec<Company>,
+    members: Vec<(Uuid, Uuid, CompanyMembership)>,
+) -> MockCompanyPersistence {
+    MockCompanyPersistence::new(companies)
+        .with_memberships(members)
+        .with_model_connections(
+            vec![crate::entities::company::CompanyModelConnection {
+                provider: "openai".into(),
+                models: vec!["gpt-4o".into()],
+                is_default: true,
+                has_api_key: true,
+            }],
+            Some("test-key"),
+        )
 }
 
 struct MockAgentPersistence {
@@ -231,9 +143,8 @@ struct Fixture {
 fn fixture() -> Fixture {
     let owner_id = Uuid::new_v4();
     let company_id = Uuid::new_v4();
-    let company_persistence = Arc::new(MockCompanyPersistence {
-        members: Mutex::new(Vec::new()),
-        companies: Mutex::new(vec![Company {
+    let company_persistence = Arc::new(company_double(
+        vec![Company {
             channel_defaults: Default::default(),
             id: company_id,
             user_id: owner_id,
@@ -241,8 +152,9 @@ fn fixture() -> Fixture {
             slug: "acme".into(),
             avatar_url: None,
             created_at: Utc::now(),
-        }]),
-    });
+        }],
+        Vec::new(),
+    ));
     let agent_persistence = Arc::new(MockAgentPersistence {
         agents: Mutex::new(Vec::new()),
     });
@@ -326,9 +238,8 @@ async fn company_owner_agent_crud_flow_works() {
     let owner_id = Uuid::new_v4();
     let company_id = Uuid::new_v4();
 
-    let company_persistence = Arc::new(MockCompanyPersistence {
-        members: Mutex::new(Vec::new()),
-        companies: Mutex::new(vec![Company {
+    let company_persistence = Arc::new(company_double(
+        vec![Company {
             channel_defaults: Default::default(),
             id: company_id,
             user_id: owner_id,
@@ -336,8 +247,9 @@ async fn company_owner_agent_crud_flow_works() {
             slug: "acme".into(),
             avatar_url: None,
             created_at: Utc::now(),
-        }]),
-    });
+        }],
+        Vec::new(),
+    ));
 
     let agent_persistence = Arc::new(MockAgentPersistence {
         agents: Mutex::new(Vec::new()),
@@ -507,16 +419,16 @@ async fn members_read_agents_and_admins_manage_them() {
         created_at: Utc::now(),
     };
 
-    let company_persistence = Arc::new(MockCompanyPersistence {
-        companies: Mutex::new(vec![
+    let company_persistence = Arc::new(company_double(
+        vec![
             company(company_id, owner_id, "acme"),
             company(other_company_id, Uuid::new_v4(), "other"),
-        ]),
-        members: Mutex::new(vec![
+        ],
+        vec![
             (admin_id, company_id, CompanyMembership::Admin),
             (member_id, company_id, CompanyMembership::Member),
-        ]),
-    });
+        ],
+    ));
     let agent_persistence = Arc::new(MockAgentPersistence {
         agents: Mutex::new(Vec::new()),
     });
@@ -646,9 +558,8 @@ async fn members_read_agents_and_admins_manage_them() {
 async fn a_library_pick_is_copied_into_the_company_with_a_model_it_can_run() {
     let owner_id = Uuid::new_v4();
     let company_id = Uuid::new_v4();
-    let company_persistence = Arc::new(MockCompanyPersistence {
-        members: Mutex::new(Vec::new()),
-        companies: Mutex::new(vec![Company {
+    let company_persistence = Arc::new(company_double(
+        vec![Company {
             channel_defaults: Default::default(),
             id: company_id,
             user_id: owner_id,
@@ -656,8 +567,9 @@ async fn a_library_pick_is_copied_into_the_company_with_a_model_it_can_run() {
             slug: "acme".into(),
             avatar_url: None,
             created_at: Utc::now(),
-        }]),
-    });
+        }],
+        Vec::new(),
+    ));
 
     // A library definition is one with no company of its own.
     let definition = |name: &str, slug: &str, provider: &str, model: &str| Agent {
@@ -777,5 +689,53 @@ async fn a_library_pick_is_copied_into_the_company_with_a_model_it_can_run() {
             )
             .await
             .is_err()
+    );
+}
+
+#[tokio::test]
+async fn nonoperators_cannot_manage_library_agents_or_spend_prompt_credentials() {
+    let f = fixture();
+    let caller = Caller::user(f.owner_id);
+    assert!(matches!(
+        f.use_cases
+            .create_library_agent(&caller, support_agent())
+            .await,
+        Err(AppError::NotFound(_))
+    ));
+    assert!(f.use_cases.list_library_agents().await.unwrap().is_empty());
+    let definition = f
+        .use_cases
+        .create_library_agent(&Caller::operator(f.owner_id), support_agent())
+        .await
+        .unwrap();
+    assert!(matches!(
+        f.use_cases.library_agents_for(&caller).await,
+        Err(AppError::NotFound(_))
+    ));
+    assert!(matches!(
+        f.use_cases.library_agent_for(&caller, definition.id).await,
+        Err(AppError::NotFound(_))
+    ));
+    assert!(matches!(
+        f.use_cases
+            .update_library_agent(&caller, definition.id, support_agent())
+            .await,
+        Err(AppError::NotFound(_))
+    ));
+    assert!(matches!(
+        f.use_cases
+            .delete_library_agent(&caller, definition.id)
+            .await,
+        Err(AppError::NotFound(_))
+    ));
+    assert!(matches!(
+        f.use_cases
+            .generate_library_system_prompt(&caller, "do work", None, None, None)
+            .await,
+        Err(AppError::NotFound(_))
+    ));
+    assert_eq!(
+        f.use_cases.get_library_agent(definition.id).await.unwrap(),
+        Some(definition)
     );
 }

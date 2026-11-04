@@ -1,0 +1,33 @@
+    Checking mail_agents v0.1.0 (/Users/mac03/dev/openbot/.worktrees/fix-app-p04)
+error[E0061]: this function takes 6 arguments but 5 arguments were supplied
+   --> src/adapters/http/routes/channel_authorization_tests.rs:34:13
+    |
+ 34 |               list_channels_page(
+    |  _____________^^^^^^^^^^^^^^^^^^-
+ 35 | |                 State(companies.clone()),
+ 36 | |                 State(f.channels.clone()),
+ 37 | |                 State(f.config.clone()),
+ 38 | |                 Fixture::auth(user),
+ 39 | |                 Path(company),
+ 40 | |             )
+    | |_____________- argument #6 of type `axum::extract::Query<ChannelsPageQuery>` is missing
+    |
+note: function defined here
+   --> src/adapters/http/routes/channel.rs:283:10
+    |
+283 | async fn list_channels_page(
+    |          ^^^^^^^^^^^^^^^^^^
+...
+289 |     Query(query): Query<ChannelsPageQuery>,
+    |     --------------------------------------
+help: provide the argument
+    |
+ 34 |             list_channels_page(
+...
+ 39 |                 Path(company),
+ 40 ~                 /* axum::extract::Query<ChannelsPageQuery> */,
+ 41 ~             )
+    |
+
+For more information about this error, try `rustc --explain E0061`.
+error: could not compile `mail_agents` (lib test) due to 1 previous error

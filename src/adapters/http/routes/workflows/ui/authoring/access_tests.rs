@@ -316,3 +316,44 @@ async fn every_workspace_write_refuses_a_cross_origin_cookie_post() {
         assert_eq!(same.status(), StatusCode::NO_CONTENT, "{path}");
     }
 }
+
+#[tokio::test]
+async fn workflow_company_lookup_failures_remain_server_errors_on_pages_and_panes() {
+    use crate::use_cases::{
+        company::CompanyUseCases, company_test_support::MockCompanyPersistence,
+    };
+    use axum::response::IntoResponse;
+    let Some(f) = Fixture::new().await else {
+        return;
+    };
+    let companies = Arc::new(CompanyUseCases::new(Arc::new(
+        MockCompanyPersistence::failing(),
+    )));
+    let mut ui = f.ui(f.member);
+    ui.companies = companies.clone();
+    let error = new_pane(ui, f.query()).await.unwrap_err();
+    assert!(matches!(error, AppError::Database(_)));
+    assert_eq!(
+        error.into_response().status(),
+        StatusCode::INTERNAL_SERVER_ERROR
+    );
+    let mut ui = f.ui(f.member);
+    ui.companies = companies;
+    let error = workspace(
+        ui,
+        Query(WorkspaceQuery {
+            company_id: Some(f.company),
+            workflow_id: None,
+            tab: None,
+            new: None,
+            tools: None,
+        }),
+    )
+    .await
+    .unwrap_err();
+    assert!(matches!(error, AppError::Database(_)));
+    assert_eq!(
+        error.into_response().status(),
+        StatusCode::INTERNAL_SERVER_ERROR
+    );
+}

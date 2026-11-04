@@ -22,6 +22,7 @@ pub mod inbound_event;
 pub mod integration;
 pub(crate) mod model_usage;
 pub mod notification;
+pub mod onboarding;
 pub mod participant;
 pub mod run_counts;
 pub mod runtime_metrics;

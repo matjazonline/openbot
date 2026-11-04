@@ -1,0 +1,2 @@
+# Preserve immutable decisions, captured patches and console output byte-for-byte.
+logs/** -whitespace

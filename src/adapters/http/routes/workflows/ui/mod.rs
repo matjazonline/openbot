@@ -3,10 +3,8 @@
 //! caller owns or administers (`load_managed_company`), and every command authorizes again.
 use super::*;
 use crate::adapters::http::pages;
-use crate::adapters::http::routes::ui::{
-    load_account, load_managed_company, managed_company_membership, workspace_user,
-};
-use crate::entities::company::Company;
+use crate::adapters::http::routes::ui::{load_account, load_managed_company, workspace_user};
+use crate::entities::company::{Company, CompanyAccess};
 use crate::entities::value_objects::EmailAddress;
 use crate::infra::config::AppConfig;
 use crate::use_cases::{agent::AgentUseCases, company::CompanyUseCases, user::UserUseCases};
@@ -63,23 +61,31 @@ impl Ui {
 
     /// A company the caller owns or administers; any other id is not found.
     async fn company(&self, company_id: Uuid) -> AppResult<Company> {
-        let (_, company) =
-            load_managed_company(&self.companies, self.user, Some(company_id)).await?;
-        company.ok_or_else(|| AppError::NotFound("Company not found".into()))
+        match self.companies.managed_company(self.user, company_id).await {
+            Ok(access) => Ok(access.company),
+            Err(AppError::Forbidden(_)) => Err(AppError::NotFound("Company not found".into())),
+            Err(error) => Err(error),
+        }
     }
 
     /// The whole-page frame: the caller as the shell shows them, and the company picked from
     /// those they manage (`None` when they manage none).
     async fn frame(&self, requested: Option<Uuid>) -> AppResult<Frame> {
         let account = load_account(&self.users, self.user).await?;
-        let (_, company) = load_managed_company(&self.companies, self.user, requested).await?;
+        // Workflow listing pages keep their empty-workspace response for an unavailable
+        // scope; detail/command routes use company()'s concealed 404. Outages still propagate.
+        let company = match load_managed_company(&self.companies, self.user, requested).await {
+            Ok((_, company)) => company,
+            Err(AppError::Forbidden(_) | AppError::NotFound(_)) => None,
+            Err(error) => return Err(error),
+        };
         Ok(Frame { account, company })
     }
 }
 
 pub(super) struct Frame {
     account: crate::entities::user::User,
-    company: Option<Company>,
+    company: Option<CompanyAccess>,
 }
 
 impl Frame {
@@ -93,10 +99,9 @@ impl Frame {
         let user = workspace_user(&self.account, &email, config);
         match &self.company {
             None => pages::mailbox_no_company_page(&user),
-            Some(company) => {
-                let user = user
-                    .with_company_membership(managed_company_membership(company, self.account.id));
-                page(&user, company)
+            Some(access) => {
+                let user = user.with_company_membership(access.membership);
+                page(&user, &access.company)
             }
         }
     }

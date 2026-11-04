@@ -6,78 +6,10 @@
 
 use super::*;
 use crate::entities::company::Company;
-use crate::use_cases::company::CompanyWrite;
+use crate::entities::company_member::CompanyMembership;
+use crate::use_cases::company_test_support::MockCompanyPersistence;
 use chrono::Utc;
 use std::sync::Mutex;
-
-struct MockCompanyPersistence {
-    companies: Mutex<Vec<Company>>,
-}
-
-#[async_trait]
-impl CompanyPersistence for MockCompanyPersistence {
-    async fn create(&self, _user_id: Uuid, _write: CompanyWrite) -> AppResult<Company> {
-        unimplemented!()
-    }
-
-    async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Company>> {
-        Ok(self
-            .companies
-            .lock()
-            .unwrap()
-            .iter()
-            .find(|c| c.id == id)
-            .cloned())
-    }
-
-    async fn get_by_slug(&self, slug: &str) -> AppResult<Option<Company>> {
-        Ok(self
-            .companies
-            .lock()
-            .unwrap()
-            .iter()
-            .find(|c| c.slug.eq_ignore_ascii_case(slug))
-            .cloned())
-    }
-
-    async fn list_by_user_id(&self, _user_id: Uuid) -> AppResult<Vec<Company>> {
-        unimplemented!()
-    }
-
-    async fn update(&self, _id: Uuid, _write: CompanyWrite) -> AppResult<Company> {
-        unimplemented!()
-    }
-
-    async fn delete(&self, _id: Uuid) -> AppResult<()> {
-        unimplemented!()
-    }
-
-    /// Model connections are not part of what these tests drive; a call here is a wiring mistake
-    /// rather than a state worth simulating.
-    async fn list_model_connections(
-        &self,
-        _company_id: Uuid,
-    ) -> AppResult<Vec<crate::entities::company::CompanyModelConnection>> {
-        unimplemented!("this double is not exercised on the model-connection path")
-    }
-
-    async fn model_api_key(
-        &self,
-        _company_id: Uuid,
-        _provider: &crate::entities::value_objects::ModelProvider,
-    ) -> AppResult<Option<String>> {
-        unimplemented!("this double is not exercised on the model-connection path")
-    }
-
-    async fn replace_model_connections_for_user(
-        &self,
-        _user_id: Uuid,
-        _company_id: Uuid,
-        _connections: Vec<crate::use_cases::company::CompanyModelConnectionWrite>,
-    ) -> AppResult<()> {
-        unimplemented!("this double is not exercised on the model-connection path")
-    }
-}
 
 struct MockCompanyInvitePersistence {
     invites: Mutex<Vec<CompanyInvite>>,
@@ -284,17 +216,15 @@ impl CompanyInvitePersistence for MockCompanyInvitePersistence {
 }
 
 fn acme(owner_id: Uuid, company_id: Uuid) -> Arc<MockCompanyPersistence> {
-    Arc::new(MockCompanyPersistence {
-        companies: Mutex::new(vec![Company {
-            channel_defaults: Default::default(),
-            id: company_id,
-            user_id: owner_id,
-            name: "Acme Corp".to_string(),
-            slug: "acme".into(),
-            avatar_url: None,
-            created_at: Utc::now(),
-        }]),
-    })
+    Arc::new(MockCompanyPersistence::new(vec![Company {
+        channel_defaults: Default::default(),
+        id: company_id,
+        user_id: owner_id,
+        name: "Acme Corp".to_string(),
+        slug: "acme".into(),
+        avatar_url: None,
+        created_at: Utc::now(),
+    }]))
 }
 
 fn member_row(company_id: Uuid, user_id: Uuid) -> CompanyMember {
@@ -338,11 +268,12 @@ async fn the_owner_removes_a_member() {
 async fn members_may_list_the_team_and_everyone_else_is_told_nothing() {
     let owner_id = Uuid::new_v4();
     let member_id = Uuid::new_v4();
+    let admin_id = Uuid::new_v4();
     let stranger_id = Uuid::new_v4();
     let company_id = Uuid::new_v4();
 
-    let company_persistence = Arc::new(MockCompanyPersistence {
-        companies: Mutex::new(vec![Company {
+    let company_persistence = Arc::new(
+        MockCompanyPersistence::new(vec![Company {
             channel_defaults: Default::default(),
             id: company_id,
             user_id: owner_id,
@@ -350,8 +281,12 @@ async fn members_may_list_the_team_and_everyone_else_is_told_nothing() {
             slug: "acme".into(),
             avatar_url: None,
             created_at: Utc::now(),
-        }]),
-    });
+        }])
+        .with_memberships(vec![
+            (member_id, company_id, CompanyMembership::Member),
+            (admin_id, company_id, CompanyMembership::Admin),
+        ]),
+    );
     let invite_persistence = Arc::new(MockCompanyInvitePersistence::with_members(vec![
         member_row(company_id, member_id),
     ]));
@@ -374,6 +309,16 @@ async fn members_may_list_the_team_and_everyone_else_is_told_nothing() {
             .len(),
         1,
         "a member is not the owner but may still read the team"
+    );
+
+    assert_eq!(
+        use_cases
+            .list_company_team_members(admin_id, company_id)
+            .await
+            .unwrap()
+            .len(),
+        1,
+        "an admin may read the team too"
     );
 
     let stranger_err = use_cases
@@ -401,21 +346,19 @@ async fn company_invites_crud_and_accept_flow() {
     let owner_id = Uuid::new_v4();
     let company_id = Uuid::new_v4();
 
-    let company_persistence = Arc::new(MockCompanyPersistence {
-        companies: Mutex::new(vec![Company {
-            channel_defaults: Default::default(),
-            id: company_id,
-            user_id: owner_id,
-            name: "Acme Corp".to_string(),
-            slug: "acme".into(),
-            avatar_url: None,
-            created_at: Utc::now(),
-        }]),
-    });
+    let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
+        channel_defaults: Default::default(),
+        id: company_id,
+        user_id: owner_id,
+        name: "Acme Corp".to_string(),
+        slug: "acme".into(),
+        avatar_url: None,
+        created_at: Utc::now(),
+    }]));
 
     let invite_persistence = Arc::new(MockCompanyInvitePersistence::with_members(Vec::new()));
 
-    let use_cases = CompanyInviteUseCases::new(company_persistence, invite_persistence);
+    let use_cases = CompanyInviteUseCases::new(company_persistence.clone(), invite_persistence);
 
     // Owner creates invite
     let invite = use_cases
@@ -535,6 +478,14 @@ async fn company_invites_crud_and_accept_flow() {
         .await
         .unwrap();
     assert_eq!(changed_member.role, CompanyAccessRole::Member);
+
+    // The two doubles stand for one `company_members` table: acceptance wrote the row the
+    // company double answers `company_access` from.
+    company_persistence.memberships.lock().unwrap().push((
+        user.id,
+        company_id,
+        CompanyMembership::Member,
+    ));
 
     // Verify member (non-owner) can also list company team members
     let member_list = use_cases

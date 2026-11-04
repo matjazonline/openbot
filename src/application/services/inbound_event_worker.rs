@@ -660,6 +660,7 @@ fn classify_commit_error(error: &AppError) -> (InboundEventErrorClass, bool) {
         AppError::Execution(_)
         | AppError::BadRequest(_)
         | AppError::NotFound(_)
+        | AppError::Forbidden(_)
         | AppError::Conflict(_) => (InboundEventErrorClass::Routing, true),
         AppError::Timeout(_) => (InboundEventErrorClass::Deadline, false),
         // Decoding again routes it again, against the settings that replaced the old ones.

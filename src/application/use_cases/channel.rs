@@ -158,6 +158,68 @@ pub trait ChannelPersistence: Send + Sync {
     async fn delete(&self, id: Uuid) -> AppResult<()>;
 }
 
+/// The ports the channel read rule needs, borrowed from whichever use case asks.
+#[derive(Clone, Copy)]
+pub(crate) struct ChannelReaders<'a> {
+    pub(crate) companies: &'a dyn CompanyPersistence,
+    pub(crate) channels: &'a dyn ChannelPersistence,
+    pub(crate) participants: &'a dyn ParticipantPersistence,
+}
+
+/// What the viewer is to a company as a principal, or `None` if they are nothing to it.
+async fn viewer_access(
+    readers: &ChannelReaders<'_>,
+    viewer: &Viewer,
+    company_id: Uuid,
+) -> AppResult<Option<PrincipalAccessContext>> {
+    if readers
+        .companies
+        .company_access(viewer.user_id, company_id)
+        .await?
+        .is_none()
+    {
+        return Ok(None);
+    }
+    readers
+        .participants
+        .access_context_for_user(company_id, viewer.user_id)
+        .await
+}
+
+/// The one rule for "may this viewer read this channel": a member of its company whom
+/// [`Channel::viewer_access`] lets in. `None` for an unknown channel, another company's channel and
+/// a channel the viewer may not read alike; a lookup failure is an error, never a `None`.
+pub(crate) async fn readable_channel(
+    readers: &ChannelReaders<'_>,
+    viewer: &Viewer,
+    company_id: Uuid,
+    channel_id: Uuid,
+) -> AppResult<Option<Channel>> {
+    let Some(access) = viewer_access(readers, viewer, company_id).await? else {
+        return Ok(None);
+    };
+    let channel = readers.channels.get_by_id(channel_id).await?;
+    Ok(channel.filter(|channel| channel.company_id == company_id && channel.viewer_access(access)))
+}
+
+/// Every channel of the company this viewer may read, by the same rule as [`readable_channel`].
+pub(crate) async fn readable_channels(
+    readers: &ChannelReaders<'_>,
+    viewer: &Viewer,
+    company_id: Uuid,
+) -> AppResult<Vec<Channel>> {
+    let Some(access) = viewer_access(readers, viewer, company_id).await? else {
+        return Ok(Vec::new());
+    };
+    Ok(readers
+        .channels
+        .list_by_company_id(company_id)
+        .await?
+        .into_iter()
+        .filter(|channel| channel.viewer_access(access))
+        .collect())
+}
+
 #[derive(Clone)]
 pub struct ChannelUseCases {
     company_persistence: Arc<dyn CompanyPersistence>,
@@ -256,17 +318,7 @@ impl ChannelUseCases {
         viewer: &Viewer,
         company_id: Uuid,
     ) -> AppResult<Vec<Channel>> {
-        let Some(access) = self.viewer_access(viewer, company_id).await? else {
-            return Ok(Vec::new());
-        };
-
-        Ok(self
-            .channel_persistence
-            .list_by_company_id(company_id)
-            .await?
-            .into_iter()
-            .filter(|channel| channel.viewer_access(access))
-            .collect())
+        readable_channels(&self.readers(), viewer, company_id).await
     }
 
     /// One channel, if this viewer may read it.
@@ -280,33 +332,15 @@ impl ChannelUseCases {
         company_id: Uuid,
         channel_id: Uuid,
     ) -> AppResult<Option<Channel>> {
-        let Some(access) = self.viewer_access(viewer, company_id).await? else {
-            return Ok(None);
-        };
-
-        let channel = self.channel_persistence.get_by_id(channel_id).await?;
-
-        Ok(channel
-            .filter(|channel| channel.company_id == company_id && channel.viewer_access(access)))
+        readable_channel(&self.readers(), viewer, company_id, channel_id).await
     }
 
-    /// What the viewer is to a company, or `None` if they are nothing to it.
-    async fn viewer_access(
-        &self,
-        viewer: &Viewer,
-        company_id: Uuid,
-    ) -> AppResult<Option<PrincipalAccessContext>> {
-        if self
-            .company_persistence
-            .company_access(viewer.user_id, company_id)
-            .await?
-            .is_none()
-        {
-            return Ok(None);
+    fn readers(&self) -> ChannelReaders<'_> {
+        ChannelReaders {
+            companies: self.company_persistence.as_ref(),
+            channels: self.channel_persistence.as_ref(),
+            participants: self.participant_persistence.as_ref(),
         }
-        self.participant_persistence
-            .access_context_for_user(company_id, viewer.user_id)
-            .await
     }
 
     #[instrument(skip_all)]
@@ -538,13 +572,13 @@ mod tests {
 
     use crate::adapters::protocols::email::EmailChannelSelectorParser;
     use crate::entities::channel::ChannelAccessMode;
-    use crate::entities::company::{Company, CompanyAccess};
+    use crate::entities::company::Company;
     use crate::entities::company_member::CompanyMembership;
     use crate::entities::transport::ChannelSelector;
     use crate::entities::value_objects::EmailAddress;
-    use crate::use_cases::company::CompanyWrite;
+    use crate::use_cases::company_test_support::{MockCompanyPersistence, TeamByAddress};
     use crate::use_cases::participant::test_support::{
-        InMemoryParticipantDirectory, TeamFixture, email_allowlist_policy,
+        InMemoryParticipantDirectory, email_allowlist_policy,
     };
     use chrono::Utc;
     use std::sync::Mutex;
@@ -571,122 +605,6 @@ mod tests {
     fn parse_recipient_address(value: &str, domain: &str) -> Option<(CompanySlug, ChannelSlug)> {
         parse_recipient_address_pipeline(value, domain)
             .and_then(|(company, channels, _)| channels.into_iter().next().map(|c| (company, c)))
-    }
-
-    struct MockCompanyPersistence {
-        companies: Mutex<Vec<Company>>,
-        memberships: Mutex<Vec<(Uuid, Uuid, CompanyMembership)>>,
-    }
-
-    /// The signed-in half is what these tests drive, so `company_access` carries the memberships
-    /// this double was built with and the by-address half is never reached.
-    #[async_trait]
-    impl TeamFixture for MockCompanyPersistence {
-        async fn membership_for_email(
-            &self,
-            _company_id: Uuid,
-            _email: &str,
-        ) -> AppResult<CompanyMembership> {
-            Ok(CompanyMembership::Member)
-        }
-
-        async fn company_access(
-            &self,
-            user_id: Uuid,
-            company_id: Uuid,
-        ) -> AppResult<Option<CompanyAccess>> {
-            CompanyPersistence::company_access(self, user_id, company_id).await
-        }
-    }
-
-    #[async_trait]
-    impl CompanyPersistence for MockCompanyPersistence {
-        async fn create(&self, _user_id: Uuid, _write: CompanyWrite) -> AppResult<Company> {
-            unimplemented!()
-        }
-
-        async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Company>> {
-            Ok(self
-                .companies
-                .lock()
-                .unwrap()
-                .iter()
-                .find(|c| c.id == id)
-                .cloned())
-        }
-
-        async fn get_by_slug(&self, slug: &str) -> AppResult<Option<Company>> {
-            Ok(self
-                .companies
-                .lock()
-                .unwrap()
-                .iter()
-                .find(|c| c.slug.eq_ignore_ascii_case(slug))
-                .cloned())
-        }
-
-        async fn list_by_user_id(&self, _user_id: Uuid) -> AppResult<Vec<Company>> {
-            unimplemented!()
-        }
-
-        async fn list_accessible_by_user_id(&self, user_id: Uuid) -> AppResult<Vec<CompanyAccess>> {
-            let companies = self.companies.lock().unwrap();
-            let memberships = self.memberships.lock().unwrap();
-            Ok(companies
-                .iter()
-                .filter_map(|company| {
-                    let membership = if company.user_id == user_id {
-                        CompanyMembership::Owner
-                    } else if let Some((_, _, membership)) =
-                        memberships.iter().find(|(member_id, company_id, _)| {
-                            *member_id == user_id && *company_id == company.id
-                        })
-                    {
-                        *membership
-                    } else {
-                        return None;
-                    };
-                    Some(CompanyAccess {
-                        company: company.clone(),
-                        membership,
-                    })
-                })
-                .collect())
-        }
-
-        async fn update(&self, _id: Uuid, _write: CompanyWrite) -> AppResult<Company> {
-            unimplemented!()
-        }
-
-        async fn delete(&self, _id: Uuid) -> AppResult<()> {
-            unimplemented!()
-        }
-
-        /// Model connections are not part of what these tests drive; a call here is a wiring mistake
-        /// rather than a state worth simulating.
-        async fn list_model_connections(
-            &self,
-            _company_id: Uuid,
-        ) -> AppResult<Vec<crate::entities::company::CompanyModelConnection>> {
-            unimplemented!("this double is not exercised on the model-connection path")
-        }
-
-        async fn model_api_key(
-            &self,
-            _company_id: Uuid,
-            _provider: &crate::entities::value_objects::ModelProvider,
-        ) -> AppResult<Option<String>> {
-            unimplemented!("this double is not exercised on the model-connection path")
-        }
-
-        async fn replace_model_connections_for_user(
-            &self,
-            _user_id: Uuid,
-            _company_id: Uuid,
-            _connections: Vec<crate::use_cases::company::CompanyModelConnectionWrite>,
-        ) -> AppResult<()> {
-            unimplemented!("this double is not exercised on the model-connection path")
-        }
     }
 
     struct MockChannelPersistence {
@@ -818,8 +736,8 @@ mod tests {
         let member_id = Uuid::new_v4();
         let company_id = Uuid::new_v4();
         let channel_id = Uuid::new_v4();
-        let company_persistence = Arc::new(MockCompanyPersistence {
-            companies: Mutex::new(vec![Company {
+        let company_persistence = Arc::new(
+            MockCompanyPersistence::new(vec![Company {
                 id: company_id,
                 user_id: owner_id,
                 name: "Acme".into(),
@@ -827,9 +745,10 @@ mod tests {
                 avatar_url: None,
                 created_at: Utc::now(),
                 channel_defaults: Default::default(),
-            }]),
-            memberships: Mutex::new(vec![(member_id, company_id, CompanyMembership::Member)]),
-        });
+            }])
+            .with_memberships(vec![(member_id, company_id, CompanyMembership::Member)])
+            .with_team(TeamByAddress::EveryoneIsMember),
+        );
         let channel = channel_from_write(
             channel_id,
             company_id,
@@ -894,10 +813,11 @@ mod tests {
             avatar_url: None,
             created_at: Utc::now(),
         };
-        let company_persistence = Arc::new(MockCompanyPersistence {
-            companies: Mutex::new(vec![company(company_id), company(other_company_id)]),
-            memberships: Mutex::new(Vec::new()),
-        });
+        let company_persistence = Arc::new(
+            MockCompanyPersistence::new(vec![company(company_id), company(other_company_id)])
+                .with_memberships(Vec::new())
+                .with_team(TeamByAddress::EveryoneIsMember),
+        );
         let channel_persistence = Arc::new(MockChannelPersistence {
             channels: Mutex::new(Vec::new()),
         });
@@ -989,8 +909,8 @@ mod tests {
         let admin_id = Uuid::new_v4();
         let member_id = Uuid::new_v4();
         let company_id = Uuid::new_v4();
-        let company_persistence = Arc::new(MockCompanyPersistence {
-            companies: Mutex::new(vec![Company {
+        let company_persistence = Arc::new(
+            MockCompanyPersistence::new(vec![Company {
                 channel_defaults: Default::default(),
                 id: company_id,
                 user_id: owner_id,
@@ -998,12 +918,13 @@ mod tests {
                 slug: "acme".into(),
                 avatar_url: None,
                 created_at: Utc::now(),
-            }]),
-            memberships: Mutex::new(vec![
+            }])
+            .with_memberships(vec![
                 (admin_id, company_id, CompanyMembership::Admin),
                 (member_id, company_id, CompanyMembership::Member),
-            ]),
-        });
+            ])
+            .with_team(TeamByAddress::EveryoneIsMember),
+        );
         let channel_persistence = Arc::new(MockChannelPersistence {
             channels: Mutex::new(Vec::new()),
         });
@@ -1085,8 +1006,8 @@ mod tests {
         let owner_id = Uuid::new_v4();
         let company_id = Uuid::new_v4();
 
-        let company_persistence = Arc::new(MockCompanyPersistence {
-            companies: Mutex::new(vec![Company {
+        let company_persistence = Arc::new(
+            MockCompanyPersistence::new(vec![Company {
                 channel_defaults: Default::default(),
                 id: company_id,
                 user_id: owner_id,
@@ -1094,9 +1015,10 @@ mod tests {
                 slug: "acme".into(),
                 avatar_url: None,
                 created_at: Utc::now(),
-            }]),
-            memberships: Mutex::new(Vec::new()),
-        });
+            }])
+            .with_memberships(Vec::new())
+            .with_team(TeamByAddress::EveryoneIsMember),
+        );
 
         let channel_persistence = Arc::new(MockChannelPersistence {
             channels: Mutex::new(Vec::new()),
@@ -1393,8 +1315,8 @@ mod tests {
         let owner_id = Uuid::new_v4();
         let company_id = Uuid::new_v4();
 
-        let company_persistence = Arc::new(MockCompanyPersistence {
-            companies: Mutex::new(vec![Company {
+        let company_persistence = Arc::new(
+            MockCompanyPersistence::new(vec![Company {
                 channel_defaults: Default::default(),
                 id: company_id,
                 user_id: owner_id,
@@ -1402,9 +1324,10 @@ mod tests {
                 slug: "acme".into(),
                 avatar_url: None,
                 created_at: Utc::now(),
-            }]),
-            memberships: Mutex::new(Vec::new()),
-        });
+            }])
+            .with_memberships(Vec::new())
+            .with_team(TeamByAddress::EveryoneIsMember),
+        );
 
         let channel_persistence = Arc::new(MockChannelPersistence {
             channels: Mutex::new(Vec::new()),
@@ -1498,8 +1421,8 @@ mod tests {
         let owner_id = Uuid::new_v4();
         let company_id = Uuid::new_v4();
 
-        let company_persistence = Arc::new(MockCompanyPersistence {
-            companies: Mutex::new(vec![Company {
+        let company_persistence = Arc::new(
+            MockCompanyPersistence::new(vec![Company {
                 channel_defaults: Default::default(),
                 id: company_id,
                 user_id: owner_id,
@@ -1507,9 +1430,10 @@ mod tests {
                 slug: "acme".into(),
                 avatar_url: None,
                 created_at: Utc::now(),
-            }]),
-            memberships: Mutex::new(Vec::new()),
-        });
+            }])
+            .with_memberships(Vec::new())
+            .with_team(TeamByAddress::EveryoneIsMember),
+        );
 
         let channel_persistence = Arc::new(MockChannelPersistence {
             channels: Mutex::new(Vec::new()),

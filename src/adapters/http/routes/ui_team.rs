@@ -29,9 +29,9 @@ use crate::{
     },
     app_error::{AppError, AppResult},
     entities::{
-        company::Company,
+        company::{Company, CompanyAccess},
         company_invite::CompanyInvite,
-        company_member::{CompanyAccessRole, CompanyMember},
+        company_member::{CompanyAccessRole, CompanyMember, CompanyMembership},
         value_objects::{AvatarUrl, EmailAddress},
     },
     infra::config::AppConfig,
@@ -40,7 +40,7 @@ use crate::{
     },
 };
 
-use super::ui::{load_scoped_company, workspace_user};
+use super::ui::workspace_user;
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -159,6 +159,15 @@ pub struct AvatarForm {
     pub avatar_url: String,
 }
 
+/// Only validation/conflict refusals belong in a successful editable fragment.
+/// Authorization, missing rows and infrastructure failures keep their typed HTTP outcome.
+fn inline_team_mutation_error(error: AppError) -> AppResult<String> {
+    match error {
+        AppError::BadRequest(_) | AppError::Conflict(_) => Ok(error.to_string()),
+        error => Err(error),
+    }
+}
+
 const NO_SELECTION: &str = "Select someone to see their access, or invite a new person.";
 
 /// The use cases and the caller every Team handler starts from.
@@ -193,19 +202,20 @@ impl FromRequestParts<AppState> for Workspace {
 }
 
 impl Workspace {
-    /// The company a request is scoped to, always picked from the caller's own companies so a
-    /// guessed `company_id` cannot reach another user's team.
-    async fn scoped_company(&self, company_id: Uuid) -> AppResult<Company> {
-        let (_, company) =
-            load_scoped_company(&self.company_use_cases, self.user_id, Some(company_id)).await?;
-        company.ok_or_else(|| AppError::NotFound("Company not found".into()))
+    /// The company a request is scoped to and what the caller is to it: any member may open the
+    /// team (404 for anyone else); what they may change is [`TeamView::require_owner`]'s call.
+    async fn scoped_company(&self, company_id: Uuid) -> AppResult<CompanyAccess> {
+        self.company_use_cases
+            .readable_company(self.user_id, company_id)
+            .await
     }
 
-    fn view<'a>(&'a self, company: &'a Company) -> TeamView<'a> {
+    fn view<'a>(&'a self, access: &'a CompanyAccess) -> TeamView<'a> {
         TeamView {
             invite_use_cases: &self.invite_use_cases,
             user_id: self.user_id,
-            company,
+            company: &access.company,
+            membership: access.membership,
         }
     }
 }
@@ -217,13 +227,14 @@ impl Workspace {
 pub(super) async fn team_tab_body(
     invite_use_cases: &CompanyInviteUseCases,
     user_id: Uuid,
-    company: &Company,
+    access: &CompanyAccess,
     request: TeamRequest,
 ) -> AppResult<String> {
     let view = TeamView {
         invite_use_cases,
         user_id,
-        company,
+        company: &access.company,
+        membership: access.membership,
     };
     let members = view.members().await?;
     let invites = view.invites().await?;
@@ -340,6 +351,7 @@ async fn set_member_avatar(
     {
         Ok(saved) => saved,
         Err(err) => {
+            let err = inline_team_mutation_error(err)?;
             let member = view.member(user_id).await?;
             return Ok(Html(
                 view.member_pane_with_draft(
@@ -397,7 +409,7 @@ async fn create_invite(
         .invite_use_cases
         .create_company_invite(
             view.user_id,
-            company.id,
+            view.company.id,
             &form.email,
             form.role.unwrap_or_default(),
         )
@@ -409,12 +421,15 @@ async fn create_invite(
             view.saved_response(TeamSelection::Invite(invite.id), pane)
                 .await
         }
-        Err(err) => Ok(Html(view.invite_create_pane(
-            &form.email,
-            form.role.unwrap_or_default(),
-            Some(&format!("Failed to send invite: {err}")),
-        ))
-        .into_response()),
+        Err(err) => {
+            let err = inline_team_mutation_error(err)?;
+            Ok(Html(view.invite_create_pane(
+                &form.email,
+                form.role.unwrap_or_default(),
+                Some(&format!("Failed to send invite: {err}")),
+            ))
+            .into_response())
+        }
     }
 }
 
@@ -431,7 +446,13 @@ async fn update_invite(
 
     let saved = view
         .invite_use_cases
-        .update_company_invite(view.user_id, company.id, invite_id, &form.email, form.role)
+        .update_company_invite(
+            view.user_id,
+            view.company.id,
+            invite_id,
+            &form.email,
+            form.role,
+        )
         .await;
 
     match saved {
@@ -440,13 +461,16 @@ async fn update_invite(
             view.saved_response(TeamSelection::Invite(invite.id), pane)
                 .await
         }
-        Err(err) => Ok(Html(view.invite_pane(
-            &stored,
-            Some(&form.email),
-            Some(form.role.unwrap_or(stored.role)),
-            Some(&format!("Failed to save invite: {err}")),
-        ))
-        .into_response()),
+        Err(err) => {
+            let err = inline_team_mutation_error(err)?;
+            Ok(Html(view.invite_pane(
+                &stored,
+                Some(&form.email),
+                Some(form.role.unwrap_or(stored.role)),
+                Some(&format!("Failed to save invite: {err}")),
+            ))
+            .into_response())
+        }
     }
 }
 
@@ -459,7 +483,7 @@ async fn delete_invite(
     let company = workspace.scoped_company(company_id).await?;
     let view = workspace.view(&company);
     view.invite_use_cases
-        .delete_company_invite(view.user_id, company.id, invite_id)
+        .delete_company_invite(view.user_id, view.company.id, invite_id)
         .await?;
 
     view.cleared_response().await
@@ -477,7 +501,7 @@ async fn update_member_role(
 
     match view
         .invite_use_cases
-        .update_company_team_member_role(view.user_id, company.id, user_id, form.role)
+        .update_company_team_member_role(view.user_id, view.company.id, user_id, form.role)
         .await
     {
         Ok(member) => {
@@ -486,6 +510,7 @@ async fn update_member_role(
                 .await
         }
         Err(err) => {
+            let err = inline_team_mutation_error(err)?;
             let member = view.member(user_id).await?;
             Ok(Html(
                 view.member_pane(
@@ -508,12 +533,13 @@ async fn remove_member(
     let company = workspace.scoped_company(company_id).await?;
     let view = workspace.view(&company);
 
-    // A refused removal is the pane's own error, not a 500: the owner row is the case that hits it.
+    // Validation refusals remain editable when the target is a visible member.
     if let Err(err) = view
         .invite_use_cases
-        .remove_company_team_member(view.user_id, company.id, user_id)
+        .remove_company_team_member(view.user_id, view.company.id, user_id)
         .await
     {
+        let err = inline_team_mutation_error(err)?;
         let member = view.member(user_id).await?;
         return Ok(Html(
             view.member_pane(&member, Some(&format!("Failed to remove member: {err}")))
@@ -530,27 +556,30 @@ struct TeamView<'a> {
     invite_use_cases: &'a CompanyInviteUseCases,
     user_id: Uuid,
     company: &'a Company,
+    /// What the caller is to the company, from their membership row.
+    membership: CompanyMembership,
 }
 
 impl TeamView<'_> {
     /// What the caller may do here.
     ///
-    /// Decided from the company's own `user_id` rather than by letting an unauthorized use-case
-    /// call fail: the invite calls reject a non-owner outright, so asking them first would turn
-    /// an ordinary member's page load into an error.
+    /// Decided from their membership rather than by letting an unauthorized use-case call fail:
+    /// the invite calls refuse a non-owner outright, so asking them first would turn an ordinary
+    /// member's page load into an error.
     fn role(&self) -> TeamRole {
-        if self.company.user_id == self.user_id {
+        if self.membership.is_owner() {
             TeamRole::Owner
         } else {
             TeamRole::Member
         }
     }
 
+    /// The owner manages invites and members; anyone else on the team sees it and is refused.
     fn require_owner(&self) -> AppResult<()> {
         match self.role() {
             TeamRole::Owner => Ok(()),
-            TeamRole::Member => Err(AppError::Internal(
-                "Unauthorized: only the company owner can manage invites and team members.".into(),
+            TeamRole::Member => Err(AppError::Forbidden(
+                "Only the company owner can manage invites and team members.".into(),
             )),
         }
     }
@@ -753,3 +782,7 @@ impl TeamView<'_> {
         Ok(([("HX-Push-Url", push_url)], Html(format!("{pane}{list}"))).into_response())
     }
 }
+
+#[cfg(test)]
+#[path = "ui_team_authorization_tests.rs"]
+mod authorization_tests;

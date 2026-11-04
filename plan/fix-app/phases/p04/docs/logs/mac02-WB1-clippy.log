@@ -1,0 +1,12 @@
+    Checking mail_agents v0.1.0 (/Users/mac02/dev/openbot-recovery/.worktrees/fix-app-p04)
+error: the borrowed expression implements the required traits
+   --> src/adapters/http/pages/layout.rs:695:31
+    |
+695 |         assert!(page.contains(&crate::adapters::http::routes::assets::app_js_url()));
+    |                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: change this to: `crate::adapters::http::routes::assets::app_js_url()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#needless_borrows_for_generic_args
+    = note: `-D clippy::needless-borrows-for-generic-args` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::needless_borrows_for_generic_args)]`
+
+error: could not compile `mail_agents` (lib test) due to 1 previous error

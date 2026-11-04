@@ -1,0 +1,93 @@
+    Checking mail_agents v0.1.0 (/Users/mac03/dev/openbot/.worktrees/fix-app-p04)
+error[E0433]: cannot find type `AppError` in this scope
+   --> src/adapters/http/routes/company_invite.rs:145:20
+    |
+145 |         Err(err @ (AppError::BadRequest(_) | AppError::Conflict(_))) => {
+    |                    ^^^^^^^^ use of undeclared type `AppError`
+    |
+help: consider importing this enum
+    |
+  1 + use crate::app_error::AppError;
+    |
+
+error[E0433]: cannot find type `AppError` in this scope
+   --> src/adapters/http/routes/company_invite.rs:145:46
+    |
+145 |         Err(err @ (AppError::BadRequest(_) | AppError::Conflict(_))) => {
+    |                                              ^^^^^^^^ use of undeclared type `AppError`
+    |
+help: consider importing this enum
+    |
+  1 + use crate::app_error::AppError;
+    |
+
+error[E0433]: cannot find type `AppError` in this scope
+   --> src/adapters/http/routes/company_invite.rs:169:24
+    |
+169 |         .ok_or_else(|| AppError::NotFound("Invite not found.".into()))?;
+    |                        ^^^^^^^^ use of undeclared type `AppError`
+    |
+help: consider importing this enum
+    |
+  1 + use crate::app_error::AppError;
+    |
+
+error[E0433]: cannot find type `AppError` in this scope
+   --> src/adapters/http/routes/company_invite.rs:185:24
+    |
+185 |         .ok_or_else(|| AppError::NotFound("Invite not found.".into()))?;
+    |                        ^^^^^^^^ use of undeclared type `AppError`
+    |
+help: consider importing this enum
+    |
+  1 + use crate::app_error::AppError;
+    |
+
+error[E0433]: cannot find type `AppError` in this scope
+   --> src/adapters/http/routes/company_invite.rs:205:24
+    |
+205 |             Err(err @ (AppError::BadRequest(_) | AppError::Conflict(_))) => {
+    |                        ^^^^^^^^ use of undeclared type `AppError`
+    |
+help: consider importing this enum
+    |
+  1 + use crate::app_error::AppError;
+    |
+
+error[E0433]: cannot find type `AppError` in this scope
+   --> src/adapters/http/routes/company_invite.rs:205:50
+    |
+205 |             Err(err @ (AppError::BadRequest(_) | AppError::Conflict(_))) => {
+    |                                                  ^^^^^^^^ use of undeclared type `AppError`
+    |
+help: consider importing this enum
+    |
+  1 + use crate::app_error::AppError;
+    |
+
+error[E0433]: cannot find type `AppError` in this scope
+   --> src/adapters/http/routes/company_invite.rs:227:24
+    |
+227 |             Err(err @ (AppError::BadRequest(_) | AppError::Conflict(_))) => Html(
+    |                        ^^^^^^^^ use of undeclared type `AppError`
+    |
+help: consider importing this enum
+    |
+  1 + use crate::app_error::AppError;
+    |
+
+error[E0433]: cannot find type `AppError` in this scope
+   --> src/adapters/http/routes/company_invite.rs:227:50
+    |
+227 |             Err(err @ (AppError::BadRequest(_) | AppError::Conflict(_))) => Html(
+    |                                                  ^^^^^^^^ use of undeclared type `AppError`
+    |
+help: consider importing this enum
+    |
+  1 + use crate::app_error::AppError;
+    |
+
+For more information about this error, try `rustc --explain E0433`.
+error: could not compile `mail_agents` (lib) due to 8 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `mail_agents` (lib test) due to 8 previous errors

@@ -8,10 +8,11 @@ use crate::{
     app_error::{AppError, AppResult},
     entities::{
         company::{Company, CompanyAccess, CompanyChannelDefaults, CompanyModelConnection},
-        company_member::CompanyMembership,
+        user::Caller,
         value_objects::{AvatarUrl, ModelName, ModelProvider},
     },
     model_providers::is_supported_model_provider,
+    use_cases::caller::require_operator,
 };
 
 pub const MAX_COMPANY_MODEL_CONNECTIONS: usize = 8;
@@ -130,52 +131,30 @@ pub trait CompanyPersistence: Send + Sync {
     async fn list_by_user_id(&self, user_id: Uuid) -> AppResult<Vec<Company>>;
     async fn update(&self, id: Uuid, write: CompanyWrite) -> AppResult<Company>;
     async fn delete(&self, id: Uuid) -> AppResult<()>;
+    /// Update a company only when `user_id` owns it; `NotFound` when the scoped statement matches
+    /// nothing. The use case authorizes first, so this is defence in depth, never the decision.
     async fn update_for_user(
         &self,
         user_id: Uuid,
         id: Uuid,
         write: CompanyWrite,
-    ) -> AppResult<Company> {
-        match self.get_by_id(id).await? {
-            Some(company) if company.user_id == user_id => self.update(id, write).await,
-            _ => Err(company_not_found()),
-        }
-    }
-    async fn delete_for_user(&self, user_id: Uuid, id: Uuid) -> AppResult<()> {
-        match self.get_by_id(id).await? {
-            Some(company) if company.user_id == user_id => self.delete(id).await,
-            _ => Err(company_not_found()),
-        }
-    }
-    /// Every company the user may *read*: the ones they own, plus the ones they were invited to.
+    ) -> AppResult<Company>;
+    /// Delete a company only when `user_id` owns it; `NotFound` when nothing matched.
+    async fn delete_for_user(&self, user_id: Uuid, id: Uuid) -> AppResult<()>;
+    /// Every company the user may *read*, each with what they are to it: the switchers and the
+    /// default selection of the pages. Capped by the implementation, so it never authorizes an
+    /// explicitly requested company -- [`CompanyPersistence::company_access`] does.
     ///
-    /// Separate from [`CompanyPersistence::list_by_user_id`], which stays ownership-only because
-    /// it scopes the pages that administer a company. The default answers with owned companies
-    /// alone -- the conservative half of the truth -- so a persistence that has not implemented
-    /// this grants nobody anything they would not already have had.
-    async fn list_accessible_by_user_id(&self, user_id: Uuid) -> AppResult<Vec<CompanyAccess>> {
-        Ok(self
-            .list_by_user_id(user_id)
-            .await?
-            .into_iter()
-            .map(|company| CompanyAccess {
-                company,
-                membership: CompanyMembership::Owner,
-            })
-            .collect())
-    }
-    /// What the user is to one company, or `None` if they are nothing to it.
+    /// Required: a default answering "owned companies only" would grant nothing wrong, but would
+    /// let a double hide the admin and member paths from every test that uses it.
+    async fn list_accessible_by_user_id(&self, user_id: Uuid) -> AppResult<Vec<CompanyAccess>>;
+    /// What the user is to one company, or `None` if they are nothing to it: the one membership
+    /// read every authorization decision starts from. One row, never a scan of a capped list.
     async fn company_access(
         &self,
         user_id: Uuid,
         company_id: Uuid,
-    ) -> AppResult<Option<CompanyAccess>> {
-        Ok(self
-            .list_accessible_by_user_id(user_id)
-            .await?
-            .into_iter()
-            .find(|access| access.company.id == company_id))
-    }
+    ) -> AppResult<Option<CompanyAccess>>;
 
     /// Required rather than defaulted, like the two below it. A default returning an empty list
     /// reads as "this company has configured no providers", which is a real state with real
@@ -203,59 +182,72 @@ pub trait CompanyPersistence: Send + Sync {
     ) -> AppResult<()>;
 }
 
+/// The caller's access to a company they can see at all.
+///
+/// A company that does not exist and a company the caller has no membership in are reported
+/// *identically*, on purpose: telling the two apart would let anyone probe ids to enumerate other
+/// tenants' companies. A database error propagates; it is never read as "not a member".
+pub async fn readable_company(
+    persistence: &dyn CompanyPersistence,
+    user_id: Uuid,
+    company_id: Uuid,
+) -> AppResult<CompanyAccess> {
+    persistence
+        .company_access(user_id, company_id)
+        .await?
+        .ok_or_else(company_not_found)
+}
+
 /// Resolve a company the caller owns.
 ///
-/// A company that does not exist and a company owned by somebody else are reported *identically*,
-/// on purpose: telling the two apart would let anyone probe ids to enumerate other tenants'
-/// companies. Nothing in the product shows a non-owner a company — `list_by_user_id` returns only
-/// owned rows — so there is no "visible but forbidden" case that would deserve a 403 instead.
-///
-/// The denied attempt is logged, so the signal an operator needs survives even though the caller
-/// is told nothing.
+/// Someone with no membership gets the same not-found as for a missing company. An admin or member
+/// can see the company, so for them this is a refusal (`Forbidden`, 403) rather than a pretence
+/// that it does not exist. Ownership is the `Owner` membership, which the schema keeps in step with
+/// `companies.user_id`.
 pub async fn owned_company(
     persistence: &dyn CompanyPersistence,
     user_id: Uuid,
     company_id: Uuid,
 ) -> AppResult<Company> {
-    match persistence.get_by_id(company_id).await? {
-        Some(company) if company.user_id == user_id => Ok(company),
-        Some(_) => {
-            warn!("User {user_id} is not the owner of company {company_id}");
-            Err(company_not_found())
-        }
-        None => Err(company_not_found()),
+    let access = readable_company(persistence, user_id, company_id).await?;
+    if access.membership.is_owner() {
+        return Ok(access.company);
     }
+    warn!("User {user_id} is not the owner of company {company_id}");
+    Err(company_forbidden("Only the company owner can do this."))
 }
 
-/// Resolve a company whose operational workspaces and automation the caller may manage.
-///
-/// Ownership still outranks the stored membership row. Otherwise the caller must be an accepted
-/// company admin; an ordinary member and a stranger receive the same not-found response so this
-/// guard does not become a tenant-id probe.
+/// Resolve a company whose operational workspaces and automation the caller may manage: its owner
+/// or one of its admins. A member can see the company and is refused (`Forbidden`); a stranger gets
+/// the same not-found as for a missing company.
 pub async fn managed_company(
     persistence: &dyn CompanyPersistence,
     user_id: Uuid,
     company_id: Uuid,
 ) -> AppResult<Company> {
-    let company = persistence
-        .get_by_id(company_id)
+    Ok(managed_company_access(persistence, user_id, company_id)
         .await?
-        .ok_or_else(company_not_found)?;
+        .company)
+}
 
-    if company.user_id == user_id {
-        return Ok(company);
+async fn managed_company_access(
+    persistence: &dyn CompanyPersistence,
+    user_id: Uuid,
+    company_id: Uuid,
+) -> AppResult<CompanyAccess> {
+    let access = readable_company(persistence, user_id, company_id).await?;
+    if access.membership.manages_company_operations() {
+        return Ok(access);
     }
-
-    let may_manage = persistence
-        .company_access(user_id, company_id)
-        .await?
-        .is_some_and(|access| access.membership.manages_company_operations());
-    if may_manage {
-        return Ok(company);
-    }
-
     warn!("User {user_id} may not manage operations for company {company_id}");
-    Err(company_not_found())
+    Err(company_forbidden(
+        "Only the company owner or an admin can do this.",
+    ))
+}
+
+/// A refusal for someone who can see the company but may not do this to it.
+pub fn company_forbidden(message: &str) -> AppError {
+    AppError::Forbidden(message.into())
 }
 
 pub fn company_not_found() -> AppError {
@@ -305,18 +297,39 @@ impl CompanyUseCases {
         Self { persistence }
     }
 
-    /// The company, only when the caller owns it.
-    ///
-    /// The method exists because route handlers hold an `Arc<CompanyUseCases>` and cannot reach
-    /// the persistence behind it. See [`owned_company`] for why a company owned by somebody else
-    /// is reported exactly like one that does not exist.
+    /// What the caller is to a company they can see; not-found for anyone else. See
+    /// [`readable_company`].
+    pub async fn readable_company(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+    ) -> AppResult<CompanyAccess> {
+        readable_company(self.persistence.as_ref(), user_id, company_id).await
+    }
+
+    /// The company, only when the caller owns it. See [`owned_company`] for the 404/403 split.
     pub async fn owned_company(&self, user_id: Uuid, company_id: Uuid) -> AppResult<Company> {
         owned_company(self.persistence.as_ref(), user_id, company_id).await
     }
 
-    /// The company, only when the caller owns it or is one of its admins.
-    pub async fn managed_company(&self, user_id: Uuid, company_id: Uuid) -> AppResult<Company> {
-        managed_company(self.persistence.as_ref(), user_id, company_id).await
+    /// The caller's access, only when they own the company or are one of its admins.
+    pub async fn managed_company(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+    ) -> AppResult<CompanyAccess> {
+        managed_company_access(self.persistence.as_ref(), user_id, company_id).await
+    }
+
+    /// Any company, for an operator watching the deployment-wide dashboard. Operators are usually
+    /// not members of the companies they watch; anyone else is told there is nothing here.
+    pub async fn operator_company(
+        &self,
+        caller: &Caller,
+        company_id: Uuid,
+    ) -> AppResult<Option<Company>> {
+        require_operator(caller)?;
+        self.persistence.get_by_id(company_id).await
     }
 
     #[instrument(skip_all)]
@@ -347,49 +360,14 @@ impl CompanyUseCases {
 
     /// Companies whose operational workspaces and automation the caller may manage.
     #[instrument(skip_all)]
-    pub async fn list_managed_companies(&self, user_id: Uuid) -> AppResult<Vec<Company>> {
+    pub async fn list_managed_companies(&self, user_id: Uuid) -> AppResult<Vec<CompanyAccess>> {
         Ok(self
             .persistence
             .list_accessible_by_user_id(user_id)
             .await?
             .into_iter()
             .filter(|access| access.membership.manages_company_operations())
-            .map(|access| access.company)
             .collect())
-    }
-
-    /// What a user is to one company: its owner, an invited member, or nothing.
-    #[instrument(skip_all)]
-    pub async fn company_access(
-        &self,
-        user_id: Uuid,
-        company_id: Uuid,
-    ) -> AppResult<Option<CompanyAccess>> {
-        self.persistence.company_access(user_id, company_id).await
-    }
-
-    #[instrument(skip_all)]
-    pub async fn get_company(&self, id: Uuid) -> AppResult<Option<Company>> {
-        self.persistence.get_by_id(id).await
-    }
-
-    #[instrument(skip_all)]
-    pub async fn get_company_by_slug(&self, slug: &str) -> AppResult<Option<Company>> {
-        self.persistence.get_by_slug(slug.trim()).await
-    }
-
-    #[instrument(skip_all)]
-    pub async fn update_company(&self, id: Uuid, mut write: CompanyWrite) -> AppResult<Company> {
-        write.normalize()?;
-
-        info!(company_id = %id, "Updating company");
-        self.persistence.update(id, write).await
-    }
-
-    #[instrument(skip_all)]
-    pub async fn delete_company(&self, id: Uuid) -> AppResult<()> {
-        info!("Deleting company {}", id);
-        self.persistence.delete(id).await
     }
 
     pub async fn update_company_for_user(
@@ -398,11 +376,15 @@ impl CompanyUseCases {
         id: Uuid,
         mut write: CompanyWrite,
     ) -> AppResult<Company> {
+        owned_company(self.persistence.as_ref(), user_id, id).await?;
         write.normalize()?;
+        info!(company_id = %id, "Updating company");
         self.persistence.update_for_user(user_id, id, write).await
     }
 
     pub async fn delete_company_for_user(&self, user_id: Uuid, id: Uuid) -> AppResult<()> {
+        owned_company(self.persistence.as_ref(), user_id, id).await?;
+        info!(company_id = %id, "Deleting company");
         self.persistence.delete_for_user(user_id, id).await
     }
 
@@ -431,133 +413,13 @@ impl CompanyUseCases {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Mutex;
-
     use chrono::Utc;
 
     use super::*;
-
-    struct MockCompanyPersistence {
-        companies: Mutex<Vec<Company>>,
-        memberships: Mutex<Vec<(Uuid, Uuid, CompanyMembership)>>,
-    }
-
-    #[async_trait]
-    impl CompanyPersistence for MockCompanyPersistence {
-        async fn create(&self, user_id: Uuid, write: CompanyWrite) -> AppResult<Company> {
-            let company = Company {
-                channel_defaults: Default::default(),
-                id: Uuid::new_v4(),
-                user_id,
-                name: write.name,
-                slug: write.slug.into(),
-                avatar_url: write.avatar_url,
-                created_at: Utc::now(),
-            };
-            self.companies.lock().unwrap().push(company.clone());
-            Ok(company)
-        }
-
-        async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Company>> {
-            Ok(self
-                .companies
-                .lock()
-                .unwrap()
-                .iter()
-                .find(|c| c.id == id)
-                .cloned())
-        }
-
-        async fn get_by_slug(&self, slug: &str) -> AppResult<Option<Company>> {
-            Ok(self
-                .companies
-                .lock()
-                .unwrap()
-                .iter()
-                .find(|c| c.slug.eq_ignore_ascii_case(slug))
-                .cloned())
-        }
-
-        async fn list_by_user_id(&self, user_id: Uuid) -> AppResult<Vec<Company>> {
-            Ok(self
-                .companies
-                .lock()
-                .unwrap()
-                .iter()
-                .filter(|c| c.user_id == user_id)
-                .cloned()
-                .collect())
-        }
-
-        async fn list_accessible_by_user_id(&self, user_id: Uuid) -> AppResult<Vec<CompanyAccess>> {
-            let companies = self.companies.lock().unwrap();
-            let memberships = self.memberships.lock().unwrap();
-            Ok(companies
-                .iter()
-                .filter_map(|company| {
-                    let membership = if company.user_id == user_id {
-                        CompanyMembership::Owner
-                    } else if let Some((_, _, membership)) =
-                        memberships.iter().find(|(member_id, company_id, _)| {
-                            *member_id == user_id && *company_id == company.id
-                        })
-                    {
-                        *membership
-                    } else {
-                        return None;
-                    };
-                    Some(CompanyAccess {
-                        company: company.clone(),
-                        membership,
-                    })
-                })
-                .collect())
-        }
-
-        async fn update(&self, id: Uuid, write: CompanyWrite) -> AppResult<Company> {
-            let mut list = self.companies.lock().unwrap();
-            let company = list
-                .iter_mut()
-                .find(|c| c.id == id)
-                .ok_or_else(|| AppError::Internal("Not found".into()))?;
-
-            company.name = write.name;
-            company.slug = write.slug.into();
-            company.avatar_url = write.avatar_url;
-            Ok(company.clone())
-        }
-
-        async fn delete(&self, id: Uuid) -> AppResult<()> {
-            self.companies.lock().unwrap().retain(|c| c.id != id);
-            Ok(())
-        }
-
-        /// Model connections are not part of what these tests drive; a call here is a wiring mistake
-        /// rather than a state worth simulating.
-        async fn list_model_connections(
-            &self,
-            _company_id: Uuid,
-        ) -> AppResult<Vec<crate::entities::company::CompanyModelConnection>> {
-            unimplemented!("this double is not exercised on the model-connection path")
-        }
-
-        async fn model_api_key(
-            &self,
-            _company_id: Uuid,
-            _provider: &crate::entities::value_objects::ModelProvider,
-        ) -> AppResult<Option<String>> {
-            unimplemented!("this double is not exercised on the model-connection path")
-        }
-
-        async fn replace_model_connections_for_user(
-            &self,
-            _user_id: Uuid,
-            _company_id: Uuid,
-            _connections: Vec<crate::use_cases::company::CompanyModelConnectionWrite>,
-        ) -> AppResult<()> {
-            unimplemented!("this double is not exercised on the model-connection path")
-        }
-    }
+    use crate::{
+        entities::company_member::CompanyMembership,
+        use_cases::company_test_support::MockCompanyPersistence,
+    };
 
     #[test]
     fn a_wholesale_replace_never_means_delete_every_credential() {
@@ -616,10 +478,7 @@ mod tests {
 
     #[tokio::test]
     async fn company_crud_flow_works() {
-        let persistence = Arc::new(MockCompanyPersistence {
-            companies: Mutex::new(Vec::new()),
-            memberships: Mutex::new(Vec::new()),
-        });
+        let persistence = Arc::new(MockCompanyPersistence::new(Vec::new()));
         let use_cases = CompanyUseCases::new(persistence);
         let user_id = Uuid::new_v4();
 
@@ -649,7 +508,8 @@ mod tests {
 
         // Update
         let updated = use_cases
-            .update_company(
+            .update_company_for_user(
+                user_id,
                 company.id,
                 CompanyWrite {
                     name: "Acme Inc".to_string(),
@@ -664,7 +524,10 @@ mod tests {
         assert_eq!(updated.avatar_url, None);
 
         // Delete
-        use_cases.delete_company(company.id).await.unwrap();
+        use_cases
+            .delete_company_for_user(user_id, company.id)
+            .await
+            .unwrap();
         let list_after = use_cases.list_user_companies(user_id).await.unwrap();
         assert_eq!(list_after.len(), 0);
     }
@@ -684,10 +547,7 @@ mod tests {
             avatar_url: None,
             created_at: Utc::now(),
         };
-        let persistence = MockCompanyPersistence {
-            companies: Mutex::new(vec![company.clone()]),
-            memberships: Mutex::new(Vec::new()),
-        };
+        let persistence = MockCompanyPersistence::new(vec![company.clone()]);
 
         owned_company(&persistence, owner, company.id)
             .await
@@ -722,27 +582,32 @@ mod tests {
             avatar_url: None,
             created_at: Utc::now(),
         };
-        let persistence = Arc::new(MockCompanyPersistence {
-            companies: Mutex::new(vec![company.clone()]),
-            memberships: Mutex::new(vec![
+        let persistence = Arc::new(
+            MockCompanyPersistence::new(vec![company.clone()]).with_memberships(vec![
                 (admin, company.id, CompanyMembership::Admin),
                 (member, company.id, CompanyMembership::Member),
             ]),
-        });
+        );
         let use_cases = CompanyUseCases::new(persistence);
 
         assert_eq!(
             use_cases
                 .list_managed_companies(owner)
                 .await
-                .expect("owner management list"),
+                .expect("owner management list")
+                .into_iter()
+                .map(|access| access.company)
+                .collect::<Vec<_>>(),
             vec![company.clone()]
         );
         assert_eq!(
             use_cases
                 .list_managed_companies(admin)
                 .await
-                .expect("admin management list"),
+                .expect("admin management list")
+                .into_iter()
+                .map(|access| access.company)
+                .collect::<Vec<_>>(),
             vec![company.clone()]
         );
         assert!(
@@ -756,9 +621,130 @@ mod tests {
             use_cases
                 .managed_company(admin, company.id)
                 .await
-                .expect("admin management access"),
+                .expect("admin management access")
+                .company,
             company
         );
-        assert!(use_cases.managed_company(member, company.id).await.is_err());
+        // A member sees the company, so being refused is a 403, not a pretence it is not there.
+        assert!(matches!(
+            use_cases.managed_company(member, company.id).await,
+            Err(AppError::Forbidden(_))
+        ));
+    }
+
+    fn acme(owner: Uuid) -> Company {
+        Company {
+            channel_defaults: Default::default(),
+            id: Uuid::new_v4(),
+            user_id: owner,
+            name: "Acme".into(),
+            slug: "acme".into(),
+            avatar_url: None,
+            created_at: Utc::now(),
+        }
+    }
+
+    /// Owner-only actions: an admin or member is refused with 403, a stranger and a missing id get
+    /// the same 404, and the write never runs for any of them.
+    #[tokio::test]
+    async fn only_the_owner_may_update_or_delete_and_members_are_refused_not_hidden() {
+        let owner = Uuid::new_v4();
+        let admin = Uuid::new_v4();
+        let member = Uuid::new_v4();
+        let stranger = Uuid::new_v4();
+        let company = acme(owner);
+        let persistence = Arc::new(
+            MockCompanyPersistence::new(vec![company.clone()]).with_memberships(vec![
+                (admin, company.id, CompanyMembership::Admin),
+                (member, company.id, CompanyMembership::Member),
+            ]),
+        );
+        let use_cases = CompanyUseCases::new(persistence.clone());
+        let rename = || CompanyWrite {
+            name: "Renamed".into(),
+            slug: "renamed".into(),
+            ..CompanyWrite::default()
+        };
+
+        for refused in [admin, member] {
+            assert!(matches!(
+                use_cases
+                    .update_company_for_user(refused, company.id, rename())
+                    .await,
+                Err(AppError::Forbidden(_))
+            ));
+            assert!(matches!(
+                use_cases.delete_company_for_user(refused, company.id).await,
+                Err(AppError::Forbidden(_))
+            ));
+        }
+        let foreign = use_cases
+            .update_company_for_user(stranger, company.id, rename())
+            .await
+            .unwrap_err();
+        let missing = use_cases
+            .delete_company_for_user(owner, Uuid::new_v4())
+            .await
+            .unwrap_err();
+        assert!(matches!(foreign, AppError::NotFound(_)), "{foreign:?}");
+        assert_eq!(foreign.to_string(), missing.to_string());
+        assert_eq!(
+            persistence.get_by_id(company.id).await.unwrap(),
+            Some(company.clone()),
+            "no refused caller changed anything"
+        );
+
+        let renamed = use_cases
+            .update_company_for_user(owner, company.id, rename())
+            .await
+            .unwrap();
+        assert_eq!(renamed.name, "Renamed");
+        use_cases
+            .delete_company_for_user(owner, company.id)
+            .await
+            .unwrap();
+    }
+
+    /// A database outage is an error, never a decision: not "not found", not "forbidden".
+    #[tokio::test]
+    async fn an_unreachable_database_is_an_error_not_a_refusal() {
+        let use_cases = CompanyUseCases::new(Arc::new(MockCompanyPersistence::failing()));
+        let user = Uuid::new_v4();
+        let company = Uuid::new_v4();
+
+        assert!(matches!(
+            use_cases.readable_company(user, company).await,
+            Err(AppError::Database(_))
+        ));
+        assert!(matches!(
+            use_cases.owned_company(user, company).await,
+            Err(AppError::Database(_))
+        ));
+        assert!(matches!(
+            use_cases.managed_company(user, company).await,
+            Err(AppError::Database(_))
+        ));
+    }
+
+    #[tokio::test]
+    async fn only_an_operator_reads_a_company_it_does_not_belong_to() {
+        let company = acme(Uuid::new_v4());
+        let use_cases =
+            CompanyUseCases::new(Arc::new(MockCompanyPersistence::new(vec![company.clone()])));
+        let watcher = Uuid::new_v4();
+
+        assert_eq!(
+            use_cases
+                .operator_company(&Caller::operator(watcher), company.id)
+                .await
+                .unwrap(),
+            Some(company.clone())
+        );
+        assert!(matches!(
+            use_cases
+                .operator_company(&Caller::user(watcher), company.id)
+                .await,
+            Err(AppError::NotFound(_))
+        ));
     }
 }

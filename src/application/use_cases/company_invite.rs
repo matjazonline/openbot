@@ -11,7 +11,7 @@ use crate::{
         company_member::{CompanyAccessRole, CompanyMember},
         user::{User, VerifiedEmail},
     },
-    use_cases::company::{CompanyPersistence, company_not_found, owned_company},
+    use_cases::company::{CompanyPersistence, owned_company, readable_company},
 };
 
 /// An invite belonging to another company is reported exactly like a missing one, so an id probe
@@ -278,25 +278,9 @@ impl CompanyInviteUseCases {
         user_id: Uuid,
         company_id: Uuid,
     ) -> AppResult<Vec<CompanyMember>> {
-        // The one place a non-owner has legitimate access, so it cannot delegate to
-        // `owned_company` outright — but a caller who is neither owner nor member is told exactly
-        // what a stranger asking about a nonexistent company is told.
-        match owned_company(self.company_persistence.as_ref(), user_id, company_id).await {
-            Ok(_) => {}
-            Err(AppError::NotFound(_)) => {
-                let members = self
-                    .invite_persistence
-                    .list_members_by_company(company_id)
-                    .await?;
-                return if members.iter().any(|m| m.user_id == user_id) {
-                    Ok(members)
-                } else {
-                    Err(company_not_found())
-                };
-            }
-            Err(err) => return Err(err),
-        }
-
+        // Every member may see who else is on the team; a stranger is told exactly what someone
+        // asking about a nonexistent company is told.
+        readable_company(self.company_persistence.as_ref(), user_id, company_id).await?;
         self.invite_persistence
             .list_members_by_company(company_id)
             .await
@@ -312,7 +296,7 @@ impl CompanyInviteUseCases {
         self.verify_company_owner(user_id, company_id).await?;
 
         if user_id == member_user_id {
-            return Err(AppError::Internal(
+            return Err(AppError::BadRequest(
                 "Cannot remove company owner from the team.".into(),
             ));
         }
@@ -337,7 +321,7 @@ impl CompanyInviteUseCases {
         self.verify_company_owner(user_id, company_id).await?;
 
         if user_id == member_user_id {
-            return Err(AppError::Internal(
+            return Err(AppError::BadRequest(
                 "The company owner's access role cannot be changed.".into(),
             ));
         }

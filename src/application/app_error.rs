@@ -34,6 +34,11 @@ pub enum AppError {
     #[error("Not found: {0}")]
     NotFound(String),
 
+    /// The caller can see the resource -- they belong to its company -- but may not do this to
+    /// it. Something they cannot see at all is [`Self::NotFound`], so an id probe learns nothing.
+    #[error("Forbidden: {0}")]
+    Forbidden(String),
+
     #[error("Conflict: {0}")]
     Conflict(String),
 

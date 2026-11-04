@@ -1,4 +1,4 @@
-use std::{convert::Infallible, sync::Arc, time::Instant};
+use std::{convert::Infallible, sync::Arc};
 
 use crate::infra::events::MailboxEvent;
 use async_stream::stream;
@@ -15,15 +15,12 @@ use uuid::Uuid;
 use crate::{
     adapters::http::{app_state::AppState, pages},
     app_error::{AppError, AppResult},
-    application::attention::AttentionPersistence,
-    domain::monitoring::MonitoringService,
+    application::attention::{AttentionListRequest, AttentionUseCases},
     entities::{
-        attention::{AttentionCursor, AttentionPage, AttentionQuery, AttentionView},
-        company::CompanyAccess,
-        transport::PrincipalId,
+        attention::{AttentionCursor, AttentionPage, AttentionView},
         user::Viewer,
     },
-    use_cases::{channel::ChannelUseCases, company::CompanyUseCases, thread::ThreadUseCases},
+    use_cases::company::CompanyUseCases,
 };
 
 use super::ui::{load_readable_company, workspace_user};
@@ -71,141 +68,39 @@ impl ListQuery {
     }
 }
 
-pub(super) struct ReadContext {
-    pub(super) access: CompanyAccess,
-    pub(super) principal_id: PrincipalId,
-    pub(super) visible_channel_ids: Vec<Uuid>,
-}
-
-pub(super) async fn read_context(
-    companies: &CompanyUseCases,
-    channels: &ChannelUseCases,
-    threads: &ThreadUseCases,
-    viewer: &Viewer,
-    company_id: Uuid,
-) -> AppResult<ReadContext> {
-    let access = companies
-        .company_access(viewer.user_id, company_id)
-        .await?
-        .filter(|access| access.membership.is_team())
-        .ok_or_else(crate::use_cases::company::company_not_found)?;
-    let principal_id = threads
-        .principal_access_for_user(company_id, viewer.user_id)
-        .await?
-        .and_then(|context| context.principal_id)
-        .ok_or_else(crate::use_cases::company::company_not_found)?;
-    let visible_channel_ids = channels
-        .list_readable_channels(viewer, company_id)
-        .await?
-        .into_iter()
-        .map(|channel| channel.id)
-        .collect();
-    Ok(ReadContext {
-        access,
-        principal_id,
-        visible_channel_ids,
+/// The request's view, cursor and size as the use case takes them.
+fn list_request<'a>(
+    query: &ListQuery,
+    cursor: Option<&'a AttentionCursor>,
+) -> AppResult<AttentionListRequest<'a>> {
+    Ok(AttentionListRequest {
+        view: query.view()?,
+        cursor,
+        limit: query.limit,
     })
 }
 
-async fn read_page(
-    attention: &dyn AttentionPersistence,
-    monitoring: &dyn MonitoringService,
-    context: &ReadContext,
-    query: &ListQuery,
-) -> AppResult<AttentionPage> {
-    let view = query.view()?;
-    if view == AttentionView::TeamWork && !context.access.membership.manages_company_operations() {
-        return Err(crate::use_cases::company::company_not_found());
-    }
-    let cursor = query.cursor()?;
-    let started = Instant::now();
-    let page = attention
-        .list_attention(AttentionQuery {
-            company_id: context.access.company.id,
-            principal_id: context.principal_id,
-            visible_channel_ids: &context.visible_channel_ids,
-            manager: context.access.membership.manages_company_operations(),
-            view,
-            cursor: cursor.as_ref(),
-            limit: query.limit.unwrap_or(AttentionQuery::DEFAULT_LIMIT),
-        })
-        .await?;
-    monitoring.record_histogram(
-        "attention_query_duration",
-        started.elapsed().as_secs_f64() * 1_000.0,
-        &[("view", view_label(view))],
-    );
-    monitoring.record_gauge(
-        "attention_working_set_size",
-        page.working_set_size as f64,
-        &[("view", view_label(view))],
-    );
-    if page.truncated {
-        monitoring.increment_counter(
-            "attention_working_set_truncated",
-            1,
-            &[("view", view_label(view))],
-        );
-    }
-    Ok(page)
-}
-
-const fn view_label(view: AttentionView) -> &'static str {
-    match view {
-        AttentionView::MyWork => "my_work",
-        AttentionView::Unassigned => "unassigned",
-        AttentionView::TeamWork => "team_work",
-    }
-}
-
 async fn list_attention(
-    State(state): State<AppState>,
+    State(attention): State<Arc<AttentionUseCases>>,
     viewer: Viewer,
     Path(company_id): Path<Uuid>,
     Query(query): Query<ListQuery>,
 ) -> AppResult<Json<AttentionPage>> {
-    let context = read_context(
-        &state.company_use_cases,
-        &state.channel_use_cases,
-        &state.thread_use_cases,
-        &viewer,
-        company_id,
-    )
-    .await?;
-    Ok(Json(
-        read_page(
-            state.attention.as_ref(),
-            state.monitoring.as_ref(),
-            &context,
-            &query,
-        )
-        .await?,
-    ))
+    let cursor = query.cursor()?;
+    let listing = attention
+        .list(&viewer, company_id, list_request(&query, cursor.as_ref())?)
+        .await?;
+    Ok(Json(listing.page))
 }
 
 async fn operational_summary(
-    State(attention): State<Arc<dyn AttentionPersistence>>,
-    State(companies): State<Arc<CompanyUseCases>>,
-    State(channels): State<Arc<ChannelUseCases>>,
-    State(threads): State<Arc<ThreadUseCases>>,
-    State(monitoring): State<Arc<dyn MonitoringService>>,
+    State(attention): State<Arc<AttentionUseCases>>,
     viewer: Viewer,
     Path(company_id): Path<Uuid>,
 ) -> AppResult<Json<crate::entities::attention::OperationalSummary>> {
-    let context = read_context(&companies, &channels, &threads, &viewer, company_id).await?;
-    if !context.access.membership.manages_company_operations() {
-        return Err(crate::use_cases::company::company_not_found());
-    }
-    let started = Instant::now();
-    let summary = attention
-        .operational_summary(company_id, &context.visible_channel_ids)
-        .await?;
-    monitoring.record_histogram(
-        "operational_summary_query_duration",
-        started.elapsed().as_secs_f64() * 1_000.0,
-        &[],
-    );
-    Ok(Json(summary))
+    Ok(Json(
+        attention.operational_summary(&viewer, company_id).await?,
+    ))
 }
 
 /// Whether an event changes what this viewer's work list may show: a resync, a delivery or other
@@ -231,17 +126,8 @@ async fn attention_events(
     // Subscribe before authorization. The first reconcile event makes any earlier gap harmless,
     // while this order also retains a source change racing with the access query.
     let receiver = state.events.subscribe();
-    let context = read_context(
-        &state.company_use_cases,
-        &state.channel_use_cases,
-        &state.thread_use_cases,
-        &viewer,
-        company_id,
-    )
-    .await?;
-    let companies = state.company_use_cases;
-    let channels = state.channel_use_cases;
-    let threads = state.thread_use_cases;
+    let attention = state.attention_use_cases.clone();
+    let context = attention.read_context(&viewer, company_id).await?;
     let stream = stream! {
         yield Ok(Event::default().event("reconcile").json_data(
             serde_json::json!({ "company_id": company_id })
@@ -264,9 +150,7 @@ async fn attention_events(
                     ).expect("identifier event serializes")),
                     None => break,
                 },
-                _ = periodic.tick() => match read_context(
-                    &companies, &channels, &threads, &viewer, company_id
-                ).await {
+                _ = periodic.tick() => match attention.read_context(&viewer, company_id).await {
                     Ok(context) => {
                         visible_channel_ids = context.visible_channel_ids;
                         yield Ok(Event::default().event("reconcile").json_data(
@@ -297,26 +181,21 @@ async fn work_page(
     let (company_list, selected) =
         load_readable_company(&state.company_use_cases, viewer.user_id, query.company_id).await?;
     let access = selected.ok_or_else(crate::use_cases::company::company_not_found)?;
-    let context = read_context(
-        &state.company_use_cases,
-        &state.channel_use_cases,
-        &state.thread_use_cases,
-        &viewer,
-        access.company.id,
-    )
-    .await?;
     let list_query = ListQuery {
         view: query.view,
         cursor: query.cursor,
         limit: query.limit,
     };
-    let page = read_page(
-        state.attention.as_ref(),
-        state.monitoring.as_ref(),
-        &context,
-        &list_query,
-    )
-    .await?;
+    let cursor = list_query.cursor()?;
+    let listing = state
+        .attention_use_cases
+        .list(
+            &viewer,
+            access.company.id,
+            list_request(&list_query, cursor.as_ref())?,
+        )
+        .await?;
+    let page = listing.page;
     let account = state
         .user_use_cases
         .get_user_by_id(viewer.user_id)
@@ -335,31 +214,32 @@ async fn work_page(
 }
 
 async fn work_list(
-    State(attention): State<Arc<dyn AttentionPersistence>>,
+    State(attention): State<Arc<AttentionUseCases>>,
     State(companies): State<Arc<CompanyUseCases>>,
-    State(channels): State<Arc<ChannelUseCases>>,
-    State(threads): State<Arc<ThreadUseCases>>,
-    State(monitoring): State<Arc<dyn MonitoringService>>,
     viewer: Viewer,
     Query(query): Query<WorkQuery>,
 ) -> AppResult<Html<String>> {
     let (_, selected) = load_readable_company(&companies, viewer.user_id, query.company_id).await?;
     let access = selected.ok_or_else(crate::use_cases::company::company_not_found)?;
-    let context = read_context(&companies, &channels, &threads, &viewer, access.company.id).await?;
     let list_query = ListQuery {
         view: query.view,
         cursor: query.cursor,
         limit: query.limit,
     };
     let view = list_query.view()?;
-    let page = read_page(
-        attention.as_ref(),
-        monitoring.as_ref(),
-        &context,
-        &list_query,
-    )
-    .await?;
-    Ok(Html(pages::attention_list(access.company.id, view, &page)))
+    let cursor = list_query.cursor()?;
+    let listing = attention
+        .list(
+            &viewer,
+            access.company.id,
+            list_request(&list_query, cursor.as_ref())?,
+        )
+        .await?;
+    Ok(Html(pages::attention_list(
+        access.company.id,
+        view,
+        &listing.page,
+    )))
 }
 
 #[cfg(test)]
@@ -402,3 +282,7 @@ mod tests {
         assert!(wakes_attention(&MailboxEvent::Resync, company, &visible));
     }
 }
+
+#[cfg(test)]
+#[path = "attention_authorization_tests.rs"]
+mod authorization_tests;

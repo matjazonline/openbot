@@ -160,49 +160,28 @@ fn delivery_mode(deliver: bool) -> ReplyDelivery {
     }
 }
 
-/// The company a mailbox request is scoped to, always picked from the caller's own companies so a
-/// guessed `company_id` cannot reach another user's mail.
-pub(super) async fn load_scoped_company(
-    company_use_cases: &CompanyUseCases,
-    user_id: Uuid,
-    requested: Option<Uuid>,
-) -> AppResult<(Vec<Company>, Option<Company>)> {
-    let companies = company_use_cases.list_user_companies(user_id).await?;
-    let selected = match requested {
-        Some(id) => companies.iter().find(|c| c.id == id).cloned(),
-        None => companies.first().cloned(),
-    };
-    Ok((companies, selected))
-}
-
-/// The company an operational or automation-management request is scoped to.
-///
-/// Owners and company admins may configure these resources. Ordinary members are intentionally
-/// absent from both the returned list and the selection, so a guessed company id grants nothing.
+/// A management request's company: explicit IDs use the one-row manager check (404/403).
+/// The list only fills the switcher and supplies the default when nothing is requested.
 pub(super) async fn load_managed_company(
     company_use_cases: &CompanyUseCases,
     user_id: Uuid,
     requested: Option<Uuid>,
-) -> AppResult<(Vec<Company>, Option<Company>)> {
-    let companies = company_use_cases.list_managed_companies(user_id).await?;
+) -> AppResult<(Vec<Company>, Option<CompanyAccess>)> {
     let selected = match requested {
-        Some(id) => companies.iter().find(|company| company.id == id).cloned(),
-        None => companies.first().cloned(),
+        Some(id) => Some(company_use_cases.managed_company(user_id, id).await?),
+        None => None,
     };
+    let managed = company_use_cases.list_managed_companies(user_id).await?;
+    let selected = selected.or_else(|| managed.first().cloned());
+    let companies = managed.into_iter().map(|access| access.company).collect();
     Ok((companies, selected))
-}
-
-/// Membership implied by a successful [`load_managed_company`] selection.
-pub(super) fn managed_company_membership(company: &Company, user_id: Uuid) -> CompanyMembership {
-    if company.user_id == user_id {
-        CompanyMembership::Owner
-    } else {
-        CompanyMembership::Admin
-    }
 }
 
 /// The company a *read* is scoped to, from the companies the caller may see rather than only the
 /// ones they own -- an invited member reads their team's mail, but still administers nothing.
+///
+/// An explicitly requested company is authorized on its own (`readable_company`); the list fills
+/// the switcher and supplies the default.
 pub(super) async fn load_readable_company(
     company_use_cases: &CompanyUseCases,
     user_id: Uuid,
@@ -210,7 +189,7 @@ pub(super) async fn load_readable_company(
 ) -> AppResult<(Vec<Company>, Option<CompanyAccess>)> {
     let accessible = company_use_cases.list_accessible_companies(user_id).await?;
     let selected = match requested {
-        Some(id) => accessible.iter().find(|a| a.company.id == id).cloned(),
+        Some(id) => Some(company_use_cases.readable_company(user_id, id).await?),
         None => accessible.first().cloned(),
     };
 
@@ -237,21 +216,11 @@ pub(super) async fn load_viewable_channel(
         .await?
         .ok_or_else(|| AppError::NotFound("Channel not found".into()))?;
     let company = company_use_cases
-        .get_company(company_id)
+        .readable_company(viewer.user_id, company_id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Company not found".into()))?;
+        .company;
 
     Ok((company, channel))
-}
-
-/// A thread, but only when it really belongs to the channel the request claims.
-pub(super) async fn load_channel_thread(
-    thread_use_cases: &ThreadUseCases,
-    channel_id: Uuid,
-    thread_id: Uuid,
-) -> AppResult<Option<Thread>> {
-    let thread = thread_use_cases.get_thread(thread_id).await?;
-    Ok(thread.filter(|thread| thread.channel_id == channel_id))
 }
 
 fn empty_thread_page() -> ThreadListResponse {
@@ -370,7 +339,9 @@ async fn mailbox_page(
 
     let selected_thread = match (selected_channel, query.thread_id) {
         (Some(channel), Some(thread_id)) => {
-            load_channel_thread(&thread_use_cases, channel.id, thread_id).await?
+            thread_use_cases
+                .readable_thread(&viewer, channel.company_id, channel.id, thread_id)
+                .await?
         }
         (Some(_), None) => thread_page.threads.first().cloned(),
         (None, _) => None,
@@ -508,7 +479,8 @@ async fn message_pane_fragment(
         .get_readable_channel(&viewer, query.company_id, query.channel_id)
         .await?
         .ok_or_else(|| AppError::NotFound("Channel not found".into()))?;
-    let thread = load_channel_thread(&thread_use_cases, channel.id, query.thread_id)
+    let thread = thread_use_cases
+        .readable_thread(&viewer, channel.company_id, channel.id, query.thread_id)
         .await?
         .ok_or_else(|| AppError::NotFound("Thread not found".into()))?;
 
@@ -566,7 +538,8 @@ async fn thread_message_stream(
         .get_readable_channel(&viewer, query.company_id, query.channel_id)
         .await?
         .ok_or_else(|| AppError::NotFound("Channel not found".into()))?;
-    let thread = load_channel_thread(&thread_use_cases, channel.id, query.thread_id)
+    let thread = thread_use_cases
+        .readable_thread(&viewer, channel.company_id, channel.id, query.thread_id)
         .await?
         .ok_or_else(|| AppError::NotFound("Thread not found".into()))?;
 
@@ -981,7 +954,8 @@ async fn reply_form(
         query.channel_id,
     )
     .await?;
-    let thread = load_channel_thread(&thread_use_cases, channel.id, query.thread_id)
+    let thread = thread_use_cases
+        .readable_thread(&viewer, channel.company_id, channel.id, query.thread_id)
         .await?
         .ok_or_else(|| AppError::NotFound("Thread not found".into()))?;
     let sender_email = sender_email(&user_use_cases, viewer.user_id).await?;
@@ -1025,7 +999,8 @@ async fn send_reply(
         form.channel_id,
     )
     .await?;
-    let thread = load_channel_thread(&thread_use_cases, channel.id, form.thread_id)
+    let thread = thread_use_cases
+        .readable_thread(&viewer, channel.company_id, channel.id, form.thread_id)
         .await?
         .ok_or_else(|| AppError::NotFound("Thread not found".into()))?;
     let sender_email = sender_email(&user_use_cases, viewer.user_id).await?;
@@ -1161,7 +1136,7 @@ pub(super) fn workspace_user<'a>(
         username: &account.username,
         email: account_email,
         avatar_url: account.avatar_url.as_ref(),
-        is_operator: config.is_operator(account),
+        is_operator: crate::adapters::http::auth::caller_for(account, config).is_operator(),
         company_membership: CompanyMembership::None,
     }
 }

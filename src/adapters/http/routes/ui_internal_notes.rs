@@ -28,7 +28,7 @@ use crate::{
     use_cases::{channel::ChannelUseCases, company::CompanyUseCases, thread::ThreadUseCases},
 };
 
-use super::ui::{load_channel_thread, load_viewable_channel, render_message_pane};
+use super::ui::{load_viewable_channel, render_message_pane};
 
 const NOTE_BODY_LIMIT: usize = MAX_INTERNAL_NOTE_BYTES + 16 * 1024;
 
@@ -111,7 +111,8 @@ async fn load_scope(
         channel_id,
     )
     .await?;
-    let thread = load_channel_thread(thread_use_cases, channel.id, thread_id)
+    let thread = thread_use_cases
+        .readable_thread(viewer, channel.company_id, channel.id, thread_id)
         .await?
         .ok_or_else(|| AppError::NotFound("Thread not found".into()))?;
     let actor = thread_use_cases

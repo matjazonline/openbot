@@ -13,9 +13,9 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::{
-    adapters::http::{app_state::AppState, auth::AuthenticatedUser, pages},
+    adapters::http::{app_state::AppState, pages},
     app_error::{AppError, AppResult},
-    entities::{agent::Agent, value_objects::AvatarUrl},
+    entities::{agent::Agent, user::Caller, value_objects::AvatarUrl},
     infra::config::AppConfig,
     use_cases::{
         agent::{AgentUseCases, AgentWrite},
@@ -87,22 +87,6 @@ impl LibraryAgentResponse {
     }
 }
 
-pub(super) async fn require_operator(
-    user: &AuthenticatedUser,
-    users: &UserUseCases,
-    config: &AppConfig,
-) -> AppResult<()> {
-    let account = users
-        .get_user_by_id(user.id)
-        .await?
-        .ok_or(AppError::InvalidCredentials)?;
-    if config.is_operator(&account) {
-        Ok(())
-    } else {
-        Err(AppError::NotFound("Library workspace not found.".into()))
-    }
-}
-
 fn write(payload: AgentJsonPayload) -> Result<AgentWrite, AppError> {
     let avatar_url = payload.avatar_url().map_err(AppError::BadRequest)?;
     Ok(AgentWrite {
@@ -122,13 +106,10 @@ fn write(payload: AgentJsonPayload) -> Result<AgentWrite, AppError> {
 async fn list_json(
     State(agents): State<Arc<AgentUseCases>>,
     State(skills): State<Arc<SkillUseCases>>,
-    State(users): State<Arc<UserUseCases>>,
-    State(config): State<Arc<AppConfig>>,
-    user: AuthenticatedUser,
+    caller: Caller,
 ) -> AppResult<Json<Vec<LibraryAgentResponse>>> {
-    require_operator(&user, &users, &config).await?;
     let mut response = Vec::new();
-    for agent in agents.list_library_agents().await? {
+    for agent in agents.library_agents_for(&caller).await? {
         let capabilities = skills
             .library_agent_capabilities(agent.id)
             .await?
@@ -144,14 +125,11 @@ async fn list_json(
 async fn get_json(
     State(agents): State<Arc<AgentUseCases>>,
     State(skills): State<Arc<SkillUseCases>>,
-    State(users): State<Arc<UserUseCases>>,
-    State(config): State<Arc<AppConfig>>,
-    user: AuthenticatedUser,
+    caller: Caller,
     Path(id): Path<Uuid>,
 ) -> AppResult<Json<LibraryAgentResponse>> {
-    require_operator(&user, &users, &config).await?;
     let agent = agents
-        .get_library_agent(id)
+        .library_agent_for(&caller, id)
         .await?
         .ok_or_else(|| AppError::NotFound("Library agent not found.".into()))?;
     let capabilities = skills
@@ -166,14 +144,14 @@ async fn get_json(
 
 async fn create_json(
     State(agents): State<Arc<AgentUseCases>>,
-    State(users): State<Arc<UserUseCases>>,
-    State(config): State<Arc<AppConfig>>,
     State(skills): State<Arc<SkillUseCases>>,
-    user: AuthenticatedUser,
+    caller: Caller,
     Json(payload): Json<AgentJsonPayload>,
 ) -> AppResult<(StatusCode, Json<LibraryAgentResponse>)> {
-    require_operator(&user, &users, &config).await?;
-    let agent = agents.create_library_agent(write(payload)?).await?;
+    agents.authorize_library(&caller)?;
+    let agent = agents
+        .create_library_agent(&caller, write(payload)?)
+        .await?;
     let capabilities = skills
         .library_agent_capabilities(agent.id)
         .await?
@@ -189,20 +167,23 @@ async fn create_json(
 
 async fn update_json(
     State(agents): State<Arc<AgentUseCases>>,
-    State(users): State<Arc<UserUseCases>>,
-    State(config): State<Arc<AppConfig>>,
     State(skills): State<Arc<SkillUseCases>>,
-    user: AuthenticatedUser,
+    caller: Caller,
     Path(id): Path<Uuid>,
     Json(mut payload): Json<AgentJsonPayload>,
 ) -> AppResult<Json<LibraryAgentResponse>> {
-    require_operator(&user, &users, &config).await?;
+    agents
+        .library_agent_for(&caller, id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Library agent not found".into()))?;
     let stored = skills
         .library_agent_capabilities(id)
         .await?
         .ok_or_else(|| AppError::NotFound("Library agent not found".into()))?;
     payload.preserve_capabilities(&stored);
-    let agent = agents.update_library_agent(id, write(payload)?).await?;
+    let agent = agents
+        .update_library_agent(&caller, id, write(payload)?)
+        .await?;
     let capabilities = skills
         .library_agent_capabilities(id)
         .await?
@@ -215,13 +196,10 @@ async fn update_json(
 
 async fn delete_json(
     State(agents): State<Arc<AgentUseCases>>,
-    State(users): State<Arc<UserUseCases>>,
-    State(config): State<Arc<AppConfig>>,
-    user: AuthenticatedUser,
+    caller: Caller,
     Path(id): Path<Uuid>,
 ) -> AppResult<StatusCode> {
-    require_operator(&user, &users, &config).await?;
-    agents.delete_library_agent(id).await?;
+    agents.delete_library_agent(&caller, id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -247,14 +225,12 @@ struct PromptForm {
 
 async fn generate_prompt_fragment(
     State(agents): State<Arc<AgentUseCases>>,
-    State(users): State<Arc<UserUseCases>>,
-    State(config): State<Arc<AppConfig>>,
-    user: AuthenticatedUser,
+    caller: Caller,
     Form(form): Form<PromptForm>,
 ) -> AppResult<Html<String>> {
-    require_operator(&user, &users, &config).await?;
     let prompt = agents
         .generate_library_system_prompt(
+            &caller,
             &form.instructions,
             form.provider.as_deref(),
             form.model.as_deref(),
@@ -269,14 +245,12 @@ async fn generate_prompt_fragment(
 
 async fn generate_prompt(
     State(agents): State<Arc<AgentUseCases>>,
-    State(users): State<Arc<UserUseCases>>,
-    State(config): State<Arc<AppConfig>>,
-    user: AuthenticatedUser,
+    caller: Caller,
     Json(payload): Json<PromptPayload>,
 ) -> AppResult<Json<PromptResponse>> {
-    require_operator(&user, &users, &config).await?;
     let system_prompt = agents
         .generate_library_system_prompt(
+            &caller,
             &payload.instructions,
             payload.provider.as_deref(),
             payload.model.as_deref(),
@@ -291,11 +265,12 @@ async fn workspace(
     State(skills): State<Arc<SkillUseCases>>,
     State(users): State<Arc<UserUseCases>>,
     State(config): State<Arc<AppConfig>>,
-    user: AuthenticatedUser,
+    caller: Caller,
 ) -> AppResult<Html<String>> {
-    require_operator(&user, &users, &config).await?;
+    // The operator-checked read comes first: nothing about the library is read for anyone else.
+    let library_agents = agents.library_agents_for(&caller).await?;
     let account = users
-        .get_user_by_id(user.id)
+        .get_user_by_id(caller.user_id)
         .await?
         .ok_or(AppError::InvalidCredentials)?;
     let account_email = account.email.as_str().into();
@@ -307,7 +282,7 @@ async fn workspace(
         })
         .await?;
     let mut rows = String::new();
-    for agent in agents.list_library_agents().await? {
+    for agent in library_agents {
         let capabilities = skills
             .library_agent_capabilities(agent.id)
             .await?
@@ -370,3 +345,7 @@ async fn workspace(
         content: &content,
     })))
 }
+
+#[cfg(test)]
+#[path = "agent_library_authorization_tests.rs"]
+mod authorization_tests;

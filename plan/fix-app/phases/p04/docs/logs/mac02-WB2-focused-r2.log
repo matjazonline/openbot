@@ -1,0 +1,96 @@
+   Compiling mail_agents v0.1.0 (/Users/mac02/dev/openbot-recovery/.worktrees/fix-app-p04)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2m 03s
+     Running unittests src/lib.rs (target/debug/deps/mail_agents-91c1847adc52f46f)
+
+running 63 tests
+test adapters::http::routes::onboarding::tests::onboarding_pages_render_each_step ... ok
+test adapters::http::routes::onboarding::authorization_tests::onboarding_page_hides_foreign_companies_and_refuses_members ... ok
+test adapters::http::routes::assistant_channels::tests::assistant_channel_route_maps_results_and_refusals ... ok
+test adapters::http::routes::onboarding::tests::the_channel_step_gives_each_modelled_agent_one_assistant_channel ... ok
+test adapters::persistence::workflow::provisioning::tests::requester_source_matches_each_stored_admission_source ... ok
+test adapters::persistence::onboarding::tests::onboarding_address_refusal_keeps_the_agent_and_other_channels ... ok
+test adapters::persistence::onboarding::tests::onboarding_denials_and_invalid_selection_have_no_provider_effects ... FAILED
+test adapters::persistence::onboarding::tests::onboarding_library_model_lookup_failure_remains_an_infrastructure_error ... ok
+test adapters::persistence::onboarding::tests::onboarding_same_key_custom_competitors_wait_for_company_and_generate_once ... ok
+test adapters::persistence::onboarding::tests::onboarding_provider_failure_releases_transaction_for_retry ... ok
+test adapters::persistence::onboarding::tests::onboarding_one_connection_progresses_with_real_custom_library_and_competitor ... ok
+test adapters::persistence::onboarding::tests::onboarding_new_key_after_rename_does_not_replay_an_old_channel ... ok
+test adapters::persistence::onboarding::tests::onboarding_cancellation_drops_provider_and_releases_company_lock ... ok
+test adapters::persistence::onboarding::tests::onboarding_same_key_reuses_results_and_new_key_after_deletion_is_fresh ... ok
+test adapters::persistence::onboarding::tests::onboarding_second_channel_error_rolls_back_every_effect ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::assistant_channel_command_replays_by_key_and_refuses_a_changed_request ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_grants_capture_the_built_in_or_refuse_an_ambiguous_capture ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::assistant_channel_commands_race_to_one_assistant ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_lists_agents_and_models ... ok
+test adapters::smtp::server::answer_tests::a_failure_of_ours_is_transient_and_a_malformed_message_is_not ... ok
+test adapters::smtp::server::answer_tests::a_message_refused_on_its_merits_is_a_permanent_rejection ... ok
+test adapters::smtp::server::answer_tests::a_message_the_platform_chose_not_to_route_is_accepted_and_dropped ... ok
+test adapters::smtp::server::answer_tests::an_accepted_message_is_queued ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_transient_fault_leaves_no_marker_receipt_or_effect ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_lists_an_oversized_directory_within_its_bound ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_stale_fences_write_nothing ... ok
+test adapters::smtp::server::tests::smtp_line_limits_accept_boundary_and_reject_one_over ... ok
+test adapters::smtp::server::tests::declared_size_and_streamed_data_share_the_twenty_mib_limit ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_competing_claimants_create_one_assistant ... ok
+test adapters::smtp::server::tests::smtp_sender_trust_lookup_failure_is_logged_and_scanned ... FAILED
+test adapters::smtp::server::tests::test_dkim_verification_with_gmail_raw_email ... ignored, optional live DNS smoke; required CI denies external egress
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_losing_an_address_race_is_a_conflict_refusal ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_in_a_child_run_acts_for_the_roots_requester ... ok
+test adapters::smtp::server::tests::test_spf_verification_with_google_ip ... ignored, optional live DNS smoke; required CI denies external egress
+test adapters::smtp::server::tests::test_parse_raw_mime_to_payload ... ok
+test adapters::smtp::transport::tests::plaintext_rejects_credentials ... ok
+test adapters::smtp::transport::tests::plaintext_accepts_ipv4_and_ipv6_loopback_without_credentials ... ok
+test adapters::smtp::transport::tests::plaintext_rejects_remote_ip ... ok
+test adapters::smtp::transport::tests::remote_credentials_build_only_a_tls_transport ... ok
+test adapters::smtp::server::tests::test_smtp_rate_limiting_and_monitoring ... ok
+test application::use_cases::agent::tests::a_library_pick_is_copied_into_the_company_with_a_model_it_can_run ... ok
+test application::use_cases::agent::tests::creating_an_agent_creates_only_the_agent ... ok
+test application::use_cases::agent::tests::company_owner_agent_crud_flow_works ... ok
+test application::use_cases::agent::tests::members_read_agents_and_admins_manage_them ... ok
+test application::use_cases::agent::tests::validating_a_new_agent_normalizes_the_handle_and_refuses_an_unavailable_model ... ok
+test adapters::smtp::transport::tests::security_email_identity_transport_availability_matches_built_client ... ok
+test application::use_cases::agent::tests::prompt_generation_requires_explicitly_owned_credentials ... ok
+test application::use_cases::agent::tests::nonoperators_cannot_manage_library_agents_or_spend_prompt_credentials ... ok
+test application::use_cases::builtin_agent_library::tests::agent_builder_is_granted_the_provisioning_tools_and_told_their_rules ... ok
+test application::workflow::provisioning::tests::every_built_in_name_is_reserved ... ok
+test application::workflow::provisioning::tests::arguments_are_held_to_the_input_contract ... ok
+test application::workflow::provisioning::tests::only_the_exact_name_only_built_in_is_trusted ... ok
+test application::workflow::provisioning::tests::refusals_and_results_are_both_valid_receipts ... ok
+test application::workflow::provisioning::tests::http_operations_cannot_take_a_built_in_name ... ok
+test adapters::smtp::server::tests::stale_dkim_and_submitted_auth_headers_do_not_authorize_smtp_mail ... ok
+test application::workflow::registry::message_tests::provisioning_names_are_not_step_tools ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_refusals_commit_a_receipt_and_no_effect ... ok
+test adapters::smtp::server::tests::smtp_sender_trust_matches_routing_aliases_and_distinguishes_strangers ... FAILED
+test adapters::smtp::server::tests::submitted_authentication_headers_cannot_authorize_smtp_mail ... ok
+test adapters::persistence::onboarding::tests::onboarding_prompt_and_operation_timeouts_cancel_and_allow_retry ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::builder_provisions_an_assistant_for_a_signed_in_admin ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::reviewed_assistants_park_their_answer_until_the_run_deadline ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::builder_refuses_members_and_emailed_requests ... ok
+
+failures:
+
+---- adapters::persistence::onboarding::tests::onboarding_denials_and_invalid_selection_have_no_provider_effects stdout ----
+
+thread 'adapters::persistence::onboarding::tests::onboarding_denials_and_invalid_selection_have_no_provider_effects' (29447692) panicked at src/adapters/persistence/onboarding/tests.rs:570:14:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "08P01", message: "bind message supplies 3 parameters, but prepared statement \"sqlx_s_1\" requires 4", detail: None, hint: None, position: None, where: None, schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("postgres.c"), line: Some(1731), routine: Some("exec_bind_message") })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::smtp::server::tests::smtp_sender_trust_lookup_failure_is_logged_and_scanned stdout ----
+
+thread 'adapters::smtp::server::tests::smtp_sender_trust_lookup_failure_is_logged_and_scanned' (29447956) panicked at src/infra/config.rs:416:49:
+JWT_SECRET must be set: NotPresent
+
+---- adapters::smtp::server::tests::smtp_sender_trust_matches_routing_aliases_and_distinguishes_strangers stdout ----
+
+thread 'adapters::smtp::server::tests::smtp_sender_trust_matches_routing_aliases_and_distinguishes_strangers' (29447957) panicked at src/infra/config.rs:416:49:
+JWT_SECRET must be set: NotPresent
+
+
+failures:
+    adapters::persistence::onboarding::tests::onboarding_denials_and_invalid_selection_have_no_provider_effects
+    adapters::smtp::server::tests::smtp_sender_trust_lookup_failure_is_logged_and_scanned
+    adapters::smtp::server::tests::smtp_sender_trust_matches_routing_aliases_and_distinguishes_strangers
+
+test result: FAILED. 58 passed; 3 failed; 2 ignored; 0 measured; 2550 filtered out; finished in 10.34s
+
+error: test failed, to rerun pass `--lib`

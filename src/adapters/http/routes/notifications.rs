@@ -14,14 +14,11 @@ use uuid::Uuid;
 use crate::{
     adapters::http::{app_state::AppState, pages},
     app_error::{AppError, AppResult},
-    application::notification::NotificationPersistence,
+    application::{attention::AttentionReadContext, notification::NotificationPersistence},
     entities::{notification::NotificationPage, user::Viewer},
 };
 
-use super::{
-    attention::{ReadContext, read_context},
-    ui::{load_readable_company, workspace_user},
-};
+use super::ui::{load_readable_company, workspace_user};
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -53,7 +50,7 @@ struct NotificationQuery {
 async fn read_notifications(
     persistence: &dyn NotificationPersistence,
     viewer: &Viewer,
-    context: &ReadContext,
+    context: &AttentionReadContext,
 ) -> AppResult<NotificationPage> {
     persistence
         .list_notifications(
@@ -191,9 +188,7 @@ async fn notification_events(
 ) -> AppResult<Sse<impl Stream<Item = Result<Event, Infallible>>>> {
     let receiver = state.events.subscribe();
     notification_read_context(&state, &viewer, company_id).await?;
-    let companies = state.company_use_cases;
-    let channels = state.channel_use_cases;
-    let threads = state.thread_use_cases;
+    let attention = state.attention_use_cases.clone();
     let user_id = viewer.user_id;
     let stream = stream! {
         yield Ok(reconcile_event(company_id));
@@ -210,9 +205,7 @@ async fn notification_events(
                     Some(Err(_)) => yield Ok(reconcile_event(company_id)),
                     None => break,
                 },
-                _ = periodic.tick() => match read_context(
-                    &companies, &channels, &threads, &viewer, company_id
-                ).await {
+                _ = periodic.tick() => match attention.read_context(&viewer, company_id).await {
                     Ok(_) => yield Ok(reconcile_event(company_id)),
                     Err(_) => break,
                 },
@@ -233,13 +226,9 @@ async fn notification_read_context(
     state: &AppState,
     viewer: &Viewer,
     company_id: Uuid,
-) -> AppResult<ReadContext> {
-    read_context(
-        &state.company_use_cases,
-        &state.channel_use_cases,
-        &state.thread_use_cases,
-        viewer,
-        company_id,
-    )
-    .await
+) -> AppResult<AttentionReadContext> {
+    state
+        .attention_use_cases
+        .read_context(viewer, company_id)
+        .await
 }
