@@ -1,0 +1,9 @@
+Fresh offline clone and both worktrees restored successfully in /private/tmp/fix-app-recovery-verify-20261104.
+1464 p03 and1473 p04 source files verified against SHA256/executable manifest.
+p03 historical snapshot digest MATCH: 05defcdaaf223bb332f5123dcddda09b740a1d64b96501f9108892e25a1220e9
+p04 historical snapshot digest MATCH: a366d1d6eaba053c6a66ad52a798a073ec14e8a9cecd5903c3a22840d504e092
+No application tests or implementation were resumed.
+
+Git-based local-clone restoration also completed successfully.
+p03 source files and historical snapshot digest MATCH: 05defcdaaf223bb332f5123dcddda09b740a1d64b96501f9108892e25a1220e9
+p04 source files and historical snapshot digest MATCH: a366d1d6eaba053c6a66ad52a798a073ec14e8a9cecd5903c3a22840d504e092

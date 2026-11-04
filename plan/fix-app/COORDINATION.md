@@ -2,7 +2,7 @@
 
 - Authority: /Users/mac03/dev/openbot/plan/fix-app/COORDINATION.md (primary checkout, main branch; untracked)
 - Writer: manager root session (main conversation), worktree /Users/mac03/dev/openbot
-- Revision: 5
+- Revision: 10
 
 ## Plan-wide instructions
 
@@ -41,8 +41,8 @@
 | p01 | phase root agent | (removed) | main: plan/fix-app/phases/p01/docs/ | integrated in main 9d68a6b (commit 4d940da) |
 | p02 | phase root agent | (removed) | main: plan/fix-app/phases/p02/docs/ | integrated in main fbf56e9 (commit 7ca2fb5) |
 | p05 | phase root agent | (removed) | main: plan/fix-app/phases/p05/docs/ | integrated in main 48626a1 (commit 2f16a07) |
-| p03 | phase root agent | .worktrees/fix-app-p03 | .worktrees/fix-app-p03/plan/fix-app/phases/p03/docs/ | paused (G1 r3 PASS; batch 4 done, batches 1-2 partial, 3 not started; nothing committed) |
-| p04 | phase root agent | .worktrees/fix-app-p04 | .worktrees/fix-app-p04/plan/fix-app/phases/p04/docs/ | paused (G1 r3 PASS; batches 1-4 written, lib does not compile yet; 5-6 not started; nothing committed) |
+| p03 | stopped author/reviewer; resume with fresh workers | .worktrees/fix-app-p03 | .worktrees/fix-app-p03/plan/fix-app/phases/p03/docs/ | paused by user; G1r4 PASS; core24/24 PASS; affected1071 passed/31 failed/1 ignored; uncommitted, no B1 acceptance |
+| p04 | stopped author/reviewer; resume with fresh workers | .worktrees/fix-app-p04 | .worktrees/fix-app-p04/plan/fix-app/phases/p04/docs/ | paused by user; G1r6 PASS; all-target check and authorization15/15 PASS; WB1 unreviewed, WB2 not started; uncommitted |
 | p06 | — | — | — | awaiting p03 merge |
 | p07 | — | — | — | awaiting p04 merge |
 | p08 | — | — | — | awaiting p03 merge (p01, p02 integrated) |
@@ -128,3 +128,64 @@ Phases request notices in their final report or by SendMessage to the manager.
   inbound_event_worker.rs with p03's `AppError::WorkflowGuard`. Merge second one resolves.
 - p04 -> p07: ThreadUseCases persistence accessors removed; new AttentionUseCases, Caller, onboarding use case.
 - 2026-11-01: revision 5 — p03 and p04 paused at safe points by user; reviewers stopped; handoffs written.
+
+## Resume ownership (2026-11-04)
+- Coordination writer transferred from the stopped manager to current manager thread thr_gwccjxwzjt in /Users/mac03/dev/openbot.
+- User selected implement-astra-reviewed-2-2 and explicitly chose separate Sol 6.1/xhigh phase authors. Root stays coordinator (actual model/effort not exposed); independent reviewers are Astra/high, direct children of root, without inherited context. Historical Opus gate evidence remains historical; fresh reviewers validate it before dependent work that needs a gate.
+- Current primary HEAD e4273e8; phase worktrees remain at 48626a1 with preserved uncommitted phase work. Preserve the unrelated primary modification plan/knowledge-access-levels/README.md. Authors finish on their existing baseline; integration must reconcile all intervening main changes and receive independent review before acceptance as integrated.
+- Prior authorizations retained: accepted phase commits, local main merges, pull origin/main if new, dependent phases after prerequisite integration, no push. I004 targeted verification continues to supersede full-suite gates.
+- Host exposes context usage but effective auto-compaction threshold is unknown; durable phase checkpoints required.
+
+### fix-app-C006 / r1
+- State: proposed
+- Origin: p03 paused TASK Cross-phase notes; G1 r3 historical review
+- Targets: p06, p08
+- Instruction/change: p06 must account for workflow_runs BEFORE-trigger order and terminal-execution CHECK. p08 must account for retirement guard, workflow.guard_violation, handler *.guard_violation, event guard_violation:<guard>, and removal of token_refusal cancelled.
+- Dependencies/order: blocked on accepted and integrated p03 artifact; consult final p03 decision and tests before affected edits.
+- Evidence/review: p03 authoritative TASK/REVIEW in .worktrees/fix-app-p03/plan/fix-app/phases/p03/docs; pending fresh review and completed implementation.
+- Responses: p06 -> pending; p08 -> pending
+
+### fix-app-C007 / r1
+- State: active
+- Origin: p04 paused TASK Cross-phase notes
+- Targets: p03, p04 integration
+- Instruction/change: p04 adds AppError::Forbidden; p03 adds AppError::WorkflowGuard. Preserve both semantics in app_error.rs, app_error_impl.rs, inbound_event_worker.rs when merging; second merge resolves overlap and runs both phases' affected checks.
+- Evidence/review: both historical G1 r3 decisions; final code and combined behavior require fresh review.
+- Responses: p03 -> pending; p04 -> pending
+
+### fix-app-C008 / r1
+- State: proposed
+- Origin: p04 paused TASK Cross-phase notes
+- Targets: p07
+- Instruction/change: ThreadUseCases persistence accessors are removed; new AttentionUseCases, Caller, and onboarding ports/use case must be included in p07 layering work.
+- Dependencies/order: blocked on accepted and integrated p04 artifact; consult final p04 interfaces before affected edits.
+- Evidence/review: p04 authoritative TASK/REVIEW in .worktrees/fix-app-p04/plan/fix-app/phases/p04/docs; pending fresh review and implementation.
+- Responses: p07 -> pending
+
+### fix-app-I005 / r1 — User retention decision (2026-11-04)
+- State: active
+- Targets: p06, p08, integration
+- User explicitly selected: delete terminal workflow trees after90 days once no live child, open decision or unsettled reconciliation references them; preserve usage and cost reporting.
+- p06 owns the concrete storage/reporting preservation design and independent architecture gate. Do not delete usage/cost reporting information as a side effect of retention. p08 model_usage_calls nullability must follow accepted p06 decision/artifact.
+- No authorization for a production reset or deployment is added. Use isolated disposable fixtures for verification.
+- Responses: p06 -> pending; p08 -> pending; integration -> acknowledged, implementation pending
+
+## User pause (2026-11-04)
+- User explicitly requested: stop at safe checkpoint and write handoff. No new implementation/tests/reviews/commits/merges or dependent phases. Authors are saving current work and logs and stopping only their own commands; reviewer completed evidence remains preserved.
+- Manager resume authority remains /Users/mac03/dev/openbot/plan/fix-app/COORDINATION.md. Fresh resume must read primary plan/fix-app/integration/resumed-all/docs/HANDOFF.md and each authoritative phase HANDOFF in its worktree. Do not reuse stale worker handles from this session.
+- Current authorization for future resume remains separate Sol6.1/xhigh authors and independent Astra/high reviewers, targeted tests only, accepted local commits/merges, no push. This pause must be explicitly resumed before further work.
+- User retention decision I005/r1 remains90 days with usage/cost reporting preserved. p06/p07/p08 have not started.
+- p03/p04 source remains uncommitted and unaccepted in this resumed session. Their architecture gates have fresh PASS (p03 G1r4, p04 G1r6); code batches and combined integration still require independent review.
+- Manager-owned PG clusters pg-p03:55403, pg-p04:55404, pg-main:55400 remain preserved; do not clean other processes/caches. Final phase paths/digests/results are in phase handoffs.
+
+## Final stop confirmations (revision9)
+- Both authors and both independent reviewers confirmed all own commands stopped; no task source commits/merges/pushes occurred. Preserve worktrees/DBs.
+- p03 final digest05defcdaaf223bb332f5123dcddda09b740a1d64b96501f9108892e25a1220e9, sole exclusion plan/fix-app/phases/p03/docs; phase HANDOFF and logs/PAUSE-checkpoint.md authoritative. All31 broad-run failures remain unresolved.
+- p04 final digesta366d1d6eaba053c6a66ad52a798a073ec14e8a9cecd5903c3a22840d504e092, sole exclusion plan/fix-app/phases/p04/docs; phase HANDOFF authoritative. Broader union/clippy/sqlx/code review not started.
+- Manager HANDOFF: /Users/mac03/dev/openbot/plan/fix-app/integration/resumed-all/docs/HANDOFF.md. Phase handoffs last reconciledr8; revision9 only updates final stop/status identities, no technical requirement changes.
+
+## Portable checkpoint publication (revision10)
+- User explicitly authorized committing and pushing this recovery checkpoint to main. This publishes paused source as patches/new-file archives plus records, not as accepted phase implementation; application work remains paused.
+- Versioned recovery entry point: plan/fix-app/recovery/2026-11-04/README.md and restore.py. Git-based restore reuses original base48626a1 from repository history, creates fresh worktrees, restores phase records, and verifies source. No secrets, databases or build caches included.
+- Both offline ZIP and Git-based restoration were exercised in temporary checkouts; all2937 source files and both historical workflow snapshot digests matched. The original phase worktrees were not changed.
+- After pulling main on another computer, read versioned recovery README and restore into a NEW directory; do not resolve old machine-local absolute paths directly. Fresh manager must establish local coordination authority/resource paths before resumed implementation.

@@ -1,0 +1,4 @@
+# Preserve checksummed payload bytes across Git line-ending settings.
+* -text
+# Blank context lines in patch data contain a required space.
+*.patch -whitespace
