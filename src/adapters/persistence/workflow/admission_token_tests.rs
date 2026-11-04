@@ -147,3 +147,25 @@ async fn workflow_admit_token_child_admission_refused_and_runtime_child_shares_r
         .unwrap();
     assert_eq!(budgets, 1);
 }
+
+#[tokio::test]
+async fn root_budget_admission_token_policy_equals_the_compiled_policy() {
+    let (f, reviewer) = configured().await;
+    let prepared = f.prepare(f.request("token-policy", f.manual())).await;
+    f.persistence().admit(&prepared).await.unwrap();
+    let policy: Value = sqlx::query_scalar(
+        "SELECT token_policy FROM workflow_root_budgets WHERE company_id=$1 AND root_run_id=$2",
+    )
+    .bind(prepared.company_id().as_uuid())
+    .bind(prepared.proposed_run_id().as_uuid())
+    .fetch_one(f.persistence().pool())
+    .await
+    .unwrap();
+    assert_eq!(
+        policy,
+        json!({"max_tokens":2000,"reviewers":[{"kind":"user","id":reviewer}]})
+    );
+    let compiled:Value=sqlx::query_scalar("SELECT version->'compiled'->'root_budget'->'tokens' FROM workflow_runs AS run CROSS JOIN LATERAL jsonb_array_elements(convert_from(run.bundle,'UTF8')::jsonb->'versions') AS version WHERE run.id=$1 AND version->>'version'=convert_from(run.bundle,'UTF8')::jsonb->>'root'")
+        .bind(prepared.proposed_run_id().as_uuid()).fetch_one(f.persistence().pool()).await.unwrap();
+    assert_eq!(policy, compiled);
+}

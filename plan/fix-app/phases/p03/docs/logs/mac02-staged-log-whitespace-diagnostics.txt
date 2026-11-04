@@ -1,0 +1,10 @@
+plan/fix-app/phases/p03/docs/logs/b1-core-focused.log:32: new blank line at EOF.
+plan/fix-app/phases/p03/docs/logs/graft-build-initial.log:1: trailing whitespace.
+plan/fix-app/phases/p03/docs/logs/mac02-b1-affected-union-r2.log:1211: new blank line at EOF.
+plan/fix-app/phases/p03/docs/logs/mac02-b1-affected-union.log:1210: new blank line at EOF.
+plan/fix-app/phases/p03/docs/logs/mac02-compensation-and-guard-green-r2.log:23: new blank line at EOF.
+plan/fix-app/phases/p03/docs/logs/mac02-final-graft-build.log:2: trailing whitespace.
+plan/fix-app/phases/p03/docs/logs/run-list-small-fixture.log:11: trailing whitespace.
+plan/fix-app/phases/p03/docs/logs/run-list-small-fixture.log:40: trailing whitespace.
+plan/fix-app/phases/p03/docs/logs/run-list-small-fixture.log:67: trailing whitespace.
+plan/fix-app/phases/p03/docs/logs/run-list-small-fixture.log:72: trailing whitespace.

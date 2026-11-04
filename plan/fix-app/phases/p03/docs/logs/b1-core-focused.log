@@ -1,0 +1,32 @@
+   Compiling mail_agents v0.1.0 (/Users/mac03/dev/openbot/.worktrees/fix-app-p03)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 41s
+     Running unittests src/lib.rs (target/debug/deps/mail_agents-65122ec83e7c21fc)
+
+running 24 tests
+test adapters::harness::rig::workflow::guard_tests::workflow_guard_error_agent_handler_mapping_names_the_guard_and_stays_retryable ... ok
+test adapters::persistence::tests::workflow_guard_error_is_typed_by_its_constraint_name ... ok
+test adapters::persistence::workflow::tests::admission_tests::admission_token_tests::root_budget_admission_token_policy_equals_the_compiled_policy ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::wakeup_tests::budget_schema_tests::root_budget_admission_matches_compiled_limits_and_starts_at_zero ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::wakeup_tests::budget_schema_tests::root_budget_admission_raw_root_without_budget_is_refused ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::transition_tests::run_transition_failed_to_running_without_retry_evidence_is_rejected ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::transition_tests::run_transition_guard_fires_before_finished_and_state_witness_triggers ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::transition_tests::run_transition_cancelled_to_running_is_rejected ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::transition_tests::run_transition_eligible_control_retry_commits_and_clears_terminal_id ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::wakeup_tests::budget_schema_tests::root_budget_admission_child_links_to_root_without_its_own_budget ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::transition_tests::run_transition_terminal_execution_shape_is_required_exactly_for_success_and_failure ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_pending_job_is_never_control_retry_safe ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_cancel_and_guard_failure_compete_for_one_terminal_run ... ok
+test application::workflow::actions::failure::tests::workflow_guard_error_action_handler_mapping_is_typed_bounded_and_retryable ... ok
+test domain::workflow::state::tests::stored_run_transition_table_includes_retry_and_keeps_success_and_cancel_final ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_parent_failure_cancels_its_live_child_subtree ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::transition_tests::workflow_lease_renew_update_itself_refuses_each_stale_fence_component ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_ordinary_connection_error_is_retried ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_retirement_first_keeps_the_competing_owners_result ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_pure_step_fails_once_and_stops_polling ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_io_completion_never_reexecutes_the_handler ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_decision_timeout_fails_instead_of_deferring_to_itself ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_run_expiry_handles_processing_expired_lease ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::transition_tests::run_transition_matrix_matches_domain ... ok
+
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 2578 filtered out; finished in 7.99s
+

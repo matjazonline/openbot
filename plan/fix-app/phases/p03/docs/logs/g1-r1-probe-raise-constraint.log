@@ -1,0 +1,11 @@
+# FIXAPP-P03-G1-R1 reviewer probe (2026-11-01), throwaway DB p03_review_g1_probe on 127.0.0.1:55403 (created, dropped)
+# Deferred constraint triggers raising with USING CONSTRAINT='workflow_guard:<name>'; psql VERBOSITY=verbose
+BEGIN; INSERT INTO t VALUES (1,1); COMMIT;
+ERROR:  23514: guard tripped
+CONTEXT:  PL/pgSQL function g() line 1 at RAISE
+CONSTRAINT NAME:  workflow_guard:g
+BEGIN; INSERT INTO t VALUES (2,2); COMMIT;
+ERROR:  P0001: p0001 tripped
+CONTEXT:  PL/pgSQL function p() line 1 at RAISE
+CONSTRAINT NAME:  workflow_guard:p
+# Conclusion: the constraint field reaches the client on COMMIT for both 23514 and default P0001 RAISEs.

@@ -272,7 +272,7 @@ async fn workflow_action_reconciliation_claim_sql_episode_wrong_retired_ordinal(
     // Actual safe ordinary retry supplies an earlier genuine attempt without an episode.
     let s = Box::pin(second_attempt_schedule()).await;
     let name = install_episode_probe(&s, "ordinal", s.request.fence.scope).await;
-    rejected_schedule(&s, "episode ordinal probe SQLSTATE=23514 SQLERRM=invalid current workflow reconciliation claim episode CONSTRAINT=").await;
+    rejected_schedule(&s, "episode ordinal probe SQLSTATE=23514 SQLERRM=invalid current workflow reconciliation claim episode CONSTRAINT=workflow_guard:workflow_action_claim_episode_guard").await;
     remove_episode_probe(&s, &name).await;
     assert!(matches!(
         run_command(&s.fixture, &s.command, s.verifier.clone())

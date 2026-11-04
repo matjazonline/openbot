@@ -183,7 +183,18 @@ async fn cancel_tree_on(
     let children: Vec<Uuid> = sqlx::query_scalar("SELECT child_run_id FROM workflow_waits WHERE company_id=$1 AND run_id=$2 AND state='waiting' AND reason='child_run' ORDER BY child_run_id")
         .bind(company.as_uuid()).bind(run.as_uuid()).fetch_all(&mut *db).await?;
     cancel_run_on(db, company, run).await?;
-    for child in children {
+    cancel_children_on(db, company, &children, actor).await
+}
+
+/// Cancel each still-live child subtree of a run that has just ended, parent already locked,
+/// recording `cancelled_by_parent` on each child. Shared by cancellation and guard failure.
+pub(super) async fn cancel_children_on(
+    db: &mut PgConnection,
+    company: CompanyId,
+    children: &[Uuid],
+    actor: Uuid,
+) -> AppResult<()> {
+    for &child in children {
         let live: Option<bool> = sqlx::query_scalar("SELECT state IN ('queued','running','waiting') FROM workflow_runs WHERE company_id=$1 AND id=$2 FOR UPDATE")
             .bind(company.as_uuid()).bind(child).fetch_optional(&mut *db).await?;
         if live != Some(true) {

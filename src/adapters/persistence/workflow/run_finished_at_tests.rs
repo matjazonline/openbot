@@ -13,7 +13,7 @@ use chrono::{DateTime, Utc};
 pub(super) async fn drive(f: &AdmissionFixture, run: RunId, state: RunStateName) {
     sqlx::query(
         "UPDATE workflow_runs SET state = $3, \
-         waiting_reason = CASE WHEN $3 = 'waiting' THEN 'timer' END \
+         waiting_reason = CASE WHEN $3 = 'waiting' THEN 'timer' END, terminal_execution_id=CASE WHEN $3 IN ('succeeded','failed') THEN (SELECT execution.id FROM workflow_executions AS execution WHERE execution.company_id=workflow_runs.company_id AND execution.run_id=workflow_runs.id ORDER BY activation DESC LIMIT 1) END \
          WHERE company_id = $1 AND id = $2",
     )
     .bind(f.binding.target.company.as_uuid())
@@ -78,11 +78,10 @@ async fn run_finished_at_is_stamped_on_success_failure_and_cancel() {
 /// A retry reopens the run and clears the stamp; finishing again stamps it later.
 #[tokio::test]
 async fn run_finished_at_clears_on_retry_and_restamps_later() {
-    let f = AdmissionFixture::new().await;
-    let run = admitted(&f, "retried").await.run;
-    drive(&f, run, RunStateName::Failed).await;
+    let (f, scope) = super::lease_tests::retryable_fixture().await;
+    let run = scope.run;
     let first = stamp(&f, run).await.0.unwrap();
-    drive(&f, run, RunStateName::Queued).await;
+    super::lease_tests::retry_scope(&f, scope).await;
     assert_eq!(stamp(&f, run).await.0, None);
     drive(&f, run, RunStateName::Running).await;
     drive(&f, run, RunStateName::Failed).await;
@@ -95,7 +94,7 @@ async fn run_finished_at_is_stamped_when_a_terminal_write_clears_it() {
     let f = AdmissionFixture::new().await;
     let run = admitted(&f, "cleared").await.run;
     drive(&f, run, RunStateName::Running).await;
-    sqlx::query("UPDATE workflow_runs SET state = 'succeeded', finished_at = NULL WHERE id = $1")
+    sqlx::query("UPDATE workflow_runs SET state = 'succeeded',terminal_execution_id=(SELECT execution.id FROM workflow_executions AS execution WHERE execution.company_id=workflow_runs.company_id AND execution.run_id=workflow_runs.id ORDER BY activation DESC LIMIT 1), finished_at = NULL WHERE id = $1")
         .bind(run.as_uuid())
         .execute(f.persistence().pool())
         .await
@@ -113,8 +112,8 @@ async fn run_finished_at_keeps_the_revision_when_the_stamp_undoes_a_write() {
     drive(&f, run, RunStateName::Succeeded).await;
     let finished = stamp(&f, run).await;
     for sql in [
-        "UPDATE workflow_runs SET state = 'succeeded', finished_at = NULL WHERE id = $1",
-        "UPDATE workflow_runs SET state = 'succeeded', \
+        "UPDATE workflow_runs SET state = 'succeeded',terminal_execution_id=(SELECT execution.id FROM workflow_executions AS execution WHERE execution.company_id=workflow_runs.company_id AND execution.run_id=workflow_runs.id ORDER BY activation DESC LIMIT 1), finished_at = NULL WHERE id = $1",
+        "UPDATE workflow_runs SET state = 'succeeded',terminal_execution_id=(SELECT execution.id FROM workflow_executions AS execution WHERE execution.company_id=workflow_runs.company_id AND execution.run_id=workflow_runs.id ORDER BY activation DESC LIMIT 1), \
          finished_at = finished_at - interval '1 hour' WHERE id = $1",
         "UPDATE workflow_runs SET state = state WHERE id = $1",
     ] {
@@ -161,7 +160,7 @@ async fn run_finished_at_stamps_beside_a_snapshot_column() {
         .unwrap();
     let run = admitted(&f, "guarded").await.run;
     drive(&f, run, RunStateName::Running).await;
-    sqlx::query("UPDATE workflow_runs SET state = 'succeeded', deadline = deadline WHERE id = $1")
+    sqlx::query("UPDATE workflow_runs SET state = 'succeeded',terminal_execution_id=(SELECT execution.id FROM workflow_executions AS execution WHERE execution.company_id=workflow_runs.company_id AND execution.run_id=workflow_runs.id ORDER BY activation DESC LIMIT 1), deadline = deadline WHERE id = $1")
         .bind(run.as_uuid())
         .execute(f.persistence().pool())
         .await

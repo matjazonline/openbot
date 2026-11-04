@@ -130,7 +130,7 @@ async fn workflow_action_reconciliation_eligibility_activation_immutable() {
         .execute(&mut *tx)
         .await
         .unwrap_err();
-        constraint(error, "workflow_activation_immutable");
+        constraint(error, "workflow_guard:workflow_activation_immutable");
         tx.rollback().await.unwrap();
         assert_eq!(before, all_tables(&pending.fixture).await);
     }

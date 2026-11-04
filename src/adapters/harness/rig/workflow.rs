@@ -402,6 +402,9 @@ fn structured(output: &AgentExecutionOutput) -> AppResult<serde_json::Value> {
 /// predicate (not this label) decides whether an earlier effect makes retry unsafe.
 fn failure(error: &AppError) -> WorkflowFailure {
     use FailureClass::{Retryable, Terminal};
+    if let AppError::WorkflowGuard(violation) = error {
+        return crate::application::workflow::actions::guard_step_failure("agent", violation);
+    }
     let (class, suffix) = match error {
         AppError::Execution(ExecutionFailure::Budget) => (Terminal, "budget"),
         AppError::Execution(ExecutionFailure::InvalidOutput) => (Terminal, "invalid_output"),
@@ -419,5 +422,29 @@ fn failure(error: &AppError) -> WorkflowFailure {
     WorkflowFailure {
         failure: StepFailure::new(class, code, None).expect("bounded agent failure"),
         safety: RetrySafety::SafeToRetry,
+    }
+}
+
+#[cfg(test)]
+mod guard_tests {
+    use super::*;
+
+    #[test]
+    fn workflow_guard_error_agent_handler_mapping_names_the_guard_and_stays_retryable() {
+        let error = AppError::WorkflowGuard(
+            crate::application::app_error::WorkflowGuardViolation::from_constraint(
+                "workflow_guard:guard_workflow_token_proposal",
+                "forced",
+            )
+            .unwrap(),
+        );
+        let result = failure(&error);
+        assert_eq!(result.failure.class(), FailureClass::Retryable);
+        assert_eq!(result.failure.code().as_str(), "agent.guard_violation");
+        assert_eq!(
+            result.failure.diagnostic(),
+            Some("guard guard_workflow_token_proposal")
+        );
+        assert_eq!(result.safety, RetrySafety::SafeToRetry);
     }
 }

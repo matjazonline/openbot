@@ -44,6 +44,7 @@ mod decisions;
 mod definitions;
 mod fair_polling;
 mod fairness;
+mod guard_failure;
 mod history_reader;
 pub mod http;
 pub mod jev;

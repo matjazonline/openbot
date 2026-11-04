@@ -766,3 +766,26 @@ mod control_tests;
 
 #[path = "harness_owner_tests.rs"]
 mod harness_owner_tests;
+
+/// A genuine retryable failed I/O run for read-model and timestamp fixtures.
+pub(super) async fn retryable_fixture() -> (AdmissionFixture, ActivationRequest) {
+    let (f, scope) = fixture().await;
+    Box::pin(control_tests::failed(
+        &f,
+        scope,
+        crate::domain::workflow::RetrySafety::SafeToRetry,
+    ))
+    .await;
+    (f, scope)
+}
+
+pub(super) async fn retry_scope(f: &AdmissionFixture, scope: ActivationRequest) {
+    let command = control_tests::command(f, scope, "read-fixture-retry").await;
+    assert!(matches!(
+        f.persistence()
+            .retry(control_tests::retry(command))
+            .await
+            .unwrap(),
+        RetryResult::Applied { .. }
+    ));
+}

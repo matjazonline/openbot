@@ -1,0 +1,49 @@
+   Compiling mail_agents v0.1.0 (/Users/mac03/dev/openbot/.worktrees/fix-app-p03)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 37s
+     Running unittests src/lib.rs (target/debug/deps/mail_agents-65122ec83e7c21fc)
+
+running 12 tests
+test adapters::harness::rig::workflow::guard_tests::workflow_guard_error_agent_handler_mapping_names_the_guard_and_stays_retryable ... ok
+test adapters::persistence::tests::workflow_guard_error_is_typed_by_its_constraint_name ... ok
+test application::workflow::actions::failure::tests::workflow_guard_error_action_handler_mapping_is_typed_bounded_and_retryable ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_pending_job_is_never_control_retry_safe ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_io_completion_never_reexecutes_the_handler ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_cancel_and_guard_failure_compete_for_one_terminal_run ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_ordinary_connection_error_is_retried ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_retirement_first_keeps_the_competing_owners_result ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_parent_failure_cancels_its_live_child_subtree ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_run_expiry_handles_processing_expired_lease ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_decision_timeout_fails_instead_of_deferring_to_itself ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_pure_step_fails_once_and_stops_polling ... FAILED
+
+failures:
+
+---- adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_parent_failure_cancels_its_live_child_subtree stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_parent_failure_cancels_its_live_child_subtree' (12737298) panicked at src/adapters/persistence/workflow/workflow_guard_tests.rs:51:5:
+assertion `left == right` failed
+  left: "completed"
+ right: "failed"
+
+---- adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_decision_timeout_fails_instead_of_deferring_to_itself stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_decision_timeout_fails_instead_of_deferring_to_itself' (12737295) panicked at src/adapters/persistence/workflow/workflow_guard_tests.rs:51:5:
+assertion `left == right` failed
+  left: "completed"
+ right: "failed"
+
+---- adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_pure_step_fails_once_and_stops_polling stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_pure_step_fails_once_and_stops_polling' (12737300) panicked at src/adapters/persistence/workflow/workflow_guard_tests.rs:93:10:
+called `Result::unwrap()` on an `Err` value: Conflict("Workflow batch is not runnable")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_decision_timeout_fails_instead_of_deferring_to_itself
+    adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_parent_failure_cancels_its_live_child_subtree
+    adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_pure_step_fails_once_and_stops_polling
+
+test result: FAILED. 9 passed; 3 failed; 0 ignored; 0 measured; 2590 filtered out; finished in 3.08s
+
+error: test failed, to rerun pass `--lib`

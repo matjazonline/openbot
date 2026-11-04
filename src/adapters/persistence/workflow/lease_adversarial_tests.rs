@@ -19,7 +19,7 @@ async fn workflow_io_claim_rejects_pure_wait_due_terminal_and_deadline() {
     for change in [
         "UPDATE background_tasks SET run_at=clock_timestamp()+interval '1 hour'",
         "UPDATE workflow_runs SET state='waiting',waiting_reason='timer'",
-        "UPDATE workflow_runs SET state='failed'",
+        "UPDATE workflow_runs SET state='failed',terminal_execution_id=(SELECT execution.id FROM workflow_executions AS execution WHERE execution.company_id=workflow_runs.company_id AND execution.run_id=workflow_runs.id ORDER BY activation DESC LIMIT 1)",
         "UPDATE workflow_runs SET deadline=clock_timestamp()-interval '1 second',created_at=clock_timestamp()-interval '10 seconds'",
     ] {
         let (f, scope) = fixture().await;
@@ -241,9 +241,17 @@ async fn workflow_io_existing_mismatched_scope_and_run_states_reject_all_fenced_
     }
     for change in [
         "UPDATE workflow_runs SET state='waiting',waiting_reason='timer'",
-        "UPDATE workflow_runs SET state='failed',waiting_reason=NULL",
+        "UPDATE workflow_runs SET state='failed',terminal_execution_id=(SELECT execution.id FROM workflow_executions AS execution WHERE execution.company_id=workflow_runs.company_id AND execution.run_id=workflow_runs.id ORDER BY activation DESC LIMIT 1),waiting_reason=NULL",
         "UPDATE workflow_runs SET state='running',waiting_reason=NULL,deadline=clock_timestamp()-interval '1 second',created_at=clock_timestamp()-interval '10 seconds'",
     ] {
+        let (f, scope) = fixture().await;
+        let claim = f
+            .persistence()
+            .settled()
+            .claim_io(scope, worker(), policy())
+            .await
+            .unwrap()
+            .unwrap();
         sqlx::query(change)
             .execute(f.persistence().pool())
             .await

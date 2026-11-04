@@ -192,13 +192,13 @@ async fn workflow_control_direct_retry_without_receipt_fails_own_guard() {
     failed(&f, scope, RetrySafety::SafeToRetry).await;
     let before = control_state(&f).await;
     let mut tx = f.persistence().pool().begin().await.unwrap();
-    sqlx::query("UPDATE workflow_runs SET state='running',terminal_execution_id=NULL WHERE id=$1")
-        .bind(scope.run.as_uuid())
+    sqlx::query("UPDATE background_tasks SET status='pending' WHERE id=$1")
+        .bind(scope.job.0)
         .execute(&mut *tx)
         .await
         .unwrap();
-    sqlx::query("UPDATE background_tasks SET status='pending' WHERE id=$1")
-        .bind(scope.job.0)
+    sqlx::query("UPDATE workflow_runs SET state='running',terminal_execution_id=NULL WHERE id=$1")
+        .bind(scope.run.as_uuid())
         .execute(&mut *tx)
         .await
         .unwrap();

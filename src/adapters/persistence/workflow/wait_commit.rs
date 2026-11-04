@@ -303,8 +303,8 @@ async fn expire(
     sqlx::query("UPDATE workflow_waits SET state='expired',settled_at=clock_timestamp() WHERE company_id=$1 AND run_id=$2 AND execution_id=$3 AND state='waiting'")
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).execute(&mut *db).await?;
     if run_state == "waiting" {
-        sqlx::query("UPDATE workflow_runs SET state='failed',waiting_reason=NULL WHERE company_id=$1 AND id=$2")
-            .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).execute(&mut *db).await?;
+        sqlx::query("UPDATE workflow_runs SET state='failed',waiting_reason=NULL,terminal_execution_id=$3 WHERE company_id=$1 AND id=$2")
+            .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).execute(&mut *db).await?;
     }
     waits::audit(db, scope, "wait_expired").await?;
     Ok(WaitProgress::Expired(CommitDisposition::Committed))
@@ -391,10 +391,11 @@ pub(super) async fn fail(
     sqlx::query("UPDATE workflow_waits SET state='failed',failure_code=$4,settled_at=clock_timestamp() WHERE company_id=$1 AND run_id=$2 AND execution_id=$3 AND state='waiting'")
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(code).execute(&mut *db).await?;
     sqlx::query(
-        "UPDATE workflow_runs SET state='failed',waiting_reason=NULL WHERE company_id=$1 AND id=$2",
+        "UPDATE workflow_runs SET state='failed',waiting_reason=NULL,terminal_execution_id=$3 WHERE company_id=$1 AND id=$2",
     )
     .bind(scope.company.as_uuid())
     .bind(scope.run.as_uuid())
+    .bind(scope.execution.as_uuid())
     .execute(&mut *db)
     .await?;
     waits::audit(db, scope, "wait_failed").await?;

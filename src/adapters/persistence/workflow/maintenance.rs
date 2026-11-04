@@ -53,6 +53,8 @@ pub(super) async fn expire_on(db: &mut PgConnection, scope: ActivationRequest) -
 pub(super) enum RetirementCause {
     Deadline,
     Cancel,
+    /// A confirmed workflow guard violation (`guard_failure`); never retry-safe.
+    Guard,
 }
 
 pub(super) async fn retire_jobs(
@@ -64,6 +66,7 @@ pub(super) async fn retire_jobs(
     let (code, retirement, stop) = match cause {
         RetirementCause::Deadline => ("workflow.run_deadline", "deadline", Some("timed_out")),
         RetirementCause::Cancel => ("workflow.cancelled", "cancel", None),
+        RetirementCause::Guard => (guard_failure::GUARD_FAILURE_CODE, "guard", None),
     };
     // Unknown is conservative: maintenance must not infer effect safety from a lost worker.
     let attempts = sqlx::query("UPDATE task_attempts AS attempt SET status='failed',finished_at=clock_timestamp(),workflow_failure_class='terminal',workflow_failure_code=$3,workflow_retry_safety='unknown',workflow_retirement=$4,stop_reason=$5 FROM background_tasks AS job JOIN workflow_executions AS execution ON execution.company_id=job.company_id AND execution.id=job.workflow_execution_id WHERE execution.company_id=$1 AND execution.run_id=$2 AND job.queue_kind='workflow' AND job.status='processing' AND attempt.task_id=job.id AND attempt.attempt_number=job.attempt_ordinal AND attempt.execution_generation=job.execution_generation AND attempt.worker_id=job.worker_id AND attempt.status='processing'")

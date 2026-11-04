@@ -665,6 +665,7 @@ fn classify_commit_error(error: &AppError) -> (InboundEventErrorClass, bool) {
         // Decoding again routes it again, against the settings that replaced the old ones.
         AppError::Superseded(_) => (InboundEventErrorClass::Superseded, false),
         AppError::Database(_)
+        | AppError::WorkflowGuard(_)
         | AppError::DatabaseTimeout(_)
         | AppError::ServiceUnavailable(_)
         | AppError::Internal(_)

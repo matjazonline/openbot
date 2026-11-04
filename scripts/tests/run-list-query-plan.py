@@ -52,7 +52,7 @@ FROM generate_series(1, 100) AS tenants(t), generate_series(0, 39) AS workflows(
 INSERT INTO workflow_runs
     (company_id, id, binding_id, binding_revision, workflow_id, version_id, actor_id, trigger_id,
      correlation_id, bundle, input, params, resources, max_steps, max_context_bytes, deadline,
-     created_at, state, waiting_reason, parent_run_id, parent_execution_id, channel_id, finished_at)
+     created_at, state, waiting_reason, parent_run_id, parent_execution_id, channel_id, finished_at, terminal_execution_id)
 SELECT company, md5('run' || t || '-' || n)::uuid, md5('binding' || t || '-' || w)::uuid, 1,
        md5('workflow' || t || '-' || w)::uuid, md5('version' || t || '-' || w || '-' || v)::uuid,
        md5('actor' || t)::uuid, md5('trigger' || t || '-' || n)::uuid,
@@ -63,7 +63,8 @@ SELECT company, md5('run' || t || '-' || n)::uuid, md5('binding' || t || '-' || 
        CASE WHEN n % 10 = 5 THEN md5('execution' || t || '-' || n)::uuid END,
        CASE WHEN w < 32 THEN md5('channel' || t || '-' || w)::uuid END,
        CASE WHEN state IN ('succeeded', 'failed', 'cancelled')
-            THEN created + interval '10 minutes' END
+            THEN created + interval '10 minutes' END,
+       CASE WHEN state IN ('succeeded','failed') THEN md5('terminal' || t || '-' || n)::uuid END
 FROM (SELECT t, n, n % 40 AS w, 20 * n / total AS v, md5('company' || t)::uuid AS company,
              now() - interval '2 years' + (n::double precision / total) * interval '2 years' AS created,
              CASE WHEN n % 20 = 0 THEN (ARRAY['queued', 'running', 'waiting'])[1 + (n / 20) % 3]
@@ -268,13 +269,13 @@ CHILD_HISTORY = r"""
 INSERT INTO workflow_runs
     (company_id, id, binding_id, binding_revision, workflow_id, version_id, actor_id, trigger_id,
      correlation_id, bundle, input, params, resources, max_steps, max_context_bytes, deadline,
-     created_at, state, parent_run_id, parent_execution_id, channel_id, finished_at)
+     created_at, state, parent_run_id, parent_execution_id, channel_id, finished_at, terminal_execution_id)
 SELECT md5('company1')::uuid, md5('extra-run1-' || n)::uuid, md5('binding1-5')::uuid, 1,
        md5('workflow1-5')::uuid, md5('version1-5-18')::uuid, md5('actor1')::uuid,
        md5('extra-trigger1-' || n)::uuid, md5('extra-correlation1-' || n)::uuid, '\x00'::bytea,
        '{}', '{}', '{}', 100, 65536, created + interval '1 day', created, 'succeeded',
        md5('run1-4')::uuid, md5('extra-execution1-' || n)::uuid, md5('channel1-5')::uuid,
-       created + interval '10 minutes'
+       created + interval '10 minutes',md5('extra-terminal1-' || n)::uuid
 FROM (SELECT n, now() - interval '30 days' + n * interval '1 second' AS created
       FROM generate_series(1, 100000) AS extra(n)) AS seed;
 ANALYZE workflow_runs;

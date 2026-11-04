@@ -82,7 +82,7 @@ async fn workflow_wakeup_actual_wait_expiry_produces_failed_fact() {
     let saved = wakeups(&f, parent, child).await;
     assert_eq!(saved.len(), 1);
     assert_eq!(saved[0].state, ChildTerminalState::Failed);
-    assert_eq!(saved[0].terminal_execution, None);
+    assert_eq!(saved[0].terminal_execution, Some(child.execution));
 }
 
 async fn forged(
@@ -118,7 +118,7 @@ async fn workflow_wakeup_rejects_forged_duplicate_and_overridden_transition_fact
     );
     assert!(
         sqlx::query(
-            "UPDATE workflow_runs SET state='failed',terminal_wakeup_sequence=99 WHERE id=$1"
+            "UPDATE workflow_runs SET state='failed',terminal_execution_id=(SELECT execution.id FROM workflow_executions AS execution WHERE execution.company_id=workflow_runs.company_id AND execution.run_id=workflow_runs.id ORDER BY activation DESC LIMIT 1),terminal_wakeup_sequence=99 WHERE id=$1"
         )
         .bind(child.run.as_uuid())
         .execute(f.persistence().pool())

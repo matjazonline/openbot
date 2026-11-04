@@ -120,6 +120,26 @@ async fn workflow_child_schema_requires_the_parent_wait_of_the_same_execution() 
     assert_eq!(ordinals, 1);
 }
 
+async fn copied_root(
+    pool: &sqlx::PgPool,
+    company: Uuid,
+    sql: &str,
+    source: Uuid,
+    original: Uuid,
+) -> Result<sqlx::postgres::PgQueryResult, sqlx::Error> {
+    let mut tx = pool.begin().await?;
+    let run = Uuid::new_v4();
+    seed_root_budget(&mut tx, company, run).await?;
+    let result = sqlx::query(sql)
+        .bind(source)
+        .bind(run)
+        .bind(original)
+        .execute(&mut *tx)
+        .await?;
+    tx.commit().await?;
+    Ok(result)
+}
+
 #[tokio::test]
 async fn workflow_rerun_schema_links_only_a_top_level_run_of_the_same_workflow_and_tenant() {
     let (f, scopes) = AdmissionFixture::chain(data_map(), 1).await;
@@ -129,12 +149,14 @@ async fn workflow_rerun_schema_links_only_a_top_level_run_of_the_same_workflow_a
     // A child original is refused; so is a run that would be both child and rerun.
     assert_eq!(
         code(
-            sqlx::query(copy)
-                .bind(root.run.as_uuid())
-                .bind(Uuid::new_v4())
-                .bind(child.run.as_uuid())
-                .execute(pool)
-                .await
+            copied_root(
+                pool,
+                root.company.as_uuid(),
+                copy,
+                root.run.as_uuid(),
+                child.run.as_uuid()
+            )
+            .await
         )
         .await,
         "23514"
@@ -160,12 +182,14 @@ async fn workflow_rerun_schema_links_only_a_top_level_run_of_the_same_workflow_a
     for original in originals {
         assert_eq!(
             code(
-                sqlx::query(copy)
-                    .bind(root.run.as_uuid())
-                    .bind(Uuid::new_v4())
-                    .bind(original)
-                    .execute(pool)
-                    .await
+                copied_root(
+                    pool,
+                    root.company.as_uuid(),
+                    copy,
+                    root.run.as_uuid(),
+                    original
+                )
+                .await
             )
             .await,
             "23503",
@@ -174,13 +198,18 @@ async fn workflow_rerun_schema_links_only_a_top_level_run_of_the_same_workflow_a
     }
     // A real top-level original links, and the link is immutable.
     let rerun = Uuid::new_v4();
+    let mut tx = pool.begin().await.unwrap();
+    seed_root_budget(&mut tx, root.company.as_uuid(), rerun)
+        .await
+        .unwrap();
     sqlx::query(copy)
         .bind(root.run.as_uuid())
         .bind(rerun)
         .bind(root.run.as_uuid())
-        .execute(pool)
+        .execute(&mut *tx)
         .await
         .unwrap();
+    tx.commit().await.unwrap();
     assert_eq!(
         code(
             sqlx::query("UPDATE workflow_runs SET rerun_of_run_id=NULL WHERE id=$1")

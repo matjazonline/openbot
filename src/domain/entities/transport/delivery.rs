@@ -107,14 +107,6 @@ impl DeliveryStatus {
         matches!(self, Self::Sending)
     }
 
-    /// Whether the queue is finished with this row, one way or another.
-    pub const fn is_terminal(self) -> bool {
-        matches!(
-            self,
-            Self::Delivered | Self::OutcomeUnknown | Self::DeadLetter
-        )
-    }
-
     /// Whether a human should be looking at this row.
     pub const fn needs_attention(self) -> bool {
         matches!(self, Self::OutcomeUnknown | Self::DeadLetter)

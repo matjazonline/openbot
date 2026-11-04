@@ -1,0 +1,3 @@
+# Preserve captured console output byte-for-byte; whitespace is evidence data.
+logs/*.log -whitespace
+logs/**/*.log -whitespace

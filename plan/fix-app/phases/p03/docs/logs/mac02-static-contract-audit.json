@@ -1,0 +1,8 @@
+{
+  "no_compiler_revision_in_migrations": true,
+  "no_legacy_budget_provenance": false,
+  "workflow_raise_functions_without_names": [
+    "guard_workflow_token_proposal",
+    "notify_workflow_run_changed"
+  ]
+}

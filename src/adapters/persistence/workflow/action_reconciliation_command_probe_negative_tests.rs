@@ -285,7 +285,10 @@ fn assert_diagnostic(envelope: &ProbeEnvelope, case: ProbeCase, row: &Value) {
         assert_eq!(envelope.native_table.as_deref(), row["relation"].as_str());
     } else {
         assert_eq!(envelope.native_state.as_deref(), Some("23514"));
-        assert_eq!(envelope.native_constraint.as_deref(), Some(""));
+        assert_eq!(
+            envelope.native_constraint.as_deref(),
+            Some(format!("workflow_guard:{name}").as_str())
+        );
         let message = if case == ProbeCase::EvidenceActor {
             "invalid workflow action evidence provenance"
         } else {

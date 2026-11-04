@@ -292,6 +292,7 @@ async fn jev_runtime_production_worker_mixed_fixture_once() {
         lease: policy(),
         poll: PollPolicy::new(Duration::from_secs(1), 16).unwrap(),
         active_jobs: None,
+        monitoring: None,
     };
     let candidates = f.persistence.poll_work(None, 16).await.unwrap();
     let candidate = candidates

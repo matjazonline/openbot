@@ -113,7 +113,10 @@ fn assert_diagnostic(envelope: &DiagnosticEnvelope, case: AuditCase) {
         return;
     }
     assert_eq!(envelope.native_state.as_deref(), Some("23514"));
-    assert_eq!(envelope.native_constraint.as_deref(), Some(""));
+    assert_eq!(
+        envelope.native_constraint.as_deref(),
+        Some("workflow_guard:workflow_action_command_scope_guard")
+    );
     assert_eq!(envelope.native_schema.as_deref(), Some(""));
     assert_eq!(envelope.native_table.as_deref(), Some(""));
     assert_eq!(

@@ -1,0 +1,3 @@
+workflow_root_budgets_check: CHECK ((((activations >= 1) AND (activations <= 100000)) AND ((model_calls >= 1) AND (model_calls <= 1000)) AND ((repetitions >= 1) AND (repetitions <= 1000))))
+workflow_root_token_policy_check: CHECK (((token_policy IS NULL) OR valid_workflow_token_policy(token_policy)))
+workflow_run_terminal_execution_shape: CHECK (((state = ANY (ARRAY['succeeded'::text, 'failed'::text])) = (terminal_execution_id IS NOT NULL)))

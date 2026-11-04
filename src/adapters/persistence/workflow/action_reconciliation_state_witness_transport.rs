@@ -172,7 +172,10 @@ fn assert_diagnostic(e: &Envelope, mode: &str) {
         return;
     }
     assert_eq!(e.native_state.as_deref(), Some("23514"));
-    assert_eq!(e.native_constraint.as_deref(), Some(""));
+    assert_eq!(
+        e.native_constraint.as_deref(),
+        Some("workflow_guard:check_workflow_control_retry")
+    );
     assert_eq!(e.native_schema.as_deref(), Some(""));
     assert_eq!(e.native_table.as_deref(), Some(""));
     assert_eq!(

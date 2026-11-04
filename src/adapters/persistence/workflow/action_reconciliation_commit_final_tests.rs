@@ -383,7 +383,7 @@ async fn exercise(case: Case) {
                 "Final full proposal reached gate: {result:?}"
             );
             assert!(
-                matches!(result,Err(AppError::Database(ref error)) if error=="error returned from database: invalid explicit workflow retry"),
+                matches!(result,Err(AppError::WorkflowGuard(ref error)) if error.guard()=="check_workflow_control_retry" && error.message()=="error returned from database: invalid explicit workflow retry"),
                 "{result:?}"
             );
             assert_eq!(after, before, "native COMMIT rolls back every public row");

@@ -168,7 +168,7 @@ async fn workflow_message_race_delayed_commit_past_fence_expiry_or_deadline_roll
         };
         assert_eq!(
             failure.failure.code().as_str(),
-            "message.unresolved",
+            "message.guard_violation",
             "{bound}"
         );
         let reached: i64 = sqlx::query_scalar("SELECT last_value FROM fixture_commit_reached")

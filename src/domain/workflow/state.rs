@@ -44,6 +44,43 @@ impl RunState {
         matches!(self, Self::Succeeded | Self::Failed | Self::Cancelled)
     }
 
+    /// The stored `workflow_runs.state` value; the waiting reason is a separate column.
+    pub const fn stored_name(self) -> &'static str {
+        match self {
+            Self::Queued => "queued",
+            Self::Running => "running",
+            Self::Waiting(_) => "waiting",
+            Self::Succeeded => "succeeded",
+            Self::Failed => "failed",
+            Self::Cancelled => "cancelled",
+        }
+    }
+
+    /// The one run state machine, over stored states. The trigger
+    /// `guard_workflow_run_transition` states the same table in SQL, and a database-backed matrix
+    /// proves the two agree. Staying in the same stored state is no transition (a re-park changes
+    /// only the waiting reason). Nothing returns to `Queued`, and `Succeeded` and `Cancelled` are
+    /// final. `Failed -> Running` is the explicit control-retry edge, which the database further
+    /// restricts to a retry `workflow_control_retry_safe` admits.
+    pub fn can_transition_to(self, next: Self) -> bool {
+        if self.stored_name() == next.stored_name() {
+            return true;
+        }
+        matches!(
+            (self, next),
+            (
+                Self::Queued,
+                Self::Running | Self::Waiting(_) | Self::Succeeded | Self::Failed | Self::Cancelled
+            ) | (
+                Self::Running,
+                Self::Waiting(_) | Self::Succeeded | Self::Failed | Self::Cancelled
+            ) | (
+                Self::Waiting(_),
+                Self::Running | Self::Failed | Self::Cancelled
+            ) | (Self::Failed, Self::Running)
+        )
+    }
+
     pub fn start(self) -> Result<Self, RunStateError> {
         match self {
             Self::Queued => Ok(Self::Running),
@@ -134,6 +171,41 @@ impl RunState {
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn stored_run_transition_table_includes_retry_and_keeps_success_and_cancel_final() {
+        let states = [
+            RunState::Queued,
+            RunState::Running,
+            RunState::Waiting(WaitingReason::Timer),
+            RunState::Succeeded,
+            RunState::Failed,
+            RunState::Cancelled,
+        ];
+        let expected = [
+            [true, true, true, true, true, true],
+            [false, true, true, true, true, true],
+            [false, true, true, false, true, true],
+            [false, false, false, true, false, false],
+            [false, true, false, false, true, false],
+            [false, false, false, false, false, true],
+        ];
+        for (i, from) in states.into_iter().enumerate() {
+            for (j, to) in states.into_iter().enumerate() {
+                assert_eq!(
+                    from.can_transition_to(to),
+                    expected[i][j],
+                    "{} -> {}",
+                    from.stored_name(),
+                    to.stored_name()
+                );
+            }
+        }
+        assert!(
+            RunState::Waiting(WaitingReason::Decision)
+                .can_transition_to(RunState::Waiting(WaitingReason::Effect))
+        );
+    }
     use super::*;
     use crate::domain::workflow::{
         CompletedStep, CompletionRoute, ContextLimits, FailureClass, FailureCode, StepFailure,

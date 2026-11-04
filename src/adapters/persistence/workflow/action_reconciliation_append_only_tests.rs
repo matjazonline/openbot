@@ -71,7 +71,11 @@ async fn reject(f: &AdmissionFixture, sql: &str, company: Uuid, alternate_entry:
     let error = query.execute(&mut *tx).await.unwrap_err();
     let db_error = error.as_database_error().unwrap();
     assert_eq!(db_error.code().as_deref(), Some("P0001"), "{sql}");
-    assert_eq!(db_error.constraint(), None, "{sql}");
+    assert_eq!(
+        db_error.constraint(),
+        Some("workflow_guard:workflow_action_fact_immutable"),
+        "{sql}"
+    );
     assert_eq!(
         db_error.message(),
         "workflow action effect fact is append-only",

@@ -159,6 +159,7 @@ async fn workflow_batch_first_successor_link_enforces_run_and_company_scope() {
         .bind(request.run.as_uuid()).bind(foreign.id).execute(&mut *tx).await.unwrap();
     for company in [request.company.as_uuid(), foreign.id] {
         let run = Uuid::new_v4();
+        seed_root_budget(&mut tx, company, run).await.unwrap();
         sqlx::query("INSERT INTO workflow_runs SELECT (jsonb_populate_record(NULL::workflow_runs,to_jsonb(original) || jsonb_build_object('id',$2::uuid,'company_id',$3::uuid))).* FROM workflow_runs AS original WHERE original.id = $1")
             .bind(request.run.as_uuid()).bind(run).bind(company).execute(&mut *tx).await.unwrap();
         let execution = Uuid::new_v4();

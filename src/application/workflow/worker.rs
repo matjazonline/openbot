@@ -1,11 +1,12 @@
 //! Reusable single-slot worker. Production handler wiring belongs to the owning
 //! action/agent subsystems; notification delivery is never a prerequisite.
 use super::{
-    activation::*, batch::*, children::*, completion::*, decisions::*, lease::*, polling::*,
-    supervise::*, waits::*,
+    activation::*, batch::*, children::*, completion::*, decisions::*, guard::*, lease::*,
+    polling::*, supervise::*, waits::*,
 };
-use crate::application::app_error::AppResult;
+use crate::application::app_error::{AppError, AppResult};
 use crate::application::services::runtime_metrics::ActiveWorkflowJobs;
+use crate::domain::monitoring::MonitoringService;
 use async_trait::async_trait;
 use std::time::Duration;
 use tokio::{
@@ -41,7 +42,31 @@ pub struct WorkflowWorker<'a, P, H> {
     /// Counts this slot in the runtime panel's active jobs while it executes one. `None` where
     /// nothing samples the process, as in tests.
     pub active_jobs: Option<&'a ActiveWorkflowJobs>,
+    /// Counts confirmed guard violations (`workflow_guard_violations_total`). `None` in tests
+    /// that do not observe metrics.
+    pub monitoring: Option<&'a dyn MonitoringService>,
 }
+// Candidate operations may be confirmed once. Errors after a handler has run must
+// propagate without re-entering that candidate, including errors from compensation.
+enum ProcessFailure {
+    Candidate(AppError),
+    AfterHandler(AppError),
+}
+
+impl From<AppError> for ProcessFailure {
+    fn from(error: AppError) -> Self {
+        Self::Candidate(error)
+    }
+}
+
+impl ProcessFailure {
+    fn into_error(self) -> AppError {
+        match self {
+            Self::Candidate(error) | Self::AfterHandler(error) => error,
+        }
+    }
+}
+
 impl<P, H> WorkflowWorker<'_, P, H>
 where
     P: WorkflowPolling
@@ -52,7 +77,8 @@ where
         + WorkflowDecisions
         + WorkflowLeases
         + WorkflowLeaseRecovery
-        + WorkflowCompletion,
+        + WorkflowCompletion
+        + WorkflowGuardFailure,
     H: WorkflowHandler,
 {
     /// Own one actual operation at a time. Dropping the loop drops its in-flight
@@ -107,11 +133,46 @@ where
         }
     }
 
+    /// A guard violation from the worker's own write is acted on only if an immediate re-run
+    /// trips a guard again: guards compare the clock at COMMIT, and a re-run that sees the moved
+    /// clock takes its owned path (expiry, lease retirement, wait timeout) instead. A violation
+    /// that repeats is a disagreement between Rust and SQL, and fails the run.
     pub async fn process(
         &self,
         candidate: PollCandidate,
         shutdown: &CancellationToken,
     ) -> AppResult<WorkDisposition> {
+        let first = Box::pin(self.process_once(candidate, shutdown)).await;
+        if !matches!(
+            first,
+            Err(ProcessFailure::Candidate(AppError::WorkflowGuard(_)))
+        ) {
+            return first.map_err(ProcessFailure::into_error);
+        }
+        match Box::pin(self.process_once(candidate, shutdown)).await {
+            Err(ProcessFailure::Candidate(AppError::WorkflowGuard(violation))) => {
+                let site = match candidate.work {
+                    PollWork::ExpiredRun => GuardSite::RunExpiry,
+                    PollWork::ExpiredLease | PollWork::ExhaustedPending => GuardSite::LeaseExpiry,
+                    PollWork::Job | PollWork::Wait | PollWork::MessageReceipt => GuardSite::Step,
+                };
+                Box::pin(self.fail_on_guard(GuardFailure {
+                    scope: candidate.scope,
+                    violation,
+                    site,
+                    fence: None,
+                }))
+                .await
+            }
+            other => other.map_err(ProcessFailure::into_error),
+        }
+    }
+
+    async fn process_once(
+        &self,
+        candidate: PollCandidate,
+        shutdown: &CancellationToken,
+    ) -> Result<WorkDisposition, ProcessFailure> {
         let scope = candidate.scope;
         match candidate.work {
             PollWork::ExpiredRun => {
@@ -179,7 +240,7 @@ where
         scope: ActivationRequest,
         kind: &WorkflowStepKind,
         shutdown: &CancellationToken,
-    ) -> AppResult<WorkDisposition> {
+    ) -> Result<WorkDisposition, ProcessFailure> {
         let Some(claim) = self.port.claim_io(scope, self.worker, self.lease).await? else {
             return Ok(WorkDisposition::Deferred);
         };
@@ -196,9 +257,69 @@ where
         )
         .await;
         if let SupervisedResult::Ready(result) = result {
-            self.port.complete_io(result).await?;
+            return self
+                .complete_confirmed(result)
+                .await
+                .map_err(ProcessFailure::AfterHandler);
         }
         Ok(WorkDisposition::Done)
+    }
+
+    /// The handler already ran, so a refused completion is confirmed here, under the claim's
+    /// fence, and never re-raised: re-running the candidate would only find its own claim.
+    async fn complete_confirmed(&self, result: FencedWorkflowResult) -> AppResult<WorkDisposition> {
+        let fence = result.fence;
+        let retry = result.clone();
+        let first = self.port.complete_io(result).await;
+        if !matches!(first, Err(AppError::WorkflowGuard(_))) {
+            // Any other outcome, error included, propagates exactly as before.
+            return first.map(|_| WorkDisposition::Done);
+        }
+        match self.port.complete_io(retry).await {
+            Err(AppError::WorkflowGuard(violation)) => {
+                Box::pin(self.fail_on_guard(GuardFailure {
+                    scope: fence.scope,
+                    violation,
+                    site: GuardSite::Step,
+                    fence: Some(fence),
+                }))
+                .await
+            }
+            other => other.map(|_| WorkDisposition::Done),
+        }
+    }
+
+    async fn fail_on_guard(&self, failure: GuardFailure) -> AppResult<WorkDisposition> {
+        let (scope, site) = (failure.scope, failure.site);
+        let guard = failure.violation.guard().to_owned();
+        let message = failure.violation.message().to_owned();
+        let outcome = self.port.fail_run_on_guard(failure).await;
+        let label = outcome.as_ref().map_or("error", |outcome| outcome.as_str());
+        if let Some(monitoring) = self.monitoring {
+            monitoring.increment_counter(
+                "workflow_guard_violations_total",
+                1,
+                &[
+                    ("guard", &guard),
+                    ("site", site.as_str()),
+                    ("outcome", label),
+                ],
+            );
+        }
+        match outcome {
+            Ok(_) => {
+                tracing::warn!(company_id = %scope.company.as_uuid(), run_id = %scope.run.as_uuid(),
+                    guard = %guard, site = site.as_str(), outcome = label, error = %message,
+                    "Workflow guard refused the worker's write twice");
+                Ok(WorkDisposition::Done)
+            }
+            Err(error) => {
+                tracing::error!(company_id = %scope.company.as_uuid(), run_id = %scope.run.as_uuid(),
+                    guard = %guard, site = site.as_str(), error = %error, refused = %message,
+                    "Workflow guard violation could not fail its run");
+                Err(error)
+            }
+        }
     }
 }
 

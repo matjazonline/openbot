@@ -1,0 +1,7 @@
+{
+  "no_compiler_revision_in_migrations": true,
+  "no_legacy_budget_values": true,
+  "root_budget_provenance_column_absent": true,
+  "workflow_raise_functions_without_names": [],
+  "method": "Live PostgreSQL function definitions; initial text regex crossed function boundaries and global provenance matched unrelated action-evidence text."
+}

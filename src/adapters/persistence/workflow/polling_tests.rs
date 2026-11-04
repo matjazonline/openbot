@@ -30,10 +30,10 @@ fn scripted() -> Scripted {
         supported: true,
     }
 }
-fn polling<'a>(
+fn polling<'a, H: WorkflowHandler>(
     p: &'a PostgresPersistence,
-    h: &'a Scripted,
-) -> WorkflowWorker<'a, PostgresPersistence, Scripted> {
+    h: &'a H,
+) -> WorkflowWorker<'a, PostgresPersistence, H> {
     WorkflowWorker {
         port: p,
         handler: h,
@@ -42,6 +42,7 @@ fn polling<'a>(
         lease: policy(),
         poll: PollPolicy::new(Duration::from_millis(50), 2).unwrap(),
         active_jobs: None,
+        monitoring: None,
     }
 }
 async fn run_state(p: &PostgresPersistence, scope: ActivationRequest) -> String {
@@ -325,6 +326,7 @@ async fn workflow_poll_shutdown_drops_actual_future_and_leaves_recoverable_lease
         lease: policy(),
         poll: PollPolicy::new(Duration::from_millis(50), 2).unwrap(),
         active_jobs: Some(&active),
+        monitoring: None,
     };
     let cancel = CancellationToken::new();
     let wakeup = Notify::new();
@@ -467,3 +469,6 @@ mod maintenance_worker_tests;
 
 #[path = "phase03_tests.rs"]
 mod phase03_tests;
+
+#[path = "workflow_guard_tests.rs"]
+mod guard_tests;

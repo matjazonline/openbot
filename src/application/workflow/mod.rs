@@ -21,6 +21,7 @@ pub mod completion;
 mod contracts;
 pub mod decisions;
 pub mod fixtures;
+pub mod guard;
 pub mod history;
 pub mod http;
 pub mod jev;

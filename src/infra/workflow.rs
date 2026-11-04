@@ -484,6 +484,7 @@ impl WorkflowEngine {
             let notices = self.notices.clone();
             let wakeup = self.worker_wakeups.clone();
             let active_jobs = self.active_jobs.clone();
+            let monitoring = self.monitoring.clone();
             let shutdown = shutdown.clone();
             handles.push((
                 "workflow worker",
@@ -496,6 +497,7 @@ impl WorkflowEngine {
                         lease: LeasePolicy::new(LEASE).expect("static workflow lease"),
                         poll: PollPolicy::new(POLL, POLL_PAGE).expect("static workflow poll"),
                         active_jobs: Some(&active_jobs),
+                        monitoring: Some(monitoring.as_ref()),
                     };
                     worker.run(&wakeup, &shutdown).await;
                 }),

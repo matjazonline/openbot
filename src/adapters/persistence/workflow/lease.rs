@@ -72,23 +72,28 @@ impl WorkflowLeases for PostgresPersistence {
     ) -> AppResult<Option<LeaseWindow>> {
         let bound = WriteBound::start("lease.renew", policy);
         let started = bound.started();
-        let attempt = bound.attempt(Box::pin(async {
-            let mut conn = bound.acquire(&self.pool).await?;
-            let mut tx = bound.begin(&mut conn).await?;
-            let renewed: AppResult<End<_>> = async {
-                if !lock_fence(&mut tx, fence, bound.server_timeout()).await? { return Ok(End::Rollback(None)); }
-                // A renewal must not remain uncommitted across its old expiry while
-                // another claimant counts that old version as free capacity.
-                capacity::lock(&mut tx).await?;
-                super::persistence_bound::locks_held();
-                if live_window(&mut tx, fence, started).await?.is_none() { return Ok(End::Rollback(None)); }
-                sqlx::query("UPDATE background_tasks SET lock_expires_at = LEAST(clock_timestamp() + make_interval(secs => $2), (SELECT deadline FROM workflow_runs WHERE company_id = $3 AND id = $4)) WHERE id = $1 AND lock_expires_at > clock_timestamp() AND EXISTS (SELECT 1 FROM workflow_runs AS run WHERE run.company_id=$3 AND run.id=$4 AND run.deadline > clock_timestamp())")
-                    .bind(fence.scope.job.0).bind(policy.duration().as_secs_f64()).bind(fence.scope.company.as_uuid()).bind(fence.scope.run.as_uuid()).execute(&mut *tx).await?;
-                Ok(End::Commit(live_window(&mut tx, fence, started).await?))
-            }
+        let attempt = bound
+            .attempt(Box::pin(async {
+                let mut conn = bound.acquire(&self.pool).await?;
+                let mut tx = bound.begin(&mut conn).await?;
+                let renewed: AppResult<End<_>> = async {
+                    if !lock_fence(&mut tx, fence, bound.server_timeout()).await? {
+                        return Ok(End::Rollback(None));
+                    }
+                    // A renewal must not remain uncommitted across its old expiry while
+                    // another claimant counts that old version as free capacity.
+                    capacity::lock(&mut tx).await?;
+                    super::persistence_bound::locks_held();
+                    if live_window(&mut tx, fence, started).await?.is_none() {
+                        return Ok(End::Rollback(None));
+                    }
+                    renew_owned(&mut tx, fence, policy).await?;
+                    Ok(End::Commit(live_window(&mut tx, fence, started).await?))
+                }
+                .await;
+                bound.end(tx, renewed).await
+            }))
             .await;
-            bound.end(tx, renewed).await
-        })).await;
         match attempt {
             Attempt::Done(window) => Ok(window),
             Attempt::Failed(error) => Err(error),
@@ -454,4 +459,19 @@ async fn settle_retirement(
                 .await
         }
     }
+}
+
+/// The write carries the full fence independently of lock_fence; a stale generation, worker,
+/// scope or attempt cannot extend the replacement execution's lease.
+pub(super) async fn renew_owned(
+    db: &mut PgConnection,
+    fence: WorkflowFence,
+    policy: LeasePolicy,
+) -> AppResult<bool> {
+    let changed = sqlx::query("UPDATE background_tasks SET lock_expires_at = LEAST(clock_timestamp() + make_interval(secs => $2), (SELECT deadline FROM workflow_runs WHERE company_id=$3 AND id=$4)) WHERE id=$1 AND company_id=$3 AND workflow_execution_id=$5 AND queue_kind='workflow' AND status='processing' AND execution_generation=$6 AND worker_id=$7 AND attempt_ordinal=$8 AND lock_expires_at > clock_timestamp() AND EXISTS (SELECT 1 FROM workflow_runs AS run WHERE run.company_id=$3 AND run.id=$4 AND run.deadline > clock_timestamp())")
+        .bind(fence.scope.job.0).bind(policy.duration().as_secs_f64())
+        .bind(fence.scope.company.as_uuid()).bind(fence.scope.run.as_uuid())
+        .bind(fence.scope.execution.as_uuid()).bind(fence.generation.0).bind(fence.worker.0)
+        .bind(fence.attempt.0).execute(db).await?;
+    Ok(changed.rows_affected() == 1)
 }

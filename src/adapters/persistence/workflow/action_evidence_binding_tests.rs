@@ -2,10 +2,11 @@ use super::*;
 
 #[tokio::test]
 async fn workflow_action_evidence_state_witness_keeps_first_state_and_reason() {
-    for initial in ["cancelled", "failed", "waiting"] {
+    // Terminal states cannot leave their state; exercise first-OLD capture on both live edges.
+    for initial in ["running", "waiting"] {
         let (f, request) = setup().await;
         let mut tx = f.persistence().pool().begin().await.unwrap();
-        sqlx::query("UPDATE workflow_runs SET state=$2,waiting_reason=CASE WHEN $2='waiting' THEN 'decision' ELSE NULL END WHERE id=$1")
+        sqlx::query("UPDATE workflow_runs SET state=$2,terminal_execution_id=CASE WHEN $2='failed' THEN (SELECT execution.id FROM workflow_executions AS execution WHERE execution.company_id=workflow_runs.company_id AND execution.run_id=workflow_runs.id ORDER BY activation DESC LIMIT 1) END,waiting_reason=CASE WHEN $2='waiting' THEN 'decision' ELSE NULL END WHERE id=$1")
             .bind(request.scope().run.as_uuid()).bind(initial).execute(&mut *tx).await.unwrap();
         tx.commit().await.unwrap();
         let mut tx = f.persistence().pool().begin().await.unwrap();

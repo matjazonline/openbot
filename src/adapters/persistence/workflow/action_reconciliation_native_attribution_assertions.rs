@@ -193,7 +193,11 @@ fn rejected(cell: Cell, native: &NativeDiagnostic) {
         assert_eq!(native.state, "23514");
         assert_eq!(
             (&*native.schema, &*native.table, &*native.constraint),
-            ("", "", "")
+            (
+                "",
+                "",
+                "workflow_guard:workflow_action_applied_request_guard"
+            )
         );
         assert_eq!(
             native.message,
