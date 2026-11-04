@@ -215,104 +215,52 @@ async fn workflow_budget_schema_consumption_never_locks_root_run_or_execution() 
 }
 
 /// S-F001: the sealing branch of `insert_workflow_budget_link` and the debit rule of
-/// `debit_workflow_budget_receipt`, on a fresh schema. A root run whose stored bundle is not
-/// the current compiler revision, or does not decode, is `sealed_legacy` with no limits, and every positive
-/// debit of it is `exhausted` without touching usage. The admitted current-revision root is
-/// `frozen_v6` and grants: the control.
+/// A raw root must supply a budget explicitly; there is no bundle-decoding fallback.
 #[tokio::test]
-async fn workflow_budget_schema_sealed_roots_exhaust_every_debit() {
+async fn root_budget_admission_raw_root_without_budget_is_refused() {
     let (f, admitted) = limited().await;
-    let company = admitted.company.as_uuid();
-    let mut db = f.persistence().pool().acquire().await.unwrap();
-    let mut sealed = Vec::new();
-    for (case, bundle) in [
-        (
-            "older compiler revision",
-            "convert_to(jsonb_set(convert_from(source.bundle,'UTF8')::jsonb,'{compiler_revision}','\"1\"')::text,'UTF8')",
-        ),
-        (
-            "previous compiler revision",
-            "convert_to(jsonb_set(convert_from(source.bundle,'UTF8')::jsonb,'{compiler_revision}','3')::text,'UTF8')",
-        ),
-        ("malformed bundle", "convert_to('not a bundle','UTF8')"),
-    ] {
-        // A raw root run beside the admitted one, as an SQL-only writer would insert it.
-        let (run, execution) = (Uuid::new_v4(), Uuid::new_v4());
-        sqlx::query(&format!(
-            "INSERT INTO workflow_runs (company_id,id,binding_id,binding_revision,workflow_id,version_id,actor_id,trigger_id,correlation_id,bundle,input,params,resources,max_steps,max_context_bytes,deadline) \
-             SELECT company_id,$2,binding_id,binding_revision,workflow_id,version_id,actor_id,gen_random_uuid(),gen_random_uuid(),{bundle},input,params,resources,max_steps,max_context_bytes,deadline \
-               FROM workflow_runs AS source WHERE company_id=$1 AND id=$3"
-        ))
-        .bind(company)
-        .bind(run)
-        .bind(admitted.run.as_uuid())
-        .execute(&mut *db)
-        .await
-        .unwrap_or_else(|error| panic!("{case}: {error}"));
-        sqlx::query("INSERT INTO workflow_executions (company_id,run_id,id,step_id,activation) VALUES ($1,$2,$3,'start',1)")
-            .bind(company).bind(run).bind(execution).execute(&mut *db).await
-            .unwrap_or_else(|error| panic!("{case}: {error}"));
-        sealed.push((
-            case,
-            ActivationRequest {
-                company: admitted.company,
-                run: RunId::new(run),
-                execution: ExecutionId::new(execution),
-                job: WorkflowJobId(Uuid::nil()),
-            },
-        ));
-    }
-    let budget = |run: RunId| {
-        sqlx::query_scalar::<_, Value>(
-            "SELECT jsonb_build_object('provenance',budget.provenance,'limits',jsonb_build_array(budget.activations,budget.model_calls,budget.repetitions),\
-               'usage',jsonb_build_array(usage.activations,usage.model_calls,usage.repetitions)) \
-             FROM workflow_root_budgets AS budget JOIN workflow_root_budget_usage AS usage USING (company_id,root_run_id) \
-             WHERE budget.company_id=$1 AND budget.root_run_id=$2",
-        )
-        .bind(company)
-        .bind(run.as_uuid())
-        .fetch_one(f.persistence().pool())
-    };
-    for (case, scope) in &sealed {
-        let sealed_budget =
-            json!({"provenance":"sealed_legacy","limits":[null,null,null],"usage":[0,0,0]});
-        assert_eq!(budget(scope.run).await.unwrap(), sealed_budget, "{case}");
-        for (resource, key) in [
-            ("activation", "activation"),
-            ("model_call", "sealed-call"),
-            ("repetition", "sealed-repeat"),
-        ] {
-            assert_eq!(
-                receipt(&mut db, *scope, resource, key, 1)
-                    .await
-                    .unwrap()
-                    .as_deref(),
-                Some("exhausted"),
-                "{case}: {resource}"
-            );
-        }
-        assert_eq!(
-            budget(scope.run).await.unwrap(),
-            sealed_budget,
-            "{case}: usage unchanged"
-        );
-    }
-    // The control: the admitted current-revision root carries its frozen limits and grants.
+    let error = sqlx::query("INSERT INTO workflow_runs (company_id,id,binding_id,binding_revision,workflow_id,version_id,actor_id,trigger_id,correlation_id,bundle,input,params,resources,max_steps,max_context_bytes,deadline) SELECT company_id,$2,binding_id,binding_revision,workflow_id,version_id,actor_id,gen_random_uuid(),gen_random_uuid(),bundle,input,params,resources,max_steps,max_context_bytes,deadline FROM workflow_runs WHERE id=$1")
+        .bind(admitted.run.as_uuid()).bind(Uuid::new_v4())
+        .execute(f.persistence().pool()).await.unwrap_err();
+    let db = error.as_database_error().unwrap();
+    assert_eq!(db.code().as_deref(), Some("23503"));
     assert_eq!(
-        budget(admitted.run).await.unwrap(),
-        json!({"provenance":"frozen_v6","limits":[2,2,2],"usage":[0,0,0]})
+        db.constraint(),
+        Some("workflow_run_budgets_company_id_root_run_id_fkey")
     );
+}
+
+#[tokio::test]
+async fn root_budget_admission_matches_compiled_limits_and_starts_at_zero() {
+    let (f, scope) = limited().await;
+    let saved: Value = sqlx::query_scalar("SELECT jsonb_build_object('limits',jsonb_build_array(budget.activations,budget.model_calls,budget.repetitions),'usage',jsonb_build_array(usage.activations,usage.model_calls,usage.repetitions),'tokens',budget.token_policy) FROM workflow_root_budgets AS budget JOIN workflow_root_budget_usage AS usage USING(company_id,root_run_id) WHERE budget.company_id=$1 AND budget.root_run_id=$2")
+        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).fetch_one(f.persistence().pool()).await.unwrap();
     assert_eq!(
-        receipt(&mut db, admitted, "model_call", "frozen-call", 1)
+        saved,
+        json!({"limits":[2,2,2],"usage":[0,0,0],"tokens":null})
+    );
+}
+
+#[tokio::test]
+async fn root_budget_admission_child_links_to_root_without_its_own_budget() {
+    let (f, root, child) = limited_child().await;
+    let links: Vec<(Uuid, Uuid)> = sqlx::query_as(
+        "SELECT run_id,root_run_id FROM workflow_run_budgets WHERE company_id=$1 ORDER BY run_id",
+    )
+    .bind(root.company.as_uuid())
+    .fetch_all(f.persistence().pool())
+    .await
+    .unwrap();
+    assert_eq!(links.len(), 2);
+    assert!(links.contains(&(root.run.as_uuid(), root.run.as_uuid())));
+    assert!(links.contains(&(child.run.as_uuid(), root.run.as_uuid())));
+    let roots: Vec<Uuid> =
+        sqlx::query_scalar("SELECT root_run_id FROM workflow_root_budgets WHERE company_id=$1")
+            .bind(root.company.as_uuid())
+            .fetch_all(f.persistence().pool())
             .await
-            .unwrap()
-            .as_deref(),
-        Some("granted")
-    );
-    assert_eq!(
-        budget(admitted.run).await.unwrap()["usage"],
-        json!([0, 1, 0])
-    );
+            .unwrap();
+    assert_eq!(roots, [root.run.as_uuid()]);
 }
 
 #[tokio::test]
@@ -321,11 +269,11 @@ async fn workflow_budget_current_compiler_admission_activates() {
     let (f, scope) = limited().await;
     let activation = f.persistence().activate(scope).await.unwrap();
     assert_eq!(activation.execution, scope.execution);
-    let saved: Value = sqlx::query_scalar("SELECT jsonb_build_object('compiler',(convert_from(run.bundle,'UTF8')::jsonb)->'compiler_revision','provenance',budget.provenance,'activations',usage.activations) FROM workflow_runs AS run JOIN workflow_root_budgets AS budget ON budget.company_id=run.company_id AND budget.root_run_id=run.id JOIN workflow_root_budget_usage AS usage ON usage.company_id=run.company_id AND usage.root_run_id=run.id WHERE run.company_id=$1 AND run.id=$2")
+    let saved: Value = sqlx::query_scalar("SELECT jsonb_build_object('compiler',(convert_from(run.bundle,'UTF8')::jsonb)->'compiler_revision','activations',usage.activations) FROM workflow_runs AS run JOIN workflow_root_budgets AS budget ON budget.company_id=run.company_id AND budget.root_run_id=run.id JOIN workflow_root_budget_usage AS usage ON usage.company_id=run.company_id AND usage.root_run_id=run.id WHERE run.company_id=$1 AND run.id=$2")
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).fetch_one(f.persistence().pool()).await.unwrap();
     assert_eq!(
         saved,
-        json!({"compiler":crate::application::workflow::compiler::SEMANTIC_REVISION,"provenance":"frozen_v6","activations":1})
+        json!({"compiler":crate::application::workflow::compiler::SEMANTIC_REVISION,"activations":1})
     );
 }
 

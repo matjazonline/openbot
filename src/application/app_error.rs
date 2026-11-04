@@ -16,6 +16,11 @@ pub enum AppError {
     /// before COMMIT was sent is this class too: definitely not applied, safe to retry.
     #[error("Database timed out: {0}")]
     DatabaseTimeout(String),
+    /// A workflow database guard refused a write: Rust and SQL disagree about what may happen.
+    /// Retrying the same write trips the same guard, so the workflow worker treats a confirmed
+    /// violation as terminal for its run instead of retrying it until the deadline.
+    #[error("Workflow guard {0}")]
+    WorkflowGuard(WorkflowGuardViolation),
 
     #[error("Invalid credentials")]
     InvalidCredentials,
@@ -78,4 +83,49 @@ pub enum ExecutionFailure {
     CheckpointDenied,
     #[error("execution ownership lost")]
     OwnershipLost,
+}
+
+/// Prefix of the constraint name every workflow guard `RAISE` in the init schema reports
+/// (`USING CONSTRAINT = 'workflow_guard:<name>'`). Table constraints never carry it.
+pub const WORKFLOW_GUARD_PREFIX: &str = "workflow_guard:";
+
+/// A validated PostgreSQL workflow-guard identifier, distinct from its free-text diagnostic.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WorkflowGuardName(String);
+
+/// Which guard refused, and the database diagnostic. A validated name can label a metric and
+/// audit event without confusing the identifier with its free-text message.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WorkflowGuardViolation {
+    guard: WorkflowGuardName,
+    message: String,
+}
+
+impl WorkflowGuardViolation {
+    /// `None` unless `constraint` is a prefixed guard name of 1-63 `[a-z0-9_]` bytes.
+    pub fn from_constraint(constraint: &str, message: impl Into<String>) -> Option<Self> {
+        let guard = constraint.strip_prefix(WORKFLOW_GUARD_PREFIX)?;
+        let valid = (1..=63).contains(&guard.len())
+            && guard
+                .bytes()
+                .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_');
+        valid.then(|| Self {
+            guard: WorkflowGuardName(guard.to_owned()),
+            message: message.into(),
+        })
+    }
+
+    pub fn guard(&self) -> &str {
+        &self.guard.0
+    }
+
+    pub fn message(&self) -> &str {
+        &self.message
+    }
+}
+
+impl std::fmt::Display for WorkflowGuardViolation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}: {}", self.guard(), self.message)
+    }
 }

@@ -125,18 +125,17 @@ async fn run_board_read_windows_finished_columns_by_finished_at() {
 /// A retried run leaves its finished column for its open one.
 #[tokio::test]
 async fn run_board_read_moves_a_retried_run_back_to_its_open_column() {
-    let f = AdmissionFixture::new().await;
-    let run = admitted(&f, "retried").await.run;
-    drive(&f, run, RunStateName::Failed).await;
+    let (f, scope) = super::lease_tests::retryable_fixture().await;
+    let run = scope.run;
     let cutoff = Utc::now() - Duration::days(1);
     assert_eq!(
         ids(column(&columns(&f, cutoff).await, RunStateName::Failed)),
         [run]
     );
-    drive(&f, run, RunStateName::Queued).await;
+    super::lease_tests::retry_scope(&f, scope).await;
     let board = columns(&f, cutoff).await;
     assert_eq!(column(&board, RunStateName::Failed).total, 0);
-    assert_eq!(ids(column(&board, RunStateName::Queued)), [run]);
+    assert_eq!(ids(column(&board, RunStateName::Running)), [run]);
 }
 
 /// A child is neither counted nor read, nor is another company's run; a binding scope keeps its

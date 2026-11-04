@@ -158,7 +158,7 @@ async fn workflow_call_child_failure_and_cancellation_route_or_fail_never_succee
     let (f, parent) = AdmissionFixture::with_child(data_map(), routed).await;
     let p = f.persistence();
     let child = f.spawn(parent).await;
-    sqlx::query("UPDATE workflow_runs SET state='failed' WHERE id=$1")
+    sqlx::query("UPDATE workflow_runs SET state='failed',terminal_execution_id=(SELECT execution.id FROM workflow_executions AS execution WHERE execution.company_id=workflow_runs.company_id AND execution.run_id=workflow_runs.id ORDER BY activation DESC LIMIT 1) WHERE id=$1")
         .bind(child.run.as_uuid())
         .execute(p.pool())
         .await
@@ -522,6 +522,7 @@ async fn workflow_call_runs_through_the_worker_and_fair_poll() {
         lease: LeasePolicy::new(std::time::Duration::from_secs(30)).unwrap(),
         poll: PollPolicy::new(std::time::Duration::from_millis(50), 16).unwrap(),
         active_jobs: None,
+        monitoring: None,
     };
     let cancel = tokio_util::sync::CancellationToken::new();
     let job = |scope| PollCandidate {

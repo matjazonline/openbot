@@ -261,12 +261,6 @@ async fn budget_exhausted(
     scope: ActivationRequest,
 ) -> AppResult<WaitProgress> {
     let progress = wait_commit::fail(db, scope, WaitFailureReason::RootBudgetExhausted).await?;
-    sqlx::query("UPDATE workflow_runs SET terminal_execution_id=$3 WHERE company_id=$1 AND id=$2")
-        .bind(scope.company.as_uuid())
-        .bind(scope.run.as_uuid())
-        .bind(scope.execution.as_uuid())
-        .execute(&mut *db)
-        .await?;
     let closed = sqlx::query("UPDATE background_tasks SET status='failed',updated_at=clock_timestamp() WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 AND queue_kind='workflow' AND status='completed'")
         .bind(scope.company.as_uuid()).bind(scope.job.0).bind(scope.execution.as_uuid()).execute(&mut *db).await?;
     if closed.rows_affected() != 1 {

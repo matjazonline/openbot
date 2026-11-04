@@ -1,0 +1,22 @@
+   Compiling mail_agents v0.1.0 (/Users/mac02/dev/openbot-recovery/.worktrees/fix-app-p03)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 50s
+     Running unittests src/lib.rs (target/debug/deps/mail_agents-91c1847adc52f46f)
+
+running 1 test
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_io_compensation_failure_propagates_without_reentering_candidate ... FAILED
+
+failures:
+
+---- adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_io_compensation_failure_propagates_without_reentering_candidate stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_io_compensation_failure_propagates_without_reentering_candidate' (29316932) panicked at src/adapters/persistence/workflow/workflow_guard_tests.rs:422:10:
+the failed compensation must propagate, without another candidate attempt: Deferred
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_io_compensation_failure_propagates_without_reentering_candidate
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 2603 filtered out; finished in 0.72s
+
+error: test failed, to rerun pass `--lib`

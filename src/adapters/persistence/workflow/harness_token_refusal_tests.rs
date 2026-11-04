@@ -336,14 +336,16 @@ async fn workflow_harness_token_cancel_and_approval_contend_without_late_resurre
     let cancellation = cancellation.unwrap();
     if matches!(cancellation, CancelResult::Applied { .. }) {
         assert!(approval.is_err());
-        let refusal: String = sqlx::query_scalar(
+        // Cancellation closes the decision's wait, which is what stops a late approval; it is
+        // abandonment, not a refusal of the root budget (fix-app 03).
+        let refusal: Option<String> = sqlx::query_scalar(
             "SELECT token_refusal FROM workflow_root_budget_usage WHERE company_id=$1",
         )
         .bind(scope.company.as_uuid())
         .fetch_one(p.pool())
         .await
         .unwrap();
-        assert_eq!(refusal, "cancelled");
+        assert_eq!(refusal, None);
         assert!(
             p.settled()
                 .claim_io(scope, worker(), f.model.write.lease_policy)
@@ -359,4 +361,57 @@ async fn workflow_harness_token_cancel_and_approval_contend_without_late_resurre
         approval.unwrap();
     }
     assert_eq!(accounting(&f.model).await["rows"], json!([]));
+}
+
+/// Plan 03 batch 4: cancelling one child that is parked on its own token decision abandons that
+/// request. It is not a refusal of the root budget the child's parent shares, so the parent's
+/// next token-consuming step must still progress.
+#[tokio::test]
+async fn token_refusal_child_cancel_leaves_parent_progression_open() {
+    let f = configured().await;
+    let p = f.model.native.fixture.persistence();
+    let root = f.model.write.fence.scope;
+    let child_write = child_checkpoint(&f).await;
+    let child = child_write.fence.scope;
+    assert!(matches!(
+        p.reserve_workflow_model(
+            child_write,
+            model_request(&reservation()),
+            Some(&notices(p))
+        )
+        .await
+        .unwrap(),
+        WorkflowModelAdmission::Parked(_)
+    ));
+    let cancel = CancelCommand {
+        company_id: child.company,
+        run_id: child.run,
+        actor: f.model.native.fixture.binding.target.actor,
+        command_key: IdempotencyKey::parse("cancel-child-token").unwrap(),
+        expected_revision: p
+            .head(child.company, child.run)
+            .await
+            .unwrap()
+            .unwrap()
+            .revision,
+    };
+    assert!(matches!(
+        p.cancel(cancel).await.unwrap(),
+        CancelResult::Applied { .. }
+    ));
+    let refusal: Option<String> = sqlx::query_scalar(
+        "SELECT token_refusal FROM workflow_root_budget_usage WHERE company_id=$1 AND root_run_id=$2",
+    )
+    .bind(root.company.as_uuid())
+    .bind(root.run.as_uuid())
+    .fetch_one(p.pool())
+    .await
+    .unwrap();
+    assert_eq!(refusal, None, "a cancelled child does not refuse its root");
+    crate::adapters::persistence::workflow::token_budget::require_progression(
+        &mut p.pool().acquire().await.unwrap(),
+        root,
+    )
+    .await
+    .expect("the parent keeps its token progression");
 }

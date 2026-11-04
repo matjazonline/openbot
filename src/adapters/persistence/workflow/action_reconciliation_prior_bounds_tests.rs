@@ -145,11 +145,12 @@ async fn scheduled_128(f: &AdmissionFixture, request: &ActionDispatchRequest, pr
     let scheduled = all_tables(f).await;
     assert_eq!(entry_consumptions(f).await, (128, 127));
     assert_eq!(available(f, request, None).await, Some(proof));
-    let old = scheduled["workflow_action_remote_entries"][0]["id"]
-        .as_str()
-        .unwrap()
-        .parse::<Uuid>()
-        .unwrap();
+    // Table snapshots are sorted by row identity, not attempt order. The latest entry can
+    // legitimately consume an older proof; use the first entry for this unrelated-entry refusal.
+    let old: Uuid = sqlx::query_scalar("SELECT id FROM workflow_action_remote_entries WHERE company_id=$1 AND invocation_id=$2 AND attempt_number=1")
+        .bind(request.scope().company.as_uuid())
+        .bind(request.subject.invocation.as_uuid())
+        .fetch_one(f.persistence().pool()).await.unwrap();
     for excluded in [old, Uuid::new_v4()] {
         assert_eq!(available(f, request, Some(excluded)).await, None);
     }

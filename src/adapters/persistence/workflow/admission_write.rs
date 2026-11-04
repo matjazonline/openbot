@@ -91,9 +91,35 @@ pub(super) struct RunRow<'a> {
     pub delivery_policy: DeliveryPolicy,
 }
 
+/// The deferred root-budget FK permits inserting the budget before its run; the run's
+/// immediate budget-link FK then proves that every admitted root has compiled limits.
+async fn insert_root_budget(
+    db: &mut PgConnection,
+    company: CompanyId,
+    run: RunId,
+    limits: &crate::domain::workflow::RootBudgetLimits,
+) -> AppResult<()> {
+    use crate::domain::workflow::BudgetResource;
+    sqlx::query("INSERT INTO workflow_root_budgets(company_id,root_run_id,activations,model_calls,repetitions,token_policy) VALUES($1,$2,$3,$4,$5,$6)")
+        .bind(company.as_uuid()).bind(run.as_uuid())
+        .bind(i32::try_from(limits.limit(BudgetResource::Activation)).map_err(|_| invalid())?)
+        .bind(i32::try_from(limits.limit(BudgetResource::ModelCall)).map_err(|_| invalid())?)
+        .bind(i32::try_from(limits.limit(BudgetResource::Repetition)).map_err(|_| invalid())?)
+        .bind(limits.tokens().map(|tokens| tokens.policy())).execute(&mut *db).await?;
+    sqlx::query("INSERT INTO workflow_root_budget_usage(company_id,root_run_id) VALUES($1,$2)")
+        .bind(company.as_uuid())
+        .bind(run.as_uuid())
+        .execute(db)
+        .await?;
+    Ok(())
+}
+
 pub(super) async fn insert_run(db: &mut PgConnection, row: &RunRow<'_>) -> AppResult<()> {
     let (channel, thread) = binding_rows::association_columns(row.association);
     let definition = row.binding.bundle().compiled().graph().definition();
+    if row.parent.is_none() {
+        insert_root_budget(db, row.company, row.run, &definition.limits.root_budget).await?;
+    }
     let resources = serde_json::to_value(row.binding.resources())
         .map_err(|_| AppError::Internal("Workflow resource encoding failed".into()))?;
     let inherited = match row.deadline {

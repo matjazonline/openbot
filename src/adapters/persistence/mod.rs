@@ -109,9 +109,20 @@ impl From<sqlx::Error> for AppError {
             .and_then(|error| error.code())
             .is_some_and(|code| matches!(code.as_ref(), LOCK_NOT_AVAILABLE | QUERY_CANCELED));
         if gave_up_waiting {
-            AppError::DatabaseTimeout(value.to_string())
-        } else {
-            AppError::Database(value.to_string())
+            return AppError::DatabaseTimeout(value.to_string());
+        }
+        let guard = value
+            .as_database_error()
+            .and_then(|error| error.constraint())
+            .and_then(|constraint| {
+                crate::app_error::WorkflowGuardViolation::from_constraint(
+                    constraint,
+                    value.to_string(),
+                )
+            });
+        match guard {
+            Some(violation) => AppError::WorkflowGuard(violation),
+            None => AppError::Database(value.to_string()),
         }
     }
 }
@@ -392,6 +403,47 @@ mod tests {
             .await
             .expect_err("the column does not exist");
         assert!(matches!(AppError::from(broken), AppError::Database(_)));
+    }
+
+    /// A refusal carrying a `workflow_guard:` constraint name is a typed guard violation with that
+    /// name, whatever its SQLSTATE; a table constraint name or a malformed guard name is not.
+    #[tokio::test]
+    async fn workflow_guard_error_is_typed_by_its_constraint_name() {
+        use crate::app_error::AppError;
+
+        let Some(pool) = test_pool().await else {
+            return;
+        };
+        let raise = |code: &str, constraint: &str| {
+            format!(
+                "DO $$ BEGIN RAISE EXCEPTION 'refused' USING ERRCODE='{code}', CONSTRAINT='{constraint}'; END $$"
+            )
+        };
+        for code in ["23514", "P0001", "54000"] {
+            let refused = sqlx::query(&raise(code, "workflow_guard:check_workflow_test_guard"))
+                .execute(&pool)
+                .await
+                .expect_err("the block raises");
+            let AppError::WorkflowGuard(violation) = AppError::from(refused) else {
+                panic!("{code} with a guard name is a workflow guard violation");
+            };
+            assert_eq!(violation.guard(), "check_workflow_test_guard");
+            assert!(violation.message().contains("refused"));
+        }
+        for constraint in [
+            "workflow_run_state",
+            "workflow_guard:",
+            "workflow_guard:Bad-Name",
+        ] {
+            let refused = sqlx::query(&raise("23514", constraint))
+                .execute(&pool)
+                .await
+                .expect_err("the block raises");
+            assert!(
+                matches!(AppError::from(refused), AppError::Database(_)),
+                "{constraint} is not a workflow guard name"
+            );
+        }
     }
 }
 

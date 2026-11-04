@@ -75,7 +75,7 @@ impl Fixture {
     async fn drive(&self, run: Uuid, state: RunStateName) {
         sqlx::query(
             "UPDATE workflow_runs SET state = $2, \
-             waiting_reason = CASE WHEN $2 = 'waiting' THEN 'timer' END WHERE id = $1",
+             waiting_reason = CASE WHEN $2 = 'waiting' THEN 'timer' END, terminal_execution_id=CASE WHEN $2 IN ('succeeded','failed') THEN (SELECT execution.id FROM workflow_executions AS execution WHERE execution.company_id=workflow_runs.company_id AND execution.run_id=workflow_runs.id ORDER BY activation DESC LIMIT 1) END WHERE id = $1",
         )
         .bind(run)
         .bind(state.as_str())

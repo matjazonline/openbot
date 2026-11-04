@@ -1,0 +1,1 @@
+PASS all correction affected union, SQLx prepare/all-target compilation, offline clippy -Dwarnings, fmt, diff-check. Source digest ba772625d27ac6dfa497e3798067e0665d09ebfff4081d9b0dd02ef724cf1440 unchanged throughout. See per-check logs and nonzero filter-count manifest.

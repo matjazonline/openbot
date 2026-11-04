@@ -35,6 +35,28 @@ use crate::application::use_cases::{
     user::UserPersistence,
 };
 
+/// Raw-schema fixtures explicitly own their root budget; SQL never decodes their bundle.
+async fn seed_root_budget(
+    db: &mut PgConnection,
+    company: Uuid,
+    run: Uuid,
+) -> Result<(), sqlx::Error> {
+    use crate::domain::workflow::{BudgetResource, RootBudgetLimits};
+    let limits = RootBudgetLimits::default();
+    sqlx::query("INSERT INTO workflow_root_budgets(company_id,root_run_id,activations,model_calls,repetitions) VALUES($1,$2,$3,$4,$5)")
+        .bind(company).bind(run)
+        .bind(limits.limit(BudgetResource::Activation) as i32)
+        .bind(limits.limit(BudgetResource::ModelCall) as i32)
+        .bind(limits.limit(BudgetResource::Repetition) as i32)
+        .execute(&mut *db).await?;
+    sqlx::query("INSERT INTO workflow_root_budget_usage(company_id,root_run_id) VALUES($1,$2)")
+        .bind(company)
+        .bind(run)
+        .execute(db)
+        .await?;
+    Ok(())
+}
+
 /// The squashed init schema every fresh database applies (the only migration).
 const INIT_SCHEMA: &str = include_str!("../../../../migrations/20260817000000_init_schema.sql");
 

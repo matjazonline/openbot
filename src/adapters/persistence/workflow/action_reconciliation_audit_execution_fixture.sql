@@ -169,7 +169,7 @@ BEGIN
     expected_message := CASE WHEN config.probe_case='mismatch-control' THEN 'workflow action command evidence scope mismatch'
         ELSE 'workflow action command audit scope mismatch' END;
     prefix := CASE WHEN native_state IS NULL THEN 'FIXTURE_AUDIT_EXECUTION_ACCEPTED_V1:'
-        WHEN COALESCE(native_state='23514' AND native_constraint='' AND native_schema='' AND native_table=''
+        WHEN COALESCE(native_state='23514' AND native_constraint='workflow_guard:workflow_action_command_scope_guard' AND native_schema='' AND native_table=''
             AND native_message=expected_message AND position('workflow_action_command_scope_guard()' IN native_context)>0
             AND position('SET CONSTRAINTS public.workflow_action_command_scope_guard IMMEDIATE' IN native_context)>0,false)
         THEN 'FIXTURE_AUDIT_EXECUTION_NATIVE_V1:' ELSE 'FIXTURE_AUDIT_EXECUTION_MISMATCH_V1:' END;

@@ -212,40 +212,52 @@ async fn workflow_wakeup_write_and_commit_failures_rollback_progression() {
 
 #[tokio::test]
 async fn workflow_wakeup_terminal_transitions_are_immutable_and_noops_do_not_repeat() {
-    let (f, parent, child) = chained(example("data.map")).await;
     for state in ["failed", "cancelled"] {
-        sqlx::query("UPDATE workflow_runs SET state=$2 WHERE id=$1")
-            .bind(child.run.as_uuid())
-            .bind(state)
-            .execute(f.persistence().pool())
-            .await
-            .unwrap();
+        let (f, parent, child) = chained(example("data.map")).await;
+        sqlx::query("UPDATE workflow_runs SET state=$2,terminal_execution_id=CASE WHEN $2='failed' THEN $3 END WHERE id=$1")
+            .bind(child.run.as_uuid()).bind(state).bind(child.execution.as_uuid()).execute(f.persistence().pool()).await.unwrap();
         let saved = wakeups(&f, parent, child).await;
+        assert_eq!(saved.len(), 1, "one immutable terminal fact");
+        assert_eq!(
+            saved[0].state,
+            if state == "failed" {
+                ChildTerminalState::Failed
+            } else {
+                ChildTerminalState::Cancelled
+            }
+        );
         sqlx::query("UPDATE workflow_runs SET state=state WHERE id=$1")
             .bind(child.run.as_uuid())
             .execute(f.persistence().pool())
             .await
             .unwrap();
         assert_eq!(wakeups(&f, parent, child).await, saved);
+        let error = sqlx::query(
+            "UPDATE workflow_runs SET state='succeeded',terminal_execution_id=$2 WHERE id=$1",
+        )
+        .bind(child.run.as_uuid())
+        .bind(child.execution.as_uuid())
+        .execute(f.persistence().pool())
+        .await
+        .unwrap_err();
+        assert_eq!(
+            error.as_database_error().unwrap().constraint(),
+            Some("workflow_guard:guard_workflow_run_transition")
+        );
+        assert_eq!(wakeups(&f, parent, child).await, saved);
+        assert!(sqlx::query("UPDATE workflow_run_events SET terminal_state='succeeded' WHERE run_id=$1 AND event_kind='parent_wakeup'")
+            .bind(child.run.as_uuid()).execute(f.persistence().pool()).await.is_err());
+        assert_eq!(wakeups(&f, parent, child).await, saved);
+        f.persistence().resume_wait(parent).await.unwrap();
+        assert_eq!(parent_state(&f, parent).await["state"], "failed");
+        let total: i64 = sqlx::query_scalar(
+            "SELECT count(*) FROM workflow_run_events WHERE event_kind='parent_wakeup'",
+        )
+        .fetch_one(f.persistence().pool())
+        .await
+        .unwrap();
+        assert_eq!(total, 1, "a root writes no wakeup");
     }
-    let saved = wakeups(&f, parent, child).await;
-    assert_eq!(
-        saved.iter().map(|event| event.state).collect::<Vec<_>>(),
-        vec![ChildTerminalState::Failed, ChildTerminalState::Cancelled]
-    );
-    assert!(sqlx::query("UPDATE workflow_run_events SET terminal_state='succeeded' WHERE run_id=$1 AND event_kind='parent_wakeup'")
-        .bind(child.run.as_uuid()).execute(f.persistence().pool()).await.is_err());
-    assert_eq!(wakeups(&f, parent, child).await, saved);
-    // The parked root consumes its child's last fact and fails; a root writes no wakeup.
-    f.persistence().resume_wait(parent).await.unwrap();
-    assert_eq!(parent_state(&f, parent).await["state"], "failed");
-    let total: i64 = sqlx::query_scalar(
-        "SELECT count(*) FROM workflow_run_events WHERE event_kind='parent_wakeup'",
-    )
-    .fetch_one(f.persistence().pool())
-    .await
-    .unwrap();
-    assert_eq!(total, 2);
 }
 
 #[tokio::test]

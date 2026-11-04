@@ -85,7 +85,7 @@ async fn workflow_maintenance_forged_retirement_is_rejected_and_rolled_back() {
             if let Some(sql) = tamper { sqlx::query(sql).bind(scope.job.0).execute(&mut *tx).await?; }
             sqlx::query("UPDATE background_tasks SET status=$2,retry_count=retry_count+$3,worker_id=NULL,execution_generation=NULL,locked_at=NULL,lock_expires_at=NULL,run_at=clock_timestamp()+interval '1 hour' WHERE id=$1")
                 .bind(scope.job.0).bind(if forgery == "retry" { "pending" } else { "failed" }).bind(if forgery == "debit" { 0i32 } else { 1 }).execute(&mut *tx).await?;
-            sqlx::query("UPDATE workflow_runs SET state='failed',waiting_reason=NULL WHERE id=$1")
+            sqlx::query("UPDATE workflow_runs SET state='failed',terminal_execution_id=(SELECT execution.id FROM workflow_executions AS execution WHERE execution.company_id=workflow_runs.company_id AND execution.run_id=workflow_runs.id ORDER BY activation DESC LIMIT 1),waiting_reason=NULL WHERE id=$1")
                 .bind(scope.run.as_uuid()).execute(&mut *tx).await?;
             if forgery == "successor" {
                 let next = Uuid::new_v4();

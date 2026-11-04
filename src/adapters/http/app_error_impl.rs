@@ -12,6 +12,7 @@ impl IntoResponse for AppError {
             AppError::Execution(_) => "execution",
             AppError::Database(_) => "database",
             AppError::DatabaseTimeout(_) => "database_timeout",
+            AppError::WorkflowGuard(_) => "workflow_guard",
             AppError::InvalidCredentials => "invalid_credentials",
             AppError::ServiceUnavailable(_) => "service_unavailable",
             AppError::BadRequest(_) => "bad_request",
@@ -27,7 +28,7 @@ impl IntoResponse for AppError {
             AppError::Execution(_) => {
                 (StatusCode::UNPROCESSABLE_ENTITY, "Execution stopped").into_response()
             }
-            AppError::Database(_) => {
+            AppError::Database(_) | AppError::WorkflowGuard(_) => {
                 (StatusCode::INTERNAL_SERVER_ERROR, "Database error").into_response()
             }
             AppError::DatabaseTimeout(_) => (

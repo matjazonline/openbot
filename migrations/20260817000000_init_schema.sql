@@ -74,12 +74,12 @@ CREATE FUNCTION public.advance_workflow_run_revision() RETURNS trigger
     AS $$
 BEGIN
     IF NEW.revision<>OLD.revision AND pg_trigger_depth()=1 THEN
-        RAISE EXCEPTION 'workflow revision is database generated' USING ERRCODE='23514';
+        RAISE EXCEPTION 'workflow revision is database generated' USING ERRCODE='23514', CONSTRAINT='workflow_guard:advance_workflow_run_revision';
     END IF;
     IF (to_jsonb(NEW)-'revision') IS DISTINCT FROM (to_jsonb(OLD)-'revision')
         OR NEW.revision<>OLD.revision THEN
         IF OLD.revision=9223372036854775807 THEN
-            RAISE EXCEPTION 'workflow revision exhausted' USING ERRCODE='23514';
+            RAISE EXCEPTION 'workflow revision exhausted' USING ERRCODE='23514', CONSTRAINT='workflow_guard:advance_workflow_run_revision';
         END IF;
         NEW.revision=OLD.revision+1;
     END IF;
@@ -97,11 +97,11 @@ CREATE FUNCTION public.allocate_workflow_wakeup_sequence() RETURNS trigger
 BEGIN
     IF TG_OP='INSERT' THEN
         IF NEW.terminal_wakeup_sequence IS NOT NULL THEN
-            RAISE EXCEPTION 'Workflow wakeup sequence is generated' USING ERRCODE='23514';
+            RAISE EXCEPTION 'Workflow wakeup sequence is generated' USING ERRCODE='23514', CONSTRAINT='workflow_guard:allocate_workflow_wakeup_sequence';
         END IF;
     ELSE
         IF NEW.terminal_wakeup_sequence IS DISTINCT FROM OLD.terminal_wakeup_sequence THEN
-            RAISE EXCEPTION 'Workflow wakeup sequence is generated' USING ERRCODE='23514';
+            RAISE EXCEPTION 'Workflow wakeup sequence is generated' USING ERRCODE='23514', CONSTRAINT='workflow_guard:allocate_workflow_wakeup_sequence';
         END IF;
         IF NEW.parent_run_id IS NOT NULL AND NEW.state IS DISTINCT FROM OLD.state
            AND NEW.state IN ('succeeded','failed','cancelled') THEN
@@ -150,7 +150,7 @@ BEGIN
             OR NEW.workflow_execution_id<>OLD.workflow_execution_id OR NEW.id<>OLD.id
             OR owner.state<>'running' OR owner.terminal_execution_id IS NOT NULL
             OR NOT (ordinary OR reconciled)
-        THEN RAISE EXCEPTION 'invalid explicit workflow retry' USING ERRCODE='23514'; END IF;
+        THEN RAISE EXCEPTION 'invalid explicit workflow retry' USING ERRCODE='23514', CONSTRAINT='workflow_guard:check_workflow_control_retry'; END IF;
     END IF;
     RETURN NULL;
 END $$;
@@ -204,7 +204,7 @@ BEGIN
                                     AND wait.child_tool_call_id IS NOT NULL
                                     AND wait.parked_attempt_number=OLD.attempt_ordinal)))
             ) THEN
-            RAISE EXCEPTION 'workflow completion lost ownership before commit' USING ERRCODE = '23514';
+            RAISE EXCEPTION 'workflow completion lost ownership before commit' USING ERRCODE = '23514', CONSTRAINT='workflow_guard:check_workflow_fenced_completion';
         END IF;
     END IF;
     IF OLD.queue_kind='workflow' AND OLD.status='completed' AND NEW.status='pending' THEN
@@ -264,7 +264,7 @@ BEGIN
                     AND wait.child_tool_call_id IS NOT NULL AND wait.parked_attempt_number=OLD.attempt_ordinal
                     AND child.terminal_wakeup_sequence IS NOT NULL
             )) THEN
-            RAISE EXCEPTION 'workflow job reopen requires an approval, delivery or child continuation' USING ERRCODE='23514';
+            RAISE EXCEPTION 'workflow job reopen requires an approval, delivery or child continuation' USING ERRCODE='23514', CONSTRAINT='workflow_guard:check_workflow_fenced_completion';
         END IF;
     END IF;
     RETURN NULL;
@@ -291,11 +291,11 @@ BEGIN
             OR (NEW.status='pending' AND (retirement.workflow_retry_safety<>'safe'
                 OR retirement.workflow_failure_class<>'retryable' OR NEW.retry_count>=NEW.max_retries
                 OR NEW.run_at<=retirement.finished_at)) THEN
-            RAISE EXCEPTION 'workflow failure lost ownership or retry eligibility' USING ERRCODE='23514';
+            RAISE EXCEPTION 'workflow failure lost ownership or retry eligibility' USING ERRCODE='23514', CONSTRAINT='workflow_guard:check_workflow_fenced_retirement';
         END IF;
         IF retirement.workflow_retry_safety='safe' AND
             workflow_action_retry_safe(NEW.company_id,NEW.workflow_execution_id) IS FALSE THEN
-            RAISE EXCEPTION 'workflow action outcome unknown at retirement' USING ERRCODE='23514';
+            RAISE EXCEPTION 'workflow action outcome unknown at retirement' USING ERRCODE='23514', CONSTRAINT='workflow_guard:check_workflow_fenced_retirement';
         END IF;
         IF retirement.workflow_retirement='deadline' AND (
             NEW.status<>'failed' OR retirement.workflow_failure_class<>'terminal'
@@ -307,7 +307,7 @@ BEGIN
                 WHERE execution.company_id=NEW.company_id AND execution.id=NEW.workflow_execution_id
                     AND run.deadline<=clock_timestamp() AND run.state='failed'
                     AND execution.successor_execution_id IS NULL)) THEN
-            RAISE EXCEPTION 'invalid workflow deadline retirement' USING ERRCODE='23514';
+            RAISE EXCEPTION 'invalid workflow deadline retirement' USING ERRCODE='23514', CONSTRAINT='workflow_guard:check_workflow_fenced_retirement';
         END IF;
         IF retirement.workflow_retirement='cancel' AND (
             NEW.status<>'failed' OR retirement.workflow_failure_class<>'terminal'
@@ -319,7 +319,22 @@ BEGIN
                 WHERE execution.company_id=NEW.company_id AND execution.id=NEW.workflow_execution_id
                     AND run.state='cancelled' AND execution.completed_at IS NULL
                     AND execution.successor_execution_id IS NULL)) THEN
-            RAISE EXCEPTION 'invalid workflow cancellation retirement' USING ERRCODE='23514';
+            RAISE EXCEPTION 'invalid workflow cancellation retirement' USING ERRCODE='23514', CONSTRAINT='workflow_guard:check_workflow_fenced_retirement';
+        END IF;
+        -- A confirmed guard violation fails the run and names the guard in its audit (fix-app 03).
+        IF retirement.workflow_retirement='guard' AND (
+            NEW.status<>'failed' OR retirement.workflow_failure_class<>'terminal'
+            OR retirement.workflow_failure_code<>'workflow.guard_violation'
+            OR retirement.workflow_retry_safety<>'unknown'
+            OR NOT EXISTS (
+                SELECT 1 FROM workflow_executions AS execution
+                JOIN workflow_runs AS run ON run.company_id=execution.company_id AND run.id=execution.run_id
+                WHERE execution.company_id=NEW.company_id AND execution.id=NEW.workflow_execution_id
+                    AND run.state='failed' AND execution.successor_execution_id IS NULL
+                    AND EXISTS (SELECT 1 FROM workflow_run_events AS audit
+                        WHERE audit.company_id=run.company_id AND audit.run_id=run.id
+                            AND audit.event_kind LIKE 'guard\_violation:%'))) THEN
+            RAISE EXCEPTION 'invalid workflow guard retirement' USING ERRCODE='23514', CONSTRAINT='workflow_guard:check_workflow_fenced_retirement';
         END IF;
         -- A retirement may fail or suspend an expired run, but cannot schedule
         -- a retry or successor after its original deadline, including commit delay.
@@ -331,7 +346,7 @@ BEGIN
                 JOIN workflow_runs AS run ON run.company_id=execution.company_id AND run.id=execution.run_id
                 WHERE execution.company_id=NEW.company_id AND execution.id=NEW.workflow_execution_id
                     AND run.deadline<=clock_timestamp()) THEN
-            RAISE EXCEPTION 'workflow retirement scheduled work after deadline' USING ERRCODE='23514';
+            RAISE EXCEPTION 'workflow retirement scheduled work after deadline' USING ERRCODE='23514', CONSTRAINT='workflow_guard:check_workflow_fenced_retirement';
         END IF;
     END IF;
     RETURN NULL;
@@ -348,7 +363,7 @@ CREATE FUNCTION public.check_workflow_parent_source() RETURNS trigger
 DECLARE source jsonb; parent_run uuid; parent_execution uuid; ordinal numeric; call uuid;
 BEGIN
     IF TG_OP='UPDATE' AND NEW IS DISTINCT FROM OLD THEN
-        RAISE EXCEPTION 'Workflow admission identity is immutable' USING ERRCODE='23514';
+        RAISE EXCEPTION 'Workflow admission identity is immutable' USING ERRCODE='23514', CONSTRAINT='workflow_guard:check_workflow_parent_source';
     END IF;
     source := substring(NEW.source_key FROM 4)::jsonb;
     SELECT run.parent_run_id,run.parent_execution_id INTO parent_run,parent_execution
@@ -372,10 +387,10 @@ BEGIN
            OR NOT EXISTS (SELECT 1 FROM workflow_executions AS execution
                 WHERE execution.company_id=NEW.company_id AND execution.run_id=parent_run
                   AND execution.id=parent_execution AND execution.step_id=source->>3) THEN
-            RAISE EXCEPTION 'Workflow admission parent mismatch' USING ERRCODE='23514';
+            RAISE EXCEPTION 'Workflow admission parent mismatch' USING ERRCODE='23514', CONSTRAINT='workflow_guard:check_workflow_parent_source';
         END IF;
     ELSIF parent_run IS NOT NULL THEN
-        RAISE EXCEPTION 'Non-child admission has parent' USING ERRCODE='23514';
+        RAISE EXCEPTION 'Non-child admission has parent' USING ERRCODE='23514', CONSTRAINT='workflow_guard:check_workflow_parent_source';
     END IF;
     RETURN NEW;
 END $$;
@@ -393,7 +408,7 @@ BEGIN
         AND EXISTS (SELECT 1 FROM workflow_runs AS run
             WHERE run.company_id = NEW.company_id AND run.id = NEW.run_id
                 AND run.deadline <= clock_timestamp()) THEN
-        RAISE EXCEPTION 'workflow deadline reached before progression commit' USING ERRCODE = '23514';
+        RAISE EXCEPTION 'workflow deadline reached before progression commit' USING ERRCODE = '23514', CONSTRAINT='workflow_guard:check_workflow_progression_deadline';
     END IF;
     RETURN NULL;
 END $$;
@@ -418,14 +433,14 @@ BEGIN
                SELECT 1 FROM workflow_wait_events AS event WHERE event.company_id=NEW.company_id
                  AND event.run_id=NEW.run_id AND event.id=NEW.consumed_event_id
                  AND event.created_at<=NEW.deadline)) THEN
-            RAISE EXCEPTION 'workflow wait deadline reached before commit' USING ERRCODE='23514';
+            RAISE EXCEPTION 'workflow wait deadline reached before commit' USING ERRCODE='23514', CONSTRAINT='workflow_guard:check_workflow_wait_commit';
         END IF;
     END IF;
     -- A run-scoped event is consumed by exactly the wait that records it (05-D2 §11).
     IF NEW.consumed_event_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM workflow_wait_events AS event
         WHERE event.company_id=NEW.company_id AND event.run_id=NEW.run_id AND event.id=NEW.consumed_event_id
             AND event.consumed_execution_id=NEW.execution_id) THEN
-        RAISE EXCEPTION 'workflow wait consumed an event it does not own' USING ERRCODE='23514';
+        RAISE EXCEPTION 'workflow wait consumed an event it does not own' USING ERRCODE='23514', CONSTRAINT='workflow_guard:check_workflow_wait_commit';
     END IF;
     RETURN NULL;
 END $$;
@@ -463,7 +478,7 @@ BEGIN
         AND run_id=NEW.run_id AND execution_id=NEW.execution_id AND resource=NEW.resource AND reservation_key=NEW.reservation_key;
     IF FOUND THEN
         IF (NEW.root_run_id,NEW.quantity) IS DISTINCT FROM (receipt.root_run_id,receipt.quantity) THEN
-            RAISE EXCEPTION 'Workflow budget reservation payload conflicts' USING ERRCODE='23514';
+            RAISE EXCEPTION 'Workflow budget reservation payload conflicts' USING ERRCODE='23514', CONSTRAINT='workflow_guard:debit_workflow_budget_receipt';
         END IF;
         NEW.disposition=receipt.disposition;
         RETURN NEW;
@@ -474,7 +489,7 @@ BEGIN
         WHERE company_id=NEW.company_id AND root_run_id=NEW.root_run_id;
     consumed=CASE NEW.resource WHEN 'activation' THEN usage.activations WHEN 'model_call' THEN usage.model_calls ELSE usage.repetitions END;
     ceiling=CASE NEW.resource WHEN 'activation' THEN budget.activations WHEN 'model_call' THEN budget.model_calls ELSE budget.repetitions END;
-    NEW.disposition=CASE WHEN budget.provenance='frozen_v6' AND NEW.quantity>0
+    NEW.disposition=CASE WHEN NEW.quantity>0
         AND consumed<=ceiling::bigint-NEW.quantity THEN 'granted' ELSE 'exhausted' END;
     IF NEW.disposition='granted' THEN
         UPDATE workflow_root_budget_usage SET
@@ -630,7 +645,7 @@ CREATE FUNCTION public.guard_workflow_capacity_policy() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
-    RAISE EXCEPTION 'workflow capacity policy is immutable' USING ERRCODE = '23514';
+    RAISE EXCEPTION 'workflow capacity policy is immutable' USING ERRCODE = '23514', CONSTRAINT='workflow_guard:guard_workflow_capacity_policy';
 END;
 $$;
 
@@ -647,7 +662,7 @@ BEGIN
             IS DISTINCT FROM (OLD.company_id, OLD.run_id, OLD.id, OLD.event_name, OLD.correlation, OLD.payload, OLD.created_at)
         OR (OLD.consumed_execution_id IS NOT NULL AND NEW.consumed_execution_id IS DISTINCT FROM OLD.consumed_execution_id)
         OR (OLD.consumed_execution_id IS NULL AND NEW.consumed_execution_id IS NULL) THEN
-        RAISE EXCEPTION 'workflow event facts are immutable' USING ERRCODE='23514';
+        RAISE EXCEPTION 'workflow event facts are immutable' USING ERRCODE='23514', CONSTRAINT='workflow_guard:immutable_workflow_wait_event';
     END IF;
     RETURN NEW;
 END $$;
@@ -660,29 +675,13 @@ END $$;
 CREATE FUNCTION public.insert_workflow_budget_link() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
-DECLARE root uuid; stored jsonb; limits jsonb;
+DECLARE root uuid;
 BEGIN
     IF NEW.parent_run_id IS NOT NULL THEN
         SELECT root_run_id INTO STRICT root FROM workflow_run_budgets
             WHERE company_id=NEW.company_id AND run_id=NEW.parent_run_id;
     ELSE
         root=NEW.id;
-        -- Invalid/old raw schema fixtures may remain as sealed records. They do
-        -- not become executable or receive defaults through this SQL boundary.
-        BEGIN
-            stored=convert_from(NEW.bundle,'UTF8')::jsonb;
-            IF stored->>'compiler_revision'='6' THEN
-                SELECT version->'compiled'->'root_budget' INTO limits
-                    FROM jsonb_array_elements(stored->'versions') AS version
-                    WHERE version->>'version'=stored->>'root';
-            END IF;
-        EXCEPTION WHEN data_exception THEN
-            limits=NULL;
-        END;
-        INSERT INTO workflow_root_budgets(company_id,root_run_id,provenance,activations,model_calls,repetitions,token_policy)
-            VALUES(NEW.company_id,root,CASE WHEN limits IS NULL THEN 'sealed_legacy' ELSE 'frozen_v6' END,
-                (limits->>'activations')::integer,(limits->>'model_calls')::integer,(limits->>'repetitions')::integer,limits->'tokens');
-        INSERT INTO workflow_root_budget_usage(company_id,root_run_id) VALUES(NEW.company_id,root);
     END IF;
     INSERT INTO workflow_run_budgets(company_id,run_id,root_run_id,parent_run_id)
         VALUES(NEW.company_id,NEW.id,root,NEW.parent_run_id);
@@ -1132,12 +1131,12 @@ BEGIN
     IF TG_OP='DELETE' THEN
         IF EXISTS (SELECT 1 FROM workflow_runs WHERE company_id=OLD.company_id
             AND id=CASE WHEN TG_TABLE_NAME='workflow_run_budgets' THEN (to_jsonb(OLD)->>'run_id')::uuid ELSE OLD.root_run_id END) THEN
-            RAISE EXCEPTION 'Workflow budget identity cannot be removed while its owner exists' USING ERRCODE='23514';
+            RAISE EXCEPTION 'Workflow budget identity cannot be removed while its owner exists' USING ERRCODE='23514', CONSTRAINT='workflow_guard:preserve_workflow_budget_identity';
         END IF;
         RETURN OLD;
     END IF;
     IF NEW IS DISTINCT FROM OLD THEN
-        RAISE EXCEPTION 'Workflow budget identity is immutable' USING ERRCODE='23514';
+        RAISE EXCEPTION 'Workflow budget identity is immutable' USING ERRCODE='23514', CONSTRAINT='workflow_guard:preserve_workflow_budget_identity';
     END IF;
     RETURN NEW;
 END $$;
@@ -1153,12 +1152,12 @@ CREATE FUNCTION public.preserve_workflow_budget_receipt() RETURNS trigger
 BEGIN
     IF TG_OP='DELETE' THEN
         IF EXISTS (SELECT 1 FROM workflow_runs WHERE company_id=OLD.company_id AND id=OLD.run_id) THEN
-            RAISE EXCEPTION 'Workflow budget receipt cannot be removed while its owner exists' USING ERRCODE='23514';
+            RAISE EXCEPTION 'Workflow budget receipt cannot be removed while its owner exists' USING ERRCODE='23514', CONSTRAINT='workflow_guard:preserve_workflow_budget_receipt';
         END IF;
         RETURN OLD;
     END IF;
     IF NEW IS DISTINCT FROM OLD THEN
-        RAISE EXCEPTION 'Workflow budget receipt is immutable' USING ERRCODE='23514';
+        RAISE EXCEPTION 'Workflow budget receipt is immutable' USING ERRCODE='23514', CONSTRAINT='workflow_guard:preserve_workflow_budget_receipt';
     END IF;
     RETURN NEW;
 END $$;
@@ -1174,13 +1173,13 @@ CREATE FUNCTION public.preserve_workflow_budget_usage() RETURNS trigger
 BEGIN
     IF TG_OP='INSERT' THEN
         IF NEW.activations<>0 OR NEW.model_calls<>0 OR NEW.repetitions<>0 OR NEW.authorized_tokens<>0 OR NEW.token_refusal IS NOT NULL THEN
-            RAISE EXCEPTION 'New workflow budget usage starts at zero' USING ERRCODE='23514';
+            RAISE EXCEPTION 'New workflow budget usage starts at zero' USING ERRCODE='23514', CONSTRAINT='workflow_guard:preserve_workflow_budget_usage';
         END IF;
         RETURN NEW;
     END IF;
     IF TG_OP='DELETE' THEN
         IF EXISTS (SELECT 1 FROM workflow_root_budgets WHERE company_id=OLD.company_id AND root_run_id=OLD.root_run_id) THEN
-            RAISE EXCEPTION 'Workflow budget usage cannot be removed while its owner exists' USING ERRCODE='23514';
+            RAISE EXCEPTION 'Workflow budget usage cannot be removed while its owner exists' USING ERRCODE='23514', CONSTRAINT='workflow_guard:preserve_workflow_budget_usage';
         END IF;
         RETURN OLD;
     END IF;
@@ -1189,7 +1188,7 @@ BEGIN
         OR NEW.authorized_tokens<OLD.authorized_tokens
         OR (OLD.token_refusal IS NOT NULL AND NEW.token_refusal IS DISTINCT FROM OLD.token_refusal)
         OR (NEW IS DISTINCT FROM OLD AND pg_trigger_depth()<2) THEN
-        RAISE EXCEPTION 'Workflow budget usage changes require a receipt' USING ERRCODE='23514';
+        RAISE EXCEPTION 'Workflow budget usage changes require a receipt' USING ERRCODE='23514', CONSTRAINT='workflow_guard:preserve_workflow_budget_usage';
     END IF;
     RETURN NEW;
 END $$;
@@ -1206,12 +1205,12 @@ BEGIN
     IF TG_OP='DELETE' THEN
         IF EXISTS (SELECT 1 FROM workflow_runs WHERE company_id=OLD.company_id AND id=OLD.run_id)
             AND EXISTS (SELECT 1 FROM companies WHERE id=OLD.company_id) THEN
-            RAISE EXCEPTION 'workflow control receipts are immutable' USING ERRCODE='23514';
+            RAISE EXCEPTION 'workflow control receipts are immutable' USING ERRCODE='23514', CONSTRAINT='workflow_guard:preserve_workflow_control_receipt';
         END IF;
         RETURN OLD;
     END IF;
     IF NEW IS DISTINCT FROM OLD THEN
-        RAISE EXCEPTION 'workflow control receipts are immutable' USING ERRCODE='23514';
+        RAISE EXCEPTION 'workflow control receipts are immutable' USING ERRCODE='23514', CONSTRAINT='workflow_guard:preserve_workflow_control_receipt';
     END IF;
     RETURN NEW;
 END $$;
@@ -1229,13 +1228,13 @@ BEGIN
        (NEW.activated_at, NEW.frozen_inputs) IS DISTINCT FROM
        (OLD.activated_at, OLD.frozen_inputs) THEN
         RAISE EXCEPTION 'workflow activation inputs are immutable'
-            USING ERRCODE = '23514', CONSTRAINT = 'workflow_activation_immutable';
+            USING ERRCODE = '23514', CONSTRAINT = 'workflow_guard:workflow_activation_immutable';
     END IF;
     IF OLD.completed_at IS NOT NULL AND
        (NEW.completed_at, NEW.committed_output) IS DISTINCT FROM
        (OLD.completed_at, OLD.committed_output) THEN
         RAISE EXCEPTION 'workflow committed output is immutable'
-            USING ERRCODE = '23514', CONSTRAINT = 'workflow_output_immutable';
+            USING ERRCODE = '23514', CONSTRAINT = 'workflow_guard:workflow_output_immutable';
     END IF;
     RETURN NEW;
 END;
@@ -1253,7 +1252,7 @@ BEGIN
     IF (NEW.company_id, NEW.id, NEW.run_id, NEW.step_id, NEW.activation) IS DISTINCT FROM
        (OLD.company_id, OLD.id, OLD.run_id, OLD.step_id, OLD.activation) THEN
         RAISE EXCEPTION 'workflow execution identity is immutable'
-            USING ERRCODE = '23514', CONSTRAINT = 'workflow_execution_identity_immutable';
+            USING ERRCODE = '23514', CONSTRAINT = 'workflow_guard:workflow_execution_identity_immutable';
     END IF;
     RETURN NEW;
 END;
@@ -1281,7 +1280,7 @@ BEGIN
               = COALESCE(to_jsonb(wait.child_tool_call_id::text),'null'::jsonb)
           AND substring(admission.source_key FROM 4)::jsonb->5
               = COALESCE(to_jsonb(wait.child_ordinal),'null'::jsonb)) THEN
-        RAISE EXCEPTION 'Workflow child run has no parent child_run wait' USING ERRCODE='23514';
+        RAISE EXCEPTION 'Workflow child run has no parent child_run wait' USING ERRCODE='23514', CONSTRAINT='workflow_guard:check_workflow_child_parent_wait';
     END IF;
     RETURN NULL;
 END $$;
@@ -1299,7 +1298,7 @@ BEGIN
     IF NEW.rerun_of_run_id IS NOT NULL AND EXISTS (SELECT 1 FROM workflow_runs AS original
         WHERE original.company_id=NEW.company_id AND original.id=NEW.rerun_of_run_id
           AND original.parent_run_id IS NOT NULL) THEN
-        RAISE EXCEPTION 'Workflow rerun original is not a top-level run' USING ERRCODE='23514';
+        RAISE EXCEPTION 'Workflow rerun original is not a top-level run' USING ERRCODE='23514', CONSTRAINT='workflow_guard:check_workflow_rerun_original';
     END IF;
     RETURN NEW;
 END $$;
@@ -1315,7 +1314,7 @@ CREATE FUNCTION public.preserve_workflow_parent() RETURNS trigger
 BEGIN
     IF (NEW.parent_run_id,NEW.parent_execution_id,NEW.rerun_of_run_id) IS DISTINCT FROM
        (OLD.parent_run_id,OLD.parent_execution_id,OLD.rerun_of_run_id) THEN
-        RAISE EXCEPTION 'Admitted workflow parent is immutable' USING ERRCODE='23514';
+        RAISE EXCEPTION 'Admitted workflow parent is immutable' USING ERRCODE='23514', CONSTRAINT='workflow_guard:preserve_workflow_parent';
     END IF;
     RETURN NEW;
 END $$;
@@ -1330,7 +1329,7 @@ CREATE FUNCTION public.preserve_workflow_parent_link() RETURNS trigger
     AS $$
 BEGIN
     IF NEW IS DISTINCT FROM OLD THEN
-        RAISE EXCEPTION 'Workflow parent link is immutable' USING ERRCODE='23514';
+        RAISE EXCEPTION 'Workflow parent link is immutable' USING ERRCODE='23514', CONSTRAINT='workflow_guard:preserve_workflow_parent_link';
     END IF;
     RETURN NEW;
 END $$;
@@ -1345,19 +1344,19 @@ CREATE FUNCTION public.preserve_workflow_progression() RETURNS trigger
     AS $$
 BEGIN
     IF OLD.activated_at IS NOT NULL AND NEW.frozen_choice IS DISTINCT FROM OLD.frozen_choice THEN
-        RAISE EXCEPTION 'workflow rule choice is immutable' USING ERRCODE = '23514';
+        RAISE EXCEPTION 'workflow rule choice is immutable' USING ERRCODE = '23514', CONSTRAINT='workflow_guard:preserve_workflow_progression';
     END IF;
     IF OLD.committed_route IS NOT NULL AND
         (NEW.committed_route,NEW.route_target,NEW.successor_execution_id) IS DISTINCT FROM
         (OLD.committed_route,OLD.route_target,OLD.successor_execution_id) THEN
-        RAISE EXCEPTION 'workflow route is immutable' USING ERRCODE = '23514';
+        RAISE EXCEPTION 'workflow route is immutable' USING ERRCODE = '23514', CONSTRAINT='workflow_guard:preserve_workflow_progression';
     END IF;
     IF NEW.successor_execution_id IS NOT NULL AND NOT EXISTS (
         SELECT 1 FROM workflow_executions AS successor
         WHERE successor.company_id = NEW.company_id AND successor.run_id = NEW.run_id
             AND successor.id = NEW.successor_execution_id AND successor.step_id = NEW.route_target
             AND successor.activation = NEW.activation + 1) THEN
-        RAISE EXCEPTION 'invalid workflow successor' USING ERRCODE = '23514';
+        RAISE EXCEPTION 'invalid workflow successor' USING ERRCODE = '23514', CONSTRAINT='workflow_guard:preserve_workflow_progression';
     END IF;
     RETURN NEW;
 END $$;
@@ -1374,7 +1373,7 @@ BEGIN
     IF (NEW.company_id, NEW.id, NEW.channel_id, NEW.thread_id) IS DISTINCT FROM
        (OLD.company_id, OLD.id, OLD.channel_id, OLD.thread_id) THEN
         RAISE EXCEPTION 'workflow run association is immutable'
-            USING ERRCODE = '23514', CONSTRAINT = 'workflow_run_association_immutable';
+            USING ERRCODE = '23514', CONSTRAINT = 'workflow_guard:workflow_run_association_immutable';
     END IF;
     RETURN NEW;
 END;
@@ -1390,7 +1389,7 @@ CREATE FUNCTION public.preserve_workflow_wakeup() RETURNS trigger
     AS $$
 BEGIN
     IF (OLD.event_kind='parent_wakeup' OR NEW.event_kind='parent_wakeup') AND NEW IS DISTINCT FROM OLD THEN
-        RAISE EXCEPTION 'Workflow parent wakeup is immutable' USING ERRCODE='23514';
+        RAISE EXCEPTION 'Workflow parent wakeup is immutable' USING ERRCODE='23514', CONSTRAINT='workflow_guard:preserve_workflow_wakeup';
     END IF;
     RETURN NEW;
 END $$;
@@ -1782,7 +1781,7 @@ BEGIN
           AND child.state=NEW.terminal_state AND child.actor_id=NEW.actor_id
           AND child.terminal_execution_id IS NOT DISTINCT FROM NEW.terminal_execution_id
     ) THEN
-        RAISE EXCEPTION 'Workflow wakeup does not match generated terminal transition' USING ERRCODE='23514';
+        RAISE EXCEPTION 'Workflow wakeup does not match generated terminal transition' USING ERRCODE='23514', CONSTRAINT='workflow_guard:validate_workflow_wakeup_insert';
     END IF;
     RETURN NEW;
 END $$;
@@ -1850,7 +1849,7 @@ BEGIN
         WHERE receipt.company_id=NEW.company_id AND receipt.run_id=NEW.run_id
             AND receipt.execution_id=NEW.execution_id AND receipt.invocation_id=NEW.invocation_id
             AND receipt.argument_digest=NEW.argument_digest AND receipt.dispatch_id=NEW.dispatch_id)
-    THEN RAISE EXCEPTION 'workflow action actual observation requires canonical receipt' USING ERRCODE='23514'; END IF;
+    THEN RAISE EXCEPTION 'workflow action actual observation requires canonical receipt' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_action_actual_observation_receipt_guard'; END IF;
     RETURN NULL;
 END $$;
 
@@ -1864,7 +1863,7 @@ CREATE FUNCTION public.workflow_action_applied_request_guard() RETURNS trigger
     AS $$
 BEGIN
     IF NEW.disposition='applied' AND NEW.applied_request IS NULL
-    THEN RAISE EXCEPTION 'applied evidence requires request attribution' USING ERRCODE='23514'; END IF;
+    THEN RAISE EXCEPTION 'applied evidence requires request attribution' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_action_applied_request_guard'; END IF;
     RETURN NEW;
 END $$;
 
@@ -1881,7 +1880,7 @@ BEGIN
         WHERE command.company_id=NEW.company_id AND command.run_id=NEW.run_id
             AND command.audit_sequence=NEW.sequence AND command.execution_id=NEW.execution_id
             AND command.actor_id=NEW.actor_id AND command.evidence_id IS NOT NULL)<>1 THEN
-        RAISE EXCEPTION 'workflow reconciliation audit requires one exact evidence command' USING ERRCODE='23514';
+        RAISE EXCEPTION 'workflow reconciliation audit requires one exact evidence command' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_action_audit_command_guard';
     END IF;
     RETURN NULL;
 END $$;
@@ -1899,11 +1898,11 @@ BEGIN
         AND NOT EXISTS(SELECT 1 FROM workflow_runs WHERE company_id=OLD.company_id AND id=OLD.run_id)
     THEN RETURN OLD; END IF;
     IF OLD.event_kind='action_reconciled' THEN
-        RAISE EXCEPTION 'workflow reconciliation actor audit is append-only' USING ERRCODE='23514';
+        RAISE EXCEPTION 'workflow reconciliation actor audit is append-only' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_action_audit_immutable';
     END IF;
     IF TG_OP='DELETE' THEN RETURN OLD; END IF;
     IF NEW.event_kind='action_reconciled' THEN
-        RAISE EXCEPTION 'workflow event cannot become a reconciliation actor audit' USING ERRCODE='23514';
+        RAISE EXCEPTION 'workflow event cannot become a reconciliation actor audit' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_action_audit_immutable';
     END IF;
     RETURN NEW;
 END $$;
@@ -1924,7 +1923,7 @@ BEGIN
             WHERE witness.company_id=NEW.company_id AND witness.run_id=NEW.run_id
                 AND witness.execution_id=NEW.execution_id AND witness.job_id=NEW.scheduled_job_id
                 AND witness.transaction_id=pg_current_xact_id();
-        IF NOT FOUND THEN RAISE EXCEPTION 'workflow reconciliation schedule lacks current episode witness' USING ERRCODE='23514'; END IF;
+        IF NOT FOUND THEN RAISE EXCEPTION 'workflow reconciliation schedule lacks current episode witness' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_action_bind_schedule'; END IF;
     END IF;
     RETURN NEW;
 END $$;
@@ -1943,7 +1942,7 @@ BEGIN
         SELECT count(*) INTO candidates FROM workflow_action_claim_episodes AS binding
             WHERE binding.company_id=OLD.company_id AND binding.run_id=OLD.id
                 AND workflow_action_pending_claim_episode(binding.company_id,binding.run_id,binding.execution_id,binding.job_id)=binding.command_key;
-        IF candidates>1 THEN RAISE EXCEPTION 'multiple current workflow reconciliation claim episodes' USING ERRCODE='23514'; END IF;
+        IF candidates>1 THEN RAISE EXCEPTION 'multiple current workflow reconciliation claim episodes' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_action_capture_claim_retirement'; END IF;
         SELECT binding.* INTO episode FROM workflow_action_claim_episodes AS binding
             WHERE binding.company_id=OLD.company_id AND binding.run_id=OLD.id
                 AND workflow_action_pending_claim_episode(binding.company_id,binding.run_id,binding.execution_id,binding.job_id)=binding.command_key;
@@ -2038,7 +2037,7 @@ BEGIN
                 AND step.activated_at IS NOT NULL AND step.completed_at IS NULL
                 AND audit.execution_id=NEW.execution_id AND audit.event_kind='workflow.root_budget_exhausted'
                 AND NOT EXISTS(SELECT 1 FROM task_attempts AS later WHERE later.task_id=NEW.job_id AND later.attempt_number>NEW.retired_attempt))
-    THEN RAISE EXCEPTION 'invalid current workflow reconciliation budget refusal' USING ERRCODE='23514'; END IF;
+    THEN RAISE EXCEPTION 'invalid current workflow reconciliation budget refusal' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_action_claim_budget_refusal_guard'; END IF;
     IF TG_WHEN='BEFORE' THEN RETURN NEW; END IF;
     RETURN NULL;
 END $$;
@@ -2069,7 +2068,7 @@ BEGIN
             AND job.worker_id IS NULL AND job.execution_generation IS NULL AND job.lock_expires_at IS NULL
             AND attempt.status='failed' AND attempt.finished_at IS NOT NULL
             AND NOT EXISTS(SELECT 1 FROM task_attempts AS later WHERE later.task_id=NEW.job_id AND later.attempt_number>NEW.retired_attempt))
-    THEN RAISE EXCEPTION 'invalid current workflow reconciliation claim episode' USING ERRCODE='23514'; END IF;
+    THEN RAISE EXCEPTION 'invalid current workflow reconciliation claim episode' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_action_claim_episode_guard'; END IF;
     RETURN NULL;
 END $$;
 
@@ -2089,7 +2088,7 @@ BEGIN
         WHERE witness.company_id=OLD.company_id AND witness.run_id=OLD.run_id AND witness.audit_sequence=OLD.sequence)
         OR EXISTS(SELECT 1 FROM workflow_action_claim_budget_refusals AS refusal
             WHERE refusal.company_id=OLD.company_id AND refusal.run_id=OLD.run_id AND refusal.audit_sequence=OLD.sequence)
-    THEN RAISE EXCEPTION 'workflow claim budget retirement audit is immutable' USING ERRCODE='23514'; END IF;
+    THEN RAISE EXCEPTION 'workflow claim budget retirement audit is immutable' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_action_claim_refusal_audit_immutable'; END IF;
     IF TG_OP='DELETE' THEN RETURN OLD; END IF;
     RETURN NEW;
 END $$;
@@ -2107,7 +2106,7 @@ BEGIN
         WHERE refusal.company_id=NEW.company_id AND refusal.run_id=NEW.run_id AND refusal.execution_id=NEW.execution_id
             AND refusal.job_id=NEW.job_id AND refusal.command_key=NEW.command_key AND refusal.retired_attempt=NEW.retired_attempt
             AND refusal.audit_sequence=NEW.audit_sequence)
-    THEN RAISE EXCEPTION 'workflow claim budget retirement requires atomic refusal' USING ERRCODE='23514'; END IF;
+    THEN RAISE EXCEPTION 'workflow claim budget retirement requires atomic refusal' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_action_claim_retirement_atomic_guard'; END IF;
     RETURN NULL;
 END $$;
 
@@ -2124,15 +2123,15 @@ BEGIN
         IF pg_trigger_depth()>1
             AND NOT EXISTS(SELECT 1 FROM workflow_runs WHERE company_id=OLD.company_id AND id=OLD.run_id)
         THEN RETURN OLD; END IF;
-        RAISE EXCEPTION 'workflow claim retirement witness is database owned' USING ERRCODE='23514';
+        RAISE EXCEPTION 'workflow claim retirement witness is database owned' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_action_claim_retirement_witness_owner';
     END IF;
     IF pg_trigger_depth()<2 OR NEW.transaction_id<>pg_current_xact_id()
-    THEN RAISE EXCEPTION 'workflow claim retirement witness is database owned' USING ERRCODE='23514'; END IF;
+    THEN RAISE EXCEPTION 'workflow claim retirement witness is database owned' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_action_claim_retirement_witness_owner'; END IF;
     IF TG_OP='UPDATE' AND (
         (to_jsonb(OLD)-'retirement_confirmed'-'audit_sequence') IS DISTINCT FROM (to_jsonb(NEW)-'retirement_confirmed'-'audit_sequence')
         OR (OLD.retirement_confirmed AND NOT NEW.retirement_confirmed)
         OR (OLD.audit_sequence IS NOT NULL AND OLD.audit_sequence IS DISTINCT FROM NEW.audit_sequence))
-    THEN RAISE EXCEPTION 'workflow claim retirement witness is append-once' USING ERRCODE='23514'; END IF;
+    THEN RAISE EXCEPTION 'workflow claim retirement witness is append-once' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_action_claim_retirement_witness_owner'; END IF;
     RETURN NEW;
 END $$;
 
@@ -2152,14 +2151,14 @@ BEGIN
             AND evidence.run_id=NEW.run_id AND evidence.execution_id=NEW.execution_id
             AND evidence.invocation_id=NEW.invocation_id AND evidence.argument_digest=NEW.argument_digest
             AND evidence.dispatch_id=NEW.dispatch_id)
-    THEN RAISE EXCEPTION 'workflow action command evidence scope mismatch' USING ERRCODE='23514'; END IF;
+    THEN RAISE EXCEPTION 'workflow action command evidence scope mismatch' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_action_command_scope_guard'; END IF;
     IF NEW.evidence_id IS NOT NULL AND NOT EXISTS (
         SELECT 1 FROM workflow_run_events AS audit
         WHERE audit.company_id=NEW.company_id AND audit.run_id=NEW.run_id
             AND audit.sequence=NEW.audit_sequence AND audit.execution_id=NEW.execution_id
             AND audit.actor_id=NEW.actor_id AND audit.event_kind='action_reconciled'
     ) THEN
-        RAISE EXCEPTION 'workflow action command audit scope mismatch' USING ERRCODE='23514';
+        RAISE EXCEPTION 'workflow action command audit scope mismatch' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_action_command_scope_guard';
     END IF;
     RETURN NULL;
 END $$;
@@ -2225,7 +2224,7 @@ BEGIN
                 AND entry.reservation_xid=NEW.reservation_xid)
         OR workflow_action_not_applied_available(NEW.company_id,NEW.invocation_id,NEW.remote_entry_id)
             IS DISTINCT FROM NEW.evidence_id
-    THEN RAISE EXCEPTION 'workflow action final proof cannot be consumed' USING ERRCODE='23514'; END IF;
+    THEN RAISE EXCEPTION 'workflow action final proof cannot be consumed' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_action_consumption_commit_guard'; END IF;
     RETURN NULL;
 END $$;
 
@@ -2252,7 +2251,7 @@ BEGIN
                 WHERE target.company_id=NEW.company_id AND target.invocation_id=NEW.invocation_id)
             OR (SELECT count(*) FROM workflow_message_destinations AS target
                 WHERE target.company_id=NEW.company_id AND target.invocation_id=NEW.invocation_id)<>action.destination_count
-        THEN RAISE EXCEPTION 'workflow message dispatch requires its linkage'; END IF;
+        THEN RAISE EXCEPTION 'workflow message dispatch requires its linkage' USING CONSTRAINT='workflow_guard:workflow_action_dispatch_commit_guard'; END IF;
         has_delivery:=EXISTS(SELECT 1 FROM workflow_message_destinations AS target
             WHERE target.company_id=NEW.company_id AND target.invocation_id=NEW.invocation_id
                 AND target.delivery_id IS NOT NULL);
@@ -2270,16 +2269,16 @@ BEGIN
                       AND job.queue_kind='workflow' AND job.status<>'processing'
                       AND attempt.worker_id=NEW.worker_id AND attempt.execution_generation=NEW.execution_generation
                       AND attempt.status='completed' AND attempt.stop_reason='effect_parked')
-            THEN RAISE EXCEPTION 'workflow message park lost its fence'; END IF;
+            THEN RAISE EXCEPTION 'workflow message park lost its fence' USING CONSTRAINT='workflow_guard:workflow_action_dispatch_commit_guard'; END IF;
             RETURN NEW;
         END IF;
         IF has_delivery THEN
-            RAISE EXCEPTION 'workflow message with deliveries must park';
+            RAISE EXCEPTION 'workflow message with deliveries must park' USING CONSTRAINT='workflow_guard:workflow_action_dispatch_commit_guard';
         END IF;
         IF NOT has_delivery AND NOT EXISTS(SELECT 1 FROM workflow_action_receipts AS receipt
             WHERE receipt.company_id=NEW.company_id AND receipt.invocation_id=NEW.invocation_id
               AND receipt.dispatch_id=NEW.id)
-        THEN RAISE EXCEPTION 'in-app workflow message requires atomic receipt'; END IF;
+        THEN RAISE EXCEPTION 'in-app workflow message requires atomic receipt' USING CONSTRAINT='workflow_guard:workflow_action_dispatch_commit_guard'; END IF;
     END IF;
     IF NOT EXISTS (
         SELECT 1 FROM workflow_runs AS run
@@ -2294,12 +2293,12 @@ BEGIN
           AND job.attempt_ordinal=NEW.attempt_number AND job.lock_expires_at>clock_timestamp()
           AND attempt.attempt_number=NEW.attempt_number AND attempt.worker_id=NEW.worker_id
           AND attempt.execution_generation=NEW.execution_generation AND attempt.status='processing'
-    ) THEN RAISE EXCEPTION 'workflow action dispatch lost live fence'; END IF;
+    ) THEN RAISE EXCEPTION 'workflow action dispatch lost live fence' USING CONSTRAINT='workflow_guard:workflow_action_dispatch_commit_guard'; END IF;
     IF NEW.effect_kind='local' AND NOT EXISTS (
         SELECT 1 FROM workflow_action_receipts AS receipt
         WHERE receipt.company_id=NEW.company_id AND receipt.invocation_id=NEW.invocation_id
           AND receipt.dispatch_id=NEW.id
-    ) THEN RAISE EXCEPTION 'local workflow action requires atomic receipt'; END IF;
+    ) THEN RAISE EXCEPTION 'local workflow action requires atomic receipt' USING CONSTRAINT='workflow_guard:workflow_action_dispatch_commit_guard'; END IF;
     RETURN NEW;
 END
 $$;
@@ -2325,7 +2324,7 @@ BEGIN
             AND command.run_id=NEW.run_id AND command.execution_id=NEW.execution_id
             AND command.invocation_id=NEW.invocation_id AND command.argument_digest=NEW.argument_digest
             AND command.dispatch_id=NEW.dispatch_id)
-    THEN RAISE EXCEPTION 'invalid workflow action evidence provenance' USING ERRCODE='23514'; END IF;
+    THEN RAISE EXCEPTION 'invalid workflow action evidence provenance' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_action_evidence_commit_guard'; END IF;
     IF marker.effect_kind='message' THEN
         SELECT part.request_started_at INTO started FROM message_delivery_parts AS part
             WHERE part.delivery_id=NEW.delivery_id ORDER BY part.part_index LIMIT 1;
@@ -2333,7 +2332,7 @@ BEGIN
             OR (NEW.disposition='applied') <> (NEW.applied_request IS NOT DISTINCT FROM 'delivery')
             OR EXISTS(SELECT 1 FROM workflow_action_evidence_coverage WHERE company_id=NEW.company_id AND evidence_id=NEW.id)
             OR started IS NULL OR NEW.observed_at<started
-        THEN RAISE EXCEPTION 'invalid workflow message evidence provenance' USING ERRCODE='23514'; END IF;
+        THEN RAISE EXCEPTION 'invalid workflow message evidence provenance' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_action_evidence_commit_guard'; END IF;
         RETURN NULL;
     END IF;
     IF marker.effect_kind<>'remote' OR NEW.observed_at<marker.created_at
@@ -2349,7 +2348,7 @@ BEGIN
                 AND entry.created_at<=NEW.created_at AND (entry.created_at>NEW.observed_at
                 OR NOT EXISTS(SELECT 1 FROM workflow_action_evidence_coverage AS coverage
                     WHERE coverage.company_id=NEW.company_id AND coverage.evidence_id=NEW.id AND coverage.remote_entry_id=entry.id)))
-    THEN RAISE EXCEPTION 'invalid workflow action evidence provenance' USING ERRCODE='23514'; END IF;
+    THEN RAISE EXCEPTION 'invalid workflow action evidence provenance' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_action_evidence_commit_guard'; END IF;
     RETURN NULL;
 END $$;
 
@@ -2365,7 +2364,7 @@ BEGIN
     IF TG_OP='DELETE' AND pg_trigger_depth()>1
         AND NOT EXISTS(SELECT 1 FROM workflow_runs WHERE company_id=OLD.company_id AND id=OLD.run_id)
     THEN RETURN OLD; END IF;
-    RAISE EXCEPTION 'workflow action effect fact is append-only';
+    RAISE EXCEPTION 'workflow action effect fact is append-only' USING CONSTRAINT='workflow_guard:workflow_action_fact_immutable';
 END $$;
 
 
@@ -2390,7 +2389,7 @@ CREATE FUNCTION public.workflow_action_intent_immutable() RETURNS trigger
     AS $$
 BEGIN
     IF NEW IS DISTINCT FROM OLD THEN
-        RAISE EXCEPTION 'workflow action intent is immutable';
+        RAISE EXCEPTION 'workflow action intent is immutable' USING CONSTRAINT='workflow_guard:workflow_action_intent_immutable';
     END IF;
     RETURN NEW;
 END
@@ -2509,7 +2508,7 @@ BEGIN
     IF NEW.reconciliation_evidence_id IS NOT NULL AND NOT EXISTS(
         SELECT 1 FROM workflow_action_evidence WHERE company_id=NEW.company_id
             AND id=NEW.reconciliation_evidence_id AND disposition='applied' AND registration IS NOT NULL)
-    THEN RAISE EXCEPTION 'workflow action receipt requires verified applied evidence' USING ERRCODE='23514'; END IF;
+    THEN RAISE EXCEPTION 'workflow action receipt requires verified applied evidence' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_action_receipt_evidence_guard'; END IF;
     RETURN NEW;
 END $$;
 
@@ -2581,7 +2580,7 @@ CREATE FUNCTION public.workflow_action_reconciliation_budget_eligible(company uu
     SELECT EXISTS(SELECT 1 FROM workflow_run_budgets AS link
         JOIN workflow_root_budgets AS budget ON budget.company_id=link.company_id AND budget.root_run_id=link.root_run_id
         JOIN workflow_root_budget_usage AS usage ON usage.company_id=budget.company_id AND usage.root_run_id=budget.root_run_id
-        WHERE link.company_id=company AND link.run_id=run AND budget.provenance='frozen_v6'
+        WHERE link.company_id=company AND link.run_id=run
             AND usage.activations<=budget.activations AND usage.model_calls<budget.model_calls
             AND usage.repetitions<=budget.repetitions
             AND NOT EXISTS(SELECT 1 FROM workflow_budget_receipts AS receipt
@@ -2606,7 +2605,7 @@ BEGIN
         OR EXISTS (SELECT 1 FROM workflow_action_receipts AS receipt
             WHERE receipt.company_id=NEW.company_id AND receipt.invocation_id=NEW.invocation_id)
     THEN
-        RAISE EXCEPTION 'workflow reconciliation requires parked or terminal unresolved effect' USING ERRCODE='23514';
+        RAISE EXCEPTION 'workflow reconciliation requires parked or terminal unresolved effect' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_action_reconciliation_guard';
     END IF;
     RETURN NEW;
 END $$;
@@ -2670,7 +2669,7 @@ BEGIN
             AND job.attempt_ordinal=NEW.attempt_number AND job.lock_expires_at>clock_timestamp()
             AND attempt.attempt_number=NEW.attempt_number AND attempt.worker_id=NEW.worker_id
             AND attempt.execution_generation=NEW.execution_generation AND attempt.status='processing')
-    THEN RAISE EXCEPTION 'workflow action remote entry lost live fence'; END IF;
+    THEN RAISE EXCEPTION 'workflow action remote entry lost live fence' USING CONSTRAINT='workflow_guard:workflow_action_remote_entry_commit_guard'; END IF;
     SELECT * INTO marker FROM workflow_action_dispatches WHERE company_id=NEW.company_id AND invocation_id=NEW.invocation_id;
     proof:=workflow_action_not_applied_available(NEW.company_id,NEW.invocation_id,NEW.id);
     IF workflow_action_has_evidence_conflict(NEW.company_id,NEW.execution_id)
@@ -2686,7 +2685,7 @@ BEGIN
         OR (marker.attempt_number<>NEW.attempt_number AND (marker.attempt_number>=NEW.attempt_number
             OR (proof IS NULL AND NOT COALESCE(workflow_action_replay_supported(NEW.company_id,NEW.invocation_id),false))))
         OR (EXISTS(SELECT 1 FROM workflow_action_evidence_consumptions WHERE company_id=NEW.company_id AND remote_entry_id=NEW.id) AND proof IS NULL)
-    THEN RAISE EXCEPTION 'workflow action remote entry lacks supported replay'; END IF;
+    THEN RAISE EXCEPTION 'workflow action remote entry lacks supported replay' USING CONSTRAINT='workflow_guard:workflow_action_remote_entry_commit_guard'; END IF;
     RETURN NEW;
 END $$;
 
@@ -2763,7 +2762,7 @@ CREATE FUNCTION public.workflow_action_reservation_identity() RETURNS trigger
     AS $$
 BEGIN
     IF NEW.reservation_xid IS NOT NULL AND NEW.reservation_xid<>pg_current_xact_id()
-    THEN RAISE EXCEPTION 'invalid workflow action reservation transaction' USING ERRCODE='23514'; END IF;
+    THEN RAISE EXCEPTION 'invalid workflow action reservation transaction' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_action_reservation_identity'; END IF;
     NEW.reservation_xid:=pg_current_xact_id();
     RETURN NEW;
 END $$;
@@ -2806,7 +2805,7 @@ CREATE FUNCTION public.workflow_action_state_witness_owner() RETURNS trigger
     AS $$
 BEGIN
     IF pg_trigger_depth()<2 OR NEW.transaction_id<>pg_current_xact_id()
-    THEN RAISE EXCEPTION 'workflow action state witness is database owned' USING ERRCODE='23514'; END IF;
+    THEN RAISE EXCEPTION 'workflow action state witness is database owned' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_action_state_witness_owner'; END IF;
     RETURN NEW;
 END $$;
 
@@ -2846,6 +2845,9 @@ CREATE FUNCTION public.workflow_control_retry_safe(company uuid, run uuid, job u
                 JOIN background_tasks AS other ON other.company_id=sibling.company_id AND other.workflow_execution_id=sibling.id
                 WHERE sibling.company_id=company AND sibling.run_id=run AND other.queue_kind='workflow'
                     AND other.id<>job AND other.status IN ('pending','processing'))
+            -- A run failed by a confirmed guard violation would only trip it again (fix-app 03).
+            AND NOT EXISTS (SELECT 1 FROM workflow_run_events AS audit
+                WHERE audit.company_id=company AND audit.run_id=run AND audit.event_kind LIKE 'guard\_violation:%')
     )
 $$;
 
@@ -2858,7 +2860,7 @@ CREATE FUNCTION public.workflow_decision_fact_immutable() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
-    RAISE EXCEPTION 'workflow decision facts are immutable' USING ERRCODE='23514';
+    RAISE EXCEPTION 'workflow decision facts are immutable' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_decision_fact_immutable';
 END $$;
 
 
@@ -2876,7 +2878,7 @@ BEGIN
             IS NOT DISTINCT FROM (to_jsonb(OLD)-ARRAY['submitted_at','submitted_by','submitted_xact','command_key','command_fingerprint','choice','feedback','data','revision']) THEN
         RETURN NEW;
     END IF;
-    RAISE EXCEPTION 'workflow decision facts are immutable' USING ERRCODE='23514';
+    RAISE EXCEPTION 'workflow decision facts are immutable' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_decision_immutable';
 END $$;
 
 
@@ -2894,7 +2896,7 @@ BEGIN
         WHERE principal.company_id=company AND principal.id=principal_id AND principal.kind='person'
         FOR SHARE;
     IF snapshot_user IS NULL THEN
-        RAISE EXCEPTION 'workflow decision identity is not a current tenant person' USING ERRCODE='23514';
+        RAISE EXCEPTION 'workflow decision identity is not a current tenant person' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_decision_person_snapshot';
     END IF;
     RETURN snapshot_user;
 END $$;
@@ -2925,14 +2927,14 @@ DECLARE snapshot_user uuid;
 BEGIN
     snapshot_user := workflow_decision_person_snapshot(NEW.company_id, NEW.principal_id);
     IF NEW.user_id IS NOT NULL AND NEW.user_id <> snapshot_user THEN
-        RAISE EXCEPTION 'workflow decision reviewer user snapshot mismatches principal' USING ERRCODE='23514';
+        RAISE EXCEPTION 'workflow decision reviewer user snapshot mismatches principal' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_decision_reviewer_guard';
     END IF;
     NEW.user_id := snapshot_user;
     -- Every reviewer was provably notified, or provably opted out of decision email (P08-D4 F076).
     IF NEW.notice_opted_out THEN
         IF NOT EXISTS (SELECT 1 FROM user_notification_preferences AS preference
                 WHERE preference.user_id=snapshot_user AND NOT preference.decision_email_enabled) THEN
-            RAISE EXCEPTION 'workflow decision reviewer opt-out is not recorded' USING ERRCODE='23514';
+            RAISE EXCEPTION 'workflow decision reviewer opt-out is not recorded' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_decision_reviewer_guard';
         END IF;
         RETURN NEW;
     END IF;
@@ -2942,7 +2944,7 @@ BEGIN
             AND delivery.destination_binding_id IS NULL AND delivery.external_destination IS NOT NULL
             AND starts_with(delivery.idempotency_key, 'notification:workflow-decision:' || NEW.decision_id
                 || ':principal:' || NEW.principal_id || ':')) THEN
-        RAISE EXCEPTION 'workflow decision reviewer lacks a provable member notice' USING ERRCODE='23514';
+        RAISE EXCEPTION 'workflow decision reviewer lacks a provable member notice' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_decision_reviewer_guard';
     END IF;
     RETURN NEW;
 END $$;
@@ -2958,7 +2960,7 @@ CREATE FUNCTION public.workflow_http_identity_immutable() RETURNS trigger
 BEGIN
     IF (NEW.company_id, NEW.id, NEW.origin, NEW.bearer, NEW.created_at)
         IS DISTINCT FROM (OLD.company_id, OLD.id, OLD.origin, OLD.bearer, OLD.created_at) THEN
-        RAISE EXCEPTION 'HTTP connection identity is immutable';
+        RAISE EXCEPTION 'HTTP connection identity is immutable' USING CONSTRAINT='workflow_guard:workflow_http_identity_immutable';
     END IF;
     RETURN NEW;
 END;
@@ -2999,10 +3001,10 @@ BEGIN
         AND attempt.status='processing' AND attempt.worker_id=marker.worker_id
         AND attempt.execution_generation=marker.execution_generation;
     IF captured IS NULL THEN
-        RAISE EXCEPTION 'workflow message action requires a live fence' USING ERRCODE='23514';
+        RAISE EXCEPTION 'workflow message action requires a live fence' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_job_continuation_limit';
     END IF;
     IF NEW.fence_expires_at IS NOT NULL AND NEW.fence_expires_at IS DISTINCT FROM captured THEN
-        RAISE EXCEPTION 'workflow message fence expiry is database owned' USING ERRCODE='23514';
+        RAISE EXCEPTION 'workflow message fence expiry is database owned' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_job_continuation_limit';
     END IF;
     NEW.fence_expires_at:=captured;
     NEW.state:='pending';
@@ -3024,19 +3026,19 @@ BEGIN
     IF TG_OP='DELETE' THEN
         IF pg_trigger_depth()>1 AND NOT EXISTS(SELECT 1 FROM workflow_runs
             WHERE company_id=OLD.company_id AND id=OLD.run_id) THEN RETURN OLD; END IF;
-        RAISE EXCEPTION 'workflow message action is retained with its run' USING ERRCODE='23514';
+        RAISE EXCEPTION 'workflow message action is retained with its run' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_message_action_guard';
     END IF;
     IF (to_jsonb(OLD)-'state'-'consumed_through'-'consume_failures'-'consume_after'-'updated_at')
         IS DISTINCT FROM (to_jsonb(NEW)-'state'-'consumed_through'-'consume_failures'-'consume_after'-'updated_at')
         OR NEW.consumed_through<OLD.consumed_through OR NEW.consume_failures<OLD.consume_failures
-    THEN RAISE EXCEPTION 'workflow message action linkage is immutable' USING ERRCODE='23514'; END IF;
+    THEN RAISE EXCEPTION 'workflow message action linkage is immutable' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_message_action_guard'; END IF;
     IF NEW.state IS DISTINCT FROM OLD.state THEN
         IF OLD.state IN ('accepted', 'failed', 'stalled') THEN
-            RAISE EXCEPTION 'workflow message action state is final' USING ERRCODE='23514';
+            RAISE EXCEPTION 'workflow message action state is final' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_message_action_guard';
         END IF;
         IF NEW.state='stalled' THEN
             IF NEW.consume_failures<>5 THEN
-                RAISE EXCEPTION 'workflow message action stalls only at five failures' USING ERRCODE='23514';
+                RAISE EXCEPTION 'workflow message action stalls only at five failures' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_message_action_guard';
             END IF;
             RETURN NEW;
         END IF;
@@ -3045,7 +3047,7 @@ BEGIN
             OR (NEW.state IN ('accepted', 'failed') AND NOT EXISTS(SELECT 1 FROM workflow_action_receipts AS receipt
                 WHERE receipt.company_id=NEW.company_id AND receipt.invocation_id=NEW.invocation_id
                     AND receipt.effect_kind='message' AND receipt.result->>'status'=NEW.state))
-        THEN RAISE EXCEPTION 'workflow message action state disagrees with its deliveries' USING ERRCODE='23514';
+        THEN RAISE EXCEPTION 'workflow message action state disagrees with its deliveries' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_message_action_guard';
         END IF;
     END IF;
     RETURN NEW;
@@ -3066,7 +3068,7 @@ BEGIN
         AND execution_generation=NEW.execution_generation AND worker_id=NEW.worker_id FOR UPDATE;
     IF (SELECT count(*) FROM (SELECT 1 FROM workflow_action_dispatches
             WHERE company_id=NEW.company_id AND execution_id=NEW.execution_id LIMIT 128) AS bounded)>=128
-    THEN RAISE EXCEPTION 'workflow message action limit' USING ERRCODE='54000'; END IF;
+    THEN RAISE EXCEPTION 'workflow message action limit' USING ERRCODE='54000', CONSTRAINT='workflow_guard:workflow_message_admission_guard'; END IF;
     RETURN NEW;
 END $$;
 
@@ -3085,7 +3087,7 @@ BEGIN
         WHERE run.company_id=NEW.company_id AND run.id=NEW.run_id AND run.delivery_policy='in_app_only'
     ) THEN
         RAISE EXCEPTION 'workflow user destination requires a delivery unless its run is in-app only'
-            USING ERRCODE='23514';
+            USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_message_destination_in_app_guard';
     END IF;
     RETURN NEW;
 END $$;
@@ -3151,7 +3153,7 @@ BEGIN
     IF NOT EXISTS(SELECT 1 FROM workflow_message_destinations AS target
         WHERE target.company_id=NEW.company_id AND target.delivery_id=NEW.id) THEN RETURN NEW; END IF;
     IF OLD.status IN ('delivered', 'dead_letter') THEN
-        RAISE EXCEPTION 'workflow message delivery outcome is final' USING ERRCODE='23514';
+        RAISE EXCEPTION 'workflow message delivery outcome is final' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_message_delivery_transition_guard';
     END IF;
     IF OLD.status<>'outcome_unknown' THEN RETURN NEW; END IF;
     IF NEW.status IN ('delivered', 'dead_letter') THEN
@@ -3159,18 +3161,18 @@ BEGIN
             WHERE company_id=NEW.company_id AND id=NEW.settled_evidence_id AND delivery_id=NEW.id;
         IF NOT FOUND OR (NEW.status='delivered' AND evidence.disposition<>'applied')
             OR (NEW.status='dead_letter' AND evidence.disposition<>'final_not_applied')
-        THEN RAISE EXCEPTION 'workflow message delivery leaves unknown only by evidence' USING ERRCODE='23514'; END IF;
+        THEN RAISE EXCEPTION 'workflow message delivery leaves unknown only by evidence' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_message_delivery_transition_guard'; END IF;
         RETURN NEW;
     END IF;
     IF NEW.status='retryable' THEN
         SELECT * INTO reopen FROM workflow_message_delivery_reopens
             WHERE company_id=NEW.company_id AND id=NEW.reopen_id AND delivery_id=NEW.id;
         IF NOT FOUND OR reopen.attempt_count<>OLD.attempt_count THEN
-            RAISE EXCEPTION 'workflow message delivery reopens only by consumed proof' USING ERRCODE='23514';
+            RAISE EXCEPTION 'workflow message delivery reopens only by consumed proof' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_message_delivery_transition_guard';
         END IF;
         RETURN NEW;
     END IF;
-    RAISE EXCEPTION 'workflow message delivery leaves unknown only by evidence' USING ERRCODE='23514';
+    RAISE EXCEPTION 'workflow message delivery leaves unknown only by evidence' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_message_delivery_transition_guard';
 END $$;
 
 
@@ -3204,7 +3206,7 @@ BEGIN
             WHERE execution.company_id=NEW.company_id AND execution.id=NEW.execution_id
               AND execution.completed_at IS NULL AND execution.committed_route IS NULL
               AND job.status='pending')
-    THEN RAISE EXCEPTION 'workflow tool child wait only continues its agent job' USING ERRCODE='23514'; END IF;
+    THEN RAISE EXCEPTION 'workflow tool child wait only continues its agent job' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_tool_child_wait_continuation_guard'; END IF;
     RETURN NULL;
 END $$;
 
@@ -3224,7 +3226,7 @@ BEGIN
             WHERE execution.company_id=NEW.company_id AND execution.id=NEW.execution_id
               AND execution.completed_at IS NULL AND execution.committed_route IS NULL
               AND job.status='pending')
-    THEN RAISE EXCEPTION 'model-tool delivery only continues its agent job' USING ERRCODE='23514'; END IF;
+    THEN RAISE EXCEPTION 'model-tool delivery only continues its agent job' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_model_tool_wait_continuation_guard'; END IF;
     RETURN NULL;
 END $$;
 
@@ -3238,7 +3240,7 @@ BEGIN
             AND run.id=NEW.run_id AND run.deadline=NEW.deadline)
         OR NOT EXISTS(SELECT 1 FROM workflow_message_actions AS action WHERE action.company_id=NEW.company_id
             AND action.run_id=NEW.run_id AND action.execution_id=NEW.execution_id AND action.wait_id=NEW.id)
-    THEN RAISE EXCEPTION 'workflow effect wait must belong to one message action' USING ERRCODE='23514'; END IF;
+    THEN RAISE EXCEPTION 'workflow effect wait must belong to one message action' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_message_effect_wait_guard'; END IF;
     RETURN NEW;
 END $$;
 
@@ -3256,21 +3258,21 @@ BEGIN
         WHERE target.company_id=NEW.company_id AND target.delivery_id=NEW.delivery_id) THEN RETURN NEW; END IF;
     SELECT * INTO parent FROM message_deliveries WHERE id=NEW.delivery_id;
     IF OLD.status IN ('delivered', 'dead') THEN
-        RAISE EXCEPTION 'workflow message part outcome is final' USING ERRCODE='23514';
+        RAISE EXCEPTION 'workflow message part outcome is final' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_message_part_transition_guard';
     END IF;
     IF OLD.status='outcome_unknown' THEN
         IF (NEW.status='delivered' AND parent.settled_evidence_id IS NOT NULL AND parent.status='delivered')
             OR (NEW.status='dead' AND parent.settled_evidence_id IS NOT NULL AND parent.status='dead_letter')
             OR (NEW.status='retryable' AND parent.reopen_id IS NOT NULL AND parent.status='retryable')
         THEN RETURN NEW; END IF;
-        RAISE EXCEPTION 'workflow message part leaves unknown only by evidence' USING ERRCODE='23514';
+        RAISE EXCEPTION 'workflow message part leaves unknown only by evidence' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_message_part_transition_guard';
     END IF;
     IF OLD.status='retryable' AND NEW.status='outcome_unknown' THEN
         SELECT * INTO reopen FROM workflow_message_delivery_reopens
             WHERE company_id=parent.company_id AND id=parent.reopen_id;
         IF NOT FOUND OR NEW.last_error_class IS DISTINCT FROM 'reconciliation_proof_expired'
             OR (OLD.request_started_at IS NOT NULL AND OLD.request_started_at>=reopen.created_at)
-        THEN RAISE EXCEPTION 'workflow message part re-enters unknown only by expired proof' USING ERRCODE='23514'; END IF;
+        THEN RAISE EXCEPTION 'workflow message part re-enters unknown only by expired proof' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_message_part_transition_guard'; END IF;
     END IF;
     RETURN NEW;
 END $$;
@@ -3290,7 +3292,7 @@ BEGIN
     SELECT * INTO aggregate FROM workflow_message_aggregate(NEW.company_id, NEW.invocation_id);
     IF expected IS NULL OR aggregate.destinations<>expected
         OR aggregate.state NOT IN ('accepted', 'failed') OR NEW.result IS DISTINCT FROM aggregate.result
-    THEN RAISE EXCEPTION 'workflow message receipt disagrees with its deliveries' USING ERRCODE='23514'; END IF;
+    THEN RAISE EXCEPTION 'workflow message receipt disagrees with its deliveries' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_message_receipt_guard'; END IF;
     RETURN NEW;
 END $$;
 
@@ -3314,7 +3316,7 @@ BEGIN
         OR NOT EXISTS(SELECT 1 FROM message_deliveries AS delivery WHERE delivery.company_id=NEW.company_id
             AND delivery.id=NEW.delivery_id AND delivery.status='outcome_unknown'
             AND delivery.attempt_count=NEW.attempt_count)
-    THEN RAISE EXCEPTION 'workflow message reopen requires one unexpired final proof' USING ERRCODE='23514'; END IF;
+    THEN RAISE EXCEPTION 'workflow message reopen requires one unexpired final proof' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_message_reopen_guard'; END IF;
     RETURN NEW;
 END $$;
 
@@ -4195,7 +4197,7 @@ CREATE TABLE public.task_attempts (
     CONSTRAINT task_attempts_machine_id_check CHECK ((length(TRIM(BOTH FROM machine_id)) > 0)),
     CONSTRAINT task_attempts_status_check CHECK ((status = ANY (ARRAY['processing'::text, 'completed'::text, 'failed'::text]))),
     CONSTRAINT task_attempts_stop_reason_check CHECK ((stop_reason = ANY (ARRAY['completed'::text, 'timed_out'::text, 'lease_lost'::text, 'effect_parked'::text, 'approval_parked'::text, 'child_parked'::text]))),
-    CONSTRAINT workflow_attempt_failure_shape CHECK ((((workflow_failure_class IS NULL) AND (workflow_failure_code IS NULL) AND (workflow_retry_safety IS NULL) AND (workflow_retirement IS NULL)) OR ((status = 'failed'::text) AND (finished_at IS NOT NULL) AND (workflow_failure_class IS NOT NULL) AND (workflow_failure_class = ANY (ARRAY['retryable'::text, 'terminal'::text])) AND (workflow_failure_code IS NOT NULL) AND ((octet_length(workflow_failure_code) >= 1) AND (octet_length(workflow_failure_code) <= 128)) AND (workflow_retry_safety IS NOT NULL) AND (workflow_retry_safety = ANY (ARRAY['safe'::text, 'unknown'::text])) AND (workflow_retirement IS NOT NULL) AND (workflow_retirement = ANY (ARRAY['live'::text, 'expired'::text, 'deadline'::text, 'cancel'::text])))))
+    CONSTRAINT workflow_attempt_failure_shape CHECK ((((workflow_failure_class IS NULL) AND (workflow_failure_code IS NULL) AND (workflow_retry_safety IS NULL) AND (workflow_retirement IS NULL)) OR ((status = 'failed'::text) AND (finished_at IS NOT NULL) AND (workflow_failure_class IS NOT NULL) AND (workflow_failure_class = ANY (ARRAY['retryable'::text, 'terminal'::text])) AND (workflow_failure_code IS NOT NULL) AND ((octet_length(workflow_failure_code) >= 1) AND (octet_length(workflow_failure_code) <= 128)) AND (workflow_retry_safety IS NOT NULL) AND (workflow_retry_safety = ANY (ARRAY['safe'::text, 'unknown'::text])) AND (workflow_retirement IS NOT NULL) AND (workflow_retirement = ANY (ARRAY['live'::text, 'expired'::text, 'deadline'::text, 'cancel'::text, 'guard'::text])))))
 );
 
 
@@ -5465,7 +5467,7 @@ COMMENT ON TABLE public.workflow_provisioning_commands IS 'One "Create assistant
 
 CREATE TABLE public.workflow_root_budget_usage (
     authorized_tokens bigint NOT NULL DEFAULT 0 CHECK (authorized_tokens>=0),
-    token_refusal text CHECK (token_refusal IN ('rejected','expired','cancelled')),
+    token_refusal text CHECK (token_refusal IN ('rejected','expired')),
     company_id uuid NOT NULL,
     root_run_id uuid NOT NULL,
     activations bigint DEFAULT 0 NOT NULL,
@@ -5513,14 +5515,12 @@ END $$;
 CREATE TABLE public.workflow_root_budgets (
     company_id uuid NOT NULL,
     root_run_id uuid NOT NULL,
-    provenance text NOT NULL,
-    activations integer,
-    model_calls integer,
-    repetitions integer,
+    activations integer NOT NULL,
+    model_calls integer NOT NULL,
+    repetitions integer NOT NULL,
     token_policy jsonb,
-    CONSTRAINT workflow_root_token_policy_check CHECK (token_policy IS NULL OR (provenance='frozen_v6' AND public.valid_workflow_token_policy(token_policy))),
-    CONSTRAINT workflow_root_budgets_check CHECK ((((provenance = 'sealed_legacy'::text) AND (activations IS NULL) AND (model_calls IS NULL) AND (repetitions IS NULL)) OR ((provenance = 'frozen_v6'::text) AND (activations IS NOT NULL) AND ((activations >= 1) AND (activations <= 100000)) AND (model_calls IS NOT NULL) AND ((model_calls >= 1) AND (model_calls <= 1000)) AND (repetitions IS NOT NULL) AND ((repetitions >= 1) AND (repetitions <= 1000))))),
-    CONSTRAINT workflow_root_budgets_provenance_check CHECK ((provenance = ANY (ARRAY['frozen_v6'::text, 'sealed_legacy'::text])))
+    CONSTRAINT workflow_root_token_policy_check CHECK (token_policy IS NULL OR public.valid_workflow_token_policy(token_policy)),
+    CONSTRAINT workflow_root_budgets_check CHECK (activations BETWEEN 1 AND 100000 AND model_calls BETWEEN 1 AND 1000 AND repetitions BETWEEN 1 AND 1000)
 );
 
 
@@ -5627,6 +5627,7 @@ CREATE TABLE public.workflow_runs (
     CONSTRAINT workflow_run_finished_shape CHECK (((state = ANY (ARRAY['succeeded'::text, 'failed'::text, 'cancelled'::text])) = (finished_at IS NOT NULL))),
     CONSTRAINT workflow_rerun_shape CHECK (((rerun_of_run_id IS NULL) OR ((parent_run_id IS NULL) AND (rerun_of_run_id <> id)))),
     CONSTRAINT workflow_parent_shape CHECK ((((parent_run_id IS NULL) AND (parent_execution_id IS NULL)) OR ((parent_run_id IS NOT NULL) AND (parent_execution_id IS NOT NULL) AND (parent_run_id <> id)))),
+    CONSTRAINT workflow_run_terminal_execution_shape CHECK ((state IN ('succeeded','failed')) = (terminal_execution_id IS NOT NULL)),
     CONSTRAINT workflow_run_state CHECK ((state = ANY (ARRAY['queued'::text, 'running'::text, 'waiting'::text, 'succeeded'::text, 'failed'::text, 'cancelled'::text]))),
     CONSTRAINT workflow_run_waiting_shape CHECK ((((state = 'waiting'::text) AND (waiting_reason IS NOT NULL) AND (waiting_reason = ANY (ARRAY['decision'::text, 'event'::text, 'timer'::text, 'child_run'::text, 'effect'::text, 'reconciliation'::text]))) OR ((state <> 'waiting'::text) AND (waiting_reason IS NULL)))),
     CONSTRAINT workflow_runs_binding_revision_check CHECK ((binding_revision > 0)),
@@ -8976,6 +8977,43 @@ CREATE TRIGGER workflow_run_revision BEFORE UPDATE ON public.workflow_runs FOR E
 
 
 --
+-- Name: guard_workflow_run_transition(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+-- Run transitions are checked before the workflow_* BEFORE triggers stamp or witness them.
+-- Failed -> running is reserved for the explicit retry transaction: its job is reopened first,
+-- and the deferred workflow_control_retry_guard still requires that transaction's receipt.
+CREATE FUNCTION public.guard_workflow_run_transition() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE allowed boolean;
+BEGIN
+    IF OLD.state=NEW.state THEN RETURN NEW; END IF;
+    allowed=CASE OLD.state
+        WHEN 'queued' THEN NEW.state IN ('running','waiting','succeeded','failed','cancelled')
+        WHEN 'running' THEN NEW.state IN ('waiting','succeeded','failed','cancelled')
+        WHEN 'waiting' THEN NEW.state IN ('running','failed','cancelled')
+        WHEN 'failed' THEN NEW.state='running'
+            AND OLD.terminal_execution_id IS NOT NULL AND NEW.terminal_execution_id IS NULL
+            AND EXISTS (SELECT 1 FROM background_tasks AS job
+                JOIN workflow_executions AS execution
+                  ON execution.company_id=job.company_id AND execution.id=job.workflow_execution_id
+                WHERE execution.company_id=OLD.company_id AND execution.run_id=OLD.id
+                  AND execution.id=OLD.terminal_execution_id AND job.queue_kind='workflow'
+                  AND job.status='pending' AND workflow_control_retry_safe(OLD.company_id,OLD.id,job.id))
+        ELSE false
+    END;
+    IF allowed IS DISTINCT FROM true THEN
+        RAISE EXCEPTION 'workflow run cannot move from % to %', OLD.state, NEW.state
+            USING ERRCODE='23514', CONSTRAINT='workflow_guard:guard_workflow_run_transition';
+    END IF;
+    RETURN NEW;
+END $$;
+
+CREATE TRIGGER guard_workflow_run_transition BEFORE UPDATE OF state ON public.workflow_runs
+    FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_run_transition();
+
+
 -- Name: stamp_workflow_run_finished(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -11102,14 +11140,14 @@ CREATE FUNCTION public.workflow_continuation_counter_guard() RETURNS trigger LAN
 BEGIN
     IF TG_OP='INSERT' THEN
         IF NEW.continuation_count<>0 THEN
-            RAISE EXCEPTION 'workflow continuation must begin at zero' USING ERRCODE='23514';
+            RAISE EXCEPTION 'workflow continuation must begin at zero' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_continuation_counter_guard';
         END IF;
     ELSIF NEW.continuation_count<>OLD.continuation_count AND NOT (
         OLD.queue_kind='workflow' AND NEW.queue_kind='workflow'
         AND OLD.status='completed' AND NEW.status='pending'
         AND NEW.continuation_count=OLD.continuation_count+1
         AND NEW.retry_count=OLD.retry_count) THEN
-        RAISE EXCEPTION 'workflow continuation requires an approval reopen' USING ERRCODE='23514';
+        RAISE EXCEPTION 'workflow continuation requires an approval reopen' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_continuation_counter_guard';
     END IF;
     RETURN NEW;
 END $$;
@@ -11120,7 +11158,7 @@ CREATE FUNCTION public.workflow_decision_wait_pair_guard() RETURNS trigger LANGU
 BEGIN
     IF EXISTS(SELECT 1 FROM workflow_waits WHERE company_id=NEW.company_id AND id=NEW.id AND reason='decision')
         AND NOT EXISTS(SELECT 1 FROM workflow_decisions WHERE company_id=NEW.company_id AND wait_id=NEW.id) THEN
-        RAISE EXCEPTION 'workflow decision wait requires its exact decision' USING ERRCODE='23514';
+        RAISE EXCEPTION 'workflow decision wait requires its exact decision' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_decision_wait_pair_guard';
     END IF;
     RETURN NULL;
 END $$;
@@ -11133,16 +11171,16 @@ BEGIN
         IF TG_OP='DELETE' AND pg_trigger_depth()>1
             AND NOT EXISTS(SELECT 1 FROM workflow_runs WHERE company_id=OLD.company_id AND id=OLD.run_id)
         THEN RETURN OLD; END IF;
-        RAISE EXCEPTION 'workflow approval audit is append-only' USING ERRCODE='23514';
+        RAISE EXCEPTION 'workflow approval audit is append-only' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_approval_audit_guard';
     END IF;
     IF TG_OP='DELETE' THEN RETURN OLD; END IF;
     IF TG_OP='UPDATE' AND NEW.decision_id IS NOT NULL THEN
-        RAISE EXCEPTION 'workflow event cannot become an approval audit' USING ERRCODE='23514';
+        RAISE EXCEPTION 'workflow event cannot become an approval audit' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_approval_audit_guard';
     END IF;
     IF NEW.decision_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM workflow_decisions
         WHERE company_id=NEW.company_id AND run_id=NEW.run_id AND execution_id=NEW.execution_id
             AND id=NEW.decision_id AND ((subject_kind='action_approval' AND NEW.event_kind NOT LIKE 'token_allowance_%') OR (subject_kind='token_allowance' AND NEW.event_kind LIKE 'token_allowance_%'))) THEN
-        RAISE EXCEPTION 'workflow approval audit requires its exact decision' USING ERRCODE='23514';
+        RAISE EXCEPTION 'workflow approval audit requires its exact decision' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_approval_audit_guard';
     END IF;
     RETURN NEW;
 END $$;
@@ -11153,7 +11191,7 @@ CREATE FUNCTION public.workflow_decision_wait_delete_guard() RETURNS trigger LAN
 BEGIN
     IF EXISTS(SELECT 1 FROM workflow_waits WHERE company_id=OLD.company_id AND id=OLD.wait_id)
         AND NOT EXISTS(SELECT 1 FROM workflow_decisions WHERE company_id=OLD.company_id AND wait_id=OLD.wait_id) THEN
-        RAISE EXCEPTION 'workflow decision wait requires its exact decision' USING ERRCODE='23514';
+        RAISE EXCEPTION 'workflow decision wait requires its exact decision' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_decision_wait_delete_guard';
     END IF;
     RETURN NULL;
 END $$;
@@ -11189,19 +11227,22 @@ BEGIN
     IF NEW.choice='approve' THEN
         UPDATE workflow_root_budget_usage SET authorized_tokens=GREATEST(authorized_tokens,(NEW.token_proposal->>'proposed_allowance')::bigint)
             WHERE company_id=NEW.company_id AND root_run_id=root AND token_refusal IS NULL;
-        IF NOT FOUND THEN RAISE EXCEPTION 'root token continuation already refused' USING ERRCODE='23514'; END IF;
+        IF NOT FOUND THEN RAISE EXCEPTION 'root token continuation already refused' USING ERRCODE='23514', CONSTRAINT='workflow_guard:apply_workflow_token_decision'; END IF;
     ELSIF NEW.choice='reject' THEN
         UPDATE workflow_root_budget_usage SET token_refusal=COALESCE(token_refusal,'rejected') WHERE company_id=NEW.company_id AND root_run_id=root;
-    ELSE RAISE EXCEPTION 'invalid token decision choice' USING ERRCODE='23514'; END IF;
+    ELSE RAISE EXCEPTION 'invalid token decision choice' USING ERRCODE='23514', CONSTRAINT='workflow_guard:apply_workflow_token_decision'; END IF;
     RETURN NEW;
 END $$;
 CREATE TRIGGER apply_workflow_token_decision AFTER UPDATE ON public.workflow_decisions
     FOR EACH ROW EXECUTE FUNCTION public.apply_workflow_token_decision();
 
+-- Only an expired token decision refuses the root: nobody granted the request in time. A cancelled
+-- wait is abandonment, not refusal; it must not refuse the budget an ancestor or sibling shares
+-- (fix-app 03).
 CREATE FUNCTION public.refuse_expired_workflow_tokens() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
-    IF OLD.state='waiting' AND NEW.state IN ('expired','cancelled') THEN
-        UPDATE workflow_root_budget_usage AS usage SET token_refusal=COALESCE(usage.token_refusal,NEW.state)
+    IF OLD.state='waiting' AND NEW.state='expired' THEN
+        UPDATE workflow_root_budget_usage AS usage SET token_refusal=COALESCE(usage.token_refusal,'expired')
         FROM workflow_run_budgets AS link, workflow_decisions AS decision
         WHERE decision.company_id=NEW.company_id AND decision.wait_id=NEW.id AND decision.subject_kind='token_allowance'
             AND link.company_id=decision.company_id AND link.run_id=decision.run_id
@@ -11257,7 +11298,7 @@ DECLARE root uuid; policy jsonb; allowance bigint; refused text; observed jsonb;
 BEGIN
     IF NEW.subject_kind<>'token_allowance' THEN RETURN NEW; END IF;
     IF NOT public.valid_workflow_token_proposal(NEW.token_proposal,NEW.token_stage,NEW.token_request_id) THEN
-        RAISE EXCEPTION 'invalid token proposal' USING ERRCODE='23514'; END IF;
+        RAISE EXCEPTION 'invalid token proposal' USING ERRCODE='23514', CONSTRAINT='workflow_guard:guard_workflow_token_proposal'; END IF;
     SELECT usage.root_run_id,budget.token_policy,GREATEST(usage.authorized_tokens,(budget.token_policy->>'max_tokens')::bigint),usage.token_refusal
         INTO STRICT root,policy,allowance,refused FROM workflow_run_budgets AS link
         JOIN workflow_root_budget_usage AS usage USING(company_id,root_run_id)
@@ -11265,7 +11306,7 @@ BEGIN
         WHERE link.company_id=NEW.company_id AND link.run_id=NEW.run_id FOR UPDATE OF usage;
     IF policy IS NULL OR refused IS NOT NULL OR (NEW.token_proposal->>'original_allowance')::bigint<>(policy->>'max_tokens')::bigint
         OR (NEW.token_proposal->>'old_allowance')::bigint<>allowance THEN
-        RAISE EXCEPTION 'token proposal does not match current root allowance' USING ERRCODE='23514'; END IF;
+        RAISE EXCEPTION 'token proposal does not match current root allowance' USING ERRCODE='23514', CONSTRAINT='workflow_guard:guard_workflow_token_proposal'; END IF;
     SELECT jsonb_build_object(
         'reported',COALESCE(sum(input_tokens+output_tokens) FILTER(WHERE usage_source='reported'),0),
         'estimated',COALESCE(sum(input_tokens+output_tokens) FILTER(WHERE usage_source='estimated'),0),
@@ -11277,7 +11318,7 @@ BEGIN
     IF NEW.token_proposal->'usage' IS DISTINCT FROM observed
         OR (NEW.token_proposal->>'proposed_allowance')::bigint<needed+(observed->>'reported')::bigint
             +(observed->>'estimated')::bigint+(observed->>'mixed')::bigint+(observed->>'unconfirmed')::bigint THEN
-        RAISE EXCEPTION 'token proposal does not cover observed usage' USING ERRCODE='23514'; END IF;
+        RAISE EXCEPTION 'token proposal does not cover observed usage' USING ERRCODE='23514', CONSTRAINT='workflow_guard:guard_workflow_token_proposal'; END IF;
     IF NOT EXISTS(SELECT 1 FROM task_harness_runs AS checkpoint JOIN background_tasks AS job ON job.company_id=checkpoint.company_id AND job.id=checkpoint.task_id
         WHERE checkpoint.company_id=NEW.company_id AND checkpoint.id=NEW.checkpoint_id AND checkpoint.workflow_run_id=NEW.run_id
             AND checkpoint.workflow_execution_id=NEW.execution_id AND checkpoint.task_id=NEW.job_id AND checkpoint.revision=NEW.checkpoint_revision
@@ -11286,7 +11327,7 @@ BEGIN
             AND job.worker_id=checkpoint.workflow_worker_id AND job.execution_generation=checkpoint.workflow_generation
             AND ((NEW.token_stage='settlement' AND EXISTS(SELECT 1 FROM jsonb_array_elements(checkpoint.checkpoint->'turns') AS turn WHERE turn->>'request_id'=NEW.token_request_id::text))
                 OR (NEW.token_stage='reservation' AND NOT EXISTS(SELECT 1 FROM jsonb_array_elements(checkpoint.checkpoint->'reservations') AS reservation WHERE reservation->>'request_id'=NEW.token_request_id::text)))) THEN
-        RAISE EXCEPTION 'token proposal requires its exact live checkpoint' USING ERRCODE='23514'; END IF;
+        RAISE EXCEPTION 'token proposal requires its exact live checkpoint' USING ERRCODE='23514', CONSTRAINT='workflow_guard:guard_workflow_token_proposal'; END IF;
     RETURN NEW;
 END $$;
 CREATE TRIGGER guard_workflow_token_proposal BEFORE INSERT ON public.workflow_decisions
@@ -11358,7 +11399,7 @@ BEGIN
     -- Every valid run creates its immutable budget link in its insert trigger.
     IF NOT FOUND THEN RETURN; END IF;
     IF refused IS NOT NULL THEN
-        RAISE EXCEPTION 'workflow token continuation refused: %',refused USING ERRCODE='23514';
+        RAISE EXCEPTION 'workflow token continuation refused: %',refused USING ERRCODE='23514', CONSTRAINT='workflow_guard:require_workflow_token_progression';
     END IF;
     IF NOT EXISTS(SELECT 1 FROM workflow_run_budgets AS link
         JOIN workflow_root_budgets AS budget USING(company_id,root_run_id)
@@ -11368,7 +11409,7 @@ BEGIN
         JOIN workflow_run_budgets AS link ON link.company_id=call.company_id AND link.root_run_id=call.root_run_id
         WHERE link.company_id=company AND link.run_id=run;
     IF observed>allowance THEN
-        RAISE EXCEPTION 'workflow token approval required' USING ERRCODE='23514';
+        RAISE EXCEPTION 'workflow token approval required' USING ERRCODE='23514', CONSTRAINT='workflow_guard:require_workflow_token_progression';
     END IF;
 END $$;
 
@@ -11405,12 +11446,12 @@ BEGIN
             OR NEW.checkpoint->'final_output' IS DISTINCT FROM OLD.checkpoint->'final_output'
             OR NEW.checkpoint->'tool_catalogue_fingerprint' IS DISTINCT FROM OLD.checkpoint->'tool_catalogue_fingerprint'
             OR NEW.state IS DISTINCT FROM OLD.state) THEN
-        RAISE EXCEPTION 'active model request prevents checkpoint progression' USING ERRCODE='23514';
+        RAISE EXCEPTION 'active model request prevents checkpoint progression' USING ERRCODE='23514', CONSTRAINT='workflow_guard:guard_harness_workflow_progression';
     END IF;
     IF progresses THEN
         IF NOT EXISTS(SELECT 1 FROM jsonb_array_elements(NEW.checkpoint->'executions') AS execution
             WHERE execution->>'generation'=NEW.workflow_generation::text) THEN
-            RAISE EXCEPTION 'checkpoint progression requires execution reservation' USING ERRCODE='23514';
+            RAISE EXCEPTION 'checkpoint progression requires execution reservation' USING ERRCODE='23514', CONSTRAINT='workflow_guard:guard_harness_workflow_progression';
         END IF;
         PERFORM public.require_workflow_token_progression(NEW.company_id,NEW.workflow_run_id);
     END IF;
@@ -11451,7 +11492,7 @@ BEGIN
         'terminal_wakeup_sequence','revision','finished_at']) IS DISTINCT FROM
        (to_jsonb(OLD) - ARRAY['state','waiting_reason','terminal_execution_id',
         'terminal_wakeup_sequence','revision','finished_at']) THEN
-        RAISE EXCEPTION 'workflow run snapshot is immutable' USING ERRCODE='23514';
+        RAISE EXCEPTION 'workflow run snapshot is immutable' USING ERRCODE='23514', CONSTRAINT='workflow_guard:guard_workflow_run_snapshot';
     END IF;
     RETURN NEW;
 END $$;
@@ -11476,10 +11517,10 @@ BEGIN
                 THEN RETURN OLD; END IF;
             END IF;
         END IF;
-        RAISE EXCEPTION 'published workflow configuration is immutable' USING ERRCODE='23514';
+        RAISE EXCEPTION 'published workflow configuration is immutable' USING ERRCODE='23514', CONSTRAINT='workflow_guard:guard_workflow_publication_snapshot';
     END IF;
     IF NEW IS DISTINCT FROM OLD THEN
-        RAISE EXCEPTION 'published workflow configuration is immutable' USING ERRCODE='23514';
+        RAISE EXCEPTION 'published workflow configuration is immutable' USING ERRCODE='23514', CONSTRAINT='workflow_guard:guard_workflow_publication_snapshot';
     END IF;
     RETURN NEW;
 END $$;
@@ -11493,7 +11534,7 @@ BEGIN
     IF TG_OP='DELETE' AND pg_trigger_depth()>1
         AND NOT EXISTS (SELECT 1 FROM public.workflow_runs WHERE company_id=OLD.company_id AND id=OLD.run_id)
     THEN RETURN OLD; END IF;
-    RAISE EXCEPTION 'workflow history snapshot is immutable' USING ERRCODE='23514';
+    RAISE EXCEPTION 'workflow history snapshot is immutable' USING ERRCODE='23514', CONSTRAINT='workflow_guard:guard_workflow_history_snapshot';
 END $$;
 CREATE TRIGGER workflow_history_members_immutable BEFORE UPDATE OR DELETE ON public.workflow_history_members
     FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_history_snapshot();

@@ -222,7 +222,10 @@ fn assert_native(error: &sqlx::Error, attack: &IdentityAttack) {
     assert_eq!(native.code(), "23514");
     assert_eq!(native.message(), message);
     assert!(native.schema().is_none());
-    assert!(native.constraint().is_none());
+    assert_eq!(
+        native.constraint(),
+        Some(format!("workflow_guard:{}", function.trim_end_matches("()")).as_str())
+    );
     assert!(native.table().is_none());
     assert!(native.r#where().unwrap().contains(function));
     eprintln!(

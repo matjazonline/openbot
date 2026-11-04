@@ -718,10 +718,7 @@ pub(crate) fn compile_resolved(
         },
     });
     if let Some(tokens) = parsed.definition.limits.root_budget.tokens() {
-        representation["root_budget"]["tokens"] = json!({
-            "max_tokens": tokens.max_tokens(),
-            "reviewers": tokens.reviewers().iter().map(|id| json!({"kind":"user","id":id})).collect::<Vec<_>>()
-        });
+        representation["root_budget"]["tokens"] = tokens.policy();
     }
     let content_hash = identity(&decoded.source, &representation);
     Ok(CompiledWorkflow {

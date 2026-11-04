@@ -138,9 +138,16 @@ fn transported(error: AppError, outcome: Outcome) -> Envelope {
         assert_eq!(native.message, "");
         assert_eq!(native.context, "");
     }
-    for field in [&native.constraint, &native.schema, &native.table] {
-        assert_eq!(field, "");
-    }
+    assert_eq!(native.schema, "");
+    assert_eq!(native.table, "");
+    assert_eq!(
+        native.constraint,
+        if matches!(outcome, Outcome::Rejected) {
+            "workflow_guard:workflow_action_evidence_commit_guard"
+        } else {
+            ""
+        }
+    );
     eprintln!(
         "native_chronology mode={outcome:?} state={} schema={} table={} constraint={} message={}",
         native.state, native.schema, native.table, native.constraint, native.message

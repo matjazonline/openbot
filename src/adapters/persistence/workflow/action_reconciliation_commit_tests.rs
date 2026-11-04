@@ -287,7 +287,7 @@ async fn exercise(case: Case) {
                 "complete proposal reached final gate: {result:?}"
             );
             assert!(
-                matches!(result, Err(AppError::Database(ref error)) if error=="error returned from database: invalid workflow action evidence provenance"),
+                matches!(result, Err(AppError::WorkflowGuard(ref error)) if error.guard()=="workflow_action_evidence_commit_guard" && error.message()=="error returned from database: invalid workflow action evidence provenance"),
                 "{result:?}"
             );
             assert_eq!(after, before, "native COMMIT rolls back every public row");

@@ -1,0 +1,77 @@
+BEGIN
+Pager usage is off.
+SET
+CREATE TABLE
+CREATE TABLE
+INSERT 0 1600
+INSERT 0 80
+ANALYZE
+ANALYZE
+== Table and index sizes (temporary clones)
+                             relname                             | rows |    size    
+-----------------------------------------------------------------+------+------------
+ workflow_runs                                                   |   80 | 24 kB
+ workflow_versions                                               | 1600 | 432 kB
+ pg_toast_317773_index                                           |    0 | 8192 bytes
+ pg_toast_317807_index                                           |    0 | 8192 bytes
+ workflow_runs_company_id_binding_id_created_at_id_idx           |   80 | 16 kB
+ workflow_runs_company_id_channel_id_state_idx                   |    4 | 16 kB
+ workflow_runs_company_id_created_at_id_idx                      |   80 | 16 kB
+ workflow_runs_company_id_id_binding_id_key                      |   80 | 16 kB
+ workflow_runs_company_id_id_channel_id_thread_id_key            |   80 | 16 kB
+ workflow_runs_company_id_id_parent_run_id_key                   |   80 | 16 kB
+ workflow_runs_company_id_id_parent_run_id_parent_execution__key |   80 | 16 kB
+ workflow_runs_company_id_id_workflow_id_key                     |   80 | 16 kB
+ workflow_runs_company_id_id_workflow_id_version_id_key          |   80 | 16 kB
+ workflow_runs_company_id_rerun_of_run_id_idx                    |    0 | 8192 bytes
+ workflow_runs_company_id_state_created_at_idx                   |   26 | 16 kB
+ workflow_runs_company_id_state_finished_at_id_idx               |   68 | 16 kB
+ workflow_runs_company_id_thread_id_created_at_idx               |    0 | 8192 bytes
+ workflow_runs_company_id_version_id_created_at_id_idx           |   80 | 16 kB
+ workflow_runs_company_id_version_id_created_at_id_idx1          |   72 | 16 kB
+ workflow_runs_company_id_workflow_id_created_at_id_idx          |   80 | 16 kB
+ workflow_runs_pkey                                              |   80 | 16 kB
+ workflow_versions_company_id_command_key_key                    | 1600 | 144 kB
+ workflow_versions_company_id_workflow_id_id_key                 | 1600 | 160 kB
+ workflow_versions_pkey                                          | 1600 | 128 kB
+(24 rows)
+
+== Shipped indexes on public.workflow_runs and public.workflow_versions
+                                                                                           indexdef                                                                                            
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ CREATE INDEX workflow_runs_attention ON public.workflow_runs USING btree (company_id, state, created_at DESC) WHERE (state = ANY (ARRAY['waiting'::text, 'failed'::text]))
+ CREATE INDEX workflow_runs_binding_newest ON public.workflow_runs USING btree (company_id, binding_id, created_at DESC, id DESC)
+ CREATE INDEX workflow_runs_by_thread ON public.workflow_runs USING btree (company_id, thread_id, created_at DESC) WHERE (thread_id IS NOT NULL)
+ CREATE INDEX workflow_runs_finished_by_state ON public.workflow_runs USING btree (company_id, state, finished_at DESC, id DESC) WHERE ((finished_at IS NOT NULL) AND (parent_run_id IS NULL))
+ CREATE INDEX workflow_runs_newest ON public.workflow_runs USING btree (company_id, created_at DESC, id DESC)
+ CREATE INDEX workflow_runs_open_by_channel ON public.workflow_runs USING btree (company_id, channel_id, state) WHERE (state = ANY (ARRAY['queued'::text, 'running'::text, 'waiting'::text]))
+ CREATE INDEX workflow_runs_reruns ON public.workflow_runs USING btree (company_id, rerun_of_run_id) WHERE (rerun_of_run_id IS NOT NULL)
+ CREATE INDEX workflow_runs_version_newest ON public.workflow_runs USING btree (company_id, version_id, created_at DESC, id DESC)
+ CREATE INDEX workflow_runs_version_top_level ON public.workflow_runs USING btree (company_id, version_id, created_at DESC, id DESC) WHERE (parent_run_id IS NULL)
+ CREATE INDEX workflow_runs_workflow_newest ON public.workflow_runs USING btree (company_id, workflow_id, created_at DESC, id DESC)
+ CREATE UNIQUE INDEX workflow_run_budget_parent_identity ON public.workflow_runs USING btree (company_id, id, parent_run_id)
+ CREATE UNIQUE INDEX workflow_run_parent_identity ON public.workflow_runs USING btree (company_id, id, parent_run_id, parent_execution_id)
+ CREATE UNIQUE INDEX workflow_run_workflow_identity ON public.workflow_runs USING btree (company_id, id, workflow_id)
+ CREATE UNIQUE INDEX workflow_runs_company_id_id_binding_id_key ON public.workflow_runs USING btree (company_id, id, binding_id)
+ CREATE UNIQUE INDEX workflow_runs_company_id_id_channel_id_thread_id_key ON public.workflow_runs USING btree (company_id, id, channel_id, thread_id)
+ CREATE UNIQUE INDEX workflow_runs_pkey ON public.workflow_runs USING btree (company_id, id)
+ CREATE UNIQUE INDEX workflow_usage_version_identity ON public.workflow_runs USING btree (company_id, id, workflow_id, version_id)
+ CREATE UNIQUE INDEX workflow_versions_company_id_command_key_key ON public.workflow_versions USING btree (company_id, command_key)
+ CREATE UNIQUE INDEX workflow_versions_company_id_workflow_id_id_key ON public.workflow_versions USING btree (company_id, workflow_id, id)
+ CREATE UNIQUE INDEX workflow_versions_pkey ON public.workflow_versions USING btree (company_id, id)
+(20 rows)
+
+INSERT 0 40
+ANALYZE
+SET
+   ?column?   
+--------------
+ p03_rows=120
+(1 row)
+
+         ?column?         
+--------------------------
+ p03_bad_terminal_shape=0
+(1 row)
+
+ROLLBACK

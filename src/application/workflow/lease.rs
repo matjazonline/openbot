@@ -152,7 +152,8 @@ pub trait WorkflowLeases: Send + Sync {
     ) -> AppResult<bool>;
 }
 
-#[derive(Debug)]
+/// `Clone` so the worker can confirm a guard-refused completion by re-running it once.
+#[derive(Debug, Clone)]
 pub struct FencedWorkflowResult {
     pub fence: WorkflowFence,
     pub output: Value,

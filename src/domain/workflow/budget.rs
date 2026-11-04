@@ -11,7 +11,6 @@ pub const MAX_ROOT_REPETITIONS: u32 = 1_000;
 pub enum TokenRefusal {
     Rejected,
     Expired,
-    Cancelled,
 }
 
 impl TokenRefusal {
@@ -19,7 +18,6 @@ impl TokenRefusal {
         match self {
             Self::Rejected => "workflow.tokens_rejected",
             Self::Expired => "workflow.tokens_expired",
-            Self::Cancelled => "workflow.tokens_cancelled",
         }
     }
 }
@@ -134,6 +132,16 @@ impl TokenAllowance {
     }
     pub fn reviewers(&self) -> &[Uuid] {
         &self.reviewers
+    }
+
+    /// Canonical allowance policy shared by compilation and root-budget admission.
+    pub fn policy(&self) -> serde_json::Value {
+        serde_json::json!({
+            "max_tokens": self.max_tokens,
+            "reviewers": self.reviewers.iter()
+                .map(|id| serde_json::json!({"kind":"user","id":id}))
+                .collect::<Vec<_>>()
+        })
     }
 }
 

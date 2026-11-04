@@ -21,10 +21,19 @@ async fn change_gate(f: &AdmissionFixture, request: &ActionDispatchRequest, gate
         ReopenGate::Succeeded => ("succeeded", None),
         _ => ("waiting", Some("reconciliation")),
     };
-    sqlx::query("UPDATE workflow_runs SET state=$2,waiting_reason=$3 WHERE id=$1")
+    if matches!(gate, ReopenGate::Succeeded) {
+        // A reconciliation wait must resume before it can succeed.
+        sqlx::query("UPDATE workflow_runs SET state='running',waiting_reason=NULL WHERE id=$1")
+            .bind(request.scope().run.as_uuid())
+            .execute(f.persistence().pool())
+            .await
+            .unwrap();
+    }
+    sqlx::query("UPDATE workflow_runs SET state=$2,waiting_reason=$3,terminal_execution_id=CASE WHEN $2 IN ('failed','succeeded') THEN $4 ELSE NULL END WHERE id=$1")
         .bind(request.scope().run.as_uuid())
         .bind(state)
         .bind(reason)
+        .bind(request.scope().execution.as_uuid())
         .execute(f.persistence().pool())
         .await
         .unwrap();

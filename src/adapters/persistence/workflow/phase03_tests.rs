@@ -92,6 +92,7 @@ async fn workflow_phase03_admission_wait_retry_restart_combined() {
         lease: policy(),
         poll: PollPolicy::new(Duration::from_millis(50), 2).unwrap(),
         active_jobs: None,
+        monitoring: None,
     };
     failed
         .process(candidate, &CancellationToken::new())

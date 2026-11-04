@@ -2,7 +2,11 @@ use super::*;
 use crate::application::workflow::{completion::*, supervise::*};
 use crate::domain::workflow::{FailureClass, FailureCode, RetrySafety, StepFailure};
 
-async fn command(f: &AdmissionFixture, scope: ActivationRequest, key: &str) -> CancelCommand {
+pub(super) async fn command(
+    f: &AdmissionFixture,
+    scope: ActivationRequest,
+    key: &str,
+) -> CancelCommand {
     CancelCommand {
         company_id: scope.company,
         run_id: scope.run,
@@ -17,7 +21,7 @@ async fn command(f: &AdmissionFixture, scope: ActivationRequest, key: &str) -> C
             .revision,
     }
 }
-fn retry(command: CancelCommand) -> RetryCommand {
+pub(super) fn retry(command: CancelCommand) -> RetryCommand {
     RetryCommand {
         company_id: command.company_id,
         run_id: command.run_id,
@@ -26,7 +30,7 @@ fn retry(command: CancelCommand) -> RetryCommand {
         expected_revision: command.expected_revision,
     }
 }
-async fn failed(
+pub(super) async fn failed(
     f: &AdmissionFixture,
     scope: ActivationRequest,
     safety: RetrySafety,
@@ -485,3 +489,6 @@ mod acceptance_tests;
 
 #[path = "budget_runtime_tests.rs"]
 mod budget_runtime_tests;
+
+#[path = "run_transition_tests.rs"]
+mod transition_tests;

@@ -1,0 +1,7 @@
+{
+  "src/adapters/persistence/workflow/guard_failure.rs": "",
+  "src/application/workflow/worker.rs": "99\t5\tsrc/application/workflow/worker.rs",
+  "src/adapters/persistence/workflow/admission_write.rs": "26\t0\tsrc/adapters/persistence/workflow/admission_write.rs",
+  "src/adapters/persistence/workflow/lease.rs": "36\t16\tsrc/adapters/persistence/workflow/lease.rs",
+  "src/adapters/persistence/workflow/wait_commit.rs": "4\t3\tsrc/adapters/persistence/workflow/wait_commit.rs"
+}

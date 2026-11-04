@@ -100,7 +100,10 @@ fn assert_native(error: &sqlx::Error, attack: Attack) {
     assert_eq!(native.code(), code);
     assert_eq!(native.message(), message);
     assert!(native.schema().is_none());
-    assert!(native.constraint().is_none());
+    assert_eq!(
+        native.constraint(),
+        Some(format!("workflow_guard:{}", function.trim_end_matches("()")).as_str())
+    );
     assert!(native.table().is_none());
     assert!(native.r#where().unwrap().contains(function));
     eprintln!("high_bounds native function={function} code={code} message={message}");

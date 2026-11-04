@@ -121,7 +121,7 @@ BEGIN
     IF octet_length(envelope::text)>65536 THEN RAISE EXCEPTION 'Final diagnostic overflow'; END IF;
     expected_message:=CASE WHEN config.probe_case='mismatch-control' THEN 'deliberately wrong reopen diagnostic' ELSE 'invalid explicit workflow retry' END;
     prefix:=CASE WHEN native_state IS NULL THEN 'FIXTURE_REOPEN_ACCEPTED_V1:'
-        WHEN COALESCE(native_state='23514' AND native_constraint='' AND native_schema='' AND native_table='' AND native_message=expected_message
+        WHEN COALESCE(native_state='23514' AND native_constraint='workflow_guard:check_workflow_control_retry' AND native_schema='' AND native_table='' AND native_message=expected_message
             AND position('check_workflow_control_retry()' IN native_context)>0 AND position('SET CONSTRAINTS public.workflow_control_retry_guard IMMEDIATE' IN native_context)>0,false)
         THEN 'FIXTURE_REOPEN_NATIVE_V1:' ELSE 'FIXTURE_REOPEN_MISMATCH_V1:' END;
     RAISE EXCEPTION USING ERRCODE='P0001',MESSAGE=prefix||envelope::text;

@@ -302,6 +302,23 @@ async fn rejected_owner(source: Source, mode: &str) {
     let error = Box::pin(run_command(f, &owner.candidate, owner.verifier.clone()))
         .await
         .expect_err("actual service owner abort");
+    // A terminal-to-waiting attack is now rejected by the earlier transition guard.
+    // The Human case below still reaches and proves the original first-OLD witness guard.
+    if matches!(source, Source::Failed | Source::Cancelled) && mode == "native" {
+        assert!(
+            matches!(&error,AppError::WorkflowGuard(v) if v.guard()=="guard_workflow_run_transition" && v.message()==format!("error returned from database: workflow run cannot move from {} to waiting",source.state())),
+            "{error:?}"
+        );
+        assert_eq!(
+            all_tables(f).await,
+            baseline,
+            "EVERY public relation rolls back before the forbidden terminal edge"
+        );
+        assert_eq!(native_catalog(f).await, catalog);
+        drop(observer);
+        f.persistence().pool().close().await;
+        return;
+    }
     let envelope = witness_transport::decode(error, mode);
     witness_transport::assert_envelope(&envelope, &owner, mode, &target, &database);
     witness_transport::wait_rollback(&mut observer, &envelope, observer_pid).await;

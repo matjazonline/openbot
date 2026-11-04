@@ -45,7 +45,7 @@ async fn listed(
 }
 
 async fn set_state(f: &AdmissionFixture, run: RunId, state: &str) {
-    sqlx::query("UPDATE workflow_runs SET state = $2 WHERE company_id = $1 AND id = $3")
+    sqlx::query("UPDATE workflow_runs SET state = $2, terminal_execution_id=CASE WHEN $2 IN ('succeeded','failed') THEN (SELECT execution.id FROM workflow_executions AS execution WHERE execution.company_id=workflow_runs.company_id AND execution.run_id=workflow_runs.id ORDER BY activation DESC LIMIT 1) END WHERE company_id = $1 AND id = $3")
         .bind(f.binding.target.company.as_uuid())
         .bind(state)
         .bind(run.as_uuid())

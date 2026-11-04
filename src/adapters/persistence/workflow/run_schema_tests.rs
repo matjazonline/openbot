@@ -25,11 +25,15 @@ async fn insert_run(
     run: Uuid,
     association: RunAssociation,
 ) -> Result<(), sqlx::Error> {
+    // Root budget rows and their run must commit together, including pool-backed fixtures.
+    // Beginning on a caller's transaction creates a savepoint, preserving its rollback scope.
+    let mut tx = sqlx::Connection::begin(db).await?;
+    seed_root_budget(&mut tx, f.target.company.as_uuid(), run).await?;
     sqlx::query("INSERT INTO workflow_runs (company_id, id, binding_id, binding_revision, workflow_id, version_id, actor_id, trigger_id, correlation_id, bundle, input, params, resources, max_steps, max_context_bytes, deadline, channel_id, thread_id) SELECT company_id, $2, $3, 1, workflow_id, id, actor_id, $4, $5, bundle, $6, $7, '{}'::jsonb, 100, 1048576, CURRENT_TIMESTAMP + interval '1 hour', $9, $10 FROM workflow_versions WHERE company_id = $1 AND id = $8")
         .bind(f.target.company.as_uuid()).bind(run).bind(f.target.binding.as_uuid())
         .bind(Uuid::new_v4()).bind(Uuid::new_v4()).bind(json!({"input": "original"}))
-        .bind(json!({"parameter": 7})).bind(f.request(None).version.as_uuid()).bind(association.channel).bind(association.thread).execute(db).await?;
-    Ok(())
+        .bind(json!({"parameter": 7})).bind(f.request(None).version.as_uuid()).bind(association.channel).bind(association.thread).execute(&mut *tx).await?;
+    tx.commit().await
 }
 
 async fn insert_execution(

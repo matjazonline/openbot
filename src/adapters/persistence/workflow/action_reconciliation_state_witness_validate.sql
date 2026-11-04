@@ -84,7 +84,7 @@ BEGIN
     IF octet_length(envelope::text)>65536 THEN RAISE EXCEPTION 'state bounded diagnostic overflow'; END IF;
     expected_message:=CASE WHEN config.mode='mismatch-control' THEN 'deliberately wrong state witness diagnostic' ELSE 'invalid explicit workflow retry' END;
     prefix:=CASE WHEN native_state IS NULL THEN 'FIXTURE_STATE_ACCEPTED_V1:'
-        WHEN COALESCE(native_state='23514' AND native_constraint='' AND native_schema='' AND native_table='' AND native_message=expected_message
+        WHEN COALESCE(native_state='23514' AND native_constraint='workflow_guard:check_workflow_control_retry' AND native_schema='' AND native_table='' AND native_message=expected_message
             AND position('check_workflow_control_retry()' IN native_context)>0 AND position('SET CONSTRAINTS public.workflow_control_retry_guard IMMEDIATE' IN native_context)>0,false)
         THEN 'FIXTURE_STATE_NATIVE_V1:' ELSE 'FIXTURE_STATE_MISMATCH_V1:' END;
     RAISE EXCEPTION USING ERRCODE='P0001',MESSAGE=prefix||envelope::text;
@@ -134,7 +134,7 @@ BEGIN
         'not_result_poison',attempt.workflow_failure_code<>'workflow.invalid_result','not_deadline_poison',attempt.workflow_failure_code<>'workflow.run_deadline',
         'not_budget_poison',attempt.workflow_failure_code<>'workflow.root_budget_exhausted','action_safe',workflow_action_retry_safe(config.company_id,execution.id) IS TRUE,
         'budget_link',link.company_id=owner.company_id AND link.run_id=owner.id AND link.root_run_id=budget.root_run_id,
-        'budget_usage_scope',usage.company_id=budget.company_id AND usage.root_run_id=budget.root_run_id,'frozen_v6',budget.provenance='frozen_v6',
+        'budget_usage_scope',usage.company_id=budget.company_id AND usage.root_run_id=budget.root_run_id,'budget_limits_bounded',budget.activations BETWEEN 1 AND 100000 AND budget.model_calls BETWEEN 1 AND 1000 AND budget.repetitions BETWEEN 1 AND 1000,
         'budget_activations',usage.activations<=budget.activations,'budget_model',usage.model_calls<budget.model_calls,'budget_repetitions',usage.repetitions<=budget.repetitions,
         'no_exhausted_receipt',NOT EXISTS(SELECT 1 FROM workflow_budget_receipts WHERE company_id=config.company_id AND run_id=config.run_id AND disposition='exhausted'),
         'no_refusal',NOT EXISTS(SELECT 1 FROM workflow_action_claim_budget_refusals WHERE company_id=config.company_id AND run_id=config.run_id AND execution_id=config.execution_id AND job_id=config.job_id),

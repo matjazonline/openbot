@@ -98,6 +98,11 @@ pub fn action_step_failure(
 ) -> WorkflowFailure {
     use ActionStepOutcome::*;
     use FailureClass::{Retryable, Terminal};
+    if let Preparation(AppError::WorkflowGuard(violation))
+    | Dispatch(AppError::WorkflowGuard(violation)) = outcome
+    {
+        return guard_step_failure(family.prefix(), violation);
+    }
     let (class, suffix) = match outcome {
         Preparation(
             AppError::NotFound(_) | AppError::BadRequest(_) | AppError::InvalidCredentials,
@@ -118,9 +123,59 @@ pub fn action_step_failure(
     }
 }
 
+/// A workflow guard refused the handler's own transaction. Most such refusals inside a handler
+/// are fence-loss races (`... lost its fence`, `... requires a live fence`), so the step stays
+/// retryable within its attempt budget, but typed and naming the guard rather than a generic
+/// `*.unresolved` (fix-app 03, G1 r2). The transaction rolled back, so nothing was sent.
+pub fn guard_step_failure(
+    prefix: &str,
+    violation: &crate::app_error::WorkflowGuardViolation,
+) -> WorkflowFailure {
+    let code =
+        FailureCode::parse(format!("{prefix}.guard_violation")).expect("static guard failure code");
+    WorkflowFailure {
+        failure: StepFailure::new(
+            FailureClass::Retryable,
+            code,
+            Some(format!("guard {}", violation.guard())),
+        )
+        .expect("bounded guard failure"),
+        safety: RetrySafety::SafeToRetry,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn workflow_guard_error_action_handler_mapping_is_typed_bounded_and_retryable() {
+        let error = AppError::WorkflowGuard(
+            crate::application::app_error::WorkflowGuardViolation::from_constraint(
+                "workflow_guard:check_workflow_fenced_completion",
+                "forced",
+            )
+            .unwrap(),
+        );
+        for family in [ActionFamily::Http, ActionFamily::Mcp, ActionFamily::Message] {
+            for outcome in [
+                ActionStepOutcome::Preparation(&error),
+                ActionStepOutcome::Dispatch(&error),
+            ] {
+                let failure = action_step_failure(family, outcome);
+                assert_eq!(failure.failure.class(), FailureClass::Retryable);
+                assert_eq!(
+                    failure.failure.code().as_str(),
+                    format!("{}.guard_violation", family.prefix())
+                );
+                assert_eq!(
+                    failure.failure.diagnostic(),
+                    Some("guard check_workflow_fenced_completion")
+                );
+                assert_eq!(failure.safety, RetrySafety::SafeToRetry);
+            }
+        }
+    }
 
     fn code(family: ActionFamily, outcome: ActionStepOutcome<'_>) -> (String, FailureClass) {
         let failure = action_step_failure(family, outcome);

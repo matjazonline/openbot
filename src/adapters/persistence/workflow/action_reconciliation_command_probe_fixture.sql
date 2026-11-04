@@ -184,7 +184,7 @@ BEGIN
     END IF;
     guard_message := CASE WHEN config.probe_case IN ('evidence-actor','mismatch-control') THEN 'invalid workflow action evidence provenance'
         WHEN config.probe_case='command-actor' THEN 'workflow action command evidence scope mismatch' ELSE NULL END;
-    RETURN COALESCE(state='23514' AND constraint_name='' AND message=guard_message
+    RETURN COALESCE(state='23514' AND constraint_name='workflow_guard:'||config.target_name AND message=guard_message
         AND position(config.target_name||'()' IN context)>0
         AND position(format('SET CONSTRAINTS public.%I IMMEDIATE',config.target_name) IN context)>0,false);
 END $$;

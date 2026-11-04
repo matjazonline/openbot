@@ -130,7 +130,7 @@ async fn workflow_job_association_parents_and_scope_reject_mutation() {
         .execute(&mut *db)
         .await
         .unwrap_err();
-        constraint(error, "workflow_run_association_immutable");
+        constraint(error, "workflow_guard:workflow_run_association_immutable");
     }
     for field in ["company_id", "id", "run_id"] {
         let error = sqlx::query(&format!(
@@ -141,7 +141,10 @@ async fn workflow_job_association_parents_and_scope_reject_mutation() {
         .execute(&mut *db)
         .await
         .unwrap_err();
-        constraint(error, "workflow_execution_identity_immutable");
+        constraint(
+            error,
+            "workflow_guard:workflow_execution_identity_immutable",
+        );
     }
     for assignment in ["step_id = 'other'", "activation = 2"] {
         let error = sqlx::query(&format!(
@@ -151,7 +154,10 @@ async fn workflow_job_association_parents_and_scope_reject_mutation() {
         .execute(&mut *db)
         .await
         .unwrap_err();
-        constraint(error, "workflow_execution_identity_immutable");
+        constraint(
+            error,
+            "workflow_guard:workflow_execution_identity_immutable",
+        );
     }
     for scope in [
         RunAssociation {
@@ -201,13 +207,13 @@ fn parent_mutations(f: &JobFixture) -> [ParentMutation; 2] {
             table: "workflow_runs",
             id: f.run,
             assignment: "channel_id = NULL, thread_id = NULL",
-            expected: "workflow_run_association_immutable",
+            expected: "workflow_guard:workflow_run_association_immutable",
         },
         ParentMutation {
             table: "workflow_executions",
             id: f.execution,
             assignment: "run_id = gen_random_uuid()",
-            expected: "workflow_execution_identity_immutable",
+            expected: "workflow_guard:workflow_execution_identity_immutable",
         },
     ]
 }

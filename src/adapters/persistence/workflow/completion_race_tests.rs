@@ -120,7 +120,7 @@ async fn workflow_completion_inactive_run_and_lock_contention_refuse() {
     ] {
         let (f, claim) = claimed(chain()).await;
         sqlx::raw_sql(&format!(
-            "UPDATE workflow_runs SET state='{run_state}'{extra}"
+            "UPDATE workflow_runs SET state='{run_state}'{extra},terminal_execution_id=CASE WHEN '{run_state}' IN ('succeeded','failed') THEN (SELECT execution.id FROM workflow_executions AS execution WHERE execution.company_id=workflow_runs.company_id AND execution.run_id=workflow_runs.id ORDER BY activation DESC LIMIT 1) END"
         ))
         .execute(f.persistence().pool())
         .await

@@ -1,0 +1,17 @@
+[
+  "cargo",
+  "test",
+  "--locked",
+  "--offline",
+  "--lib",
+  "--",
+  "adapters::persistence::workflow::",
+  "routes::workflows::ui::runs::",
+  "message_park_continuation_",
+  "delivery_late_completion_",
+  "notification_stale_",
+  "schedule_claim_",
+  "workflow_guard_error_",
+  "domain::workflow::state::tests::",
+  "persistence::tests::"
+]

@@ -35,6 +35,7 @@ async fn drive(f: &Fixture, engine: &WorkflowEngine, run: RunId) {
         lease: LeasePolicy::new(Duration::from_secs(30)).unwrap(),
         poll: PollPolicy::new(Duration::from_secs(1), 16).unwrap(),
         active_jobs: None,
+        monitoring: None,
     };
     for _ in 0..8 {
         let candidates = f.persistence.poll_work(None, 16).await.unwrap();

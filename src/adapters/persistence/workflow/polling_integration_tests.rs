@@ -37,6 +37,7 @@ async fn workflow_poll_failed_batch_is_not_immediately_reclaimed() {
         lease: policy(),
         poll: PollPolicy::new(Duration::from_millis(50), 1).unwrap(),
         active_jobs: None,
+        monitoring: None,
     };
     let cancel = CancellationToken::new();
     let first = p.poll_work(None, 1).await.unwrap();
@@ -182,6 +183,7 @@ async fn workflow_poll_unchanged_page_and_notification_storm_preserve_delay() {
         lease: policy(),
         poll: PollPolicy::new(Duration::from_millis(50), 1).unwrap(),
         active_jobs: None,
+        monitoring: None,
     };
     let cancel = CancellationToken::new();
     let wakeup = Notify::new();

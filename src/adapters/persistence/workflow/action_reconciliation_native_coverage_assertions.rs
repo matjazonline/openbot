@@ -71,7 +71,15 @@ pub(super) fn coverage_transport(error: AppError, case: Case) -> (Envelope, Valu
     let native = &envelope.native;
     assert_eq!(
         (&*native.schema, &*native.table, &*native.constraint),
-        ("", "", "")
+        (
+            "",
+            "",
+            if case.mode == Mode::Rejected {
+                "workflow_guard:workflow_action_evidence_commit_guard"
+            } else {
+                ""
+            }
+        )
     );
     if case.mode == Mode::Rejected {
         assert_eq!(native.state, "23514");

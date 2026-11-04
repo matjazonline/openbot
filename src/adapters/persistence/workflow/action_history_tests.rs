@@ -284,22 +284,80 @@ async fn reopen_sql_on(
     tx: &mut Transaction<'_, Postgres>,
     f: &AdmissionFixture,
     request: &ActionDispatchRequest,
-) {
+) -> Result<(), sqlx::Error> {
     let company = request.scope().company.as_uuid();
     let run = request.scope().run.as_uuid();
     let expected: i64 = sqlx::query_scalar("SELECT revision FROM workflow_runs WHERE id=$1")
         .bind(run)
         .fetch_one(&mut **tx)
-        .await
-        .unwrap();
+        .await?;
     sqlx::query("UPDATE background_tasks SET status='pending',run_at=clock_timestamp()+interval '1 second' WHERE id=$1")
-        .bind(request.fence.scope.job.0).execute(&mut **tx).await.unwrap();
+        .bind(request.fence.scope.job.0).execute(&mut **tx).await?;
     sqlx::query("UPDATE workflow_runs SET state='running',waiting_reason=NULL,terminal_execution_id=NULL WHERE id=$1")
-        .bind(run).execute(&mut **tx).await.unwrap();
+        .bind(run).execute(&mut **tx).await?;
     let sequence: i64 = sqlx::query_scalar("INSERT INTO workflow_run_events(company_id,run_id,sequence,event_kind,actor_id) SELECT $1,$2,COALESCE(MAX(sequence),0)+1,'control_retry',$3 FROM workflow_run_events WHERE company_id=$1 AND run_id=$2 RETURNING sequence")
-        .bind(company).bind(run).bind(f.binding.target.actor.user_id()).fetch_one(&mut **tx).await.unwrap();
+        .bind(company).bind(run).bind(f.binding.target.actor.user_id()).fetch_one(&mut **tx).await?;
     sqlx::query("INSERT INTO workflow_control_commands(company_id,command_key,run_id,actor_id,operation,expected_revision,result,result_revision,audit_sequence) SELECT $1,'retention-reopen',$2,$3,'retry',$4,'applied',revision,$5 FROM workflow_runs WHERE company_id=$1 AND id=$2")
-        .bind(company).bind(run).bind(f.binding.target.actor.user_id()).bind(expected).bind(sequence).execute(&mut **tx).await.unwrap();
+        .bind(company).bind(run).bind(f.binding.target.actor.user_id()).bind(expected).bind(sequence).execute(&mut **tx).await?;
+    Ok(())
+}
+
+async fn check_retention_reopen(
+    f: &AdmissionFixture,
+    request: &ActionDispatchRequest,
+    expiry: &str,
+    before: &Value,
+) {
+    let mut tx = f.persistence().pool().begin().await.unwrap();
+    let extend =
+        "UPDATE workflow_runs SET deadline=clock_timestamp()+interval '1 hour' WHERE id=$1";
+    if expiry == "before_reopen" {
+        sqlx::query(extend)
+            .bind(request.scope().run.as_uuid())
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+    }
+    assert_eq!(
+        predicate(&mut tx, request).await,
+        Some(expiry != "before_reopen")
+    );
+    let reopened = reopen_sql_on(&mut tx, f, request).await;
+    if expiry == "before_reopen" {
+        // The new immediate transition guard rejects an already-unsafe retry.
+        let error = reopened.unwrap_err();
+        assert_eq!(
+            error.as_database_error().unwrap().constraint(),
+            Some("workflow_guard:guard_workflow_run_transition")
+        );
+    } else {
+        reopened.unwrap();
+        if expiry == "after_reopen" {
+            // Retain the deferred guard's independent retention recheck: the retry
+            // was safe at UPDATE, then its evidence horizon changed before COMMIT.
+            sqlx::query(extend)
+                .bind(request.scope().run.as_uuid())
+                .execute(&mut *tx)
+                .await
+                .unwrap();
+        }
+        let checked = sqlx::query("SET CONSTRAINTS workflow_control_retry_guard IMMEDIATE")
+            .execute(&mut *tx)
+            .await;
+        if expiry == "after_reopen" {
+            let error = checked.unwrap_err();
+            let native = error.as_database_error().unwrap();
+            assert_eq!(native.message(), "invalid explicit workflow retry");
+            assert_eq!(
+                native.constraint(),
+                Some("workflow_guard:check_workflow_control_retry")
+            );
+        } else {
+            checked.unwrap();
+        }
+    }
+    tx.rollback().await.unwrap();
+    assert_eq!(snapshot(f).await, *before);
 }
 
 #[tokio::test]
@@ -345,33 +403,8 @@ async fn workflow_action_history_direct_sql_reopen_rechecks_current_retention() 
         .unwrap();
     assert!(initially_safe);
     let before = snapshot(&f).await;
-    for expired in [false, true] {
-        let mut tx = f.persistence().pool().begin().await.unwrap();
-        if expired {
-            // Only the horizon changes; immutable evidence and the historical safe label remain.
-            sqlx::query(
-                "UPDATE workflow_runs SET deadline=clock_timestamp()+interval '1 hour' WHERE id=$1",
-            )
-            .bind(request.scope().run.as_uuid())
-            .execute(&mut *tx)
-            .await
-            .unwrap();
-        }
-        assert_eq!(predicate(&mut tx, &request).await, Some(!expired));
-        reopen_sql_on(&mut tx, &f, &request).await;
-        let result = sqlx::query("SET CONSTRAINTS workflow_control_retry_guard IMMEDIATE")
-            .execute(&mut *tx)
-            .await;
-        if expired {
-            assert_eq!(
-                result.unwrap_err().as_database_error().unwrap().message(),
-                "invalid explicit workflow retry"
-            );
-        } else {
-            result.unwrap();
-        }
-        tx.rollback().await.unwrap();
-        assert_eq!(snapshot(&f).await, before);
+    for expiry in ["live", "before_reopen", "after_reopen"] {
+        check_retention_reopen(&f, &request, expiry, &before).await;
     }
 }
 

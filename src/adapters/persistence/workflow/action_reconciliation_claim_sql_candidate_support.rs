@@ -107,6 +107,7 @@ pub(super) async fn capture_catalog(f: &AdmissionFixture) -> Value {
     assert_eq!(
         names,
         [
+            "guard_workflow_run_transition",
             "workflow_action_capture_claim_retirement",
             "workflow_action_capture_state_witness",
             "workflow_allocate_wakeup",
