@@ -206,15 +206,14 @@ pub trait UserPersistence: Send + Sync {
     /// never reaches the adapter layer. `Ok(None)` means no such user.
     async fn update_password_hash(&self, id: Uuid, password_hash: &str) -> AppResult<Option<User>>;
 
-    async fn activate_password(&self, id: Uuid, password_hash: &str) -> AppResult<Option<User>> {
-        self.update_password_hash(id, password_hash).await
-    }
+    /// Store the first password of an account that had none, recording password as one of its
+    /// login methods in the same write. `Ok(None)` means no such user. Required: a default that
+    /// only stored the hash would leave the login-method record behind it.
+    async fn activate_password(&self, id: Uuid, password_hash: &str) -> AppResult<Option<User>>;
 
-    async fn has_login_method(&self, _id: Uuid, method: LoginMethod) -> AppResult<bool> {
-        // Keeps lightweight persistence doubles focused on the behavior they test. Production
-        // persistence overrides this and treats the table as authoritative.
-        Ok(method == LoginMethod::Password)
-    }
+    /// Whether the account can sign in with `method`. Required: it gates credential changes, and a
+    /// double must say what it answers rather than inherit "password, always".
+    async fn has_login_method(&self, id: Uuid, method: LoginMethod) -> AppResult<bool>;
 
     async fn create_external_user(&self, _identity: ExternalIdentity<'_>) -> AppResult<User> {
         Err(AppError::Internal(

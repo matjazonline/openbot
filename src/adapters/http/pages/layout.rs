@@ -502,7 +502,7 @@ pub(crate) const LEGACY_FORMS_SCRIPT: &str = r##"        function slugifyValue(v
         }"##;
 
 pub(crate) fn layout(title: &str, content: &str, authenticated: bool) -> String {
-    use super::mailbox::{BRAND_LOGO_STYLES, THEME_CONTROLLER, brand_logo};
+    use super::mailbox::{BRAND_LOGO_STYLES, REQUEST_ERROR_TOAST, THEME_CONTROLLER, brand_logo};
 
     let title = escape_html_text(title);
     let home_href = if authenticated {
@@ -533,6 +533,7 @@ pub(crate) fn layout(title: &str, content: &str, authenticated: bool) -> String 
     <script src="/assets/htmx-2.0.4.min.js" defer></script>
 </head>
 <body class="h-full font-sans antialiased text-base-content flex flex-col items-center p-4 md:p-8">
+    {REQUEST_ERROR_TOAST}
     <div class="w-full max-w-4xl">
         <nav class="flex items-center justify-between mb-8 pb-4 border-b border-base-300">
             <a href="{home_href}" class="flex items-center" title="BusyBots">
@@ -681,4 +682,19 @@ pub(crate) fn escape_html_text(value: &str) -> String {
 /// attributes, `data-*` values, or htmx confirmation prompts.
 pub(crate) fn escape_html_attr(value: &str) -> String {
     escape_html_text(value)
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn legacy_layout_reports_and_dismisses_failed_fragment_requests() {
+        let page = super::base_layout("Agents", "<main>Agents</main>");
+        assert!(page.contains(r#"id="request-error-toast""#));
+        assert!(page.contains(r#"id="request-error-message""#));
+        assert!(page.contains(r#"data-action="dismiss-request-error""#));
+        assert!(page.contains(crate::adapters::http::routes::assets::app_js_url()));
+        let script = super::super::mailbox::application_javascript();
+        assert!(script.contains("htmx:responseError"));
+        assert!(script.contains("case 'dismiss-request-error': hideRequestError();"));
+    }
 }

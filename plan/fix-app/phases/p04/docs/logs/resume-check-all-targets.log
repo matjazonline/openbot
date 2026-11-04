@@ -1,0 +1,63 @@
+    Checking mail_agents v0.1.0 (/Users/mac03/dev/openbot/.worktrees/fix-app-p04)
+warning: unused import: `super::*`
+  --> src/adapters/http/routes/monitoring.rs:30:9
+   |
+30 |     use super::*;
+   |         ^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `crate::entities::company_member::CompanyMembership`
+ --> src/application/use_cases/thread/tests.rs:6:5
+  |
+6 | use crate::entities::company_member::CompanyMembership;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `TeamFixture`
+  --> src/application/use_cases/thread/tests.rs:15:35
+   |
+15 |     InMemoryParticipantDirectory, TeamFixture, email_allowlist_grants, email_allowlist_policy,
+   |                                   ^^^^^^^^^^^
+
+error[E0046]: not all trait items implemented, missing: `activate_password`, `has_login_method`
+   --> src/adapters/http/routes/user_tests.rs:220:1
+    |
+220 | impl crate::use_cases::user::UserPersistence for StubUserPersistence {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ missing `activate_password`, `has_login_method` in implementation
+    |
+   ::: src/application/use_cases/user.rs:212:5
+    |
+212 |     async fn activate_password(&self, id: Uuid, password_hash: &str) -> AppResult<Option<User>>;
+    |     -------------------------------------------------------------------------------------------- `activate_password` from trait
+...
+216 |     async fn has_login_method(&self, id: Uuid, method: LoginMethod) -> AppResult<bool>;
+    |     ----------------------------------------------------------------------------------- `has_login_method` from trait
+
+error[E0063]: missing field `membership` in initializer of `ui_dashboard::DashboardScope`
+   --> src/adapters/http/routes/ui_dashboard.rs:621:34
+    |
+621 |         let company_user_scope = DashboardScope {
+    |                                  ^^^^^^^^^^^^^^ missing `membership`
+
+warning: function `load_scoped_company` is never used
+   --> src/adapters/http/routes/ui.rs:168:21
+    |
+168 | pub(super) async fn load_scoped_company(
+    |                     ^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: field `user_use_cases` is never read
+   --> src/adapters/http/routes/ui_dashboard.rs:108:5
+    |
+106 | struct Dashboard {
+    |        --------- field in this struct
+107 |     company_use_cases: Arc<CompanyUseCases>,
+108 |     user_use_cases: Arc<UserUseCases>,
+    |     ^^^^^^^^^^^^^^
+
+warning: `mail_agents` (lib) generated 2 warnings
+Some errors have detailed explanations: E0046, E0063.
+For more information about an error, try `rustc --explain E0046`.
+warning: `mail_agents` (lib test) generated 3 warnings
+error: could not compile `mail_agents` (lib test) due to 2 previous errors; 3 warnings emitted

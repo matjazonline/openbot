@@ -1,0 +1,179 @@
+# FIXAPP-P04-G1-R1 reviewer evidence (read-only greps at HEAD 48626a1)
+Sun Nov  1 09:40:44 UTC 2026
+
+## CompanyUseCases::get_company adapter call sites (plan says 26 at 4e92edd)
+src/adapters/http/routes/onboarding.rs:186:    let company = company_use_cases.get_company(company_id).await?;
+src/adapters/http/routes/onboarding.rs:217:    let company = company_use_cases.get_company(company_id).await?;
+src/adapters/http/routes/onboarding.rs:441:    let company = company_use_cases.get_company(company_id).await?;
+src/adapters/http/routes/company.rs:135:    if let Ok(Some(company)) = company_use_cases.get_company(id).await
+src/adapters/http/routes/company.rs:151:    if let Ok(Some(company)) = company_use_cases.get_company(id).await
+src/adapters/http/routes/channel.rs:291:    let company = match company_use_cases.get_company(company_id).await {
+src/adapters/http/routes/channel.rs:323:    let company = match company_use_cases.get_company(company_id).await {
+src/adapters/http/routes/channel.rs:402:    let company = match company_use_cases.get_company(company_id).await {
+src/adapters/http/routes/channel.rs:431:    let company = match company_use_cases.get_company(company_id).await {
+src/adapters/http/routes/channel.rs:460:    let company = match company_use_cases.get_company(company_id).await {
+src/adapters/http/routes/channel.rs:560:    let company = match company_use_cases.get_company(company_id).await {
+src/adapters/http/routes/channel.rs:717:    let company = match company_use_cases.get_company(company_id).await {
+src/adapters/http/routes/channel.rs:907:        .get_company(company_id)
+src/adapters/http/routes/channel.rs:1063:        .get_company(context.company_id)
+src/adapters/http/routes/channel.rs:1180:        .get_company(company_id)
+src/adapters/http/routes/company_invite.rs:114:    let company = match company_use_cases.get_company(company_id).await {
+src/adapters/http/routes/agent.rs:260:    let company = match company_use_cases.get_company(company_id).await {
+src/adapters/http/routes/agent.rs:282:    let company = match company_use_cases.get_company(company_id).await {
+src/adapters/http/routes/agent.rs:357:    let company = match company_use_cases.get_company(company_id).await {
+src/adapters/http/routes/agent.rs:380:    let company = match company_use_cases.get_company(company_id).await {
+src/adapters/http/routes/agent.rs:404:    let company = match company_use_cases.get_company(company_id).await {
+src/adapters/http/routes/ui.rs:240:        .get_company(company_id)
+src/adapters/http/routes/ui_dashboard.rs:180:            (true, Some(company_id)) => dashboard.company_use_cases.get_company(company_id).await?,
+
+## SkillUseCases::get_company (scoped, user-taking) sites counted in the plan's 26?
+src/adapters/http/routes/skill_library.rs:355:        .get_company(user.id, company_id, skill_id)
+src/adapters/http/routes/skill_library.rs:391:        .get_company(user.id, company_id, skill_id)
+src/adapters/http/routes/ui_agents.rs:581:                    .get_company(self.user_id, self.company.id, *skill_id)
+
+## Callers matching Err(AppError::NotFound) from company.rs free functions
+        match owned_company(self.company_persistence.as_ref(), user_id, company_id).await {
+            Ok(_) => {}
+            Err(AppError::NotFound(_)) => {
+                let members = self
+                    .invite_persistence
+                    .list_members_by_company(company_id)
+                    .await?;
+                return if members.iter().any(|m| m.user_id == user_id) {
+                    Ok(members)
+                } else {
+                    Err(company_not_found())
+                };
+            }
+
+## Postgres update_for_user/delete_for_user not-found answer
+262:        .ok_or_else(|| AppError::Internal("Company not found.".into()))?;
+268:            return Err(AppError::Internal("Company not found.".into()));
+
+## Adapter callers of update/delete_company_for_user
+src/adapters/http/routes/ui_companies.rs:598:                .update_company_for_user(workspace.user_id, company_id, write)
+src/adapters/http/routes/ui_companies.rs:745:        .delete_company_for_user(workspace.user_id, company_id)
+src/adapters/http/routes/company.rs:171:                .update_company_for_user(_user.id, id, write)
+src/adapters/http/routes/company.rs:191:        .delete_company_for_user(_user.id, id)
+src/adapters/http/routes/company.rs:231:        .update_company_for_user(_user.id, id, payload.write()?)
+src/adapters/http/routes/company.rs:249:        .delete_company_for_user(_user.id, id)
+#[instrument(skip_all)]
+async fn delete_company(
+    State(company_use_cases): State<Arc<CompanyUseCases>>,
+    _user: AuthenticatedUser,
+    Path(id): Path<Uuid>,
+) -> impl IntoResponse {
+    let _ = company_use_cases
+        .delete_company_for_user(_user.id, id)
+        .await;
+    Html(String::new())
+}
+
+## List-scan company selection helpers (load_*_company) uses
+src/adapters/http/routes/ui.rs:347:        load_readable_company(&company_use_cases, user.id, query.company_id).await?;
+src/adapters/http/routes/ui_schedules.rs:26:            ui::{load_account, load_managed_company, managed_company_membership, workspace_user},
+src/adapters/http/routes/ui_schedules.rs:131:        load_managed_company(&self.company_use_cases, self.user_id, company_id).await
+src/adapters/http/routes/ui_run_counts.rs:4:    ui::load_managed_company,
+src/adapters/http/routes/ui_run_counts.rs:89:    let (_, company) = load_managed_company(
+src/adapters/http/routes/ui_dashboard.rs:166:            load_managed_company(&dashboard.company_use_cases, dashboard.user_id, requested)
+src/adapters/http/routes/attention.rs:298:        load_readable_company(&state.company_use_cases, viewer.user_id, query.company_id).await?;
+src/adapters/http/routes/attention.rs:346:    let (_, selected) = load_readable_company(&companies, viewer.user_id, query.company_id).await?;
+src/adapters/http/routes/ui_invites.rs:49:    let (_, company) = load_readable_company(&company_use_cases, user.id, query.company_id).await?;
+src/adapters/http/routes/ui_deliveries.rs:50:    ui::{load_account, load_managed_company, managed_company_membership, workspace_user},
+src/adapters/http/routes/ui_deliveries.rs:145:            load_managed_company(&self.company_use_cases, self.user_id, company_id).await?;
+src/adapters/http/routes/ui_deliveries.rs:171:    let (companies, company) = load_managed_company(
+src/adapters/http/routes/ui_agents.rs:48:    ui::{load_account, load_managed_company, managed_company_membership, workspace_user},
+src/adapters/http/routes/ui_agents.rs:151:            load_managed_company(&self.company_use_cases, self.user_id, Some(company_id)).await?;
+src/adapters/http/routes/ui_agents.rs:176:    let (companies, company) = load_managed_company(
+src/adapters/http/routes/ui_profile.rs:202:    let (_, company) = load_readable_company(&company_use_cases, user.id, query.company_id).await?;
+src/adapters/http/routes/ui_companies.rs:53:    ui::{load_account, load_readable_company, workspace_user},
+src/adapters/http/routes/ui_companies.rs:402:    let (companies, access) = load_readable_company(
+src/adapters/http/routes/ui_team.rs:200:            load_scoped_company(&self.company_use_cases, self.user_id, Some(company_id)).await?;
+src/adapters/http/routes/ui_channels.rs:43:    ui::{load_account, load_managed_company, managed_company_membership, workspace_user},
+src/adapters/http/routes/ui_channels.rs:121:            load_managed_company(&self.company_use_cases, self.user_id, Some(company_id)).await?;
+src/adapters/http/routes/ui_channels.rs:146:    let (companies, company) = load_managed_company(
+src/adapters/http/routes/notifications.rs:23:    ui::{load_readable_company, workspace_user},
+src/adapters/http/routes/notifications.rs:104:        load_readable_company(&state.company_use_cases, viewer.user_id, query.company_id).await?;
+src/adapters/http/routes/notifications.rs:130:        load_readable_company(&state.company_use_cases, viewer.user_id, query.company_id).await?;
+src/adapters/http/routes/workflows/ui/mod.rs:7:    load_account, load_managed_company, managed_company_membership, workspace_user,
+src/adapters/http/routes/workflows/ui/mod.rs:67:            load_managed_company(&self.companies, self.user, Some(company_id)).await?;
+src/adapters/http/routes/workflows/ui/mod.rs:75:        let (_, company) = load_managed_company(&self.companies, self.user, requested).await?;
+
+## Owner-only simulation surfaces
+561:        Ok(Some(company)) if company.user_id == user.id => company,
+718:        Ok(Some(company)) if company.user_id == user.id => company,
+909:        .filter(|company| company.user_id == user.id)
+1066:        Ok(Some(company)) if company.user_id == context.user.id => company,
+
+## load_simulation_thread_fragment entry points
+584:            load_simulation_thread_fragment(
+617:async fn load_simulation_thread_fragment(
+855:            match load_simulation_thread_fragment(
+937:            let rendered = load_simulation_thread_fragment(
+1057:async fn open_simulated_thread_logic(
+1078:    match load_simulation_thread_fragment(
+1122:    open_simulated_thread_logic(
+1154:    open_simulated_thread_logic(
+
+## Skill library operator gate in HTTP
+595:    operator(&user, &users, &config).await?;
+630:    operator(&user, &users, &config).await?;
+645:    operator(&user, &users, &config).await?;
+660:    operator(&user, &users, &config).await?;
+671:    operator(&user, &users, &config).await?;
+684:    operator(&user, &users, &config).await?;
+711:    operator(&user, &users, &config).await?;
+729:    operator(&user, &users, &config).await?;
+741:    operator(&user, &users, &config).await?;
+824:    operator(&user, &users, &config).await?;
+844:    operator(&user, &users, &config).await?;
+216:    pub async fn library_agent_capabilities(
+298:    pub async fn create_skill_from_library(
+311:    pub async fn create_library(&self, mut write: SkillWrite) -> AppResult<Skill> {
+318:    pub async fn get_library(&self, skill_id: Uuid) -> AppResult<Option<Skill>> {
+323:    pub async fn list_library_page(&self, page: SkillPageRequest) -> AppResult<SkillPage> {
+328:    pub async fn update_library(&self, skill_id: Uuid, mut write: SkillWrite) -> AppResult<Skill> {
+335:    pub async fn delete_library(&self, skill_id: Uuid) -> AppResult<()> {
+
+## workflow_provisioning_commands (no FK to agent/channel)
+CREATE TABLE public.workflow_provisioning_commands (
+    company_id uuid NOT NULL,
+    command_key text NOT NULL,
+    request_digest text NOT NULL,
+    actor_id uuid NOT NULL,
+    result jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT workflow_provisioning_commands_command_key_check CHECK (((octet_length(command_key) >= 1) AND (octet_length(command_key) <= 128))),
+    CONSTRAINT workflow_provisioning_commands_request_digest_check CHECK ((request_digest ~ '^[0-9a-f]{64}$'::text)),
+    CONSTRAINT workflow_provisioning_commands_result_check CHECK (((jsonb_typeof(result) = 'object'::text) AND (octet_length((result)::text) <= 4096)))
+);
+
+## authorize_company admits admins
+    if owner != actor.user_id() && role != "admin" {
+        return Err(missing());
+    }
+
+## htmx-config (4xx/5xx not swapped) and request-error toast only in ui_layout
+76:    <meta name="htmx-config" content='{{"responseHandling":[{{"code":"204","swap":false}},{{"code":"[23]..","swap":true}},{{"code":"(408|413|429|503)","swap":true,"error":true}},{{"code":"[45]..","swap":false,"error":true}}]}}'>
+src/adapters/http/pages/mailbox.rs:91:        <div id="request-error-toast" role="alert" aria-live="assertive" aria-atomic="true"
+src/adapters/http/pages/mailbox.rs:670:            var toast = document.getElementById('request-error-toast');
+src/adapters/http/pages/mailbox.rs:675:            var toast = document.getElementById('request-error-toast');
+
+## Error-swallowing child reads in D2 handler files
+src/adapters/http/routes/company.rs:135:    if let Ok(Some(company)) = company_use_cases.get_company(id).await
+src/adapters/http/routes/company.rs:151:    if let Ok(Some(company)) = company_use_cases.get_company(id).await
+src/adapters/http/routes/company.rs:190:    let _ = company_use_cases
+src/adapters/http/routes/company_invite.rs:185:    if let Ok(Some(invite)) = invite_use_cases
+src/adapters/http/routes/company_invite.rs:202:    if let Ok(Some(invite)) = invite_use_cases
+src/adapters/http/routes/company_invite.rs:288:        _ => return Html(pages::error_alert("User not found.")).into_response(),
+src/adapters/http/routes/company_invite.rs:309:        _ => return Html(pages::error_alert("User not found.")).into_response(),
+src/adapters/http/routes/company_invite.rs:331:        _ => return Html(pages::error_alert("User not found.")).into_response(),
+src/adapters/http/routes/channel.rs:407:    if let Ok(Some(wf)) = channel_use_cases
+src/adapters/http/routes/channel.rs:436:    if let Ok(Some(wf)) = channel_use_cases
+src/adapters/http/routes/channel.rs:569:        _ => return Html(pages::error_alert("Channel not found.")).into_response(),
+src/adapters/http/routes/channel.rs:573:        _ => return Html(pages::error_alert("User not found.")).into_response(),
+src/adapters/http/routes/channel.rs:726:        _ => return Html(pages::error_alert("Channel not found.")).into_response(),
+src/adapters/http/routes/channel.rs:818:                _ => return Html(pages::error_alert("User not found.")).into_response(),
+src/adapters/http/routes/channel.rs:1075:        _ => return Html(pages::error_alert("Channel not found.")).into_response(),
+src/adapters/http/routes/agent.rs:362:    if let Ok(Some(ag)) = agent_use_cases
+src/adapters/http/routes/agent.rs:385:    if let Ok(Some(ag)) = agent_use_cases

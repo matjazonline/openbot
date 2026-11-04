@@ -1,0 +1,7 @@
+FIXAPP-P04-WB1-R2-MAC02 inspection checkpoint, 2026-11-04
+Input digest c5debdeab77f80515c4a88ae2384af6503ae320e53cb48b4fc3dc3c87a2719da; HEAD/start/review base48626a1240f032ca3b99372bd3f5a05eb08c0c66. Sole exclusion plan/fix-app/phases/p04/docs. Coordination r15 matches immutable pin.
+Inspected correction branches ui_team create/update_invite, update_member_role, remove_member and avatar: only BadRequest/Conflict become successful inline fragments; all other error variants propagate before fallback reads.
+CompanyInviteUseCases self-owner removal/demotion now BadRequest only after owner authorization. Depth-all callers checked: legacy HTML, JSON, UI and direct application tests. No authority relaxation or schema change.
+New regression tests cover each originally failing mutation for member/admin403, foreign/unknown404, typedDB500 after healthy initial readable scope. Red log reproduced both bugs; corrected union472passed/0failed/4ignored. Owner feedback test adjustment supported by existing Postgres list_members_by_company predicate member.role <> owner; hidden owner member pane404 retained, explicit business rejection400 tested and ownership retained. Reachable invalid invite create/update retains200 feedback.
+F2 layout needless borrow removed without weakening assertion. Unaffected R1 code review reused.
+No new issue found in inspection; final acceptance awaits SQLx/offline compilation/Clippy/fmt/whitespace evidence and final identity check. No fixture checks or source edits by reviewer.

@@ -1,0 +1,22 @@
+    Checking mail_agents v0.1.0 (/Users/mac02/dev/openbot-recovery/.worktrees/fix-app-p04)
+error: items after a test module
+    --> src/adapters/persistence/workflow/provisioning.rs:949:1
+     |
+ 949 |   mod tests {
+     |   ^^^^^^^^^
+...
+1002 | / pub(crate) async fn assistant_channel_on(
+1003 | |     tx: &mut Transaction<'_, Postgres>,
+1004 | |     templates: &ProvisioningDeployment,
+1005 | |     company: CompanyId,
+1006 | |     caller: WorkflowActor,
+1007 | |     request: AssistantChannelRequest,
+1008 | | ) -> AppResult<Provisioned<Value>> {
+     | |__________________________________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#items_after_test_module
+     = note: `-D clippy::items-after-test-module` implied by `-D warnings`
+     = help: to override `-D warnings` add `#[allow(clippy::items_after_test_module)]`
+     = help: move the items to before the test module was defined
+
+error: could not compile `mail_agents` (lib test) due to 1 previous error

@@ -1,0 +1,23 @@
+   Compiling mail_agents v0.1.0 (/Users/mac02/dev/openbot-recovery/.worktrees/fix-app-p04)
+error[E0277]: the trait bound `MockCompanyPersistence: application::use_cases::company_invite::CompanyInvitePersistence` is not satisfied
+   --> src/adapters/http/routes/ui_team_authorization_tests.rs:122:9
+    |
+122 |         Arc::new(MockCompanyPersistence::failing()),
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ unsatisfied trait bound
+    |
+help: the trait `application::use_cases::company_invite::CompanyInvitePersistence` is not implemented for `MockCompanyPersistence`
+   --> src/application/use_cases/company_test_support.rs:44:1
+    |
+ 44 | pub(crate) struct MockCompanyPersistence {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: the trait `application::use_cases::company_invite::CompanyInvitePersistence` is implemented for `persistence::PostgresPersistence`
+   --> src/adapters/persistence/company_invite.rs:92:1
+    |
+ 92 | impl CompanyInvitePersistence for PostgresPersistence {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = note: required for the cast from `std::sync::Arc<MockCompanyPersistence>` to `Arc<dyn CompanyInvitePersistence>`
+    = note: the full name for the type has been written to '/Users/mac02/dev/openbot-recovery/.worktrees/fix-app-p04/target/debug/deps/mail_agents-91c1847adc52f46f.long-type-9654149615061519211.txt'
+    = note: consider using `--verbose` to print the full type name to the console
+
+For more information about this error, try `rustc --explain E0277`.
+error: could not compile `mail_agents` (lib test) due to 1 previous error

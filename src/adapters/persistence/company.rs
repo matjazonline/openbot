@@ -11,7 +11,9 @@ use crate::{
         company_member::CompanyMembership,
         value_objects::{AvatarUrl, CompanySlug, ModelName, ModelProvider},
     },
-    use_cases::company::{CompanyModelConnectionWrite, CompanyPersistence, CompanyWrite},
+    use_cases::company::{
+        CompanyModelConnectionWrite, CompanyPersistence, CompanyWrite, company_not_found,
+    },
 };
 
 #[derive(sqlx::FromRow, Debug, Serialize)]
@@ -41,29 +43,43 @@ impl From<CompanyDb> for Company {
     }
 }
 
-/// A company row plus whether the caller owns it, for [`CompanyPersistence::list_accessible_by_user_id`].
+/// A company row plus the caller's `company_members.role` in it, for the access reads.
+///
+/// Ownership is the owner member row: 01 makes it agree with `companies.user_id` at commit, so the
+/// role column alone says what the caller is.
 #[derive(sqlx::FromRow, Debug)]
 struct AccessibleCompanyDb {
     #[sqlx(flatten)]
     company: CompanyDb,
-    is_owner: bool,
-    is_admin: bool,
+    role: String,
 }
 
-impl From<AccessibleCompanyDb> for CompanyAccess {
-    fn from(db: AccessibleCompanyDb) -> Self {
-        CompanyAccess {
-            membership: if db.is_owner {
-                CompanyMembership::Owner
-            } else if db.is_admin {
-                CompanyMembership::Admin
-            } else {
-                CompanyMembership::Member
-            },
+impl TryFrom<AccessibleCompanyDb> for CompanyAccess {
+    type Error = AppError;
+
+    fn try_from(db: AccessibleCompanyDb) -> AppResult<Self> {
+        let membership = match db.role.as_str() {
+            "owner" => CompanyMembership::Owner,
+            "admin" => CompanyMembership::Admin,
+            "member" => CompanyMembership::Member,
+            // The role CHECK constraint makes this unreachable; a new role must be mapped here
+            // rather than read as some lesser access.
+            other => {
+                return Err(AppError::Internal(format!(
+                    "Unknown company membership role '{other}'"
+                )));
+            }
+        };
+        Ok(CompanyAccess {
             company: db.company.into(),
-        }
+            membership,
+        })
     }
 }
+
+/// The columns of [`AccessibleCompanyDb`], joined from `company` and `member`.
+const ACCESSIBLE_COMPANY_COLUMNS: &str = "company.id, company.user_id, company.name, company.slug, \
+     company.default_add_3rd_party, company.avatar_url, company.created_at, member.role";
 
 /// How many dependent agents a rejected model-connection change names before it stops listing
 /// them. The message is for a person reading a form, not an inventory.
@@ -186,32 +202,42 @@ impl CompanyPersistence for PostgresPersistence {
     }
 
     async fn list_accessible_by_user_id(&self, user_id: Uuid) -> AppResult<Vec<CompanyAccess>> {
-        // The owner ∪ members union that `access_context_for_user` also walks, asked here for
-        // every company at once -- the read guards start from a session and need to know which of
-        // the two the caller is before they can decide what to show.
-        let db_list = sqlx::query_as::<_, AccessibleCompanyDb>(
-            r#"SELECT company.id, company.user_id, company.name, company.slug,
-                      company.default_add_3rd_party, company.avatar_url, company.created_at,
-                      (company.user_id = $1) AS is_owner,
-                      COALESCE((
-                          SELECT member.role = 'admin'
-                          FROM company_members AS member
-                          WHERE member.company_id = company.id AND member.user_id = $1
-                      ), FALSE) AS is_admin
+        // Feeds switchers and default selection only: an explicitly requested company is
+        // authorized by `company_access`, so this cap never denies anything.
+        let db_list = sqlx::query_as::<_, AccessibleCompanyDb>(&format!(
+            r#"SELECT {ACCESSIBLE_COMPANY_COLUMNS}
                FROM companies AS company
-               WHERE company.user_id = $1
-                  OR EXISTS (
-                       SELECT 1 FROM company_members AS member
-                       WHERE member.company_id = company.id AND member.user_id = $1
-                     )
-               ORDER BY company.created_at DESC, company.id DESC LIMIT 200"#,
-        )
+               JOIN company_members AS member
+                 ON member.company_id = company.id AND member.user_id = $1
+               ORDER BY company.created_at DESC, company.id DESC LIMIT 200"#
+        ))
         .bind(user_id)
         .fetch_all(&self.pool)
         .await
         .map_err(AppError::from)?;
 
-        Ok(db_list.into_iter().map(Into::into).collect())
+        db_list.into_iter().map(TryInto::try_into).collect()
+    }
+
+    async fn company_access(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+    ) -> AppResult<Option<CompanyAccess>> {
+        let db = sqlx::query_as::<_, AccessibleCompanyDb>(&format!(
+            r#"SELECT {ACCESSIBLE_COMPANY_COLUMNS}
+               FROM companies AS company
+               JOIN company_members AS member
+                 ON member.company_id = company.id AND member.user_id = $1
+               WHERE company.id = $2"#
+        ))
+        .bind(user_id)
+        .bind(company_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+
+        db.map(TryInto::try_into).transpose()
     }
 
     async fn update(&self, id: Uuid, write: CompanyWrite) -> AppResult<Company> {
@@ -259,13 +285,13 @@ impl CompanyPersistence for PostgresPersistence {
         .fetch_optional(&self.pool)
         .await
         .map_err(AppError::from)?
-        .ok_or_else(|| AppError::Internal("Company not found.".into()))?;
+        .ok_or_else(company_not_found)?;
         Ok(db.into())
     }
 
     async fn delete_for_user(&self, user_id: Uuid, id: Uuid) -> AppResult<()> {
         if !delete_company_with_cleanup(self, id, Some(user_id)).await? {
-            return Err(AppError::Internal("Company not found.".into()));
+            return Err(company_not_found());
         }
         Ok(())
     }
@@ -274,28 +300,8 @@ impl CompanyPersistence for PostgresPersistence {
         &self,
         company_id: Uuid,
     ) -> AppResult<Vec<CompanyModelConnection>> {
-        let rows = sqlx::query_as::<_, (String, Vec<String>, bool, bool)>(
-            r#"SELECT provider, models, is_default, (api_key IS NOT NULL) AS has_api_key
-               FROM company_model_connections
-               WHERE company_id = $1
-               ORDER BY is_default DESC, provider"#,
-        )
-        .bind(company_id)
-        .fetch_all(&self.pool)
-        .await
-        .map_err(AppError::from)?;
-
-        Ok(rows
-            .into_iter()
-            .map(
-                |(provider, models, is_default, has_api_key)| CompanyModelConnection {
-                    provider: ModelProvider::from(provider),
-                    models: models.into_iter().map(ModelName::from).collect(),
-                    is_default,
-                    has_api_key,
-                },
-            )
-            .collect())
+        let mut db = self.pool.acquire().await?;
+        model_connections_on(&mut db, company_id).await
     }
 
     async fn model_api_key(
@@ -303,18 +309,8 @@ impl CompanyPersistence for PostgresPersistence {
         company_id: Uuid,
         provider: &ModelProvider,
     ) -> AppResult<Option<String>> {
-        // Folded by `ModelProvider::canonical` before it gets here, so the column is compared as
-        // stored rather than through a function that would also hide a miscased write.
-        let stored: Option<String> = sqlx::query_scalar(
-            r#"SELECT api_key FROM company_model_connections
-               WHERE company_id = $1 AND provider = $2"#,
-        )
-        .bind(company_id)
-        .bind(provider.as_str())
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(AppError::from)?;
-        self.decrypt_credential(stored)
+        let mut db = self.pool.acquire().await?;
+        model_api_key_on(self, &mut db, company_id, provider).await
     }
 
     async fn replace_model_connections_for_user(
@@ -457,7 +453,7 @@ mod tests {
     /// The accessible-companies query is built at runtime, so nothing but a real database can say
     /// whether its `is_owner` projection and its `company_members` join do what they claim.
     #[tokio::test]
-    async fn a_company_is_accessible_to_its_owner_and_to_whoever_was_invited_to_it() {
+    async fn company_access_returns_owner_admin_member_and_no_relation() {
         let Some(pool) = test_pool().await else {
             return;
         };
@@ -953,4 +949,56 @@ mod tests {
             .map(|access| access.company.id)
             .collect()
     }
+}
+
+#[cfg(test)]
+#[path = "company_access_tests.rs"]
+mod access_tests;
+
+pub(crate) async fn model_connections_on(
+    db: &mut sqlx::PgConnection,
+    company_id: Uuid,
+) -> AppResult<Vec<CompanyModelConnection>> {
+    let rows = sqlx::query_as::<_, (String, Vec<String>, bool, bool)>(
+        r#"SELECT provider, models, is_default, (api_key IS NOT NULL) AS has_api_key
+               FROM company_model_connections
+               WHERE company_id = $1
+               ORDER BY is_default DESC, provider"#,
+    )
+    .bind(company_id)
+    .fetch_all(db)
+    .await
+    .map_err(AppError::from)?;
+
+    Ok(rows
+        .into_iter()
+        .map(
+            |(provider, models, is_default, has_api_key)| CompanyModelConnection {
+                provider: ModelProvider::from(provider),
+                models: models.into_iter().map(ModelName::from).collect(),
+                is_default,
+                has_api_key,
+            },
+        )
+        .collect())
+}
+
+pub(crate) async fn model_api_key_on(
+    persistence: &PostgresPersistence,
+    db: &mut sqlx::PgConnection,
+    company_id: Uuid,
+    provider: &ModelProvider,
+) -> AppResult<Option<String>> {
+    // Folded by `ModelProvider::canonical` before it gets here, so the column is compared as
+    // stored rather than through a function that would also hide a miscased write.
+    let stored: Option<String> = sqlx::query_scalar(
+        r#"SELECT api_key FROM company_model_connections
+               WHERE company_id = $1 AND provider = $2"#,
+    )
+    .bind(company_id)
+    .bind(provider.as_str())
+    .fetch_optional(db)
+    .await
+    .map_err(AppError::from)?;
+    persistence.decrypt_credential(stored)
 }

@@ -1,0 +1,145 @@
+plan/fix-app/phases/p04/docs/logs/G1-r4-decisions.md:289: new blank line at EOF.
+plan/fix-app/phases/p04/docs/logs/G1-r5-decisions.md:307: new blank line at EOF.
+plan/fix-app/phases/p04/docs/logs/G1-r6-decisions.md:337: new blank line at EOF.
+plan/fix-app/phases/p04/docs/logs/WB1-R1-fixture-diffs.txt:6: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-R1-fixture-diffs.txt:23: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-R1-fixture-diffs.txt:107: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-R1-fixture-diffs.txt:133: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-R1-fixture-diffs.txt:160: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-R1-fixture-diffs.txt:166: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-R1-fixture-diffs.txt:189: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-R1-fixture-diffs.txt:191: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-R1-fixture-diffs.txt:315: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-R1-fixture-diffs.txt:344: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-R1-fixture-diffs.txt:362: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-R1-fixture-diffs.txt:368: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-R1-fixture-diffs.txt:409: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-R1-fixture-diffs.txt:469: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-R1-fixture-diffs.txt:477: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-R1-fixture-diffs.txt:552: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-R1-fixture-diffs.txt:575: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-R1-fixture-diffs.txt:584: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-R1-fixture-diffs.txt:610: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-R1-fixture-diffs.txt:627: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-R1-fixture-diffs.txt:648: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-R1-fixture-diffs.txt:650: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-R1-fixture-diffs.txt:653: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-R1-fixture-diffs.txt:659: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-R1-fixture-diffs.txt:678: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-R1-fixture-diffs.txt:750: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-R1-fixture-diffs.txt:820: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-R1-fixture-diffs.txt:888: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-R1-fixture-diffs.txt:893: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-R1-fixture-diffs.txt:902: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-R1-fixture-diffs.txt:911: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-R1-fixture-diffs.txt:920: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-R1-fixture-diffs.txt:929: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-R1-fixture-diffs.txt:938: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-R1-fixture-diffs.txt:947: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-R1-fixture-diffs.txt:956: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-R1-fixture-diffs.txt:965: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-R1-fixture-diffs.txt:974: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-R1-fixture-diffs.txt:983: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-R1-fixture-diffs.txt:1001: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-R1-fixture-diffs.txt:1037: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-R1-fixture-diffs.txt:1046: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-R1-fixture-diffs.txt:1055: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-R1-fixture-diffs.txt:1064: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-author-authorization-audit.diff:16: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-author-authorization-audit.diff:21: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-author-authorization-audit.diff:87: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-author-authorization-audit.diff:90: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-author-authorization-audit.diff:92: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-author-authorization-audit.diff:110: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-author-authorization-audit.diff:123: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-author-authorization-audit.diff:139: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-author-authorization-audit.diff:219: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-author-authorization-audit.diff:222: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-author-authorization-audit.diff:242: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-author-authorization-audit.diff:253: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-author-authorization-audit.diff:258: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-author-authorization-audit.diff:270: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-author-authorization-audit.diff:323: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-author-authorization-audit.diff:326: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-author-authorization-audit.diff:331: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-author-authorization-audit.diff:346: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-author-authorization-audit.diff:385: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-author-authorization-audit.diff:397: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-author-authorization-audit.diff:406: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-author-authorization-audit.diff:409: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-author-authorization-audit.diff:433: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-author-authorization-audit.diff:451: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-author-authorization-audit.diff:482: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-author-authorization-audit.diff:485: trailing whitespace.
++ 
+plan/fix-app/phases/p04/docs/logs/WB1-author-authorization-audit.diff:504: trailing whitespace.
++ 

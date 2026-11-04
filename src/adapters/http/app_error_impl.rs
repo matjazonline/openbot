@@ -16,6 +16,7 @@ impl IntoResponse for AppError {
             AppError::ServiceUnavailable(_) => "service_unavailable",
             AppError::BadRequest(_) => "bad_request",
             AppError::NotFound(_) => "not_found",
+            AppError::Forbidden(_) => "forbidden",
             AppError::Conflict(_) => "conflict",
             AppError::Superseded(_) => "superseded",
             AppError::Timeout(_) => "timeout",
@@ -45,6 +46,7 @@ impl IntoResponse for AppError {
                 .into_response(),
             AppError::BadRequest(message) => (StatusCode::BAD_REQUEST, message).into_response(),
             AppError::NotFound(message) => (StatusCode::NOT_FOUND, message).into_response(),
+            AppError::Forbidden(message) => (StatusCode::FORBIDDEN, message).into_response(),
             AppError::Conflict(message) | AppError::Superseded(message) => {
                 (StatusCode::CONFLICT, message).into_response()
             }

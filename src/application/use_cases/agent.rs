@@ -10,11 +10,12 @@ use crate::{
         agent::{Agent, MAX_AGENT_SKILLS},
         company::Company,
         creation::CreationProvenance,
-        user::Viewer,
+        user::{Caller, Viewer},
         value_objects::{AvatarUrl, ModelName, ModelProvider},
     },
     services::harness::{ClassificationRequest, TextClassifier},
     use_cases::{
+        caller::require_operator,
         channel::{SlugKind, validate_slug},
         company::{CompanyPersistence, managed_company},
     },
@@ -187,7 +188,7 @@ pub enum LibraryCopyModel {
 /// One library definition as a company agent write: every stored field, with the provenance left
 /// for [`AgentUseCases::create_agent_from_library`] to stamp with whoever picked it. Its workflow
 /// tool grants are copied with its skills, in the creating transaction.
-fn library_agent_write(definition: &Agent) -> AgentWrite {
+pub(super) fn library_agent_write(definition: &Agent) -> AgentWrite {
     AgentWrite {
         workflow_tools: None,
         name: definition.name.clone(),
@@ -253,28 +254,14 @@ impl AgentUseCases {
         company_id: Uuid,
         write: &AgentWrite,
     ) -> AppResult<()> {
-        let (Some(provider), Some(model)) = (write.provider.as_deref(), write.model.as_deref())
-        else {
-            if write.provider.is_some() || write.model.is_some() {
-                return Err(AppError::BadRequest(
-                    "Select both a provider and one of its enabled models, or inherit the company default."
-                        .into(),
-                ));
-            }
-            return Ok(());
-        };
+        if write.provider.is_none() || write.model.is_none() {
+            return model_preparation::validate_model_selection(&[], write);
+        }
         let connections = self
             .company_persistence
             .list_model_connections(company_id)
             .await?;
-        if !model_allowed(&connections, provider, model) {
-            return Err(AppError::BadRequest(format!(
-                "Model '{}' is not enabled for provider '{}' in this company.",
-                ModelName::canonical(model),
-                ModelProvider::canonical(provider)
-            )));
-        }
-        Ok(())
+        model_preparation::validate_model_selection(&connections, write)
     }
 
     pub async fn list_company_model_connections(
@@ -356,43 +343,16 @@ impl AgentUseCases {
             .get_library_agent(library_agent_id)
             .await?
             .ok_or_else(agent_not_found)?;
-        let mut write = library_agent_write(&definition);
-
-        // A library definition names a model the company may not have enabled, and the picker
-        // never showed one. Fall back to the company default rather than refusing the pick, and
-        // say so.
-        let mut warnings = Vec::new();
-        if write.provider.is_some()
-            && self
-                .validate_model_selection(company_id, &write)
-                .await
-                .is_err()
-        {
-            write.provider = None;
-            write.model = None;
-            warnings.push(ProvisioningWarning {
-                code: "library_model_unavailable".into(),
-                message: format!(
-                    "'{}' was created on the company's default model: the model it is published with is not enabled here.",
-                    definition.name
-                ),
-            });
-        }
-
-        if copy_model == LibraryCopyModel::PinDefault && write.provider.is_none() {
-            let connections = self
-                .company_persistence
-                .list_model_connections(company_id)
-                .await?;
-            if let Some((provider, model)) = pinned_default_model(&connections) {
-                write.provider = Some(provider);
-                write.model = Some(model);
-            }
-        }
-
-        write.created_by = Some(CreationProvenance::user(user_id));
-        write.normalize()?;
-        self.validate_model_selection(company_id, &write).await?;
+        let connections = self
+            .company_persistence
+            .list_model_connections(company_id)
+            .await?;
+        let (write, mut warnings) = model_preparation::prepare_library_write(
+            &definition,
+            user_id,
+            copy_model,
+            &connections,
+        )?;
         let inherited = write.provider.is_none();
         let agent = self
             .library_copy_persistence
@@ -432,17 +392,50 @@ impl AgentUseCases {
             .filter(Agent::is_library))
     }
 
-    pub async fn create_library_agent(&self, mut write: AgentWrite) -> AppResult<Agent> {
+    /// Authorize the library workspace before a transport validates its editable fields.
+    /// The mutation methods repeat this guard so direct application callers cannot bypass it.
+    pub fn authorize_library(&self, caller: &Caller) -> AppResult<()> {
+        require_operator(caller)
+    }
+
+    /// Every library definition, for the operator workspace and its API. The same list every
+    /// company picks from ([`Self::list_library_agents`]) is not what this guards: managing the
+    /// library is the operator's, so reading it *as its manager* is too.
+    pub async fn library_agents_for(&self, caller: &Caller) -> AppResult<Vec<Agent>> {
+        self.authorize_library(caller)?;
+        self.list_library_agents().await
+    }
+
+    /// One library definition, for the operator workspace and its API.
+    pub async fn library_agent_for(
+        &self,
+        caller: &Caller,
+        agent_id: Uuid,
+    ) -> AppResult<Option<Agent>> {
+        self.authorize_library(caller)?;
+        self.get_library_agent(agent_id).await
+    }
+
+    /// Operator only: a global definition is offered to every company.
+    pub async fn create_library_agent(
+        &self,
+        caller: &Caller,
+        mut write: AgentWrite,
+    ) -> AppResult<Agent> {
+        self.authorize_library(caller)?;
         write.created_by = Some(CreationProvenance::system());
         write.normalize()?;
         self.agent_persistence.create_library(write).await
     }
 
+    /// Operator only.
     pub async fn update_library_agent(
         &self,
+        caller: &Caller,
         agent_id: Uuid,
         mut write: AgentWrite,
     ) -> AppResult<Agent> {
+        self.authorize_library(caller)?;
         self.get_library_agent(agent_id)
             .await?
             .ok_or_else(agent_not_found)?;
@@ -450,7 +443,9 @@ impl AgentUseCases {
         self.agent_persistence.update(agent_id, write).await
     }
 
-    pub async fn delete_library_agent(&self, agent_id: Uuid) -> AppResult<()> {
+    /// Operator only.
+    pub async fn delete_library_agent(&self, caller: &Caller, agent_id: Uuid) -> AppResult<()> {
+        self.authorize_library(caller)?;
         self.get_library_agent(agent_id)
             .await?
             .ok_or_else(agent_not_found)?;
@@ -571,35 +566,8 @@ impl AgentUseCases {
             .company_persistence
             .list_model_connections(company_id)
             .await?;
-        let default = connections
-            .iter()
-            .find(|connection| connection.is_default)
-            .ok_or_else(|| {
-                AppError::BadRequest("Configure a default company model provider first.".into())
-            })?;
-        let provider = ModelProvider::canonical(
-            non_empty(provider_override).unwrap_or(default.provider.as_str()),
-        );
-        let connection = connections
-            .iter()
-            .find(|connection| connection.provider == provider)
-            .ok_or_else(|| {
-                AppError::BadRequest(format!(
-                    "Provider '{provider}' is not enabled for this company."
-                ))
-            })?;
-        let model = ModelName::canonical(
-            non_empty(model_override)
-                .or_else(|| connection.models.first().map(|model| model.as_ref()))
-                .ok_or_else(|| {
-                    AppError::BadRequest("Configure at least one model first.".into())
-                })?,
-        );
-        if !connection.models.contains(&model) {
-            return Err(AppError::BadRequest(format!(
-                "Model '{model}' is not enabled for provider '{provider}' in this company."
-            )));
-        }
+        let (provider, model) =
+            model_preparation::prompt_model(&connections, provider_override, model_override)?;
         let api_key = self
             .company_persistence
             .model_api_key(company_id, &provider)
@@ -611,13 +579,17 @@ impl AgentUseCases {
 
     /// Generate a library prompt from explicit operator settings (falling back to environment
     /// credentials), since a global definition has no company settings to inherit from.
+    ///
+    /// Operator only: it spends the deployment's own provider credentials.
     pub async fn generate_library_system_prompt(
         &self,
+        caller: &Caller,
         instructions: &str,
         provider: Option<&str>,
         model: Option<&str>,
         api_key: Option<&str>,
     ) -> AppResult<String> {
+        self.authorize_library(caller)?;
         let llm = PromptGeneratorLlm::resolve_global(provider, model, api_key)?;
         generate_prompt_with(self.prompt_classifier()?.as_ref(), llm, instructions).await
     }
@@ -742,4 +714,23 @@ pub(crate) fn validate_workflow_names(
         )));
     }
     Ok(())
+}
+
+pub(crate) mod model_preparation;
+
+#[async_trait]
+impl super::onboarding::OnboardingPromptGenerator for AgentUseCases {
+    async fn generate(&self, request: super::onboarding::PromptRequest) -> AppResult<String> {
+        let llm = PromptGeneratorLlm::resolve_explicit(
+            &request.provider,
+            &request.model,
+            request.api_key.as_deref(),
+        )?;
+        generate_prompt_with(
+            self.prompt_classifier()?.as_ref(),
+            llm,
+            &request.instructions,
+        )
+        .await
+    }
 }

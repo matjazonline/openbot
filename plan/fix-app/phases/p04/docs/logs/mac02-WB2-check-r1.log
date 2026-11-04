@@ -1,0 +1,43 @@
+    Checking mail_agents v0.1.0 (/Users/mac02/dev/openbot-recovery/.worktrees/fix-app-p04)
+error[E0599]: no method named `map_err` found for enum `std::option::Option<T>` in the current scope
+   --> src/adapters/http/routes/onboarding.rs:215:10
+    |
+214 |       let submitted_ids = super::channel::parse_agent_ids_form(form.library_agent_ids.clone())
+    |  _________________________-
+215 | |         .map_err(AppError::BadRequest)?;
+    | |_________-^^^^^^^
+    |
+help: there is a method `map_or` with a similar name, but with different arguments
+   --> /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/option.rs:1224:4
+
+error: implementation of `sqlx::Executor` is not general enough
+  --> src/adapters/persistence/onboarding.rs:39:5
+   |
+39 |     async fn begin(&self, user_id: Uuid, company_id: Uuid) -> AppResult<Box<dyn OnboardingSession>> {
+   |     ^^^^^ implementation of `sqlx::Executor` is not general enough
+   |
+   = note: `sqlx::Executor<'_>` would have to be implemented for the type `&'0 mut sqlx::PgConnection`, for any lifetime `'0`...
+   = note: ...but `sqlx::Executor<'1>` is actually implemented for the type `&'1 mut sqlx::PgConnection`, for some specific lifetime `'1`
+
+error: implementation of `sqlx::Executor` is not general enough
+  --> src/adapters/persistence/onboarding.rs:39:5
+   |
+39 |     async fn begin(&self, user_id: Uuid, company_id: Uuid) -> AppResult<Box<dyn OnboardingSession>> {
+   |     ^^^^^ implementation of `sqlx::Executor` is not general enough
+   |
+   = note: `sqlx::Executor<'0>` would have to be implemented for the type `&mut sqlx::PgConnection`, for any lifetime `'0`...
+   = note: ...but `sqlx::Executor<'1>` is actually implemented for the type `&'1 mut sqlx::PgConnection`, for some specific lifetime `'1`
+
+error: implementation of `std::marker::Send` is not general enough
+  --> src/adapters/persistence/onboarding.rs:39:5
+   |
+39 |     async fn begin(&self, user_id: Uuid, company_id: Uuid) -> AppResult<Box<dyn OnboardingSession>> {
+   |     ^^^^^ implementation of `std::marker::Send` is not general enough
+   |
+   = note: `std::marker::Send` would have to be implemented for the type `&PostgresOnboarding`
+   = note: ...but `std::marker::Send` is actually implemented for the type `&'0 PostgresOnboarding`, for some specific lifetime `'0`
+
+For more information about this error, try `rustc --explain E0599`.
+error: could not compile `mail_agents` (lib) due to 4 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `mail_agents` (lib test) due to 4 previous errors

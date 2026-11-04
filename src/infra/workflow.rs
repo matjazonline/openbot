@@ -425,6 +425,17 @@ impl WorkflowEngine {
     }
 
     /// "Create assistant channel" (p08 D2.4), over the same provisioning as the Builder's tool.
+    pub fn onboarding_persistence(
+        &self,
+    ) -> Arc<dyn crate::use_cases::onboarding::OnboardingPersistence> {
+        Arc::new(
+            crate::adapters::persistence::onboarding::PostgresOnboarding::new(
+                self.persistence.clone(),
+                self.templates.clone(),
+            ),
+        )
+    }
+
     pub fn assistant_channels(&self) -> Arc<dyn AssistantChannels> {
         Arc::new(AssistantChannelService::new(
             self.persistence.clone(),

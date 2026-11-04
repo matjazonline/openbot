@@ -519,7 +519,7 @@ impl LibraryAgentCopyPersistence for PostgresPersistence {
 /// copies the agent is attached to, and its workflow tool grants come with it. A copy that grants
 /// tools and would inherit its model gets the company default connection's first model, because a
 /// workflow runs an agent only on an explicit model (p08 D2.6).
-async fn prepare_library_agent_on(
+pub(crate) async fn prepare_library_agent_on(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     company_id: Uuid,
     library_agent_id: Uuid,

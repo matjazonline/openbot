@@ -784,6 +784,47 @@ impl ThreadPersistence for InMemoryThreads {
         }))
     }
 
+    /// The Postgres rule restated over the store: the newest inbound, external, conversation turn
+    /// with an email author and email headers. Internal notes and agent turns never answer.
+    async fn latest_replyable_email_context(
+        &self,
+        thread_id: Uuid,
+    ) -> AppResult<Option<EmailReplyContext>> {
+        use crate::entities::message::{MessageAudience, ThreadEntryKind};
+
+        let store = self.store.lock().unwrap();
+        let mut associations: Vec<_> = store
+            .associations
+            .iter()
+            .filter(|association| {
+                association.thread_id == thread_id
+                    && association.entry_kind == ThreadEntryKind::Conversation
+            })
+            .collect();
+        associations.sort_by_key(|association| (association.created_at, association.id));
+        Ok(associations.into_iter().rev().find_map(|association| {
+            let message = self.read(&store, association)?;
+            if message.direction != MessageDirection::Inbound
+                || message.audience != MessageAudience::ExternalConversation
+            {
+                return None;
+            }
+            let author_email = message_sender_email(&message)?;
+            let metadata = store
+                .canonical
+                .iter()
+                .find(|canonical| canonical.id == association.message_id)
+                .and_then(|canonical| canonical.email.as_ref())?;
+            Some(EmailReplyContext {
+                canonical_id: message.canonical_id,
+                author_email: Some(author_email),
+                rfc_message_id: Some(metadata.rfc_message_id.clone()),
+                references: metadata.references.clone(),
+                cc: message_email_recipients(&message, MessageParticipantKind::Cc),
+            })
+        }))
+    }
+
     async fn latest_thread_rfc_message_id(&self, thread_id: Uuid) -> AppResult<Option<MessageId>> {
         let store = self.store.lock().unwrap();
         let mut associations: Vec<_> = store

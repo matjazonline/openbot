@@ -255,6 +255,13 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
             .map_err(|error| anyhow::anyhow!("Could not register the email transport: {error}"))?,
     );
 
+    let agent_use_cases = Arc::new(agent_use_cases);
+    let onboarding_use_cases = Arc::new(crate::use_cases::onboarding::OnboardingUseCases::new(
+        postgres_arc.clone(),
+        postgres_arc.clone(),
+        workflow.onboarding_persistence(),
+        agent_use_cases.clone(),
+    ));
     let schedule_use_cases = Arc::new(ScheduleUseCases::new(
         postgres_arc.clone(),
         workflow.authorization(),
@@ -270,7 +277,7 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
         db: postgres_arc.pool().clone(),
         mcp_use_cases,
         config,
-        monitoring,
+        monitoring: monitoring.clone(),
         user_use_cases: Arc::new(user_use_cases),
         company_use_cases: Arc::new(company_use_cases),
         company_invite_use_cases: Arc::new(company_invite_use_cases),
@@ -278,14 +285,21 @@ pub async fn init_app_state() -> anyhow::Result<AppState> {
         company_resend_api_accounts: postgres_arc.clone(),
         channel_use_cases,
         schedule_use_cases,
-        agent_use_cases: Arc::new(agent_use_cases),
+        agent_use_cases,
+        onboarding_use_cases,
         skill_use_cases,
         thread_use_cases,
         inbound_event_worker,
         inbound_event_inbox,
         inbound_event_wakeups,
         dashboard_snapshots,
-        attention: postgres_arc.clone(),
+        attention_use_cases: Arc::new(crate::application::attention::AttentionUseCases::new(
+            postgres_arc.clone(),
+            postgres_arc.clone(),
+            postgres_arc.clone(),
+            postgres_arc.clone(),
+            monitoring.clone(),
+        )),
         notifications: postgres_arc.clone(),
         notification_worker,
         database_query_health,

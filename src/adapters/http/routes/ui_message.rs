@@ -25,7 +25,8 @@ pub(super) async fn page(
         query.channel_id,
     )
     .await?;
-    let thread = load_channel_thread(&threads, channel.id, query.thread_id)
+    let thread = threads
+        .readable_thread(&viewer, channel.company_id, channel.id, query.thread_id)
         .await?
         .ok_or_else(|| AppError::NotFound("Thread not found".into()))?;
     let message = threads

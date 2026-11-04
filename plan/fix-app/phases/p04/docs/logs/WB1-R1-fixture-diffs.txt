@@ -1,0 +1,1096 @@
+diff --git a/src/adapters/smtp/server.rs b/src/adapters/smtp/server.rs
+index 5014f8d..f2ec641 100644
+--- a/src/adapters/smtp/server.rs
++++ b/src/adapters/smtp/server.rs
+@@ -1028,94 +1028,20 @@ mod tests {
+ 
+     use crate::{
+         app_error::AppResult,
+-        entities::{
+-            channel::Channel,
+-            company::{Company, CompanyAccess},
+-            company_member::CompanyMembership,
+-        },
++        entities::{channel::Channel, company::Company},
+         use_cases::{
+             channel::{ChannelPersistence, ChannelWrite},
+-            company::{CompanyPersistence, CompanyWrite},
+-            participant::test_support::{InMemoryParticipantDirectory, TeamFixture},
++            company_test_support::{MockCompanyPersistence, TeamByAddress},
++            participant::test_support::InMemoryParticipantDirectory,
+         },
+     };
+ 
+-    struct MockCompanyPersistence {
+-        companies: Mutex<Vec<Company>>,
+-    }
+-
+-    /// These tests are about SMTP, not team management: every sender is a colleague.
+-    #[async_trait]
+-    impl TeamFixture for MockCompanyPersistence {
+-        async fn membership_for_email(
+-            &self,
+-            _company_id: Uuid,
+-            _email: &str,
+-        ) -> AppResult<CompanyMembership> {
+-            Ok(CompanyMembership::Member)
+-        }
+-
+-        async fn company_access(
+-            &self,
+-            _user_id: Uuid,
+-            _company_id: Uuid,
+-        ) -> AppResult<Option<CompanyAccess>> {
+-            unimplemented!("this double is not exercised on the signed-in path")
+-        }
+-    }
+-
+-    #[async_trait]
+-    impl CompanyPersistence for MockCompanyPersistence {
+-        async fn create(&self, _user_id: Uuid, _write: CompanyWrite) -> AppResult<Company> {
+-            unimplemented!()
+-        }
+-        async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<Company>> {
+-            unimplemented!()
+-        }
+-        async fn get_by_slug(&self, slug: &str) -> AppResult<Option<Company>> {
+-            Ok(self
+-                .companies
+-                .lock()
+-                .unwrap()
+-                .iter()
+-                .find(|c| c.slug == slug)
+-                .cloned())
+-        }
+-        async fn list_by_user_id(&self, _user_id: Uuid) -> AppResult<Vec<Company>> {
+-            unimplemented!()
+-        }
+-        async fn update(&self, _id: Uuid, _write: CompanyWrite) -> AppResult<Company> {
+-            unimplemented!()
+-        }
+-        async fn delete(&self, _id: Uuid) -> AppResult<()> {
+-            unimplemented!()
+-        }
+-
+-        /// This double never reaches a provider call: the tests around it assert on ingestion and
+-        /// threading, and an agent run that gets this far fails at parameter resolution by design.
+-        async fn list_model_connections(
+-            &self,
+-            _company_id: Uuid,
+-        ) -> AppResult<Vec<crate::entities::company::CompanyModelConnection>> {
+-            Ok(Vec::new())
+-        }
+-
+-        async fn model_api_key(
+-            &self,
+-            _company_id: Uuid,
+-            _provider: &crate::entities::value_objects::ModelProvider,
+-        ) -> AppResult<Option<String>> {
+-            Ok(None)
+-        }
+-
+-        async fn replace_model_connections_for_user(
+-            &self,
+-            _user_id: Uuid,
+-            _company_id: Uuid,
+-            _connections: Vec<crate::use_cases::company::CompanyModelConnectionWrite>,
+-        ) -> AppResult<()> {
+-            unimplemented!("this double is not exercised on the model-connection write path")
+-        }
++    /// These tests are about SMTP, not team management: every sender is a colleague, and nothing
++    /// reaches a provider, so no model connection is configured beyond "none".
++    fn company_double(companies: Vec<Company>) -> MockCompanyPersistence {
++        MockCompanyPersistence::new(companies)
++            .with_team(TeamByAddress::EveryoneIsMember)
++            .with_model_connections(Vec::new(), None)
+     }
+ 
+     struct MockChannelPersistence {
+@@ -1196,17 +1122,15 @@ mod tests {
+     #[tokio::test]
+     async fn submitted_authentication_headers_cannot_authorize_smtp_mail() {
+         let company_id = Uuid::new_v4();
+-        let company_persistence = Arc::new(MockCompanyPersistence {
+-            companies: Mutex::new(vec![Company {
+-                channel_defaults: Default::default(),
+-                id: company_id,
+-                user_id: Uuid::new_v4(),
+-                name: "Acme Corp".to_string(),
+-                slug: "acme".into(),
+-                avatar_url: None,
+-                created_at: Utc::now(),
+-            }]),
+-        });
++        let company_persistence = Arc::new(company_double(vec![Company {
++            channel_defaults: Default::default(),
++            id: company_id,
++            user_id: Uuid::new_v4(),
++            name: "Acme Corp".to_string(),
++            slug: "acme".into(),
++            avatar_url: None,
++            created_at: Utc::now(),
++        }]));
+ 
+         let channel_persistence = Arc::new(MockChannelPersistence {
+             channels: Mutex::new(vec![Channel {
+@@ -1416,17 +1340,15 @@ regis";
+     #[tokio::test]
+     async fn stale_dkim_and_submitted_auth_headers_do_not_authorize_smtp_mail() {
+         let company_id = Uuid::new_v4();
+-        let company_persistence = Arc::new(MockCompanyPersistence {
+-            companies: Mutex::new(vec![Company {
+-                channel_defaults: Default::default(),
+-                id: company_id,
+-                user_id: Uuid::new_v4(),
+-                name: "Populus Network".to_string(),
+-                slug: "populus".into(),
+-                avatar_url: None,
+-                created_at: Utc::now(),
+-            }]),
+-        });
++        let company_persistence = Arc::new(company_double(vec![Company {
++            channel_defaults: Default::default(),
++            id: company_id,
++            user_id: Uuid::new_v4(),
++            name: "Populus Network".to_string(),
++            slug: "populus".into(),
++            avatar_url: None,
++            created_at: Utc::now(),
++        }]));
+ 
+         let channel_persistence = Arc::new(MockChannelPersistence {
+             channels: Mutex::new(vec![Channel {
+@@ -1564,9 +1486,7 @@ Message-ID: <CAGj=2VKEn_MHfovWkBCqn4sp3AXPR=ZTLMso=mPjWtnMDStiRw@mail.gmail.com>
+     async fn test_smtp_rate_limiting_and_monitoring() {
+         use crate::adapters::monitoring::InMemoryMonitor;
+ 
+-        let company_persistence = Arc::new(MockCompanyPersistence {
+-            companies: Mutex::new(Vec::new()),
+-        });
++        let company_persistence = Arc::new(company_double(Vec::new()));
+         let channel_persistence = Arc::new(MockChannelPersistence {
+             channels: Mutex::new(Vec::new()),
+         });
+diff --git a/src/application/use_cases/agent_tests.rs b/src/application/use_cases/agent_tests.rs
+index cf36f36..e64709e 100644
+--- a/src/application/use_cases/agent_tests.rs
++++ b/src/application/use_cases/agent_tests.rs
+@@ -1,118 +1,30 @@
+ use super::*;
+ use crate::entities::{
+-    company::{Company, CompanyAccess},
+-    company_member::CompanyMembership,
+-    value_objects::EmailAddress,
++    company::Company, company_member::CompanyMembership, value_objects::EmailAddress,
+ };
+-use crate::use_cases::company::CompanyWrite;
++use crate::use_cases::company_test_support::MockCompanyPersistence;
+ use chrono::Utc;
+ 
+ use std::sync::Mutex;
+ 
+-struct MockCompanyPersistence {
+-    companies: Mutex<Vec<Company>>,
+-    /// Accepted memberships, as `(user_id, company_id, access)`.
+-    members: Mutex<Vec<(Uuid, Uuid, CompanyMembership)>>,
+-}
+-
+-#[async_trait]
+-impl CompanyPersistence for MockCompanyPersistence {
+-    async fn create(&self, _user_id: Uuid, _write: CompanyWrite) -> AppResult<Company> {
+-        unimplemented!()
+-    }
+-
+-    async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Company>> {
+-        Ok(self
+-            .companies
+-            .lock()
+-            .unwrap()
+-            .iter()
+-            .find(|c| c.id == id)
+-            .cloned())
+-    }
+-
+-    async fn get_by_slug(&self, slug: &str) -> AppResult<Option<Company>> {
+-        Ok(self
+-            .companies
+-            .lock()
+-            .unwrap()
+-            .iter()
+-            .find(|c| c.slug.eq_ignore_ascii_case(slug))
+-            .cloned())
+-    }
+-
+-    async fn list_by_user_id(&self, user_id: Uuid) -> AppResult<Vec<Company>> {
+-        Ok(self
+-            .companies
+-            .lock()
+-            .unwrap()
+-            .iter()
+-            .filter(|c| c.user_id == user_id)
+-            .cloned()
+-            .collect())
+-    }
+-
+-    async fn list_accessible_by_user_id(&self, user_id: Uuid) -> AppResult<Vec<CompanyAccess>> {
+-        let companies = self.companies.lock().unwrap();
+-        let members = self.members.lock().unwrap();
+-        Ok(companies
+-            .iter()
+-            .filter_map(|company| {
+-                let membership = if company.user_id == user_id {
+-                    CompanyMembership::Owner
+-                } else if let Some((_, _, membership)) =
+-                    members.iter().find(|(member_id, company_id, _)| {
+-                        *member_id == user_id && *company_id == company.id
+-                    })
+-                {
+-                    *membership
+-                } else {
+-                    return None;
+-                };
+-                Some(CompanyAccess {
+-                    company: company.clone(),
+-                    membership,
+-                })
+-            })
+-            .collect())
+-    }
+-
+-    async fn update(&self, _id: Uuid, _write: CompanyWrite) -> AppResult<Company> {
+-        unimplemented!()
+-    }
+-
+-    async fn delete(&self, _id: Uuid) -> AppResult<()> {
+-        unimplemented!()
+-    }
+-
+-    async fn list_model_connections(
+-        &self,
+-        _company_id: Uuid,
+-    ) -> AppResult<Vec<crate::entities::company::CompanyModelConnection>> {
+-        Ok(vec![crate::entities::company::CompanyModelConnection {
+-            provider: "openai".into(),
+-            models: vec!["gpt-4o".into()],
+-            is_default: true,
+-            has_api_key: true,
+-        }])
+-    }
+-
+-    async fn model_api_key(
+-        &self,
+-        _company_id: Uuid,
+-        _provider: &crate::entities::value_objects::ModelProvider,
+-    ) -> AppResult<Option<String>> {
+-        Ok(Some("test-key".into()))
+-    }
+-
+-    async fn replace_model_connections_for_user(
+-        &self,
+-        _user_id: Uuid,
+-        _company_id: Uuid,
+-        _connections: Vec<crate::use_cases::company::CompanyModelConnectionWrite>,
+-    ) -> AppResult<()> {
+-        unimplemented!("agent use cases read connections, they do not write them")
+-    }
++/// The company double every agent test uses: the given companies (each with its owner's row),
++/// these memberships, and one OpenAI connection with a key -- agent creation validates models
++/// against it.
++fn company_double(
++    companies: Vec<Company>,
++    members: Vec<(Uuid, Uuid, CompanyMembership)>,
++) -> MockCompanyPersistence {
++    MockCompanyPersistence::new(companies)
++        .with_memberships(members)
++        .with_model_connections(
++            vec![crate::entities::company::CompanyModelConnection {
++                provider: "openai".into(),
++                models: vec!["gpt-4o".into()],
++                is_default: true,
++                has_api_key: true,
++            }],
++            Some("test-key"),
++        )
+ }
+ 
+ struct MockAgentPersistence {
+@@ -231,9 +143,8 @@ struct Fixture {
+ fn fixture() -> Fixture {
+     let owner_id = Uuid::new_v4();
+     let company_id = Uuid::new_v4();
+-    let company_persistence = Arc::new(MockCompanyPersistence {
+-        members: Mutex::new(Vec::new()),
+-        companies: Mutex::new(vec![Company {
++    let company_persistence = Arc::new(company_double(
++        vec![Company {
+             channel_defaults: Default::default(),
+             id: company_id,
+             user_id: owner_id,
+@@ -241,8 +152,9 @@ fn fixture() -> Fixture {
+             slug: "acme".into(),
+             avatar_url: None,
+             created_at: Utc::now(),
+-        }]),
+-    });
++        }],
++        Vec::new(),
++    ));
+     let agent_persistence = Arc::new(MockAgentPersistence {
+         agents: Mutex::new(Vec::new()),
+     });
+@@ -326,9 +238,8 @@ async fn company_owner_agent_crud_flow_works() {
+     let owner_id = Uuid::new_v4();
+     let company_id = Uuid::new_v4();
+ 
+-    let company_persistence = Arc::new(MockCompanyPersistence {
+-        members: Mutex::new(Vec::new()),
+-        companies: Mutex::new(vec![Company {
++    let company_persistence = Arc::new(company_double(
++        vec![Company {
+             channel_defaults: Default::default(),
+             id: company_id,
+             user_id: owner_id,
+@@ -336,8 +247,9 @@ async fn company_owner_agent_crud_flow_works() {
+             slug: "acme".into(),
+             avatar_url: None,
+             created_at: Utc::now(),
+-        }]),
+-    });
++        }],
++        Vec::new(),
++    ));
+ 
+     let agent_persistence = Arc::new(MockAgentPersistence {
+         agents: Mutex::new(Vec::new()),
+@@ -507,16 +419,16 @@ async fn members_read_agents_and_admins_manage_them() {
+         created_at: Utc::now(),
+     };
+ 
+-    let company_persistence = Arc::new(MockCompanyPersistence {
+-        companies: Mutex::new(vec![
++    let company_persistence = Arc::new(company_double(
++        vec![
+             company(company_id, owner_id, "acme"),
+             company(other_company_id, Uuid::new_v4(), "other"),
+-        ]),
+-        members: Mutex::new(vec![
++        ],
++        vec![
+             (admin_id, company_id, CompanyMembership::Admin),
+             (member_id, company_id, CompanyMembership::Member),
+-        ]),
+-    });
++        ],
++    ));
+     let agent_persistence = Arc::new(MockAgentPersistence {
+         agents: Mutex::new(Vec::new()),
+     });
+@@ -646,9 +558,8 @@ async fn members_read_agents_and_admins_manage_them() {
+ async fn a_library_pick_is_copied_into_the_company_with_a_model_it_can_run() {
+     let owner_id = Uuid::new_v4();
+     let company_id = Uuid::new_v4();
+-    let company_persistence = Arc::new(MockCompanyPersistence {
+-        members: Mutex::new(Vec::new()),
+-        companies: Mutex::new(vec![Company {
++    let company_persistence = Arc::new(company_double(
++        vec![Company {
+             channel_defaults: Default::default(),
+             id: company_id,
+             user_id: owner_id,
+@@ -656,8 +567,9 @@ async fn a_library_pick_is_copied_into_the_company_with_a_model_it_can_run() {
+             slug: "acme".into(),
+             avatar_url: None,
+             created_at: Utc::now(),
+-        }]),
+-    });
++        }],
++        Vec::new(),
++    ));
+ 
+     // A library definition is one with no company of its own.
+     let definition = |name: &str, slug: &str, provider: &str, model: &str| Agent {
+@@ -779,3 +691,51 @@ async fn a_library_pick_is_copied_into_the_company_with_a_model_it_can_run() {
+             .is_err()
+     );
+ }
++
++#[tokio::test]
++async fn nonoperators_cannot_manage_library_agents_or_spend_prompt_credentials() {
++    let f = fixture();
++    let caller = Caller::user(f.owner_id);
++    assert!(matches!(
++        f.use_cases
++            .create_library_agent(&caller, support_agent())
++            .await,
++        Err(AppError::NotFound(_))
++    ));
++    assert!(f.use_cases.list_library_agents().await.unwrap().is_empty());
++    let definition = f
++        .use_cases
++        .create_library_agent(&Caller::operator(f.owner_id), support_agent())
++        .await
++        .unwrap();
++    assert!(matches!(
++        f.use_cases.library_agents_for(&caller).await,
++        Err(AppError::NotFound(_))
++    ));
++    assert!(matches!(
++        f.use_cases.library_agent_for(&caller, definition.id).await,
++        Err(AppError::NotFound(_))
++    ));
++    assert!(matches!(
++        f.use_cases
++            .update_library_agent(&caller, definition.id, support_agent())
++            .await,
++        Err(AppError::NotFound(_))
++    ));
++    assert!(matches!(
++        f.use_cases
++            .delete_library_agent(&caller, definition.id)
++            .await,
++        Err(AppError::NotFound(_))
++    ));
++    assert!(matches!(
++        f.use_cases
++            .generate_library_system_prompt(&caller, "do work", None, None, None)
++            .await,
++        Err(AppError::NotFound(_))
++    ));
++    assert_eq!(
++        f.use_cases.get_library_agent(definition.id).await.unwrap(),
++        Some(definition)
++    );
++}
+diff --git a/src/application/use_cases/company_invite_tests.rs b/src/application/use_cases/company_invite_tests.rs
+index bc6caef..3517bc2 100644
+--- a/src/application/use_cases/company_invite_tests.rs
++++ b/src/application/use_cases/company_invite_tests.rs
+@@ -6,79 +6,11 @@
+ 
+ use super::*;
+ use crate::entities::company::Company;
+-use crate::use_cases::company::CompanyWrite;
++use crate::entities::company_member::CompanyMembership;
++use crate::use_cases::company_test_support::MockCompanyPersistence;
+ use chrono::Utc;
+ use std::sync::Mutex;
+ 
+-struct MockCompanyPersistence {
+-    companies: Mutex<Vec<Company>>,
+-}
+-
+-#[async_trait]
+-impl CompanyPersistence for MockCompanyPersistence {
+-    async fn create(&self, _user_id: Uuid, _write: CompanyWrite) -> AppResult<Company> {
+-        unimplemented!()
+-    }
+-
+-    async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Company>> {
+-        Ok(self
+-            .companies
+-            .lock()
+-            .unwrap()
+-            .iter()
+-            .find(|c| c.id == id)
+-            .cloned())
+-    }
+-
+-    async fn get_by_slug(&self, slug: &str) -> AppResult<Option<Company>> {
+-        Ok(self
+-            .companies
+-            .lock()
+-            .unwrap()
+-            .iter()
+-            .find(|c| c.slug.eq_ignore_ascii_case(slug))
+-            .cloned())
+-    }
+-
+-    async fn list_by_user_id(&self, _user_id: Uuid) -> AppResult<Vec<Company>> {
+-        unimplemented!()
+-    }
+-
+-    async fn update(&self, _id: Uuid, _write: CompanyWrite) -> AppResult<Company> {
+-        unimplemented!()
+-    }
+-
+-    async fn delete(&self, _id: Uuid) -> AppResult<()> {
+-        unimplemented!()
+-    }
+-
+-    /// Model connections are not part of what these tests drive; a call here is a wiring mistake
+-    /// rather than a state worth simulating.
+-    async fn list_model_connections(
+-        &self,
+-        _company_id: Uuid,
+-    ) -> AppResult<Vec<crate::entities::company::CompanyModelConnection>> {
+-        unimplemented!("this double is not exercised on the model-connection path")
+-    }
+-
+-    async fn model_api_key(
+-        &self,
+-        _company_id: Uuid,
+-        _provider: &crate::entities::value_objects::ModelProvider,
+-    ) -> AppResult<Option<String>> {
+-        unimplemented!("this double is not exercised on the model-connection path")
+-    }
+-
+-    async fn replace_model_connections_for_user(
+-        &self,
+-        _user_id: Uuid,
+-        _company_id: Uuid,
+-        _connections: Vec<crate::use_cases::company::CompanyModelConnectionWrite>,
+-    ) -> AppResult<()> {
+-        unimplemented!("this double is not exercised on the model-connection path")
+-    }
+-}
+-
+ struct MockCompanyInvitePersistence {
+     invites: Mutex<Vec<CompanyInvite>>,
+     members: Mutex<Vec<CompanyMember>>,
+@@ -284,17 +216,15 @@ impl CompanyInvitePersistence for MockCompanyInvitePersistence {
+ }
+ 
+ fn acme(owner_id: Uuid, company_id: Uuid) -> Arc<MockCompanyPersistence> {
+-    Arc::new(MockCompanyPersistence {
+-        companies: Mutex::new(vec![Company {
+-            channel_defaults: Default::default(),
+-            id: company_id,
+-            user_id: owner_id,
+-            name: "Acme Corp".to_string(),
+-            slug: "acme".into(),
+-            avatar_url: None,
+-            created_at: Utc::now(),
+-        }]),
+-    })
++    Arc::new(MockCompanyPersistence::new(vec![Company {
++        channel_defaults: Default::default(),
++        id: company_id,
++        user_id: owner_id,
++        name: "Acme Corp".to_string(),
++        slug: "acme".into(),
++        avatar_url: None,
++        created_at: Utc::now(),
++    }]))
+ }
+ 
+ fn member_row(company_id: Uuid, user_id: Uuid) -> CompanyMember {
+@@ -338,11 +268,12 @@ async fn the_owner_removes_a_member() {
+ async fn members_may_list_the_team_and_everyone_else_is_told_nothing() {
+     let owner_id = Uuid::new_v4();
+     let member_id = Uuid::new_v4();
++    let admin_id = Uuid::new_v4();
+     let stranger_id = Uuid::new_v4();
+     let company_id = Uuid::new_v4();
+ 
+-    let company_persistence = Arc::new(MockCompanyPersistence {
+-        companies: Mutex::new(vec![Company {
++    let company_persistence = Arc::new(
++        MockCompanyPersistence::new(vec![Company {
+             channel_defaults: Default::default(),
+             id: company_id,
+             user_id: owner_id,
+@@ -350,8 +281,12 @@ async fn members_may_list_the_team_and_everyone_else_is_told_nothing() {
+             slug: "acme".into(),
+             avatar_url: None,
+             created_at: Utc::now(),
+-        }]),
+-    });
++        }])
++        .with_memberships(vec![
++            (member_id, company_id, CompanyMembership::Member),
++            (admin_id, company_id, CompanyMembership::Admin),
++        ]),
++    );
+     let invite_persistence = Arc::new(MockCompanyInvitePersistence::with_members(vec![
+         member_row(company_id, member_id),
+     ]));
+@@ -376,6 +311,16 @@ async fn members_may_list_the_team_and_everyone_else_is_told_nothing() {
+         "a member is not the owner but may still read the team"
+     );
+ 
++    assert_eq!(
++        use_cases
++            .list_company_team_members(admin_id, company_id)
++            .await
++            .unwrap()
++            .len(),
++        1,
++        "an admin may read the team too"
++    );
++
+     let stranger_err = use_cases
+         .list_company_team_members(stranger_id, company_id)
+         .await
+@@ -401,21 +346,19 @@ async fn company_invites_crud_and_accept_flow() {
+     let owner_id = Uuid::new_v4();
+     let company_id = Uuid::new_v4();
+ 
+-    let company_persistence = Arc::new(MockCompanyPersistence {
+-        companies: Mutex::new(vec![Company {
+-            channel_defaults: Default::default(),
+-            id: company_id,
+-            user_id: owner_id,
+-            name: "Acme Corp".to_string(),
+-            slug: "acme".into(),
+-            avatar_url: None,
+-            created_at: Utc::now(),
+-        }]),
+-    });
++    let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
++        channel_defaults: Default::default(),
++        id: company_id,
++        user_id: owner_id,
++        name: "Acme Corp".to_string(),
++        slug: "acme".into(),
++        avatar_url: None,
++        created_at: Utc::now(),
++    }]));
+ 
+     let invite_persistence = Arc::new(MockCompanyInvitePersistence::with_members(Vec::new()));
+ 
+-    let use_cases = CompanyInviteUseCases::new(company_persistence, invite_persistence);
++    let use_cases = CompanyInviteUseCases::new(company_persistence.clone(), invite_persistence);
+ 
+     // Owner creates invite
+     let invite = use_cases
+@@ -536,6 +479,14 @@ async fn company_invites_crud_and_accept_flow() {
+         .unwrap();
+     assert_eq!(changed_member.role, CompanyAccessRole::Member);
+ 
++    // The two doubles stand for one `company_members` table: acceptance wrote the row the
++    // company double answers `company_access` from.
++    company_persistence.memberships.lock().unwrap().push((
++        user.id,
++        company_id,
++        CompanyMembership::Member,
++    ));
++
+     // Verify member (non-owner) can also list company team members
+     let member_list = use_cases
+         .list_company_team_members(user.id, company_id)
+diff --git a/src/application/use_cases/thread/test_support.rs b/src/application/use_cases/thread/test_support.rs
+index 80bdcc9..ab8e104 100644
+--- a/src/application/use_cases/thread/test_support.rs
++++ b/src/application/use_cases/thread/test_support.rs
+@@ -784,6 +784,47 @@ impl ThreadPersistence for InMemoryThreads {
+         }))
+     }
+ 
++    /// The Postgres rule restated over the store: the newest inbound, external, conversation turn
++    /// with an email author and email headers. Internal notes and agent turns never answer.
++    async fn latest_replyable_email_context(
++        &self,
++        thread_id: Uuid,
++    ) -> AppResult<Option<EmailReplyContext>> {
++        use crate::entities::message::{MessageAudience, ThreadEntryKind};
++
++        let store = self.store.lock().unwrap();
++        let mut associations: Vec<_> = store
++            .associations
++            .iter()
++            .filter(|association| {
++                association.thread_id == thread_id
++                    && association.entry_kind == ThreadEntryKind::Conversation
++            })
++            .collect();
++        associations.sort_by_key(|association| (association.created_at, association.id));
++        Ok(associations.into_iter().rev().find_map(|association| {
++            let message = self.read(&store, association)?;
++            if message.direction != MessageDirection::Inbound
++                || message.audience != MessageAudience::ExternalConversation
++            {
++                return None;
++            }
++            let author_email = message_sender_email(&message)?;
++            let metadata = store
++                .canonical
++                .iter()
++                .find(|canonical| canonical.id == association.message_id)
++                .and_then(|canonical| canonical.email.as_ref())?;
++            Some(EmailReplyContext {
++                canonical_id: message.canonical_id,
++                author_email: Some(author_email),
++                rfc_message_id: Some(metadata.rfc_message_id.clone()),
++                references: metadata.references.clone(),
++                cc: message_email_recipients(&message, MessageParticipantKind::Cc),
++            })
++        }))
++    }
++
+     async fn latest_thread_rfc_message_id(&self, thread_id: Uuid) -> AppResult<Option<MessageId>> {
+         let store = self.store.lock().unwrap();
+         let mut associations: Vec<_> = store
+diff --git a/src/application/use_cases/thread/tests.rs b/src/application/use_cases/thread/tests.rs
+index 0a0e3ff..d84b7d8 100644
+--- a/src/application/use_cases/thread/tests.rs
++++ b/src/application/use_cases/thread/tests.rs
+@@ -3,17 +3,15 @@ use crate::adapters::monitoring::in_memory_monitor::InMemoryMonitor;
+ use crate::adapters::protocols::email::parser::RawInboundPayload;
+ use crate::domain::monitoring::MonitoringService;
+ use crate::entities::channel::{Channel, ChannelAccessMode};
+-use crate::entities::company::CompanyAccess;
+-use crate::entities::company_member::CompanyMembership;
+ use crate::entities::correlation::CorrelationId;
+ use crate::entities::message::MessageDirection;
+ use crate::infra::config::ResendApiConfig;
+ use crate::transport::InboundOrigin;
+ use crate::transport::{MAX_ATTACHMENTS, MAX_BODY_BYTES, MAX_INGRESS_HOPS};
+ use crate::use_cases::channel::{ChannelPersistence, ChannelWrite};
+-use crate::use_cases::company::CompanyWrite;
++use crate::use_cases::company_test_support::{MockCompanyPersistence, TeamByAddress};
+ use crate::use_cases::participant::test_support::{
+-    InMemoryParticipantDirectory, TeamFixture, email_allowlist_grants, email_allowlist_policy,
++    InMemoryParticipantDirectory, email_allowlist_grants, email_allowlist_policy,
+ };
+ use crate::use_cases::thread::test_support::InMemoryThreads;
+ use chrono::Utc;
+@@ -50,126 +48,27 @@ fn internal_test_config() -> Arc<AppConfig> {
+     })
+ }
+ 
+-struct MockCompanyPersistence {
+-    companies: Mutex<Vec<Company>>,
+-    team_members: Mutex<Vec<(Uuid, String)>>,
+-}
+-
+-impl MockCompanyPersistence {
+-    fn new(companies: Vec<Company>) -> Self {
+-        Self {
+-            companies: Mutex::new(companies),
+-            team_members: Mutex::new(Vec::new()),
+-        }
+-    }
+-
+-    fn with_team_members(companies: Vec<Company>, members: Vec<(Uuid, String)>) -> Self {
+-        Self {
+-            companies: Mutex::new(companies),
+-            team_members: Mutex::new(members),
+-        }
+-    }
+-}
+-
+-/// A flat team: this double knows who belongs to a company, not who owns it, so it never answers
+-/// `Owner`. The owner exemption is the entity's rule and is tested there.
++/// The company double these tests share: a flat team that knows who belongs to a company, not
++/// who owns it, so it never answers `Owner` by address -- the owner exemption is the entity's rule
++/// and is tested there. These tests never reach a provider, so no model connection is configured
++/// beyond "none".
+ ///
+ /// With no explicit team, membership falls back to the names these tests use for outsiders, so a
+ /// scenario that only cares about one hostile sender does not have to enumerate everyone else.
+-#[async_trait]
+-impl TeamFixture for MockCompanyPersistence {
+-    async fn membership_for_email(
+-        &self,
+-        company_id: Uuid,
+-        email: &str,
+-    ) -> AppResult<CompanyMembership> {
+-        let members = self.team_members.lock().unwrap();
+-        let clean = email.trim().to_lowercase();
+-        let on_the_team = if members.is_empty() {
+-            !(clean.contains("spammer")
+-                || clean.contains("unauthorized")
+-                || clean.contains("evil")
+-                || clean.contains("notallowed"))
+-        } else {
+-            members
+-                .iter()
+-                .any(|(cid, e)| *cid == company_id && e.eq_ignore_ascii_case(&clean))
+-        };
+-
+-        Ok(if on_the_team {
+-            CompanyMembership::Member
+-        } else {
+-            CompanyMembership::None
+-        })
+-    }
+-
+-    async fn company_access(
+-        &self,
+-        _user_id: Uuid,
+-        _company_id: Uuid,
+-    ) -> AppResult<Option<CompanyAccess>> {
+-        unimplemented!("ingest knows a sender by address, never by account")
+-    }
++fn company_double(companies: Vec<Company>) -> MockCompanyPersistence {
++    MockCompanyPersistence::new(companies)
++        .with_team(TeamByAddress::OutsidersByName)
++        .with_model_connections(Vec::new(), None)
+ }
+ 
+-#[async_trait]
+-impl CompanyPersistence for MockCompanyPersistence {
+-    async fn create(&self, _user_id: Uuid, _write: CompanyWrite) -> AppResult<Company> {
+-        unimplemented!()
+-    }
+-    async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Company>> {
+-        Ok(self
+-            .companies
+-            .lock()
+-            .unwrap()
+-            .iter()
+-            .find(|company| company.id == id)
+-            .cloned())
+-    }
+-    async fn get_by_slug(&self, slug: &str) -> AppResult<Option<Company>> {
+-        Ok(self
+-            .companies
+-            .lock()
+-            .unwrap()
+-            .iter()
+-            .find(|c| c.slug == slug)
+-            .cloned())
+-    }
+-    async fn list_by_user_id(&self, _user_id: Uuid) -> AppResult<Vec<Company>> {
+-        unimplemented!()
+-    }
+-    async fn update(&self, _id: Uuid, _write: CompanyWrite) -> AppResult<Company> {
+-        unimplemented!()
+-    }
+-    async fn delete(&self, _id: Uuid) -> AppResult<()> {
+-        unimplemented!()
+-    }
+-
+-    /// This double never reaches a provider call: the tests around it assert on ingestion and
+-    /// threading, and an agent run that gets this far fails at parameter resolution by design.
+-    async fn list_model_connections(
+-        &self,
+-        _company_id: Uuid,
+-    ) -> AppResult<Vec<crate::entities::company::CompanyModelConnection>> {
+-        Ok(Vec::new())
+-    }
+-
+-    async fn model_api_key(
+-        &self,
+-        _company_id: Uuid,
+-        _provider: &crate::entities::value_objects::ModelProvider,
+-    ) -> AppResult<Option<String>> {
+-        Ok(None)
+-    }
+-
+-    async fn replace_model_connections_for_user(
+-        &self,
+-        _user_id: Uuid,
+-        _company_id: Uuid,
+-        _connections: Vec<crate::use_cases::company::CompanyModelConnectionWrite>,
+-    ) -> AppResult<()> {
+-        unimplemented!("this double is not exercised on the model-connection write path")
+-    }
++/// [`company_double`] with an explicit team: these `(company, address)` pairs and nobody else.
++fn company_double_with_team(
++    companies: Vec<Company>,
++    members: Vec<(Uuid, String)>,
++) -> MockCompanyPersistence {
++    MockCompanyPersistence::new(companies)
++        .with_team(TeamByAddress::Listed(members))
++        .with_model_connections(Vec::new(), None)
+ }
+ 
+ struct MockChannelPersistence {
+@@ -308,7 +207,7 @@ async fn test_inter_channel_hop_limit_rejection() {
+     let channel_id = Uuid::new_v4();
+     let source_channel_id = Uuid::new_v4();
+ 
+-    let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
++    let company_persistence = Arc::new(company_double(vec![Company {
+         channel_defaults: Default::default(),
+         id: company_id,
+         user_id: Uuid::new_v4(),
+@@ -423,7 +322,7 @@ async fn test_spf_authentication_failure_rejection() {
+     let company_id = Uuid::new_v4();
+     let channel_id = Uuid::new_v4();
+ 
+-    let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
++    let company_persistence = Arc::new(company_double(vec![Company {
+         channel_defaults: Default::default(),
+         id: company_id,
+         user_id: Uuid::new_v4(),
+@@ -515,7 +414,7 @@ async fn test_high_spam_score_rejection() {
+     let company_id = Uuid::new_v4();
+     let channel_id = Uuid::new_v4();
+ 
+-    let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
++    let company_persistence = Arc::new(company_double(vec![Company {
+         channel_defaults: Default::default(),
+         id: company_id,
+         user_id: Uuid::new_v4(),
+@@ -605,7 +504,7 @@ async fn test_dmarc_authentication_failure_rejection() {
+     let company_id = Uuid::new_v4();
+     let channel_id = Uuid::new_v4();
+ 
+-    let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
++    let company_persistence = Arc::new(company_double(vec![Company {
+         channel_defaults: Default::default(),
+         id: company_id,
+         user_id: Uuid::new_v4(),
+@@ -695,7 +594,7 @@ async fn test_unauthorized_sender_blocked_before_spam_checks() {
+     let company_id = Uuid::new_v4();
+     let channel_id = Uuid::new_v4();
+ 
+-    let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
++    let company_persistence = Arc::new(company_double(vec![Company {
+         channel_defaults: Default::default(),
+         id: company_id,
+         user_id: Uuid::new_v4(),
+@@ -786,7 +685,7 @@ async fn test_participant_sender_bypasses_spam_checks() {
+     let company_id = Uuid::new_v4();
+     let channel_id = Uuid::new_v4();
+ 
+-    let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
++    let company_persistence = Arc::new(company_double(vec![Company {
+         channel_defaults: Default::default(),
+         id: company_id,
+         user_id: Uuid::new_v4(),
+@@ -878,7 +777,7 @@ async fn test_channel_in_cc_resolves_properly() {
+     let company_id = Uuid::new_v4();
+     let channel_id = Uuid::new_v4();
+ 
+-    let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
++    let company_persistence = Arc::new(company_double(vec![Company {
+         channel_defaults: Default::default(),
+         id: company_id,
+         user_id: Uuid::new_v4(),
+@@ -974,7 +873,7 @@ async fn test_multi_channel_to_and_cc_execution() {
+     let wf1_id = Uuid::new_v4();
+     let wf2_id = Uuid::new_v4();
+ 
+-    let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
++    let company_persistence = Arc::new(company_double(vec![Company {
+         channel_defaults: Default::default(),
+         id: company_id,
+         user_id: Uuid::new_v4(),
+@@ -1115,7 +1014,7 @@ async fn test_pipeline_address_chaining_execution() {
+     let wf2_id = Uuid::new_v4();
+     let wf3_id = Uuid::new_v4();
+ 
+-    let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
++    let company_persistence = Arc::new(company_double(vec![Company {
+         channel_defaults: Default::default(),
+         id: company_id,
+         user_id: Uuid::new_v4(),
+@@ -1249,7 +1148,7 @@ async fn test_pipeline_address_chaining_execution() {
+ async fn test_misspelled_channel_bounce_and_strict_pipeline_validation() {
+     let company_id = Uuid::new_v4();
+ 
+-    let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
++    let company_persistence = Arc::new(company_double(vec![Company {
+         channel_defaults: Default::default(),
+         id: company_id,
+         user_id: Uuid::new_v4(),
+@@ -1407,7 +1306,7 @@ async fn test_quote_stripping_rules_for_first_in_thread_and_forwarded_emails() {
+     let company_id = Uuid::new_v4();
+     let channel_id = Uuid::new_v4();
+ 
+-    let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
++    let company_persistence = Arc::new(company_double(vec![Company {
+         channel_defaults: Default::default(),
+         id: company_id,
+         user_id: Uuid::new_v4(),
+@@ -1544,7 +1443,7 @@ async fn test_quote_stripping_rules_for_first_in_thread_and_forwarded_emails() {
+ #[tokio::test]
+ async fn test_participant_modes_company_team_public_and_explicit() {
+     let company_id = Uuid::new_v4();
+-    let company_persistence = Arc::new(MockCompanyPersistence::with_team_members(
++    let company_persistence = Arc::new(company_double_with_team(
+         vec![Company {
+             channel_defaults: Default::default(),
+             id: company_id,
+@@ -1725,7 +1624,7 @@ async fn test_sender_verification_refuses_strangers_replying_into_a_thread() {
+     let company_id = Uuid::new_v4();
+     let channel_id = Uuid::new_v4();
+ 
+-    let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
++    let company_persistence = Arc::new(company_double(vec![Company {
+         channel_defaults: Default::default(),
+         id: company_id,
+         user_id: Uuid::new_v4(),
+@@ -1855,7 +1754,7 @@ async fn uncorrelated_inter_channel_cycle_is_rejected() {
+     let company_id = Uuid::new_v4();
+     let channel_a_id = Uuid::new_v4();
+     let channel_b_id = Uuid::new_v4();
+-    let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
++    let company_persistence = Arc::new(company_double(vec![Company {
+         channel_defaults: Default::default(),
+         id: company_id,
+         user_id: Uuid::new_v4(),
+@@ -1941,7 +1840,7 @@ async fn a_hop_to_a_plain_channel_is_relayed() {
+     let company_id = Uuid::new_v4();
+     let channel_a_id = Uuid::new_v4();
+     let channel_b_id = Uuid::new_v4();
+-    let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
++    let company_persistence = Arc::new(company_double(vec![Company {
+         channel_defaults: Default::default(),
+         id: company_id,
+         user_id: Uuid::new_v4(),
+@@ -2018,7 +1917,7 @@ async fn inter_channel_max_hops_exceeded_is_rejected() {
+     let company_id = Uuid::new_v4();
+     let channel_a_id = Uuid::new_v4();
+     let channel_b_id = Uuid::new_v4();
+-    let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
++    let company_persistence = Arc::new(company_double(vec![Company {
+         channel_defaults: Default::default(),
+         id: company_id,
+         user_id: Uuid::new_v4(),
+@@ -2099,7 +1998,7 @@ async fn test_third_party_thread_participants_addition_and_authorization() {
+     let company_id = Uuid::new_v4();
+     let channel_id = Uuid::new_v4();
+ 
+-    let company_persistence = Arc::new(MockCompanyPersistence::with_team_members(
++    let company_persistence = Arc::new(company_double_with_team(
+         vec![Company {
+             channel_defaults: Default::default(),
+             id: company_id,
+@@ -2302,7 +2201,7 @@ async fn test_context_only_quiet_mode_ingestion() {
+     let company_id = Uuid::new_v4();
+     let channel_id = Uuid::new_v4();
+ 
+-    let company_persistence = Arc::new(MockCompanyPersistence::with_team_members(
++    let company_persistence = Arc::new(company_double_with_team(
+         vec![Company {
+             channel_defaults: Default::default(),
+             id: company_id,
+@@ -2498,7 +2397,7 @@ fn channel_fixture_with_config(spec: TestChannel, config: Arc<AppConfig>) -> Cha
+     let (access_mode, principal_grants) =
+         email_allowlist_policy(company_id, participant_emails.as_deref());
+ 
+-    let company_persistence = Arc::new(MockCompanyPersistence::with_team_members(
++    let company_persistence = Arc::new(company_double_with_team(
+         vec![Company {
+             channel_defaults: Default::default(),
+             id: company_id,
+@@ -3264,7 +3163,7 @@ impl Default for DirectoryChannel {
+ fn use_cases_with_directory(specs: Vec<DirectoryChannel>) -> ThreadUseCases {
+     let company_id = Uuid::new_v4();
+ 
+-    let company_persistence = Arc::new(MockCompanyPersistence::with_team_members(
++    let company_persistence = Arc::new(company_double_with_team(
+         vec![Company {
+             channel_defaults: Default::default(),
+             id: company_id,
+@@ -3700,7 +3599,7 @@ async fn an_agent_cannot_use_help_to_enumerate_its_company() {
+ #[tokio::test]
+ async fn send_reply_in_thread_with_prior_agent_turn_stays_in_same_thread() {
+     let company_id = Uuid::new_v4();
+-    let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
++    let company_persistence = Arc::new(company_double(vec![Company {
+         channel_defaults: Default::default(),
+         id: company_id,
+         user_id: Uuid::new_v4(),
+@@ -3798,7 +3697,7 @@ async fn send_reply_in_thread_with_prior_agent_turn_stays_in_same_thread() {
+ #[tokio::test]
+ async fn external_email_cannot_use_mailagents_thread_id_header_to_inject() {
+     let company_id = Uuid::new_v4();
+-    let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
++    let company_persistence = Arc::new(company_double(vec![Company {
+         channel_defaults: Default::default(),
+         id: company_id,
+         user_id: Uuid::new_v4(),
+@@ -3876,7 +3775,7 @@ async fn external_email_cannot_use_mailagents_thread_id_header_to_inject() {
+ #[tokio::test]
+ async fn ingest_canonical_threads_correctly_with_target_thread_and_reply_to() {
+     let company_id = Uuid::new_v4();
+-    let company_persistence = Arc::new(MockCompanyPersistence::new(vec![Company {
++    let company_persistence = Arc::new(company_double(vec![Company {
+         channel_defaults: Default::default(),
+         id: company_id,
+         user_id: Uuid::new_v4(),

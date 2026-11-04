@@ -1,3 +1,6 @@
+#[cfg(test)]
+mod authorization_test_support;
+
 pub mod agent;
 pub mod agent_library;
 pub mod apple_auth;

@@ -2,11 +2,9 @@ use axum::{Router, extract::State, response::Json, routing::get};
 use std::sync::Arc;
 
 use crate::{
-    adapters::http::{app_state::AppState, auth::AuthenticatedUser},
-    app_error::{AppError, AppResult},
-    domain::monitoring::MonitoringService,
-    infra::config::AppConfig,
-    use_cases::user::UserUseCases,
+    adapters::http::app_state::AppState, app_error::AppResult,
+    domain::monitoring::MonitoringService, entities::user::Caller,
+    use_cases::caller::require_operator,
 };
 
 pub fn router() -> Router<AppState> {
@@ -15,25 +13,21 @@ pub fn router() -> Router<AppState> {
         .route("/metrics", get(get_monitoring_stats))
 }
 
+/// Process-wide metrics, for deployment operators only.
+///
+/// Checked here, on the [`Caller`] property the extractor decided, because no application use case
+/// owns these reads: `MonitoringService` is the process's own counters, with no tenant in them.
 async fn get_monitoring_stats(
     State(monitoring): State<Arc<dyn MonitoringService>>,
-    State(users): State<Arc<UserUseCases>>,
-    State(config): State<Arc<AppConfig>>,
-    user: AuthenticatedUser,
+    caller: Caller,
 ) -> AppResult<Json<serde_json::Value>> {
-    let user = users
-        .get_user_by_id(user.id)
-        .await?
-        .ok_or_else(|| AppError::NotFound("Operator not found".into()))?;
-    if !config.is_operator(&user) {
-        return Err(AppError::NotFound("Operator not found".into()));
-    }
+    require_operator(&caller)?;
     Ok(Json(monitoring.get_stats_json()))
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::{adapters::http::auth::caller_for, infra::config::AppConfig};
 
     #[test]
     fn metrics_require_deployment_operator() {
@@ -48,10 +42,10 @@ mod tests {
             avatar_url: None,
             created_at: chrono::Utc::now(),
         };
-        assert!(!config.is_operator(&user));
+        assert!(!caller_for(&user, &config).is_operator());
         config.operator_emails = vec!["operator@example.com".into()];
-        assert!(!config.is_operator(&user));
+        assert!(!caller_for(&user, &config).is_operator());
         user.email_verified_at = Some(chrono::Utc::now());
-        assert!(config.is_operator(&user));
+        assert!(caller_for(&user, &config).is_operator());
     }
 }

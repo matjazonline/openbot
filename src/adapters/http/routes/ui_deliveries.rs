@@ -33,7 +33,7 @@ use crate::{
     domain::monitoring::{MonitoringService, record_pagination_observation},
     entities::{
         channel::Channel,
-        company::Company,
+        company::{Company, CompanyAccess},
         delivery::{DeliveryEntry, DeliveryFilter, DeliveryQuery as DeliveryPageQuery},
         transport::DeliveryId,
         value_objects::EmailAddress,
@@ -47,7 +47,7 @@ use crate::{
 
 use super::{
     deserialize_empty_string_as_none,
-    ui::{load_account, load_managed_company, managed_company_membership, workspace_user},
+    ui::{load_account, load_managed_company, workspace_user},
 };
 
 pub fn router() -> Router<AppState> {
@@ -143,7 +143,9 @@ impl Workspace {
     async fn scoped_company(&self, company_id: Option<Uuid>) -> AppResult<Company> {
         let (_, company) =
             load_managed_company(&self.company_use_cases, self.user_id, company_id).await?;
-        company.ok_or_else(|| AppError::NotFound("Company not found".into()))
+        company
+            .map(|access| access.company)
+            .ok_or_else(|| AppError::NotFound("Company not found".into()))
     }
 
     fn view<'a>(&'a self, company: &'a Company) -> DeliveriesView<'a> {
@@ -174,11 +176,14 @@ async fn deliveries_page(
         query.company_id,
     )
     .await?;
-    let Some(company) = company else {
+    let Some(CompanyAccess {
+        company,
+        membership,
+    }) = company
+    else {
         return Ok(Html(pages::mailbox_no_company_page(&workspace_user)));
     };
-    let workspace_user = workspace_user
-        .with_company_membership(managed_company_membership(&company, workspace.user_id));
+    let workspace_user = workspace_user.with_company_membership(membership);
 
     let view = workspace.view(&company);
     let filter = query.filter();

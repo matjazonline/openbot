@@ -456,7 +456,7 @@ async fn workspace(ui: Ui, Query(query): Query<WorkspaceQuery>) -> AppResult<Htm
         return board_workspace(ui, query).await;
     }
     let frame = ui.frame(query.company_id).await?;
-    let Some(company) = frame.company.as_ref() else {
+    let Some(company) = frame.company.as_ref().map(|access| &access.company) else {
         return Ok(Html(frame.render(&ui.config, |_, _| String::new())));
     };
     let company_id = company.id;
@@ -518,7 +518,7 @@ async fn board_workspace(ui: Ui, query: WorkspaceQuery) -> AppResult<Html<String
         ));
     }
     let frame = ui.frame(query.company_id).await?;
-    let Some(company) = frame.company.as_ref() else {
+    let Some(company) = frame.company.as_ref().map(|access| &access.company) else {
         return Ok(Html(frame.render(&ui.config, |_, _| String::new())));
     };
     let company_id = company.id;

@@ -21,7 +21,7 @@ use crate::{
     },
     application::use_cases::thread::{
         InboundIngestResult, InboundPreflight, IngestRejection, IngressOrigin, ReplyDelivery,
-        ThreadUseCases,
+        SenderTrust, ThreadUseCases,
     },
     domain::monitoring::{MonitoringService, SmtpConnectionMetrics, SmtpStatus},
     infra::config::AppConfig,
@@ -620,48 +620,20 @@ impl SmtpServer {
         let Some(selector) = selection.selectors().first() else {
             return true;
         };
-        let Some(company_slug) = selector.company() else {
-            return true;
-        };
-        let channel_slug = selector.channel();
-        let Ok(Some(company)) = self
-            .thread_use_cases
-            .company_persistence()
-            .get_by_slug(company_slug)
-            .await
-        else {
-            return true;
-        };
-        let Ok(Some(channel)) = self
-            .thread_use_cases
-            .channel_persistence()
-            .get_by_company_slug_and_channel_slug(company_slug, channel_slug)
-            .await
-        else {
-            return true;
-        };
-
         let Ok(sender) = EmailIdentity::parse(crate::entities::value_objects::EmailAddress::from(
             extract_email(&raw_payload.from),
         ))
         .map(EmailIdentity::qualify_default) else {
             return true;
         };
-        let context = match self
-            .thread_use_cases
-            .participant_persistence()
-            .access_context_for_identity(company.id, &sender)
-            .await
-        {
-            Ok(context) => context,
+        match self.thread_use_cases.sender_trust(selector, &sender).await {
+            Ok(SenderTrust::Trusted) => false,
+            Ok(SenderTrust::Stranger) => true,
             Err(error) => {
-                // Every other bail-out here scans too: a directory lookup that failed must not be
-                // the reason a stranger is promoted to a trusted sender.
-                warn!(%error, "Principal resolution failed; scanning sender as a stranger");
-                return true;
+                warn!(%error, "Sender trust lookup failed; scanning sender as a stranger");
+                true
             }
-        };
-        !channel.participant_access(context).trusted
+        }
     }
 
     async fn apply_spam_score(&self, session: &SmtpSession, raw_payload: &mut RawInboundPayload) {
@@ -1028,94 +1000,20 @@ mod tests {
 
     use crate::{
         app_error::AppResult,
-        entities::{
-            channel::Channel,
-            company::{Company, CompanyAccess},
-            company_member::CompanyMembership,
-        },
+        entities::{channel::Channel, company::Company},
         use_cases::{
             channel::{ChannelPersistence, ChannelWrite},
-            company::{CompanyPersistence, CompanyWrite},
-            participant::test_support::{InMemoryParticipantDirectory, TeamFixture},
+            company_test_support::{MockCompanyPersistence, TeamByAddress},
+            participant::test_support::InMemoryParticipantDirectory,
         },
     };
 
-    struct MockCompanyPersistence {
-        companies: Mutex<Vec<Company>>,
-    }
-
-    /// These tests are about SMTP, not team management: every sender is a colleague.
-    #[async_trait]
-    impl TeamFixture for MockCompanyPersistence {
-        async fn membership_for_email(
-            &self,
-            _company_id: Uuid,
-            _email: &str,
-        ) -> AppResult<CompanyMembership> {
-            Ok(CompanyMembership::Member)
-        }
-
-        async fn company_access(
-            &self,
-            _user_id: Uuid,
-            _company_id: Uuid,
-        ) -> AppResult<Option<CompanyAccess>> {
-            unimplemented!("this double is not exercised on the signed-in path")
-        }
-    }
-
-    #[async_trait]
-    impl CompanyPersistence for MockCompanyPersistence {
-        async fn create(&self, _user_id: Uuid, _write: CompanyWrite) -> AppResult<Company> {
-            unimplemented!()
-        }
-        async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<Company>> {
-            unimplemented!()
-        }
-        async fn get_by_slug(&self, slug: &str) -> AppResult<Option<Company>> {
-            Ok(self
-                .companies
-                .lock()
-                .unwrap()
-                .iter()
-                .find(|c| c.slug == slug)
-                .cloned())
-        }
-        async fn list_by_user_id(&self, _user_id: Uuid) -> AppResult<Vec<Company>> {
-            unimplemented!()
-        }
-        async fn update(&self, _id: Uuid, _write: CompanyWrite) -> AppResult<Company> {
-            unimplemented!()
-        }
-        async fn delete(&self, _id: Uuid) -> AppResult<()> {
-            unimplemented!()
-        }
-
-        /// This double never reaches a provider call: the tests around it assert on ingestion and
-        /// threading, and an agent run that gets this far fails at parameter resolution by design.
-        async fn list_model_connections(
-            &self,
-            _company_id: Uuid,
-        ) -> AppResult<Vec<crate::entities::company::CompanyModelConnection>> {
-            Ok(Vec::new())
-        }
-
-        async fn model_api_key(
-            &self,
-            _company_id: Uuid,
-            _provider: &crate::entities::value_objects::ModelProvider,
-        ) -> AppResult<Option<String>> {
-            Ok(None)
-        }
-
-        async fn replace_model_connections_for_user(
-            &self,
-            _user_id: Uuid,
-            _company_id: Uuid,
-            _connections: Vec<crate::use_cases::company::CompanyModelConnectionWrite>,
-        ) -> AppResult<()> {
-            unimplemented!("this double is not exercised on the model-connection write path")
-        }
+    /// These tests are about SMTP, not team management: every sender is a colleague, and nothing
+    /// reaches a provider, so no model connection is configured beyond "none".
+    fn company_double(companies: Vec<Company>) -> MockCompanyPersistence {
+        MockCompanyPersistence::new(companies)
+            .with_team(TeamByAddress::EveryoneIsMember)
+            .with_model_connections(Vec::new(), None)
     }
 
     struct MockChannelPersistence {
@@ -1196,17 +1094,15 @@ mod tests {
     #[tokio::test]
     async fn submitted_authentication_headers_cannot_authorize_smtp_mail() {
         let company_id = Uuid::new_v4();
-        let company_persistence = Arc::new(MockCompanyPersistence {
-            companies: Mutex::new(vec![Company {
-                channel_defaults: Default::default(),
-                id: company_id,
-                user_id: Uuid::new_v4(),
-                name: "Acme Corp".to_string(),
-                slug: "acme".into(),
-                avatar_url: None,
-                created_at: Utc::now(),
-            }]),
-        });
+        let company_persistence = Arc::new(company_double(vec![Company {
+            channel_defaults: Default::default(),
+            id: company_id,
+            user_id: Uuid::new_v4(),
+            name: "Acme Corp".to_string(),
+            slug: "acme".into(),
+            avatar_url: None,
+            created_at: Utc::now(),
+        }]));
 
         let channel_persistence = Arc::new(MockChannelPersistence {
             channels: Mutex::new(vec![Channel {
@@ -1416,17 +1312,15 @@ regis";
     #[tokio::test]
     async fn stale_dkim_and_submitted_auth_headers_do_not_authorize_smtp_mail() {
         let company_id = Uuid::new_v4();
-        let company_persistence = Arc::new(MockCompanyPersistence {
-            companies: Mutex::new(vec![Company {
-                channel_defaults: Default::default(),
-                id: company_id,
-                user_id: Uuid::new_v4(),
-                name: "Populus Network".to_string(),
-                slug: "populus".into(),
-                avatar_url: None,
-                created_at: Utc::now(),
-            }]),
-        });
+        let company_persistence = Arc::new(company_double(vec![Company {
+            channel_defaults: Default::default(),
+            id: company_id,
+            user_id: Uuid::new_v4(),
+            name: "Populus Network".to_string(),
+            slug: "populus".into(),
+            avatar_url: None,
+            created_at: Utc::now(),
+        }]));
 
         let channel_persistence = Arc::new(MockChannelPersistence {
             channels: Mutex::new(vec![Channel {
@@ -1564,9 +1458,7 @@ Message-ID: <CAGj=2VKEn_MHfovWkBCqn4sp3AXPR=ZTLMso=mPjWtnMDStiRw@mail.gmail.com>
     async fn test_smtp_rate_limiting_and_monitoring() {
         use crate::adapters::monitoring::InMemoryMonitor;
 
-        let company_persistence = Arc::new(MockCompanyPersistence {
-            companies: Mutex::new(Vec::new()),
-        });
+        let company_persistence = Arc::new(company_double(Vec::new()));
         let channel_persistence = Arc::new(MockChannelPersistence {
             channels: Mutex::new(Vec::new()),
         });
@@ -1644,5 +1536,142 @@ Message-ID: <CAGj=2VKEn_MHfovWkBCqn4sp3AXPR=ZTLMso=mPjWtnMDStiRw@mail.gmail.com>
 
         let stats = monitor.get_stats_json();
         assert_eq!(stats["smtp_connections"]["blocked_rate_limit"], 1);
+    }
+    struct TrustLog(Arc<Mutex<Vec<u8>>>);
+    impl std::io::Write for TrustLog {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            self.0.lock().unwrap().extend_from_slice(bytes);
+            Ok(bytes.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[tokio::test]
+    async fn smtp_sender_trust_lookup_failure_is_logged_and_scanned() {
+        use tracing::instrument::WithSubscriber;
+        let config = Arc::new(AppConfig {
+            app_domain_name: "mailagents.com".into(),
+            ..AppConfig::for_test()
+        });
+        let use_cases = ThreadUseCases::for_test(
+            Arc::new(InMemoryThreads::new()),
+            Arc::new(MockChannelPersistence {
+                channels: Mutex::new(vec![]),
+            }),
+            Arc::new(MockCompanyPersistence::failing()),
+            Arc::new(InMemoryParticipantDirectory::new()),
+            config.clone(),
+        );
+        let server = SmtpServer::new(Arc::new(use_cases), config);
+        let captured = Arc::new(Mutex::new(Vec::new()));
+        let sink = captured.clone();
+        let subscriber = tracing_subscriber::fmt()
+            .without_time()
+            .with_ansi(false)
+            .with_writer(move || TrustLog(sink.clone()))
+            .finish();
+        let payload = RawInboundPayload {
+            to: "desk@acme.mailagents.com".into(),
+            from: "sender@example.test".into(),
+            ..Default::default()
+        };
+        assert!(
+            server
+                .sender_needs_spam_scan(&payload)
+                .with_subscriber(subscriber)
+                .await
+        );
+        let logged = String::from_utf8(captured.lock().unwrap().clone()).unwrap();
+        assert!(logged.contains("WARN"), "{logged}");
+        assert!(
+            logged.contains("Sender trust lookup failed; scanning sender as a stranger"),
+            "{logged}"
+        );
+        assert!(logged.contains("mock database is unavailable"), "{logged}");
+    }
+
+    #[tokio::test]
+    async fn smtp_sender_trust_matches_routing_aliases_and_distinguishes_strangers() {
+        use crate::{
+            adapters::persistence::{PostgresPersistence, test_support::own_database},
+            use_cases::{
+                company::{CompanyPersistence, CompanyWrite},
+                user::UserPersistence,
+            },
+        };
+        let db = own_database()
+            .await
+            .expect("SMTP trust test requires PostgreSQL");
+        let persistence = Arc::new(PostgresPersistence::new(db.pool.clone()));
+        let owner = persistence
+            .create_user("owner", "owner@example.test", "hash")
+            .await
+            .unwrap()
+            .id;
+        let company = CompanyPersistence::create(
+            persistence.as_ref(),
+            owner,
+            CompanyWrite {
+                name: "Acme".into(),
+                slug: "acme".into(),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        ChannelPersistence::create(
+            persistence.as_ref(),
+            company.id,
+            ChannelWrite {
+                name: "Desk".into(),
+                slug: "desk".into(),
+                alias_slugs: vec!["help".into()],
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        let config = Arc::new(AppConfig {
+            app_domain_name: "mailagents.com".into(),
+            ..AppConfig::for_test()
+        });
+        let use_cases = Arc::new(ThreadUseCases::for_test(
+            Arc::new(InMemoryThreads::new()),
+            persistence.clone(),
+            persistence.clone(),
+            persistence,
+            config.clone(),
+        ));
+        let server = SmtpServer::new(use_cases, config);
+        let payload = |recipient: &str, sender: &str| RawInboundPayload {
+            to: recipient.into(),
+            from: sender.into(),
+            ..Default::default()
+        };
+        for recipient in ["desk@acme.mailagents.com", "help@acme.mailagents.com"] {
+            assert!(
+                !server
+                    .sender_needs_spam_scan(&payload(recipient, "owner@example.test"))
+                    .await
+            );
+            assert!(
+                server
+                    .sender_needs_spam_scan(&payload(recipient, "stranger@example.test"))
+                    .await
+            );
+        }
+        for recipient in [
+            "unknown@acme.mailagents.com",
+            "desk@unknown.mailagents.com",
+            "malformed",
+        ] {
+            assert!(
+                server
+                    .sender_needs_spam_scan(&payload(recipient, "owner@example.test"))
+                    .await
+            );
+        }
     }
 }

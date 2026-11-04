@@ -1,0 +1,678 @@
+diff --git a/src/adapters/http/auth.rs b/src/adapters/http/auth.rs
+index 8731223..926d3df 100644
+--- a/src/adapters/http/auth.rs
++++ b/src/adapters/http/auth.rs
+@@ -12,7 +12,11 @@ use uuid::Uuid;
+ use crate::{
+     adapters::http::{app_state::AppState, session::SessionAuthority},
+     application::session::VerifiedSession,
+-    entities::{user::Viewer, value_objects::EmailAddress},
++    entities::{
++        user::{Caller, User, Viewer},
++        value_objects::EmailAddress,
++    },
++    infra::config::AppConfig,
+ };
+ 
+ #[derive(Debug, Clone)]
+@@ -137,6 +141,38 @@ impl FromRequestParts<AppState> for Viewer {
+     }
+ }
+ 
++/// Who the signed-in account is to the deployment: the one place operator status is decided.
++///
++/// `AppConfig::is_operator` is called from here and nowhere else, so the account menu
++/// (`workspace_user`) and every operator check read the same answer.
++pub fn caller_for(account: &User, config: &AppConfig) -> Caller {
++    if config.is_operator(account) {
++        Caller::operator(account.id)
++    } else {
++        Caller::user(account.id)
++    }
++}
++
++/// The signed-in account as the use cases that check operator status see it, decided once per
++/// request from the session's own account.
++impl FromRequestParts<AppState> for Caller {
++    type Rejection = AuthError;
++
++    async fn from_request_parts(
++        parts: &mut Parts,
++        state: &AppState,
++    ) -> Result<Self, Self::Rejection> {
++        let user = AuthenticatedUser::from_request_parts(parts, state).await?;
++        let account = state
++            .user_use_cases
++            .get_user_by_id(user.id)
++            .await
++            .map_err(|_| AuthError::ServiceUnavailable)?
++            .ok_or_else(|| auth_error_for(parts))?;
++        Ok(caller_for(&account, &state.config))
++    }
++}
++
+ #[cfg(test)]
+ mod tests {
+     use super::*;
+diff --git a/src/adapters/http/routes/ui_dashboard.rs b/src/adapters/http/routes/ui_dashboard.rs
+index 6a1bddd..983172c 100644
+--- a/src/adapters/http/routes/ui_dashboard.rs
++++ b/src/adapters/http/routes/ui_dashboard.rs
+@@ -35,26 +35,27 @@ use uuid::Uuid;
+ use crate::{
+     adapters::http::{
+         app_state::AppState,
+-        auth::{AuthError, AuthenticatedUser},
++        auth::{AuthError, AuthenticatedUser, caller_for},
+         pages,
+     },
+     app_error::{AppError, AppResult},
+     domain::monitoring::MonitoringService,
+     entities::{
+-        company::Company,
++        company::{Company, CompanyAccess},
+         company_member::CompanyMembership,
+         dashboard::{DashboardSnapshot, DashboardWindow, ProcessGauges},
+         runtime_metrics::{MachineIdentity, RuntimeMetricSnapshot},
++        user::Caller,
+         value_objects::EmailAddress,
+     },
+     infra::config::AppConfig,
+     services::dashboard_snapshot::{DASHBOARD_TICK, DashboardSnapshotService},
+     services::database_query_health::{DatabaseQueryHealth, DatabaseQueryHealthService},
+     services::runtime_metrics::RuntimeMetricPersistence,
+-    use_cases::{company::CompanyUseCases, user::UserUseCases},
++    use_cases::company::CompanyUseCases,
+ };
+ 
+-use super::ui::{load_account, load_managed_company, workspace_user};
++use super::ui::{load_managed_company, workspace_user};
+ 
+ const PRIVATE_NO_STORE: &str = "private, no-store";
+ 
+@@ -104,7 +105,6 @@ impl DashboardQuery {
+ /// Everything a dashboard handler needs about its caller, resolved once.
+ struct Dashboard {
+     company_use_cases: Arc<CompanyUseCases>,
+-    user_use_cases: Arc<UserUseCases>,
+     dashboard_snapshots: Arc<DashboardSnapshotService>,
+     database_query_health: Arc<DatabaseQueryHealthService>,
+     dashboard_sse_connections: Arc<AtomicU64>,
+@@ -113,6 +113,10 @@ struct Dashboard {
+     monitoring: Arc<dyn MonitoringService>,
+     config: Arc<AppConfig>,
+     user_id: Uuid,
++    /// The signed-in account, loaded once for the shell.
++    account: crate::entities::user::User,
++    /// Operator status, decided once from that account.
++    caller: Caller,
+ }
+ 
+ impl FromRequestParts<AppState> for Dashboard {
+@@ -123,10 +127,18 @@ impl FromRequestParts<AppState> for Dashboard {
+         state: &AppState,
+     ) -> Result<Self, Self::Rejection> {
+         let user = AuthenticatedUser::from_request_parts(parts, state).await?;
++        let account = state
++            .user_use_cases
++            .get_user_by_id(user.id)
++            .await
++            .map_err(|_| AuthError::ServiceUnavailable)?
++            .ok_or(AuthError::RedirectToLogin)?;
++        let caller = caller_for(&account, &state.config);
+ 
+         Ok(Self {
++            account,
++            caller,
+             company_use_cases: state.company_use_cases.clone(),
+-            user_use_cases: state.user_use_cases.clone(),
+             dashboard_snapshots: state.dashboard_snapshots.clone(),
+             database_query_health: state.database_query_health.clone(),
+             dashboard_sse_connections: state.dashboard_sse_connections.clone(),
+@@ -148,6 +160,8 @@ struct DashboardScope {
+     selected_company: Option<Company>,
+     companies: Vec<Company>,
+     operator: bool,
++    /// What the caller is to `selected_company`, from their membership row.
++    membership: CompanyMembership,
+ }
+ 
+ impl DashboardScope {
+@@ -156,30 +170,49 @@ impl DashboardScope {
+     /// This is an authorization decision, so every fallible step propagates with `?`. Reading a
+     /// database error as "not an operator" would fail closed silently, and reading it as "operator"
+     /// would hand out every company's traffic — neither is a default worth having.
+-    async fn resolve(
+-        dashboard: &Dashboard,
+-        account: &crate::entities::user::User,
+-        query: &DashboardQuery,
+-    ) -> AppResult<Self> {
++    async fn resolve(dashboard: &Dashboard, query: &DashboardQuery) -> AppResult<Self> {
+         let requested = query.company_id;
+-        let (companies, selected) =
+-            load_managed_company(&dashboard.company_use_cases, dashboard.user_id, requested)
++        let caller = &dashboard.caller;
++        let operator = caller.is_operator();
++        let company_use_cases = &dashboard.company_use_cases;
++
++        let (companies, selected) = if operator {
++            // An operator asking for one company in particular gets that company unless
++            // `scope=system` explicitly selects the global rollup. It is read as the operator's,
++            // because an operator is not usually a member of the companies they are watching --
++            // and it discloses nothing new, since the global rollup already shows those
++            // companies' tasks by name. Their own managed companies only fill the switcher.
++            let managed = company_use_cases
++                .list_managed_companies(dashboard.user_id)
+                 .await?;
+-
+-        let operator = dashboard.config.is_operator(account);
+-
+-        // An operator asking for one company in particular gets that company unless `scope=system`
+-        // explicitly selects the global rollup. The lookup goes through `get_company` rather than
+-        // the caller's own list, because an operator is not usually a member of the companies they
+-        // are watching — and it discloses nothing new, since the global rollup already shows those
+-        // companies' tasks by name.
+-        //
+-        // Everyone else stays pinned to `load_managed_company`'s answer, which only ever returns a
+-        // company the caller owns or administers.
+-        let selected_company = match (operator, requested) {
+-            (true, Some(company_id)) => dashboard.company_use_cases.get_company(company_id).await?,
+-            _ => selected,
++            let selected = match requested {
++                Some(company_id) => company_use_cases
++                    .operator_company(caller, company_id)
++                    .await?
++                    .map(|company| {
++                        let membership = managed
++                            .iter()
++                            .find(|access| access.company.id == company.id)
++                            .map_or(CompanyMembership::None, |access| access.membership);
++                        CompanyAccess {
++                            company,
++                            membership,
++                        }
++                    }),
++                None => managed.first().cloned(),
++            };
++            let companies = managed.into_iter().map(|access| access.company).collect();
++            (companies, selected)
++        } else {
++            // Everyone else gets a company they own or administer: a requested one is 404 when
++            // it is not theirs and 403 when they are only a member.
++            load_managed_company(company_use_cases, dashboard.user_id, requested).await?
+         };
++
++        let membership = selected
++            .as_ref()
++            .map_or(CompanyMembership::None, |access| access.membership);
++        let selected_company = selected.map(|access| access.company);
+         let company = match (operator, requested, query.requests_system_scope()) {
+             (true, _, true) | (true, None, false) => None,
+             (true, Some(_), false) | (false, _, _) => selected_company.clone(),
+@@ -190,6 +223,7 @@ impl DashboardScope {
+             selected_company,
+             companies,
+             operator,
++            membership,
+         })
+     }
+ 
+@@ -207,21 +241,8 @@ impl DashboardScope {
+     }
+ 
+     /// What the caller is to the company anchoring the rail, if there is one.
+-    fn membership(&self, user_id: Uuid) -> CompanyMembership {
+-        let Some(company) = &self.selected_company else {
+-            return CompanyMembership::None;
+-        };
+-        if company.user_id == user_id {
+-            CompanyMembership::Owner
+-        } else if self
+-            .companies
+-            .iter()
+-            .any(|managed| managed.id == company.id)
+-        {
+-            CompanyMembership::Admin
+-        } else {
+-            CompanyMembership::None
+-        }
++    fn membership(&self) -> CompanyMembership {
++        self.membership
+     }
+ 
+     fn view(&self) -> pages::DashboardScopeView<'_> {
+@@ -322,12 +343,12 @@ async fn dashboard_page(
+     dashboard: Dashboard,
+     Query(query): Query<DashboardQuery>,
+ ) -> AppResult<Response> {
+-    let account = load_account(&dashboard.user_use_cases, dashboard.user_id).await?;
++    let account = &dashboard.account;
+     let account_email = EmailAddress::from(account.email.as_str());
+-    let user = workspace_user(&account, &account_email, &dashboard.config);
++    let user = workspace_user(account, &account_email, &dashboard.config);
+ 
+-    let scope = DashboardScope::resolve(&dashboard, &account, &query).await?;
+-    let user = user.with_company_membership(scope.membership(dashboard.user_id));
++    let scope = DashboardScope::resolve(&dashboard, &query).await?;
++    let user = user.with_company_membership(scope.membership());
+ 
+     // A user with no company and no operator grant has nothing to show; the shell's own empty
+     // state says so rather than rendering a page of zeroes.
+@@ -357,11 +378,11 @@ async fn dashboard_panels_fragment(
+     dashboard: Dashboard,
+     Query(query): Query<DashboardQuery>,
+ ) -> AppResult<Response> {
+-    let account = load_account(&dashboard.user_use_cases, dashboard.user_id).await?;
++    let account = &dashboard.account;
+     let account_email = EmailAddress::from(account.email.as_str());
+-    let user = workspace_user(&account, &account_email, &dashboard.config);
++    let user = workspace_user(account, &account_email, &dashboard.config);
+ 
+-    let scope = DashboardScope::resolve(&dashboard, &account, &query).await?;
++    let scope = DashboardScope::resolve(&dashboard, &query).await?;
+     let company = scope.authorized_company_id()?;
+     let window = query.window();
+     let reading = dashboard.read(company, window, scope.operator).await?;
+@@ -379,9 +400,9 @@ async fn dashboard_stream(
+ ) -> AppResult<Response> {
+     // Authorize once, here: the loop that follows re-reads under the scope decided now and never
+     // re-checks it, exactly as the thread streams do.
+-    let account = load_account(&dashboard.user_use_cases, dashboard.user_id).await?;
++    let account = dashboard.account.clone();
+     let account_email = EmailAddress::from(account.email.as_str());
+-    let scope = DashboardScope::resolve(&dashboard, &account, &query).await?;
++    let scope = DashboardScope::resolve(&dashboard, &query).await?;
+     let company = scope.authorized_company_id()?;
+     let operator = scope.operator;
+     let window = query.window();
+@@ -600,6 +621,7 @@ mod tests {
+             selected_company: None,
+             companies: Vec::new(),
+             operator: false,
++            membership: CompanyMembership::None,
+         };
+         assert!(matches!(
+             company_user_scope.authorized_company_id(),
+@@ -613,3 +635,7 @@ mod tests {
+         assert_eq!(operator_scope.authorized_company_id().unwrap(), None);
+     }
+ }
++
++#[cfg(test)]
++#[path = "ui_dashboard_authorization_tests.rs"]
++mod authorization_tests;
+diff --git a/src/adapters/http/routes/ui_team.rs b/src/adapters/http/routes/ui_team.rs
+index 4626578..cfb3faf 100644
+--- a/src/adapters/http/routes/ui_team.rs
++++ b/src/adapters/http/routes/ui_team.rs
+@@ -29,9 +29,9 @@ use crate::{
+     },
+     app_error::{AppError, AppResult},
+     entities::{
+-        company::Company,
++        company::{Company, CompanyAccess},
+         company_invite::CompanyInvite,
+-        company_member::{CompanyAccessRole, CompanyMember},
++        company_member::{CompanyAccessRole, CompanyMember, CompanyMembership},
+         value_objects::{AvatarUrl, EmailAddress},
+     },
+     infra::config::AppConfig,
+@@ -40,7 +40,7 @@ use crate::{
+     },
+ };
+ 
+-use super::ui::{load_scoped_company, workspace_user};
++use super::ui::workspace_user;
+ 
+ pub fn router() -> Router<AppState> {
+     Router::new()
+@@ -193,19 +193,20 @@ impl FromRequestParts<AppState> for Workspace {
+ }
+ 
+ impl Workspace {
+-    /// The company a request is scoped to, always picked from the caller's own companies so a
+-    /// guessed `company_id` cannot reach another user's team.
+-    async fn scoped_company(&self, company_id: Uuid) -> AppResult<Company> {
+-        let (_, company) =
+-            load_scoped_company(&self.company_use_cases, self.user_id, Some(company_id)).await?;
+-        company.ok_or_else(|| AppError::NotFound("Company not found".into()))
++    /// The company a request is scoped to and what the caller is to it: any member may open the
++    /// team (404 for anyone else); what they may change is [`TeamView::require_owner`]'s call.
++    async fn scoped_company(&self, company_id: Uuid) -> AppResult<CompanyAccess> {
++        self.company_use_cases
++            .readable_company(self.user_id, company_id)
++            .await
+     }
+ 
+-    fn view<'a>(&'a self, company: &'a Company) -> TeamView<'a> {
++    fn view<'a>(&'a self, access: &'a CompanyAccess) -> TeamView<'a> {
+         TeamView {
+             invite_use_cases: &self.invite_use_cases,
+             user_id: self.user_id,
+-            company,
++            company: &access.company,
++            membership: access.membership,
+         }
+     }
+ }
+@@ -217,13 +218,14 @@ impl Workspace {
+ pub(super) async fn team_tab_body(
+     invite_use_cases: &CompanyInviteUseCases,
+     user_id: Uuid,
+-    company: &Company,
++    access: &CompanyAccess,
+     request: TeamRequest,
+ ) -> AppResult<String> {
+     let view = TeamView {
+         invite_use_cases,
+         user_id,
+-        company,
++        company: &access.company,
++        membership: access.membership,
+     };
+     let members = view.members().await?;
+     let invites = view.invites().await?;
+@@ -397,7 +399,7 @@ async fn create_invite(
+         .invite_use_cases
+         .create_company_invite(
+             view.user_id,
+-            company.id,
++            view.company.id,
+             &form.email,
+             form.role.unwrap_or_default(),
+         )
+@@ -431,7 +433,13 @@ async fn update_invite(
+ 
+     let saved = view
+         .invite_use_cases
+-        .update_company_invite(view.user_id, company.id, invite_id, &form.email, form.role)
++        .update_company_invite(
++            view.user_id,
++            view.company.id,
++            invite_id,
++            &form.email,
++            form.role,
++        )
+         .await;
+ 
+     match saved {
+@@ -459,7 +467,7 @@ async fn delete_invite(
+     let company = workspace.scoped_company(company_id).await?;
+     let view = workspace.view(&company);
+     view.invite_use_cases
+-        .delete_company_invite(view.user_id, company.id, invite_id)
++        .delete_company_invite(view.user_id, view.company.id, invite_id)
+         .await?;
+ 
+     view.cleared_response().await
+@@ -477,7 +485,7 @@ async fn update_member_role(
+ 
+     match view
+         .invite_use_cases
+-        .update_company_team_member_role(view.user_id, company.id, user_id, form.role)
++        .update_company_team_member_role(view.user_id, view.company.id, user_id, form.role)
+         .await
+     {
+         Ok(member) => {
+@@ -511,7 +519,7 @@ async fn remove_member(
+     // A refused removal is the pane's own error, not a 500: the owner row is the case that hits it.
+     if let Err(err) = view
+         .invite_use_cases
+-        .remove_company_team_member(view.user_id, company.id, user_id)
++        .remove_company_team_member(view.user_id, view.company.id, user_id)
+         .await
+     {
+         let member = view.member(user_id).await?;
+@@ -530,27 +538,30 @@ struct TeamView<'a> {
+     invite_use_cases: &'a CompanyInviteUseCases,
+     user_id: Uuid,
+     company: &'a Company,
++    /// What the caller is to the company, from their membership row.
++    membership: CompanyMembership,
+ }
+ 
+ impl TeamView<'_> {
+     /// What the caller may do here.
+     ///
+-    /// Decided from the company's own `user_id` rather than by letting an unauthorized use-case
+-    /// call fail: the invite calls reject a non-owner outright, so asking them first would turn
+-    /// an ordinary member's page load into an error.
++    /// Decided from their membership rather than by letting an unauthorized use-case call fail:
++    /// the invite calls refuse a non-owner outright, so asking them first would turn an ordinary
++    /// member's page load into an error.
+     fn role(&self) -> TeamRole {
+-        if self.company.user_id == self.user_id {
++        if self.membership.is_owner() {
+             TeamRole::Owner
+         } else {
+             TeamRole::Member
+         }
+     }
+ 
++    /// The owner manages invites and members; anyone else on the team sees it and is refused.
+     fn require_owner(&self) -> AppResult<()> {
+         match self.role() {
+             TeamRole::Owner => Ok(()),
+-            TeamRole::Member => Err(AppError::Internal(
+-                "Unauthorized: only the company owner can manage invites and team members.".into(),
++            TeamRole::Member => Err(AppError::Forbidden(
++                "Only the company owner can manage invites and team members.".into(),
+             )),
+         }
+     }
+@@ -753,3 +764,7 @@ impl TeamView<'_> {
+         Ok(([("HX-Push-Url", push_url)], Html(format!("{pane}{list}"))).into_response())
+     }
+ }
++
++#[cfg(test)]
++#[path = "ui_team_authorization_tests.rs"]
++mod authorization_tests;
+diff --git a/src/application/attention.rs b/src/application/attention.rs
+index 556920d..b36a7ce 100644
+--- a/src/application/attention.rs
++++ b/src/application/attention.rs
+@@ -1,10 +1,29 @@
+ //! Application boundary for the human-operational queue and its business report.
++//!
++//! [`AttentionUseCases`] decides who may read which view; the HTTP routes only translate a request
++//! into it and its answer into a page.
++
++use std::{sync::Arc, time::Instant};
+ 
+ use async_trait::async_trait;
++use uuid::Uuid;
+ 
+ use crate::{
+     app_error::AppResult,
+-    entities::attention::{AttentionPage, AttentionQuery, OperationalSummary},
++    domain::monitoring::MonitoringService,
++    entities::{
++        attention::{
++            AttentionCursor, AttentionPage, AttentionQuery, AttentionView, OperationalSummary,
++        },
++        company::CompanyAccess,
++        transport::PrincipalId,
++        user::Viewer,
++    },
++    use_cases::{
++        channel::{ChannelPersistence, ChannelReaders, readable_channels},
++        company::{CompanyPersistence, company_forbidden, readable_company},
++        participant::ParticipantPersistence,
++    },
+ };
+ 
+ #[async_trait]
+@@ -18,3 +37,172 @@ pub trait AttentionPersistence: Send + Sync {
+         visible_channel_ids: &[uuid::Uuid],
+     ) -> AppResult<OperationalSummary>;
+ }
++
++/// What a viewer may read in one company's queue: their access, the principal their work is
++/// assigned to, and the channels they can see.
++#[derive(Debug, Clone)]
++pub struct AttentionReadContext {
++    pub access: CompanyAccess,
++    pub principal_id: PrincipalId,
++    pub visible_channel_ids: Vec<Uuid>,
++}
++
++/// One page request of the queue, already parsed from the transport.
++#[derive(Debug, Clone, Copy)]
++pub struct AttentionListRequest<'a> {
++    pub view: AttentionView,
++    pub cursor: Option<&'a AttentionCursor>,
++    pub limit: Option<usize>,
++}
++
++/// A page of the queue together with the access it was read under, for the page shell.
++#[derive(Debug, Clone)]
++pub struct AttentionListing {
++    pub access: CompanyAccess,
++    pub page: AttentionPage,
++}
++
++#[derive(Clone)]
++pub struct AttentionUseCases {
++    attention: Arc<dyn AttentionPersistence>,
++    companies: Arc<dyn CompanyPersistence>,
++    channels: Arc<dyn ChannelPersistence>,
++    participants: Arc<dyn ParticipantPersistence>,
++    monitoring: Arc<dyn MonitoringService>,
++}
++
++impl AttentionUseCases {
++    pub fn new(
++        attention: Arc<dyn AttentionPersistence>,
++        companies: Arc<dyn CompanyPersistence>,
++        channels: Arc<dyn ChannelPersistence>,
++        participants: Arc<dyn ParticipantPersistence>,
++        monitoring: Arc<dyn MonitoringService>,
++    ) -> Self {
++        Self {
++            attention,
++            companies,
++            channels,
++            participants,
++            monitoring,
++        }
++    }
++
++    /// The viewer's read context in one company. Someone who is nothing to the company, or who
++    /// has no person principal in it, is told the company does not exist; a lookup failure is an
++    /// error, never a refusal.
++    pub async fn read_context(
++        &self,
++        viewer: &Viewer,
++        company_id: Uuid,
++    ) -> AppResult<AttentionReadContext> {
++        let access = readable_company(self.companies.as_ref(), viewer.user_id, company_id).await?;
++        let principal_id = self
++            .participants
++            .access_context_for_user(company_id, viewer.user_id)
++            .await?
++            .and_then(|context| context.principal_id)
++            .ok_or_else(crate::use_cases::company::company_not_found)?;
++        let readers = ChannelReaders {
++            companies: self.companies.as_ref(),
++            channels: self.channels.as_ref(),
++            participants: self.participants.as_ref(),
++        };
++        let visible_channel_ids = readable_channels(&readers, viewer, company_id)
++            .await?
++            .into_iter()
++            .map(|channel| channel.id)
++            .collect();
++        Ok(AttentionReadContext {
++            access,
++            principal_id,
++            visible_channel_ids,
++        })
++    }
++
++    /// One page of the queue. The team view is the managers'; an ordinary member can see the
++    /// company, so asking for it is a refusal (`Forbidden`) rather than a not-found.
++    pub async fn list(
++        &self,
++        viewer: &Viewer,
++        company_id: Uuid,
++        request: AttentionListRequest<'_>,
++    ) -> AppResult<AttentionListing> {
++        let context = self.read_context(viewer, company_id).await?;
++        let manager = context.access.membership.manages_company_operations();
++        if request.view == AttentionView::TeamWork && !manager {
++            return Err(company_forbidden(
++                "Only the company owner or an admin can see the team's work.",
++            ));
++        }
++        let started = Instant::now();
++        let page = self
++            .attention
++            .list_attention(AttentionQuery {
++                company_id: context.access.company.id,
++                principal_id: context.principal_id,
++                visible_channel_ids: &context.visible_channel_ids,
++                manager,
++                view: request.view,
++                cursor: request.cursor,
++                limit: request.limit.unwrap_or(AttentionQuery::DEFAULT_LIMIT),
++            })
++            .await?;
++        self.record_page_metrics(request.view, &page, started);
++        Ok(AttentionListing {
++            access: context.access,
++            page,
++        })
++    }
++
++    /// The company's operational summary, for its owner and admins; a member is refused.
++    pub async fn operational_summary(
++        &self,
++        viewer: &Viewer,
++        company_id: Uuid,
++    ) -> AppResult<OperationalSummary> {
++        let context = self.read_context(viewer, company_id).await?;
++        if !context.access.membership.manages_company_operations() {
++            return Err(company_forbidden(
++                "Only the company owner or an admin can see the operational summary.",
++            ));
++        }
++        let started = Instant::now();
++        let summary = self
++            .attention
++            .operational_summary(company_id, &context.visible_channel_ids)
++            .await?;
++        self.monitoring.record_histogram(
++            "operational_summary_query_duration",
++            started.elapsed().as_secs_f64() * 1_000.0,
++            &[],
++        );
++        Ok(summary)
++    }
++
++    fn record_page_metrics(&self, view: AttentionView, page: &AttentionPage, started: Instant) {
++        let labels = [("view", view_label(view))];
++        self.monitoring.record_histogram(
++            "attention_query_duration",
++            started.elapsed().as_secs_f64() * 1_000.0,
++            &labels,
++        );
++        self.monitoring.record_gauge(
++            "attention_working_set_size",
++            page.working_set_size as f64,
++            &labels,
++        );
++        if page.truncated {
++            self.monitoring
++                .increment_counter("attention_working_set_truncated", 1, &labels);
++        }
++    }
++}
++
++const fn view_label(view: AttentionView) -> &'static str {
++    match view {
++        AttentionView::MyWork => "my_work",
++        AttentionView::Unassigned => "unassigned",
++        AttentionView::TeamWork => "team_work",
++    }
++}

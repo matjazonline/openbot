@@ -1,0 +1,7 @@
+{
+  "files": 1477,
+  "digest": "f9db48296bd464fc1e8c9fc3904badd39113eff29720f8df8506a881860b74ae",
+  "exclusion": [
+    "plan/fix-app/phases/p04/docs"
+  ]
+}

@@ -31,6 +31,39 @@ pub struct Viewer {
     pub email_verified_at: Option<chrono::DateTime<chrono::Utc>>,
 }
 
+/// Who is making a request, as the use cases that care about deployment-wide authority see it.
+///
+/// Operator status is decided once, where the request is authenticated, from the account and the
+/// deployment's operator list; a use case that needs it checks this value rather than deciding
+/// again. Nothing here says anything about a company -- that is `CompanyAccess`'s job.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Caller {
+    pub user_id: Uuid,
+    operator: bool,
+}
+
+impl Caller {
+    /// An ordinary signed-in account.
+    pub const fn user(user_id: Uuid) -> Self {
+        Self {
+            user_id,
+            operator: false,
+        }
+    }
+
+    /// A deployment operator. Only the authentication boundary decides this.
+    pub const fn operator(user_id: Uuid) -> Self {
+        Self {
+            user_id,
+            operator: true,
+        }
+    }
+
+    pub const fn is_operator(&self) -> bool {
+        self.operator
+    }
+}
+
 /// An address proven for the account's current stored email. Construct only from a freshly loaded
 /// account or viewer; a signed session supplies an id, never this proof.
 #[derive(Debug, Clone)]

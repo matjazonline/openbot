@@ -208,17 +208,6 @@ pub(super) struct AgentInstructionRequest<'a> {
 ///
 /// Used by the `/ui` Agents workspace's Simple tab so prompt expansion shares the same
 /// model-validation path as Advanced creation.
-pub(super) async fn create_agent_from_instructions(
-    agent_use_cases: &AgentUseCases,
-    request: AgentInstructionRequest<'_>,
-) -> Result<Agent, String> {
-    let write = agent_write_from_instructions(agent_use_cases, request).await?;
-    agent_use_cases
-        .create_agent(request.user_id, request.company_id, write)
-        .await
-        .map_err(|err| format!("Failed to create agent: {err}"))
-}
-
 pub(super) async fn agent_write_from_instructions(
     agent_use_cases: &AgentUseCases,
     request: AgentInstructionRequest<'_>,
@@ -250,27 +239,31 @@ pub(super) async fn agent_write_from_instructions(
 }
 
 /// GET /companies/{company_id}/agents - Full HTML page listing agents (Protected).
+///
+/// Authorized before anything is rendered: someone else's company is a 404 that names nothing,
+/// a member is refused with 403, and a failed agent read is an error rather than an empty list.
 #[instrument(skip_all)]
 async fn list_agents_page(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(agent_use_cases): State<Arc<AgentUseCases>>,
     user: AuthenticatedUser,
     Path(company_id): Path<Uuid>,
-) -> impl IntoResponse {
-    let company = match company_use_cases.get_company(company_id).await {
-        Ok(Some(c)) => c,
-        _ => return Html(pages::error_alert("Company not found.")),
-    };
-
+) -> AppResult<Html<String>> {
+    let company = company_use_cases
+        .managed_company(user.id, company_id)
+        .await?
+        .company;
     let agents = agent_use_cases
         .list_company_agents(user.id, company_id)
-        .await
-        .unwrap_or_default();
+        .await?;
 
-    Html(pages::agents_page(&company, &agents))
+    Ok(Html(pages::agents_page(&company, &agents)))
 }
 
 /// POST /companies/{company_id}/agents - HTMX create agent (Protected).
+///
+/// A refused or failed *write* is shown inline above the list, as before; who may write at all is
+/// decided first, and answered with a status.
 #[instrument(skip_all)]
 async fn create_agent_handler(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
@@ -278,72 +271,74 @@ async fn create_agent_handler(
     user: AuthenticatedUser,
     Path(company_id): Path<Uuid>,
     Form(form): Form<AgentForm>,
-) -> impl IntoResponse {
-    let company = match company_use_cases.get_company(company_id).await {
-        Ok(Some(c)) => c,
-        _ => return Html(pages::error_alert("Company not found.")),
-    };
+) -> AppResult<Html<String>> {
+    let company = company_use_cases
+        .managed_company(user.id, company_id)
+        .await?
+        .company;
 
     let submitted = form
         .capabilities()
         .and_then(|capabilities| Ok((capabilities, form.avatar_url()?)));
 
-    let (capabilities, avatar_url) = match submitted {
-        Ok(fields) => fields,
-        Err(err) => {
-            let error_html = pages::error_alert(&err);
-            let agents = agent_use_cases
-                .list_company_agents(user.id, company_id)
-                .await
-                .unwrap_or_default();
-            return Html(format!(
-                "{}{}",
-                error_html,
-                pages::agent_list_fragment(&company, &agents)
-            ));
-        }
+    let error_html = match submitted {
+        Err(err) => pages::error_alert(&err),
+        Ok((capabilities, avatar_url)) => match agent_use_cases
+            .create_agent(
+                user.id,
+                company_id,
+                AgentWrite {
+                    // Workflow tool grants are edited in phase 09; keep the stored list.
+                    workflow_tools: None,
+                    name: form.name.clone(),
+                    slug: form.slug(),
+                    provider: form.provider.clone(),
+                    model: form.model.clone(),
+                    system_prompt: form.system_prompt.clone(),
+                    description: form.description.clone(),
+                    skill_ids: capabilities.skill_ids,
+                    avatar_url,
+                    created_by: None,
+                },
+            )
+            .await
+        {
+            Ok(_) => String::new(),
+            Err(err @ (AppError::BadRequest(_) | AppError::Conflict(_))) => {
+                pages::error_alert(&format!("Failed to create agent: {err}"))
+            }
+            Err(error) => return Err(error),
+        },
     };
 
-    match agent_use_cases
-        .create_agent(
-            user.id,
-            company_id,
-            AgentWrite {
-                // Workflow tool grants are edited in phase 09; keep the stored list.
-                workflow_tools: None,
-                name: form.name.clone(),
-                slug: form.slug(),
-                provider: form.provider.clone(),
-                model: form.model.clone(),
-                system_prompt: form.system_prompt.clone(),
-                description: form.description.clone(),
-                skill_ids: capabilities.skill_ids,
-                avatar_url,
-                created_by: None,
-            },
-        )
-        .await
-    {
-        Ok(_) => {
-            let agents = agent_use_cases
-                .list_company_agents(user.id, company_id)
-                .await
-                .unwrap_or_default();
-            Html(pages::agent_list_fragment(&company, &agents))
-        }
-        Err(err) => {
-            let error_html = pages::error_alert(&format!("Failed to create agent: {err}"));
-            let agents = agent_use_cases
-                .list_company_agents(user.id, company_id)
-                .await
-                .unwrap_or_default();
-            Html(format!(
-                "{}{}",
-                error_html,
-                pages::agent_list_fragment(&company, &agents)
-            ))
-        }
-    }
+    let agents = agent_use_cases
+        .list_company_agents(user.id, company_id)
+        .await?;
+    Ok(Html(format!(
+        "{}{}",
+        error_html,
+        pages::agent_list_fragment(&company, &agents)
+    )))
+}
+
+/// The company and one of its agents, for the row fragments: 404/403 for the company as above,
+/// and a 404 for an agent that is not this company's.
+async fn managed_agent(
+    company_use_cases: &CompanyUseCases,
+    agent_use_cases: &AgentUseCases,
+    user_id: Uuid,
+    company_id: Uuid,
+    agent_id: Uuid,
+) -> AppResult<(crate::entities::company::Company, Agent)> {
+    let company = company_use_cases
+        .managed_company(user_id, company_id)
+        .await?
+        .company;
+    let agent = agent_use_cases
+        .get_company_agent(user_id, company_id, agent_id)
+        .await?
+        .ok_or_else(crate::use_cases::agent::agent_not_found)?;
+    Ok((company, agent))
 }
 
 /// GET /companies/{company_id}/agents/{id}/edit - HTMX edit agent form fragment (Protected).
@@ -353,20 +348,16 @@ async fn edit_agent_form(
     State(agent_use_cases): State<Arc<AgentUseCases>>,
     user: AuthenticatedUser,
     Path((company_id, agent_id)): Path<(Uuid, Uuid)>,
-) -> impl IntoResponse {
-    let company = match company_use_cases.get_company(company_id).await {
-        Ok(Some(c)) => c,
-        _ => return Html(pages::error_alert("Company not found.")),
-    };
-
-    if let Ok(Some(ag)) = agent_use_cases
-        .get_company_agent(user.id, company_id, agent_id)
-        .await
-    {
-        Html(pages::agent_edit_fragment(&company, &ag))
-    } else {
-        Html(pages::error_alert("Agent not found."))
-    }
+) -> AppResult<Html<String>> {
+    let (company, agent) = managed_agent(
+        &company_use_cases,
+        &agent_use_cases,
+        user.id,
+        company_id,
+        agent_id,
+    )
+    .await?;
+    Ok(Html(pages::agent_edit_fragment(&company, &agent)))
 }
 
 /// GET /companies/{company_id}/agents/{id}/cancel - Cancel agent edit fragment (Protected).
@@ -376,20 +367,16 @@ async fn cancel_agent_edit(
     State(agent_use_cases): State<Arc<AgentUseCases>>,
     user: AuthenticatedUser,
     Path((company_id, agent_id)): Path<(Uuid, Uuid)>,
-) -> impl IntoResponse {
-    let company = match company_use_cases.get_company(company_id).await {
-        Ok(Some(c)) => c,
-        _ => return Html(pages::error_alert("Company not found.")),
-    };
-
-    if let Ok(Some(ag)) = agent_use_cases
-        .get_company_agent(user.id, company_id, agent_id)
-        .await
-    {
-        Html(pages::agent_row_fragment(&company, &ag))
-    } else {
-        Html(String::new())
-    }
+) -> AppResult<Html<String>> {
+    let (company, agent) = managed_agent(
+        &company_use_cases,
+        &agent_use_cases,
+        user.id,
+        company_id,
+        agent_id,
+    )
+    .await?;
+    Ok(Html(pages::agent_row_fragment(&company, &agent)))
 }
 
 /// PUT /companies/{company_id}/agents/{id} - HTMX update agent (Protected).
@@ -400,11 +387,15 @@ async fn update_agent_handler(
     user: AuthenticatedUser,
     Path((company_id, agent_id)): Path<(Uuid, Uuid)>,
     Form(form): Form<AgentForm>,
-) -> impl IntoResponse {
-    let company = match company_use_cases.get_company(company_id).await {
-        Ok(Some(c)) => c,
-        _ => return Html(pages::error_alert("Company not found.")),
-    };
+) -> AppResult<Html<String>> {
+    let (company, _) = managed_agent(
+        &company_use_cases,
+        &agent_use_cases,
+        user.id,
+        company_id,
+        agent_id,
+    )
+    .await?;
 
     let submitted = form
         .capabilities()
@@ -412,46 +403,53 @@ async fn update_agent_handler(
 
     let (capabilities, avatar_url) = match submitted {
         Ok(fields) => fields,
-        Err(err) => return Html(pages::error_alert(&err)),
+        Err(err) => return Ok(Html(pages::error_alert(&err))),
     };
 
-    match agent_use_cases
-        .update_agent(
-            user.id,
-            company_id,
-            agent_id,
-            AgentWrite {
-                // Workflow tool grants are edited in phase 09; keep the stored list.
-                workflow_tools: None,
-                name: form.name.clone(),
-                slug: form.slug(),
-                provider: form.provider.clone(),
-                model: form.model.clone(),
-                system_prompt: form.system_prompt.clone(),
-                description: form.description.clone(),
-                skill_ids: capabilities.skill_ids,
-                avatar_url,
-                created_by: None,
-            },
-        )
-        .await
-    {
-        Ok(ag) => Html(pages::agent_row_fragment(&company, &ag)),
-        Err(err) => Html(pages::error_alert(&format!("Update failed: {err}"))),
-    }
+    Ok(
+        match agent_use_cases
+            .update_agent(
+                user.id,
+                company_id,
+                agent_id,
+                AgentWrite {
+                    // Workflow tool grants are edited in phase 09; keep the stored list.
+                    workflow_tools: None,
+                    name: form.name.clone(),
+                    slug: form.slug(),
+                    provider: form.provider.clone(),
+                    model: form.model.clone(),
+                    system_prompt: form.system_prompt.clone(),
+                    description: form.description.clone(),
+                    skill_ids: capabilities.skill_ids,
+                    avatar_url,
+                    created_by: None,
+                },
+            )
+            .await
+        {
+            Ok(ag) => Html(pages::agent_row_fragment(&company, &ag)),
+            Err(err @ (AppError::BadRequest(_) | AppError::Conflict(_))) => {
+                Html(pages::error_alert(&format!("Update failed: {err}")))
+            }
+            Err(error) => return Err(error),
+        },
+    )
 }
 
 /// DELETE /companies/{company_id}/agents/{id} - HTMX delete agent (Protected).
+///
+/// A refusal or a failure is an error status, never an empty 200 that reads as "deleted".
 #[instrument(skip_all)]
 async fn delete_agent_handler(
     State(agent_use_cases): State<Arc<AgentUseCases>>,
     user: AuthenticatedUser,
     Path((company_id, agent_id)): Path<(Uuid, Uuid)>,
-) -> impl IntoResponse {
-    let _ = agent_use_cases
+) -> AppResult<Html<String>> {
+    agent_use_cases
         .delete_agent(user.id, company_id, agent_id)
-        .await;
-    Html(String::new())
+        .await?;
+    Ok(Html(String::new()))
 }
 
 /// JSON API: List company agents (Protected).
@@ -685,13 +683,14 @@ pub async fn generate_agent_prompt_handler(
             );
             Ok(Html(html).into_response())
         }
-        Err(err) => Ok((
+        Err(err @ (AppError::BadRequest(_) | AppError::Conflict(_))) => Ok((
             StatusCode::OK,
             Html(pages::error_alert(&format!(
                 "Prompt generation failed: {err}"
             ))),
         )
             .into_response()),
+        Err(error) => Err(error),
     }
 }
 
@@ -855,3 +854,7 @@ mod harness_payload_tests {
 #[cfg(test)]
 #[path = "agent_api_tests.rs"]
 mod api_tests;
+
+#[cfg(test)]
+#[path = "agent_authorization_tests.rs"]
+mod authorization_tests;

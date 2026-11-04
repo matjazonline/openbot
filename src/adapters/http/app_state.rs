@@ -8,7 +8,7 @@ use crate::{
         http::{auth_admission::AuthAdmission, session::SessionAuthority},
         storage::FileStorage,
     },
-    application::{attention::AttentionPersistence, notification::NotificationPersistence},
+    application::{attention::AttentionUseCases, notification::NotificationPersistence},
     domain::monitoring::MonitoringService,
     entities::runtime_metrics::MachineIdentity,
     infra::{config::AppConfig, events::MailboxEvents},
@@ -58,6 +58,7 @@ pub struct AppState {
     pub channel_use_cases: Arc<ChannelUseCases>,
     pub schedule_use_cases: Arc<ScheduleUseCases>,
     pub agent_use_cases: Arc<AgentUseCases>,
+    pub onboarding_use_cases: Arc<crate::use_cases::onboarding::OnboardingUseCases>,
     pub skill_use_cases: Arc<SkillUseCases>,
     pub thread_use_cases: Arc<ThreadUseCases>,
     /// Owns claims on authenticated provider events. Routes only store and wake it.
@@ -70,7 +71,7 @@ pub struct AppState {
     /// Handlers reach the aggregates only through this, so none can bypass the cache.
     pub dashboard_snapshots: Arc<DashboardSnapshotService>,
     /// Derived human work and durable business summaries; source commands remain authoritative.
-    pub attention: Arc<dyn AttentionPersistence>,
+    pub attention_use_cases: Arc<AttentionUseCases>,
     /// Recipient-facing projection over the same operational sources as `attention`.
     pub notifications: Arc<dyn NotificationPersistence>,
     /// Owns durable notification-event claims and enqueues optional email through deliveries.
@@ -144,6 +145,12 @@ impl FromRef<AppState> for InboundEventWakeups {
     }
 }
 
+impl FromRef<AppState> for Arc<AttentionUseCases> {
+    fn from_ref(app_state: &AppState) -> Self {
+        app_state.attention_use_cases.clone()
+    }
+}
+
 impl FromRef<AppState> for Arc<UserUseCases> {
     fn from_ref(app_state: &AppState) -> Self {
         app_state.user_use_cases.clone()
@@ -204,12 +211,6 @@ impl FromRef<AppState> for Arc<dyn crate::application::message_outcomes::Message
     }
 }
 
-impl FromRef<AppState> for Arc<dyn AttentionPersistence> {
-    fn from_ref(app_state: &AppState) -> Self {
-        app_state.attention.clone()
-    }
-}
-
 impl FromRef<AppState> for Arc<dyn NotificationPersistence> {
     fn from_ref(app_state: &AppState) -> Self {
         app_state.notifications.clone()
@@ -243,5 +244,11 @@ impl axum::extract::FromRef<AppState> for Arc<crate::use_cases::mcp::McpUseCases
 impl FromRef<AppState> for Arc<dyn crate::services::model_usage::ModelUsageStore> {
     fn from_ref(state: &AppState) -> Self {
         state.model_usage.clone()
+    }
+}
+
+impl FromRef<AppState> for Arc<crate::use_cases::onboarding::OnboardingUseCases> {
+    fn from_ref(state: &AppState) -> Self {
+        state.onboarding_use_cases.clone()
     }
 }

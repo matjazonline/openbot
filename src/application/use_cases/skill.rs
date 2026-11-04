@@ -13,9 +13,13 @@ use crate::{
         agent::Agent,
         creation::CreationProvenance,
         skill::{MAX_SKILL_INSTRUCTIONS_JSON_BYTES, Skill, SkillInstruction},
+        user::Caller,
         value_objects::SkillSlug,
     },
-    use_cases::company::{CompanyPersistence, managed_company, owned_company},
+    use_cases::{
+        caller::require_operator,
+        company::{CompanyPersistence, managed_company, owned_company},
+    },
 };
 
 pub const MAX_SKILL_PAGE_SIZE: u16 = 100;
@@ -307,8 +311,10 @@ impl SkillUseCases {
             .await
     }
 
+    /// Operator only: a library skill is offered to every company.
     #[instrument(skip_all)]
-    pub async fn create_library(&self, mut write: SkillWrite) -> AppResult<Skill> {
+    pub async fn create_library(&self, caller: &Caller, mut write: SkillWrite) -> AppResult<Skill> {
+        require_operator(caller)?;
         write.created_by = Some(CreationProvenance::system());
         write.normalize()?;
         self.persistence.create_library(write).await
@@ -324,15 +330,47 @@ impl SkillUseCases {
         self.persistence.list_library_page(page.validate()?).await
     }
 
+    /// The library as its manager reads it, for the operator workspace and its API. Companies
+    /// browse the same rows through [`Self::list_library_page`] to copy them.
     #[instrument(skip_all)]
-    pub async fn update_library(&self, skill_id: Uuid, mut write: SkillWrite) -> AppResult<Skill> {
+    pub async fn library_page_for(
+        &self,
+        caller: &Caller,
+        page: SkillPageRequest,
+    ) -> AppResult<SkillPage> {
+        require_operator(caller)?;
+        self.list_library_page(page).await
+    }
+
+    /// One library skill, for the operator workspace and its API.
+    #[instrument(skip_all)]
+    pub async fn library_skill_for(
+        &self,
+        caller: &Caller,
+        skill_id: Uuid,
+    ) -> AppResult<Option<Skill>> {
+        require_operator(caller)?;
+        self.get_library(skill_id).await
+    }
+
+    /// Operator only.
+    #[instrument(skip_all)]
+    pub async fn update_library(
+        &self,
+        caller: &Caller,
+        skill_id: Uuid,
+        mut write: SkillWrite,
+    ) -> AppResult<Skill> {
+        require_operator(caller)?;
         write.created_by = None;
         write.normalize()?;
         self.persistence.update_library(skill_id, write).await
     }
 
+    /// Operator only.
     #[instrument(skip_all)]
-    pub async fn delete_library(&self, skill_id: Uuid) -> AppResult<()> {
+    pub async fn delete_library(&self, caller: &Caller, skill_id: Uuid) -> AppResult<()> {
+        require_operator(caller)?;
         self.persistence.delete_library(skill_id).await
     }
 }
@@ -352,6 +390,73 @@ mod tests {
             instructions,
             created_by: None,
         }
+    }
+
+    #[tokio::test]
+    async fn nonoperators_cannot_read_or_write_the_skill_library_management_surface() {
+        use crate::adapters::persistence::{PostgresPersistence, test_support::own_database};
+        use crate::use_cases::company_test_support::MockCompanyPersistence;
+        let Some(database) = own_database().await else {
+            return;
+        };
+        let persistence = Arc::new(PostgresPersistence::new(database.pool.clone()));
+        let use_cases = SkillUseCases::new(
+            persistence.clone(),
+            Arc::new(MockCompanyPersistence::failing()),
+            persistence.clone(),
+        );
+        let caller = Caller::user(Uuid::new_v4());
+        let draft = || {
+            write(vec![SkillInstruction::Prompt {
+                text: "Review it.".into(),
+            }])
+        };
+        assert!(matches!(
+            use_cases.create_library(&caller, draft()).await,
+            Err(AppError::NotFound(_))
+        ));
+        let count: i64 = sqlx::query_scalar("SELECT count(*) FROM skills")
+            .fetch_one(&database.pool)
+            .await
+            .unwrap();
+        assert_eq!(count, 0, "denied create writes nothing");
+        let stored = use_cases
+            .create_library(&Caller::operator(caller.user_id), draft())
+            .await
+            .unwrap();
+        assert!(matches!(
+            use_cases.library_skill_for(&caller, stored.id).await,
+            Err(AppError::NotFound(_))
+        ));
+        assert!(matches!(
+            use_cases
+                .library_page_for(
+                    &caller,
+                    SkillPageRequest {
+                        before: None,
+                        limit: 20
+                    }
+                )
+                .await,
+            Err(AppError::NotFound(_))
+        ));
+        assert!(matches!(
+            use_cases.update_library(&caller, stored.id, draft()).await,
+            Err(AppError::NotFound(_))
+        ));
+        assert!(matches!(
+            use_cases.delete_library(&caller, stored.id).await,
+            Err(AppError::NotFound(_))
+        ));
+        assert_eq!(
+            use_cases
+                .get_library(stored.id)
+                .await
+                .unwrap()
+                .unwrap()
+                .name,
+            stored.name
+        );
     }
 
     #[test]

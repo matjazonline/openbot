@@ -1,0 +1,24 @@
+   Compiling mail_agents v0.1.0 (/Users/mac02/dev/openbot-recovery/.worktrees/fix-app-p04)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 51s
+     Running unittests src/lib.rs (target/debug/deps/mail_agents-91c1847adc52f46f)
+
+running 16 tests
+test adapters::http::routes::onboarding::tests::onboarding_pages_render_each_step ... ok
+test adapters::http::routes::onboarding::authorization_tests::onboarding_page_hides_foreign_companies_and_refuses_members ... ok
+test adapters::http::routes::onboarding::authorization_tests::onboarding_submission_key_is_required_and_denials_propagate ... ok
+test adapters::persistence::onboarding::tests::onboarding_new_owner_with_new_key_does_not_replay_the_previous_owners_command ... ok
+test adapters::persistence::onboarding::tests::onboarding_denials_and_invalid_selection_have_no_provider_effects ... ok
+test adapters::persistence::onboarding::tests::onboarding_library_model_lookup_failure_remains_an_infrastructure_error ... ok
+test adapters::persistence::onboarding::tests::onboarding_new_key_after_rename_does_not_replay_an_old_channel ... ok
+test adapters::persistence::onboarding::tests::onboarding_cancellation_drops_provider_and_releases_company_lock ... ok
+test adapters::persistence::onboarding::tests::onboarding_provider_failure_releases_transaction_for_retry ... ok
+test adapters::persistence::onboarding::tests::onboarding_address_refusal_keeps_the_agent_and_other_channels ... ok
+test adapters::persistence::onboarding::tests::onboarding_one_connection_progresses_with_real_custom_library_and_competitor ... ok
+test adapters::persistence::onboarding::tests::onboarding_same_key_custom_competitors_wait_for_company_and_generate_once ... ok
+test adapters::persistence::onboarding::tests::onboarding_second_channel_error_rolls_back_every_effect ... ok
+test adapters::persistence::onboarding::tests::onboarding_same_key_reuses_results_and_new_key_after_deletion_is_fresh ... ok
+test adapters::persistence::onboarding::tests::onboarding_selection_is_bounded_and_custom_fields_are_paired ... ok
+test adapters::persistence::onboarding::tests::onboarding_prompt_and_operation_timeouts_cancel_and_allow_retry ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 2600 filtered out; finished in 4.03s
+

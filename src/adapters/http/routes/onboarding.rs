@@ -1,5 +1,7 @@
-use std::{collections::HashSet, sync::Arc};
+use std::sync::Arc;
 
+#[cfg(test)]
+use crate::application::workflow::provisioning::{AssistantChannelRequest, ReplyMode};
 use axum::{
     Form, Router,
     extract::{Path, State},
@@ -11,26 +13,20 @@ use uuid::Uuid;
 
 use crate::{
     adapters::http::{app_state::AppState, auth::AuthenticatedUser, pages},
-    app_error::AppResult,
-    application::workflow::{
-        WorkflowActor,
-        provisioning::{AssistantChannelRequest, AssistantChannels, ReplyMode},
-    },
+    app_error::{AppError, AppResult},
+    application::workflow::{WorkflowActor, provisioning::AssistantChannels},
     domain::workflow::CompanyId,
     entities::{agent::Agent, value_objects::EmailAddress},
     infra::config::AppConfig,
     use_cases::{
-        agent::{AgentUseCases, LibraryCopyModel, pinned_default_model},
+        agent::AgentUseCases,
         company::{CompanyModelConnectionWrite, CompanyUseCases, CompanyWrite},
+        onboarding::{OnboardingOutcome, OnboardingSubmission, OnboardingUseCases},
         user::UserUseCases,
     },
 };
 
-use super::{
-    agent::{AgentInstructionRequest, ModelOverrides, create_agent_from_instructions},
-    channel::slugify,
-    ui::{load_account, workspace_user},
-};
+use super::ui::{load_account, workspace_user};
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -67,6 +63,36 @@ struct OnboardingChannelForm {
     #[serde(default)]
     instructions: String,
     library_agent_ids: Option<String>,
+    submission_key: Option<String>,
+}
+
+impl OnboardingChannelForm {
+    fn submission(&self) -> AppResult<OnboardingSubmission> {
+        let submission_key = self
+            .submission_key
+            .as_deref()
+            .and_then(|key| Uuid::parse_str(key).ok())
+            .ok_or_else(|| {
+                AppError::BadRequest("A valid onboarding submission key is required.".into())
+            })?;
+        let library_agent_ids = self
+            .library_agent_ids
+            .as_deref()
+            .unwrap_or_default()
+            .split([',', ' ', ';', '\n'])
+            .filter(|id| !id.is_empty())
+            .map(|id| {
+                Uuid::parse_str(id)
+                    .map_err(|_| AppError::BadRequest("Invalid library agent selection.".into()))
+            })
+            .collect::<AppResult<Vec<_>>>()?;
+        Ok(OnboardingSubmission {
+            submission_key,
+            library_agent_ids,
+            name: self.name.clone(),
+            instructions: self.instructions.clone(),
+        })
+    }
 }
 
 async fn start(
@@ -183,10 +209,7 @@ async fn channel_step(
     let account = load_account(&user_use_cases, user.id).await?;
     let email = EmailAddress::from(account.email.as_str());
     let mailbox_user = workspace_user(&account, &email, &config);
-    let company = company_use_cases.get_company(company_id).await?;
-    let Some(company) = company.filter(|company| company.user_id == user.id) else {
-        return Ok(Redirect::to("/ui").into_response());
-    };
+    let company = company_use_cases.owned_company(user.id, company_id).await?;
     let library_agents = agent_use_cases.list_library_agents().await?;
     Ok(Html(pages::onboarding_channel_page(
         &mailbox_user,
@@ -200,161 +223,59 @@ async fn channel_step(
 /// Step 2 (p08 D4.7): the chosen agents, agent-only and pinned to the company default model when
 /// there is one, then an assistant channel for each agent that has a model. The completion page
 /// is rendered here, so a refusal shows next to its agent.
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments)] // Typed Axum extractors name each application dependency.
 async fn create_agents(
-    State(company_use_cases): State<Arc<CompanyUseCases>>,
-    State(agent_use_cases): State<Arc<AgentUseCases>>,
-    State(assistant_channels): State<Arc<dyn AssistantChannels>>,
-    State(user_use_cases): State<Arc<UserUseCases>>,
+    State(onboarding): State<Arc<OnboardingUseCases>>,
+    State(companies): State<Arc<CompanyUseCases>>,
+    State(agents): State<Arc<AgentUseCases>>,
+    State(users): State<Arc<UserUseCases>>,
     State(config): State<Arc<AppConfig>>,
     user: AuthenticatedUser,
     Path(company_id): Path<Uuid>,
     Form(form): Form<OnboardingChannelForm>,
 ) -> AppResult<Response> {
-    let account = load_account(&user_use_cases, user.id).await?;
+    let submission = form.submission()?;
+    let submission_key = submission.submission_key;
+    let submitted_ids = submission.library_agent_ids.clone();
+    let account = load_account(&users, user.id).await?;
     let email = EmailAddress::from(account.email.as_str());
     let mailbox_user = workspace_user(&account, &email, &config);
-    let company = company_use_cases.get_company(company_id).await?;
-    let Some(company) = company.filter(|company| company.user_id == user.id) else {
-        return Ok(Redirect::to("/ui").into_response());
-    };
-    let library_agents = agent_use_cases.list_library_agents().await?;
-    let submitted_ids =
-        super::channel::parse_agent_ids_form(form.library_agent_ids.clone()).unwrap_or_default();
-    let draft = pages::OnboardingAgentDraft {
-        name: &form.name,
-        instructions: &form.instructions,
-        library_ids: &submitted_ids,
-    };
-    let mut selected_ids = HashSet::new();
-    let selected_library_agents = submitted_ids
-        .iter()
-        .filter(|id| selected_ids.insert(**id))
-        .map(|id| library_agents.iter().find(|agent| agent.id == *id))
-        .collect::<Option<Vec<_>>>();
-    let Some(selected_library_agents) = selected_library_agents else {
-        return Ok(Html(pages::onboarding_channel_draft_page(
+    let outcome = onboarding.onboard(user.id, company_id, submission).await?;
+    let company = companies.owned_company(user.id, company_id).await?;
+    let html = match outcome {
+        OnboardingOutcome::Rejected(message) => pages::onboarding_channel_draft_page(
             &mailbox_user,
             &company,
-            &library_agents,
-            &draft,
-            Some("One or more selected library agents are no longer available."),
-        ))
-        .into_response());
-    };
-    let custom_name = form.name.trim();
-    let custom_instructions = form.instructions.trim();
-    if selected_library_agents.is_empty()
-        && custom_name.is_empty()
-        && custom_instructions.is_empty()
-    {
-        return Ok(Html(pages::onboarding_channel_draft_page(
-            &mailbox_user,
-            &company,
-            &library_agents,
-            &draft,
-            Some("Select at least one library agent or fill in the custom agent form."),
-        ))
-        .into_response());
-    }
-    if custom_name.is_empty() != custom_instructions.is_empty() {
-        return Ok(Html(pages::onboarding_channel_draft_page(
-            &mailbox_user,
-            &company,
-            &library_agents,
-            &draft,
-            Some("A custom agent needs both a channel name and instructions."),
-        ))
-        .into_response());
-    }
-
-    let connections = agent_use_cases
-        .list_company_model_connections(user.id, company_id)
-        .await?;
-    let default_model = pinned_default_model(&connections);
-    let mut created_agents = Vec::new();
-
-    if !custom_name.is_empty() {
-        let slug = slugify(custom_name);
-        match create_agent_from_instructions(
-            &agent_use_cases,
-            AgentInstructionRequest {
-                user_id: user.id,
-                company_id,
-                name: custom_name,
-                slug: &slug,
-                instructions: custom_instructions,
-                overrides: ModelOverrides {
-                    provider: default_model
-                        .as_ref()
-                        .map(|(provider, _)| provider.as_str()),
-                    model: default_model.as_ref().map(|(_, model)| model.as_str()),
-                },
-                avatar_url: None,
+            &agents.list_library_agents().await?,
+            &pages::OnboardingAgentDraft {
+                name: &form.name,
+                instructions: &form.instructions,
+                library_ids: &submitted_ids,
+                submission_key,
             },
-        )
-        .await
-        {
-            Ok(agent) => created_agents.push(agent),
-            Err(err) => {
-                return Ok(Html(pages::onboarding_channel_draft_page(
-                    &mailbox_user,
-                    &company,
-                    &library_agents,
-                    &draft,
-                    Some(&err),
-                ))
-                .into_response());
-            }
+            Some(&message),
+        ),
+        OnboardingOutcome::Completed(created) => {
+            let onboarded = created
+                .iter()
+                .map(|created| pages::OnboardedAgent {
+                    agent: &created.agent,
+                    channel: match &created.channel {
+                        None => pages::OnboardingChannel::NoModel,
+                        Some(Ok(value)) => created_channel(value),
+                        Some(Err(refusal)) => pages::OnboardingChannel::Refused(refusal.message()),
+                    },
+                })
+                .collect::<Vec<_>>();
+            pages::onboarding_complete_page(&mailbox_user, &company, &onboarded)
         }
-    }
-
-    for library_agent in selected_library_agents {
-        match agent_use_cases
-            .create_agent_from_library(
-                user.id,
-                company_id,
-                library_agent.id,
-                LibraryCopyModel::PinDefault,
-            )
-            .await
-        {
-            Ok(provisioned) => created_agents.push(provisioned.agent),
-            Err(err) => {
-                for agent in created_agents {
-                    let _ = agent_use_cases
-                        .delete_agent(user.id, company_id, agent.id)
-                        .await;
-                }
-                return Ok(Html(pages::onboarding_channel_draft_page(
-                    &mailbox_user,
-                    &company,
-                    &library_agents,
-                    &draft,
-                    Some(&format!("Could not create agent from library: {err}")),
-                ))
-                .into_response());
-            }
-        }
-    }
-
-    let caller = WorkflowActor::authenticated(user.id)?;
-    let mut onboarded = Vec::with_capacity(created_agents.len());
-    for agent in &created_agents {
-        let channel =
-            onboarding_channel(assistant_channels.as_ref(), company_id, caller, agent).await?;
-        onboarded.push(pages::OnboardedAgent { agent, channel });
-    }
-    Ok(Html(pages::onboarding_complete_page(
-        &mailbox_user,
-        &company,
-        &onboarded,
-    ))
-    .into_response())
+    };
+    Ok(Html(html).into_response())
 }
 
 /// One agent's assistant channel: slug = its handle, name = its name, autonomous replies, team
 /// access, under its onboarding key. An agent without a model is skipped, not refused.
+#[cfg(test)]
 async fn onboarding_channel(
     channels: &dyn AssistantChannels,
     company_id: Uuid,
@@ -438,10 +359,7 @@ async fn complete(
     let account = load_account(&user_use_cases, user.id).await?;
     let email = EmailAddress::from(account.email.as_str());
     let mailbox_user = workspace_user(&account, &email, &config);
-    let company = company_use_cases.get_company(company_id).await?;
-    let Some(company) = company.filter(|company| company.user_id == user.id) else {
-        return Ok(Redirect::to("/ui").into_response());
-    };
+    let company = company_use_cases.owned_company(user.id, company_id).await?;
     let agents = agent_use_cases
         .list_company_agents(user.id, company_id)
         .await?;
@@ -551,6 +469,7 @@ mod tests {
                 name: "Retained name",
                 instructions: "Retained <instructions>",
                 library_ids: &[],
+                submission_key: Uuid::new_v4(),
             },
             Some("Fix the selected configuration"),
         );
@@ -840,3 +759,7 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+#[path = "onboarding_authorization_tests.rs"]
+mod authorization_tests;

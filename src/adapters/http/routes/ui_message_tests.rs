@@ -250,14 +250,14 @@ async fn assert_unverified_team_attention_and_note(h: &Harness, viewer: Viewer, 
         PrincipalGrantAuthority::WithheldUnverifiedEmail
     );
     let principal_id = context.principal_id.expect("account keeps its principal");
-    let companies = CompanyUseCases::new(h.persistence.clone());
-    let attention = super::super::super::attention::read_context(
-        &companies,
-        &h.channels,
-        &h.threads,
-        &viewer,
-        h.company_id,
+    let attention = crate::application::attention::AttentionUseCases::new(
+        h.persistence.clone(),
+        h.persistence.clone(),
+        h.persistence.clone(),
+        h.persistence.clone(),
+        Arc::new(crate::adapters::monitoring::in_memory_monitor::InMemoryMonitor::new()),
     )
+    .read_context(&viewer, h.company_id)
     .await
     .unwrap();
     assert_eq!(attention.principal_id, principal_id);

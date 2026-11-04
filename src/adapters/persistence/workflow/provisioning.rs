@@ -911,72 +911,16 @@ impl AssistantChannels for AssistantChannelService {
         caller: WorkflowActor,
         request: AssistantChannelRequest,
     ) -> AppResult<Provisioned<Value>> {
-        if request.command_key.is_empty() || request.command_key.len() > MAX_COMMAND_KEY_BYTES {
-            return Err(AppError::BadRequest(
-                "A command key of 1 to 128 bytes is required".into(),
-            ));
-        }
-        let digest = format!(
-            "{:x}",
-            Sha256::digest(
-                json!({
-                    "caller": caller.user_id(),
-                    "agent_slug": request.agent_slug,
-                    "channel_slug": request.channel_slug,
-                    "channel_name": request.channel_name,
-                    "reply_mode": request.reply_mode.as_str(),
-                })
-                .to_string()
-            )
-        );
         let mut tx = self.persistence.pool().begin().await?;
         super::authority::authorize_company(&mut tx, company, caller).await?;
-        let stored: Option<(String, Value)> = sqlx::query_as(
-            "SELECT request_digest, result FROM workflow_provisioning_commands \
-             WHERE company_id = $1 AND command_key = $2",
-        )
-        .bind(company.as_uuid())
-        .bind(&request.command_key)
-        .fetch_optional(&mut *tx)
-        .await?;
-        if let Some((stored, result)) = stored {
-            if stored != digest {
-                return Err(AppError::Conflict(
-                    "This command key was already used for a different request".into(),
-                ));
-            }
+        let result =
+            assistant_channel_on(&mut tx, &self.templates, company, caller, request).await?;
+        if result.is_ok() {
             tx.commit().await?;
-            return Ok(Ok(result));
+        } else {
+            tx.rollback().await?;
         }
-        let provisioning = Provisioning {
-            company,
-            requester: caller,
-            agent: AssistantAgent::Existing(request.agent_slug),
-            channel_slug: request.channel_slug,
-            channel_name: request.channel_name,
-            reply_mode: request.reply_mode,
-            key: ProvisioningKey::command(company, &request.command_key),
-        };
-        let provisioned = match provision_guarded(&mut tx, &self.templates, &provisioning).await? {
-            Ok(provisioned) => provisioned.to_json(),
-            Err(refusal) => {
-                tx.rollback().await?;
-                return Ok(Err(refusal));
-            }
-        };
-        sqlx::query(
-            "INSERT INTO workflow_provisioning_commands \
-             (company_id, command_key, request_digest, actor_id, result) VALUES ($1, $2, $3, $4, $5)",
-        )
-        .bind(company.as_uuid())
-        .bind(&request.command_key)
-        .bind(&digest)
-        .bind(caller.user_id())
-        .bind(&provisioned)
-        .execute(&mut *tx)
-        .await?;
-        tx.commit().await?;
-        Ok(Ok(provisioned))
+        Ok(result)
     }
 
     async fn assistant_channel_result(
@@ -999,6 +943,77 @@ impl AssistantChannels for AssistantChannelService {
         .fetch_optional(self.persistence.pool())
         .await?)
     }
+}
+
+/// Same command/replay operation inside a caller-owned, company-locked transaction.
+pub(crate) async fn assistant_channel_on(
+    tx: &mut Transaction<'_, Postgres>,
+    templates: &ProvisioningDeployment,
+    company: CompanyId,
+    caller: WorkflowActor,
+    request: AssistantChannelRequest,
+) -> AppResult<Provisioned<Value>> {
+    if request.command_key.is_empty() || request.command_key.len() > MAX_COMMAND_KEY_BYTES {
+        return Err(AppError::BadRequest(
+            "A command key of 1 to 128 bytes is required".into(),
+        ));
+    }
+    let digest = format!(
+        "{:x}",
+        Sha256::digest(
+            json!({
+                "caller": caller.user_id(),
+                "agent_slug": request.agent_slug,
+                "channel_slug": request.channel_slug,
+                "channel_name": request.channel_name,
+                "reply_mode": request.reply_mode.as_str(),
+            })
+            .to_string()
+        )
+    );
+    let stored: Option<(String, Value)> = sqlx::query_as(
+        "SELECT request_digest, result FROM workflow_provisioning_commands \
+             WHERE company_id = $1 AND command_key = $2",
+    )
+    .bind(company.as_uuid())
+    .bind(&request.command_key)
+    .fetch_optional(&mut **tx)
+    .await?;
+    if let Some((stored, result)) = stored {
+        if stored != digest {
+            return Err(AppError::Conflict(
+                "This command key was already used for a different request".into(),
+            ));
+        }
+        return Ok(Ok(result));
+    }
+    let provisioning = Provisioning {
+        company,
+        requester: caller,
+        agent: AssistantAgent::Existing(request.agent_slug),
+        channel_slug: request.channel_slug,
+        channel_name: request.channel_name,
+        reply_mode: request.reply_mode,
+        key: ProvisioningKey::command(company, &request.command_key),
+    };
+    let provisioned = match provision_guarded(tx, templates, &provisioning).await? {
+        Ok(provisioned) => provisioned.to_json(),
+        Err(refusal) => {
+            return Ok(Err(refusal));
+        }
+    };
+    sqlx::query(
+            "INSERT INTO workflow_provisioning_commands \
+             (company_id, command_key, request_digest, actor_id, result) VALUES ($1, $2, $3, $4, $5)",
+        )
+        .bind(company.as_uuid())
+        .bind(&request.command_key)
+        .bind(&digest)
+        .bind(caller.user_id())
+        .bind(&provisioned)
+        .execute(&mut **tx)
+        .await?;
+    Ok(Ok(provisioned))
 }
 
 #[cfg(test)]

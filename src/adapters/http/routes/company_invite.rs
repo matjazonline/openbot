@@ -13,7 +13,7 @@ use uuid::Uuid;
 
 use crate::{
     adapters::http::{app_state::AppState, auth::AuthenticatedUser, pages},
-    app_error::AppResult,
+    app_error::{AppError, AppResult},
     entities::{
         company_invite::CompanyInvite,
         company_member::{CompanyAccessRole, CompanyMember},
@@ -110,30 +110,18 @@ async fn company_invites_page(
     State(invite_use_cases): State<Arc<CompanyInviteUseCases>>,
     user: AuthenticatedUser,
     Path(company_id): Path<Uuid>,
-) -> impl IntoResponse {
-    let company = match company_use_cases.get_company(company_id).await {
-        Ok(Some(c)) => c,
-        _ => return Html(pages::error_alert("Company not found.")).into_response(),
-    };
-
-    if company.user_id != user.id {
-        return Html(pages::error_alert(
-            "Unauthorized: Only company owner can manage invites.",
-        ))
-        .into_response();
-    }
-
+) -> AppResult<Html<String>> {
+    let company = company_use_cases.owned_company(user.id, company_id).await?;
     let invites = invite_use_cases
         .list_company_invites(user.id, company_id)
-        .await
-        .unwrap_or_default();
-
+        .await?;
     let members = invite_use_cases
         .list_company_team_members(user.id, company_id)
-        .await
-        .unwrap_or_default();
+        .await?;
 
-    Html(pages::company_invites_page(&company, &invites, &members)).into_response()
+    Ok(Html(pages::company_invites_page(
+        &company, &invites, &members,
+    )))
 }
 
 /// POST /companies/{company_id}/invites - Create email invite (HTMX).
@@ -143,8 +131,8 @@ async fn create_company_invite(
     user: AuthenticatedUser,
     Path(company_id): Path<Uuid>,
     Form(form): Form<InviteForm>,
-) -> impl IntoResponse {
-    match invite_use_cases
+) -> AppResult<Html<String>> {
+    let error_html = match invite_use_cases
         .create_company_invite(
             user.id,
             company_id,
@@ -153,26 +141,19 @@ async fn create_company_invite(
         )
         .await
     {
-        Ok(_) => {
-            let invites = invite_use_cases
-                .list_company_invites(user.id, company_id)
-                .await
-                .unwrap_or_default();
-            Html(pages::company_invite_list_fragment(company_id, &invites))
+        Ok(_) => String::new(),
+        Err(err @ (AppError::BadRequest(_) | AppError::Conflict(_))) => {
+            pages::error_alert(&format!("Failed to create invite: {err}"))
         }
-        Err(err) => {
-            let error_html = pages::error_alert(&format!("Failed to create invite: {err}"));
-            let invites = invite_use_cases
-                .list_company_invites(user.id, company_id)
-                .await
-                .unwrap_or_default();
-            Html(format!(
-                "{}{}",
-                error_html,
-                pages::company_invite_list_fragment(company_id, &invites)
-            ))
-        }
-    }
+        Err(error) => return Err(error),
+    };
+    let invites = invite_use_cases
+        .list_company_invites(user.id, company_id)
+        .await?;
+    Ok(Html(format!(
+        "{error_html}{}",
+        pages::company_invite_list_fragment(company_id, &invites)
+    )))
 }
 
 /// GET /companies/{company_id}/invites/{invite_id}/edit - Edit form fragment.
@@ -181,15 +162,14 @@ async fn edit_invite_form(
     State(invite_use_cases): State<Arc<CompanyInviteUseCases>>,
     user: AuthenticatedUser,
     Path((company_id, invite_id)): Path<(Uuid, Uuid)>,
-) -> impl IntoResponse {
-    if let Ok(Some(invite)) = invite_use_cases
+) -> AppResult<Html<String>> {
+    let invite = invite_use_cases
         .get_company_invite(user.id, company_id, invite_id)
-        .await
-    {
-        Html(pages::company_invite_edit_fragment(company_id, &invite))
-    } else {
-        Html(pages::error_alert("Invite not found."))
-    }
+        .await?
+        .ok_or_else(|| AppError::NotFound("Invite not found.".into()))?;
+    Ok(Html(pages::company_invite_edit_fragment(
+        company_id, &invite,
+    )))
 }
 
 /// GET /companies/{company_id}/invites/{invite_id}/cancel - Cancel edit fragment.
@@ -198,15 +178,14 @@ async fn cancel_invite_edit(
     State(invite_use_cases): State<Arc<CompanyInviteUseCases>>,
     user: AuthenticatedUser,
     Path((company_id, invite_id)): Path<(Uuid, Uuid)>,
-) -> impl IntoResponse {
-    if let Ok(Some(invite)) = invite_use_cases
+) -> AppResult<Html<String>> {
+    let invite = invite_use_cases
         .get_company_invite(user.id, company_id, invite_id)
-        .await
-    {
-        Html(pages::company_invite_row_fragment(company_id, &invite))
-    } else {
-        Html(String::new())
-    }
+        .await?
+        .ok_or_else(|| AppError::NotFound("Invite not found.".into()))?;
+    Ok(Html(pages::company_invite_row_fragment(
+        company_id, &invite,
+    )))
 }
 
 /// PUT /companies/{company_id}/invites/{invite_id} - Update invite email (HTMX).
@@ -216,14 +195,19 @@ async fn update_company_invite(
     user: AuthenticatedUser,
     Path((company_id, invite_id)): Path<(Uuid, Uuid)>,
     Form(form): Form<InviteForm>,
-) -> impl IntoResponse {
-    match invite_use_cases
-        .update_company_invite(user.id, company_id, invite_id, &form.email, form.role)
-        .await
-    {
-        Ok(invite) => Html(pages::company_invite_row_fragment(company_id, &invite)),
-        Err(err) => Html(pages::error_alert(&format!("Update failed: {err}"))),
-    }
+) -> AppResult<Html<String>> {
+    Ok(
+        match invite_use_cases
+            .update_company_invite(user.id, company_id, invite_id, &form.email, form.role)
+            .await
+        {
+            Ok(invite) => Html(pages::company_invite_row_fragment(company_id, &invite)),
+            Err(err @ (AppError::BadRequest(_) | AppError::Conflict(_))) => {
+                Html(pages::error_alert(&format!("Update failed: {err}")))
+            }
+            Err(error) => return Err(error),
+        },
+    )
 }
 
 /// PUT /companies/{company_id}/team/{user_id} - Update member access role (HTMX).
@@ -233,16 +217,19 @@ async fn update_team_member_role(
     user: AuthenticatedUser,
     Path((company_id, member_user_id)): Path<(Uuid, Uuid)>,
     Form(form): Form<MemberRoleForm>,
-) -> impl IntoResponse {
-    match invite_use_cases
-        .update_company_team_member_role(user.id, company_id, member_user_id, form.role)
-        .await
-    {
-        Ok(member) => Html(pages::company_team_row_fragment(company_id, &member)),
-        Err(err) => Html(pages::error_alert(&format!(
-            "Failed to update member access: {err}"
-        ))),
-    }
+) -> AppResult<Html<String>> {
+    Ok(
+        match invite_use_cases
+            .update_company_team_member_role(user.id, company_id, member_user_id, form.role)
+            .await
+        {
+            Ok(member) => Html(pages::company_team_row_fragment(company_id, &member)),
+            Err(err @ (AppError::BadRequest(_) | AppError::Conflict(_))) => Html(
+                pages::error_alert(&format!("Failed to update member access: {err}")),
+            ),
+            Err(error) => return Err(error),
+        },
+    )
 }
 
 /// DELETE /companies/{company_id}/invites/{invite_id} - Delete invite (HTMX).
@@ -251,11 +238,11 @@ async fn delete_company_invite(
     State(invite_use_cases): State<Arc<CompanyInviteUseCases>>,
     user: AuthenticatedUser,
     Path((company_id, invite_id)): Path<(Uuid, Uuid)>,
-) -> impl IntoResponse {
-    let _ = invite_use_cases
+) -> AppResult<Html<String>> {
+    invite_use_cases
         .delete_company_invite(user.id, company_id, invite_id)
-        .await;
-    Html(String::new())
+        .await?;
+    Ok(Html(String::new()))
 }
 
 /// DELETE /companies/{company_id}/team/{user_id} - Remove member from company team (HTMX).
@@ -264,16 +251,11 @@ async fn remove_team_member(
     State(invite_use_cases): State<Arc<CompanyInviteUseCases>>,
     user: AuthenticatedUser,
     Path((company_id, member_user_id)): Path<(Uuid, Uuid)>,
-) -> impl IntoResponse {
-    match invite_use_cases
+) -> AppResult<Html<String>> {
+    invite_use_cases
         .remove_company_team_member(user.id, company_id, member_user_id)
-        .await
-    {
-        Ok(_) => Html(String::new()),
-        Err(err) => Html(pages::error_alert(&format!(
-            "Failed to remove member: {err}"
-        ))),
-    }
+        .await?;
+    Ok(Html(String::new()))
 }
 
 /// GET /invites - Page listing user's invites.
@@ -568,3 +550,7 @@ mod tests {
         assert!(user_invites_html.contains("Decline"));
     }
 }
+
+#[cfg(test)]
+#[path = "company_invite_authorization_tests.rs"]
+mod authorization_tests;

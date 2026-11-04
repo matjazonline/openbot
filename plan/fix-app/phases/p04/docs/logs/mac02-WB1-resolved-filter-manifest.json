@@ -1,0 +1,107 @@
+{
+  "filters": [
+    "company_access_",
+    "routes::agent",
+    "routes::channel",
+    "routes::company",
+    "routes::company_invite",
+    "ui_team",
+    "attention",
+    "notifications",
+    "agent_library",
+    "skill_library",
+    "monitoring",
+    "ui_dashboard",
+    "ui_companies",
+    "ui_agents",
+    "adapters::http::routes::ui::",
+    "ui_schedules",
+    "pages::tests::",
+    "ui_run_counts",
+    "workflows::ui",
+    "ui_attachments",
+    "use_cases::company",
+    "use_cases::channel",
+    "use_cases::agent",
+    "use_cases::company_invite",
+    "use_cases::thread",
+    "use_cases::user",
+    "use_cases::skill",
+    "application::use_cases::integration",
+    "routes::mcp::",
+    "smtp::",
+    "pages::layout",
+    "http::auth::",
+    "services::inbound_event_worker",
+    "persistence::company::",
+    "routes::user"
+  ],
+  "counts_from_identical_source_test_inventory": {
+    "company_access_": 2,
+    "routes::agent": 9,
+    "routes::channel": 6,
+    "routes::company": 6,
+    "routes::company_invite": 2,
+    "ui_team": 2,
+    "attention": 16,
+    "notifications": 2,
+    "agent_library": 4,
+    "skill_library": 4,
+    "monitoring": 4,
+    "ui_dashboard": 6,
+    "ui_companies": 3,
+    "ui_agents": 1,
+    "adapters::http::routes::ui::": 9,
+    "ui_schedules": 7,
+    "pages::tests::": 120,
+    "ui_run_counts": 8,
+    "workflows::ui": 72,
+    "ui_attachments": 4,
+    "use_cases::company": 15,
+    "use_cases::channel": 14,
+    "use_cases::agent": 7,
+    "use_cases::company_invite": 3,
+    "use_cases::thread": 69,
+    "use_cases::user": 21,
+    "use_cases::skill": 3,
+    "application::use_cases::integration": 6,
+    "routes::mcp::": 2,
+    "smtp::": 17,
+    "pages::layout": 1,
+    "http::auth::": 7,
+    "services::inbound_event_worker": 6,
+    "persistence::company::": 5,
+    "routes::user": 20
+  },
+  "historical_zero_filter_map": {
+    "ui_channels": [
+      "routes::channel",
+      "adapters::http::routes::ui::"
+    ],
+    "ui_deliveries": [
+      "adapters::http::routes::ui::",
+      "pages::tests::"
+    ],
+    "ui_message": [
+      "adapters::http::routes::ui::",
+      "pages::tests::"
+    ],
+    "ui_stream": [
+      "adapters::http::routes::ui::"
+    ],
+    "ui_internal_notes": [
+      "adapters::http::routes::ui::",
+      "pages::tests::"
+    ],
+    "ui_message_diagnostics": [
+      "adapters::http::routes::ui::",
+      "pages::tests::"
+    ],
+    "use_cases::mcp": [
+      "application::use_cases::integration",
+      "routes::mcp::"
+    ]
+  },
+  "selected_unique_tests": 471,
+  "source_inventory_digest": "a366d1d6eaba053c6a66ad52a798a073ec14e8a9cecd5903c3a22840d504e092"
+}

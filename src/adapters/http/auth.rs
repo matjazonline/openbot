@@ -12,7 +12,11 @@ use uuid::Uuid;
 use crate::{
     adapters::http::{app_state::AppState, session::SessionAuthority},
     application::session::VerifiedSession,
-    entities::{user::Viewer, value_objects::EmailAddress},
+    entities::{
+        user::{Caller, User, Viewer},
+        value_objects::EmailAddress,
+    },
+    infra::config::AppConfig,
 };
 
 #[derive(Debug, Clone)]
@@ -134,6 +138,38 @@ impl FromRequestParts<AppState> for Viewer {
             email: EmailAddress::from(account.email.as_str()),
             email_verified_at: account.email_verified_at,
         })
+    }
+}
+
+/// Who the signed-in account is to the deployment: the one place operator status is decided.
+///
+/// `AppConfig::is_operator` is called from here and nowhere else, so the account menu
+/// (`workspace_user`) and every operator check read the same answer.
+pub fn caller_for(account: &User, config: &AppConfig) -> Caller {
+    if config.is_operator(account) {
+        Caller::operator(account.id)
+    } else {
+        Caller::user(account.id)
+    }
+}
+
+/// The signed-in account as the use cases that check operator status see it, decided once per
+/// request from the session's own account.
+impl FromRequestParts<AppState> for Caller {
+    type Rejection = AuthError;
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &AppState,
+    ) -> Result<Self, Self::Rejection> {
+        let user = AuthenticatedUser::from_request_parts(parts, state).await?;
+        let account = state
+            .user_use_cases
+            .get_user_by_id(user.id)
+            .await
+            .map_err(|_| AuthError::ServiceUnavailable)?
+            .ok_or_else(|| auth_error_for(parts))?;
+        Ok(caller_for(&account, &state.config))
     }
 }
 

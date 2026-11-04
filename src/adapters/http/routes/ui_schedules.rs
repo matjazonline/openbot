@@ -23,11 +23,15 @@ use crate::{
         pages,
         routes::{
             schedule::{UiScheduleForm, run_now_key},
-            ui::{load_account, load_managed_company, managed_company_membership, workspace_user},
+            ui::{load_account, load_managed_company, workspace_user},
         },
     },
     app_error::{AppError, AppResult},
-    entities::{company::Company, schedule::ScheduleRun, value_objects::EmailAddress},
+    entities::{
+        company::{Company, CompanyAccess},
+        schedule::ScheduleRun,
+        value_objects::EmailAddress,
+    },
     infra::config::AppConfig,
     use_cases::{
         channel::ChannelUseCases,
@@ -127,7 +131,7 @@ impl SchedulesWorkspace {
     async fn scoped_company(
         &self,
         company_id: Option<Uuid>,
-    ) -> AppResult<(Vec<Company>, Option<Company>)> {
+    ) -> AppResult<(Vec<Company>, Option<CompanyAccess>)> {
         load_managed_company(&self.company_use_cases, self.user_id, company_id).await
     }
 
@@ -239,11 +243,14 @@ async fn schedules_page(
     let workspace_user = workspace_user(&account, &account_email, &workspace.config);
 
     let (companies, company) = workspace.scoped_company(query.company_id).await?;
-    let Some(company) = company else {
+    let Some(CompanyAccess {
+        company,
+        membership,
+    }) = company
+    else {
         return Ok(Html(pages::mailbox_no_company_page(&workspace_user)));
     };
-    let workspace_user = workspace_user
-        .with_company_membership(managed_company_membership(&company, workspace.user_id));
+    let workspace_user = workspace_user.with_company_membership(membership);
 
     let schedules = workspace
         .schedule_use_cases
@@ -360,7 +367,11 @@ async fn create_pane(
     Query(query): Query<CompanyScopedQuery>,
 ) -> AppResult<Html<String>> {
     let (_, company) = workspace.scoped_company(Some(query.company_id)).await?;
-    let Some(company) = company else {
+    let Some(CompanyAccess {
+        company,
+        membership: _,
+    }) = company
+    else {
         return Ok(Html(String::new()));
     };
 
@@ -389,7 +400,11 @@ async fn edit_schedule_pane(
     Query(query): Query<CompanyScopedQuery>,
 ) -> AppResult<Html<String>> {
     let (_, company) = workspace.scoped_company(Some(query.company_id)).await?;
-    let Some(company) = company else {
+    let Some(CompanyAccess {
+        company,
+        membership: _,
+    }) = company
+    else {
         return Ok(Html(String::new()));
     };
 

@@ -30,7 +30,7 @@ use crate::{
     app_error::{AppError, AppResult},
     entities::{
         agent::Agent,
-        company::Company,
+        company::{Company, CompanyAccess},
         value_objects::{AvatarUrl, EmailAddress},
     },
     infra::config::AppConfig,
@@ -45,7 +45,7 @@ use crate::{
 use super::{
     agent::{AgentForm, AgentInstructionRequest, ModelOverrides, agent_write_from_instructions},
     channel::parse_agent_ids_form,
-    ui::{load_account, load_managed_company, managed_company_membership, workspace_user},
+    ui::{load_account, load_managed_company, workspace_user},
 };
 
 pub fn router() -> Router<AppState> {
@@ -147,9 +147,11 @@ impl Workspace {
     /// The company a request is scoped to, always picked from those the caller owns or administers
     /// so a guessed `company_id` cannot reach another company's agents.
     async fn scoped_company(&self, company_id: Uuid) -> AppResult<Company> {
-        let (_, company) =
-            load_managed_company(&self.company_use_cases, self.user_id, Some(company_id)).await?;
-        company.ok_or_else(|| AppError::NotFound("Company not found".into()))
+        Ok(self
+            .company_use_cases
+            .managed_company(self.user_id, company_id)
+            .await?
+            .company)
     }
 
     fn view<'a>(&'a self, company: &'a Company) -> AgentSettingsView<'a> {
@@ -179,11 +181,14 @@ async fn agents_page(
         query.company_id,
     )
     .await?;
-    let Some(company) = company else {
+    let Some(CompanyAccess {
+        company,
+        membership,
+    }) = company
+    else {
         return Ok(Html(pages::mailbox_no_company_page(&workspace_user)));
     };
-    let workspace_user = workspace_user
-        .with_company_membership(managed_company_membership(&company, workspace.user_id));
+    let workspace_user = workspace_user.with_company_membership(membership);
 
     let view = workspace.view(&company);
     let agents = view.agents().await?;
