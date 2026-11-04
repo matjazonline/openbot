@@ -1,0 +1,57 @@
+[
+  {
+    "sql": "CREATE SCHEMA p06_review_70af4c28fcb945d9a5e3e148bfe7b6c7; CREATE TABLE p06_review_70af4c28fcb945d9a5e3e148bfe7b6c7.bundles (digest int PRIMARY KEY); CREATE TABLE p06_review_70af4c28fcb945d9a5e3e148bfe7b6c7.runs (id int PRIMARY KEY, digest int NOT NULL REFERENCES p06_review_70af4c28fcb945d9a5e3e148bfe7b6c7.bundles(digest) DEFERRABLE INITIALLY DEFERRED); INSERT INTO p06_review_70af4c28fcb945d9a5e3e148bfe7b6c7.bundles VALUES (1);",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT wait_event FROM pg_stat_activity WHERE application_name='p06_review_70af4c28fcb945d9a5e3e148bfe7b6c7_admission'",
+    "exit": 0,
+    "stdout": "PgSleep\n",
+    "stderr": ""
+  },
+  {
+    "sql": "BEGIN; SET LOCAL lock_timeout='500ms'; DELETE FROM p06_review_70af4c28fcb945d9a5e3e148bfe7b6c7.bundles AS bundle WHERE digest IN (SELECT digest FROM p06_review_70af4c28fcb945d9a5e3e148bfe7b6c7.bundles FOR UPDATE SKIP LOCKED LIMIT 1) AND NOT EXISTS (SELECT 1 FROM p06_review_70af4c28fcb945d9a5e3e148bfe7b6c7.runs AS run WHERE run.digest=bundle.digest) RETURNING digest; COMMIT;",
+    "exit": 0,
+    "stdout": "1\n",
+    "stderr": ""
+  },
+  {
+    "name": "admission after conflict reuse and concurrent GC",
+    "sql": "BEGIN; INSERT INTO p06_review_70af4c28fcb945d9a5e3e148bfe7b6c7.bundles VALUES (1) ON CONFLICT DO NOTHING; SELECT pg_sleep(4); INSERT INTO p06_review_70af4c28fcb945d9a5e3e148bfe7b6c7.runs VALUES (1,1); COMMIT;",
+    "exit": 1,
+    "stdout": "\n",
+    "stderr": "ERROR:  insert or update on table \"runs\" violates foreign key constraint \"runs_digest_fkey\"\nDETAIL:  Key (digest)=(1) is not present in table \"bundles\".\n"
+  },
+  {
+    "sql": "CREATE TABLE p06_review_70af4c28fcb945d9a5e3e148bfe7b6c7.owners(id int PRIMARY KEY); CREATE TABLE p06_review_70af4c28fcb945d9a5e3e148bfe7b6c7.executions(id int PRIMARY KEY, run int REFERENCES p06_review_70af4c28fcb945d9a5e3e148bfe7b6c7.owners(id) ON DELETE CASCADE); CREATE TABLE p06_review_70af4c28fcb945d9a5e3e148bfe7b6c7.jobs(id int PRIMARY KEY, execution int REFERENCES p06_review_70af4c28fcb945d9a5e3e148bfe7b6c7.executions(id) DEFERRABLE INITIALLY DEFERRED); INSERT INTO p06_review_70af4c28fcb945d9a5e3e148bfe7b6c7.owners VALUES(1); INSERT INTO p06_review_70af4c28fcb945d9a5e3e148bfe7b6c7.executions VALUES(1,1); INSERT INTO p06_review_70af4c28fcb945d9a5e3e148bfe7b6c7.jobs VALUES(1,1);",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "BEGIN; DELETE FROM p06_review_70af4c28fcb945d9a5e3e148bfe7b6c7.owners WHERE id=1; COMMIT;",
+    "exit": 1,
+    "stdout": "",
+    "stderr": "ERROR:  update or delete on table \"executions\" violates foreign key constraint \"jobs_execution_fkey\" on table \"jobs\"\nDETAIL:  Key (id)=(1) is still referenced from table \"jobs\".\n"
+  },
+  {
+    "sql": "SELECT tgname,pg_get_triggerdef(oid) FROM pg_trigger WHERE tgrelid='workflow_executions'::regclass AND NOT tgisinternal ORDER BY tgname",
+    "exit": 0,
+    "stdout": "guard_workflow_token_completion|CREATE TRIGGER guard_workflow_token_completion BEFORE UPDATE OF completed_at ON public.workflow_executions FOR EACH ROW WHEN (((old.completed_at IS NULL) AND (new.completed_at IS NOT NULL))) EXECUTE FUNCTION guard_workflow_token_progression()\nworkflow_execution_revision|CREATE TRIGGER workflow_execution_revision AFTER INSERT OR UPDATE ON public.workflow_executions FOR EACH ROW EXECUTE FUNCTION advance_workflow_owned_revision()\nworkflow_executions_preserve_facts|CREATE TRIGGER workflow_executions_preserve_facts BEFORE UPDATE OF activated_at, frozen_inputs, completed_at, committed_output ON public.workflow_executions FOR EACH ROW EXECUTE FUNCTION preserve_workflow_execution_facts()\nworkflow_executions_preserve_identity|CREATE TRIGGER workflow_executions_preserve_identity BEFORE UPDATE OF company_id, id, run_id, step_id, activation ON public.workflow_executions FOR EACH ROW EXECUTE FUNCTION preserve_workflow_execution_identity()\nworkflow_preserve_progression|CREATE TRIGGER workflow_preserve_progression BEFORE INSERT OR UPDATE ON public.workflow_executions FOR EACH ROW EXECUTE FUNCTION preserve_workflow_progression()\nworkflow_progression_commit_deadline|CREATE CONSTRAINT TRIGGER workflow_progression_commit_deadline AFTER INSERT OR UPDATE ON public.workflow_executions DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION check_workflow_progression_deadline()\n",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT current_database(),current_user,inet_server_port(),version()",
+    "exit": 0,
+    "stdout": "open_bots_test|mac02|55406|PostgreSQL 18.6 (Homebrew) on aarch64-apple-darwin24.6.0, compiled by Apple clang version 17.0.0 (clang-1700.6.4.2), 64-bit\n",
+    "stderr": ""
+  },
+  {
+    "sql": "DROP SCHEMA IF EXISTS p06_review_70af4c28fcb945d9a5e3e148bfe7b6c7 CASCADE",
+    "exit": 0,
+    "stdout": "",
+    "stderr": "NOTICE:  drop cascades to 5 other objects\nDETAIL:  drop cascades to table p06_review_70af4c28fcb945d9a5e3e148bfe7b6c7.bundles\ndrop cascades to table p06_review_70af4c28fcb945d9a5e3e148bfe7b6c7.runs\ndrop cascades to table p06_review_70af4c28fcb945d9a5e3e148bfe7b6c7.owners\ndrop cascades to table p06_review_70af4c28fcb945d9a5e3e148bfe7b6c7.executions\ndrop cascades to table p06_review_70af4c28fcb945d9a5e3e148bfe7b6c7.jobs\n"
+  }
+]

@@ -326,7 +326,7 @@ async fn jev_binding_current_rotation_model_removal_disable_and_no_fallback() {
         .await
         .unwrap();
     assert!(f.persistence.authorize_jev(&claim).await.is_err());
-    let snapshot:String=sqlx::query_scalar("SELECT jsonb_build_object('bundle',encode(bundle,'escape'),'resources',resources)::text FROM workflow_runs WHERE id=$1").bind(claim.fence.scope.run.as_uuid()).fetch_one(f.persistence.pool()).await.unwrap();
+    let snapshot:String=sqlx::query_scalar("SELECT jsonb_build_object('bundle',encode((SELECT stored.bundle FROM workflow_bundles stored WHERE stored.company_id=workflow_runs.company_id AND stored.digest=workflow_runs.bundle_digest),'escape'),'resources',resources)::text FROM workflow_runs WHERE id=$1").bind(claim.fence.scope.run.as_uuid()).fetch_one(f.persistence.pool()).await.unwrap();
     assert!(!snapshot.contains("secret") && !snapshot.contains("enc:v2"));
 }
 #[tokio::test]

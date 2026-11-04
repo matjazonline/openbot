@@ -1,0 +1,6 @@
+{
+  "status": "FAILED_REPORTER_ASSERTION",
+  "reason": "Reporter initially guessed a /data suffix; expected directory must come from the recorded owned-cluster identity. No database identity or data changed.",
+  "guessed_directory": "/Users/mac02/dev/openbot-recovery/.worktrees/pg-p06/data",
+  "observed_and_recorded_directory": "/Users/mac02/dev/openbot-recovery/.worktrees/pg-p06"
+}

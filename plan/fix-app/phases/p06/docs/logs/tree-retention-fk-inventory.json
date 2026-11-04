@@ -1,0 +1,617 @@
+{
+  "query": "SELECT coalesce(json_agg(json_build_object('constraint',constraint_row.conname,\n 'child',constraint_row.conrelid::regclass::text,'parent',constraint_row.confrelid::regclass::text,\n 'delete',constraint_row.confdeltype,'deferred',constraint_row.condeferrable,\n 'initially_deferred',constraint_row.condeferred,\n 'definition',pg_get_constraintdef(constraint_row.oid)) ORDER BY constraint_row.conrelid::regclass::text,constraint_row.conname),'[]')\n FROM pg_constraint AS constraint_row WHERE constraint_row.contype='f'\n AND constraint_row.confrelid IN ('workflow_runs'::regclass,'workflow_executions'::regclass,\n 'workflow_root_budgets'::regclass,'workflow_run_budgets'::regclass,'workflow_run_parents'::regclass,'background_tasks'::regclass)",
+  "rows": [
+    {
+      "constraint": "background_tasks_workflow_execution_fk",
+      "child": "background_tasks",
+      "parent": "workflow_executions",
+      "delete": "a",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, workflow_execution_id) REFERENCES workflow_executions(company_id, id)"
+    },
+    {
+      "constraint": "model_usage_calls_company_id_execution_id_task_id_fkey",
+      "child": "model_usage_calls",
+      "parent": "background_tasks",
+      "delete": "c",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, execution_id, task_id) REFERENCES background_tasks(company_id, workflow_execution_id, id) ON DELETE CASCADE"
+    },
+    {
+      "constraint": "model_usage_calls_company_id_run_id_execution_id_fkey",
+      "child": "model_usage_calls",
+      "parent": "workflow_executions",
+      "delete": "c",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, run_id, execution_id) REFERENCES workflow_executions(company_id, run_id, id) ON DELETE CASCADE"
+    },
+    {
+      "constraint": "model_usage_calls_company_id_run_id_root_run_id_fkey",
+      "child": "model_usage_calls",
+      "parent": "workflow_run_budgets",
+      "delete": "c",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, run_id, root_run_id) REFERENCES workflow_run_budgets(company_id, run_id, root_run_id) ON DELETE CASCADE"
+    },
+    {
+      "constraint": "model_usage_calls_company_id_run_id_workflow_id_version_id_fkey",
+      "child": "model_usage_calls",
+      "parent": "workflow_runs",
+      "delete": "c",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, run_id, workflow_id, version_id) REFERENCES workflow_runs(company_id, id, workflow_id, version_id) ON DELETE CASCADE"
+    },
+    {
+      "constraint": "model_usage_calls_company_id_task_id_fkey",
+      "child": "model_usage_calls",
+      "parent": "background_tasks",
+      "delete": "c",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, task_id) REFERENCES background_tasks(company_id, id) ON DELETE CASCADE"
+    },
+    {
+      "constraint": "schedule_runs_run_fk",
+      "child": "schedule_runs",
+      "parent": "workflow_runs",
+      "delete": "c",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, run_id, binding_id) REFERENCES workflow_runs(company_id, id, binding_id) ON DELETE CASCADE"
+    },
+    {
+      "constraint": "task_attempts_task_id_fkey",
+      "child": "task_attempts",
+      "parent": "background_tasks",
+      "delete": "c",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (task_id) REFERENCES background_tasks(id) ON DELETE CASCADE"
+    },
+    {
+      "constraint": "task_harness_runs_company_id_task_id_fkey",
+      "child": "task_harness_runs",
+      "parent": "background_tasks",
+      "delete": "c",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, task_id) REFERENCES background_tasks(company_id, id) ON DELETE CASCADE"
+    },
+    {
+      "constraint": "task_harness_runs_company_id_workflow_execution_id_task_id_fkey",
+      "child": "task_harness_runs",
+      "parent": "background_tasks",
+      "delete": "c",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, workflow_execution_id, task_id) REFERENCES background_tasks(company_id, workflow_execution_id, id) ON DELETE CASCADE"
+    },
+    {
+      "constraint": "task_harness_runs_company_id_workflow_run_id_workflow_exec_fkey",
+      "child": "task_harness_runs",
+      "parent": "workflow_executions",
+      "delete": "c",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, workflow_run_id, workflow_execution_id) REFERENCES workflow_executions(company_id, run_id, id) ON DELETE CASCADE"
+    },
+    {
+      "constraint": "workflow_action_owner_lifecycle",
+      "child": "workflow_action_actual_receipt_observations",
+      "parent": "workflow_runs",
+      "delete": "c",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, run_id) REFERENCES workflow_runs(company_id, id) ON DELETE CASCADE"
+    },
+    {
+      "constraint": "workflow_action_owner_lifecycle",
+      "child": "workflow_action_claim_budget_refusals",
+      "parent": "workflow_runs",
+      "delete": "c",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, run_id) REFERENCES workflow_runs(company_id, id) ON DELETE CASCADE"
+    },
+    {
+      "constraint": "workflow_action_claim_episode_company_id_execution_id_job__fkey",
+      "child": "workflow_action_claim_episodes",
+      "parent": "background_tasks",
+      "delete": "c",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, execution_id, job_id) REFERENCES background_tasks(company_id, workflow_execution_id, id) ON DELETE CASCADE"
+    },
+    {
+      "constraint": "workflow_action_claim_episode_company_id_run_id_execution__fkey",
+      "child": "workflow_action_claim_episodes",
+      "parent": "workflow_executions",
+      "delete": "c",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, run_id, execution_id) REFERENCES workflow_executions(company_id, run_id, id) ON DELETE CASCADE"
+    },
+    {
+      "constraint": "workflow_action_owner_lifecycle",
+      "child": "workflow_action_claim_episodes",
+      "parent": "workflow_runs",
+      "delete": "c",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, run_id) REFERENCES workflow_runs(company_id, id) ON DELETE CASCADE"
+    },
+    {
+      "constraint": "workflow_action_owner_lifecycle",
+      "child": "workflow_action_claim_retirement_witnesses",
+      "parent": "workflow_runs",
+      "delete": "c",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, run_id) REFERENCES workflow_runs(company_id, id) ON DELETE CASCADE"
+    },
+    {
+      "constraint": "workflow_action_dispatches_company_id_execution_id_job_id_fkey",
+      "child": "workflow_action_dispatches",
+      "parent": "background_tasks",
+      "delete": "c",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, execution_id, job_id) REFERENCES background_tasks(company_id, workflow_execution_id, id) ON DELETE CASCADE"
+    },
+    {
+      "constraint": "workflow_action_owner_lifecycle",
+      "child": "workflow_action_dispatches",
+      "parent": "workflow_runs",
+      "delete": "c",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, run_id) REFERENCES workflow_runs(company_id, id) ON DELETE CASCADE"
+    },
+    {
+      "constraint": "workflow_action_owner_lifecycle",
+      "child": "workflow_action_evidence",
+      "parent": "workflow_runs",
+      "delete": "c",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, run_id) REFERENCES workflow_runs(company_id, id) ON DELETE CASCADE"
+    },
+    {
+      "constraint": "workflow_action_evidence_comm_company_id_execution_id_sche_fkey",
+      "child": "workflow_action_evidence_commands",
+      "parent": "background_tasks",
+      "delete": "c",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, execution_id, scheduled_job_id) REFERENCES background_tasks(company_id, workflow_execution_id, id) ON DELETE CASCADE"
+    },
+    {
+      "constraint": "workflow_action_owner_lifecycle",
+      "child": "workflow_action_evidence_commands",
+      "parent": "workflow_runs",
+      "delete": "c",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, run_id) REFERENCES workflow_runs(company_id, id) ON DELETE CASCADE"
+    },
+    {
+      "constraint": "workflow_action_owner_lifecycle",
+      "child": "workflow_action_evidence_conflicts",
+      "parent": "workflow_runs",
+      "delete": "c",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, run_id) REFERENCES workflow_runs(company_id, id) ON DELETE CASCADE"
+    },
+    {
+      "constraint": "workflow_action_owner_lifecycle",
+      "child": "workflow_action_evidence_consumptions",
+      "parent": "workflow_runs",
+      "delete": "c",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, run_id) REFERENCES workflow_runs(company_id, id) ON DELETE CASCADE"
+    },
+    {
+      "constraint": "workflow_action_owner_lifecycle",
+      "child": "workflow_action_evidence_coverage",
+      "parent": "workflow_runs",
+      "delete": "c",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, run_id) REFERENCES workflow_runs(company_id, id) ON DELETE CASCADE"
+    },
+    {
+      "constraint": "workflow_action_intents_company_id_run_id_execution_id_fkey",
+      "child": "workflow_action_intents",
+      "parent": "workflow_executions",
+      "delete": "c",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, run_id, execution_id) REFERENCES workflow_executions(company_id, run_id, id) ON DELETE CASCADE"
+    },
+    {
+      "constraint": "workflow_action_owner_lifecycle",
+      "child": "workflow_action_receipts",
+      "parent": "workflow_runs",
+      "delete": "c",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, run_id) REFERENCES workflow_runs(company_id, id) ON DELETE CASCADE"
+    },
+    {
+      "constraint": "workflow_action_owner_lifecycle",
+      "child": "workflow_action_reconciliations",
+      "parent": "workflow_runs",
+      "delete": "c",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, run_id) REFERENCES workflow_runs(company_id, id) ON DELETE CASCADE"
+    },
+    {
+      "constraint": "workflow_action_owner_lifecycle",
+      "child": "workflow_action_remote_entries",
+      "parent": "workflow_runs",
+      "delete": "c",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, run_id) REFERENCES workflow_runs(company_id, id) ON DELETE CASCADE"
+    },
+    {
+      "constraint": "workflow_action_remote_entrie_company_id_execution_id_job__fkey",
+      "child": "workflow_action_remote_entries",
+      "parent": "background_tasks",
+      "delete": "c",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, execution_id, job_id) REFERENCES background_tasks(company_id, workflow_execution_id, id) ON DELETE CASCADE"
+    },
+    {
+      "constraint": "workflow_action_owner_lifecycle",
+      "child": "workflow_action_schedule_witnesses",
+      "parent": "workflow_runs",
+      "delete": "c",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, run_id) REFERENCES workflow_runs(company_id, id) ON DELETE CASCADE"
+    },
+    {
+      "constraint": "workflow_action_schedule_witn_company_id_execution_id_job__fkey",
+      "child": "workflow_action_schedule_witnesses",
+      "parent": "background_tasks",
+      "delete": "c",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, execution_id, job_id) REFERENCES background_tasks(company_id, workflow_execution_id, id) ON DELETE CASCADE"
+    },
+    {
+      "constraint": "workflow_action_schedule_witn_company_id_run_id_execution__fkey",
+      "child": "workflow_action_schedule_witnesses",
+      "parent": "workflow_executions",
+      "delete": "c",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, run_id, execution_id) REFERENCES workflow_executions(company_id, run_id, id) ON DELETE CASCADE"
+    },
+    {
+      "constraint": "workflow_action_owner_lifecycle",
+      "child": "workflow_action_state_witnesses",
+      "parent": "workflow_runs",
+      "delete": "c",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, run_id) REFERENCES workflow_runs(company_id, id) ON DELETE CASCADE"
+    },
+    {
+      "constraint": "workflow_admissions_company_id_run_id_binding_id_fkey",
+      "child": "workflow_admissions",
+      "parent": "workflow_runs",
+      "delete": "c",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, run_id, binding_id) REFERENCES workflow_runs(company_id, id, binding_id) ON DELETE CASCADE"
+    },
+    {
+      "constraint": "workflow_budget_receipts_company_id_run_id_execution_id_fkey",
+      "child": "workflow_budget_receipts",
+      "parent": "workflow_executions",
+      "delete": "c",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, run_id, execution_id) REFERENCES workflow_executions(company_id, run_id, id) ON DELETE CASCADE"
+    },
+    {
+      "constraint": "workflow_budget_receipts_company_id_run_id_root_run_id_fkey",
+      "child": "workflow_budget_receipts",
+      "parent": "workflow_run_budgets",
+      "delete": "a",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, run_id, root_run_id) REFERENCES workflow_run_budgets(company_id, run_id, root_run_id)"
+    },
+    {
+      "constraint": "workflow_control_commands_company_id_run_id_fkey",
+      "child": "workflow_control_commands",
+      "parent": "workflow_runs",
+      "delete": "c",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, run_id) REFERENCES workflow_runs(company_id, id) ON DELETE CASCADE"
+    },
+    {
+      "constraint": "workflow_decisions_company_id_execution_id_job_id_fkey",
+      "child": "workflow_decisions",
+      "parent": "background_tasks",
+      "delete": "a",
+      "deferred": true,
+      "initially_deferred": true,
+      "definition": "FOREIGN KEY (company_id, execution_id, job_id) REFERENCES background_tasks(company_id, workflow_execution_id, id) DEFERRABLE INITIALLY DEFERRED"
+    },
+    {
+      "constraint": "workflow_executions_company_id_run_id_fkey",
+      "child": "workflow_executions",
+      "parent": "workflow_runs",
+      "delete": "c",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, run_id) REFERENCES workflow_runs(company_id, id) ON DELETE CASCADE"
+    },
+    {
+      "constraint": "workflow_successor_fk",
+      "child": "workflow_executions",
+      "parent": "workflow_executions",
+      "delete": "a",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, run_id, successor_execution_id) REFERENCES workflow_executions(company_id, run_id, id)"
+    },
+    {
+      "constraint": "workflow_history_members_company_id_run_id_channel_id_thre_fkey",
+      "child": "workflow_history_members",
+      "parent": "workflow_runs",
+      "delete": "c",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, run_id, channel_id, thread_id) REFERENCES workflow_runs(company_id, id, channel_id, thread_id) ON DELETE CASCADE"
+    },
+    {
+      "constraint": "workflow_history_snapshots_company_id_run_id_fkey",
+      "child": "workflow_history_snapshots",
+      "parent": "workflow_runs",
+      "delete": "c",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, run_id) REFERENCES workflow_runs(company_id, id) ON DELETE CASCADE"
+    },
+    {
+      "constraint": "workflow_jev_invocations_company_id_run_id_execution_id_fkey",
+      "child": "workflow_jev_invocations",
+      "parent": "workflow_executions",
+      "delete": "c",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, run_id, execution_id) REFERENCES workflow_executions(company_id, run_id, id) ON DELETE CASCADE"
+    },
+    {
+      "constraint": "workflow_message_action_owner",
+      "child": "workflow_message_actions",
+      "parent": "workflow_runs",
+      "delete": "c",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, run_id) REFERENCES workflow_runs(company_id, id) ON DELETE CASCADE"
+    },
+    {
+      "constraint": "workflow_message_event_owner",
+      "child": "workflow_message_delivery_events",
+      "parent": "workflow_runs",
+      "delete": "c",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, run_id) REFERENCES workflow_runs(company_id, id) ON DELETE CASCADE"
+    },
+    {
+      "constraint": "workflow_message_reopen_owner",
+      "child": "workflow_message_delivery_reopens",
+      "parent": "workflow_runs",
+      "delete": "c",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, run_id) REFERENCES workflow_runs(company_id, id) ON DELETE CASCADE"
+    },
+    {
+      "constraint": "workflow_message_destination_owner",
+      "child": "workflow_message_destinations",
+      "parent": "workflow_runs",
+      "delete": "c",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, run_id) REFERENCES workflow_runs(company_id, id) ON DELETE CASCADE"
+    },
+    {
+      "constraint": "workflow_message_intent_binding_run",
+      "child": "workflow_message_intent_bindings",
+      "parent": "workflow_runs",
+      "delete": "c",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, run_id, binding_id) REFERENCES workflow_runs(company_id, id, binding_id) ON DELETE CASCADE"
+    },
+    {
+      "constraint": "workflow_message_intent_matched_run",
+      "child": "workflow_message_intents",
+      "parent": "workflow_runs",
+      "delete": "c",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, matched_run_id) REFERENCES workflow_runs(company_id, id) ON DELETE CASCADE"
+    },
+    {
+      "constraint": "workflow_root_budget_usage_company_id_root_run_id_fkey",
+      "child": "workflow_root_budget_usage",
+      "parent": "workflow_root_budgets",
+      "delete": "c",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, root_run_id) REFERENCES workflow_root_budgets(company_id, root_run_id) ON DELETE CASCADE"
+    },
+    {
+      "constraint": "workflow_root_budgets_company_id_root_run_id_fkey",
+      "child": "workflow_root_budgets",
+      "parent": "workflow_runs",
+      "delete": "c",
+      "deferred": true,
+      "initially_deferred": true,
+      "definition": "FOREIGN KEY (company_id, root_run_id) REFERENCES workflow_runs(company_id, id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED"
+    },
+    {
+      "constraint": "workflow_run_budgets_company_id_parent_run_id_root_run_id_fkey",
+      "child": "workflow_run_budgets",
+      "parent": "workflow_run_budgets",
+      "delete": "a",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, parent_run_id, root_run_id) REFERENCES workflow_run_budgets(company_id, run_id, root_run_id)"
+    },
+    {
+      "constraint": "workflow_run_budgets_company_id_root_run_id_fkey",
+      "child": "workflow_run_budgets",
+      "parent": "workflow_root_budgets",
+      "delete": "a",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, root_run_id) REFERENCES workflow_root_budgets(company_id, root_run_id)"
+    },
+    {
+      "constraint": "workflow_run_budgets_company_id_run_id_fkey",
+      "child": "workflow_run_budgets",
+      "parent": "workflow_runs",
+      "delete": "c",
+      "deferred": true,
+      "initially_deferred": true,
+      "definition": "FOREIGN KEY (company_id, run_id) REFERENCES workflow_runs(company_id, id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED"
+    },
+    {
+      "constraint": "workflow_run_budgets_company_id_run_id_parent_run_id_fkey",
+      "child": "workflow_run_budgets",
+      "parent": "workflow_runs",
+      "delete": "c",
+      "deferred": true,
+      "initially_deferred": true,
+      "definition": "FOREIGN KEY (company_id, run_id, parent_run_id) REFERENCES workflow_runs(company_id, id, parent_run_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED"
+    },
+    {
+      "constraint": "workflow_run_event_execution_fk",
+      "child": "workflow_run_events",
+      "parent": "workflow_executions",
+      "delete": "a",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, run_id, execution_id) REFERENCES workflow_executions(company_id, run_id, id)"
+    },
+    {
+      "constraint": "workflow_run_events_company_id_run_id_fkey",
+      "child": "workflow_run_events",
+      "parent": "workflow_runs",
+      "delete": "c",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, run_id) REFERENCES workflow_runs(company_id, id) ON DELETE CASCADE"
+    },
+    {
+      "constraint": "workflow_wakeup_execution_fk",
+      "child": "workflow_run_events",
+      "parent": "workflow_executions",
+      "delete": "a",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, run_id, terminal_execution_id) REFERENCES workflow_executions(company_id, run_id, id)"
+    },
+    {
+      "constraint": "workflow_parent_execution_fk",
+      "child": "workflow_run_parents",
+      "parent": "workflow_executions",
+      "delete": "a",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, parent_run_id, parent_execution_id) REFERENCES workflow_executions(company_id, run_id, id)"
+    },
+    {
+      "constraint": "workflow_parent_owner_fk",
+      "child": "workflow_run_parents",
+      "parent": "workflow_runs",
+      "delete": "c",
+      "deferred": true,
+      "initially_deferred": true,
+      "definition": "FOREIGN KEY (company_id, child_run_id, parent_run_id, parent_execution_id) REFERENCES workflow_runs(company_id, id, parent_run_id, parent_execution_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED"
+    },
+    {
+      "constraint": "workflow_rerun_original_fk",
+      "child": "workflow_runs",
+      "parent": "workflow_runs",
+      "delete": "a",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, rerun_of_run_id, workflow_id) REFERENCES workflow_runs(company_id, id, workflow_id)"
+    },
+    {
+      "constraint": "workflow_run_parent_link_fk",
+      "child": "workflow_runs",
+      "parent": "workflow_run_parents",
+      "delete": "a",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, id, parent_run_id, parent_execution_id) REFERENCES workflow_run_parents(company_id, child_run_id, parent_run_id, parent_execution_id)"
+    },
+    {
+      "constraint": "workflow_run_terminal_execution_fk",
+      "child": "workflow_runs",
+      "parent": "workflow_executions",
+      "delete": "a",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, id, terminal_execution_id) REFERENCES workflow_executions(company_id, run_id, id)"
+    },
+    {
+      "constraint": "workflow_wait_event_consumer_execution",
+      "child": "workflow_wait_events",
+      "parent": "workflow_executions",
+      "delete": "a",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, run_id, consumed_execution_id) REFERENCES workflow_executions(company_id, run_id, id)"
+    },
+    {
+      "constraint": "workflow_wait_events_company_id_run_id_fkey",
+      "child": "workflow_wait_events",
+      "parent": "workflow_runs",
+      "delete": "c",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, run_id) REFERENCES workflow_runs(company_id, id) ON DELETE CASCADE"
+    },
+    {
+      "constraint": "workflow_wait_child_link",
+      "child": "workflow_waits",
+      "parent": "workflow_run_parents",
+      "delete": "a",
+      "deferred": true,
+      "initially_deferred": true,
+      "definition": "FOREIGN KEY (company_id, child_run_id, run_id, execution_id) REFERENCES workflow_run_parents(company_id, child_run_id, parent_run_id, parent_execution_id) DEFERRABLE INITIALLY DEFERRED"
+    },
+    {
+      "constraint": "workflow_waits_company_id_run_id_execution_id_fkey",
+      "child": "workflow_waits",
+      "parent": "workflow_executions",
+      "delete": "c",
+      "deferred": false,
+      "initially_deferred": false,
+      "definition": "FOREIGN KEY (company_id, run_id, execution_id) REFERENCES workflow_executions(company_id, run_id, id) ON DELETE CASCADE"
+    }
+  ]
+}

@@ -145,12 +145,12 @@ async fn initialize_action_on_claim(
         vec![],
     )
     .unwrap();
-    sqlx::query("UPDATE workflow_runs SET bundle=$2 WHERE id=$1")
-        .bind(scope.run.as_uuid())
-        .bind(store_bundle(&bundle).unwrap())
-        .execute(f.persistence().pool())
-        .await
-        .unwrap();
+    replace_run_bundle(
+        f.persistence().pool(),
+        scope.run.as_uuid(),
+        &store_bundle(&bundle).unwrap(),
+    )
+    .await;
     sqlx::query("INSERT INTO fixture_action_resources VALUES ($1,true)")
         .bind(scope.company.as_uuid())
         .execute(f.persistence().pool())

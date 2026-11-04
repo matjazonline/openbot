@@ -409,7 +409,8 @@ fn agent_delete_error(error: sqlx::Error) -> AppError {
     match constraint.as_deref() {
         Some(
             "task_harness_runs_company_id_agent_id_fkey"
-            | "model_usage_calls_company_id_agent_id_fkey",
+            | "model_usage_calls_company_id_agent_id_fkey"
+            | "model_usage_history_company_id_agent_id_fkey",
         ) => AppError::Conflict("This agent has run history and cannot be deleted.".into()),
         _ => AppError::from(error),
     }

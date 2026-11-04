@@ -1,0 +1,292 @@
+[
+  {
+    "family": "list",
+    "name": "company",
+    "parameters": [
+      "company",
+      "limit"
+    ],
+    "sql": "SELECT id, binding_id, workflow_id, version_id, channel_id, thread_id, state, waiting_reason, revision, actor_id, parent_run_id, rerun_of_run_id, created_at, deadline, finished_at FROM workflow_runs WHERE company_id = $1 ORDER BY created_at DESC, id DESC LIMIT $2"
+  },
+  {
+    "family": "list",
+    "name": "binding",
+    "parameters": [
+      "company",
+      "binding",
+      "limit"
+    ],
+    "sql": "SELECT id, binding_id, workflow_id, version_id, channel_id, thread_id, state, waiting_reason, revision, actor_id, parent_run_id, rerun_of_run_id, created_at, deadline, finished_at FROM workflow_runs WHERE company_id = $1 AND binding_id = $2 ORDER BY created_at DESC, id DESC LIMIT $3"
+  },
+  {
+    "family": "list",
+    "name": "state",
+    "parameters": [
+      "company",
+      "state",
+      "limit"
+    ],
+    "sql": "SELECT id, binding_id, workflow_id, version_id, channel_id, thread_id, state, waiting_reason, revision, actor_id, parent_run_id, rerun_of_run_id, created_at, deadline, finished_at FROM workflow_runs WHERE company_id = $1 AND state = $2 ORDER BY created_at DESC, id DESC LIMIT $3"
+  },
+  {
+    "family": "list",
+    "name": "agent",
+    "parameters": [
+      "company",
+      "agent",
+      "company",
+      "limit",
+      "limit"
+    ],
+    "sql": "SELECT id, binding_id, workflow_id, version_id, channel_id, thread_id, state, waiting_reason, revision, actor_id, parent_run_id, rerun_of_run_id, created_at, deadline, finished_at FROM (SELECT version.id AS used_version FROM workflow_versions AS version WHERE version.company_id = $1 AND $2 = ANY(version.agent_ids)) AS agent_versions CROSS JOIN LATERAL (SELECT id, binding_id, workflow_id, version_id, channel_id, thread_id, state, waiting_reason, revision, actor_id, parent_run_id, rerun_of_run_id, created_at, deadline, finished_at FROM workflow_runs WHERE company_id = $3 AND version_id = agent_versions.used_version ORDER BY created_at DESC, id DESC LIMIT $4) AS run ORDER BY created_at DESC, id DESC LIMIT $5"
+  },
+  {
+    "family": "list",
+    "name": "agent_state",
+    "parameters": [
+      "company",
+      "agent",
+      "company",
+      "state",
+      "limit",
+      "limit"
+    ],
+    "sql": "SELECT id, binding_id, workflow_id, version_id, channel_id, thread_id, state, waiting_reason, revision, actor_id, parent_run_id, rerun_of_run_id, created_at, deadline, finished_at FROM (SELECT version.id AS used_version FROM workflow_versions AS version WHERE version.company_id = $1 AND $2 = ANY(version.agent_ids)) AS agent_versions CROSS JOIN LATERAL (SELECT id, binding_id, workflow_id, version_id, channel_id, thread_id, state, waiting_reason, revision, actor_id, parent_run_id, rerun_of_run_id, created_at, deadline, finished_at FROM workflow_runs WHERE company_id = $3 AND version_id = agent_versions.used_version AND state = $4 ORDER BY created_at DESC, id DESC LIMIT $5) AS run ORDER BY created_at DESC, id DESC LIMIT $6"
+  },
+  {
+    "family": "list",
+    "name": "agent_cursor",
+    "parameters": [
+      "company",
+      "agent",
+      "company",
+      "cursor_created",
+      "cursor_id",
+      "limit",
+      "limit"
+    ],
+    "sql": "SELECT id, binding_id, workflow_id, version_id, channel_id, thread_id, state, waiting_reason, revision, actor_id, parent_run_id, rerun_of_run_id, created_at, deadline, finished_at FROM (SELECT version.id AS used_version FROM workflow_versions AS version WHERE version.company_id = $1 AND $2 = ANY(version.agent_ids)) AS agent_versions CROSS JOIN LATERAL (SELECT id, binding_id, workflow_id, version_id, channel_id, thread_id, state, waiting_reason, revision, actor_id, parent_run_id, rerun_of_run_id, created_at, deadline, finished_at FROM workflow_runs WHERE company_id = $3 AND version_id = agent_versions.used_version AND (created_at, id) < ($4, $5) ORDER BY created_at DESC, id DESC LIMIT $6) AS run ORDER BY created_at DESC, id DESC LIMIT $7"
+  },
+  {
+    "family": "list",
+    "name": "top_level",
+    "parameters": [
+      "company",
+      "limit"
+    ],
+    "sql": "SELECT id, binding_id, workflow_id, version_id, channel_id, thread_id, state, waiting_reason, revision, actor_id, parent_run_id, rerun_of_run_id, created_at, deadline, finished_at FROM workflow_runs WHERE company_id = $1 AND parent_run_id IS NULL ORDER BY created_at DESC, id DESC LIMIT $2"
+  },
+  {
+    "family": "list",
+    "name": "agent_top_level",
+    "parameters": [
+      "company",
+      "agent",
+      "company",
+      "limit",
+      "limit"
+    ],
+    "sql": "SELECT id, binding_id, workflow_id, version_id, channel_id, thread_id, state, waiting_reason, revision, actor_id, parent_run_id, rerun_of_run_id, created_at, deadline, finished_at FROM (SELECT version.id AS used_version FROM workflow_versions AS version WHERE version.company_id = $1 AND $2 = ANY(version.agent_ids)) AS agent_versions CROSS JOIN LATERAL (SELECT id, binding_id, workflow_id, version_id, channel_id, thread_id, state, waiting_reason, revision, actor_id, parent_run_id, rerun_of_run_id, created_at, deadline, finished_at FROM workflow_runs WHERE company_id = $3 AND version_id = agent_versions.used_version AND parent_run_id IS NULL ORDER BY created_at DESC, id DESC LIMIT $4) AS run ORDER BY created_at DESC, id DESC LIMIT $5"
+  },
+  {
+    "family": "list",
+    "name": "workflow",
+    "parameters": [
+      "company",
+      "workflow",
+      "limit"
+    ],
+    "sql": "SELECT id, binding_id, workflow_id, version_id, channel_id, thread_id, state, waiting_reason, revision, actor_id, parent_run_id, rerun_of_run_id, created_at, deadline, finished_at FROM workflow_runs WHERE company_id = $1 AND workflow_id = $2 ORDER BY created_at DESC, id DESC LIMIT $3"
+  },
+  {
+    "family": "list",
+    "name": "workflow_state",
+    "parameters": [
+      "company",
+      "workflow",
+      "state",
+      "limit"
+    ],
+    "sql": "SELECT id, binding_id, workflow_id, version_id, channel_id, thread_id, state, waiting_reason, revision, actor_id, parent_run_id, rerun_of_run_id, created_at, deadline, finished_at FROM workflow_runs WHERE company_id = $1 AND workflow_id = $2 AND state = $3 ORDER BY created_at DESC, id DESC LIMIT $4"
+  },
+  {
+    "family": "board_counts",
+    "name": "board_counts",
+    "parameters": [
+      "company",
+      "company",
+      "cutoff"
+    ],
+    "sql": "WITH working AS MATERIALIZED (SELECT state, channel_id, binding_id, workflow_id, version_id FROM workflow_runs WHERE company_id = $1 AND state IN ('queued', 'running', 'waiting') AND parent_run_id IS NULL UNION ALL SELECT state, channel_id, binding_id, workflow_id, version_id FROM workflow_runs WHERE company_id = $2 AND finished_at >= $3 AND parent_run_id IS NULL) SELECT state, channel_id, COUNT(*)::bigint AS runs FROM working GROUP BY state, channel_id"
+  },
+  {
+    "family": "board_cards",
+    "name": "board_cards",
+    "parameters": [
+      "company",
+      "channels",
+      "company_visible",
+      "company",
+      "channels",
+      "company_visible",
+      "company",
+      "channels",
+      "company_visible",
+      "company",
+      "channels",
+      "company_visible",
+      "cutoff",
+      "company",
+      "channels",
+      "company_visible",
+      "cutoff",
+      "company",
+      "channels",
+      "company_visible",
+      "cutoff"
+    ],
+    "sql": "(SELECT id, binding_id, workflow_id, version_id, channel_id, thread_id, state, waiting_reason, revision, actor_id, parent_run_id, rerun_of_run_id, created_at, deadline, finished_at FROM workflow_runs WHERE company_id = $1 AND state = 'queued' AND parent_run_id IS NULL AND (channel_id = ANY($2) OR (channel_id IS NULL AND $3)) ORDER BY created_at, id LIMIT 51) UNION ALL (SELECT id, binding_id, workflow_id, version_id, channel_id, thread_id, state, waiting_reason, revision, actor_id, parent_run_id, rerun_of_run_id, created_at, deadline, finished_at FROM workflow_runs WHERE company_id = $4 AND state = 'running' AND parent_run_id IS NULL AND (channel_id = ANY($5) OR (channel_id IS NULL AND $6)) ORDER BY created_at, id LIMIT 51) UNION ALL (SELECT id, binding_id, workflow_id, version_id, channel_id, thread_id, state, waiting_reason, revision, actor_id, parent_run_id, rerun_of_run_id, created_at, deadline, finished_at FROM workflow_runs WHERE company_id = $7 AND state = 'waiting' AND parent_run_id IS NULL AND (channel_id = ANY($8) OR (channel_id IS NULL AND $9)) ORDER BY created_at, id LIMIT 51) UNION ALL (SELECT id, binding_id, workflow_id, version_id, channel_id, thread_id, state, waiting_reason, revision, actor_id, parent_run_id, rerun_of_run_id, created_at, deadline, finished_at FROM workflow_runs WHERE company_id = $10 AND state = 'succeeded' AND parent_run_id IS NULL AND (channel_id = ANY($11) OR (channel_id IS NULL AND $12)) AND finished_at >= $13 ORDER BY finished_at DESC, id DESC LIMIT 51) UNION ALL (SELECT id, binding_id, workflow_id, version_id, channel_id, thread_id, state, waiting_reason, revision, actor_id, parent_run_id, rerun_of_run_id, created_at, deadline, finished_at FROM workflow_runs WHERE company_id = $14 AND state = 'failed' AND parent_run_id IS NULL AND (channel_id = ANY($15) OR (channel_id IS NULL AND $16)) AND finished_at >= $17 ORDER BY finished_at DESC, id DESC LIMIT 51) UNION ALL (SELECT id, binding_id, workflow_id, version_id, channel_id, thread_id, state, waiting_reason, revision, actor_id, parent_run_id, rerun_of_run_id, created_at, deadline, finished_at FROM workflow_runs WHERE company_id = $18 AND state = 'cancelled' AND parent_run_id IS NULL AND (channel_id = ANY($19) OR (channel_id IS NULL AND $20)) AND finished_at >= $21 ORDER BY finished_at DESC, id DESC LIMIT 51)"
+  },
+  {
+    "family": "board_counts",
+    "name": "board_counts_binding",
+    "parameters": [
+      "company",
+      "company",
+      "cutoff",
+      "binding"
+    ],
+    "sql": "WITH working AS MATERIALIZED (SELECT state, channel_id, binding_id, workflow_id, version_id FROM workflow_runs WHERE company_id = $1 AND state IN ('queued', 'running', 'waiting') AND parent_run_id IS NULL UNION ALL SELECT state, channel_id, binding_id, workflow_id, version_id FROM workflow_runs WHERE company_id = $2 AND finished_at >= $3 AND parent_run_id IS NULL) SELECT state, channel_id, COUNT(*)::bigint AS runs FROM working WHERE binding_id = $4 GROUP BY state, channel_id"
+  },
+  {
+    "family": "board_cards",
+    "name": "board_cards_binding",
+    "parameters": [
+      "company",
+      "channels",
+      "company_visible",
+      "company",
+      "channels",
+      "company_visible",
+      "company",
+      "channels",
+      "company_visible",
+      "company",
+      "channels",
+      "company_visible",
+      "cutoff",
+      "company",
+      "channels",
+      "company_visible",
+      "cutoff",
+      "company",
+      "channels",
+      "company_visible",
+      "cutoff",
+      "binding",
+      "binding",
+      "binding",
+      "binding",
+      "binding",
+      "binding"
+    ],
+    "sql": "WITH queued AS MATERIALIZED (SELECT id, binding_id, workflow_id, version_id, channel_id, thread_id, state, waiting_reason, revision, actor_id, parent_run_id, rerun_of_run_id, created_at, deadline, finished_at FROM workflow_runs WHERE company_id = $1 AND state = 'queued' AND parent_run_id IS NULL AND (channel_id = ANY($2) OR (channel_id IS NULL AND $3))), running AS MATERIALIZED (SELECT id, binding_id, workflow_id, version_id, channel_id, thread_id, state, waiting_reason, revision, actor_id, parent_run_id, rerun_of_run_id, created_at, deadline, finished_at FROM workflow_runs WHERE company_id = $4 AND state = 'running' AND parent_run_id IS NULL AND (channel_id = ANY($5) OR (channel_id IS NULL AND $6))), waiting AS MATERIALIZED (SELECT id, binding_id, workflow_id, version_id, channel_id, thread_id, state, waiting_reason, revision, actor_id, parent_run_id, rerun_of_run_id, created_at, deadline, finished_at FROM workflow_runs WHERE company_id = $7 AND state = 'waiting' AND parent_run_id IS NULL AND (channel_id = ANY($8) OR (channel_id IS NULL AND $9))), succeeded AS MATERIALIZED (SELECT id, binding_id, workflow_id, version_id, channel_id, thread_id, state, waiting_reason, revision, actor_id, parent_run_id, rerun_of_run_id, created_at, deadline, finished_at FROM workflow_runs WHERE company_id = $10 AND state = 'succeeded' AND parent_run_id IS NULL AND (channel_id = ANY($11) OR (channel_id IS NULL AND $12)) AND finished_at >= $13), failed AS MATERIALIZED (SELECT id, binding_id, workflow_id, version_id, channel_id, thread_id, state, waiting_reason, revision, actor_id, parent_run_id, rerun_of_run_id, created_at, deadline, finished_at FROM workflow_runs WHERE company_id = $14 AND state = 'failed' AND parent_run_id IS NULL AND (channel_id = ANY($15) OR (channel_id IS NULL AND $16)) AND finished_at >= $17), cancelled AS MATERIALIZED (SELECT id, binding_id, workflow_id, version_id, channel_id, thread_id, state, waiting_reason, revision, actor_id, parent_run_id, rerun_of_run_id, created_at, deadline, finished_at FROM workflow_runs WHERE company_id = $18 AND state = 'cancelled' AND parent_run_id IS NULL AND (channel_id = ANY($19) OR (channel_id IS NULL AND $20)) AND finished_at >= $21) (SELECT id, binding_id, workflow_id, version_id, channel_id, thread_id, state, waiting_reason, revision, actor_id, parent_run_id, rerun_of_run_id, created_at, deadline, finished_at FROM queued WHERE binding_id = $22 ORDER BY created_at, id LIMIT 51) UNION ALL (SELECT id, binding_id, workflow_id, version_id, channel_id, thread_id, state, waiting_reason, revision, actor_id, parent_run_id, rerun_of_run_id, created_at, deadline, finished_at FROM running WHERE binding_id = $23 ORDER BY created_at, id LIMIT 51) UNION ALL (SELECT id, binding_id, workflow_id, version_id, channel_id, thread_id, state, waiting_reason, revision, actor_id, parent_run_id, rerun_of_run_id, created_at, deadline, finished_at FROM waiting WHERE binding_id = $24 ORDER BY created_at, id LIMIT 51) UNION ALL (SELECT id, binding_id, workflow_id, version_id, channel_id, thread_id, state, waiting_reason, revision, actor_id, parent_run_id, rerun_of_run_id, created_at, deadline, finished_at FROM succeeded WHERE binding_id = $25 ORDER BY finished_at DESC, id DESC LIMIT 51) UNION ALL (SELECT id, binding_id, workflow_id, version_id, channel_id, thread_id, state, waiting_reason, revision, actor_id, parent_run_id, rerun_of_run_id, created_at, deadline, finished_at FROM failed WHERE binding_id = $26 ORDER BY finished_at DESC, id DESC LIMIT 51) UNION ALL (SELECT id, binding_id, workflow_id, version_id, channel_id, thread_id, state, waiting_reason, revision, actor_id, parent_run_id, rerun_of_run_id, created_at, deadline, finished_at FROM cancelled WHERE binding_id = $27 ORDER BY finished_at DESC, id DESC LIMIT 51)"
+  },
+  {
+    "family": "board_counts",
+    "name": "board_counts_workflow",
+    "parameters": [
+      "company",
+      "company",
+      "cutoff",
+      "workflow"
+    ],
+    "sql": "WITH working AS MATERIALIZED (SELECT state, channel_id, binding_id, workflow_id, version_id FROM workflow_runs WHERE company_id = $1 AND state IN ('queued', 'running', 'waiting') AND parent_run_id IS NULL UNION ALL SELECT state, channel_id, binding_id, workflow_id, version_id FROM workflow_runs WHERE company_id = $2 AND finished_at >= $3 AND parent_run_id IS NULL) SELECT state, channel_id, COUNT(*)::bigint AS runs FROM working WHERE workflow_id = $4 GROUP BY state, channel_id"
+  },
+  {
+    "family": "board_cards",
+    "name": "board_cards_workflow",
+    "parameters": [
+      "company",
+      "channels",
+      "company_visible",
+      "company",
+      "channels",
+      "company_visible",
+      "company",
+      "channels",
+      "company_visible",
+      "company",
+      "channels",
+      "company_visible",
+      "cutoff",
+      "company",
+      "channels",
+      "company_visible",
+      "cutoff",
+      "company",
+      "channels",
+      "company_visible",
+      "cutoff",
+      "workflow",
+      "workflow",
+      "workflow",
+      "workflow",
+      "workflow",
+      "workflow"
+    ],
+    "sql": "WITH queued AS MATERIALIZED (SELECT id, binding_id, workflow_id, version_id, channel_id, thread_id, state, waiting_reason, revision, actor_id, parent_run_id, rerun_of_run_id, created_at, deadline, finished_at FROM workflow_runs WHERE company_id = $1 AND state = 'queued' AND parent_run_id IS NULL AND (channel_id = ANY($2) OR (channel_id IS NULL AND $3))), running AS MATERIALIZED (SELECT id, binding_id, workflow_id, version_id, channel_id, thread_id, state, waiting_reason, revision, actor_id, parent_run_id, rerun_of_run_id, created_at, deadline, finished_at FROM workflow_runs WHERE company_id = $4 AND state = 'running' AND parent_run_id IS NULL AND (channel_id = ANY($5) OR (channel_id IS NULL AND $6))), waiting AS MATERIALIZED (SELECT id, binding_id, workflow_id, version_id, channel_id, thread_id, state, waiting_reason, revision, actor_id, parent_run_id, rerun_of_run_id, created_at, deadline, finished_at FROM workflow_runs WHERE company_id = $7 AND state = 'waiting' AND parent_run_id IS NULL AND (channel_id = ANY($8) OR (channel_id IS NULL AND $9))), succeeded AS MATERIALIZED (SELECT id, binding_id, workflow_id, version_id, channel_id, thread_id, state, waiting_reason, revision, actor_id, parent_run_id, rerun_of_run_id, created_at, deadline, finished_at FROM workflow_runs WHERE company_id = $10 AND state = 'succeeded' AND parent_run_id IS NULL AND (channel_id = ANY($11) OR (channel_id IS NULL AND $12)) AND finished_at >= $13), failed AS MATERIALIZED (SELECT id, binding_id, workflow_id, version_id, channel_id, thread_id, state, waiting_reason, revision, actor_id, parent_run_id, rerun_of_run_id, created_at, deadline, finished_at FROM workflow_runs WHERE company_id = $14 AND state = 'failed' AND parent_run_id IS NULL AND (channel_id = ANY($15) OR (channel_id IS NULL AND $16)) AND finished_at >= $17), cancelled AS MATERIALIZED (SELECT id, binding_id, workflow_id, version_id, channel_id, thread_id, state, waiting_reason, revision, actor_id, parent_run_id, rerun_of_run_id, created_at, deadline, finished_at FROM workflow_runs WHERE company_id = $18 AND state = 'cancelled' AND parent_run_id IS NULL AND (channel_id = ANY($19) OR (channel_id IS NULL AND $20)) AND finished_at >= $21) (SELECT id, binding_id, workflow_id, version_id, channel_id, thread_id, state, waiting_reason, revision, actor_id, parent_run_id, rerun_of_run_id, created_at, deadline, finished_at FROM queued WHERE workflow_id = $22 ORDER BY created_at, id LIMIT 51) UNION ALL (SELECT id, binding_id, workflow_id, version_id, channel_id, thread_id, state, waiting_reason, revision, actor_id, parent_run_id, rerun_of_run_id, created_at, deadline, finished_at FROM running WHERE workflow_id = $23 ORDER BY created_at, id LIMIT 51) UNION ALL (SELECT id, binding_id, workflow_id, version_id, channel_id, thread_id, state, waiting_reason, revision, actor_id, parent_run_id, rerun_of_run_id, created_at, deadline, finished_at FROM waiting WHERE workflow_id = $24 ORDER BY created_at, id LIMIT 51) UNION ALL (SELECT id, binding_id, workflow_id, version_id, channel_id, thread_id, state, waiting_reason, revision, actor_id, parent_run_id, rerun_of_run_id, created_at, deadline, finished_at FROM succeeded WHERE workflow_id = $25 ORDER BY finished_at DESC, id DESC LIMIT 51) UNION ALL (SELECT id, binding_id, workflow_id, version_id, channel_id, thread_id, state, waiting_reason, revision, actor_id, parent_run_id, rerun_of_run_id, created_at, deadline, finished_at FROM failed WHERE workflow_id = $26 ORDER BY finished_at DESC, id DESC LIMIT 51) UNION ALL (SELECT id, binding_id, workflow_id, version_id, channel_id, thread_id, state, waiting_reason, revision, actor_id, parent_run_id, rerun_of_run_id, created_at, deadline, finished_at FROM cancelled WHERE workflow_id = $27 ORDER BY finished_at DESC, id DESC LIMIT 51)"
+  },
+  {
+    "family": "board_counts",
+    "name": "board_counts_agent",
+    "parameters": [
+      "company",
+      "company",
+      "cutoff",
+      "company",
+      "agent"
+    ],
+    "sql": "WITH working AS MATERIALIZED (SELECT state, channel_id, binding_id, workflow_id, version_id FROM workflow_runs WHERE company_id = $1 AND state IN ('queued', 'running', 'waiting') AND parent_run_id IS NULL UNION ALL SELECT state, channel_id, binding_id, workflow_id, version_id FROM workflow_runs WHERE company_id = $2 AND finished_at >= $3 AND parent_run_id IS NULL) SELECT state, channel_id, COUNT(*)::bigint AS runs FROM working WHERE version_id IN (SELECT version.id FROM workflow_versions AS version WHERE version.company_id = $4 AND $5 = ANY(version.agent_ids)) GROUP BY state, channel_id"
+  },
+  {
+    "family": "board_cards",
+    "name": "board_cards_agent",
+    "parameters": [
+      "company",
+      "channels",
+      "company_visible",
+      "company",
+      "channels",
+      "company_visible",
+      "company",
+      "channels",
+      "company_visible",
+      "company",
+      "channels",
+      "company_visible",
+      "cutoff",
+      "company",
+      "channels",
+      "company_visible",
+      "cutoff",
+      "company",
+      "channels",
+      "company_visible",
+      "cutoff",
+      "company",
+      "agent",
+      "company",
+      "agent",
+      "company",
+      "agent",
+      "company",
+      "agent",
+      "company",
+      "agent",
+      "company",
+      "agent"
+    ],
+    "sql": "WITH queued AS MATERIALIZED (SELECT id, binding_id, workflow_id, version_id, channel_id, thread_id, state, waiting_reason, revision, actor_id, parent_run_id, rerun_of_run_id, created_at, deadline, finished_at FROM workflow_runs WHERE company_id = $1 AND state = 'queued' AND parent_run_id IS NULL AND (channel_id = ANY($2) OR (channel_id IS NULL AND $3))), running AS MATERIALIZED (SELECT id, binding_id, workflow_id, version_id, channel_id, thread_id, state, waiting_reason, revision, actor_id, parent_run_id, rerun_of_run_id, created_at, deadline, finished_at FROM workflow_runs WHERE company_id = $4 AND state = 'running' AND parent_run_id IS NULL AND (channel_id = ANY($5) OR (channel_id IS NULL AND $6))), waiting AS MATERIALIZED (SELECT id, binding_id, workflow_id, version_id, channel_id, thread_id, state, waiting_reason, revision, actor_id, parent_run_id, rerun_of_run_id, created_at, deadline, finished_at FROM workflow_runs WHERE company_id = $7 AND state = 'waiting' AND parent_run_id IS NULL AND (channel_id = ANY($8) OR (channel_id IS NULL AND $9))), succeeded AS MATERIALIZED (SELECT id, binding_id, workflow_id, version_id, channel_id, thread_id, state, waiting_reason, revision, actor_id, parent_run_id, rerun_of_run_id, created_at, deadline, finished_at FROM workflow_runs WHERE company_id = $10 AND state = 'succeeded' AND parent_run_id IS NULL AND (channel_id = ANY($11) OR (channel_id IS NULL AND $12)) AND finished_at >= $13), failed AS MATERIALIZED (SELECT id, binding_id, workflow_id, version_id, channel_id, thread_id, state, waiting_reason, revision, actor_id, parent_run_id, rerun_of_run_id, created_at, deadline, finished_at FROM workflow_runs WHERE company_id = $14 AND state = 'failed' AND parent_run_id IS NULL AND (channel_id = ANY($15) OR (channel_id IS NULL AND $16)) AND finished_at >= $17), cancelled AS MATERIALIZED (SELECT id, binding_id, workflow_id, version_id, channel_id, thread_id, state, waiting_reason, revision, actor_id, parent_run_id, rerun_of_run_id, created_at, deadline, finished_at FROM workflow_runs WHERE company_id = $18 AND state = 'cancelled' AND parent_run_id IS NULL AND (channel_id = ANY($19) OR (channel_id IS NULL AND $20)) AND finished_at >= $21) (SELECT id, binding_id, workflow_id, version_id, channel_id, thread_id, state, waiting_reason, revision, actor_id, parent_run_id, rerun_of_run_id, created_at, deadline, finished_at FROM queued WHERE version_id IN (SELECT version.id FROM workflow_versions AS version WHERE version.company_id = $22 AND $23 = ANY(version.agent_ids)) ORDER BY created_at, id LIMIT 51) UNION ALL (SELECT id, binding_id, workflow_id, version_id, channel_id, thread_id, state, waiting_reason, revision, actor_id, parent_run_id, rerun_of_run_id, created_at, deadline, finished_at FROM running WHERE version_id IN (SELECT version.id FROM workflow_versions AS version WHERE version.company_id = $24 AND $25 = ANY(version.agent_ids)) ORDER BY created_at, id LIMIT 51) UNION ALL (SELECT id, binding_id, workflow_id, version_id, channel_id, thread_id, state, waiting_reason, revision, actor_id, parent_run_id, rerun_of_run_id, created_at, deadline, finished_at FROM waiting WHERE version_id IN (SELECT version.id FROM workflow_versions AS version WHERE version.company_id = $26 AND $27 = ANY(version.agent_ids)) ORDER BY created_at, id LIMIT 51) UNION ALL (SELECT id, binding_id, workflow_id, version_id, channel_id, thread_id, state, waiting_reason, revision, actor_id, parent_run_id, rerun_of_run_id, created_at, deadline, finished_at FROM succeeded WHERE version_id IN (SELECT version.id FROM workflow_versions AS version WHERE version.company_id = $28 AND $29 = ANY(version.agent_ids)) ORDER BY finished_at DESC, id DESC LIMIT 51) UNION ALL (SELECT id, binding_id, workflow_id, version_id, channel_id, thread_id, state, waiting_reason, revision, actor_id, parent_run_id, rerun_of_run_id, created_at, deadline, finished_at FROM failed WHERE version_id IN (SELECT version.id FROM workflow_versions AS version WHERE version.company_id = $30 AND $31 = ANY(version.agent_ids)) ORDER BY finished_at DESC, id DESC LIMIT 51) UNION ALL (SELECT id, binding_id, workflow_id, version_id, channel_id, thread_id, state, waiting_reason, revision, actor_id, parent_run_id, rerun_of_run_id, created_at, deadline, finished_at FROM cancelled WHERE version_id IN (SELECT version.id FROM workflow_versions AS version WHERE version.company_id = $32 AND $33 = ANY(version.agent_ids)) ORDER BY finished_at DESC, id DESC LIMIT 51)"
+  }
+]

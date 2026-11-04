@@ -1,0 +1,2 @@
+# Keep immutable raw tool evidence; source whitespace checks remain enabled.
+logs/** -whitespace

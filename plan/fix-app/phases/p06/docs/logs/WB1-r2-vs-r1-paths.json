@@ -1,0 +1,15 @@
+{
+  "added": [
+    "src/adapters/persistence/workflow/storage_boundary_tests.rs",
+    "src/adapters/persistence/workflow/storage_checkpoint_tests.rs",
+    "src/adapters/persistence/workflow/storage_retry_tests.rs"
+  ],
+  "removed": [],
+  "changed": [
+    "src/adapters/persistence/workflow/harness_model_store_tests.rs",
+    "src/adapters/persistence/workflow/storage_protection_tests.rs",
+    "src/adapters/persistence/workflow/storage_retention.rs",
+    "src/adapters/persistence/workflow/storage_retention_eligible.sql",
+    "src/adapters/persistence/workflow/storage_tests.rs"
+  ]
+}

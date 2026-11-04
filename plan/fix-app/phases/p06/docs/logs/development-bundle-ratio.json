@@ -1,0 +1,12 @@
+{
+  "query": "WITH bundles AS (SELECT sha256(bundle) AS digest, octet_length(bundle)::bigint AS bytes FROM workflow_runs),\n distinct_bundles AS (SELECT digest, max(bytes) AS bytes FROM bundles GROUP BY digest)\n SELECT json_build_object('runs',(SELECT count(*) FROM bundles),'distinct_bundles',(SELECT count(*) FROM distinct_bundles),\n 'total_bytes',(SELECT coalesce(sum(bytes),0) FROM bundles),'distinct_bytes',(SELECT coalesce(sum(bytes),0) FROM distinct_bundles),\n 'distinct_to_total_byte_ratio',(SELECT sum(bytes) FROM distinct_bundles)::numeric/nullif((SELECT sum(bytes) FROM bundles),0))",
+  "database": "p06 private fresh development on55406",
+  "result": {
+    "runs": 0,
+    "distinct_bundles": 0,
+    "total_bytes": 0,
+    "distinct_bytes": 0,
+    "distinct_to_total_byte_ratio": null
+  },
+  "limitation": "Empty restored development database: empirical dedup ratio unavailable; no production measurement claimed."
+}

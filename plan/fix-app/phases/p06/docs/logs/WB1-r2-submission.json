@@ -1,0 +1,41 @@
+{
+  "batch": "FIXAPP-P06-WB1-R2-MAC02",
+  "base": "9c205daad5c029229f0547dc137a9936c6b2b49c",
+  "head": "9c205daad5c029229f0547dc137a9936c6b2b49c",
+  "source_diff_sha256": "156523e0d100fb2bc7ef94d4bc4409a884701b09f080b84052874230733ed885",
+  "tree_sha256": "2d1157f2b618248ab0c6a4513f0bc913330ce1ff6f0233b5f6b35ab972c61d19",
+  "files": 1816,
+  "exclusions": [
+    "plan/fix-app/phases/p06/docs/"
+  ],
+  "authority_revision": 21,
+  "g1_r3_sha256": "d611a10527f94097b560e1a563a1d4acfa3f839b7844ceaeba9bbc3f1e73a8da",
+  "validation": {
+    "storage_cases": {
+      "unaffected_r2_selection": "35 passed; boundary fixture was the only failure",
+      "corrected_boundary_r4": "1 passed, 100001 native-schema members, first-delete marker and rollback,107.65seconds including setup",
+      "coverage": "36 selected cases covered across source-compatible runs; clone-on-Copy removal is the sole final non-boundary test-only cosmetic delta"
+    },
+    "compiler": "offline all-target clippy -Dwarnings PASS",
+    "format": "PASS",
+    "source_whitespace": "PASS",
+    "graph": "deterministic refresh PASS",
+    "schema": "No persistent schema changes since passed fresh migrations/live SQLx/all-target verification",
+    "limits": "Full suite/check.sh/stack-budget excluded by explicit I004; no100001 runtime admission or purge latency claim"
+  },
+  "r2_vs_r1_paths": {
+    "added": [
+      "src/adapters/persistence/workflow/storage_boundary_tests.rs",
+      "src/adapters/persistence/workflow/storage_checkpoint_tests.rs",
+      "src/adapters/persistence/workflow/storage_retry_tests.rs"
+    ],
+    "removed": [],
+    "changed": [
+      "src/adapters/persistence/workflow/harness_model_store_tests.rs",
+      "src/adapters/persistence/workflow/storage_protection_tests.rs",
+      "src/adapters/persistence/workflow/storage_retention.rs",
+      "src/adapters/persistence/workflow/storage_retention_eligible.sql",
+      "src/adapters/persistence/workflow/storage_tests.rs"
+    ]
+  }
+}

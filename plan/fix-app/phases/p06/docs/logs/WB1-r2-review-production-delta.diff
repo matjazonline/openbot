@@ -1,0 +1,192 @@
+--- WB1r1/src/adapters/persistence/workflow/storage_retention.rs
++++ WB1r2/src/adapters/persistence/workflow/storage_retention.rs
+@@ -1,6 +1,5 @@
+ use super::*;
+ use crate::application::workflow::storage::{RetentionRoot, RetiredTree};
+-use crate::domain::workflow::BudgetResource;
+ 
+ pub(super) async fn retire_on(
+     db: &mut PgConnection,
+@@ -28,47 +27,44 @@
+     if owned.is_none() {
+         return Ok(None);
+     }
+-    let runs: Vec<Uuid> = sqlx::query_scalar("SELECT run.id FROM workflow_runs AS run
+-        JOIN workflow_run_budgets AS link ON link.company_id=run.company_id AND link.run_id=run.id
+-        WHERE link.company_id=$1 AND link.root_run_id=$2 ORDER BY run.id LIMIT $3 FOR UPDATE OF run NOWAIT")
+-        .bind(company).bind(root_id).bind(i64::from(BudgetResource::Activation.maximum())+1).fetch_all(&mut *db).await?;
+-    if runs.is_empty() || runs.len() > BudgetResource::Activation.maximum() as usize {
++    let runs = lock_runs(db, company, root_id).await?;
++    if runs == 0 {
+         return Err(AppError::Internal(
+-            "Invalid retained workflow tree budget links".into(),
++            "Retained workflow is missing budget links".into(),
+         ));
+     }
+-    let jobs = lock_dependents(db, company, root_id, &runs).await?;
++    let jobs = lock_dependents(db, company, root_id).await?;
+     let eligible: bool = sqlx::query_scalar(include_str!("storage_retention_eligible.sql"))
+         .bind(company)
+-        .bind(&runs)
++        .bind(root_id)
+         .fetch_one(&mut *db)
+         .await?;
+     if !eligible {
+         return Ok(None);
+     }
+-    let calls = archive_usage(db, company, &runs).await?;
+-    let removed = sqlx::query("DELETE FROM workflow_runs WHERE company_id=$1 AND id=ANY($2)")
+-        .bind(company)
+-        .bind(&runs)
+-        .execute(&mut *db)
+-        .await?
+-        .rows_affected();
+-    if removed != runs.len() as u64 {
+-        return Err(AppError::Internal(
+-            "Workflow retention lost a locked run".into(),
++    let calls = archive_usage(db, company, root_id).await?;
++    let removed = sqlx::query("WITH retained AS MATERIALIZED (
++        SELECT company_id,run_id FROM workflow_run_budgets WHERE company_id=$1 AND root_run_id=$2)
++        DELETE FROM workflow_runs AS run USING retained WHERE run.company_id=retained.company_id AND run.id=retained.run_id")
++        .bind(company).bind(root_id).execute(&mut *db).await?.rows_affected();
++    // Owned members cannot disappear or change root. An extra member in the newer
++    // snapshot must roll the whole candidate back rather than delete an unowned run.
++    if removed != runs {
++        return Err(AppError::Conflict(
++            "Workflow tree changed during retention; rediscover it".into(),
+         ));
+     }
+-    // Run-owned cascades must precede job-owned append-only fact cascades. The job's
+-    // execution FK is deferred until both statements have committed together.
++    // Runs must be absent before job-owned append-only checkpoint/effect cascades.
++    // The transaction-local capture survives the run/execution/link cascades.
+     let removed_jobs = sqlx::query(
+-        "DELETE FROM background_tasks WHERE company_id=$1 AND id=ANY($2) AND queue_kind='workflow'",
++        "DELETE FROM background_tasks AS job USING pg_temp.workflow_retention_jobs AS saved
++        WHERE job.company_id=saved.company_id AND job.id=saved.job_id
++        AND job.workflow_execution_id=saved.execution_id AND job.queue_kind='workflow'",
+     )
+-    .bind(company)
+-    .bind(&jobs)
+     .execute(db)
+     .await?
+     .rows_affected();
+-    if removed_jobs != jobs.len() as u64 {
++    if removed_jobs != jobs {
+         return Err(AppError::Internal(
+             "Workflow retention lost a captured job".into(),
+         ));
+@@ -80,32 +76,55 @@
+     }))
+ }
+ 
+-async fn lock_dependents(
+-    db: &mut PgConnection,
+-    company: Uuid,
+-    root: Uuid,
+-    runs: &[Uuid],
+-) -> AppResult<Vec<Uuid>> {
+-    let executions: Vec<Uuid> = sqlx::query_scalar("SELECT id FROM workflow_executions WHERE company_id=$1 AND run_id=ANY($2) ORDER BY id FOR UPDATE NOWAIT")
+-        .bind(company).bind(runs).fetch_all(&mut *db).await?;
+-    let jobs: Vec<Uuid> = sqlx::query_scalar("SELECT id FROM background_tasks WHERE company_id=$1 AND workflow_execution_id=ANY($2) ORDER BY id FOR UPDATE NOWAIT")
+-        .bind(company).bind(&executions).fetch_all(&mut *db).await?;
+-    sqlx::query("SELECT id FROM task_attempts WHERE task_id=ANY($1) ORDER BY id FOR UPDATE NOWAIT")
+-        .bind(&jobs)
+-        .fetch_all(&mut *db)
+-        .await?;
+-    sqlx::query("SELECT root_run_id FROM workflow_root_budget_usage WHERE company_id=$1 AND root_run_id=$2 FOR UPDATE NOWAIT")
+-        .bind(company).bind(root).fetch_all(&mut *db).await?;
+-    sqlx::query("SELECT request_id FROM model_usage_calls WHERE company_id=$1 AND run_id=ANY($2) ORDER BY request_id FOR UPDATE NOWAIT")
+-        .bind(company).bind(runs).fetch_all(db).await?;
++async fn lock_runs(db: &mut PgConnection, company: Uuid, root: Uuid) -> AppResult<u64> {
++    let count: i64 = sqlx::query_scalar("SELECT count(*) FROM (
++        SELECT run.id FROM workflow_runs AS run JOIN workflow_run_budgets AS link
++            ON link.company_id=run.company_id AND link.run_id=run.id
++        WHERE link.company_id=$1 AND link.root_run_id=$2 ORDER BY run.id FOR UPDATE OF run NOWAIT) AS owned")
++        .bind(company).bind(root).fetch_one(db).await?;
++    u64::try_from(count)
++        .map_err(|_| AppError::Internal("Invalid retained workflow row count".into()))
++}
++
++async fn lock_dependents(db: &mut PgConnection, company: Uuid, root: Uuid) -> AppResult<u64> {
++    // Scalar aggregates consume locking subqueries without transferring a tree-sized ID collection.
++    sqlx::query_scalar::<_, i64>("SELECT count(*) FROM (
++        SELECT step.id FROM workflow_executions AS step JOIN workflow_run_budgets AS link
++            ON link.company_id=step.company_id AND link.run_id=step.run_id
++        WHERE link.company_id=$1 AND link.root_run_id=$2 ORDER BY step.id FOR UPDATE OF step NOWAIT) AS owned")
++        .bind(company).bind(root).fetch_one(&mut *db).await?;
++    sqlx::query(
++        "CREATE TEMP TABLE workflow_retention_jobs(company_id uuid NOT NULL,job_id uuid NOT NULL,
++        execution_id uuid NOT NULL,PRIMARY KEY(company_id,job_id)) ON COMMIT DROP",
++    )
++    .execute(&mut *db)
++    .await?;
++    let jobs = sqlx::query("INSERT INTO pg_temp.workflow_retention_jobs(company_id,job_id,execution_id)
++        SELECT job.company_id,job.id,job.workflow_execution_id FROM background_tasks AS job
++        JOIN workflow_executions AS step ON step.company_id=job.company_id AND step.id=job.workflow_execution_id
++        JOIN workflow_run_budgets AS link ON link.company_id=step.company_id AND link.run_id=step.run_id
++        WHERE link.company_id=$1 AND link.root_run_id=$2 ORDER BY job.id FOR UPDATE OF job NOWAIT")
++        .bind(company).bind(root).execute(&mut *db).await?.rows_affected();
++    sqlx::query_scalar::<_, i64>("SELECT count(*) FROM (
++        SELECT attempt.id FROM task_attempts AS attempt JOIN pg_temp.workflow_retention_jobs AS saved ON saved.job_id=attempt.task_id
++        WHERE saved.company_id=$1 ORDER BY attempt.id FOR UPDATE OF attempt NOWAIT) AS owned")
++        .bind(company).fetch_one(&mut *db).await?;
++    sqlx::query_scalar::<_, Uuid>("SELECT root_run_id FROM workflow_root_budget_usage WHERE company_id=$1 AND root_run_id=$2 FOR UPDATE NOWAIT")
++        .bind(company).bind(root).fetch_one(&mut *db).await?;
++    sqlx::query_scalar::<_, i64>("SELECT count(*) FROM (
++        SELECT call.request_id FROM model_usage_calls AS call JOIN workflow_run_budgets AS link
++            ON link.company_id=call.company_id AND link.run_id=call.run_id
++        WHERE link.company_id=$1 AND link.root_run_id=$2 ORDER BY call.request_id FOR UPDATE OF call NOWAIT) AS owned")
++        .bind(company).bind(root).fetch_one(db).await?;
+     Ok(jobs)
+ }
+ 
+-async fn archive_usage(db: &mut PgConnection, company: Uuid, runs: &[Uuid]) -> AppResult<u64> {
++async fn archive_usage(db: &mut PgConnection, company: Uuid, root: Uuid) -> AppResult<u64> {
+     Ok(sqlx::query("INSERT INTO model_usage_history(company_id,request_id,agent_id,workflow_id,version_id,provider,model,
+         requested_at,reserved_input,reserved_output,input_tokens,output_tokens,usage_source,settled_at)
+-        SELECT company_id,request_id,agent_id,workflow_id,version_id,provider,model,
+-        requested_at,reserved_input,reserved_output,input_tokens,output_tokens,usage_source,settled_at
+-        FROM model_usage_calls WHERE company_id=$1 AND run_id=ANY($2)")
+-        .bind(company).bind(runs).execute(db).await?.rows_affected())
++        SELECT call.company_id,call.request_id,call.agent_id,call.workflow_id,call.version_id,call.provider,call.model,
++        call.requested_at,call.reserved_input,call.reserved_output,call.input_tokens,call.output_tokens,call.usage_source,call.settled_at
++        FROM model_usage_calls AS call JOIN workflow_run_budgets AS link ON link.company_id=call.company_id AND link.run_id=call.run_id
++        WHERE link.company_id=$1 AND link.root_run_id=$2")
++        .bind(company).bind(root).execute(db).await?.rows_affected())
+ }
+--- WB1r1/src/adapters/persistence/workflow/storage_retention_eligible.sql
++++ WB1r2/src/adapters/persistence/workflow/storage_retention_eligible.sql
+@@ -1,18 +1,24 @@
++WITH tree AS MATERIALIZED (
++    SELECT run_id FROM workflow_run_budgets WHERE company_id=$1 AND root_run_id=$2
++)
+ SELECT
+-    NOT EXISTS(SELECT 1 FROM workflow_runs WHERE company_id=$1 AND id=ANY($2) AND state NOT IN ('succeeded','failed','cancelled'))
++    NOT EXISTS(SELECT 1 FROM workflow_runs AS run JOIN tree ON tree.run_id=run.id
++        WHERE run.company_id=$1 AND run.state NOT IN ('succeeded','failed','cancelled'))
+     AND NOT EXISTS(SELECT 1 FROM background_tasks AS job JOIN workflow_executions AS execution
+         ON execution.company_id=job.company_id AND execution.id=job.workflow_execution_id
+-        WHERE execution.company_id=$1 AND execution.run_id=ANY($2) AND job.status IN ('pending','processing'))
++        JOIN tree ON tree.run_id=execution.run_id WHERE execution.company_id=$1 AND job.status IN ('pending','processing'))
+     AND NOT EXISTS(SELECT 1 FROM task_attempts AS attempt JOIN background_tasks AS job ON job.id=attempt.task_id
+         JOIN workflow_executions AS execution ON execution.company_id=job.company_id AND execution.id=job.workflow_execution_id
+-        WHERE execution.company_id=$1 AND execution.run_id=ANY($2) AND attempt.status='processing')
++        JOIN tree ON tree.run_id=execution.run_id WHERE execution.company_id=$1 AND attempt.status='processing')
+     AND NOT EXISTS(SELECT 1 FROM workflow_decisions AS decision JOIN workflow_waits AS wait
+         ON wait.company_id=decision.company_id AND wait.run_id=decision.run_id AND wait.id=decision.wait_id
+-        WHERE decision.company_id=$1 AND decision.run_id=ANY($2) AND decision.submitted_at IS NULL AND wait.state='waiting')
+-    AND NOT EXISTS(SELECT 1 FROM workflow_message_actions WHERE company_id=$1 AND run_id=ANY($2) AND state IN ('pending','uncertain','stalled'))
+-    AND NOT EXISTS(SELECT 1 FROM workflow_runs WHERE company_id=$1 AND rerun_of_run_id=ANY($2) AND NOT (id=ANY($2)))
+-    AND NOT EXISTS(SELECT 1 FROM workflow_action_evidence_conflicts WHERE company_id=$1 AND run_id=ANY($2))
+-    AND NOT EXISTS(SELECT 1 FROM workflow_action_dispatches AS marker WHERE marker.company_id=$1 AND marker.run_id=ANY($2)
++        JOIN tree ON tree.run_id=decision.run_id WHERE decision.company_id=$1 AND decision.submitted_at IS NULL AND wait.state='waiting')
++    AND NOT EXISTS(SELECT 1 FROM workflow_message_actions AS action JOIN tree ON tree.run_id=action.run_id
++        WHERE action.company_id=$1 AND action.state IN ('pending','uncertain','stalled'))
++    AND NOT EXISTS(SELECT 1 FROM workflow_runs AS run JOIN tree ON tree.run_id=run.rerun_of_run_id
++        WHERE run.company_id=$1 AND NOT EXISTS(SELECT 1 FROM tree AS member WHERE member.run_id=run.id))
++    AND NOT EXISTS(SELECT 1 FROM workflow_action_evidence_conflicts AS conflict JOIN tree ON tree.run_id=conflict.run_id WHERE conflict.company_id=$1)
++    AND NOT EXISTS(SELECT 1 FROM workflow_action_dispatches AS marker JOIN tree ON tree.run_id=marker.run_id WHERE marker.company_id=$1
+         AND NOT EXISTS(SELECT 1 FROM workflow_action_receipts WHERE company_id=marker.company_id AND invocation_id=marker.invocation_id)
+         AND NOT EXISTS(SELECT 1 FROM workflow_action_evidence WHERE company_id=marker.company_id AND invocation_id=marker.invocation_id AND disposition='applied')
+         AND NOT (marker.effect_kind='remote' AND EXISTS(

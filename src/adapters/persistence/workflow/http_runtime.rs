@@ -16,7 +16,7 @@ pub(in crate::adapters::persistence::workflow) async fn facts(
     let actor = action_authority::prelock_on(tx, scope)
         .await?
         .ok_or_else(missing)?;
-    let (actor_id, bundle, resources): (Uuid, Vec<u8>, Value) = sqlx::query_as("SELECT actor_id,bundle,resources FROM workflow_runs WHERE company_id=$1 AND id=$2 AND state IN ('queued','running') AND deadline>clock_timestamp() FOR UPDATE")
+    let (actor_id, bundle, resources): (Uuid, Vec<u8>, Value) = sqlx::query_as("SELECT actor_id,stored.bundle AS bundle,resources FROM workflow_runs AS run LEFT JOIN workflow_bundles AS stored ON stored.company_id=run.company_id AND stored.digest=run.bundle_digest WHERE run.company_id=$1 AND id=$2 AND state IN ('queued','running') AND deadline>clock_timestamp() FOR UPDATE OF run")
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).fetch_optional(&mut **tx).await?.ok_or_else(missing)?;
     if actor_id != actor.user_id() {
         return Err(conflict());

@@ -1,0 +1,12 @@
+{
+  "binary": "/Users/mac02/dev/openbot-recovery/.worktrees/fix-app-p06/target/debug/deps/open_bots-7b3508cbfb62bd10",
+  "filters": {
+    "adapters::persistence::workflow::": 1077,
+    "application::workflow::": 286,
+    "infra::workflow::": 5,
+    "model_usage": 9,
+    "dashboard": 50,
+    "agent_retire": 5,
+    "unique_selected": 1426
+  }
+}

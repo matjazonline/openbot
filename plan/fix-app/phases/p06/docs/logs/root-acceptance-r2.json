@@ -1,0 +1,13 @@
+{
+  "status": "ACCEPTED_IN_PHASE",
+  "batch": "FIXAPP-P06-WB1-R2-MAC02",
+  "source_diff_sha256": "156523e0d100fb2bc7ef94d4bc4409a884701b09f080b84052874230733ed885",
+  "tree_sha256": "2d1157f2b618248ab0c6a4513f0bc913330ce1ff6f0233b5f6b35ab972c61d19",
+  "authority_revision": 21,
+  "independent_tests": {
+    "passed": 42,
+    "failed": 0,
+    "ignored": 0
+  },
+  "integration": "pending"
+}

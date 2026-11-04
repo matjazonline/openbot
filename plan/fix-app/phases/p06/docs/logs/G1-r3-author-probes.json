@@ -1,0 +1,120 @@
+{
+  "status": "PASS",
+  "scope": "reduced relational/scaling protocol only; no production 100001-run admission or purge latency claimed",
+  "records": [
+    {
+      "sql": "CREATE SCHEMA p06_g1r3_3481d9a7fa124a94b1568e97755361fd;\n CREATE TABLE p06_g1r3_3481d9a7fa124a94b1568e97755361fd.large_runs(company int,id int,PRIMARY KEY(company,id));\n CREATE TABLE p06_g1r3_3481d9a7fa124a94b1568e97755361fd.large_links(company int,run int,root int,PRIMARY KEY(company,run));\n CREATE INDEX ON p06_g1r3_3481d9a7fa124a94b1568e97755361fd.large_links(company,root,run);\n CREATE TABLE p06_g1r3_3481d9a7fa124a94b1568e97755361fd.large_steps(company int,id int,run int,PRIMARY KEY(company,id));\n CREATE TABLE p06_g1r3_3481d9a7fa124a94b1568e97755361fd.large_jobs(company int,id int,execution int,PRIMARY KEY(company,id));\n INSERT INTO p06_g1r3_3481d9a7fa124a94b1568e97755361fd.large_runs SELECT 1,n FROM generate_series(1,100001) AS n;\n INSERT INTO p06_g1r3_3481d9a7fa124a94b1568e97755361fd.large_links SELECT 1,n,1 FROM generate_series(1,100001) AS n;\n INSERT INTO p06_g1r3_3481d9a7fa124a94b1568e97755361fd.large_steps SELECT 1,n,n FROM generate_series(1,100001) AS n;\n INSERT INTO p06_g1r3_3481d9a7fa124a94b1568e97755361fd.large_jobs SELECT 1,n,n FROM generate_series(1,100001) AS n;\n ANALYZE p06_g1r3_3481d9a7fa124a94b1568e97755361fd.large_runs; ANALYZE p06_g1r3_3481d9a7fa124a94b1568e97755361fd.large_links; ANALYZE p06_g1r3_3481d9a7fa124a94b1568e97755361fd.large_steps; ANALYZE p06_g1r3_3481d9a7fa124a94b1568e97755361fd.large_jobs;",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "sql": "SELECT coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06r3_8e97755361fd'",
+      "exit": 0,
+      "stdout": "\n",
+      "stderr": ""
+    },
+    {
+      "sql": "SELECT coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06r3_8e97755361fd'",
+      "exit": 0,
+      "stdout": "WalWrite\n",
+      "stderr": ""
+    },
+    {
+      "sql": "SELECT coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06r3_8e97755361fd'",
+      "exit": 0,
+      "stdout": "\n",
+      "stderr": ""
+    },
+    {
+      "sql": "SELECT coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06r3_8e97755361fd'",
+      "exit": 0,
+      "stdout": "BuffileWrite\n",
+      "stderr": ""
+    },
+    {
+      "sql": "SELECT coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06r3_8e97755361fd'",
+      "exit": 0,
+      "stdout": "WalWrite\n",
+      "stderr": ""
+    },
+    {
+      "sql": "SELECT coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06r3_8e97755361fd'",
+      "exit": 0,
+      "stdout": "WalWrite\n",
+      "stderr": ""
+    },
+    {
+      "sql": "SELECT coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06r3_8e97755361fd'",
+      "exit": 0,
+      "stdout": "WalWrite\n",
+      "stderr": ""
+    },
+    {
+      "sql": "SELECT coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06r3_8e97755361fd'",
+      "exit": 0,
+      "stdout": "PgSleep\n",
+      "stderr": ""
+    },
+    {
+      "sql": "SELECT id FROM p06_g1r3_3481d9a7fa124a94b1568e97755361fd.large_runs WHERE company=1 AND id=100001 FOR UPDATE NOWAIT",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "ERROR:  could not obtain lock on row in relation \"large_runs\"\n"
+    },
+    {
+      "sql": "SELECT id FROM p06_g1r3_3481d9a7fa124a94b1568e97755361fd.large_jobs WHERE company=1 AND id=100001 FOR UPDATE NOWAIT",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "ERROR:  could not obtain lock on row in relation \"large_jobs\"\n"
+    },
+    {
+      "large_owner_sql": "BEGIN; SET LOCAL statement_timeout='5s'; SET LOCAL lock_timeout='500ms';\n SELECT count(*) FROM (SELECT run.id FROM p06_g1r3_3481d9a7fa124a94b1568e97755361fd.large_runs AS run\n JOIN p06_g1r3_3481d9a7fa124a94b1568e97755361fd.large_links AS link ON link.company=run.company AND link.run=run.id\n WHERE link.company=1 AND link.root=1 ORDER BY run.id FOR UPDATE OF run NOWAIT) AS locked; CREATE TEMP TABLE retained_jobs(company int NOT NULL,id int NOT NULL,execution int NOT NULL,PRIMARY KEY(company,id)) ON COMMIT DROP; INSERT INTO pg_temp.retained_jobs(company,id,execution)\n SELECT job.company,job.id,job.execution FROM p06_g1r3_3481d9a7fa124a94b1568e97755361fd.large_jobs AS job\n JOIN p06_g1r3_3481d9a7fa124a94b1568e97755361fd.large_steps AS step ON step.company=job.company AND step.id=job.execution\n JOIN p06_g1r3_3481d9a7fa124a94b1568e97755361fd.large_links AS link ON link.company=step.company AND link.run=step.run\n WHERE link.company=1 AND link.root=1 ORDER BY job.id FOR UPDATE OF job NOWAIT;\n SELECT count(*) FROM pg_temp.retained_jobs; SELECT pg_sleep(2);\n ROLLBACK; SELECT to_regclass('pg_temp.retained_jobs') IS NULL;",
+      "exit": 0,
+      "stdout": "100001\n100001\n\nt\n",
+      "stderr": ""
+    },
+    {
+      "sql": "CREATE TABLE p06_g1r3_3481d9a7fa124a94b1568e97755361fd.runs(company int,id int,PRIMARY KEY(company,id));\n CREATE TABLE p06_g1r3_3481d9a7fa124a94b1568e97755361fd.links(company int,run int,root int,PRIMARY KEY(company,run),\n FOREIGN KEY(company,run) REFERENCES p06_g1r3_3481d9a7fa124a94b1568e97755361fd.runs(company,id) ON DELETE CASCADE);\n CREATE INDEX ON p06_g1r3_3481d9a7fa124a94b1568e97755361fd.links(company,root,run);\n CREATE TABLE p06_g1r3_3481d9a7fa124a94b1568e97755361fd.steps(company int,id int,run int,PRIMARY KEY(company,id),\n FOREIGN KEY(company,run) REFERENCES p06_g1r3_3481d9a7fa124a94b1568e97755361fd.runs(company,id) ON DELETE CASCADE);\n CREATE INDEX ON p06_g1r3_3481d9a7fa124a94b1568e97755361fd.steps(company,run);\n CREATE TABLE p06_g1r3_3481d9a7fa124a94b1568e97755361fd.jobs(company int,id int,execution int,PRIMARY KEY(company,id),\n FOREIGN KEY(company,execution) REFERENCES p06_g1r3_3481d9a7fa124a94b1568e97755361fd.steps(company,id) DEFERRABLE INITIALLY DEFERRED);\n CREATE INDEX ON p06_g1r3_3481d9a7fa124a94b1568e97755361fd.jobs(company,execution);\n CREATE TABLE p06_g1r3_3481d9a7fa124a94b1568e97755361fd.checkpoints(company int,job int,run int,amount int,\n FOREIGN KEY(company,job) REFERENCES p06_g1r3_3481d9a7fa124a94b1568e97755361fd.jobs(company,id) ON DELETE CASCADE);\n CREATE FUNCTION p06_g1r3_3481d9a7fa124a94b1568e97755361fd.fact_guard() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN\n IF pg_trigger_depth()>1 AND NOT EXISTS(SELECT 1 FROM p06_g1r3_3481d9a7fa124a94b1568e97755361fd.runs WHERE company=OLD.company AND id=OLD.run) THEN RETURN OLD; END IF;\n RAISE EXCEPTION 'live run checkpoint is append only'; END $$;\n CREATE TRIGGER fact_guard BEFORE DELETE ON p06_g1r3_3481d9a7fa124a94b1568e97755361fd.checkpoints FOR EACH ROW EXECUTE FUNCTION p06_g1r3_3481d9a7fa124a94b1568e97755361fd.fact_guard();\n CREATE TABLE p06_g1r3_3481d9a7fa124a94b1568e97755361fd.usage(company int,run int,amount int,FOREIGN KEY(company,run) REFERENCES p06_g1r3_3481d9a7fa124a94b1568e97755361fd.runs(company,id) ON DELETE CASCADE);\n CREATE TABLE p06_g1r3_3481d9a7fa124a94b1568e97755361fd.history(company int,run int,amount int);\n INSERT INTO p06_g1r3_3481d9a7fa124a94b1568e97755361fd.runs SELECT 1,n FROM generate_series(1,4) AS n;\n INSERT INTO p06_g1r3_3481d9a7fa124a94b1568e97755361fd.runs VALUES(2,1);\n INSERT INTO p06_g1r3_3481d9a7fa124a94b1568e97755361fd.links SELECT company,id,1 FROM p06_g1r3_3481d9a7fa124a94b1568e97755361fd.runs;\n INSERT INTO p06_g1r3_3481d9a7fa124a94b1568e97755361fd.steps SELECT company,id,id FROM p06_g1r3_3481d9a7fa124a94b1568e97755361fd.runs;\n INSERT INTO p06_g1r3_3481d9a7fa124a94b1568e97755361fd.jobs SELECT company,id,id FROM p06_g1r3_3481d9a7fa124a94b1568e97755361fd.runs;\n INSERT INTO p06_g1r3_3481d9a7fa124a94b1568e97755361fd.checkpoints SELECT company,id,id,80 FROM p06_g1r3_3481d9a7fa124a94b1568e97755361fd.runs;\n INSERT INTO p06_g1r3_3481d9a7fa124a94b1568e97755361fd.usage SELECT company,id,80 FROM p06_g1r3_3481d9a7fa124a94b1568e97755361fd.runs;",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "sql": "BEGIN; SET LOCAL statement_timeout='5s'; SET LOCAL lock_timeout='500ms';\n SELECT count(*) FROM (SELECT run.id FROM p06_g1r3_3481d9a7fa124a94b1568e97755361fd.runs AS run\n JOIN p06_g1r3_3481d9a7fa124a94b1568e97755361fd.links AS link ON link.company=run.company AND link.run=run.id\n WHERE link.company=1 AND link.root=1 ORDER BY run.id FOR UPDATE OF run NOWAIT) AS locked; CREATE TEMP TABLE retained_jobs(company int NOT NULL,id int NOT NULL,execution int NOT NULL,PRIMARY KEY(company,id)) ON COMMIT DROP; INSERT INTO pg_temp.retained_jobs(company,id,execution)\n SELECT job.company,job.id,job.execution FROM p06_g1r3_3481d9a7fa124a94b1568e97755361fd.jobs AS job\n JOIN p06_g1r3_3481d9a7fa124a94b1568e97755361fd.steps AS step ON step.company=job.company AND step.id=job.execution\n JOIN p06_g1r3_3481d9a7fa124a94b1568e97755361fd.links AS link ON link.company=step.company AND link.run=step.run\n WHERE link.company=1 AND link.root=1 ORDER BY job.id FOR UPDATE OF job NOWAIT;\n INSERT INTO p06_g1r3_3481d9a7fa124a94b1568e97755361fd.history SELECT * FROM p06_g1r3_3481d9a7fa124a94b1568e97755361fd.usage WHERE company=1;\n WITH retained AS MATERIALIZED(SELECT company,run FROM p06_g1r3_3481d9a7fa124a94b1568e97755361fd.links WHERE company=1 AND root=1)\n DELETE FROM p06_g1r3_3481d9a7fa124a94b1568e97755361fd.runs AS run USING retained WHERE run.company=retained.company AND run.id=retained.run;\n DO $$ BEGIN RAISE EXCEPTION 'between run and job deletion'; END $$;\n DELETE FROM p06_g1r3_3481d9a7fa124a94b1568e97755361fd.jobs AS job USING pg_temp.retained_jobs AS saved\n WHERE job.company=saved.company AND job.id=saved.id AND job.execution=saved.execution;\n COMMIT; SELECT to_regclass('pg_temp.retained_jobs') IS NULL;",
+      "exit": 1,
+      "stdout": "4\n",
+      "stderr": "ERROR:  between run and job deletion\nCONTEXT:  PL/pgSQL function inline_code_block line 1 at RAISE\n"
+    },
+    {
+      "sql": "SELECT (SELECT count(*) FROM p06_g1r3_3481d9a7fa124a94b1568e97755361fd.runs WHERE company=1)||'|'||(SELECT count(*) FROM p06_g1r3_3481d9a7fa124a94b1568e97755361fd.jobs WHERE company=1)||'|'||(SELECT count(*) FROM p06_g1r3_3481d9a7fa124a94b1568e97755361fd.checkpoints WHERE company=1)||'|'||(SELECT count(*) FROM p06_g1r3_3481d9a7fa124a94b1568e97755361fd.usage WHERE company=1)||'|'||(SELECT count(*) FROM p06_g1r3_3481d9a7fa124a94b1568e97755361fd.history WHERE company=1)",
+      "exit": 0,
+      "stdout": "4|4|4|4|0\n",
+      "stderr": ""
+    },
+    {
+      "sql": "BEGIN; SET LOCAL statement_timeout='5s'; SET LOCAL lock_timeout='500ms';\n SELECT count(*) FROM (SELECT run.id FROM p06_g1r3_3481d9a7fa124a94b1568e97755361fd.runs AS run\n JOIN p06_g1r3_3481d9a7fa124a94b1568e97755361fd.links AS link ON link.company=run.company AND link.run=run.id\n WHERE link.company=1 AND link.root=1 ORDER BY run.id FOR UPDATE OF run NOWAIT) AS locked; CREATE TEMP TABLE retained_jobs(company int NOT NULL,id int NOT NULL,execution int NOT NULL,PRIMARY KEY(company,id)) ON COMMIT DROP; INSERT INTO pg_temp.retained_jobs(company,id,execution)\n SELECT job.company,job.id,job.execution FROM p06_g1r3_3481d9a7fa124a94b1568e97755361fd.jobs AS job\n JOIN p06_g1r3_3481d9a7fa124a94b1568e97755361fd.steps AS step ON step.company=job.company AND step.id=job.execution\n JOIN p06_g1r3_3481d9a7fa124a94b1568e97755361fd.links AS link ON link.company=step.company AND link.run=step.run\n WHERE link.company=1 AND link.root=1 ORDER BY job.id FOR UPDATE OF job NOWAIT;\n INSERT INTO p06_g1r3_3481d9a7fa124a94b1568e97755361fd.history SELECT * FROM p06_g1r3_3481d9a7fa124a94b1568e97755361fd.usage WHERE company=1;\n WITH retained AS MATERIALIZED(SELECT company,run FROM p06_g1r3_3481d9a7fa124a94b1568e97755361fd.links WHERE company=1 AND root=1)\n DELETE FROM p06_g1r3_3481d9a7fa124a94b1568e97755361fd.runs AS run USING retained WHERE run.company=retained.company AND run.id=retained.run;\n \n DELETE FROM p06_g1r3_3481d9a7fa124a94b1568e97755361fd.jobs AS job USING pg_temp.retained_jobs AS saved\n WHERE job.company=saved.company AND job.id=saved.id AND job.execution=saved.execution;\n COMMIT; SELECT to_regclass('pg_temp.retained_jobs') IS NULL;",
+      "exit": 0,
+      "stdout": "4\nt\n",
+      "stderr": ""
+    },
+    {
+      "sql": "SELECT (SELECT count(*) FROM p06_g1r3_3481d9a7fa124a94b1568e97755361fd.runs WHERE company=1)||'|'||(SELECT count(*) FROM p06_g1r3_3481d9a7fa124a94b1568e97755361fd.jobs WHERE company=1)||'|'||(SELECT count(*) FROM p06_g1r3_3481d9a7fa124a94b1568e97755361fd.checkpoints WHERE company=1)||'|'||(SELECT count(*) FROM p06_g1r3_3481d9a7fa124a94b1568e97755361fd.usage WHERE company=1)||'|'||(SELECT count(*) FROM p06_g1r3_3481d9a7fa124a94b1568e97755361fd.history WHERE company=1)",
+      "exit": 0,
+      "stdout": "0|0|0|0|4\n",
+      "stderr": ""
+    },
+    {
+      "sql": "SELECT count(*) FROM p06_g1r3_3481d9a7fa124a94b1568e97755361fd.checkpoints WHERE company=2",
+      "exit": 0,
+      "stdout": "1\n",
+      "stderr": ""
+    },
+    {
+      "sql": "DROP SCHEMA IF EXISTS p06_g1r3_3481d9a7fa124a94b1568e97755361fd CASCADE",
+      "exit": 0,
+      "stdout": "",
+      "stderr": "NOTICE:  drop cascades to 12 other objects\nDETAIL:  drop cascades to table p06_g1r3_3481d9a7fa124a94b1568e97755361fd.large_runs\ndrop cascades to table p06_g1r3_3481d9a7fa124a94b1568e97755361fd.large_links\ndrop cascades to table p06_g1r3_3481d9a7fa124a94b1568e97755361fd.large_steps\ndrop cascades to table p06_g1r3_3481d9a7fa124a94b1568e97755361fd.large_jobs\ndrop cascades to table p06_g1r3_3481d9a7fa124a94b1568e97755361fd.runs\ndrop cascades to table p06_g1r3_3481d9a7fa124a94b1568e97755361fd.links\ndrop cascades to table p06_g1r3_3481d9a7fa124a94b1568e97755361fd.steps\ndrop cascades to table p06_g1r3_3481d9a7fa124a94b1568e97755361fd.jobs\ndrop cascades to table p06_g1r3_3481d9a7fa124a94b1568e97755361fd.checkpoints\ndrop cascades to function p06_g1r3_3481d9a7fa124a94b1568e97755361fd.fact_guard()\ndrop cascades to table p06_g1r3_3481d9a7fa124a94b1568e97755361fd.usage\ndrop cascades to table p06_g1r3_3481d9a7fa124a94b1568e97755361fd.history\n"
+    }
+  ]
+}

@@ -33,6 +33,7 @@ mod binding_rows;
 mod bindings;
 mod board_reads;
 mod budget;
+mod bundle_store;
 mod capacity;
 mod checkpoints;
 pub mod child_publication;
@@ -130,3 +131,6 @@ mod message_outcomes;
 mod token_budget;
 
 mod jev_runtime;
+
+mod storage;
+mod storage_retention;

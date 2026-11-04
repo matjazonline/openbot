@@ -32,7 +32,14 @@ async fn seed_saved(f: &BindingFixture, key: &str, trigger: &TriggerRef) -> Uuid
     seed_root_budget(&mut tx, f.target.company.as_uuid(), run)
         .await
         .unwrap();
-    sqlx::query("INSERT INTO workflow_runs (company_id, id, binding_id, binding_revision, workflow_id, version_id, actor_id, trigger_id, correlation_id, bundle, input, params, resources, max_steps, max_context_bytes, deadline) SELECT company_id, $2, $3, 1, workflow_id, id, actor_id, $4, $5, bundle, '{}'::jsonb, $6, '{}'::jsonb, 100, 1048576, CURRENT_TIMESTAMP + interval '1 hour' FROM workflow_versions WHERE company_id = $1 AND id = $7")
+    seed_version_bundle(
+        &mut tx,
+        f.target.company.as_uuid(),
+        f.request(None).version.as_uuid(),
+    )
+    .await
+    .unwrap();
+    sqlx::query("INSERT INTO workflow_runs (company_id, id, binding_id, binding_revision, workflow_id, version_id, actor_id, trigger_id, correlation_id, bundle_digest, input, params, resources, max_steps, max_context_bytes, deadline) SELECT company_id, $2, $3, 1, workflow_id, id, actor_id, $4, $5, sha256(bundle), '{}'::jsonb, $6, '{}'::jsonb, 100, 1048576, CURRENT_TIMESTAMP + interval '1 hour' FROM workflow_versions WHERE company_id = $1 AND id = $7")
         .bind(f.target.company.as_uuid()).bind(run).bind(f.target.binding.as_uuid())
         .bind(trigger.trigger_id().as_uuid()).bind(Uuid::new_v4()).bind(json!({"saved": 7}))
         .bind(f.request(None).version.as_uuid()).execute(&mut *tx).await.unwrap();
@@ -223,17 +230,12 @@ async fn workflow_admission_binding_corrupt_saved_snapshot_fails_without_fallbac
     let mut unknown: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
     unknown["format"] = json!("unknown");
     for corrupt in [b"invalid".to_vec(), serde_json::to_vec(&unknown).unwrap()] {
-        sqlx::query("UPDATE workflow_runs SET bundle = $3 WHERE company_id = $1 AND id = $2")
-            .bind(f.target.company.as_uuid())
-            .bind(run)
-            .bind(corrupt)
-            .execute(pool)
-            .await
-            .unwrap();
+        replace_run_bundle(pool, run, &corrupt).await;
         assert!(select(&f, "original", &event).await.is_err());
     }
-    sqlx::query("UPDATE workflow_runs SET bundle = $3, resources = '{\"undeclared\": 7}'::jsonb WHERE company_id = $1 AND id = $2")
-        .bind(f.target.company.as_uuid()).bind(run).bind(bytes).execute(pool).await.unwrap();
+    replace_run_bundle(pool, run, &bytes).await;
+    sqlx::query("UPDATE workflow_runs SET resources = '{\"undeclared\": 7}'::jsonb WHERE company_id = $1 AND id = $2")
+        .bind(f.target.company.as_uuid()).bind(run).execute(pool).await.unwrap();
     assert!(select(&f, "original", &event).await.is_err());
     assert!(
         select(

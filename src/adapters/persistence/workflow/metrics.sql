@@ -54,7 +54,11 @@ WITH bounds AS (
                         + COALESCE(call.output_tokens, call.reserved_output)::numeric * price.output_micro_usd_per_million) / 1e12)
                FILTER (WHERE call.requested_at >= bounds.since), 0) AS charged_usd,
            count(*) FILTER (WHERE price.company_id IS NULL) AS unpriced
-    FROM model_usage_calls AS call
+    FROM (
+        SELECT company_id,provider,model,requested_at,reserved_input,reserved_output,input_tokens,output_tokens,settled_at FROM model_usage_calls
+        UNION ALL
+        SELECT company_id,provider,model,requested_at,reserved_input,reserved_output,input_tokens,output_tokens,settled_at FROM model_usage_history
+    ) AS call
     LEFT JOIN model_prices AS price ON price.company_id = call.company_id
         AND price.provider = call.provider AND price.model = call.model
     CROSS JOIN bounds WHERE call.settled_at IS NULL OR call.requested_at >= bounds.since

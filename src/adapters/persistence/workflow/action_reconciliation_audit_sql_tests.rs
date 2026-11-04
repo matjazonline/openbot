@@ -127,12 +127,17 @@ async fn native_catalog(
     assert_eq!(rows.len(), 1);
     let row = &rows[0];
     assert_eq!(row["relation"], relation);
-    assert_eq!(row["definition"], definition);
+    let expected_definition = if name == EVENT_FK {
+        format!("{definition} DEFERRABLE INITIALLY DEFERRED")
+    } else {
+        definition.to_owned()
+    };
+    assert_eq!(row["definition"], expected_definition);
     for field in ["valid", "enabled"] {
         assert_eq!(row[field], true);
     }
     for field in ["deferrable", "deferred"] {
-        assert_eq!(row[field], false);
+        assert_eq!(row[field], name == EVENT_FK);
     }
     assert_eq!(row["type"], if name == EVENT_FK { "f" } else { "c" });
     eprintln!("native_catalog={row}");
@@ -239,6 +244,20 @@ async fn insert_audit(
         .bind(candidate.actor).bind(execution).fetch_one(&mut **tx).await
 }
 
+async fn immediate_audit_savepoint(tx: &mut Transaction<'_, Postgres>) -> SqlOwner {
+    let owner = sql_owner(tx).await;
+    // Keep the selected FK attack immediate while reverse-orphan guards stay deferred.
+    sqlx::query("SET CONSTRAINTS workflow_run_event_execution_fk IMMEDIATE")
+        .execute(&mut **tx)
+        .await
+        .unwrap();
+    sqlx::query("SAVEPOINT native_audit_candidate")
+        .execute(&mut **tx)
+        .await
+        .unwrap();
+    owner
+}
+
 async fn audit_sql_pair(f: &AdmissionFixture, own: ActionScope, foreign: ActionScope, label: &str) {
     assert_ne!(own.execution, foreign.execution);
     assert_ne!(own.run, foreign.run);
@@ -256,11 +275,7 @@ async fn audit_sql_pair(f: &AdmissionFixture, own: ActionScope, foreign: ActionS
     let baseline = all_tables(f).await;
     for execution in [own.execution.as_uuid(), foreign.execution.as_uuid()] {
         let mut tx = f.persistence().pool().begin().await.unwrap();
-        let owner = sql_owner(&mut tx).await;
-        sqlx::query("SAVEPOINT native_audit_candidate")
-            .execute(&mut *tx)
-            .await
-            .unwrap();
+        let owner = immediate_audit_savepoint(&mut tx).await;
         if execution == own.execution.as_uuid() {
             let row = insert_audit(&mut tx, &candidate, execution).await.unwrap();
             assert_eq!(row.as_object().unwrap().len(), 11);

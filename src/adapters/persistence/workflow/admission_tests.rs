@@ -29,6 +29,8 @@ mod run_board_tests;
 mod run_finished_at_tests;
 #[path = "run_lineage_tests.rs"]
 mod run_lineage_tests;
+#[path = "storage_tests.rs"]
+mod storage_tests;
 use crate::domain::entities::correlation::CorrelationId;
 use binding_tests::BindingFixture;
 use serde_json::{Value, json};
@@ -254,7 +256,7 @@ async fn workflow_admit_sql_exact_snapshot_job_and_replay_preserves_deadline() {
         snapshot["correlation"],
         json!(command.causality().correlation_id().as_uuid())
     );
-    let bytes: Vec<u8> = sqlx::query_scalar("SELECT bundle FROM workflow_runs WHERE id=$1")
+    let bytes: Vec<u8> = sqlx::query_scalar("SELECT (SELECT stored.bundle FROM workflow_bundles stored WHERE stored.company_id=workflow_runs.company_id AND stored.digest=workflow_runs.bundle_digest) AS bundle FROM workflow_runs WHERE id=$1")
         .bind(command.proposed_run_id().as_uuid())
         .fetch_one(p.pool())
         .await

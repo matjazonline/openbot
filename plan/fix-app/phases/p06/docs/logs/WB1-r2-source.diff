@@ -1,0 +1,3156 @@
+diff --git a/migrations/20260817000000_init_schema.sql b/migrations/20260817000000_init_schema.sql
+index a3af639..c5c0d55 100644
+--- a/migrations/20260817000000_init_schema.sql
++++ b/migrations/20260817000000_init_schema.sql
+@@ -2120,6 +2120,7 @@ CREATE FUNCTION public.workflow_action_claim_retirement_witness_owner() RETURNS
+     AS $$
+ BEGIN
+     IF TG_OP='DELETE' THEN
++        IF OLD.transaction_id<>pg_current_xact_id() THEN RETURN OLD; END IF;
+         IF pg_trigger_depth()>1
+             AND NOT EXISTS(SELECT 1 FROM workflow_runs WHERE company_id=OLD.company_id AND id=OLD.run_id)
+         THEN RETURN OLD; END IF;
+@@ -2361,6 +2362,10 @@ CREATE FUNCTION public.workflow_action_fact_immutable() RETURNS trigger
+     LANGUAGE plpgsql
+     AS $$
+ BEGIN
++    -- MVCC exposes only committed foreign witnesses. This transaction's proof remains protected.
++    IF TG_OP='DELETE' AND TG_TABLE_NAME IN ('workflow_action_state_witnesses','workflow_action_schedule_witnesses')
++        AND (to_jsonb(OLD)->>'transaction_id')::xid8 <> pg_current_xact_id()
++    THEN RETURN OLD; END IF;
+     IF TG_OP='DELETE' AND pg_trigger_depth()>1
+         AND NOT EXISTS(SELECT 1 FROM workflow_runs WHERE company_id=OLD.company_id AND id=OLD.run_id)
+     THEN RETURN OLD; END IF;
+@@ -5593,6 +5598,29 @@ COMMENT ON TABLE public.workflow_run_parents IS 'Immutable child-owned lineage i
+ -- Name: workflow_runs; Type: TABLE; Schema: public; Owner: -
+ --
+ 
++-- A run keeps a tenant-scoped content address; the frozen bytes are stored once.
++CREATE TABLE public.workflow_bundles (
++    company_id uuid NOT NULL,
++    digest bytea NOT NULL,
++    bundle bytea NOT NULL,
++    PRIMARY KEY (company_id, digest),
++    CONSTRAINT workflow_bundles_digest CHECK (octet_length(digest)=32 AND digest=sha256(bundle)),
++    CONSTRAINT workflow_bundles_payload_size CHECK (octet_length(bundle) BETWEEN 1 AND 4194304)
++);
++
++CREATE FUNCTION public.guard_workflow_bundle() RETURNS trigger LANGUAGE plpgsql AS $$
++BEGIN
++    IF TG_OP='DELETE' AND (
++        NOT EXISTS(SELECT 1 FROM public.companies WHERE id=OLD.company_id)
++        OR NOT EXISTS(SELECT 1 FROM public.workflow_runs
++            WHERE company_id=OLD.company_id AND bundle_digest=OLD.digest)) THEN
++        RETURN OLD;
++    END IF;
++    RAISE EXCEPTION 'workflow bundle is immutable or still referenced' USING ERRCODE='23514';
++END $$;
++CREATE TRIGGER workflow_bundle_immutable BEFORE UPDATE OR DELETE ON public.workflow_bundles
++    FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_bundle();
++
+ CREATE TABLE public.workflow_runs (
+     company_id uuid NOT NULL,
+     id uuid NOT NULL,
+@@ -5605,7 +5633,7 @@ CREATE TABLE public.workflow_runs (
+     actor_id uuid NOT NULL,
+     trigger_id uuid NOT NULL,
+     correlation_id uuid NOT NULL,
+-    bundle bytea NOT NULL,
++    bundle_digest bytea NOT NULL,
+     input jsonb NOT NULL,
+     params jsonb NOT NULL,
+     resources jsonb NOT NULL,
+@@ -5623,6 +5651,8 @@ CREATE TABLE public.workflow_runs (
+     rerun_of_run_id uuid,
+     delivery_policy text DEFAULT 'deliver'::text NOT NULL,
+     finished_at timestamp with time zone,
++    CONSTRAINT workflow_runs_bundle_fk FOREIGN KEY (company_id,bundle_digest)
++        REFERENCES public.workflow_bundles(company_id,digest) DEFERRABLE INITIALLY DEFERRED,
+     CONSTRAINT workflow_run_delivery_policy CHECK ((delivery_policy = ANY (ARRAY['deliver'::text, 'in_app_only'::text]))),
+     CONSTRAINT workflow_run_finished_shape CHECK (((state = ANY (ARRAY['succeeded'::text, 'failed'::text, 'cancelled'::text])) = (finished_at IS NOT NULL))),
+     CONSTRAINT workflow_rerun_shape CHECK (((rerun_of_run_id IS NULL) OR ((parent_run_id IS NULL) AND (rerun_of_run_id <> id)))),
+@@ -5631,7 +5661,6 @@ CREATE TABLE public.workflow_runs (
+     CONSTRAINT workflow_run_state CHECK ((state = ANY (ARRAY['queued'::text, 'running'::text, 'waiting'::text, 'succeeded'::text, 'failed'::text, 'cancelled'::text]))),
+     CONSTRAINT workflow_run_waiting_shape CHECK ((((state = 'waiting'::text) AND (waiting_reason IS NOT NULL) AND (waiting_reason = ANY (ARRAY['decision'::text, 'event'::text, 'timer'::text, 'child_run'::text, 'effect'::text, 'reconciliation'::text]))) OR ((state <> 'waiting'::text) AND (waiting_reason IS NULL)))),
+     CONSTRAINT workflow_runs_binding_revision_check CHECK ((binding_revision > 0)),
+-    CONSTRAINT workflow_runs_bundle_check CHECK (((octet_length(bundle) >= 1) AND (octet_length(bundle) <= 4194304))),
+     CONSTRAINT workflow_runs_check CHECK (((thread_id IS NULL) OR (channel_id IS NOT NULL))),
+     CONSTRAINT workflow_runs_check1 CHECK ((deadline > created_at)),
+     CONSTRAINT workflow_runs_input_check CHECK ((octet_length((input)::text) <= 4194304)),
+@@ -5642,6 +5671,8 @@ CREATE TABLE public.workflow_runs (
+     CONSTRAINT workflow_runs_revision_check CHECK ((revision > 0)),
+     CONSTRAINT workflow_runs_terminal_wakeup_sequence_check CHECK ((terminal_wakeup_sequence > 0))
+ );
++CREATE INDEX workflow_runs_by_bundle ON public.workflow_runs(company_id,bundle_digest);
++
+ 
+ 
+ --
+@@ -11498,7 +11529,7 @@ BEGIN
+ END $$;
+ CREATE TRIGGER workflow_run_snapshot_immutable BEFORE UPDATE OF company_id, id, binding_id,
+     binding_revision, workflow_id, version_id, channel_id, thread_id, actor_id, trigger_id,
+-    correlation_id, bundle, input, params, resources, max_steps, max_context_bytes, deadline,
++    correlation_id, bundle_digest, input, params, resources, max_steps, max_context_bytes, deadline,
+     created_at, parent_run_id, parent_execution_id, rerun_of_run_id, delivery_policy
+     ON public.workflow_runs
+     FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_run_snapshot();
+@@ -11637,3 +11668,75 @@ END $$;
+ CREATE TRIGGER users_revoke_sessions AFTER UPDATE OF password_hash, email ON public.users
+     FOR EACH ROW WHEN (OLD.auth_revision IS DISTINCT FROM NEW.auth_revision)
+     EXECUTE FUNCTION public.revoke_account_sessions();
++
++-- The dump declares company keys after the tables; install this edge after those keys exist.
++ALTER TABLE public.workflow_bundles ADD CONSTRAINT workflow_bundles_company_fk
++    FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
++
++-- A retained tree and its explicitly captured jobs are removed in one transaction.
++ALTER TABLE public.background_tasks ALTER CONSTRAINT background_tasks_workflow_execution_fk DEFERRABLE INITIALLY DEFERRED;
++ALTER TABLE public.workflow_budget_receipts ALTER CONSTRAINT workflow_budget_receipts_company_id_run_id_root_run_id_fkey DEFERRABLE INITIALLY DEFERRED;
++ALTER TABLE public.workflow_executions ALTER CONSTRAINT workflow_successor_fk DEFERRABLE INITIALLY DEFERRED;
++ALTER TABLE public.workflow_run_budgets ALTER CONSTRAINT workflow_run_budgets_company_id_parent_run_id_root_run_id_fkey DEFERRABLE INITIALLY DEFERRED;
++ALTER TABLE public.workflow_run_budgets ALTER CONSTRAINT workflow_run_budgets_company_id_root_run_id_fkey DEFERRABLE INITIALLY DEFERRED;
++ALTER TABLE public.workflow_run_events ALTER CONSTRAINT workflow_run_event_execution_fk DEFERRABLE INITIALLY DEFERRED;
++ALTER TABLE public.workflow_run_events ALTER CONSTRAINT workflow_wakeup_execution_fk DEFERRABLE INITIALLY DEFERRED;
++ALTER TABLE public.workflow_run_parents ALTER CONSTRAINT workflow_parent_execution_fk DEFERRABLE INITIALLY DEFERRED;
++ALTER TABLE public.workflow_runs ALTER CONSTRAINT workflow_run_parent_link_fk DEFERRABLE INITIALLY DEFERRED;
++ALTER TABLE public.workflow_runs ALTER CONSTRAINT workflow_run_terminal_execution_fk DEFERRABLE INITIALLY DEFERRED;
++ALTER TABLE public.workflow_wait_events ALTER CONSTRAINT workflow_wait_event_consumer_execution DEFERRABLE INITIALLY DEFERRED;
++
++CREATE INDEX workflow_run_budgets_root ON public.workflow_run_budgets(company_id,root_run_id,run_id);
++CREATE INDEX workflow_retention_roots ON public.workflow_runs(finished_at,company_id,id)
++    WHERE parent_run_id IS NULL AND state IN ('succeeded','failed','cancelled');
++
++-- Permanent, exact reporting inputs after runtime provenance has reached its retention horizon.
++CREATE TABLE public.model_usage_history (
++    company_id uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
++    request_id uuid NOT NULL,
++    agent_id uuid,
++    workflow_id uuid NOT NULL,
++    version_id uuid NOT NULL,
++    provider text NOT NULL,
++    model text NOT NULL,
++    requested_at timestamptz NOT NULL,
++    reserved_input bigint NOT NULL,
++    reserved_output bigint NOT NULL,
++    input_tokens bigint,
++    output_tokens bigint,
++    usage_source text,
++    settled_at timestamptz,
++    PRIMARY KEY(company_id,request_id),
++    FOREIGN KEY(company_id,agent_id) REFERENCES public.agents(company_id,id) DEFERRABLE INITIALLY DEFERRED,
++    FOREIGN KEY(company_id,workflow_id,version_id) REFERENCES public.workflow_versions(company_id,workflow_id,id)
++        DEFERRABLE INITIALLY DEFERRED
++);
++CREATE INDEX model_usage_history_company_time ON public.model_usage_history(company_id,requested_at,request_id);
++CREATE FUNCTION public.guard_model_usage_history() RETURNS trigger LANGUAGE plpgsql AS $$
++DECLARE original jsonb;
++BEGIN
++    IF TG_OP='DELETE' AND pg_trigger_depth()>1 AND NOT EXISTS(SELECT 1 FROM companies WHERE id=OLD.company_id)
++    THEN RETURN OLD; END IF;
++    IF TG_OP<>'INSERT' THEN
++        RAISE EXCEPTION 'model usage history is immutable' USING ERRCODE='23514';
++    END IF;
++    SELECT to_jsonb(live)-ARRAY['task_id','run_id','execution_id','root_run_id'] INTO original
++        FROM model_usage_calls AS live WHERE company_id=NEW.company_id AND request_id=NEW.request_id FOR UPDATE;
++    IF original IS NULL OR original IS DISTINCT FROM to_jsonb(NEW) THEN
++        RAISE EXCEPTION 'usage archive must exactly match its live owner' USING ERRCODE='23514';
++    END IF;
++    RETURN NEW;
++END $$;
++CREATE TRIGGER model_usage_history_owned BEFORE INSERT OR UPDATE OR DELETE ON public.model_usage_history
++    FOR EACH ROW EXECUTE FUNCTION public.guard_model_usage_history();
++CREATE FUNCTION public.guard_model_usage_single_source() RETURNS trigger LANGUAGE plpgsql AS $$
++BEGIN
++    IF EXISTS(SELECT 1 FROM model_usage_calls WHERE company_id=NEW.company_id AND request_id=NEW.request_id)
++        AND EXISTS(SELECT 1 FROM model_usage_history WHERE company_id=NEW.company_id AND request_id=NEW.request_id)
++    THEN RAISE EXCEPTION 'model usage cannot be live and historical' USING ERRCODE='23514'; END IF;
++    RETURN NULL;
++END $$;
++CREATE CONSTRAINT TRIGGER model_usage_history_single_source AFTER INSERT ON public.model_usage_history
++    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.guard_model_usage_single_source();
++CREATE CONSTRAINT TRIGGER model_usage_live_single_source AFTER INSERT ON public.model_usage_calls
++    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.guard_model_usage_single_source();
+diff --git a/scripts/tests/run-list-query-plan.py b/scripts/tests/run-list-query-plan.py
+index 294d5f6..2c2fad8 100644
+--- a/scripts/tests/run-list-query-plan.py
++++ b/scripts/tests/run-list-query-plan.py
+@@ -51,12 +51,12 @@ FROM generate_series(1, 100) AS tenants(t), generate_series(0, 39) AS workflows(
+ -- their tenant (md5('channel' || t || '-' || w)); workflows 32..39 to the company.
+ INSERT INTO workflow_runs
+     (company_id, id, binding_id, binding_revision, workflow_id, version_id, actor_id, trigger_id,
+-     correlation_id, bundle, input, params, resources, max_steps, max_context_bytes, deadline,
++     correlation_id, bundle_digest, input, params, resources, max_steps, max_context_bytes, deadline,
+      created_at, state, waiting_reason, parent_run_id, parent_execution_id, channel_id, finished_at, terminal_execution_id)
+ SELECT company, md5('run' || t || '-' || n)::uuid, md5('binding' || t || '-' || w)::uuid, 1,
+        md5('workflow' || t || '-' || w)::uuid, md5('version' || t || '-' || w || '-' || v)::uuid,
+        md5('actor' || t)::uuid, md5('trigger' || t || '-' || n)::uuid,
+-       md5('correlation' || t || '-' || n)::uuid, '\x00'::bytea, '{}', '{}', '{}', 100, 65536,
++       md5('correlation' || t || '-' || n)::uuid, sha256('\x00'::bytea), '{}', '{}', '{}', 100, 65536,
+        created + interval '1 day', created, state,
+        CASE WHEN state = 'waiting' THEN 'decision' END,
+        CASE WHEN n % 10 = 5 THEN md5('run' || t || '-' || (n - 1))::uuid END,
+@@ -268,11 +268,11 @@ def board_measurements(shapes: list) -> str:
+ CHILD_HISTORY = r"""
+ INSERT INTO workflow_runs
+     (company_id, id, binding_id, binding_revision, workflow_id, version_id, actor_id, trigger_id,
+-     correlation_id, bundle, input, params, resources, max_steps, max_context_bytes, deadline,
++     correlation_id, bundle_digest, input, params, resources, max_steps, max_context_bytes, deadline,
+      created_at, state, parent_run_id, parent_execution_id, channel_id, finished_at, terminal_execution_id)
+ SELECT md5('company1')::uuid, md5('extra-run1-' || n)::uuid, md5('binding1-5')::uuid, 1,
+        md5('workflow1-5')::uuid, md5('version1-5-18')::uuid, md5('actor1')::uuid,
+-       md5('extra-trigger1-' || n)::uuid, md5('extra-correlation1-' || n)::uuid, '\x00'::bytea,
++       md5('extra-trigger1-' || n)::uuid, md5('extra-correlation1-' || n)::uuid, sha256('\x00'::bytea),
+        '{}', '{}', '{}', 100, 65536, created + interval '1 day', created, 'succeeded',
+        md5('run1-4')::uuid, md5('extra-execution1-' || n)::uuid, md5('channel1-5')::uuid,
+        created + interval '10 minutes',md5('extra-terminal1-' || n)::uuid
+diff --git a/src/adapters/persistence/agent.rs b/src/adapters/persistence/agent.rs
+index 0e5f176..bee85ee 100644
+--- a/src/adapters/persistence/agent.rs
++++ b/src/adapters/persistence/agent.rs
+@@ -409,7 +409,8 @@ fn agent_delete_error(error: sqlx::Error) -> AppError {
+     match constraint.as_deref() {
+         Some(
+             "task_harness_runs_company_id_agent_id_fkey"
+-            | "model_usage_calls_company_id_agent_id_fkey",
++            | "model_usage_calls_company_id_agent_id_fkey"
++            | "model_usage_history_company_id_agent_id_fkey",
+         ) => AppError::Conflict("This agent has run history and cannot be deleted.".into()),
+         _ => AppError::from(error),
+     }
+diff --git a/src/adapters/persistence/dashboard.rs b/src/adapters/persistence/dashboard.rs
+index f19748e..d5bcc68 100644
+--- a/src/adapters/persistence/dashboard.rs
++++ b/src/adapters/persistence/dashboard.rs
+@@ -312,7 +312,9 @@ const ATTEMPT_STATS_SQL: &str = r#"
+ const TOKENS_SQL: &str = r#"
+     SELECT COALESCE(SUM(usage.input_tokens), 0)::bigint AS prompt_tokens,
+            COALESCE(SUM(usage.output_tokens), 0)::bigint AS completion_tokens
+-      FROM model_usage_calls AS usage
++      FROM (SELECT company_id,requested_at,input_tokens,output_tokens FROM model_usage_calls
++            UNION ALL
++            SELECT company_id,requested_at,input_tokens,output_tokens FROM model_usage_history) AS usage
+      WHERE usage.requested_at >= CURRENT_TIMESTAMP - make_interval(mins => $1)
+        {scope}"#;
+ 
+diff --git a/src/adapters/persistence/model_usage/report.rs b/src/adapters/persistence/model_usage/report.rs
+index 06e3d29..77b595b 100644
+--- a/src/adapters/persistence/model_usage/report.rs
++++ b/src/adapters/persistence/model_usage/report.rs
+@@ -149,8 +149,13 @@ async fn load_calls(tx: &mut PgConnection, query: &UsageQuery) -> AppResult<Vec<
+     Ok(sqlx::query_as(
+         "WITH calls AS MATERIALIZED (
+            SELECT requested_at,request_id,provider,model,workflow_id,agent_id,reserved_input,reserved_output,input_tokens,output_tokens,usage_source
+-           FROM model_usage_calls WHERE company_id=$1 AND requested_at >= $2 AND requested_at < $3
+-           ORDER BY requested_at,request_id LIMIT $4)
++           FROM (
++             SELECT requested_at,request_id,provider,model,workflow_id,agent_id,reserved_input,reserved_output,input_tokens,output_tokens,usage_source
++             FROM model_usage_calls WHERE company_id=$1 AND requested_at >= $2 AND requested_at < $3
++             UNION ALL
++             SELECT requested_at,request_id,provider,model,workflow_id,agent_id,reserved_input,reserved_output,input_tokens,output_tokens,usage_source
++             FROM model_usage_history WHERE company_id=$1 AND requested_at >= $2 AND requested_at < $3
++           ) AS sources ORDER BY requested_at,request_id LIMIT $4)
+          SELECT calls.provider,calls.model,calls.workflow_id,calls.agent_id,
+            COALESCE(calls.input_tokens,calls.reserved_input) AS input_tokens,
+            COALESCE(calls.output_tokens,calls.reserved_output) AS output_tokens,calls.usage_source,
+diff --git a/src/adapters/persistence/workflow/action_authority.rs b/src/adapters/persistence/workflow/action_authority.rs
+index 8dad5cd..2366ee2 100644
+--- a/src/adapters/persistence/workflow/action_authority.rs
++++ b/src/adapters/persistence/workflow/action_authority.rs
+@@ -59,9 +59,9 @@ pub(super) async fn load_on(
+ ) -> AppResult<ActionRunAuthority> {
+     let actor = actor.ok_or_else(missing)?;
+     let run = sqlx::query_as::<_, RunAuthorityRow>(
+-        "SELECT actor_id,version_id,workflow_id,bundle,resources FROM workflow_runs \
+-             WHERE company_id=$1 AND id=$2 AND state IN ('queued','running') \
+-             AND deadline > clock_timestamp() FOR UPDATE",
++        "SELECT actor_id,version_id,workflow_id,stored.bundle AS bundle,resources FROM workflow_runs AS run LEFT JOIN workflow_bundles AS stored ON stored.company_id=run.company_id AND stored.digest=run.bundle_digest \
++             WHERE run.company_id=$1 AND id=$2 AND state IN ('queued','running') \
++             AND deadline > clock_timestamp() FOR UPDATE OF run",
+     )
+     .bind(scope.company.as_uuid())
+     .bind(scope.run.as_uuid())
+diff --git a/src/adapters/persistence/workflow/action_dispatch_tests.rs b/src/adapters/persistence/workflow/action_dispatch_tests.rs
+index 119b0f2..c6a7fa6 100644
+--- a/src/adapters/persistence/workflow/action_dispatch_tests.rs
++++ b/src/adapters/persistence/workflow/action_dispatch_tests.rs
+@@ -145,12 +145,12 @@ async fn initialize_action_on_claim(
+         vec![],
+     )
+     .unwrap();
+-    sqlx::query("UPDATE workflow_runs SET bundle=$2 WHERE id=$1")
+-        .bind(scope.run.as_uuid())
+-        .bind(store_bundle(&bundle).unwrap())
+-        .execute(f.persistence().pool())
+-        .await
+-        .unwrap();
++    replace_run_bundle(
++        f.persistence().pool(),
++        scope.run.as_uuid(),
++        &store_bundle(&bundle).unwrap(),
++    )
++    .await;
+     sqlx::query("INSERT INTO fixture_action_resources VALUES ($1,true)")
+         .bind(scope.company.as_uuid())
+         .execute(f.persistence().pool())
+diff --git a/src/adapters/persistence/workflow/action_reconciliation/mod.rs b/src/adapters/persistence/workflow/action_reconciliation/mod.rs
+index 2fefa1e..18b2109 100644
+--- a/src/adapters/persistence/workflow/action_reconciliation/mod.rs
++++ b/src/adapters/persistence/workflow/action_reconciliation/mod.rs
+@@ -199,7 +199,7 @@ async fn restore_on(
+     tx: &mut Transaction<'_, Postgres>,
+     command: &ReconcileActionCommand,
+ ) -> AppResult<ActionRunAuthority> {
+-    let run = sqlx::query_as::<_, FrozenRunRow>("SELECT actor_id,version_id,workflow_id,bundle,resources FROM workflow_runs WHERE company_id=$1 AND id=$2")
++    let run = sqlx::query_as::<_, FrozenRunRow>("SELECT actor_id,version_id,workflow_id,stored.bundle AS bundle,resources FROM workflow_runs AS run LEFT JOIN workflow_bundles AS stored ON stored.company_id=run.company_id AND stored.digest=run.bundle_digest WHERE run.company_id=$1 AND id=$2")
+         .bind(command.scope.company.as_uuid()).bind(command.scope.run.as_uuid()).fetch_one(&mut **tx).await?;
+     sqlx::query_scalar::<_, Uuid>(
+         "SELECT id FROM workflow_executions WHERE company_id=$1 AND run_id=$2 AND id=$3 FOR UPDATE",
+diff --git a/src/adapters/persistence/workflow/action_reconciliation_audit_sql_tests.rs b/src/adapters/persistence/workflow/action_reconciliation_audit_sql_tests.rs
+index 208e282..47e778b 100644
+--- a/src/adapters/persistence/workflow/action_reconciliation_audit_sql_tests.rs
++++ b/src/adapters/persistence/workflow/action_reconciliation_audit_sql_tests.rs
+@@ -127,12 +127,17 @@ async fn native_catalog(
+     assert_eq!(rows.len(), 1);
+     let row = &rows[0];
+     assert_eq!(row["relation"], relation);
+-    assert_eq!(row["definition"], definition);
++    let expected_definition = if name == EVENT_FK {
++        format!("{definition} DEFERRABLE INITIALLY DEFERRED")
++    } else {
++        definition.to_owned()
++    };
++    assert_eq!(row["definition"], expected_definition);
+     for field in ["valid", "enabled"] {
+         assert_eq!(row[field], true);
+     }
+     for field in ["deferrable", "deferred"] {
+-        assert_eq!(row[field], false);
++        assert_eq!(row[field], name == EVENT_FK);
+     }
+     assert_eq!(row["type"], if name == EVENT_FK { "f" } else { "c" });
+     eprintln!("native_catalog={row}");
+@@ -239,6 +244,20 @@ async fn insert_audit(
+         .bind(candidate.actor).bind(execution).fetch_one(&mut **tx).await
+ }
+ 
++async fn immediate_audit_savepoint(tx: &mut Transaction<'_, Postgres>) -> SqlOwner {
++    let owner = sql_owner(tx).await;
++    // Keep the selected FK attack immediate while reverse-orphan guards stay deferred.
++    sqlx::query("SET CONSTRAINTS workflow_run_event_execution_fk IMMEDIATE")
++        .execute(&mut **tx)
++        .await
++        .unwrap();
++    sqlx::query("SAVEPOINT native_audit_candidate")
++        .execute(&mut **tx)
++        .await
++        .unwrap();
++    owner
++}
++
+ async fn audit_sql_pair(f: &AdmissionFixture, own: ActionScope, foreign: ActionScope, label: &str) {
+     assert_ne!(own.execution, foreign.execution);
+     assert_ne!(own.run, foreign.run);
+@@ -256,11 +275,7 @@ async fn audit_sql_pair(f: &AdmissionFixture, own: ActionScope, foreign: ActionS
+     let baseline = all_tables(f).await;
+     for execution in [own.execution.as_uuid(), foreign.execution.as_uuid()] {
+         let mut tx = f.persistence().pool().begin().await.unwrap();
+-        let owner = sql_owner(&mut tx).await;
+-        sqlx::query("SAVEPOINT native_audit_candidate")
+-            .execute(&mut *tx)
+-            .await
+-            .unwrap();
++        let owner = immediate_audit_savepoint(&mut tx).await;
+         if execution == own.execution.as_uuid() {
+             let row = insert_audit(&mut tx, &candidate, execution).await.unwrap();
+             assert_eq!(row.as_object().unwrap().len(), 11);
+diff --git a/src/adapters/persistence/workflow/action_reconciliation_claim_sql_tests.rs b/src/adapters/persistence/workflow/action_reconciliation_claim_sql_tests.rs
+index 800df63..f9431cf 100644
+--- a/src/adapters/persistence/workflow/action_reconciliation_claim_sql_tests.rs
++++ b/src/adapters/persistence/workflow/action_reconciliation_claim_sql_tests.rs
+@@ -2,6 +2,11 @@
+ use super::*;
+ use sqlx::{Postgres, Transaction};
+ 
++#[path = "storage_reconciliation_tests.rs"]
++mod storage_reconciliation_tests;
++#[path = "storage_witness_tests.rs"]
++mod storage_witness_tests;
++
+ #[path = "action_reconciliation_claim_sql_wrong_execution_tests.rs"]
+ mod wrong_execution_tests;
+ 
+diff --git a/src/adapters/persistence/workflow/action_reconciliation_eligibility_history_tests.rs b/src/adapters/persistence/workflow/action_reconciliation_eligibility_history_tests.rs
+index 6deabff..aa93693 100644
+--- a/src/adapters/persistence/workflow/action_reconciliation_eligibility_history_tests.rs
++++ b/src/adapters/persistence/workflow/action_reconciliation_eligibility_history_tests.rs
+@@ -454,8 +454,8 @@ async fn max_steps_case(max_steps: i32) {
+         "final_not_applied"
+     );
+     assert_eq!(
+-        before["workflow_runs"][0]["bundle"],
+-        after["workflow_runs"][0]["bundle"]
++        before["workflow_runs"][0]["bundle_digest"],
++        after["workflow_runs"][0]["bundle_digest"]
+     );
+     retained_accounting(&before, &after);
+     assert_eq!(entry_consumptions(f).await, (2, 0));
+diff --git a/src/adapters/persistence/workflow/action_reconciliation_high_bounds_assertions.rs b/src/adapters/persistence/workflow/action_reconciliation_high_bounds_assertions.rs
+index 5b2e2dd..6f6da83 100644
+--- a/src/adapters/persistence/workflow/action_reconciliation_high_bounds_assertions.rs
++++ b/src/adapters/persistence/workflow/action_reconciliation_high_bounds_assertions.rs
+@@ -182,7 +182,7 @@ pub(super) fn retry_delta(
+         "deadline",
+         "max_steps",
+         "max_context_bytes",
+-        "bundle",
++        "bundle_digest",
+         "input",
+         "params",
+         "resources",
+diff --git a/src/adapters/persistence/workflow/action_reconciliation_owner_lifecycle_tests.rs b/src/adapters/persistence/workflow/action_reconciliation_owner_lifecycle_tests.rs
+index c7327b5..f18a576 100644
+--- a/src/adapters/persistence/workflow/action_reconciliation_owner_lifecycle_tests.rs
++++ b/src/adapters/persistence/workflow/action_reconciliation_owner_lifecycle_tests.rs
+@@ -48,6 +48,12 @@ async fn live_run_owner_deletion_negatives(f: &AdmissionFixture) {
+             "populated {table}"
+         );
+         let mut tx = f.persistence().pool().begin().await.unwrap();
++        // Probe the original immediate FK boundary explicitly; retention defers it only
++        // so one transaction can remove both owners in the required cascade order.
++        sqlx::query("SET CONSTRAINTS background_tasks_workflow_execution_fk IMMEDIATE")
++            .execute(&mut *tx)
++            .await
++            .unwrap();
+         let error = sqlx::query(statement)
+             .bind(f.binding.target.company.as_uuid())
+             .execute(&mut *tx)
+@@ -83,16 +89,30 @@ async fn live_run_owner_deletion_negatives(f: &AdmissionFixture) {
+     }
+ }
+ 
++fn fact_mutations(table: &str) -> Vec<String> {
++    let mut statements = vec![format!(
++        "UPDATE {table} SET run_id=run_id WHERE company_id=$1"
++    )];
++    // Committed transient proofs are now reclaimable. Permanent effect/audit facts remain append-only.
++    if ![
++        "workflow_action_state_witnesses",
++        "workflow_action_schedule_witnesses",
++        "workflow_action_claim_retirement_witnesses",
++    ]
++    .contains(&table)
++    {
++        statements.push(format!("DELETE FROM {table} WHERE company_id=$1"));
++    }
++    statements
++}
++
+ async fn live_owner_negatives(f: &AdmissionFixture) {
+     let before = all_tables(f).await;
+     for table in OWNED_FACTS {
+         if count(f, table).await == 0 {
+             continue;
+         }
+-        for statement in [
+-            format!("DELETE FROM {table} WHERE company_id=$1"),
+-            format!("UPDATE {table} SET run_id=run_id WHERE company_id=$1"),
+-        ] {
++        for statement in fact_mutations(table) {
+             let error = sqlx::query(&statement)
+                 .bind(f.binding.target.company.as_uuid())
+                 .execute(f.persistence().pool())
+diff --git a/src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_tests.rs b/src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_tests.rs
+index 6e42a3b..b5b3e52 100644
+--- a/src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_tests.rs
++++ b/src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_tests.rs
+@@ -52,12 +52,12 @@ async fn mixed_requests(
+         vec![],
+     )
+     .unwrap();
+-    sqlx::query("UPDATE workflow_runs SET bundle=$2 WHERE id=$1")
+-        .bind(first.scope().run.as_uuid())
+-        .bind(store_bundle(&bundle).unwrap())
+-        .execute(f.persistence().pool())
+-        .await
+-        .unwrap();
++    replace_run_bundle(
++        f.persistence().pool(),
++        first.scope().run.as_uuid(),
++        &store_bundle(&bundle).unwrap(),
++    )
++    .await;
+     sqlx::query(
+         "CREATE TABLE fixture_current_contracts(name text PRIMARY KEY,tool jsonb NOT NULL)",
+     )
+diff --git a/src/adapters/persistence/workflow/action_reconciliation_state_witness_fixture.sql b/src/adapters/persistence/workflow/action_reconciliation_state_witness_fixture.sql
+index 9bd5f9c..0350a20 100644
+--- a/src/adapters/persistence/workflow/action_reconciliation_state_witness_fixture.sql
++++ b/src/adapters/persistence/workflow/action_reconciliation_state_witness_fixture.sql
+@@ -36,17 +36,17 @@ BEGIN
+         'conflicts',COALESCE((SELECT jsonb_agg(to_jsonb(conflict) ORDER BY conflict.id) FROM workflow_action_evidence_conflicts AS conflict WHERE conflict.company_id=company AND conflict.invocation_id=candidate.invocation_id),'[]'::jsonb));
+ END $$;
+ CREATE FUNCTION fixture_state_step(config fixture_state_config,label text) RETURNS void LANGUAGE plpgsql AS $$
+-DECLARE owner_image jsonb; original_bundle jsonb;
++DECLARE owner_image jsonb; original_digest jsonb;
+ BEGIN
+     SELECT to_jsonb(owner) INTO STRICT owner_image FROM workflow_runs AS owner
+         WHERE owner.company_id=config.company_id AND owner.id=config.run_id;
+-    SELECT saved->'bundle' INTO STRICT original_bundle FROM jsonb_array_elements(config.baseline->'workflow_runs') AS saved
++    SELECT saved->'bundle_digest' INTO STRICT original_digest FROM jsonb_array_elements(config.baseline->'workflow_runs') AS saved
+         WHERE saved->>'company_id'=config.company_id::text AND saved->>'id'=config.run_id::text;
+-    IF owner_image->'bundle' IS DISTINCT FROM original_bundle THEN RAISE EXCEPTION 'state immutable bundle changed'; END IF;
++    IF owner_image->'bundle_digest' IS DISTINCT FROM original_digest THEN RAISE EXCEPTION 'state immutable bundle address changed'; END IF;
+     INSERT INTO fixture_state_steps(company_id,command_key,step,image)
+         SELECT config.company_id,config.command_key,label,jsonb_build_object('xid',pg_current_xact_id()::text,
+-            -- Assert the full frozen bundle above; retain every mutable head field without repeating it four times in the bounded transport.
+-            'run',owner_image-'bundle',
++            -- Assert the frozen bundle address above; retain every mutable head field without repeating it four times in the bounded transport.
++            'run',owner_image-'bundle_digest',
+             'job',(SELECT to_jsonb(job) FROM background_tasks AS job WHERE job.company_id=config.company_id AND job.id=config.job_id),
+             'states',COALESCE((SELECT jsonb_agg(to_jsonb(state)) FROM workflow_action_state_witnesses AS state WHERE state.company_id=config.company_id AND state.run_id=config.run_id AND state.transaction_id=pg_current_xact_id()),'[]'::jsonb),
+             'schedules',COALESCE((SELECT jsonb_agg(to_jsonb(schedule)) FROM workflow_action_schedule_witnesses AS schedule WHERE schedule.company_id=config.company_id AND schedule.job_id=config.job_id AND schedule.transaction_id=pg_current_xact_id()),'[]'::jsonb));
+diff --git a/src/adapters/persistence/workflow/activation_tests.rs b/src/adapters/persistence/workflow/activation_tests.rs
+index beb636d..6866111 100644
+--- a/src/adapters/persistence/workflow/activation_tests.rs
++++ b/src/adapters/persistence/workflow/activation_tests.rs
+@@ -108,9 +108,9 @@ async fn workflow_activation_abort_and_lost_ack_reuse_snapshot_across_attempts()
+     }
+     // Reconnect independently and corrupt the original resolution source. Replay
+     // must use the saved snapshot rather than rebuild inputs from source/bundle.
+-    sqlx::query("UPDATE workflow_runs SET bundle = $2, input = '{}' WHERE id = $1")
++    replace_run_bundle(f.persistence().pool(), request.run.as_uuid(), &[0]).await;
++    sqlx::query("UPDATE workflow_runs SET input='{}' WHERE id=$1")
+         .bind(request.run.as_uuid())
+-        .bind(vec![0_u8])
+         .execute(f.persistence().pool())
+         .await
+         .unwrap();
+diff --git a/src/adapters/persistence/workflow/admission_binding.rs b/src/adapters/persistence/workflow/admission_binding.rs
+index 4ae721b..1b71a2c 100644
+--- a/src/adapters/persistence/workflow/admission_binding.rs
++++ b/src/adapters/persistence/workflow/admission_binding.rs
+@@ -170,8 +170,8 @@ pub(super) async fn read_saved_binding(
+     run: Uuid,
+ ) -> AppResult<Arc<ConfiguredBinding>> {
+     let row = sqlx::query_as::<_, SavedBindingRow>(
+-        "SELECT workflow_id, version_id, binding_revision, bundle, params, resources, actor_id \
+-         FROM workflow_runs WHERE company_id = $1 AND id = $2 AND binding_id = $3",
++        "SELECT workflow_id, version_id, binding_revision, stored.bundle AS bundle, params, resources, actor_id \
++         FROM workflow_runs AS run LEFT JOIN workflow_bundles AS stored ON stored.company_id=run.company_id AND stored.digest=run.bundle_digest WHERE run.company_id = $1 AND id = $2 AND binding_id = $3",
+     )
+     .bind(company.as_uuid())
+     .bind(run)
+diff --git a/src/adapters/persistence/workflow/admission_binding_tests.rs b/src/adapters/persistence/workflow/admission_binding_tests.rs
+index 94176c5..3d55717 100644
+--- a/src/adapters/persistence/workflow/admission_binding_tests.rs
++++ b/src/adapters/persistence/workflow/admission_binding_tests.rs
+@@ -32,7 +32,14 @@ async fn seed_saved(f: &BindingFixture, key: &str, trigger: &TriggerRef) -> Uuid
+     seed_root_budget(&mut tx, f.target.company.as_uuid(), run)
+         .await
+         .unwrap();
+-    sqlx::query("INSERT INTO workflow_runs (company_id, id, binding_id, binding_revision, workflow_id, version_id, actor_id, trigger_id, correlation_id, bundle, input, params, resources, max_steps, max_context_bytes, deadline) SELECT company_id, $2, $3, 1, workflow_id, id, actor_id, $4, $5, bundle, '{}'::jsonb, $6, '{}'::jsonb, 100, 1048576, CURRENT_TIMESTAMP + interval '1 hour' FROM workflow_versions WHERE company_id = $1 AND id = $7")
++    seed_version_bundle(
++        &mut tx,
++        f.target.company.as_uuid(),
++        f.request(None).version.as_uuid(),
++    )
++    .await
++    .unwrap();
++    sqlx::query("INSERT INTO workflow_runs (company_id, id, binding_id, binding_revision, workflow_id, version_id, actor_id, trigger_id, correlation_id, bundle_digest, input, params, resources, max_steps, max_context_bytes, deadline) SELECT company_id, $2, $3, 1, workflow_id, id, actor_id, $4, $5, sha256(bundle), '{}'::jsonb, $6, '{}'::jsonb, 100, 1048576, CURRENT_TIMESTAMP + interval '1 hour' FROM workflow_versions WHERE company_id = $1 AND id = $7")
+         .bind(f.target.company.as_uuid()).bind(run).bind(f.target.binding.as_uuid())
+         .bind(trigger.trigger_id().as_uuid()).bind(Uuid::new_v4()).bind(json!({"saved": 7}))
+         .bind(f.request(None).version.as_uuid()).execute(&mut *tx).await.unwrap();
+@@ -223,17 +230,12 @@ async fn workflow_admission_binding_corrupt_saved_snapshot_fails_without_fallbac
+     let mut unknown: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+     unknown["format"] = json!("unknown");
+     for corrupt in [b"invalid".to_vec(), serde_json::to_vec(&unknown).unwrap()] {
+-        sqlx::query("UPDATE workflow_runs SET bundle = $3 WHERE company_id = $1 AND id = $2")
+-            .bind(f.target.company.as_uuid())
+-            .bind(run)
+-            .bind(corrupt)
+-            .execute(pool)
+-            .await
+-            .unwrap();
++        replace_run_bundle(pool, run, &corrupt).await;
+         assert!(select(&f, "original", &event).await.is_err());
+     }
+-    sqlx::query("UPDATE workflow_runs SET bundle = $3, resources = '{\"undeclared\": 7}'::jsonb WHERE company_id = $1 AND id = $2")
+-        .bind(f.target.company.as_uuid()).bind(run).bind(bytes).execute(pool).await.unwrap();
++    replace_run_bundle(pool, run, &bytes).await;
++    sqlx::query("UPDATE workflow_runs SET resources = '{\"undeclared\": 7}'::jsonb WHERE company_id = $1 AND id = $2")
++        .bind(f.target.company.as_uuid()).bind(run).execute(pool).await.unwrap();
+     assert!(select(&f, "original", &event).await.is_err());
+     assert!(
+         select(
+diff --git a/src/adapters/persistence/workflow/admission_tests.rs b/src/adapters/persistence/workflow/admission_tests.rs
+index 57efc49..2a9e03b 100644
+--- a/src/adapters/persistence/workflow/admission_tests.rs
++++ b/src/adapters/persistence/workflow/admission_tests.rs
+@@ -29,6 +29,8 @@ mod run_board_tests;
+ mod run_finished_at_tests;
+ #[path = "run_lineage_tests.rs"]
+ mod run_lineage_tests;
++#[path = "storage_tests.rs"]
++mod storage_tests;
+ use crate::domain::entities::correlation::CorrelationId;
+ use binding_tests::BindingFixture;
+ use serde_json::{Value, json};
+@@ -254,7 +256,7 @@ async fn workflow_admit_sql_exact_snapshot_job_and_replay_preserves_deadline() {
+         snapshot["correlation"],
+         json!(command.causality().correlation_id().as_uuid())
+     );
+-    let bytes: Vec<u8> = sqlx::query_scalar("SELECT bundle FROM workflow_runs WHERE id=$1")
++    let bytes: Vec<u8> = sqlx::query_scalar("SELECT (SELECT stored.bundle FROM workflow_bundles stored WHERE stored.company_id=workflow_runs.company_id AND stored.digest=workflow_runs.bundle_digest) AS bundle FROM workflow_runs WHERE id=$1")
+         .bind(command.proposed_run_id().as_uuid())
+         .fetch_one(p.pool())
+         .await
+diff --git a/src/adapters/persistence/workflow/admission_token_tests.rs b/src/adapters/persistence/workflow/admission_token_tests.rs
+index c1e4412..cf8c11c 100644
+--- a/src/adapters/persistence/workflow/admission_token_tests.rs
++++ b/src/adapters/persistence/workflow/admission_token_tests.rs
+@@ -165,7 +165,7 @@ async fn root_budget_admission_token_policy_equals_the_compiled_policy() {
+         policy,
+         json!({"max_tokens":2000,"reviewers":[{"kind":"user","id":reviewer}]})
+     );
+-    let compiled:Value=sqlx::query_scalar("SELECT version->'compiled'->'root_budget'->'tokens' FROM workflow_runs AS run CROSS JOIN LATERAL jsonb_array_elements(convert_from(run.bundle,'UTF8')::jsonb->'versions') AS version WHERE run.id=$1 AND version->>'version'=convert_from(run.bundle,'UTF8')::jsonb->>'root'")
++    let compiled:Value=sqlx::query_scalar("SELECT version->'compiled'->'root_budget'->'tokens' FROM workflow_runs AS run CROSS JOIN LATERAL jsonb_array_elements(convert_from((SELECT stored.bundle FROM workflow_bundles stored WHERE stored.company_id=run.company_id AND stored.digest=run.bundle_digest),'UTF8')::jsonb->'versions') AS version WHERE run.id=$1 AND version->>'version'=convert_from((SELECT stored.bundle FROM workflow_bundles stored WHERE stored.company_id=run.company_id AND stored.digest=run.bundle_digest),'UTF8')::jsonb->>'root'")
+         .bind(prepared.proposed_run_id().as_uuid()).fetch_one(f.persistence().pool()).await.unwrap();
+     assert_eq!(policy, compiled);
+ }
+diff --git a/src/adapters/persistence/workflow/admission_write.rs b/src/adapters/persistence/workflow/admission_write.rs
+index c51f688..6edacb6 100644
+--- a/src/adapters/persistence/workflow/admission_write.rs
++++ b/src/adapters/persistence/workflow/admission_write.rs
+@@ -115,6 +115,8 @@ async fn insert_root_budget(
+ }
+ 
+ pub(super) async fn insert_run(db: &mut PgConnection, row: &RunRow<'_>) -> AppResult<()> {
++    let bytes = store_bundle(row.binding.bundle())?;
++    let digest = super::bundle_store::insert_on(db, row.company, &bytes).await?;
+     let (channel, thread) = binding_rows::association_columns(row.association);
+     let definition = row.binding.bundle().compiled().graph().definition();
+     if row.parent.is_none() {
+@@ -128,7 +130,7 @@ pub(super) async fn insert_run(db: &mut PgConnection, row: &RunRow<'_>) -> AppRe
+     };
+     sqlx::query(
+         "INSERT INTO workflow_runs (company_id, id, binding_id, binding_revision, workflow_id, version_id, \
+-         channel_id, thread_id, actor_id, trigger_id, correlation_id, bundle, input, params, resources, \
++         channel_id, thread_id, actor_id, trigger_id, correlation_id, bundle_digest, input, params, resources, \
+          max_steps, max_context_bytes, deadline, parent_run_id, parent_execution_id, rerun_of_run_id, \
+          delivery_policy) \
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17, \
+@@ -137,7 +139,7 @@ pub(super) async fn insert_run(db: &mut PgConnection, row: &RunRow<'_>) -> AppRe
+         .bind(row.binding.id().as_uuid()).bind(revision(row.binding.revision().get())?)
+         .bind(definition.workflow_id.as_uuid()).bind(definition.version_id.as_uuid()).bind(channel).bind(thread)
+         .bind(row.actor_id).bind(row.trigger.as_uuid())
+-        .bind(row.correlation).bind(store_bundle(row.binding.bundle())?)
++        .bind(row.correlation).bind(digest.as_bytes())
+         .bind(row.input).bind(row.binding.params()).bind(resources)
+         .bind(i32::try_from(definition.limits.max_steps).map_err(|_| invalid())?)
+         .bind(i32::try_from(definition.limits.max_context_bytes).map_err(|_| invalid())?)
+diff --git a/src/adapters/persistence/workflow/agent_model_step_tests.rs b/src/adapters/persistence/workflow/agent_model_step_tests.rs
+index f953f4b..e589604 100644
+--- a/src/adapters/persistence/workflow/agent_model_step_tests.rs
++++ b/src/adapters/persistence/workflow/agent_model_step_tests.rs
+@@ -34,7 +34,7 @@ async fn step_setup(step: fn(&mut Value)) -> AgentSetup {
+ 
+ /// The run's frozen bundle accepts `output` as the step's committed result.
+ async fn accepted(setup: &AgentSetup, output: &Value) -> bool {
+-    let stored: Vec<u8> = sqlx::query_scalar("SELECT bundle FROM workflow_runs WHERE id=$1")
++    let stored: Vec<u8> = sqlx::query_scalar("SELECT (SELECT stored.bundle FROM workflow_bundles stored WHERE stored.company_id=workflow_runs.company_id AND stored.digest=workflow_runs.bundle_digest) AS bundle FROM workflow_runs WHERE id=$1")
+         .bind(setup.claim.fence.scope.run.as_uuid())
+         .fetch_one(setup.fixture.persistence.pool())
+         .await
+diff --git a/src/adapters/persistence/workflow/budget_schema_tests.rs b/src/adapters/persistence/workflow/budget_schema_tests.rs
+index e9764b9..0c454a1 100644
+--- a/src/adapters/persistence/workflow/budget_schema_tests.rs
++++ b/src/adapters/persistence/workflow/budget_schema_tests.rs
+@@ -219,7 +219,7 @@ async fn workflow_budget_schema_consumption_never_locks_root_run_or_execution()
+ #[tokio::test]
+ async fn root_budget_admission_raw_root_without_budget_is_refused() {
+     let (f, admitted) = limited().await;
+-    let error = sqlx::query("INSERT INTO workflow_runs (company_id,id,binding_id,binding_revision,workflow_id,version_id,actor_id,trigger_id,correlation_id,bundle,input,params,resources,max_steps,max_context_bytes,deadline) SELECT company_id,$2,binding_id,binding_revision,workflow_id,version_id,actor_id,gen_random_uuid(),gen_random_uuid(),bundle,input,params,resources,max_steps,max_context_bytes,deadline FROM workflow_runs WHERE id=$1")
++    let error = sqlx::query("INSERT INTO workflow_runs (company_id,id,binding_id,binding_revision,workflow_id,version_id,actor_id,trigger_id,correlation_id,bundle_digest,input,params,resources,max_steps,max_context_bytes,deadline) SELECT company_id,$2,binding_id,binding_revision,workflow_id,version_id,actor_id,gen_random_uuid(),gen_random_uuid(),bundle_digest,input,params,resources,max_steps,max_context_bytes,deadline FROM workflow_runs WHERE id=$1")
+         .bind(admitted.run.as_uuid()).bind(Uuid::new_v4())
+         .execute(f.persistence().pool()).await.unwrap_err();
+     let db = error.as_database_error().unwrap();
+@@ -269,7 +269,7 @@ async fn workflow_budget_current_compiler_admission_activates() {
+     let (f, scope) = limited().await;
+     let activation = f.persistence().activate(scope).await.unwrap();
+     assert_eq!(activation.execution, scope.execution);
+-    let saved: Value = sqlx::query_scalar("SELECT jsonb_build_object('compiler',(convert_from(run.bundle,'UTF8')::jsonb)->'compiler_revision','activations',usage.activations) FROM workflow_runs AS run JOIN workflow_root_budgets AS budget ON budget.company_id=run.company_id AND budget.root_run_id=run.id JOIN workflow_root_budget_usage AS usage ON usage.company_id=run.company_id AND usage.root_run_id=run.id WHERE run.company_id=$1 AND run.id=$2")
++    let saved: Value = sqlx::query_scalar("SELECT jsonb_build_object('compiler',(convert_from((SELECT stored.bundle FROM workflow_bundles stored WHERE stored.company_id=run.company_id AND stored.digest=run.bundle_digest),'UTF8')::jsonb)->'compiler_revision','activations',usage.activations) FROM workflow_runs AS run JOIN workflow_root_budgets AS budget ON budget.company_id=run.company_id AND budget.root_run_id=run.id JOIN workflow_root_budget_usage AS usage ON usage.company_id=run.company_id AND usage.root_run_id=run.id WHERE run.company_id=$1 AND run.id=$2")
+         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).fetch_one(f.persistence().pool()).await.unwrap();
+     assert_eq!(
+         saved,
+diff --git a/src/adapters/persistence/workflow/bundle_store.rs b/src/adapters/persistence/workflow/bundle_store.rs
+new file mode 100644
+index 0000000..7b59d99
+--- /dev/null
++++ b/src/adapters/persistence/workflow/bundle_store.rs
+@@ -0,0 +1,41 @@
++//! Immutable run payloads. Conflict reuse must own the tuple before a run's deferred FK exists.
++use super::*;
++use sha2::{Digest, Sha256};
++
++pub(super) struct BundleDigest([u8; 32]);
++impl BundleDigest {
++    pub(super) fn as_bytes(&self) -> &[u8] {
++        &self.0
++    }
++}
++
++pub(super) async fn insert_on(
++    db: &mut PgConnection,
++    company: CompanyId,
++    bytes: &[u8],
++) -> AppResult<BundleDigest> {
++    let digest = BundleDigest(Sha256::digest(bytes).into());
++    // WHERE false still locks the conflicting tuple, but performs no UPDATE and invokes no
++    // immutable-payload trigger. GC either skips our lock, or wins first and we insert anew.
++    sqlx::query(
++        "INSERT INTO workflow_bundles(company_id,digest,bundle) VALUES ($1,$2,$3) \
++         ON CONFLICT(company_id,digest) DO UPDATE SET bundle=EXCLUDED.bundle WHERE false",
++    )
++    .bind(company.as_uuid())
++    .bind(digest.as_bytes())
++    .bind(bytes)
++    .execute(&mut *db)
++    .await?;
++    let stored: Vec<u8> =
++        sqlx::query_scalar("SELECT bundle FROM workflow_bundles WHERE company_id=$1 AND digest=$2")
++            .bind(company.as_uuid())
++            .bind(digest.as_bytes())
++            .fetch_one(db)
++            .await?;
++    if stored != bytes {
++        return Err(AppError::Internal(
++            "Stored workflow bundle does not match its content address".into(),
++        ));
++    }
++    Ok(digest)
++}
+diff --git a/src/adapters/persistence/workflow/control_acceptance_tests.rs b/src/adapters/persistence/workflow/control_acceptance_tests.rs
+index 82b2bf5..fb8054b 100644
+--- a/src/adapters/persistence/workflow/control_acceptance_tests.rs
++++ b/src/adapters/persistence/workflow/control_acceptance_tests.rs
+@@ -460,7 +460,7 @@ async fn workflow_control_foreign_scope_and_conflicting_authorized_actor_run_key
+ }
+ 
+ #[tokio::test]
+-async fn workflow_control_ordinary_retry_owner_cascade_preserves_live_witnesses() {
++async fn workflow_control_ordinary_retry_owner_cascade_keeps_witness_updates_guarded() {
+     let (f, scope) = fixture().await;
+     failed(&f, scope, RetrySafety::SafeToRetry).await;
+     let cmd = retry(command(&f, scope, "retry-before-owner-delete").await);
+@@ -479,23 +479,21 @@ async fn workflow_control_ordinary_retry_owner_cascade_preserves_live_witnesses(
+                 .await
+                 .unwrap();
+         assert!(count > 0, "populated {table}");
+-        for statement in [
+-            format!("DELETE FROM {table} WHERE company_id=$1"),
+-            format!("UPDATE {table} SET run_id=run_id WHERE company_id=$1"),
+-        ] {
+-            let error = sqlx::query(&statement)
+-                .bind(scope.company.as_uuid())
+-                .execute(f.persistence().pool())
+-                .await
+-                .unwrap_err();
+-            assert!(
+-                error
+-                    .as_database_error()
+-                    .unwrap()
+-                    .message()
+-                    .contains("append-only")
+-            );
+-        }
++        // Committed witnesses are reclaimable, but their contents remain immutable.
++        let error = sqlx::query(&format!(
++            "UPDATE {table} SET run_id=run_id WHERE company_id=$1"
++        ))
++        .bind(scope.company.as_uuid())
++        .execute(f.persistence().pool())
++        .await
++        .unwrap_err();
++        assert!(
++            error
++                .as_database_error()
++                .unwrap()
++                .message()
++                .contains("append-only")
++        );
+     }
+     sqlx::query("DELETE FROM companies WHERE id=$1")
+         .bind(scope.company.as_uuid())
+diff --git a/src/adapters/persistence/workflow/harness_model_store_tests.rs b/src/adapters/persistence/workflow/harness_model_store_tests.rs
+index 74419ac..11ca89a 100644
+--- a/src/adapters/persistence/workflow/harness_model_store_tests.rs
++++ b/src/adapters/persistence/workflow/harness_model_store_tests.rs
+@@ -2,6 +2,8 @@ use super::*;
+ use crate::application::workflow::checkpoints::*;
+ use crate::services::harness::runs::WriteOutcome;
+ 
++#[path = "storage_checkpoint_tests.rs"]
++mod storage_checkpoint_tests;
+ #[path = "harness_token_tests.rs"]
+ mod tokens;
+ 
+diff --git a/src/adapters/persistence/workflow/history_reader_tests.rs b/src/adapters/persistence/workflow/history_reader_tests.rs
+index 666c577..1b99d9c 100644
+--- a/src/adapters/persistence/workflow/history_reader_tests.rs
++++ b/src/adapters/persistence/workflow/history_reader_tests.rs
+@@ -196,7 +196,7 @@ async fn workflow_context_history_returns_the_admission_snapshot_with_boundaries
+         .sum();
+     assert_eq!(output["token_count"], json!(total));
+     // The engine accepts the output as the step's committed result.
+-    let stored: Vec<u8> = sqlx::query_scalar("SELECT bundle FROM workflow_runs WHERE id=$1")
++    let stored: Vec<u8> = sqlx::query_scalar("SELECT (SELECT stored.bundle FROM workflow_bundles stored WHERE stored.company_id=workflow_runs.company_id AND stored.digest=workflow_runs.bundle_digest) AS bundle FROM workflow_runs WHERE id=$1")
+         .bind(claim.fence.scope.run.as_uuid())
+         .fetch_one(f.persistence().pool())
+         .await
+diff --git a/src/adapters/persistence/workflow/http_runtime.rs b/src/adapters/persistence/workflow/http_runtime.rs
+index 57a89ec..ee64e9c 100644
+--- a/src/adapters/persistence/workflow/http_runtime.rs
++++ b/src/adapters/persistence/workflow/http_runtime.rs
+@@ -16,7 +16,7 @@ pub(in crate::adapters::persistence::workflow) async fn facts(
+     let actor = action_authority::prelock_on(tx, scope)
+         .await?
+         .ok_or_else(missing)?;
+-    let (actor_id, bundle, resources): (Uuid, Vec<u8>, Value) = sqlx::query_as("SELECT actor_id,bundle,resources FROM workflow_runs WHERE company_id=$1 AND id=$2 AND state IN ('queued','running') AND deadline>clock_timestamp() FOR UPDATE")
++    let (actor_id, bundle, resources): (Uuid, Vec<u8>, Value) = sqlx::query_as("SELECT actor_id,stored.bundle AS bundle,resources FROM workflow_runs AS run LEFT JOIN workflow_bundles AS stored ON stored.company_id=run.company_id AND stored.digest=run.bundle_digest WHERE run.company_id=$1 AND id=$2 AND state IN ('queued','running') AND deadline>clock_timestamp() FOR UPDATE OF run")
+         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).fetch_optional(&mut **tx).await?.ok_or_else(missing)?;
+     if actor_id != actor.user_id() {
+         return Err(conflict());
+diff --git a/src/adapters/persistence/workflow/jev_authorization.rs b/src/adapters/persistence/workflow/jev_authorization.rs
+index d35df2e..0bb96ee 100644
+--- a/src/adapters/persistence/workflow/jev_authorization.rs
++++ b/src/adapters/persistence/workflow/jev_authorization.rs
+@@ -90,7 +90,7 @@ pub(in crate::adapters::persistence::workflow) async fn authorize_on(
+     let started = tokio::time::Instant::now();
+     let scope = claim.fence.scope;
+     let hints: Hints = sqlx::query_as(
+-        "SELECT actor_id,channel_id,thread_id,bundle,resources FROM workflow_runs WHERE company_id=$1 AND id=$2",
++        "SELECT actor_id,channel_id,thread_id,stored.bundle AS bundle,resources FROM workflow_runs AS run LEFT JOIN workflow_bundles AS stored ON stored.company_id=run.company_id AND stored.digest=run.bundle_digest WHERE run.company_id=$1 AND id=$2",
+     )
+     .bind(scope.company.as_uuid())
+     .bind(scope.run.as_uuid())
+@@ -163,7 +163,7 @@ async fn verify_locked(
+ ) -> AppResult<()> {
+     let scope = claim.fence.scope;
+     let locked: Hints = sqlx::query_as(
+-        "SELECT actor_id,channel_id,thread_id,bundle,resources FROM workflow_runs WHERE company_id=$1 AND id=$2",
++        "SELECT actor_id,channel_id,thread_id,stored.bundle AS bundle,resources FROM workflow_runs AS run LEFT JOIN workflow_bundles AS stored ON stored.company_id=run.company_id AND stored.digest=run.bundle_digest WHERE run.company_id=$1 AND id=$2",
+     )
+     .bind(scope.company.as_uuid())
+     .bind(scope.run.as_uuid())
+diff --git a/src/adapters/persistence/workflow/jev_tests.rs b/src/adapters/persistence/workflow/jev_tests.rs
+index 0e76930..ee4fe79 100644
+--- a/src/adapters/persistence/workflow/jev_tests.rs
++++ b/src/adapters/persistence/workflow/jev_tests.rs
+@@ -326,7 +326,7 @@ async fn jev_binding_current_rotation_model_removal_disable_and_no_fallback() {
+         .await
+         .unwrap();
+     assert!(f.persistence.authorize_jev(&claim).await.is_err());
+-    let snapshot:String=sqlx::query_scalar("SELECT jsonb_build_object('bundle',encode(bundle,'escape'),'resources',resources)::text FROM workflow_runs WHERE id=$1").bind(claim.fence.scope.run.as_uuid()).fetch_one(f.persistence.pool()).await.unwrap();
++    let snapshot:String=sqlx::query_scalar("SELECT jsonb_build_object('bundle',encode((SELECT stored.bundle FROM workflow_bundles stored WHERE stored.company_id=workflow_runs.company_id AND stored.digest=workflow_runs.bundle_digest),'escape'),'resources',resources)::text FROM workflow_runs WHERE id=$1").bind(claim.fence.scope.run.as_uuid()).fetch_one(f.persistence.pool()).await.unwrap();
+     assert!(!snapshot.contains("secret") && !snapshot.contains("enc:v2"));
+ }
+ #[tokio::test]
+diff --git a/src/adapters/persistence/workflow/message_tests.rs b/src/adapters/persistence/workflow/message_tests.rs
+index 44dcde4..c1eca12 100644
+--- a/src/adapters/persistence/workflow/message_tests.rs
++++ b/src/adapters/persistence/workflow/message_tests.rs
+@@ -31,6 +31,8 @@ mod reconcile_tests;
+ mod recovery_tests;
+ #[path = "message_sql_tests.rs"]
+ mod sql_tests;
++#[path = "storage_message_tests.rs"]
++mod storage_message_tests;
+ #[path = "message_thread_tests.rs"]
+ mod thread_tests;
+ #[path = "workflow_tool_race_tests.rs"]
+diff --git a/src/adapters/persistence/workflow/metrics.sql b/src/adapters/persistence/workflow/metrics.sql
+index 9f8f249..4bcc1ea 100644
+--- a/src/adapters/persistence/workflow/metrics.sql
++++ b/src/adapters/persistence/workflow/metrics.sql
+@@ -54,7 +54,11 @@ WITH bounds AS (
+                         + COALESCE(call.output_tokens, call.reserved_output)::numeric * price.output_micro_usd_per_million) / 1e12)
+                FILTER (WHERE call.requested_at >= bounds.since), 0) AS charged_usd,
+            count(*) FILTER (WHERE price.company_id IS NULL) AS unpriced
+-    FROM model_usage_calls AS call
++    FROM (
++        SELECT company_id,provider,model,requested_at,reserved_input,reserved_output,input_tokens,output_tokens,settled_at FROM model_usage_calls
++        UNION ALL
++        SELECT company_id,provider,model,requested_at,reserved_input,reserved_output,input_tokens,output_tokens,settled_at FROM model_usage_history
++    ) AS call
+     LEFT JOIN model_prices AS price ON price.company_id = call.company_id
+         AND price.provider = call.provider AND price.model = call.model
+     CROSS JOIN bounds WHERE call.settled_at IS NULL OR call.requested_at >= bounds.since
+diff --git a/src/adapters/persistence/workflow/mod.rs b/src/adapters/persistence/workflow/mod.rs
+index 6a71e61..fae8754 100644
+--- a/src/adapters/persistence/workflow/mod.rs
++++ b/src/adapters/persistence/workflow/mod.rs
+@@ -33,6 +33,7 @@ mod binding_rows;
+ mod bindings;
+ mod board_reads;
+ mod budget;
++mod bundle_store;
+ mod capacity;
+ mod checkpoints;
+ pub mod child_publication;
+@@ -130,3 +131,6 @@ mod message_outcomes;
+ mod token_budget;
+ 
+ mod jev_runtime;
++
++mod storage;
++mod storage_retention;
+diff --git a/src/adapters/persistence/workflow/provisioning_dispatch_tests.rs b/src/adapters/persistence/workflow/provisioning_dispatch_tests.rs
+index e154e5d..b05674d 100644
+--- a/src/adapters/persistence/workflow/provisioning_dispatch_tests.rs
++++ b/src/adapters/persistence/workflow/provisioning_dispatch_tests.rs
+@@ -74,7 +74,7 @@ async fn claimed(child: bool) -> (AdmissionFixture, ClaimedWorkflow) {
+         .unwrap()
+         .unwrap();
+     // The run's frozen bundle carries the trusted built-ins, as a Builder's publication would.
+-    let bundle: Vec<u8> = sqlx::query_scalar("SELECT bundle FROM workflow_runs WHERE id = $1")
++    let bundle: Vec<u8> = sqlx::query_scalar("SELECT (SELECT stored.bundle FROM workflow_bundles stored WHERE stored.company_id=workflow_runs.company_id AND stored.digest=workflow_runs.bundle_digest) AS bundle FROM workflow_runs WHERE id = $1")
+         .bind(claim.fence.scope.run.as_uuid())
+         .fetch_one(f.persistence().pool())
+         .await
+@@ -97,12 +97,12 @@ async fn claimed(child: bool) -> (AdmissionFixture, ClaimedWorkflow) {
+         vec![],
+     )
+     .unwrap();
+-    sqlx::query("UPDATE workflow_runs SET bundle = $2 WHERE id = $1")
+-        .bind(claim.fence.scope.run.as_uuid())
+-        .bind(store_bundle(&frozen).unwrap())
+-        .execute(f.persistence().pool())
+-        .await
+-        .unwrap();
++    replace_run_bundle(
++        f.persistence().pool(),
++        claim.fence.scope.run.as_uuid(),
++        &store_bundle(&frozen).unwrap(),
++    )
++    .await;
+     enable_model(&f).await;
+     (f, claim)
+ }
+diff --git a/src/adapters/persistence/workflow/run_schema_tests.rs b/src/adapters/persistence/workflow/run_schema_tests.rs
+index 4888ffe..8a5109b 100644
+--- a/src/adapters/persistence/workflow/run_schema_tests.rs
++++ b/src/adapters/persistence/workflow/run_schema_tests.rs
+@@ -16,6 +16,17 @@ struct RunAssociation {
+ async fn configured_binding() -> BindingFixture {
+     let f = BindingFixture::new(json!([])).await;
+     f.service().configure(f.request(None)).await.unwrap();
++    // Native row/claim tests start from an existing immutable payload. Their barrier
++    // follows raw run insertion; admission's exclusive bundle arbitration has its own races.
++    let mut db = f.fixture.persistence.pool().acquire().await.unwrap();
++    seed_version_bundle(
++        &mut db,
++        f.target.company.as_uuid(),
++        f.request(None).version.as_uuid(),
++    )
++    .await
++    .unwrap();
++    drop(db);
+     f
+ }
+ 
+@@ -29,7 +40,7 @@ async fn insert_run(
+     // Beginning on a caller's transaction creates a savepoint, preserving its rollback scope.
+     let mut tx = sqlx::Connection::begin(db).await?;
+     seed_root_budget(&mut tx, f.target.company.as_uuid(), run).await?;
+-    sqlx::query("INSERT INTO workflow_runs (company_id, id, binding_id, binding_revision, workflow_id, version_id, actor_id, trigger_id, correlation_id, bundle, input, params, resources, max_steps, max_context_bytes, deadline, channel_id, thread_id) SELECT company_id, $2, $3, 1, workflow_id, id, actor_id, $4, $5, bundle, $6, $7, '{}'::jsonb, 100, 1048576, CURRENT_TIMESTAMP + interval '1 hour', $9, $10 FROM workflow_versions WHERE company_id = $1 AND id = $8")
++    sqlx::query("INSERT INTO workflow_runs (company_id, id, binding_id, binding_revision, workflow_id, version_id, actor_id, trigger_id, correlation_id, bundle_digest, input, params, resources, max_steps, max_context_bytes, deadline, channel_id, thread_id) SELECT company_id, $2, $3, 1, workflow_id, id, actor_id, $4, $5, sha256(bundle), $6, $7, '{}'::jsonb, 100, 1048576, CURRENT_TIMESTAMP + interval '1 hour', $9, $10 FROM workflow_versions WHERE company_id = $1 AND id = $8")
+         .bind(f.target.company.as_uuid()).bind(run).bind(f.target.binding.as_uuid())
+         .bind(Uuid::new_v4()).bind(Uuid::new_v4()).bind(json!({"input": "original"}))
+         .bind(json!({"parameter": 7})).bind(f.request(None).version.as_uuid()).bind(association.channel).bind(association.thread).execute(&mut *tx).await?;
+@@ -93,7 +104,7 @@ async fn workflow_run_schema_preserves_snapshot_refuses_binding_removal_and_scop
+         binding_revision: i64,
+         bundle: Vec<u8>,
+     }
+-    let saved: Snapshot = sqlx::query_as("SELECT input, params, binding_id, binding_revision, bundle FROM workflow_runs WHERE company_id = $1 AND id = $2")
++    let saved: Snapshot = sqlx::query_as("SELECT input, params, binding_id, binding_revision, (SELECT stored.bundle FROM workflow_bundles stored WHERE stored.company_id=workflow_runs.company_id AND stored.digest=workflow_runs.bundle_digest) AS bundle FROM workflow_runs WHERE company_id = $1 AND id = $2")
+         .bind(company).bind(run).fetch_one(&mut *db).await.unwrap();
+     assert_eq!(saved.input, json!({"input":"original"}));
+     assert_eq!(saved.params, json!({"parameter":7}));
+diff --git a/src/adapters/persistence/workflow/run_views.rs b/src/adapters/persistence/workflow/run_views.rs
+index c983247..330ae9e 100644
+--- a/src/adapters/persistence/workflow/run_views.rs
++++ b/src/adapters/persistence/workflow/run_views.rs
+@@ -535,7 +535,7 @@ impl RunViews for PostgresPersistence {
+         run: RunId,
+     ) -> AppResult<Option<Arc<PublishedBundle>>> {
+         let bytes: Option<Vec<u8>> = sqlx::query_scalar(
+-            "SELECT bundle FROM workflow_runs WHERE company_id = $1 AND id = $2",
++            "SELECT stored.bundle AS bundle FROM workflow_runs AS run LEFT JOIN workflow_bundles AS stored ON stored.company_id=run.company_id AND stored.digest=run.bundle_digest WHERE run.company_id = $1 AND id = $2",
+         )
+         .bind(company.as_uuid())
+         .bind(run.as_uuid())
+diff --git a/src/adapters/persistence/workflow/storage.rs b/src/adapters/persistence/workflow/storage.rs
+new file mode 100644
+index 0000000..ed4a3c5
+--- /dev/null
++++ b/src/adapters/persistence/workflow/storage.rs
+@@ -0,0 +1,108 @@
++//! Bounded global maintenance. All mutation stays on one owned connection/transaction.
++use super::*;
++use crate::application::workflow::storage::*;
++use chrono::{DateTime, Utc};
++use sqlx::{Postgres, Transaction};
++
++async fn begin(pool: &sqlx::PgPool) -> AppResult<Transaction<'_, Postgres>> {
++    let mut tx = pool.begin().await?;
++    for setting in [
++        "SET LOCAL statement_timeout='5s'",
++        "SET LOCAL lock_timeout='500ms'",
++        "SET LOCAL idle_in_transaction_session_timeout='5s'",
++    ] {
++        sqlx::query(setting).execute(&mut *tx).await?;
++    }
++    Ok(tx)
++}
++fn sweep_limit(limit: u16) -> AppResult<i64> {
++    if !(1..=1024).contains(&limit) {
++        return Err(AppError::BadRequest(
++            "Invalid workflow storage sweep limit".into(),
++        ));
++    }
++    Ok(i64::from(limit))
++}
++#[async_trait]
++impl WorkflowStorageMaintenance for PostgresPersistence {
++    async fn sweep_obsolete_witnesses(&self, limit: u16) -> AppResult<u64> {
++        let limit = sweep_limit(limit)?;
++        let mut tx = begin(&self.pool).await?;
++        let mut count = 0;
++        for (table, key) in [
++            (
++                "workflow_action_state_witnesses",
++                "company_id,run_id,transaction_id",
++            ),
++            (
++                "workflow_action_schedule_witnesses",
++                "company_id,job_id,retired_attempt,transaction_id",
++            ),
++            (
++                "workflow_action_claim_retirement_witnesses",
++                "company_id,command_key,transaction_id",
++            ),
++        ] {
++            let sql = format!("WITH obsolete AS MATERIALIZED (SELECT {key} FROM {table}
++                WHERE transaction_id<>pg_current_xact_id() ORDER BY {key} LIMIT $1 FOR UPDATE SKIP LOCKED)
++                DELETE FROM {table} AS witness USING obsolete WHERE ({})=({})",
++                key.split(',').map(|k| format!("witness.{k}")).collect::<Vec<_>>().join(","),
++                key.split(',').map(|k| format!("obsolete.{k}")).collect::<Vec<_>>().join(","));
++            count += sqlx::query(&sql)
++                .bind(limit)
++                .execute(&mut *tx)
++                .await?
++                .rows_affected();
++        }
++        tx.commit().await?;
++        Ok(count)
++    }
++    async fn retention_page(&self, after: Option<RetentionRoot>) -> AppResult<RetentionPage> {
++        let mut tx = begin(&self.pool).await?;
++        let rows: Vec<(DateTime<Utc>,Uuid,Uuid)> = sqlx::query_as(
++            "SELECT finished_at,company_id,id FROM workflow_runs WHERE parent_run_id IS NULL
++             AND state IN ('succeeded','failed','cancelled') AND finished_at<clock_timestamp()-interval '90 days'
++             AND ($1::timestamptz IS NULL OR (finished_at,company_id,id)>($1,$2,$3))
++             ORDER BY finished_at,company_id,id LIMIT $4")
++            .bind(after.map(|r| r.finished_at)).bind(after.map(|r| r.company.as_uuid()))
++            .bind(after.map(|r| r.run.as_uuid())).bind(RETENTION_PAGE_SIZE as i64)
++            .fetch_all(&mut *tx).await?;
++        tx.commit().await?;
++        let roots: Vec<_> = rows
++            .into_iter()
++            .map(|(finished_at, company, run)| RetentionRoot {
++                finished_at,
++                company: CompanyId::new(company),
++                run: RunId::new(run),
++            })
++            .collect();
++        let next = (roots.len() == RETENTION_PAGE_SIZE).then(|| *roots.last().expect("full page"));
++        Ok(RetentionPage { roots, next })
++    }
++    async fn retire_tree(&self, root: RetentionRoot) -> AppResult<Option<RetiredTree>> {
++        let mut tx = begin(&self.pool).await?;
++        let result = super::storage_retention::retire_on(&mut tx, root).await?;
++        tx.commit().await?;
++        Ok(result)
++    }
++    async fn sweep_unused_bundles(&self, limit: u16) -> AppResult<u64> {
++        let limit = sweep_limit(limit)?;
++        let mut tx = begin(&self.pool).await?;
++        let count = sqlx::query("WITH unused AS MATERIALIZED (
++            SELECT blob.company_id,blob.digest FROM workflow_bundles AS blob
++            WHERE NOT EXISTS(SELECT 1 FROM workflow_runs AS run WHERE run.company_id=blob.company_id AND run.bundle_digest=blob.digest)
++            ORDER BY blob.company_id,blob.digest LIMIT $1 FOR UPDATE OF blob SKIP LOCKED)
++            DELETE FROM workflow_bundles AS blob USING unused WHERE blob.company_id=unused.company_id AND blob.digest=unused.digest
++            AND NOT EXISTS(SELECT 1 FROM workflow_runs AS run WHERE run.company_id=blob.company_id AND run.bundle_digest=blob.digest)")
++            .bind(limit).execute(&mut *tx).await?.rows_affected();
++        tx.commit().await?;
++        Ok(count)
++    }
++    async fn oldest_terminal_root(&self) -> AppResult<Option<DateTime<Utc>>> {
++        let mut tx = begin(&self.pool).await?;
++        let oldest = sqlx::query_scalar("SELECT min(finished_at) FROM workflow_runs WHERE parent_run_id IS NULL AND state IN ('succeeded','failed','cancelled')")
++            .fetch_one(&mut *tx).await?;
++        tx.commit().await?;
++        Ok(oldest)
++    }
++}
+diff --git a/src/adapters/persistence/workflow/storage_boundary_tests.rs b/src/adapters/persistence/workflow/storage_boundary_tests.rs
+new file mode 100644
+index 0000000..e59dd8d
+--- /dev/null
++++ b/src/adapters/persistence/workflow/storage_boundary_tests.rs
+@@ -0,0 +1,96 @@
++use super::*;
++
++struct BoundaryTemplate {
++    run: Value,
++    wait: Value,
++    source: Value,
++}
++async fn add_members(
++    f: &AdmissionFixture,
++    root: ActivationRequest,
++    template: &BoundaryTemplate,
++    offset: i64,
++    count: i64,
++) {
++    let mut tx = f.persistence().pool().begin().await.unwrap();
++    sqlx::query("CREATE TEMP TABLE boundary_members(execution_id uuid,run_id uuid,wait_id uuid,step_id text,activation integer) ON COMMIT DROP")
++        .execute(&mut *tx).await.unwrap();
++    sqlx::query("INSERT INTO pg_temp.boundary_members SELECT gen_random_uuid(),gen_random_uuid(),gen_random_uuid(),'boundary-'||n::text,n::integer+1 FROM generate_series($1::bigint+1,$1+$2) AS n")
++        .bind(offset).bind(count).execute(&mut *tx).await.unwrap();
++    sqlx::query(
++        "INSERT INTO workflow_executions(company_id,run_id,id,step_id,activation)
++        SELECT $1,$2,execution_id,step_id,activation FROM pg_temp.boundary_members",
++    )
++    .bind(root.company.as_uuid())
++    .bind(root.run.as_uuid())
++    .execute(&mut *tx)
++    .await
++    .unwrap();
++    sqlx::query("INSERT INTO workflow_runs SELECT (jsonb_populate_record(NULL::workflow_runs,
++        $1::jsonb||jsonb_build_object('id',member.run_id,'parent_execution_id',member.execution_id,'trigger_id',gen_random_uuid()))).*
++        FROM pg_temp.boundary_members AS member")
++        .bind(&template.run).execute(&mut *tx).await.unwrap();
++    sqlx::query("INSERT INTO workflow_admissions(company_id,binding_id,source_key,run_id)
++        SELECT $1,($2::jsonb->>'binding_id')::uuid,'v1:'||replace(jsonb_set(jsonb_set($3::jsonb,'{2}',to_jsonb(member.execution_id::text)),
++            '{3}',to_jsonb(member.step_id))::text,' ',''),member.run_id FROM pg_temp.boundary_members AS member")
++        .bind(root.company.as_uuid()).bind(&template.run).bind(&template.source).execute(&mut *tx).await.unwrap();
++    sqlx::query("INSERT INTO workflow_waits SELECT (jsonb_populate_record(NULL::workflow_waits,
++        $1::jsonb||jsonb_build_object('id',member.wait_id,'execution_id',member.execution_id,'child_run_id',member.run_id,
++            'state','cancelled','settled_at',clock_timestamp()))).* FROM pg_temp.boundary_members AS member")
++        .bind(&template.wait).execute(&mut *tx).await.unwrap();
++    tx.commit().await.unwrap();
++}
++
++#[tokio::test]
++async fn run_retention_native_schema_100001_members_reaches_delete_without_activation_cutoff() {
++    let source = serde_json::from_str(&registry::example("data.map").unwrap().source).unwrap();
++    let (f, scopes) = Box::pin(AdmissionFixture::chain(source, 1)).await;
++    let (root, child) = (scopes[0], scopes[1]);
++    let (run,wait,source):(Value,Value,Value)=sqlx::query_as("SELECT to_jsonb(run),to_jsonb(wait),substring(admission.source_key FROM 4)::jsonb
++        FROM workflow_runs AS run JOIN workflow_waits AS wait ON wait.company_id=run.company_id AND wait.child_run_id=run.id
++        JOIN workflow_admissions AS admission ON admission.company_id=run.company_id AND admission.run_id=run.id WHERE run.id=$1")
++        .bind(child.run.as_uuid()).fetch_one(f.persistence().pool()).await.unwrap();
++    let template = BoundaryTemplate { run, wait, source };
++    // One genuinely admitted child closes without consuming an activation.
++    old(&f, child).await;
++    // Native schema scaling, not100001 runtime admissions. Every synthetic child has
++    // a distinct parent execution, matching admission and closed parent wait.
++    let mut offset = 0;
++    while offset < 99999 {
++        let count = (99999 - offset).min(1000);
++        add_members(&f, root, &template, offset, count).await;
++        offset += count;
++    }
++    sqlx::query("UPDATE workflow_runs SET state='cancelled',waiting_reason=NULL WHERE parent_run_id=$1 AND state='queued'")
++        .bind(root.run.as_uuid()).execute(f.persistence().pool()).await.unwrap();
++    usage(&f, root, None).await;
++    run_finished_at_tests::drive(
++        &f,
++        root.run,
++        crate::application::workflow::reads::RunStateName::Cancelled,
++    )
++    .await;
++    let candidate = age(&f, root).await;
++    assert_eq!(count(&f, "workflow_runs").await, 100001);
++    sqlx::query("ALTER TABLE workflow_runs ENABLE TRIGGER workflow_run_snapshot_immutable")
++        .execute(f.persistence().pool())
++        .await
++        .unwrap();
++    sqlx::raw_sql("ANALYZE workflow_runs,workflow_executions,workflow_run_budgets,workflow_waits,workflow_admissions")
++        .execute(f.persistence().pool()).await.unwrap();
++    // The exact first-DELETE marker proves ownership/capture/eligibility passed the
++    // former cutoff. It stops before expensive cascades; no purge latency is claimed.
++    sqlx::raw_sql("CREATE FUNCTION retention_boundary_marker() RETURNS trigger LANGUAGE plpgsql AS $$
++        BEGIN RAISE EXCEPTION 'retention boundary reached delete'; END $$;
++        CREATE TRIGGER retention_boundary_marker BEFORE DELETE ON workflow_runs FOR EACH ROW EXECUTE FUNCTION retention_boundary_marker()")
++        .execute(f.persistence().pool()).await.unwrap();
++    let error = f.persistence().retire_tree(candidate).await.unwrap_err();
++    assert!(
++        format!("{error:?}").contains("retention boundary reached delete"),
++        "{error:?}"
++    );
++    assert_eq!(count(&f, "workflow_runs").await, 100001);
++    assert_eq!(count(&f, "background_tasks").await, 2);
++    assert_eq!(count(&f, "model_usage_calls").await, 1);
++    assert_eq!(count(&f, "model_usage_history").await, 0);
++}
+diff --git a/src/adapters/persistence/workflow/storage_bundle_tests.rs b/src/adapters/persistence/workflow/storage_bundle_tests.rs
+new file mode 100644
+index 0000000..0cd4308
+--- /dev/null
++++ b/src/adapters/persistence/workflow/storage_bundle_tests.rs
+@@ -0,0 +1,160 @@
++use super::*;
++use std::time::Duration as StdDuration;
++
++#[tokio::test]
++async fn bundle_store_shared_exact_bytes_and_native_scope_immutability() {
++    let f = AdmissionFixture::new().await;
++    let first = f.prepare(f.request("shared-1", f.manual())).await;
++    let second = f.prepare(f.request("shared-2", f.manual())).await;
++    f.persistence().admit(&first).await.unwrap();
++    f.persistence().admit(&second).await.unwrap();
++    assert_eq!(count(&f, "workflow_runs").await, 2);
++    assert_eq!(count(&f, "workflow_bundles").await, 1);
++    let saved: Vec<u8> = sqlx::query_scalar(
++        "SELECT blob.bundle FROM workflow_runs AS run JOIN workflow_bundles AS blob
++        ON blob.company_id=run.company_id AND blob.digest=run.bundle_digest WHERE run.id=$1",
++    )
++    .bind(first.proposed_run_id().as_uuid())
++    .fetch_one(f.persistence().pool())
++    .await
++    .unwrap();
++    assert_eq!(saved, store_bundle(first.binding().bundle()).unwrap());
++    for sql in [
++        "UPDATE workflow_bundles SET bundle=bundle",
++        "DELETE FROM workflow_bundles",
++    ] {
++        assert!(
++            sqlx::query(sql)
++                .execute(f.persistence().pool())
++                .await
++                .is_err()
++        );
++    }
++    let foreign = f.foreign().await;
++    let scope = admitted(&foreign, "scope").await;
++    let digest: Vec<u8> = sqlx::query_scalar("SELECT bundle_digest FROM workflow_runs WHERE id=$1")
++        .bind(first.proposed_run_id().as_uuid())
++        .fetch_one(f.persistence().pool())
++        .await
++        .unwrap();
++    assert!(
++        sqlx::query("UPDATE workflow_runs SET bundle_digest=$2 WHERE id=$1")
++            .bind(scope.run.as_uuid())
++            .bind(digest)
++            .execute(f.persistence().pool())
++            .await
++            .is_err()
++    );
++    assert!(
++        sqlx::query("INSERT INTO workflow_bundles(company_id,digest,bundle) VALUES($1,$2,$3)")
++            .bind(first.company_id().as_uuid())
++            .bind(vec![0_u8; 32])
++            .bind(vec![1_u8])
++            .execute(f.persistence().pool())
++            .await
++            .is_err()
++    );
++    for bytes in [Vec::new(), vec![0; 4 * 1024 * 1024 + 1]] {
++        let mut tx = f.persistence().pool().begin().await.unwrap();
++        assert!(
++            bundle_store::insert_on(&mut tx, first.company_id(), &bytes)
++                .await
++                .is_err()
++        );
++        tx.rollback().await.unwrap();
++    }
++}
++
++async fn wait_lock(f: &AdmissionFixture, pattern: &str) {
++    tokio::time::timeout(StdDuration::from_secs(5), async {
++        loop {
++            let waiting: bool = sqlx::query_scalar(
++                "SELECT EXISTS(SELECT 1 FROM pg_stat_activity
++                WHERE datname=current_database() AND wait_event_type='Lock' AND query LIKE $1)",
++            )
++            .bind(pattern)
++            .fetch_one(f.persistence().pool())
++            .await
++            .unwrap();
++            if waiting {
++                break;
++            }
++            tokio::time::sleep(StdDuration::from_millis(10)).await;
++        }
++    })
++    .await
++    .expect("production writer reached the controlled database lock");
++}
++async fn install_barrier(f: &AdmissionFixture, admission_first: bool) {
++    let (table, event, image) = if admission_first {
++        ("workflow_runs", "INSERT", "NEW")
++    } else {
++        ("workflow_bundles", "DELETE", "OLD")
++    };
++    sqlx::raw_sql(&format!("CREATE FUNCTION bundle_test_barrier() RETURNS trigger LANGUAGE plpgsql AS $$
++        BEGIN PERFORM pg_advisory_xact_lock(602206); RETURN {image}; END $$;
++        CREATE TRIGGER bundle_test_barrier BEFORE {event} ON {table} FOR EACH ROW EXECUTE FUNCTION bundle_test_barrier()"))
++        .execute(f.persistence().pool()).await.unwrap();
++}
++async fn competing_gc(admission_first: bool) {
++    let f = AdmissionFixture::new().await;
++    let command = f.prepare(f.request("gc-race", f.manual())).await;
++    let mut seed = f.persistence().pool().begin().await.unwrap();
++    bundle_store::insert_on(
++        &mut seed,
++        command.company_id(),
++        &store_bundle(command.binding().bundle()).unwrap(),
++    )
++    .await
++    .unwrap();
++    seed.commit().await.unwrap();
++    install_barrier(&f, admission_first).await;
++    let mut blocker = f.persistence().pool().begin().await.unwrap();
++    sqlx::query("SELECT pg_advisory_xact_lock(602206)")
++        .execute(&mut *blocker)
++        .await
++        .unwrap();
++    let persistence = f.persistence().clone();
++    let gc = if admission_first {
++        None
++    } else {
++        Some(tokio::spawn(async move {
++            persistence.sweep_unused_bundles(256).await
++        }))
++    };
++    if !admission_first {
++        wait_lock(&f, "%DELETE FROM workflow_bundles AS blob%").await;
++    }
++    let persistence = f.persistence().clone();
++    let writer = tokio::spawn(async move { persistence.admit(&command).await });
++    wait_lock(
++        &f,
++        if admission_first {
++            "%INSERT INTO workflow_runs%"
++        } else {
++            "INSERT INTO workflow_bundles%"
++        },
++    )
++    .await;
++    if admission_first {
++        assert_eq!(f.persistence().sweep_unused_bundles(256).await.unwrap(), 0);
++    }
++    blocker.commit().await.unwrap();
++    if let Some(gc) = gc {
++        assert_eq!(gc.await.unwrap().unwrap(), 1);
++    }
++    assert!(matches!(
++        writer.await.unwrap().unwrap(),
++        AdmissionResult::Created(_)
++    ));
++    assert_eq!(count(&f, "workflow_runs").await, 1);
++    assert_eq!(count(&f, "workflow_bundles").await, 1);
++}
++#[tokio::test]
++async fn bundle_store_admission_holds_reused_blob_against_gc() {
++    competing_gc(true).await;
++}
++#[tokio::test]
++async fn bundle_store_gc_first_waits_and_admission_recreates_payload() {
++    competing_gc(false).await;
++}
+diff --git a/src/adapters/persistence/workflow/storage_checkpoint_tests.rs b/src/adapters/persistence/workflow/storage_checkpoint_tests.rs
+new file mode 100644
+index 0000000..1e8e9c2
+--- /dev/null
++++ b/src/adapters/persistence/workflow/storage_checkpoint_tests.rs
+@@ -0,0 +1,169 @@
++use super::*;
++use crate::application::workflow::storage::{RetentionRoot, WorkflowStorageMaintenance};
++
++async fn retire_candidate(f: &ModelFixture) -> RetentionRoot {
++    let scope = f.native.fence.scope;
++    let p = f.native.fixture.persistence();
++    let command = CancelCommand {
++        company_id: scope.company,
++        run_id: scope.run,
++        actor: f.native.fixture.binding.target.actor,
++        command_key: IdempotencyKey::parse("checkpoint-retention").unwrap(),
++        expected_revision: p
++            .head(scope.company, scope.run)
++            .await
++            .unwrap()
++            .unwrap()
++            .revision,
++    };
++    assert!(matches!(
++        p.cancel(command).await.unwrap(),
++        CancelResult::Applied { .. }
++    ));
++    let finished_at = sqlx::query_scalar(
++        "UPDATE workflow_runs SET created_at=clock_timestamp()-interval '100 days',
++        finished_at=clock_timestamp()-interval '91 days' WHERE id=$1 RETURNING finished_at",
++    )
++    .bind(scope.run.as_uuid())
++    .fetch_one(p.pool())
++    .await
++    .unwrap();
++    sqlx::query("ALTER TABLE workflow_runs ENABLE TRIGGER workflow_run_snapshot_immutable")
++        .execute(p.pool())
++        .await
++        .unwrap();
++    RetentionRoot {
++        finished_at,
++        company: scope.company,
++        run: scope.run,
++    }
++}
++async fn snapshot(p: &PostgresPersistence) -> Value {
++    sqlx::query_scalar("SELECT jsonb_build_object(
++        'runs',(SELECT jsonb_agg(to_jsonb(row) ORDER BY id) FROM workflow_runs AS row),
++        'steps',(SELECT jsonb_agg(to_jsonb(row) ORDER BY id) FROM workflow_executions AS row),
++        'jobs',(SELECT jsonb_agg(to_jsonb(row) ORDER BY id) FROM background_tasks AS row),
++        'attempts',(SELECT jsonb_agg(to_jsonb(row) ORDER BY id) FROM task_attempts AS row),
++        'checkpoints',(SELECT jsonb_agg(to_jsonb(row) ORDER BY id) FROM task_harness_runs AS row),
++        'calls',(SELECT jsonb_agg(to_jsonb(row) ORDER BY request_id) FROM model_usage_calls AS row),
++        'history',(SELECT jsonb_agg(to_jsonb(row) ORDER BY request_id) FROM model_usage_history AS row))")
++        .fetch_one(p.pool()).await.unwrap()
++}
++async fn open_protected(f: &ModelFixture) -> RunCheckpoint {
++    let admission = &f.native.fixture;
++    let command = admission
++        .prepare(admission.request("protected-checkpoint", admission.manual()))
++        .await;
++    let p = admission.persistence();
++    p.admit(&command).await.unwrap();
++    let scope =
++        crate::adapters::persistence::workflow::tests::admission_tests::child_support::entry(
++            admission,
++            command.proposed_run_id(),
++        )
++        .await;
++    let policy = LeasePolicy::new(Duration::from_secs(60)).unwrap();
++    let claim = p
++        .settled()
++        .claim_io(scope, worker(), policy)
++        .await
++        .unwrap()
++        .unwrap();
++    let spec = WorkflowCheckpointSpec {
++        identity: RunIdentity {
++            task_id: scope.job.0,
++            ..f.run.identity.clone()
++        },
++        initial_prompt: "protected context".into(),
++        policy: f.run.policy,
++        prepared: f.native.row["workflow_prepared"].clone(),
++    };
++    let WriteOutcome::Applied(run) = p
++        .open_workflow_checkpoint(claim.fence, &spec, policy)
++        .await
++        .unwrap()
++    else {
++        panic!("protected checkpoint open")
++    };
++    let write = WorkflowCheckpointWrite {
++        fence: claim.fence,
++        checkpoint: run.run_id,
++        expected_revision: run.revision,
++        lease_policy: policy,
++    };
++    let WriteOutcome::Applied(run) = p.reserve_workflow_execution(write, 1000).await.unwrap()
++    else {
++        panic!("protected execution")
++    };
++    run
++}
++
++async fn case(fault: bool) {
++    let f = Box::pin(opened()).await;
++    let p = f.native.fixture.persistence();
++    let request = reservation();
++    let WorkflowModelAdmission::New(permit) = p
++        .reserve_workflow_model(f.write, model_request(&request), None)
++        .await
++        .unwrap()
++    else {
++        panic!("actual model reservation")
++    };
++    let checkpoint = permit.consume();
++    assert_eq!(checkpoint.executions.len(), 1);
++    // An unrelated live root/checkpoint in the SAME company and owned database.
++    let protected = open_protected(&f).await;
++    let candidate = retire_candidate(&f).await;
++    let before = snapshot(p).await;
++    assert_eq!(before["checkpoints"].as_array().unwrap().len(), 2);
++    assert_eq!(before["calls"].as_array().unwrap().len(), 1);
++    let protected_before: Value =
++        sqlx::query_scalar("SELECT to_jsonb(row) FROM task_harness_runs AS row WHERE id=$1")
++            .bind(protected.run_id.0)
++            .fetch_one(p.pool())
++            .await
++            .unwrap();
++    if fault {
++        let job = f.native.fence.scope.job.0;
++        sqlx::raw_sql(&format!("CREATE FUNCTION checkpoint_retention_fault() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'checkpoint retention between runs and jobs'; END $$;
++            CREATE TRIGGER checkpoint_retention_fault BEFORE DELETE ON background_tasks FOR EACH ROW WHEN(OLD.id='{job}'::uuid) EXECUTE FUNCTION checkpoint_retention_fault()"))
++            .execute(p.pool()).await.unwrap();
++        let error = p.retire_tree(candidate).await.unwrap_err();
++        assert!(
++            format!("{error:?}").contains("checkpoint retention between runs and jobs"),
++            "{error:?}"
++        );
++        assert_eq!(
++            snapshot(p).await,
++            before,
++            "checkpoint, attempts, owners, usage and archive rolled back together"
++        );
++        sqlx::query("DROP TRIGGER checkpoint_retention_fault ON background_tasks")
++            .execute(p.pool())
++            .await
++            .unwrap();
++    }
++    let retired = p.retire_tree(candidate).await.unwrap().unwrap();
++    assert_eq!((retired.runs, retired.jobs, retired.calls), (1, 1, 1));
++    let after = snapshot(p).await;
++    assert_eq!(after["checkpoints"].as_array().unwrap().len(), 1);
++    assert_eq!(after["runs"].as_array().unwrap().len(), 1);
++    assert_eq!(after["jobs"].as_array().unwrap().len(), 1);
++    assert!(after["calls"].is_null());
++    assert_eq!(after["history"].as_array().unwrap().len(), 1);
++    let protected_after: Value =
++        sqlx::query_scalar("SELECT to_jsonb(row) FROM task_harness_runs AS row WHERE id=$1")
++            .bind(protected.run_id.0)
++            .fetch_one(p.pool())
++            .await
++            .unwrap();
++    assert_eq!(protected_after, protected_before);
++}
++#[tokio::test]
++async fn run_retention_native_checkpoint_and_model_usage_delete_with_only_owned_jobs() {
++    case(false).await;
++}
++#[tokio::test]
++async fn run_retention_native_checkpoint_model_usage_and_tree_rollback_then_retry() {
++    case(true).await;
++}
+diff --git a/src/adapters/persistence/workflow/storage_message_tests.rs b/src/adapters/persistence/workflow/storage_message_tests.rs
+new file mode 100644
+index 0000000..f9ff3df
+--- /dev/null
++++ b/src/adapters/persistence/workflow/storage_message_tests.rs
+@@ -0,0 +1,28 @@
++use super::*;
++use crate::application::workflow::storage::{RetentionRoot, WorkflowStorageMaintenance};
++
++#[tokio::test]
++async fn run_retention_pending_message_consumption_keeps_terminal_tree() {
++    let setup = Box::pin(send(&[To::User])).await;
++    parked(&setup).await;
++    cancel(&setup, "retention-message").await;
++    let scope = setup.scope();
++    assert_eq!(action_state(setup.pool(), scope.run).await, "pending");
++    let finished_at = sqlx::query_scalar(
++        "UPDATE workflow_runs SET created_at=clock_timestamp()-interval '100 days',
++        finished_at=clock_timestamp()-interval '91 days' WHERE id=$1 RETURNING finished_at",
++    )
++    .bind(scope.run.as_uuid())
++    .fetch_one(setup.pool())
++    .await
++    .unwrap();
++    let root = RetentionRoot {
++        finished_at,
++        company: scope.company,
++        run: scope.run,
++    };
++    assert_eq!(
++        setup.fixture.persistence.retire_tree(root).await.unwrap(),
++        None
++    );
++}
+diff --git a/src/adapters/persistence/workflow/storage_protection_tests.rs b/src/adapters/persistence/workflow/storage_protection_tests.rs
+new file mode 100644
+index 0000000..54a74d4
+--- /dev/null
++++ b/src/adapters/persistence/workflow/storage_protection_tests.rs
+@@ -0,0 +1,115 @@
++use super::*;
++
++#[tokio::test]
++async fn run_retention_protects_open_decision_until_its_wait_closes() {
++    let d = Box::pin(decision_tests::DecisionFixture::new(1, None)).await;
++    d.park().await;
++    let f = &d.admission;
++    run_finished_at_tests::drive(
++        f,
++        d.scope.run,
++        crate::application::workflow::reads::RunStateName::Cancelled,
++    )
++    .await;
++    let root = age(f, d.scope).await;
++    assert_eq!(f.persistence().retire_tree(root).await.unwrap(), None);
++    assert_eq!(count(f, "workflow_decisions").await, 1);
++    sqlx::query(
++        "UPDATE workflow_waits SET state='cancelled',settled_at=clock_timestamp() WHERE run_id=$1",
++    )
++    .bind(d.scope.run.as_uuid())
++    .execute(f.persistence().pool())
++    .await
++    .unwrap();
++    assert!(f.persistence().retire_tree(root).await.unwrap().is_some());
++    assert_eq!(count(f, "workflow_decisions").await, 0);
++}
++#[tokio::test]
++async fn run_retention_external_rerun_blocks_referent_until_independent_root_is_removed() {
++    let f = AdmissionFixture::new().await;
++    let scope = admitted(&f, "original").await;
++    let original = old(&f, scope).await;
++    let mut request = f.request("rerun", f.manual());
++    request.rerun_of = Some(scope.run);
++    let prepared = f.prepare(request).await;
++    f.persistence().admit(&prepared).await.unwrap();
++    let rerun = child_support::entry(&f, prepared.proposed_run_id()).await;
++    let rerun = old(&f, rerun).await;
++    assert_eq!(f.persistence().retire_tree(original).await.unwrap(), None);
++    assert!(f.persistence().retire_tree(rerun).await.unwrap().is_some());
++    assert!(
++        f.persistence()
++            .retire_tree(original)
++            .await
++            .unwrap()
++            .is_some()
++    );
++}
++#[tokio::test]
++async fn run_retention_deferred_job_provenance_still_rejects_native_commit() {
++    let f = AdmissionFixture::new().await;
++    let scope = admitted(&f, "native-fk").await;
++    let root = old(&f, scope).await;
++    let mut tx = f.persistence().pool().begin().await.unwrap();
++    sqlx::query("DELETE FROM workflow_runs WHERE id=$1")
++        .bind(root.run.as_uuid())
++        .execute(&mut *tx)
++        .await
++        .unwrap();
++    let error = tx.commit().await.unwrap_err();
++    assert_eq!(
++        error.as_database_error().unwrap().constraint(),
++        Some("background_tasks_workflow_execution_fk")
++    );
++    assert_eq!(count(&f, "workflow_runs").await, 1);
++    assert_eq!(count(&f, "background_tasks").await, 1);
++}
++
++#[tokio::test]
++async fn run_retention_shutdown_rolls_back_the_actual_inflight_archive_and_delete() {
++    use crate::{adapters::monitoring::InMemoryMonitor, application::workflow::storage};
++    use tokio_util::sync::CancellationToken;
++    let f = AdmissionFixture::new().await;
++    let scope = admitted(&f, "cancel-write").await;
++    usage(&f, scope, None).await;
++    old(&f, scope).await;
++    sqlx::raw_sql("CREATE FUNCTION retained_job_barrier() RETURNS trigger LANGUAGE plpgsql AS $$
++        BEGIN PERFORM pg_advisory_xact_lock(602207); RETURN OLD; END $$;
++        CREATE TRIGGER retained_job_barrier BEFORE DELETE ON background_tasks FOR EACH ROW EXECUTE FUNCTION retained_job_barrier()")
++        .execute(f.persistence().pool()).await.unwrap();
++    let mut blocker = f.persistence().pool().begin().await.unwrap();
++    sqlx::query("SELECT pg_advisory_xact_lock(602207)")
++        .execute(&mut *blocker)
++        .await
++        .unwrap();
++    let shutdown = CancellationToken::new();
++    let monitor = InMemoryMonitor::new();
++    let stop = async {
++        tokio::time::timeout(std::time::Duration::from_secs(3),async {
++            loop {
++                let pid:Option<i32>=sqlx::query_scalar("SELECT pid FROM pg_stat_activity WHERE datname=current_database() AND wait_event='advisory' AND query LIKE 'DELETE FROM background_tasks AS job USING pg_temp.workflow_retention_jobs%'")
++                    .fetch_optional(f.persistence().pool()).await.unwrap();
++                if let Some(pid)=pid {shutdown.cancel();break pid;}
++                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
++            }
++        }).await.unwrap()
++    };
++    let (_, pid) = tokio::time::timeout(std::time::Duration::from_secs(4), async {
++        tokio::join!(storage::run(f.persistence(), &monitor, &shutdown), stop)
++    })
++    .await
++    .unwrap();
++    blocker.commit().await.unwrap();
++    tokio::time::timeout(std::time::Duration::from_secs(3),async{
++        loop {
++            let active:bool=sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE pid=$1 AND backend_xid IS NOT NULL)")
++                .bind(pid).fetch_one(f.persistence().pool()).await.unwrap();
++            if !active {break;}
++            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
++        }
++    }).await.unwrap();
++    assert_eq!(count(&f, "workflow_runs").await, 1);
++    assert_eq!(count(&f, "background_tasks").await, 1);
++    assert_eq!(count(&f, "model_usage_calls").await, 1);
++    assert_eq!(count(&f, "model_usage_history").await, 0);
++}
+diff --git a/src/adapters/persistence/workflow/storage_reconciliation_tests.rs b/src/adapters/persistence/workflow/storage_reconciliation_tests.rs
+new file mode 100644
+index 0000000..c2c48e8
+--- /dev/null
++++ b/src/adapters/persistence/workflow/storage_reconciliation_tests.rs
+@@ -0,0 +1,176 @@
++use super::*;
++use crate::application::workflow::storage::{RetentionRoot, WorkflowStorageMaintenance};
++
++async fn terminal_old(f: &AdmissionFixture, request: &ActionDispatchRequest) -> RetentionRoot {
++    let scope = request.scope();
++    let revision = f
++        .persistence()
++        .head(scope.company, scope.run)
++        .await
++        .unwrap()
++        .unwrap()
++        .revision;
++    let result = f
++        .persistence()
++        .cancel(CancelCommand {
++            company_id: scope.company,
++            run_id: scope.run,
++            actor: f.binding.target.actor,
++            command_key: IdempotencyKey::parse("retention-cancel").unwrap(),
++            expected_revision: revision,
++        })
++        .await
++        .unwrap();
++    assert!(matches!(result, CancelResult::Applied { .. }));
++    let finished_at = sqlx::query_scalar(
++        "UPDATE workflow_runs SET created_at=clock_timestamp()-interval '100 days',
++        finished_at=clock_timestamp()-interval '91 days' WHERE id=$1 RETURNING finished_at",
++    )
++    .bind(scope.run.as_uuid())
++    .fetch_one(f.persistence().pool())
++    .await
++    .unwrap();
++    RetentionRoot {
++        finished_at,
++        company: scope.company,
++        run: scope.run,
++    }
++}
++#[tokio::test]
++async fn run_retention_unknown_effect_is_protected_while_complete_not_applied_proof_closes_it() {
++    let (f, request) = Box::pin(limited()).await;
++    let _verifier = ledger(&f, &request).await;
++    let provider = LedgerProvider::new(&f, Delivery::Pending);
++    assert!(invoke(&f, &request, &provider).await.is_err());
++    assert_eq!(provider.calls.load(Ordering::SeqCst), 1);
++    park(&f, &request).await;
++    let root = terminal_old(&f, &request).await;
++    assert_eq!(f.persistence().retire_tree(root).await.unwrap(), None);
++    let s = Box::pin(scheduled()).await;
++    let root = terminal_old(&s.fixture, &s.request).await;
++    assert!(
++        s.fixture
++            .persistence()
++            .retire_tree(root)
++            .await
++            .unwrap()
++            .is_some()
++    );
++}
++#[tokio::test]
++async fn run_retention_consumed_old_proof_cannot_close_a_later_remote_entry() {
++    let mut s = Box::pin(scheduled()).await;
++    let Scheduled {
++        fixture, request, ..
++    } = &mut s;
++    new_claim(fixture, request).await;
++    let provider = LedgerProvider::new(fixture, Delivery::Pending);
++    assert!(invoke(fixture, request, &provider).await.is_err());
++    assert_eq!(provider.calls.load(Ordering::SeqCst), 1);
++    assert_eq!(entry_consumptions(fixture).await, (2, 1));
++    park(fixture, request).await;
++    let root = terminal_old(fixture, request).await;
++    assert_eq!(fixture.persistence().retire_tree(root).await.unwrap(), None);
++}
++
++#[tokio::test]
++async fn run_retention_evidence_conflict_keeps_terminal_tree_even_with_exact_receipt() {
++    let (f, mut request) = setup().await;
++    let verifier = ledger(&f, &request).await;
++    let writer = adapter(&f, 0);
++    let RemoteReservationResult::Reserved(reserved) =
++        writer.reserve_remote(&request, None).await.unwrap()
++    else {
++        panic!("marker")
++    };
++    let marker = reserved.marker;
++    let old = writer.enter_remote(*reserved).await.unwrap();
++    ledger_row(&f, &request, old.entry, None).await;
++    park(&f, &request).await;
++    assert!(matches!(
++        reconcile(&f, &request, marker, verifier, "retention-proof")
++            .await
++            .outcome,
++        ReconciliationOutcome::Scheduled {
++            receipt_only: false
++        }
++    ));
++    new_claim(&f, &mut request).await;
++    let RemoteReservationResult::Reserved(reserved) =
++        writer.reserve_remote(&request, None).await.unwrap()
++    else {
++        panic!("proof marker")
++    };
++    let new = writer.enter_remote(*reserved).await.unwrap();
++    writer
++        .finish_remote(new, json!({"items":[],"token_count":0,"omitted":0}))
++        .await
++        .unwrap();
++    writer
++        .finish_remote(old, json!({"items":[],"token_count":1,"omitted":0}))
++        .await
++        .unwrap();
++    let facts:(i64,i64)=sqlx::query_as("SELECT (SELECT count(*) FROM workflow_action_receipts),(SELECT count(*) FROM workflow_action_evidence_conflicts)")
++        .fetch_one(f.persistence().pool()).await.unwrap();
++    assert_eq!(facts.0, 1);
++    assert!(facts.1 > 0);
++    let root = terminal_old(&f, &request).await;
++    assert_eq!(f.persistence().retire_tree(root).await.unwrap(), None);
++}
++
++struct ExpiringVerifier(Arc<LedgerVerifier>);
++#[async_trait]
++impl ActionEvidenceVerifier for ExpiringVerifier {
++    fn registration(&self) -> &EvidenceVerifierRegistration {
++        self.0.registration()
++    }
++    async fn verify(
++        &self,
++        snapshot: &ReconciliationSnapshot,
++        reference: &EvidenceRecordReference,
++        cancellation: &CancellationToken,
++    ) -> AppResult<EvidenceAttestation> {
++        let mut proof = self.0.verify(snapshot, reference, cancellation).await?;
++        proof.valid_until = proof.observed_at + chrono::Duration::seconds(3);
++        Ok(proof)
++    }
++}
++#[tokio::test]
++async fn run_retention_historical_not_applied_closure_survives_retry_grant_expiry() {
++    let (f, request) = Box::pin(limited()).await;
++    let verifier = ledger(&f, &request).await;
++    let provider = LedgerProvider::new(&f, Delivery::Pending);
++    assert!(invoke(&f, &request, &provider).await.is_err());
++    assert_eq!(provider.calls.load(Ordering::SeqCst), 1);
++    park(&f, &request).await;
++    barrier(&f, &request).await;
++    let command = proof_command(&f, &request, &verifier, "retention-expiring").await;
++    assert!(matches!(
++        run_command(&f, &command, Arc::new(ExpiringVerifier(verifier)))
++            .await
++            .unwrap()
++            .outcome,
++        ReconciliationOutcome::Scheduled {
++            receipt_only: false
++        }
++    ));
++    let root = terminal_old(&f, &request).await;
++    let until: chrono::DateTime<chrono::Utc> =
++        sqlx::query_scalar("SELECT max(valid_until) FROM workflow_action_evidence")
++            .fetch_one(f.persistence().pool())
++            .await
++            .unwrap();
++    tokio::time::sleep(
++        (until - chrono::Utc::now()).to_std().unwrap_or_default()
++            + std::time::Duration::from_millis(20),
++    )
++    .await;
++    let expired: bool = sqlx::query_scalar(
++        "SELECT bool_and(valid_until<=clock_timestamp()) FROM workflow_action_evidence",
++    )
++    .fetch_one(f.persistence().pool())
++    .await
++    .unwrap();
++    assert!(expired);
++    assert!(f.persistence().retire_tree(root).await.unwrap().is_some());
++}
+diff --git a/src/adapters/persistence/workflow/storage_report_tests.rs b/src/adapters/persistence/workflow/storage_report_tests.rs
+new file mode 100644
+index 0000000..09abe31
+--- /dev/null
++++ b/src/adapters/persistence/workflow/storage_report_tests.rs
+@@ -0,0 +1,112 @@
++use super::*;
++use crate::application::workflow::metrics::WorkflowMetricPersistence;
++
++#[tokio::test]
++async fn run_retention_reports_preserve_categories_filters_time_prices_and_live_union() {
++    let f = AdmissionFixture::new().await;
++    let scope = admitted(&f, "report-old").await;
++    for category in [Some("reported"), Some("estimated"), Some("mixed"), None] {
++        usage(&f, scope, category).await;
++    }
++    let live = admitted(&f, "report-live").await;
++    usage(&f, live, Some("reported")).await;
++    sqlx::query("INSERT INTO model_prices(company_id,provider,model,input_micro_usd_per_million,output_micro_usd_per_million) VALUES($1,'openai','fixture',1000000,2000000)")
++        .bind(scope.company.as_uuid()).execute(f.persistence().pool()).await.unwrap();
++    let root = old(&f, scope).await;
++    let base = query(&f);
++    let (agent,workflow,requested_at):(Uuid,Uuid,chrono::DateTime<Utc>)=sqlx::query_as("SELECT agent_id,workflow_id,requested_at FROM model_usage_calls WHERE run_id=$1 ORDER BY requested_at,request_id LIMIT 1")
++        .bind(scope.run.as_uuid()).fetch_one(f.persistence().pool()).await.unwrap();
++    let mut cases = vec![base.clone()];
++    let mut q = base.clone();
++    q.grouping = UsageGrouping::Workflow;
++    cases.push(q);
++    let mut q = base.clone();
++    q.agent = Some(agent);
++    cases.push(q);
++    let mut q = base.clone();
++    q.workflow = Some(workflow);
++    cases.push(q);
++    let mut q = base.clone();
++    q.start = requested_at;
++    q.end = requested_at + Duration::microseconds(1);
++    cases.push(q);
++    let mut q = base.clone();
++    q.end = requested_at;
++    cases.push(q);
++    let mut before = Vec::new();
++    for q in &cases {
++        before.push(report(&f, q.clone()).await);
++    }
++    let metrics = f.persistence().workflow_metrics().await.unwrap();
++    assert_eq!(before[0]["groups"][0]["reported_calls"], 2);
++    assert_eq!(before[0]["groups"][0]["estimated_calls"], 1);
++    assert_eq!(before[0]["groups"][0]["mixed_calls"], 1);
++    assert_eq!(before[0]["groups"][0]["unconfirmed_calls"], 1);
++    assert_eq!(
++        f.persistence()
++            .retire_tree(root)
++            .await
++            .unwrap()
++            .unwrap()
++            .calls,
++        4
++    );
++    assert_eq!(count(&f, "model_usage_calls").await, 1);
++    for (q, expected) in cases.into_iter().zip(&before) {
++        assert_eq!(report(&f, q).await, *expected);
++    }
++    let after = f.persistence().workflow_metrics().await.unwrap();
++    assert_eq!(
++        (
++            metrics.reserved_tokens,
++            metrics.charged_tokens_last24h,
++            metrics.charged_estimated_usd_last24h,
++            metrics.unpriced_model_calls
++        ),
++        (
++            after.reserved_tokens,
++            after.charged_tokens_last24h,
++            after.charged_estimated_usd_last24h,
++            after.unpriced_model_calls
++        )
++    );
++    sqlx::query("UPDATE model_prices SET input_micro_usd_per_million=input_micro_usd_per_million*2,output_micro_usd_per_million=output_micro_usd_per_million*2,revision=nextval('model_price_revision')")
++        .execute(f.persistence().pool()).await.unwrap();
++    let repriced = report(&f, base).await;
++    assert_ne!(
++        repriced["groups"][0]["priced_subtotal_usd"],
++        before[0]["groups"][0]["priced_subtotal_usd"]
++    );
++    assert_eq!(
++        repriced["groups"][0]["input_tokens"],
++        before[0]["groups"][0]["input_tokens"]
++    );
++}
++
++#[tokio::test]
++async fn run_retention_report_global_scan_cap_applies_before_filters_across_sources() {
++    let f = AdmissionFixture::new().await;
++    let archived = admitted(&f, "cap-archive").await;
++    let live = admitted(&f, "cap-live").await;
++    usage(&f, archived, Some("reported")).await;
++    usage(&f, live, Some("reported")).await;
++    // The report must also handle native ledgers larger than one execution's model budget.
++    // Clone valid provenance with distinct requests, without manufacturing usage history.
++    sqlx::query("INSERT INTO model_usage_calls SELECT (jsonb_populate_record(NULL::model_usage_calls,
++        to_jsonb(original)||jsonb_build_object('request_id',gen_random_uuid(),
++            'requested_at',original.requested_at-interval '1 hour'))).*
++        FROM model_usage_calls AS original CROSS JOIN generate_series(1,5000) WHERE original.run_id=$1")
++        .bind(archived.run.as_uuid()).execute(f.persistence().pool()).await.unwrap();
++    sqlx::query("INSERT INTO model_usage_calls SELECT (jsonb_populate_record(NULL::model_usage_calls,
++        to_jsonb(original)||jsonb_build_object('request_id',gen_random_uuid()))).*
++        FROM model_usage_calls AS original CROSS JOIN generate_series(1,5000) WHERE original.run_id=$1")
++        .bind(live.run.as_uuid()).execute(f.persistence().pool()).await.unwrap();
++    let root = old(&f, archived).await;
++    let q = query(&f);
++    let before = report(&f, q.clone()).await;
++    assert_eq!(before["scanned_calls"], 10000);
++    assert_eq!(before["truncated"], true);
++    f.persistence().retire_tree(root).await.unwrap().unwrap();
++    assert_eq!(count(&f, "model_usage_history").await, 5001);
++    assert_eq!(report(&f, q).await, before);
++}
+diff --git a/src/adapters/persistence/workflow/storage_retention.rs b/src/adapters/persistence/workflow/storage_retention.rs
+new file mode 100644
+index 0000000..4f0f34d
+--- /dev/null
++++ b/src/adapters/persistence/workflow/storage_retention.rs
+@@ -0,0 +1,130 @@
++use super::*;
++use crate::application::workflow::storage::{RetentionRoot, RetiredTree};
++
++pub(super) async fn retire_on(
++    db: &mut PgConnection,
++    root: RetentionRoot,
++) -> AppResult<Option<RetiredTree>> {
++    let company = root.company.as_uuid();
++    let root_id = root.run.as_uuid();
++    if sqlx::query_scalar::<_, Uuid>("SELECT id FROM companies WHERE id=$1 FOR KEY SHARE")
++        .bind(company)
++        .fetch_optional(&mut *db)
++        .await?
++        .is_none()
++    {
++        return Ok(None);
++    }
++    let owned: Option<Uuid> = sqlx::query_scalar(
++        "SELECT id FROM workflow_runs WHERE company_id=$1 AND id=$2
++        AND parent_run_id IS NULL AND state IN ('succeeded','failed','cancelled')
++        AND finished_at<clock_timestamp()-interval '90 days' FOR UPDATE SKIP LOCKED",
++    )
++    .bind(company)
++    .bind(root_id)
++    .fetch_optional(&mut *db)
++    .await?;
++    if owned.is_none() {
++        return Ok(None);
++    }
++    let runs = lock_runs(db, company, root_id).await?;
++    if runs == 0 {
++        return Err(AppError::Internal(
++            "Retained workflow is missing budget links".into(),
++        ));
++    }
++    let jobs = lock_dependents(db, company, root_id).await?;
++    let eligible: bool = sqlx::query_scalar(include_str!("storage_retention_eligible.sql"))
++        .bind(company)
++        .bind(root_id)
++        .fetch_one(&mut *db)
++        .await?;
++    if !eligible {
++        return Ok(None);
++    }
++    let calls = archive_usage(db, company, root_id).await?;
++    let removed = sqlx::query("WITH retained AS MATERIALIZED (
++        SELECT company_id,run_id FROM workflow_run_budgets WHERE company_id=$1 AND root_run_id=$2)
++        DELETE FROM workflow_runs AS run USING retained WHERE run.company_id=retained.company_id AND run.id=retained.run_id")
++        .bind(company).bind(root_id).execute(&mut *db).await?.rows_affected();
++    // Owned members cannot disappear or change root. An extra member in the newer
++    // snapshot must roll the whole candidate back rather than delete an unowned run.
++    if removed != runs {
++        return Err(AppError::Conflict(
++            "Workflow tree changed during retention; rediscover it".into(),
++        ));
++    }
++    // Runs must be absent before job-owned append-only checkpoint/effect cascades.
++    // The transaction-local capture survives the run/execution/link cascades.
++    let removed_jobs = sqlx::query(
++        "DELETE FROM background_tasks AS job USING pg_temp.workflow_retention_jobs AS saved
++        WHERE job.company_id=saved.company_id AND job.id=saved.job_id
++        AND job.workflow_execution_id=saved.execution_id AND job.queue_kind='workflow'",
++    )
++    .execute(db)
++    .await?
++    .rows_affected();
++    if removed_jobs != jobs {
++        return Err(AppError::Internal(
++            "Workflow retention lost a captured job".into(),
++        ));
++    }
++    Ok(Some(RetiredTree {
++        runs: removed,
++        jobs: removed_jobs,
++        calls,
++    }))
++}
++
++async fn lock_runs(db: &mut PgConnection, company: Uuid, root: Uuid) -> AppResult<u64> {
++    let count: i64 = sqlx::query_scalar("SELECT count(*) FROM (
++        SELECT run.id FROM workflow_runs AS run JOIN workflow_run_budgets AS link
++            ON link.company_id=run.company_id AND link.run_id=run.id
++        WHERE link.company_id=$1 AND link.root_run_id=$2 ORDER BY run.id FOR UPDATE OF run NOWAIT) AS owned")
++        .bind(company).bind(root).fetch_one(db).await?;
++    u64::try_from(count)
++        .map_err(|_| AppError::Internal("Invalid retained workflow row count".into()))
++}
++
++async fn lock_dependents(db: &mut PgConnection, company: Uuid, root: Uuid) -> AppResult<u64> {
++    // Scalar aggregates consume locking subqueries without transferring a tree-sized ID collection.
++    sqlx::query_scalar::<_, i64>("SELECT count(*) FROM (
++        SELECT step.id FROM workflow_executions AS step JOIN workflow_run_budgets AS link
++            ON link.company_id=step.company_id AND link.run_id=step.run_id
++        WHERE link.company_id=$1 AND link.root_run_id=$2 ORDER BY step.id FOR UPDATE OF step NOWAIT) AS owned")
++        .bind(company).bind(root).fetch_one(&mut *db).await?;
++    sqlx::query(
++        "CREATE TEMP TABLE workflow_retention_jobs(company_id uuid NOT NULL,job_id uuid NOT NULL,
++        execution_id uuid NOT NULL,PRIMARY KEY(company_id,job_id)) ON COMMIT DROP",
++    )
++    .execute(&mut *db)
++    .await?;
++    let jobs = sqlx::query("INSERT INTO pg_temp.workflow_retention_jobs(company_id,job_id,execution_id)
++        SELECT job.company_id,job.id,job.workflow_execution_id FROM background_tasks AS job
++        JOIN workflow_executions AS step ON step.company_id=job.company_id AND step.id=job.workflow_execution_id
++        JOIN workflow_run_budgets AS link ON link.company_id=step.company_id AND link.run_id=step.run_id
++        WHERE link.company_id=$1 AND link.root_run_id=$2 ORDER BY job.id FOR UPDATE OF job NOWAIT")
++        .bind(company).bind(root).execute(&mut *db).await?.rows_affected();
++    sqlx::query_scalar::<_, i64>("SELECT count(*) FROM (
++        SELECT attempt.id FROM task_attempts AS attempt JOIN pg_temp.workflow_retention_jobs AS saved ON saved.job_id=attempt.task_id
++        WHERE saved.company_id=$1 ORDER BY attempt.id FOR UPDATE OF attempt NOWAIT) AS owned")
++        .bind(company).fetch_one(&mut *db).await?;
++    sqlx::query_scalar::<_, Uuid>("SELECT root_run_id FROM workflow_root_budget_usage WHERE company_id=$1 AND root_run_id=$2 FOR UPDATE NOWAIT")
++        .bind(company).bind(root).fetch_one(&mut *db).await?;
++    sqlx::query_scalar::<_, i64>("SELECT count(*) FROM (
++        SELECT call.request_id FROM model_usage_calls AS call JOIN workflow_run_budgets AS link
++            ON link.company_id=call.company_id AND link.run_id=call.run_id
++        WHERE link.company_id=$1 AND link.root_run_id=$2 ORDER BY call.request_id FOR UPDATE OF call NOWAIT) AS owned")
++        .bind(company).bind(root).fetch_one(db).await?;
++    Ok(jobs)
++}
++
++async fn archive_usage(db: &mut PgConnection, company: Uuid, root: Uuid) -> AppResult<u64> {
++    Ok(sqlx::query("INSERT INTO model_usage_history(company_id,request_id,agent_id,workflow_id,version_id,provider,model,
++        requested_at,reserved_input,reserved_output,input_tokens,output_tokens,usage_source,settled_at)
++        SELECT call.company_id,call.request_id,call.agent_id,call.workflow_id,call.version_id,call.provider,call.model,
++        call.requested_at,call.reserved_input,call.reserved_output,call.input_tokens,call.output_tokens,call.usage_source,call.settled_at
++        FROM model_usage_calls AS call JOIN workflow_run_budgets AS link ON link.company_id=call.company_id AND link.run_id=call.run_id
++        WHERE link.company_id=$1 AND link.root_run_id=$2")
++        .bind(company).bind(root).execute(db).await?.rows_affected())
++}
+diff --git a/src/adapters/persistence/workflow/storage_retention_eligible.sql b/src/adapters/persistence/workflow/storage_retention_eligible.sql
+new file mode 100644
+index 0000000..838fd73
+--- /dev/null
++++ b/src/adapters/persistence/workflow/storage_retention_eligible.sql
+@@ -0,0 +1,31 @@
++WITH tree AS MATERIALIZED (
++    SELECT run_id FROM workflow_run_budgets WHERE company_id=$1 AND root_run_id=$2
++)
++SELECT
++    NOT EXISTS(SELECT 1 FROM workflow_runs AS run JOIN tree ON tree.run_id=run.id
++        WHERE run.company_id=$1 AND run.state NOT IN ('succeeded','failed','cancelled'))
++    AND NOT EXISTS(SELECT 1 FROM background_tasks AS job JOIN workflow_executions AS execution
++        ON execution.company_id=job.company_id AND execution.id=job.workflow_execution_id
++        JOIN tree ON tree.run_id=execution.run_id WHERE execution.company_id=$1 AND job.status IN ('pending','processing'))
++    AND NOT EXISTS(SELECT 1 FROM task_attempts AS attempt JOIN background_tasks AS job ON job.id=attempt.task_id
++        JOIN workflow_executions AS execution ON execution.company_id=job.company_id AND execution.id=job.workflow_execution_id
++        JOIN tree ON tree.run_id=execution.run_id WHERE execution.company_id=$1 AND attempt.status='processing')
++    AND NOT EXISTS(SELECT 1 FROM workflow_decisions AS decision JOIN workflow_waits AS wait
++        ON wait.company_id=decision.company_id AND wait.run_id=decision.run_id AND wait.id=decision.wait_id
++        JOIN tree ON tree.run_id=decision.run_id WHERE decision.company_id=$1 AND decision.submitted_at IS NULL AND wait.state='waiting')
++    AND NOT EXISTS(SELECT 1 FROM workflow_message_actions AS action JOIN tree ON tree.run_id=action.run_id
++        WHERE action.company_id=$1 AND action.state IN ('pending','uncertain','stalled'))
++    AND NOT EXISTS(SELECT 1 FROM workflow_runs AS run JOIN tree ON tree.run_id=run.rerun_of_run_id
++        WHERE run.company_id=$1 AND NOT EXISTS(SELECT 1 FROM tree AS member WHERE member.run_id=run.id))
++    AND NOT EXISTS(SELECT 1 FROM workflow_action_evidence_conflicts AS conflict JOIN tree ON tree.run_id=conflict.run_id WHERE conflict.company_id=$1)
++    AND NOT EXISTS(SELECT 1 FROM workflow_action_dispatches AS marker JOIN tree ON tree.run_id=marker.run_id WHERE marker.company_id=$1
++        AND NOT EXISTS(SELECT 1 FROM workflow_action_receipts WHERE company_id=marker.company_id AND invocation_id=marker.invocation_id)
++        AND NOT EXISTS(SELECT 1 FROM workflow_action_evidence WHERE company_id=marker.company_id AND invocation_id=marker.invocation_id AND disposition='applied')
++        AND NOT (marker.effect_kind='remote' AND EXISTS(
++            SELECT 1 FROM workflow_action_evidence AS proof WHERE proof.company_id=marker.company_id AND proof.invocation_id=marker.invocation_id
++                AND proof.disposition='final_not_applied' AND proof.grant_eligible
++                -- Historical closure survives grant expiry, but cannot cover a later entry.
++                AND NOT EXISTS(SELECT 1 FROM workflow_action_remote_entries AS entry
++                    WHERE entry.company_id=marker.company_id AND entry.invocation_id=marker.invocation_id
++                    AND NOT EXISTS(SELECT 1 FROM workflow_action_evidence_coverage AS coverage
++                        WHERE coverage.company_id=proof.company_id AND coverage.evidence_id=proof.id AND coverage.remote_entry_id=entry.id)))))
+diff --git a/src/adapters/persistence/workflow/storage_retry_tests.rs b/src/adapters/persistence/workflow/storage_retry_tests.rs
+new file mode 100644
+index 0000000..5af172f
+--- /dev/null
++++ b/src/adapters/persistence/workflow/storage_retry_tests.rs
+@@ -0,0 +1,105 @@
++use super::*;
++use std::time::Duration as WallDuration;
++
++async fn wait_owner(f: &AdmissionFixture, excluded: Option<i32>, event: Option<&str>) -> i32 {
++    tokio::time::timeout(WallDuration::from_secs(4), async {
++        loop {
++            let pid: Option<i32> = sqlx::query_scalar("SELECT pid FROM pg_stat_activity WHERE datname=current_database()
++                AND wait_event_type='Lock' AND pid IS DISTINCT FROM $1 AND ($2::text IS NULL OR wait_event=$2) LIMIT 1")
++                .bind(excluded).bind(event).fetch_optional(f.persistence().pool()).await.unwrap();
++            if let Some(pid) = pid { return pid; }
++            tokio::time::sleep(WallDuration::from_millis(10)).await;
++        }
++    }).await.expect("production competitor reached observed ownership barrier")
++}
++async fn install_barrier(f: &AdmissionFixture, retry_first: bool) {
++    let sql = if retry_first {
++        "CREATE FUNCTION retention_retry_barrier() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN
++         IF OLD.state='failed' AND NEW.state='running' THEN PERFORM pg_advisory_xact_lock(602208); END IF; RETURN NEW; END $$;
++         CREATE TRIGGER retention_retry_barrier BEFORE UPDATE ON workflow_runs FOR EACH ROW EXECUTE FUNCTION retention_retry_barrier()"
++    } else {
++        "CREATE FUNCTION retention_retry_barrier() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN
++         PERFORM pg_advisory_xact_lock(602208); RETURN OLD; END $$;
++         CREATE TRIGGER retention_retry_barrier BEFORE DELETE ON background_tasks FOR EACH ROW EXECUTE FUNCTION retention_retry_barrier()"
++    };
++    sqlx::raw_sql(sql)
++        .execute(f.persistence().pool())
++        .await
++        .unwrap();
++}
++async fn race(retry_first: bool) {
++    let (f, scope) = Box::pin(lease_tests::retryable_fixture()).await;
++    usage(&f, scope, Some("reported")).await;
++    let root = age(&f, scope).await;
++    // Only date setup uses the common fault fixture; every production guard is active in the race.
++    sqlx::query("ALTER TABLE workflow_runs ENABLE TRIGGER workflow_run_snapshot_immutable")
++        .execute(f.persistence().pool())
++        .await
++        .unwrap();
++    let retry = RetryCommand {
++        company_id: scope.company,
++        run_id: scope.run,
++        actor: f.binding.target.actor,
++        command_key: IdempotencyKey::parse("retention-race-retry").unwrap(),
++        expected_revision: f
++            .persistence()
++            .head(scope.company, scope.run)
++            .await
++            .unwrap()
++            .unwrap()
++            .revision,
++    };
++    install_barrier(&f, retry_first).await;
++    let mut blocker = f.persistence().pool().begin().await.unwrap();
++    sqlx::query("SELECT pg_advisory_xact_lock(602208)")
++        .execute(&mut *blocker)
++        .await
++        .unwrap();
++    let p = f.persistence().clone();
++    if retry_first {
++        let writer = tokio::spawn(async move { p.retry(retry).await });
++        wait_owner(&f, None, Some("advisory")).await;
++        assert_eq!(f.persistence().retire_tree(root).await.unwrap(), None);
++        blocker.commit().await.unwrap();
++        assert!(matches!(
++            writer.await.unwrap().unwrap(),
++            RetryResult::Applied { .. }
++        ));
++        let state: String = sqlx::query_scalar("SELECT state FROM workflow_runs WHERE id=$1")
++            .bind(scope.run.as_uuid())
++            .fetch_one(f.persistence().pool())
++            .await
++            .unwrap();
++        assert_eq!(state, "running");
++        assert_eq!(count(&f, "model_usage_calls").await, 1);
++        assert_eq!(count(&f, "model_usage_history").await, 0);
++    } else {
++        let collector = tokio::spawn(async move { p.retire_tree(root).await });
++        let owner = wait_owner(&f, None, Some("advisory")).await;
++        let p = f.persistence().clone();
++        let writer = tokio::spawn(async move { p.retry(retry).await });
++        wait_owner(&f, Some(owner), None).await;
++        blocker.commit().await.unwrap();
++        assert_eq!(collector.await.unwrap().unwrap().unwrap().calls, 1);
++        assert!(matches!(
++            writer.await.unwrap().unwrap(),
++            RetryResult::NotFound
++        ));
++        assert_eq!(count(&f, "workflow_runs").await, 0);
++        assert_eq!(count(&f, "background_tasks").await, 0);
++        assert_eq!(count(&f, "model_usage_calls").await, 0);
++        assert_eq!(count(&f, "model_usage_history").await, 1);
++    }
++    let dangling: i64 = sqlx::query_scalar("SELECT count(*) FROM background_tasks AS job LEFT JOIN workflow_executions AS step
++        ON step.company_id=job.company_id AND step.id=job.workflow_execution_id WHERE job.workflow_execution_id IS NOT NULL AND step.id IS NULL")
++        .fetch_one(f.persistence().pool()).await.unwrap();
++    assert_eq!(dangling, 0);
++}
++#[tokio::test]
++async fn run_retention_retry_first_revival_owns_and_preserves_live_work() {
++    race(true).await;
++}
++#[tokio::test]
++async fn run_retention_first_fences_waiting_production_retry_without_partial_archive() {
++    race(false).await;
++}
+diff --git a/src/adapters/persistence/workflow/storage_tests.rs b/src/adapters/persistence/workflow/storage_tests.rs
+new file mode 100644
+index 0000000..aa7a374
+--- /dev/null
++++ b/src/adapters/persistence/workflow/storage_tests.rs
+@@ -0,0 +1,345 @@
++use super::*;
++use crate::application::services::model_usage::{
++    ModelUsageStore, UsageGrouping, UsageQuery, UsageScope,
++};
++use crate::application::workflow::activation::ActivationRequest;
++use crate::application::workflow::storage::*;
++use crate::use_cases::agent::{AgentPersistence, AgentWrite};
++use chrono::{Duration, Utc};
++use run_lineage_tests::admitted;
++
++#[path = "storage_boundary_tests.rs"]
++mod boundary_tests;
++#[path = "storage_bundle_tests.rs"]
++mod bundle_tests;
++#[path = "storage_protection_tests.rs"]
++mod protection_tests;
++#[path = "storage_report_tests.rs"]
++mod report_tests;
++#[path = "storage_retry_tests.rs"]
++mod retry_tests;
++
++async fn old(f: &AdmissionFixture, scope: ActivationRequest) -> RetentionRoot {
++    let command = CancelCommand {
++        company_id: scope.company,
++        run_id: scope.run,
++        actor: f.binding.target.actor,
++        command_key: IdempotencyKey::parse(format!("retire-{}", scope.run)).unwrap(),
++        expected_revision: f
++            .persistence()
++            .head(scope.company, scope.run)
++            .await
++            .unwrap()
++            .unwrap()
++            .revision,
++    };
++    assert!(matches!(
++        f.persistence().cancel(command).await.unwrap(),
++        CancelResult::Applied { .. }
++    ));
++    age(f, scope).await
++}
++async fn age(f: &AdmissionFixture, scope: ActivationRequest) -> RetentionRoot {
++    let finished_at = sqlx::query_scalar(
++        "UPDATE workflow_runs SET created_at=clock_timestamp()-interval '100 days',
++        finished_at=clock_timestamp()-interval '91 days' WHERE id=$1 RETURNING finished_at",
++    )
++    .bind(scope.run.as_uuid())
++    .fetch_one(f.persistence().pool())
++    .await
++    .unwrap();
++    RetentionRoot {
++        finished_at,
++        company: scope.company,
++        run: scope.run,
++    }
++}
++async fn count(f: &AdmissionFixture, table: &str) -> i64 {
++    sqlx::query_scalar(&format!("SELECT count(*) FROM {table}"))
++        .fetch_one(f.persistence().pool())
++        .await
++        .unwrap()
++}
++async fn usage(f: &AdmissionFixture, scope: ActivationRequest, category: Option<&str>) {
++    let agent = AgentPersistence::create(
++        f.persistence(),
++        scope.company.as_uuid(),
++        AgentWrite {
++            name: "Storage usage".into(),
++            slug: format!("storage-{}", Uuid::new_v4()),
++            ..Default::default()
++        },
++    )
++    .await
++    .unwrap();
++    sqlx::query("INSERT INTO model_usage_calls(company_id,request_id,task_id,agent_id,workflow_id,version_id,run_id,execution_id,root_run_id,
++        provider,model,requested_at,reserved_input,reserved_output,input_tokens,output_tokens,usage_source,settled_at)
++        SELECT run.company_id,gen_random_uuid(),job.id,$4,run.workflow_id,run.version_id,run.id,$2,link.root_run_id,
++        'openai','fixture',statement_timestamp()-interval '1 minute',100,50,
++        CASE WHEN $3::text IS NOT NULL THEN 80 END,CASE WHEN $3::text IS NOT NULL THEN 20 END,$3,
++        CASE WHEN $3::text IS NOT NULL THEN statement_timestamp() END
++        FROM workflow_runs AS run JOIN workflow_run_budgets AS link ON link.company_id=run.company_id AND link.run_id=run.id
++        JOIN background_tasks AS job ON job.company_id=run.company_id AND job.workflow_execution_id=$2 WHERE run.id=$1")
++        .bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(category).bind(agent.id)
++        .execute(f.persistence().pool()).await.unwrap();
++}
++fn query(f: &AdmissionFixture) -> UsageQuery {
++    let end = Utc::now();
++    UsageQuery {
++        scope: UsageScope {
++            company: f.binding.target.company.as_uuid(),
++            actor: f.binding.target.actor.user_id(),
++        },
++        start: end - Duration::days(1),
++        end,
++        grouping: UsageGrouping::Model,
++        agent: None,
++        workflow: None,
++    }
++}
++async fn report(f: &AdmissionFixture, query: UsageQuery) -> Value {
++    serde_json::to_value(f.persistence().usage_report(query).await.unwrap()).unwrap()
++}
++
++#[tokio::test]
++async fn run_retention_complete_tree_jobs_usage_and_idempotent_retry() {
++    let source = serde_json::from_str(&registry::example("data.map").unwrap().source).unwrap();
++    let (f, scopes) = AdmissionFixture::chain(source, 2).await;
++    for category in [Some("reported"), Some("estimated"), Some("mixed"), None] {
++        usage(&f, *scopes.last().unwrap(), category).await;
++    }
++    let root = old(&f, scopes[0]).await;
++    let activations: i64 = sqlx::query_scalar(
++        "SELECT activations FROM workflow_root_budget_usage WHERE root_run_id=$1",
++    )
++    .bind(scopes[0].run.as_uuid())
++    .fetch_one(f.persistence().pool())
++    .await
++    .unwrap();
++    assert!(
++        activations < scopes.len() as i64,
++        "admitted runs are not activation consumption"
++    );
++    let unactivated_terminal:bool=sqlx::query_scalar("SELECT run.state IN ('failed','cancelled','succeeded') AND step.activated_at IS NULL
++        FROM workflow_runs AS run JOIN workflow_executions AS step ON step.company_id=run.company_id AND step.run_id=run.id WHERE step.id=$1")
++        .bind(scopes.last().unwrap().execution.as_uuid()).fetch_one(f.persistence().pool()).await.unwrap();
++    assert!(unactivated_terminal);
++
++    let q = query(&f);
++    let before = report(&f, q.clone()).await;
++    assert_eq!(before["scanned_calls"], 4);
++    let deleted = f.persistence().retire_tree(root).await.unwrap().unwrap();
++    assert_eq!(deleted.runs, 3);
++    assert!(deleted.jobs >= 3);
++    assert_eq!(deleted.calls, 4);
++    for table in [
++        "workflow_runs",
++        "workflow_executions",
++        "background_tasks",
++        "task_attempts",
++        "workflow_waits",
++        "workflow_run_events",
++        "model_usage_calls",
++        "workflow_root_budgets",
++        "workflow_run_budgets",
++    ] {
++        assert_eq!(count(&f, table).await, 0, "{table}");
++    }
++    assert_eq!(count(&f, "model_usage_history").await, 4);
++    assert_eq!(report(&f, q).await, before);
++    assert_eq!(f.persistence().retire_tree(root).await.unwrap(), None);
++    assert!(f.persistence().sweep_unused_bundles(256).await.unwrap() > 0);
++    assert_eq!(count(&f, "workflow_bundles").await, 0);
++}
++
++#[tokio::test]
++async fn run_retention_rollback_after_runs_before_jobs_preserves_every_owner() {
++    let f = AdmissionFixture::new().await;
++    let scope = admitted(&f, "rollback").await;
++    usage(&f, scope, None).await;
++    let root = old(&f, scope).await;
++    let before = f.counts().await;
++    sqlx::raw_sql("CREATE FUNCTION fail_retained_job() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'retention fault'; END $$;
++        CREATE TRIGGER fail_retained_job BEFORE DELETE ON background_tasks FOR EACH ROW EXECUTE FUNCTION fail_retained_job()")
++        .execute(f.persistence().pool()).await.unwrap();
++    assert!(f.persistence().retire_tree(root).await.is_err());
++    assert_eq!(f.counts().await, before);
++    assert_eq!(count(&f, "model_usage_calls").await, 1);
++    assert_eq!(count(&f, "model_usage_history").await, 0);
++    sqlx::query("DROP TRIGGER fail_retained_job ON background_tasks")
++        .execute(f.persistence().pool())
++        .await
++        .unwrap();
++    assert_eq!(
++        f.persistence()
++            .retire_tree(root)
++            .await
++            .unwrap()
++            .unwrap()
++            .calls,
++        1
++    );
++}
++
++#[tokio::test]
++async fn run_retention_global_cursor_skips_protected_prefix_and_keeps_young_live() {
++    let f = AdmissionFixture::new().await;
++    let mut protected = Vec::new();
++    for i in 0..5 {
++        let scope = admitted(&f, &format!("protected-{i}")).await;
++        let child = f.lineage_child(scope).await;
++        // A terminal ancestor beside a live child is a constructed SQL safety case.
++        run_finished_at_tests::drive(
++            &f,
++            scope.run,
++            crate::application::workflow::reads::RunStateName::Cancelled,
++        )
++        .await;
++        protected.push((age(&f, scope).await, child));
++    }
++    let young = admitted(&f, "young").await;
++    old(&f, young).await;
++    sqlx::query("UPDATE workflow_runs SET finished_at=clock_timestamp() WHERE id=$1")
++        .bind(young.run.as_uuid())
++        .execute(f.persistence().pool())
++        .await
++        .unwrap();
++    let live = admitted(&f, "live").await;
++    let foreign = f.foreign().await;
++    let eligible = admitted(&foreign, "foreign-old").await;
++    let eligible = old(&foreign, eligible).await;
++    let mut after = None;
++    let mut seen = Vec::new();
++    loop {
++        let page = f.persistence().retention_page(after).await.unwrap();
++        for root in page.roots {
++            let result = f.persistence().retire_tree(root).await.unwrap();
++            seen.push(root.run);
++            assert_eq!(result.is_some(), root.run == eligible.run);
++        }
++        after = page.next;
++        if after.is_none() {
++            break;
++        }
++    }
++    assert_eq!(seen.len(), 6);
++    assert!(seen.contains(&eligible.run));
++    assert!(
++        f.persistence()
++            .head(young.company, young.run)
++            .await
++            .unwrap()
++            .is_some()
++    );
++    assert!(
++        f.persistence()
++            .head(live.company, live.run)
++            .await
++            .unwrap()
++            .is_some()
++    );
++    assert_eq!(count(&f, "workflow_runs").await, 12);
++}
++
++#[tokio::test]
++async fn run_retention_competing_collectors_delete_exactly_once() {
++    let f = AdmissionFixture::new().await;
++    let scope = admitted(&f, "compete").await;
++    let root = old(&f, scope).await;
++    let (left, right) = tokio::join!(
++        f.persistence().retire_tree(root),
++        f.persistence().retire_tree(root)
++    );
++    assert_eq!(
++        u8::from(left.unwrap().is_some()) + u8::from(right.unwrap().is_some()),
++        1
++    );
++    assert_eq!(count(&f, "workflow_runs").await, 0);
++}
++
++#[tokio::test]
++async fn run_retention_archive_guards_refuse_forgery_duplicates_and_mutation() {
++    let f = AdmissionFixture::new().await;
++    let scope = admitted(&f, "history-guards").await;
++    usage(&f, scope, Some("reported")).await;
++    let columns = "company_id,request_id,agent_id,workflow_id,version_id,provider,model,requested_at,reserved_input,reserved_output,input_tokens,output_tokens,usage_source,settled_at";
++    let copy = format!(
++        "INSERT INTO model_usage_history({columns}) SELECT {columns} FROM model_usage_calls"
++    );
++    assert!(
++        sqlx::query(&copy.replace(
++            "SELECT company_id,request_id",
++            "SELECT company_id,gen_random_uuid()"
++        ))
++        .execute(f.persistence().pool())
++        .await
++        .is_err()
++    );
++    let mut tx = f.persistence().pool().begin().await.unwrap();
++    sqlx::query(&copy).execute(&mut *tx).await.unwrap();
++    assert!(tx.commit().await.is_err());
++    let root = old(&f, scope).await;
++    f.persistence().retire_tree(root).await.unwrap().unwrap();
++    for sql in [
++        "UPDATE model_usage_history SET input_tokens=input_tokens+1",
++        "DELETE FROM model_usage_history",
++    ] {
++        assert!(
++            sqlx::query(sql)
++                .execute(f.persistence().pool())
++                .await
++                .is_err()
++        );
++    }
++    sqlx::query("DELETE FROM companies WHERE id=$1")
++        .bind(scope.company.as_uuid())
++        .execute(f.persistence().pool())
++        .await
++        .unwrap();
++    assert_eq!(count(&f, "model_usage_history").await, 0);
++}
++
++#[tokio::test]
++async fn witness_sweep_committed_state_proofs_bounded_and_current_transaction_protected() {
++    let f = AdmissionFixture::new().await;
++    let first = admitted(&f, "state-1").await;
++    let second = admitted(&f, "state-2").await;
++    for scope in [first, second] {
++        run_finished_at_tests::drive(
++            &f,
++            scope.run,
++            crate::application::workflow::reads::RunStateName::Running,
++        )
++        .await;
++    }
++    assert_eq!(count(&f, "workflow_action_state_witnesses").await, 2);
++    let mut tx = f.persistence().pool().begin().await.unwrap();
++    sqlx::query("UPDATE workflow_runs SET state='waiting',waiting_reason='timer' WHERE id=$1")
++        .bind(first.run.as_uuid())
++        .execute(&mut *tx)
++        .await
++        .unwrap();
++    // A separate sweeper cannot see this transaction's witness or delete its current proof.
++    assert_eq!(
++        f.persistence().sweep_obsolete_witnesses(1).await.unwrap(),
++        1
++    );
++    assert!(
++        sqlx::query(
++            "DELETE FROM workflow_action_state_witnesses WHERE transaction_id=pg_current_xact_id()"
++        )
++        .execute(&mut *tx)
++        .await
++        .is_err()
++    );
++    tx.rollback().await.unwrap();
++    assert_eq!(
++        f.persistence().sweep_obsolete_witnesses(1).await.unwrap(),
++        1
++    );
++    assert_eq!(count(&f, "workflow_action_state_witnesses").await, 0);
++    assert_eq!(
++        f.persistence().sweep_obsolete_witnesses(1).await.unwrap(),
++        0
++    );
++}
+diff --git a/src/adapters/persistence/workflow/storage_witness_tests.rs b/src/adapters/persistence/workflow/storage_witness_tests.rs
+new file mode 100644
+index 0000000..a47c411
+--- /dev/null
++++ b/src/adapters/persistence/workflow/storage_witness_tests.rs
+@@ -0,0 +1,61 @@
++use super::*;
++use crate::application::workflow::storage::WorkflowStorageMaintenance;
++
++#[tokio::test]
++async fn witness_sweep_all_three_tables_compete_without_removing_permanent_refusal() {
++    let s = Box::pin(scheduled()).await;
++    exhaust(&s).await;
++    assert!(
++        s.fixture
++            .persistence()
++            .settled()
++            .claim_io(s.request.fence.scope, worker(), policy())
++            .await
++            .unwrap()
++            .is_none()
++    );
++    let tables = [
++        "workflow_action_state_witnesses",
++        "workflow_action_schedule_witnesses",
++        "workflow_action_claim_retirement_witnesses",
++    ];
++    for table in tables {
++        assert!(witness_count(&s, table).await > 0, "populated {table}");
++    }
++    let before = all_tables(&s.fixture).await;
++    let p = s.fixture.persistence();
++    let (left, right) = tokio::join!(p.sweep_obsolete_witnesses(1), p.sweep_obsolete_witnesses(1));
++    assert!(left.unwrap() + right.unwrap() > 0);
++    for _ in 0..10 {
++        if p.sweep_obsolete_witnesses(1).await.unwrap() == 0 {
++            break;
++        }
++    }
++    for table in tables {
++        assert_eq!(witness_count(&s, table).await, 0, "drained {table}");
++    }
++    let after = all_tables(&s.fixture).await;
++    for table in [
++        "workflow_action_claim_budget_refusals",
++        "workflow_action_evidence",
++        "workflow_action_evidence_commands",
++        "workflow_action_remote_entries",
++        "workflow_run_events",
++    ] {
++        assert_eq!(before[table], after[table], "retained permanent {table}");
++    }
++    assert_eq!(
++        after["workflow_action_claim_budget_refusals"]
++            .as_array()
++            .unwrap()
++            .len(),
++        1
++    );
++}
++
++async fn witness_count(s: &Scheduled, table: &str) -> i64 {
++    sqlx::query_scalar(&format!("SELECT count(*) FROM {table}"))
++        .fetch_one(s.fixture.persistence().pool())
++        .await
++        .unwrap()
++}
+diff --git a/src/adapters/persistence/workflow/tests.rs b/src/adapters/persistence/workflow/tests.rs
+index 60f102d..064cec5 100644
+--- a/src/adapters/persistence/workflow/tests.rs
++++ b/src/adapters/persistence/workflow/tests.rs
+@@ -612,3 +612,41 @@ mod jev_assets_tests;
+ 
+ #[path = "jev_end_to_end_tests.rs"]
+ mod jev_end_to_end_tests;
++
++// Fault-injection fixtures already disable the run snapshot guard. Keep the
++// shared blob immutable while replacing only this fixture run's reference.
++async fn replace_run_bundle(pool: &sqlx::PgPool, run: Uuid, bytes: &[u8]) {
++    let mut tx = pool.begin().await.unwrap();
++    let company = sqlx::query_scalar("SELECT company_id FROM workflow_runs WHERE id=$1")
++        .bind(run)
++        .fetch_one(&mut *tx)
++        .await
++        .unwrap();
++    let digest = bundle_store::insert_on(&mut tx, CompanyId::new(company), bytes)
++        .await
++        .unwrap();
++    sqlx::query("UPDATE workflow_runs SET bundle_digest=$2 WHERE id=$1")
++        .bind(run)
++        .bind(digest.as_bytes())
++        .execute(&mut *tx)
++        .await
++        .unwrap();
++    tx.commit().await.unwrap();
++}
++
++async fn seed_version_bundle(
++    db: &mut PgConnection,
++    company: Uuid,
++    version: Uuid,
++) -> Result<(), sqlx::Error> {
++    sqlx::query(
++        "INSERT INTO workflow_bundles(company_id,digest,bundle)
++        SELECT company_id,sha256(bundle),bundle FROM workflow_versions WHERE company_id=$1 AND id=$2
++        ON CONFLICT(company_id,digest) DO UPDATE SET bundle=EXCLUDED.bundle WHERE false",
++    )
++    .bind(company)
++    .bind(version)
++    .execute(db)
++    .await?;
++    Ok(())
++}
+diff --git a/src/adapters/persistence/workflow/wakeup_guard_tests.rs b/src/adapters/persistence/workflow/wakeup_guard_tests.rs
+index 2415f8e..026ef4c 100644
+--- a/src/adapters/persistence/workflow/wakeup_guard_tests.rs
++++ b/src/adapters/persistence/workflow/wakeup_guard_tests.rs
+@@ -178,13 +178,21 @@ async fn workflow_wakeup_parent_composite_fk_rejects_valid_foreign_parent() {
+     let (f, _parent, child) = chained(example("data.map")).await;
+     let foreign = admission_source_tests::ForeignSource::new(&f).await;
+     let foreign = admission_source_tests::foreign_parent(&f, foreign.company).await;
++    // Exercise this FK's scoped identity directly, before the budget-link AFTER
++    // trigger derives a root from the deliberately foreign parent.
++    let mut tx = f.persistence().pool().begin().await.unwrap();
++    sqlx::query("SET CONSTRAINTS workflow_parent_execution_fk IMMEDIATE")
++        .execute(&mut *tx)
++        .await
++        .unwrap();
+     let error = sqlx::query("INSERT INTO workflow_runs SELECT (jsonb_populate_record(NULL::workflow_runs,to_jsonb(run)||jsonb_build_object('id',$2::uuid,'parent_run_id',$3::uuid,'parent_execution_id',$4::uuid))).* FROM workflow_runs AS run WHERE run.id=$1")
+         .bind(child.run.as_uuid()).bind(Uuid::new_v4()).bind(foreign.run_id().as_uuid()).bind(foreign.execution_id().as_uuid())
+-        .execute(f.persistence().pool()).await.unwrap_err();
++        .execute(&mut *tx).await.unwrap_err();
+     assert_eq!(
+         error.as_database_error().unwrap().constraint(),
+         Some("workflow_parent_execution_fk")
+     );
++    tx.rollback().await.unwrap();
+ }
+ 
+ #[path = "wakeup_parent_link_tests.rs"]
+diff --git a/src/application/workflow/mod.rs b/src/application/workflow/mod.rs
+index 3c2c572..2b0bf6b 100644
+--- a/src/application/workflow/mod.rs
++++ b/src/application/workflow/mod.rs
+@@ -41,6 +41,7 @@ pub mod run_views;
+ pub mod sample;
+ pub mod schedule_admission;
+ mod service;
++pub mod storage;
+ pub mod supervise;
+ pub mod templates;
+ pub mod tools;
+diff --git a/src/application/workflow/storage.rs b/src/application/workflow/storage.rs
+new file mode 100644
+index 0000000..b89376d
+--- /dev/null
++++ b/src/application/workflow/storage.rs
+@@ -0,0 +1,141 @@
++//! Application-wide storage maintenance. Discovery never grants deletion authority.
++use crate::{
++    app_error::{AppError, AppResult},
++    domain::{
++        monitoring::MonitoringService,
++        workflow::{CompanyId, RunId},
++    },
++};
++use async_trait::async_trait;
++use chrono::{DateTime, Utc};
++use std::time::Duration;
++use tokio_util::sync::CancellationToken;
++
++pub const RETENTION_PAGE_SIZE: usize = 4;
++pub const STORAGE_SWEEP_LIMIT: u16 = 256;
++const OPERATION_BUDGET: Duration = Duration::from_secs(6);
++const SWEEP_INTERVAL: Duration = Duration::from_secs(60);
++
++#[derive(Debug, Clone, Copy, PartialEq, Eq)]
++pub struct RetentionRoot {
++    pub finished_at: DateTime<Utc>,
++    pub company: CompanyId,
++    pub run: RunId,
++}
++#[derive(Debug)]
++pub struct RetentionPage {
++    pub roots: Vec<RetentionRoot>,
++    pub next: Option<RetentionRoot>,
++}
++#[derive(Debug, Clone, Copy, PartialEq, Eq)]
++pub struct RetiredTree {
++    pub runs: u64,
++    pub jobs: u64,
++    pub calls: u64,
++}
++
++#[async_trait]
++pub trait WorkflowStorageMaintenance: Send + Sync {
++    async fn sweep_obsolete_witnesses(&self, limit: u16) -> AppResult<u64>;
++    async fn retention_page(&self, after: Option<RetentionRoot>) -> AppResult<RetentionPage>;
++    /// Recheck and lock the complete tree; archive usage and remove runs/jobs atomically.
++    async fn retire_tree(&self, root: RetentionRoot) -> AppResult<Option<RetiredTree>>;
++    async fn sweep_unused_bundles(&self, limit: u16) -> AppResult<u64>;
++    async fn oldest_terminal_root(&self) -> AppResult<Option<DateTime<Utc>>>;
++}
++
++async fn bounded<T>(
++    future: impl std::future::Future<Output = AppResult<T>>,
++    monitoring: &dyn MonitoringService,
++) -> AppResult<T> {
++    let result = tokio::time::timeout(OPERATION_BUDGET, future)
++        .await
++        .unwrap_or_else(|_| {
++            Err(AppError::Timeout(
++                "Workflow storage operation timed out".into(),
++            ))
++        });
++    if let Err(error) = &result {
++        monitoring.increment_counter("workflow_storage_errors_total", 1, &[]);
++        tracing::warn!(%error, "Workflow storage operation failed");
++    }
++    result
++}
++
++async fn sweep(
++    port: &dyn WorkflowStorageMaintenance,
++    monitoring: &dyn MonitoringService,
++    after: &mut Option<RetentionRoot>,
++) {
++    if let Ok(count) = bounded(
++        port.sweep_obsolete_witnesses(STORAGE_SWEEP_LIMIT),
++        monitoring,
++    )
++    .await
++    {
++        monitoring.increment_counter("workflow_storage_witnesses_deleted_total", count, &[]);
++    }
++    if let Ok(page) = bounded(port.retention_page(*after), monitoring).await {
++        // Advance past every candidate, including protected or failed trees. Wrap on exhaustion.
++        *after = page.next;
++        for root in page.roots {
++            match bounded(port.retire_tree(root), monitoring).await {
++                Ok(Some(deleted)) => {
++                    for (name, count) in [
++                        ("workflow_storage_trees_deleted_total", 1),
++                        ("workflow_storage_runs_deleted_total", deleted.runs),
++                        ("workflow_storage_jobs_deleted_total", deleted.jobs),
++                        ("workflow_storage_usage_archived_total", deleted.calls),
++                    ] {
++                        monitoring.increment_counter(name, count, &[]);
++                    }
++                }
++                Ok(None) => {
++                    monitoring.increment_counter("workflow_storage_trees_skipped_total", 1, &[])
++                }
++                Err(_) => {}
++            }
++        }
++    }
++    if let Ok(count) = bounded(port.sweep_unused_bundles(STORAGE_SWEEP_LIMIT), monitoring).await {
++        monitoring.increment_counter("workflow_storage_bundles_deleted_total", count, &[]);
++    }
++    if let Ok(oldest) = bounded(port.oldest_terminal_root(), monitoring).await {
++        monitoring.record_gauge(
++            "workflow_storage_oldest_terminal_root_finished_timestamp_seconds",
++            oldest.map_or(0.0, |time| time.timestamp() as f64),
++            &[],
++        );
++        monitoring.record_gauge(
++            "workflow_storage_last_observation_timestamp_seconds",
++            Utc::now().timestamp() as f64,
++            &[],
++        );
++    }
++}
++
++/// The host owns and joins this future. Cancellation drops the actual in-flight transaction.
++pub async fn run(
++    port: &dyn WorkflowStorageMaintenance,
++    monitoring: &dyn MonitoringService,
++    shutdown: &CancellationToken,
++) {
++    let mut after = None;
++    loop {
++        tokio::select! {
++            biased;
++            _ = shutdown.cancelled() => return,
++            _ = sweep(port, monitoring, &mut after) => {}
++        }
++        // A full page or an error never turns cleanup into a busy polling loop.
++        tokio::select! {
++            biased;
++            _ = shutdown.cancelled() => return,
++            _ = tokio::time::sleep(SWEEP_INTERVAL) => {}
++        }
++    }
++}
++
++#[cfg(test)]
++#[path = "storage_tests.rs"]
++mod tests;
+diff --git a/src/application/workflow/storage_tests.rs b/src/application/workflow/storage_tests.rs
+new file mode 100644
+index 0000000..4e38f57
+--- /dev/null
++++ b/src/application/workflow/storage_tests.rs
+@@ -0,0 +1,131 @@
++use super::*;
++use crate::adapters::monitoring::InMemoryMonitor;
++use std::sync::{
++    Mutex,
++    atomic::{AtomicBool, AtomicUsize, Ordering},
++};
++use uuid::Uuid;
++
++struct Port {
++    cursors: Mutex<Vec<Option<RetentionRoot>>>,
++    visits: AtomicUsize,
++    pending: bool,
++    entered: tokio::sync::Notify,
++    dropped: AtomicBool,
++}
++impl Port {
++    fn new(pending: bool) -> Self {
++        Self {
++            cursors: Mutex::new(Vec::new()),
++            visits: AtomicUsize::new(0),
++            pending,
++            entered: Default::default(),
++            dropped: AtomicBool::new(false),
++        }
++    }
++}
++fn root(id: u128) -> RetentionRoot {
++    RetentionRoot {
++        finished_at: DateTime::from_timestamp(100, 0).unwrap(),
++        company: CompanyId::new(Uuid::from_u128(1)),
++        run: RunId::new(Uuid::from_u128(id)),
++    }
++}
++struct PendingWrite<'a>(&'a AtomicBool);
++impl Drop for PendingWrite<'_> {
++    fn drop(&mut self) {
++        self.0.store(true, Ordering::SeqCst);
++    }
++}
++#[async_trait]
++impl WorkflowStorageMaintenance for Port {
++    async fn sweep_obsolete_witnesses(&self, _: u16) -> AppResult<u64> {
++        Ok(0)
++    }
++    async fn retention_page(&self, after: Option<RetentionRoot>) -> AppResult<RetentionPage> {
++        self.cursors.lock().unwrap().push(after);
++        Ok(if after.is_none() {
++            RetentionPage {
++                roots: (1..=4).map(root).collect(),
++                next: Some(root(4)),
++            }
++        } else {
++            RetentionPage {
++                roots: vec![root(5)],
++                next: None,
++            }
++        })
++    }
++    async fn retire_tree(&self, root: RetentionRoot) -> AppResult<Option<RetiredTree>> {
++        self.visits.fetch_add(1, Ordering::SeqCst);
++        if self.pending {
++            let _write = PendingWrite(&self.dropped);
++            self.entered.notify_one();
++            return std::future::pending().await;
++        }
++        match root.run.as_uuid().as_u128() {
++            1 => Err(AppError::Timeout("protected lock".into())),
++            2..=4 => Ok(None),
++            _ => Ok(Some(RetiredTree {
++                runs: 2,
++                jobs: 2,
++                calls: 1,
++            })),
++        }
++    }
++    async fn sweep_unused_bundles(&self, _: u16) -> AppResult<u64> {
++        Ok(0)
++    }
++    async fn oldest_terminal_root(&self) -> AppResult<Option<DateTime<Utc>>> {
++        self.entered.notify_one();
++        Ok(None)
++    }
++}
++
++#[tokio::test]
++async fn workflow_storage_cursor_advances_past_full_error_and_protected_page_without_time_advance()
++{
++    let port = Port::new(false);
++    let monitor = InMemoryMonitor::new();
++    let mut cursor = None;
++    sweep(&port, &monitor, &mut cursor).await;
++    assert_eq!(cursor, Some(root(4)));
++    sweep(&port, &monitor, &mut cursor).await;
++    assert_eq!(cursor, None);
++    assert_eq!(*port.cursors.lock().unwrap(), vec![None, Some(root(4))]);
++    assert_eq!(port.visits.load(Ordering::SeqCst), 5);
++}
++#[tokio::test]
++async fn workflow_storage_shutdown_drops_pending_write_and_joins() {
++    let port = Port::new(true);
++    let monitor = InMemoryMonitor::new();
++    let shutdown = CancellationToken::new();
++    let stop = async {
++        port.entered.notified().await;
++        shutdown.cancel();
++    };
++    tokio::time::timeout(Duration::from_secs(1), async {
++        tokio::join!(run(&port, &monitor, &shutdown), stop);
++    })
++    .await
++    .unwrap();
++    assert!(port.dropped.load(Ordering::SeqCst));
++    assert_eq!(port.visits.load(Ordering::SeqCst), 1);
++}
++#[tokio::test]
++async fn workflow_storage_full_error_page_still_has_positive_worker_delay() {
++    let port = Port::new(false);
++    let monitor = InMemoryMonitor::new();
++    let shutdown = CancellationToken::new();
++    let stop = async {
++        port.entered.notified().await;
++        tokio::time::sleep(Duration::from_millis(50)).await;
++        assert_eq!(port.cursors.lock().unwrap().len(), 1);
++        shutdown.cancel();
++    };
++    tokio::time::timeout(Duration::from_secs(1), async {
++        tokio::join!(run(&port, &monitor, &shutdown), stop);
++    })
++    .await
++    .unwrap();
++}
+diff --git a/src/infra/workflow.rs b/src/infra/workflow.rs
+index 49b71ef..0963a46 100644
+--- a/src/infra/workflow.rs
++++ b/src/infra/workflow.rs
+@@ -54,11 +54,11 @@ pub const UNHANDLED_STEP_KINDS: &[&str] = &["memory.load", "memory.save"];
+ 
+ /// The default and bounds of `WORKFLOW_WORKER_SLOTS`, and the database connections everything
+ /// else `serve` runs needs (listener, HTTP headroom, task, delivery, notification and inbound
+-/// workers, the intent worker, the schedule materializer and metrics sampler). Each slot needs
++/// workers, the intent worker, the schedule materializer, metrics sampler and storage maintenance). Each slot needs
+ /// two: its claim or handler transaction and its lease renewal.
+ pub const DEFAULT_WORKFLOW_WORKER_SLOTS: usize = 2;
+ pub const MAX_WORKFLOW_WORKER_SLOTS: usize = 16;
+-pub const RESERVED_DATABASE_CONNECTIONS: u32 = 9;
++pub const RESERVED_DATABASE_CONNECTIONS: u32 = 10;
+ 
+ const LEASE: Duration = Duration::from_secs(30);
+ const POLL: Duration = Duration::from_secs(1);
+@@ -474,7 +474,7 @@ impl WorkflowEngine {
+     /// Start workflow slots, the intent worker, schedule materializer and metrics sampler
+     /// under `shutdown`. The caller keeps the handles and joins them on shutdown.
+     pub fn spawn(&self, shutdown: &CancellationToken) -> Vec<(&'static str, JoinHandle<()>)> {
+-        let mut handles = Vec::with_capacity(self.slots + 3);
++        let mut handles = Vec::with_capacity(self.slots + 4);
+         let metric_persistence = self.persistence.clone();
+         let monitoring = self.monitoring.clone();
+         let metric_shutdown = shutdown.clone();
+@@ -534,6 +534,7 @@ impl WorkflowEngine {
+                 worker.run(&intent_wakeup, &intent_shutdown).await;
+             }),
+         ));
++        handles.push(self.spawn_storage(shutdown));
+         let materializer = self.schedule_materializer();
+         let schedule_shutdown = shutdown.clone();
+         handles.push((
+@@ -549,6 +550,22 @@ impl WorkflowEngine {
+         ));
+         handles
+     }
++    fn spawn_storage(&self, shutdown: &CancellationToken) -> (&'static str, JoinHandle<()>) {
++        let persistence = self.persistence.clone();
++        let monitoring = self.monitoring.clone();
++        let shutdown = shutdown.clone();
++        (
++            "workflow storage maintenance",
++            tokio::spawn(async move {
++                crate::application::workflow::storage::run(
++                    &persistence,
++                    monitoring.as_ref(),
++                    &shutdown,
++                )
++                .await;
++            }),
++        )
++    }
+ }
+ 
+ #[cfg(test)]
+@@ -808,8 +825,8 @@ mod tests {
+                 .unwrap();
+         }
+         assert_eq!(
+-            task_count, 4,
+-            "one slot, metrics, the intent worker and the schedule materializer"
++            task_count, 5,
++            "one slot, metrics, intent, schedule and storage workers"
+         );
+     }
+ 
+@@ -824,8 +841,8 @@ mod tests {
+             worker_slots(None, crate::infra::db::DEFAULT_DATABASE_MAX_CONNECTIONS).unwrap(),
+             2
+         );
+-        assert_eq!(worker_slots(Some("4"), 17).unwrap(), 4);
+-        assert!(worker_slots(Some("4"), 16).is_err());
++        assert_eq!(worker_slots(Some("4"), 18).unwrap(), 4);
++        assert!(worker_slots(Some("4"), 17).is_err());
+         assert!(worker_slots(Some("5"), 18).is_err());
+         assert!(worker_slots(Some("0"), 64).is_err());
+         assert!(worker_slots(Some("17"), 64).is_err());

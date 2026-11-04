@@ -612,3 +612,41 @@ mod jev_assets_tests;
 
 #[path = "jev_end_to_end_tests.rs"]
 mod jev_end_to_end_tests;
+
+// Fault-injection fixtures already disable the run snapshot guard. Keep the
+// shared blob immutable while replacing only this fixture run's reference.
+async fn replace_run_bundle(pool: &sqlx::PgPool, run: Uuid, bytes: &[u8]) {
+    let mut tx = pool.begin().await.unwrap();
+    let company = sqlx::query_scalar("SELECT company_id FROM workflow_runs WHERE id=$1")
+        .bind(run)
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+    let digest = bundle_store::insert_on(&mut tx, CompanyId::new(company), bytes)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE workflow_runs SET bundle_digest=$2 WHERE id=$1")
+        .bind(run)
+        .bind(digest.as_bytes())
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+}
+
+async fn seed_version_bundle(
+    db: &mut PgConnection,
+    company: Uuid,
+    version: Uuid,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "INSERT INTO workflow_bundles(company_id,digest,bundle)
+        SELECT company_id,sha256(bundle),bundle FROM workflow_versions WHERE company_id=$1 AND id=$2
+        ON CONFLICT(company_id,digest) DO UPDATE SET bundle=EXCLUDED.bundle WHERE false",
+    )
+    .bind(company)
+    .bind(version)
+    .execute(db)
+    .await?;
+    Ok(())
+}

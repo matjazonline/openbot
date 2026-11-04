@@ -170,8 +170,8 @@ pub(super) async fn read_saved_binding(
     run: Uuid,
 ) -> AppResult<Arc<ConfiguredBinding>> {
     let row = sqlx::query_as::<_, SavedBindingRow>(
-        "SELECT workflow_id, version_id, binding_revision, bundle, params, resources, actor_id \
-         FROM workflow_runs WHERE company_id = $1 AND id = $2 AND binding_id = $3",
+        "SELECT workflow_id, version_id, binding_revision, stored.bundle AS bundle, params, resources, actor_id \
+         FROM workflow_runs AS run LEFT JOIN workflow_bundles AS stored ON stored.company_id=run.company_id AND stored.digest=run.bundle_digest WHERE run.company_id = $1 AND id = $2 AND binding_id = $3",
     )
     .bind(company.as_uuid())
     .bind(run)

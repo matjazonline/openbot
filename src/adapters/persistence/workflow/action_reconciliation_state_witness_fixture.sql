@@ -36,17 +36,17 @@ BEGIN
         'conflicts',COALESCE((SELECT jsonb_agg(to_jsonb(conflict) ORDER BY conflict.id) FROM workflow_action_evidence_conflicts AS conflict WHERE conflict.company_id=company AND conflict.invocation_id=candidate.invocation_id),'[]'::jsonb));
 END $$;
 CREATE FUNCTION fixture_state_step(config fixture_state_config,label text) RETURNS void LANGUAGE plpgsql AS $$
-DECLARE owner_image jsonb; original_bundle jsonb;
+DECLARE owner_image jsonb; original_digest jsonb;
 BEGIN
     SELECT to_jsonb(owner) INTO STRICT owner_image FROM workflow_runs AS owner
         WHERE owner.company_id=config.company_id AND owner.id=config.run_id;
-    SELECT saved->'bundle' INTO STRICT original_bundle FROM jsonb_array_elements(config.baseline->'workflow_runs') AS saved
+    SELECT saved->'bundle_digest' INTO STRICT original_digest FROM jsonb_array_elements(config.baseline->'workflow_runs') AS saved
         WHERE saved->>'company_id'=config.company_id::text AND saved->>'id'=config.run_id::text;
-    IF owner_image->'bundle' IS DISTINCT FROM original_bundle THEN RAISE EXCEPTION 'state immutable bundle changed'; END IF;
+    IF owner_image->'bundle_digest' IS DISTINCT FROM original_digest THEN RAISE EXCEPTION 'state immutable bundle address changed'; END IF;
     INSERT INTO fixture_state_steps(company_id,command_key,step,image)
         SELECT config.company_id,config.command_key,label,jsonb_build_object('xid',pg_current_xact_id()::text,
-            -- Assert the full frozen bundle above; retain every mutable head field without repeating it four times in the bounded transport.
-            'run',owner_image-'bundle',
+            -- Assert the frozen bundle address above; retain every mutable head field without repeating it four times in the bounded transport.
+            'run',owner_image-'bundle_digest',
             'job',(SELECT to_jsonb(job) FROM background_tasks AS job WHERE job.company_id=config.company_id AND job.id=config.job_id),
             'states',COALESCE((SELECT jsonb_agg(to_jsonb(state)) FROM workflow_action_state_witnesses AS state WHERE state.company_id=config.company_id AND state.run_id=config.run_id AND state.transaction_id=pg_current_xact_id()),'[]'::jsonb),
             'schedules',COALESCE((SELECT jsonb_agg(to_jsonb(schedule)) FROM workflow_action_schedule_witnesses AS schedule WHERE schedule.company_id=config.company_id AND schedule.job_id=config.job_id AND schedule.transaction_id=pg_current_xact_id()),'[]'::jsonb));

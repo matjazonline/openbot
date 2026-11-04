@@ -2,6 +2,8 @@ use super::*;
 use crate::application::workflow::checkpoints::*;
 use crate::services::harness::runs::WriteOutcome;
 
+#[path = "storage_checkpoint_tests.rs"]
+mod storage_checkpoint_tests;
 #[path = "harness_token_tests.rs"]
 mod tokens;
 

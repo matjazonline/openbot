@@ -52,12 +52,12 @@ async fn mixed_requests(
         vec![],
     )
     .unwrap();
-    sqlx::query("UPDATE workflow_runs SET bundle=$2 WHERE id=$1")
-        .bind(first.scope().run.as_uuid())
-        .bind(store_bundle(&bundle).unwrap())
-        .execute(f.persistence().pool())
-        .await
-        .unwrap();
+    replace_run_bundle(
+        f.persistence().pool(),
+        first.scope().run.as_uuid(),
+        &store_bundle(&bundle).unwrap(),
+    )
+    .await;
     sqlx::query(
         "CREATE TABLE fixture_current_contracts(name text PRIMARY KEY,tool jsonb NOT NULL)",
     )

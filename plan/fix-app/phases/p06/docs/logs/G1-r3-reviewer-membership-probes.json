@@ -1,0 +1,54 @@
+{
+  "status": "PASS",
+  "scope": "reduced count-mismatch rollback and same-session temporary relation lifecycle; no production writer claim",
+  "records": [
+    {
+      "sql": "CREATE SCHEMA p06_r3_members_f91627529a584d2398b195599b1adb86;\n    CREATE TABLE p06_r3_members_f91627529a584d2398b195599b1adb86.runs(company int,id int,PRIMARY KEY(company,id));\n    CREATE TABLE p06_r3_members_f91627529a584d2398b195599b1adb86.links(company int,run int,root int,PRIMARY KEY(company,run),\n      FOREIGN KEY(company,run) REFERENCES p06_r3_members_f91627529a584d2398b195599b1adb86.runs ON DELETE CASCADE);\n    CREATE TABLE p06_r3_members_f91627529a584d2398b195599b1adb86.usage(company int,run int,amount int,\n      FOREIGN KEY(company,run) REFERENCES p06_r3_members_f91627529a584d2398b195599b1adb86.runs ON DELETE CASCADE);\n    CREATE TABLE p06_r3_members_f91627529a584d2398b195599b1adb86.history(company int,run int,amount int);\n    INSERT INTO p06_r3_members_f91627529a584d2398b195599b1adb86.runs VALUES(1,1),(1,2),(2,1);\n    INSERT INTO p06_r3_members_f91627529a584d2398b195599b1adb86.links SELECT company,id,1 FROM p06_r3_members_f91627529a584d2398b195599b1adb86.runs;\n    INSERT INTO p06_r3_members_f91627529a584d2398b195599b1adb86.usage SELECT company,id,80 FROM p06_r3_members_f91627529a584d2398b195599b1adb86.runs;",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "sql": "SELECT coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06r3m_599b1adb86'",
+      "exit": 0,
+      "stdout": "\n",
+      "stderr": ""
+    },
+    {
+      "sql": "SELECT coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06r3m_599b1adb86'",
+      "exit": 0,
+      "stdout": "PgSleep\n",
+      "stderr": ""
+    },
+    {
+      "sql": "BEGIN; INSERT INTO p06_r3_members_f91627529a584d2398b195599b1adb86.runs VALUES(1,3); INSERT INTO p06_r3_members_f91627529a584d2398b195599b1adb86.links VALUES(1,3,1);\n      INSERT INTO p06_r3_members_f91627529a584d2398b195599b1adb86.usage VALUES(1,3,80); COMMIT;",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "owner_sql": "BEGIN; SET LOCAL statement_timeout='5s'; SET LOCAL lock_timeout='500ms';\n    SELECT set_config('p06.review_owned',count(*)::text,true) FROM (\n      SELECT run.id FROM p06_r3_members_f91627529a584d2398b195599b1adb86.runs run JOIN p06_r3_members_f91627529a584d2398b195599b1adb86.links link\n      ON link.company=run.company AND link.run=run.id\n      WHERE link.company=1 AND link.root=1 ORDER BY run.id FOR UPDATE OF run NOWAIT) owned;\n    SELECT pg_sleep(2);\n    INSERT INTO p06_r3_members_f91627529a584d2398b195599b1adb86.history SELECT usage.* FROM p06_r3_members_f91627529a584d2398b195599b1adb86.usage usage JOIN p06_r3_members_f91627529a584d2398b195599b1adb86.links link\n      ON link.company=usage.company AND link.run=usage.run WHERE link.company=1 AND link.root=1;\n    DO $$ DECLARE removed bigint; BEGIN\n      WITH retained AS MATERIALIZED(SELECT company,run FROM p06_r3_members_f91627529a584d2398b195599b1adb86.links WHERE company=1 AND root=1)\n      DELETE FROM p06_r3_members_f91627529a584d2398b195599b1adb86.runs run USING retained WHERE run.company=retained.company AND run.id=retained.run;\n      GET DIAGNOSTICS removed = ROW_COUNT;\n      IF removed<>current_setting('p06.review_owned')::bigint THEN\n        RAISE EXCEPTION 'review membership changed: locked %, removed %',current_setting('p06.review_owned'),removed;\n      END IF;\n    END $$;\n    COMMIT;",
+      "exit": 1,
+      "stdout": "2\n\n",
+      "stderr": "ERROR:  review membership changed: locked 2, removed 3\nCONTEXT:  PL/pgSQL function inline_code_block line 6 at RAISE\n"
+    },
+    {
+      "sql": "SELECT (SELECT count(*) FROM p06_r3_members_f91627529a584d2398b195599b1adb86.runs WHERE company=1)||'|'||\n      (SELECT count(*) FROM p06_r3_members_f91627529a584d2398b195599b1adb86.usage WHERE company=1)||'|'||\n      (SELECT count(*) FROM p06_r3_members_f91627529a584d2398b195599b1adb86.history)||'|'||(SELECT count(*) FROM p06_r3_members_f91627529a584d2398b195599b1adb86.runs WHERE company=2)",
+      "exit": 0,
+      "stdout": "3|3|0|1\n",
+      "stderr": ""
+    },
+    {
+      "same_session_sql": "BEGIN;\n    CREATE TEMP TABLE workflow_retention_jobs(company_id uuid NOT NULL,job_id uuid NOT NULL,\n      execution_id uuid NOT NULL,PRIMARY KEY(company_id,job_id)) ON COMMIT DROP;\n    DO $$ BEGIN RAISE EXCEPTION 'review expected candidate failure'; END $$;\n    ROLLBACK;\n    SELECT to_regclass('pg_temp.workflow_retention_jobs') IS NULL;\n    BEGIN;\n    CREATE TEMP TABLE workflow_retention_jobs(company_id uuid NOT NULL,job_id uuid NOT NULL,\n      execution_id uuid NOT NULL,PRIMARY KEY(company_id,job_id)) ON COMMIT DROP;\n    COMMIT;\n    SELECT to_regclass('pg_temp.workflow_retention_jobs') IS NULL;\n    ",
+      "exit": 0,
+      "stdout": "t\nt\n",
+      "stderr": "psql:<stdin>:4: ERROR:  review expected candidate failure\nCONTEXT:  PL/pgSQL function inline_code_block line 1 at RAISE\n"
+    },
+    {
+      "sql": "DROP SCHEMA IF EXISTS p06_r3_members_f91627529a584d2398b195599b1adb86 CASCADE",
+      "exit": 0,
+      "stdout": "",
+      "stderr": "NOTICE:  drop cascades to 4 other objects\nDETAIL:  drop cascades to table p06_r3_members_f91627529a584d2398b195599b1adb86.runs\ndrop cascades to table p06_r3_members_f91627529a584d2398b195599b1adb86.links\ndrop cascades to table p06_r3_members_f91627529a584d2398b195599b1adb86.usage\ndrop cascades to table p06_r3_members_f91627529a584d2398b195599b1adb86.history\n"
+    }
+  ]
+}

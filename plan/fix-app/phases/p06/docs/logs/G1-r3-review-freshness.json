@@ -1,0 +1,18 @@
+{
+  "checked_at": "2026-11-04T18:50:12.343538+00:00",
+  "base": "9c205daad5c029229f0547dc137a9936c6b2b49c",
+  "head": "9c205daad5c029229f0547dc137a9936c6b2b49c",
+  "branch": "fix-app/p06",
+  "exclusions": [
+    "plan/fix-app/phases/p06/docs/"
+  ],
+  "diff_sha256": "a23e85b0fb6675374168f0e0f0feeb7902550c7f43409c38bba477a9713f2502",
+  "tree_sha256": "0e1955101cac3d0ba0c99a3bb63445ee76e156715071999042d79d7bba60d93e",
+  "files_count": 1813,
+  "coordination_equal": true,
+  "coordination_sha256": "0ff403142ae8f841cd0fc1a590cf94f209e9f2756567a59d05efc3b7dad47119",
+  "decision_sha256": "d611a10527f94097b560e1a563a1d4acfa3f839b7844ceaeba9bbc3f1e73a8da",
+  "r2_decision_sha256": "c4f6f73fced9a8482e8eb62b39a564ad6715900e085dd8e78ca8cb57f57c1401",
+  "d1_d3_unchanged": true,
+  "untracked_source": []
+}

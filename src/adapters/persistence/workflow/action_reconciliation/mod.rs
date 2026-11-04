@@ -199,7 +199,7 @@ async fn restore_on(
     tx: &mut Transaction<'_, Postgres>,
     command: &ReconcileActionCommand,
 ) -> AppResult<ActionRunAuthority> {
-    let run = sqlx::query_as::<_, FrozenRunRow>("SELECT actor_id,version_id,workflow_id,bundle,resources FROM workflow_runs WHERE company_id=$1 AND id=$2")
+    let run = sqlx::query_as::<_, FrozenRunRow>("SELECT actor_id,version_id,workflow_id,stored.bundle AS bundle,resources FROM workflow_runs AS run LEFT JOIN workflow_bundles AS stored ON stored.company_id=run.company_id AND stored.digest=run.bundle_digest WHERE run.company_id=$1 AND id=$2")
         .bind(command.scope.company.as_uuid()).bind(command.scope.run.as_uuid()).fetch_one(&mut **tx).await?;
     sqlx::query_scalar::<_, Uuid>(
         "SELECT id FROM workflow_executions WHERE company_id=$1 AND run_id=$2 AND id=$3 FOR UPDATE",

@@ -182,7 +182,7 @@ pub(super) fn retry_delta(
         "deadline",
         "max_steps",
         "max_context_bytes",
-        "bundle",
+        "bundle_digest",
         "input",
         "params",
         "resources",

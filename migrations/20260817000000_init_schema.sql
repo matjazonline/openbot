@@ -2120,6 +2120,7 @@ CREATE FUNCTION public.workflow_action_claim_retirement_witness_owner() RETURNS 
     AS $$
 BEGIN
     IF TG_OP='DELETE' THEN
+        IF OLD.transaction_id<>pg_current_xact_id() THEN RETURN OLD; END IF;
         IF pg_trigger_depth()>1
             AND NOT EXISTS(SELECT 1 FROM workflow_runs WHERE company_id=OLD.company_id AND id=OLD.run_id)
         THEN RETURN OLD; END IF;
@@ -2361,6 +2362,10 @@ CREATE FUNCTION public.workflow_action_fact_immutable() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
+    -- MVCC exposes only committed foreign witnesses. This transaction's proof remains protected.
+    IF TG_OP='DELETE' AND TG_TABLE_NAME IN ('workflow_action_state_witnesses','workflow_action_schedule_witnesses')
+        AND (to_jsonb(OLD)->>'transaction_id')::xid8 <> pg_current_xact_id()
+    THEN RETURN OLD; END IF;
     IF TG_OP='DELETE' AND pg_trigger_depth()>1
         AND NOT EXISTS(SELECT 1 FROM workflow_runs WHERE company_id=OLD.company_id AND id=OLD.run_id)
     THEN RETURN OLD; END IF;
@@ -5593,6 +5598,29 @@ COMMENT ON TABLE public.workflow_run_parents IS 'Immutable child-owned lineage i
 -- Name: workflow_runs; Type: TABLE; Schema: public; Owner: -
 --
 
+-- A run keeps a tenant-scoped content address; the frozen bytes are stored once.
+CREATE TABLE public.workflow_bundles (
+    company_id uuid NOT NULL,
+    digest bytea NOT NULL,
+    bundle bytea NOT NULL,
+    PRIMARY KEY (company_id, digest),
+    CONSTRAINT workflow_bundles_digest CHECK (octet_length(digest)=32 AND digest=sha256(bundle)),
+    CONSTRAINT workflow_bundles_payload_size CHECK (octet_length(bundle) BETWEEN 1 AND 4194304)
+);
+
+CREATE FUNCTION public.guard_workflow_bundle() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP='DELETE' AND (
+        NOT EXISTS(SELECT 1 FROM public.companies WHERE id=OLD.company_id)
+        OR NOT EXISTS(SELECT 1 FROM public.workflow_runs
+            WHERE company_id=OLD.company_id AND bundle_digest=OLD.digest)) THEN
+        RETURN OLD;
+    END IF;
+    RAISE EXCEPTION 'workflow bundle is immutable or still referenced' USING ERRCODE='23514';
+END $$;
+CREATE TRIGGER workflow_bundle_immutable BEFORE UPDATE OR DELETE ON public.workflow_bundles
+    FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_bundle();
+
 CREATE TABLE public.workflow_runs (
     company_id uuid NOT NULL,
     id uuid NOT NULL,
@@ -5605,7 +5633,7 @@ CREATE TABLE public.workflow_runs (
     actor_id uuid NOT NULL,
     trigger_id uuid NOT NULL,
     correlation_id uuid NOT NULL,
-    bundle bytea NOT NULL,
+    bundle_digest bytea NOT NULL,
     input jsonb NOT NULL,
     params jsonb NOT NULL,
     resources jsonb NOT NULL,
@@ -5623,6 +5651,8 @@ CREATE TABLE public.workflow_runs (
     rerun_of_run_id uuid,
     delivery_policy text DEFAULT 'deliver'::text NOT NULL,
     finished_at timestamp with time zone,
+    CONSTRAINT workflow_runs_bundle_fk FOREIGN KEY (company_id,bundle_digest)
+        REFERENCES public.workflow_bundles(company_id,digest) DEFERRABLE INITIALLY DEFERRED,
     CONSTRAINT workflow_run_delivery_policy CHECK ((delivery_policy = ANY (ARRAY['deliver'::text, 'in_app_only'::text]))),
     CONSTRAINT workflow_run_finished_shape CHECK (((state = ANY (ARRAY['succeeded'::text, 'failed'::text, 'cancelled'::text])) = (finished_at IS NOT NULL))),
     CONSTRAINT workflow_rerun_shape CHECK (((rerun_of_run_id IS NULL) OR ((parent_run_id IS NULL) AND (rerun_of_run_id <> id)))),
@@ -5631,7 +5661,6 @@ CREATE TABLE public.workflow_runs (
     CONSTRAINT workflow_run_state CHECK ((state = ANY (ARRAY['queued'::text, 'running'::text, 'waiting'::text, 'succeeded'::text, 'failed'::text, 'cancelled'::text]))),
     CONSTRAINT workflow_run_waiting_shape CHECK ((((state = 'waiting'::text) AND (waiting_reason IS NOT NULL) AND (waiting_reason = ANY (ARRAY['decision'::text, 'event'::text, 'timer'::text, 'child_run'::text, 'effect'::text, 'reconciliation'::text]))) OR ((state <> 'waiting'::text) AND (waiting_reason IS NULL)))),
     CONSTRAINT workflow_runs_binding_revision_check CHECK ((binding_revision > 0)),
-    CONSTRAINT workflow_runs_bundle_check CHECK (((octet_length(bundle) >= 1) AND (octet_length(bundle) <= 4194304))),
     CONSTRAINT workflow_runs_check CHECK (((thread_id IS NULL) OR (channel_id IS NOT NULL))),
     CONSTRAINT workflow_runs_check1 CHECK ((deadline > created_at)),
     CONSTRAINT workflow_runs_input_check CHECK ((octet_length((input)::text) <= 4194304)),
@@ -5642,6 +5671,8 @@ CREATE TABLE public.workflow_runs (
     CONSTRAINT workflow_runs_revision_check CHECK ((revision > 0)),
     CONSTRAINT workflow_runs_terminal_wakeup_sequence_check CHECK ((terminal_wakeup_sequence > 0))
 );
+CREATE INDEX workflow_runs_by_bundle ON public.workflow_runs(company_id,bundle_digest);
+
 
 
 --
@@ -11498,7 +11529,7 @@ BEGIN
 END $$;
 CREATE TRIGGER workflow_run_snapshot_immutable BEFORE UPDATE OF company_id, id, binding_id,
     binding_revision, workflow_id, version_id, channel_id, thread_id, actor_id, trigger_id,
-    correlation_id, bundle, input, params, resources, max_steps, max_context_bytes, deadline,
+    correlation_id, bundle_digest, input, params, resources, max_steps, max_context_bytes, deadline,
     created_at, parent_run_id, parent_execution_id, rerun_of_run_id, delivery_policy
     ON public.workflow_runs
     FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_run_snapshot();
@@ -11637,3 +11668,75 @@ END $$;
 CREATE TRIGGER users_revoke_sessions AFTER UPDATE OF password_hash, email ON public.users
     FOR EACH ROW WHEN (OLD.auth_revision IS DISTINCT FROM NEW.auth_revision)
     EXECUTE FUNCTION public.revoke_account_sessions();
+
+-- The dump declares company keys after the tables; install this edge after those keys exist.
+ALTER TABLE public.workflow_bundles ADD CONSTRAINT workflow_bundles_company_fk
+    FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+
+-- A retained tree and its explicitly captured jobs are removed in one transaction.
+ALTER TABLE public.background_tasks ALTER CONSTRAINT background_tasks_workflow_execution_fk DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.workflow_budget_receipts ALTER CONSTRAINT workflow_budget_receipts_company_id_run_id_root_run_id_fkey DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.workflow_executions ALTER CONSTRAINT workflow_successor_fk DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.workflow_run_budgets ALTER CONSTRAINT workflow_run_budgets_company_id_parent_run_id_root_run_id_fkey DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.workflow_run_budgets ALTER CONSTRAINT workflow_run_budgets_company_id_root_run_id_fkey DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.workflow_run_events ALTER CONSTRAINT workflow_run_event_execution_fk DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.workflow_run_events ALTER CONSTRAINT workflow_wakeup_execution_fk DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.workflow_run_parents ALTER CONSTRAINT workflow_parent_execution_fk DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.workflow_runs ALTER CONSTRAINT workflow_run_parent_link_fk DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.workflow_runs ALTER CONSTRAINT workflow_run_terminal_execution_fk DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.workflow_wait_events ALTER CONSTRAINT workflow_wait_event_consumer_execution DEFERRABLE INITIALLY DEFERRED;
+
+CREATE INDEX workflow_run_budgets_root ON public.workflow_run_budgets(company_id,root_run_id,run_id);
+CREATE INDEX workflow_retention_roots ON public.workflow_runs(finished_at,company_id,id)
+    WHERE parent_run_id IS NULL AND state IN ('succeeded','failed','cancelled');
+
+-- Permanent, exact reporting inputs after runtime provenance has reached its retention horizon.
+CREATE TABLE public.model_usage_history (
+    company_id uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
+    request_id uuid NOT NULL,
+    agent_id uuid,
+    workflow_id uuid NOT NULL,
+    version_id uuid NOT NULL,
+    provider text NOT NULL,
+    model text NOT NULL,
+    requested_at timestamptz NOT NULL,
+    reserved_input bigint NOT NULL,
+    reserved_output bigint NOT NULL,
+    input_tokens bigint,
+    output_tokens bigint,
+    usage_source text,
+    settled_at timestamptz,
+    PRIMARY KEY(company_id,request_id),
+    FOREIGN KEY(company_id,agent_id) REFERENCES public.agents(company_id,id) DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY(company_id,workflow_id,version_id) REFERENCES public.workflow_versions(company_id,workflow_id,id)
+        DEFERRABLE INITIALLY DEFERRED
+);
+CREATE INDEX model_usage_history_company_time ON public.model_usage_history(company_id,requested_at,request_id);
+CREATE FUNCTION public.guard_model_usage_history() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE original jsonb;
+BEGIN
+    IF TG_OP='DELETE' AND pg_trigger_depth()>1 AND NOT EXISTS(SELECT 1 FROM companies WHERE id=OLD.company_id)
+    THEN RETURN OLD; END IF;
+    IF TG_OP<>'INSERT' THEN
+        RAISE EXCEPTION 'model usage history is immutable' USING ERRCODE='23514';
+    END IF;
+    SELECT to_jsonb(live)-ARRAY['task_id','run_id','execution_id','root_run_id'] INTO original
+        FROM model_usage_calls AS live WHERE company_id=NEW.company_id AND request_id=NEW.request_id FOR UPDATE;
+    IF original IS NULL OR original IS DISTINCT FROM to_jsonb(NEW) THEN
+        RAISE EXCEPTION 'usage archive must exactly match its live owner' USING ERRCODE='23514';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER model_usage_history_owned BEFORE INSERT OR UPDATE OR DELETE ON public.model_usage_history
+    FOR EACH ROW EXECUTE FUNCTION public.guard_model_usage_history();
+CREATE FUNCTION public.guard_model_usage_single_source() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF EXISTS(SELECT 1 FROM model_usage_calls WHERE company_id=NEW.company_id AND request_id=NEW.request_id)
+        AND EXISTS(SELECT 1 FROM model_usage_history WHERE company_id=NEW.company_id AND request_id=NEW.request_id)
+    THEN RAISE EXCEPTION 'model usage cannot be live and historical' USING ERRCODE='23514'; END IF;
+    RETURN NULL;
+END $$;
+CREATE CONSTRAINT TRIGGER model_usage_history_single_source AFTER INSERT ON public.model_usage_history
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.guard_model_usage_single_source();
+CREATE CONSTRAINT TRIGGER model_usage_live_single_source AFTER INSERT ON public.model_usage_calls
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.guard_model_usage_single_source();

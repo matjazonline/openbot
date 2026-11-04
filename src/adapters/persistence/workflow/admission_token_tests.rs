@@ -165,7 +165,7 @@ async fn root_budget_admission_token_policy_equals_the_compiled_policy() {
         policy,
         json!({"max_tokens":2000,"reviewers":[{"kind":"user","id":reviewer}]})
     );
-    let compiled:Value=sqlx::query_scalar("SELECT version->'compiled'->'root_budget'->'tokens' FROM workflow_runs AS run CROSS JOIN LATERAL jsonb_array_elements(convert_from(run.bundle,'UTF8')::jsonb->'versions') AS version WHERE run.id=$1 AND version->>'version'=convert_from(run.bundle,'UTF8')::jsonb->>'root'")
+    let compiled:Value=sqlx::query_scalar("SELECT version->'compiled'->'root_budget'->'tokens' FROM workflow_runs AS run CROSS JOIN LATERAL jsonb_array_elements(convert_from((SELECT stored.bundle FROM workflow_bundles stored WHERE stored.company_id=run.company_id AND stored.digest=run.bundle_digest),'UTF8')::jsonb->'versions') AS version WHERE run.id=$1 AND version->>'version'=convert_from((SELECT stored.bundle FROM workflow_bundles stored WHERE stored.company_id=run.company_id AND stored.digest=run.bundle_digest),'UTF8')::jsonb->>'root'")
         .bind(prepared.proposed_run_id().as_uuid()).fetch_one(f.persistence().pool()).await.unwrap();
     assert_eq!(policy, compiled);
 }

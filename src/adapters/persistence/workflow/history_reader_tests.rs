@@ -196,7 +196,7 @@ async fn workflow_context_history_returns_the_admission_snapshot_with_boundaries
         .sum();
     assert_eq!(output["token_count"], json!(total));
     // The engine accepts the output as the step's committed result.
-    let stored: Vec<u8> = sqlx::query_scalar("SELECT bundle FROM workflow_runs WHERE id=$1")
+    let stored: Vec<u8> = sqlx::query_scalar("SELECT (SELECT stored.bundle FROM workflow_bundles stored WHERE stored.company_id=workflow_runs.company_id AND stored.digest=workflow_runs.bundle_digest) AS bundle FROM workflow_runs WHERE id=$1")
         .bind(claim.fence.scope.run.as_uuid())
         .fetch_one(f.persistence().pool())
         .await

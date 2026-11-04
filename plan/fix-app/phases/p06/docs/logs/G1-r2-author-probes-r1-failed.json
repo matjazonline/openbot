@@ -1,0 +1,662 @@
+[
+  {
+    "sql": "CREATE SCHEMA p06_author_d4cd714fbdc44f2db60b535571ad2c23;\n    CREATE TABLE p06_author_d4cd714fbdc44f2db60b535571ad2c23.bundles(company int NOT NULL,digest bytea NOT NULL,bundle bytea NOT NULL,\n      PRIMARY KEY(company,digest),CHECK(octet_length(digest)=32 AND digest=sha256(bundle)),\n      CHECK(octet_length(bundle) BETWEEN 1 AND 4194304));\n    CREATE FUNCTION p06_author_d4cd714fbdc44f2db60b535571ad2c23.immutable_bundle() RETURNS trigger LANGUAGE plpgsql AS $$\n      BEGIN RAISE EXCEPTION 'immutable bundle payload'; END $$;\n    CREATE TRIGGER immutable_bundle BEFORE UPDATE ON p06_author_d4cd714fbdc44f2db60b535571ad2c23.bundles FOR EACH ROW EXECUTE FUNCTION p06_author_d4cd714fbdc44f2db60b535571ad2c23.immutable_bundle();\n    CREATE TABLE p06_author_d4cd714fbdc44f2db60b535571ad2c23.runs(id int PRIMARY KEY,company int NOT NULL,digest bytea NOT NULL,\n      FOREIGN KEY(company,digest) REFERENCES p06_author_d4cd714fbdc44f2db60b535571ad2c23.bundles(company,digest) DEFERRABLE INITIALLY DEFERRED);\n    INSERT INTO p06_author_d4cd714fbdc44f2db60b535571ad2c23.bundles VALUES(1,sha256('payload'::bytea),'payload'::bytea);",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "SELECT coalesce(wait_event_type,'')||'|'||coalesce(wait_event,'') FROM pg_stat_activity WHERE application_name='p06_author_d4cd714fbdc44f2db60b535571ad2c23_admission_owns_reuse'",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "sql": "DROP SCHEMA IF EXISTS p06_author_d4cd714fbdc44f2db60b535571ad2c23 CASCADE",
+    "exit": 0,
+    "stdout": "",
+    "stderr": "NOTICE:  drop cascades to 3 other objects\nDETAIL:  drop cascades to table p06_author_d4cd714fbdc44f2db60b535571ad2c23.bundles\ndrop cascades to function p06_author_d4cd714fbdc44f2db60b535571ad2c23.immutable_bundle()\ndrop cascades to table p06_author_d4cd714fbdc44f2db60b535571ad2c23.runs\n"
+  }
+]

@@ -454,8 +454,8 @@ async fn max_steps_case(max_steps: i32) {
         "final_not_applied"
     );
     assert_eq!(
-        before["workflow_runs"][0]["bundle"],
-        after["workflow_runs"][0]["bundle"]
+        before["workflow_runs"][0]["bundle_digest"],
+        after["workflow_runs"][0]["bundle_digest"]
     );
     retained_accounting(&before, &after);
     assert_eq!(entry_consumptions(f).await, (2, 0));
