@@ -440,15 +440,13 @@ impl CompanyPersistence for PostgresPersistence {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        adapters::persistence::test_support::test_pool,
-        adapters::protocols::email::EmailIdentity,
-        entities::{company_member::CompanyAccessRole, value_objects::EmailAddress},
-        use_cases::{
-            company_invite::CompanyInvitePersistence, participant::PrincipalAccessPersistence,
-            user::UserPersistence,
-        },
-    };
+    use crate::adapters::persistence::test_support::test_pool;
+    use crate::adapters::protocols::email::EmailIdentity;
+    use crate::application::ports::participant::PrincipalAccessPersistence;
+    use crate::entities::company_member::CompanyAccessRole;
+    use crate::entities::value_objects::EmailAddress;
+    use crate::use_cases::company_invite::CompanyInvitePersistence;
+    use crate::use_cases::user::UserPersistence;
 
     /// The accessible-companies query is built at runtime, so nothing but a real database can say
     /// whether its `is_owner` projection and its `company_members` join do what they claim.

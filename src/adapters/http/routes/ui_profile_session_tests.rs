@@ -73,15 +73,19 @@ impl Fixture {
         let config = Arc::new(AppConfig::for_test());
         let codes = Arc::new(Codes::default());
         let users = Arc::new(
-            UserUseCases::new(Arc::new(TestHasher), persistence.clone(), "attempt-key")
-                .with_email_confirmation(EmailConfirmation {
-                    registrations: persistence.clone(),
-                    account_changes: persistence.clone(),
-                    codes: codes.clone(),
-                    config: config.clone(),
-                    transport_available: matches!(confirmation, Confirmation::Code),
-                    allow_unverified_without_smtp: matches!(confirmation, Confirmation::Immediate),
-                }),
+            UserUseCases::new(
+                Arc::new(TestHasher),
+                persistence.clone(),
+                ("attempt-key").into(),
+            )
+            .with_email_confirmation(EmailConfirmation {
+                registrations: persistence.clone(),
+                account_changes: persistence.clone(),
+                codes: codes.clone(),
+
+                transport_available: matches!(confirmation, Confirmation::Code),
+                allow_unverified_without_smtp: matches!(confirmation, Confirmation::Immediate),
+            }),
         );
         let sessions = Arc::new(SessionAuthority::new(&config, persistence));
         let mut cookies = Vec::new();

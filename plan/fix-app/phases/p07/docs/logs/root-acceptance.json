@@ -1,0 +1,20 @@
+{
+  "verdict": "Root accepts p07 in phase; integration pending",
+  "review": "FIXAPP-P07-WB1-R2-MAC02 PASS",
+  "source": {
+    "base": "f8495f616a5f6ebce9218a6e1cd6c7c6d7bfda55",
+    "head": "f8495f616a5f6ebce9218a6e1cd6c7c6d7bfda55",
+    "exclusions": [
+      "plan/fix-app/phases/p07/docs/"
+    ],
+    "diff_sha256": "45419e6e209d3caa4c59745753c321df8e5cc2bf047dde0d63f4dbf0f4c1e974",
+    "tree_sha256": "54909572c36c7fe811d9c576ca1e87bc726391728a41eda60115cb76a199eac3",
+    "files_count": 2009
+  },
+  "authority_sha256": "eab5407aea77b9ecf188523f16b6b0fce8409b638d3d9e0fc642dec8597c9c78",
+  "findings": {
+    "FIXAPP-P07-WB1-F1-MAC02": "closed",
+    "FIXAPP-P07-WB1-F2-MAC02": "closed"
+  },
+  "verification": "899 passed/0failed/5ignored + main5/0/0; SQLx/migrations; correction deployment regression/bash syntax/clippy/fmt/whitespace PASS; no full suite per I004"
+}

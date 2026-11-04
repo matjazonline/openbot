@@ -110,6 +110,7 @@ fly ips allocate-v4          # dedicated IPv4, required for SMTP on port 25
 fly secrets set \
   DATABASE_URL="postgres://open_bots:<POSTGRES_PASSWORD>@openbots-db.internal:5432/open_bots" \
   JWT_SECRET="<random-64-chars>" \
+  AUTH_ATTEMPT_SECRET="<different-random-64-chars>" \
   SMTP_USERNAME="<relay-user>" \
   SMTP_PASSWORD="<relay-password>" \
   CREDENTIAL_ENCRYPTION_KEYS="1:<base64-32-byte-key>" \
@@ -130,6 +131,7 @@ Secrets — set with `fly secrets set`, never in `fly.toml`:
 | --- | --- |
 | `DATABASE_URL` | Points at `openbots-db.internal` |
 | `JWT_SECRET` | Session signing key |
+| `AUTH_ATTEMPT_SECRET` | Required independent authentication-attempt and confirmation-code signing key. Startup requires at least 32 bytes and a value different from `JWT_SECRET`. Keep it stable during JWT rotation. |
 | `SMTP_USERNAME` / `SMTP_PASSWORD` | Outbound relay credentials |
 | `SMTP_HOST` / `SMTP_FROM_ADDRESS` | Outbound relay and sender. When a usable SMTP transport is configured, password registration and address changes send a six-digit confirmation code; the account/address is verified only after the correct code is redeemed. Remote relay certificates are validated. A configured relay send failure does not bypass confirmation. |
 | `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` | Optional Google registration/login. Set both and register `https://<APP_DOMAIN_NAME>/auth/google/callback` as an authorized redirect URI in Google Cloud. |

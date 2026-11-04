@@ -39,7 +39,7 @@ impl ThreadActivityReader for PostgresPersistence {
         viewer: Uuid,
         ids: &[Uuid],
     ) -> AppResult<std::collections::HashSet<Uuid>> {
-        use crate::use_cases::participant::PrincipalAccessPersistence;
+        use crate::application::ports::participant::PrincipalAccessPersistence;
         if ids.len() > crate::application::thread_activity::MAX_THREAD_RUN_LINKS {
             return Err(crate::app_error::AppError::BadRequest(
                 "Too many displayed run identities".into(),

@@ -29,28 +29,37 @@ use sqlx::{Postgres, Transaction};
 use uuid::Uuid;
 
 use super::{email_metadata, external, message};
-use crate::{
-    adapters::persistence::{
-        PostgresPersistence,
-        channel_gate::{ChannelGateAccess, ChannelGateKey, acquire_channel_gates_on},
-        delivery::enqueue::insert_delivery_on,
-    },
-    app_error::{AppError, AppResult},
-    entities::{
-        email_message::EmailMessageMetadata,
-        message::{CanonicalMessageId, MessageDirection, MessageParticipantKind, MessageRole},
-        participant::{IdentityClaimMetadata, IdentityProvenance},
-        transport::{ChannelBindingId, DeliveryId, QualifiedIdentity},
-    },
-    transport::{
-        CommitDisposition, InboundCommitOutcome, InboundCommitRequest, InboundEnvelope,
-        InboundMessageCommitter, ProtocolExtension, ReplyDelivery, ThreadAssociation, ThreadTarget,
-    },
-    use_cases::{
-        participant::IdentityObservation,
-        thread::{MessageAuthorWrite, MessageCorrelation, MessageParticipantWrite, MessageWrite},
-    },
-};
+use crate::adapters::persistence::PostgresPersistence;
+use crate::adapters::persistence::channel_gate::ChannelGateAccess;
+use crate::adapters::persistence::channel_gate::ChannelGateKey;
+use crate::adapters::persistence::channel_gate::acquire_channel_gates_on;
+use crate::adapters::persistence::delivery::enqueue::insert_delivery_on;
+use crate::app_error::AppError;
+use crate::app_error::AppResult;
+use crate::application::ports::participant::IdentityObservation;
+use crate::application::ports::thread::MessageAuthorWrite;
+use crate::application::ports::thread::MessageCorrelation;
+use crate::application::ports::thread::MessageParticipantWrite;
+use crate::application::ports::thread::MessageWrite;
+use crate::application::ports::thread::ProtocolExtension;
+use crate::entities::email_message::EmailMessageMetadata;
+use crate::entities::message::CanonicalMessageId;
+use crate::entities::message::MessageDirection;
+use crate::entities::message::MessageParticipantKind;
+use crate::entities::message::MessageRole;
+use crate::entities::participant::IdentityClaimMetadata;
+use crate::entities::participant::IdentityProvenance;
+use crate::entities::transport::ChannelBindingId;
+use crate::entities::transport::DeliveryId;
+use crate::entities::transport::QualifiedIdentity;
+use crate::transport::CommitDisposition;
+use crate::transport::InboundCommitOutcome;
+use crate::transport::InboundCommitRequest;
+use crate::transport::InboundEnvelope;
+use crate::transport::InboundMessageCommitter;
+use crate::transport::ReplyDelivery;
+use crate::transport::ThreadAssociation;
+use crate::transport::ThreadTarget;
 
 /// Every thread one association resolved to, once the commit has created the ones it had to.
 struct ResolvedThread {

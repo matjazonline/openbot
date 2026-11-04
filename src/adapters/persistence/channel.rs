@@ -4,6 +4,7 @@ use serde::Serialize;
 use std::{collections::HashSet, str::FromStr};
 use uuid::Uuid;
 
+use crate::adapters::persistence::PostgresPersistence;
 use crate::adapters::persistence::integration::email_binding::{
     CanonicalEmailBinding, write_canonical_email_binding,
 };
@@ -12,22 +13,26 @@ use crate::adapters::persistence::participant::{
 };
 use crate::adapters::persistence::{agent::insert_agent_on, skill::copy_library_skill_on};
 use crate::adapters::protocols::email::EmailIdentity;
-use crate::{
-    adapters::persistence::PostgresPersistence,
-    app_error::{AppError, AppResult},
-    entities::{
-        agent::Agent,
-        channel::{Channel, ChannelAccessMode},
-        creation::CreationProvenance,
-        participant::{IdentityClaimMetadata, IdentityProvenance, PrincipalCapability},
-        value_objects::{ChannelSlug, CompanySlug, EmailAddress},
-    },
-    use_cases::{
-        agent::{AgentPersistence, AgentWrite, LibraryAgentCopyPersistence},
-        channel::{ChannelPersistence, ChannelUpdate, ChannelWrite},
-        participant::{IdentityObservation, IdentityResolution},
-    },
-};
+use crate::app_error::AppError;
+use crate::app_error::AppResult;
+use crate::application::ports::channel::ChannelPersistence;
+use crate::application::ports::channel::ChannelUpdate;
+use crate::application::ports::channel::ChannelWrite;
+use crate::application::ports::participant::IdentityObservation;
+use crate::entities::agent::Agent;
+use crate::entities::channel::Channel;
+use crate::entities::channel::ChannelAccessMode;
+use crate::entities::creation::CreationProvenance;
+use crate::entities::participant::IdentityClaimMetadata;
+use crate::entities::participant::IdentityProvenance;
+use crate::entities::participant::PrincipalCapability;
+use crate::entities::value_objects::ChannelSlug;
+use crate::entities::value_objects::CompanySlug;
+use crate::entities::value_objects::EmailAddress;
+use crate::use_cases::agent::AgentPersistence;
+use crate::use_cases::agent::AgentWrite;
+use crate::use_cases::agent::LibraryAgentCopyPersistence;
+use crate::use_cases::participant::IdentityResolution;
 
 #[derive(sqlx::FromRow, Debug, Serialize)]
 pub struct ChannelDb {

@@ -33,6 +33,7 @@ async fn builder(d: &Deployment) -> Uuid {
     register_scripted_agent_base_url(agent.id, &d.llm.base_url);
     let created = d
         .engine
+        .services()
         .assistant_channels()
         .create_assistant_channel(
             d.fixture.target.company,

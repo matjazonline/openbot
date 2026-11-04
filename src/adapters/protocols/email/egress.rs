@@ -316,10 +316,36 @@ impl TransportRenderer for EmailRenderer {
         )
     }
 
-    /// Mail's provider key is the `Message-ID` this renderer chose, so it is known before the
-    /// relay is ever called.
-    fn predicted_provider_key(&self, part: &RenderedPart) -> Option<ExternalMessageKey> {
-        ExternalMessageKey::parse(self.message_id_for(&part.key).as_str()).ok()
+    fn rendered_correlation(
+        &self,
+        part: &RenderedPart,
+    ) -> AppResult<crate::transport::ports::RenderedCorrelation> {
+        // The payload is the durable wire truth, even when read by a renderer for another domain.
+        let email: OutboundEmailV1 = part
+            .payload
+            .decode(TransportKind::Email, OUTBOUND_EMAIL_VERSION)
+            .map_err(|error| {
+                AppError::Internal(format!("Invalid frozen email correlation: {error}"))
+            })?;
+        let provider_key = ExternalMessageKey::parse(email.message_id.as_str())
+            .map_err(|error| AppError::Internal(format!("Invalid frozen email key: {error}")))?;
+        let metadata = crate::entities::email_message::EmailMessageMetadata::new(email.message_id)
+            .in_reply_to(email.in_reply_to)
+            .references(email.references)
+            .raw_bodies(Some(email.body_text), None);
+        Ok(crate::transport::ports::RenderedCorrelation {
+            provider_key: Some(provider_key),
+            extension: crate::application::ports::thread::ProtocolExtension::email(metadata),
+        })
+    }
+
+    fn application_message_key(
+        &self,
+        company: &crate::entities::value_objects::CompanySlug,
+        nonce: Uuid,
+    ) -> AppResult<ExternalMessageKey> {
+        ExternalMessageKey::parse(format!("<{nonce}@{company}.{}>", self.app_domain_name))
+            .map_err(|error| AppError::Internal(format!("Invalid application email key: {error}")))
     }
 }
 

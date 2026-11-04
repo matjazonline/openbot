@@ -17,7 +17,7 @@ enum DrainOutcome {
 }
 
 use open_bots::{
-    adapters::{persistence::PostgresPersistence, smtp::SmtpServer},
+    adapters::persistence::PostgresPersistence,
     infra::{
         app::create_app,
         config::runtime_thread_stack_bytes_from_env,
@@ -27,8 +27,8 @@ use open_bots::{
         setup::{init_app_state, init_tracing},
     },
     services::{
-        delivery_worker::DeliveryWorker, inbound_event_worker::InboundEventWorker,
-        notification_worker::NotificationWorker, runtime_metrics::RuntimeMetricSampler,
+        inbound_event_worker::InboundEventWorker, notification_worker::NotificationWorker,
+        runtime_metrics::RuntimeMetricSampler,
     },
 };
 
@@ -233,11 +233,16 @@ async fn serve() -> anyhow::Result<()> {
          freeze the init schema, reinstate follow-up migrations, and remove this warning and the \
          listed notes."
     );
-    let app_state = init_app_state().await?;
+    let open_bots::infra::setup::Application {
+        http: app_state,
+        workers,
+    } = init_app_state().await?;
     let mcp_use_cases = app_state.mcp_use_cases.clone();
-    let inbound_event_worker: Arc<InboundEventWorker> = app_state.inbound_event_worker.clone();
-    let notification_worker: Arc<NotificationWorker> = app_state.notification_worker.clone();
-    let workflow = app_state.workflow.clone();
+    let inbound_event_worker: Arc<InboundEventWorker> = workers.inbound_events;
+    let notification_worker: Arc<NotificationWorker> = workers.notifications;
+    let workflow = workers.workflow;
+    let delivery_worker = workers.deliveries;
+    let smtp_server = workers.smtp;
 
     // Create broadcast channel for background worker graceful shutdown
     let (shutdown_tx, shutdown_rx) = tokio::sync::broadcast::channel(1);
@@ -277,21 +282,7 @@ async fn serve() -> anyhow::Result<()> {
     // The delivery queue is drained by its own worker: a delivery outlives the run that produced
     // it, plenty of deliveries have no run behind them at all, and a long agent run must not hold
     // up a queued reply.
-    let delivery_worker = Arc::new(
-        DeliveryWorker::new(
-            app_state.delivery_queue.clone(),
-            app_state.transports.clone(),
-        )
-        .with_monitoring(app_state.monitoring.clone()),
-    );
     let mut delivery_worker_handle = tokio::spawn(delivery_worker.run(shutdown_rx.resubscribe()));
-
-    // Initialize Incoming SMTP Server loop
-    let smtp_server = Arc::new(
-        SmtpServer::new(app_state.thread_use_cases.clone(), app_state.config.clone())
-            .with_file_storage(app_state.file_storage.clone())
-            .with_monitoring(app_state.monitoring.clone()),
-    );
 
     let smtp_handle = tokio::spawn(smtp_server.start_server_loop(shutdown_rx.resubscribe()));
 

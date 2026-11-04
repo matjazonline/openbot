@@ -96,6 +96,7 @@ pub async fn check_dnsbl(ip: IpAddr, dnsbl_servers: &[String]) -> Option<String>
 pub struct SmtpServer {
     thread_use_cases: Arc<ThreadUseCases>,
     config: Arc<AppConfig>,
+    scanner: Arc<dyn crate::services::spam_scanner::SpamScanner>,
     /// Parses what arrives on the wire. Held rather than built per message: the app domain is
     /// deployment configuration read once, and the parser is the only thing on this path that
     /// understands the platform's address grammar.
@@ -116,9 +117,14 @@ pub struct SmtpServer {
 }
 
 impl SmtpServer {
-    pub fn new(thread_use_cases: Arc<ThreadUseCases>, config: Arc<AppConfig>) -> Self {
+    pub fn new(
+        thread_use_cases: Arc<ThreadUseCases>,
+        config: Arc<AppConfig>,
+        scanner: Arc<dyn crate::services::spam_scanner::SpamScanner>,
+    ) -> Self {
         Self {
             thread_use_cases,
+            scanner,
             ingress: EmailIngressAdapter::for_config(&config),
             config,
             file_storage: None,
@@ -126,6 +132,15 @@ impl SmtpServer {
             active_conns: Arc::new(RwLock::new(HashMap::new())),
             connection_slots: Arc::new(Semaphore::new(MAX_CONNECTIONS)),
         }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn for_test(threads: Arc<ThreadUseCases>, config: Arc<AppConfig>) -> Self {
+        let scanner = Arc::new(
+            crate::adapters::spam_scanner::SpamScannerAdapter::new(config.spam_scanner_settings())
+                .expect("valid fixture scanner"),
+        );
+        Self::new(threads, config, scanner)
     }
 
     pub fn with_monitoring(mut self, monitoring: Arc<dyn MonitoringService>) -> Self {
@@ -637,15 +652,15 @@ impl SmtpServer {
     }
 
     async fn apply_spam_score(&self, session: &SmtpSession, raw_payload: &mut RawInboundPayload) {
-        let scanner = crate::services::spam_scanner::SpamScannerService::new(self.config.clone());
-        let scan_res = scanner
-            .scan(
-                &session.data_buffer,
-                raw_payload.subject.as_deref(),
-                Some(&raw_payload.from),
-                raw_payload.text.as_deref(),
-                raw_payload.html.as_deref(),
-            )
+        let scan_res = self
+            .scanner
+            .scan(crate::services::spam_scanner::SpamScanInput {
+                raw_mime: &session.data_buffer,
+                subject: raw_payload.subject.as_deref(),
+                from: Some(&raw_payload.from),
+                body_text: raw_payload.text.as_deref(),
+                body_html: raw_payload.html.as_deref(),
+            })
             .await;
 
         if scan_res.score > 0.0 {
@@ -954,6 +969,51 @@ mod tests {
     use crate::use_cases::thread::test_support::InMemoryThreads;
 
     #[tokio::test]
+    async fn smtp_reuses_the_injected_scanner_across_messages() {
+        use crate::services::spam_scanner::{SpamScanInput, SpamScanResult, SpamScanner};
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        struct StubScanner(AtomicUsize);
+        #[async_trait::async_trait]
+        impl SpamScanner for StubScanner {
+            async fn scan(&self, input: SpamScanInput<'_>) -> SpamScanResult {
+                assert_eq!(input.raw_mime, b"raw message");
+                assert_eq!(input.subject, Some("subject"));
+                self.0.fetch_add(1, Ordering::SeqCst);
+                SpamScanResult {
+                    score: 7.0,
+                    is_spam: true,
+                    reasons: vec!["stub".into()],
+                }
+            }
+        }
+        let config = Arc::new(AppConfig::for_test());
+        let threads = ThreadUseCases::for_test(
+            Arc::new(InMemoryThreads::new()),
+            Arc::new(MockChannelPersistence {
+                channels: Mutex::new(vec![]),
+            }),
+            Arc::new(MockCompanyPersistence::failing()),
+            Arc::new(InMemoryParticipantDirectory::new()),
+            config.thread_settings(),
+        );
+        let scanner = Arc::new(StubScanner(AtomicUsize::new(0)));
+        let server = SmtpServer::new(Arc::new(threads), config, scanner.clone());
+        let session = SmtpSession {
+            data_buffer: b"raw message".to_vec(),
+            ..Default::default()
+        };
+        for _ in 0..2 {
+            let mut payload = RawInboundPayload {
+                subject: Some("subject".into()),
+                ..Default::default()
+            };
+            server.apply_spam_score(&session, &mut payload).await;
+            assert_eq!(payload.spam_score, Some(7.0));
+        }
+        assert_eq!(scanner.0.load(Ordering::SeqCst), 2);
+    }
+
+    #[tokio::test]
     async fn smtp_line_limits_accept_boundary_and_reject_one_over() {
         let mut at_limit = vec![b'a'; MAX_COMMAND_LINE_BYTES];
         at_limit[MAX_COMMAND_LINE_BYTES - 1] = b'\n';
@@ -998,15 +1058,14 @@ mod tests {
     use std::sync::Mutex;
     use uuid::Uuid;
 
-    use crate::{
-        app_error::AppResult,
-        entities::{channel::Channel, company::Company},
-        use_cases::{
-            channel::{ChannelPersistence, ChannelWrite},
-            company_test_support::{MockCompanyPersistence, TeamByAddress},
-            participant::test_support::InMemoryParticipantDirectory,
-        },
-    };
+    use crate::app_error::AppResult;
+    use crate::application::ports::channel::ChannelPersistence;
+    use crate::application::ports::channel::ChannelWrite;
+    use crate::entities::channel::Channel;
+    use crate::entities::company::Company;
+    use crate::use_cases::company_test_support::MockCompanyPersistence;
+    use crate::use_cases::company_test_support::TeamByAddress;
+    use crate::use_cases::participant::test_support::InMemoryParticipantDirectory;
 
     /// These tests are about SMTP, not team management: every sender is a colleague, and nothing
     /// reaches a provider, so no model connection is configured beyond "none".
@@ -1046,7 +1105,7 @@ mod tests {
         }
         async fn update(
             &self,
-            _request: crate::use_cases::channel::ChannelUpdate,
+            _request: crate::application::ports::channel::ChannelUpdate,
         ) -> AppResult<crate::entities::channel::Channel> {
             unimplemented!()
         }
@@ -1126,6 +1185,7 @@ mod tests {
         let thread_persistence = Arc::new(InMemoryThreads::new());
 
         let config = Arc::new(AppConfig {
+            auth_attempt_secret: "a-distinct-auth-attempt-test-secret-02".into(),
             jwt_secret: "secret".to_string(),
             sendgrid_inbound: None,
             resend_api: crate::infra::config::ResendApiConfig::default(),
@@ -1159,10 +1219,10 @@ mod tests {
             channel_persistence,
             company_persistence.clone(),
             Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
-            config.clone(),
+            (config.clone()).thread_settings(),
         ));
 
-        let server = Arc::new(SmtpServer::new(thread_use_cases, config));
+        let server = Arc::new(SmtpServer::for_test(thread_use_cases, config));
 
         // Bind listener on 127.0.0.1:0
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -1344,6 +1404,7 @@ regis";
         let thread_persistence = Arc::new(InMemoryThreads::new());
 
         let config = Arc::new(AppConfig {
+            auth_attempt_secret: "a-distinct-auth-attempt-test-secret-02".into(),
             jwt_secret: "secret".to_string(),
             sendgrid_inbound: None,
             resend_api: crate::infra::config::ResendApiConfig::default(),
@@ -1377,10 +1438,10 @@ regis";
             channel_persistence,
             company_persistence.clone(),
             Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
-            config.clone(),
+            (config.clone()).thread_settings(),
         ));
 
-        let server = Arc::new(SmtpServer::new(thread_use_cases, config));
+        let server = Arc::new(SmtpServer::for_test(thread_use_cases, config));
 
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let local_addr = listener.local_addr().unwrap();
@@ -1464,6 +1525,7 @@ Message-ID: <CAGj=2VKEn_MHfovWkBCqn4sp3AXPR=ZTLMso=mPjWtnMDStiRw@mail.gmail.com>
         });
         let thread_persistence = Arc::new(InMemoryThreads::new());
         let config = Arc::new(AppConfig {
+            auth_attempt_secret: "a-distinct-auth-attempt-test-secret-02".into(),
             jwt_secret: "secret".to_string(),
             sendgrid_inbound: None,
             resend_api: crate::infra::config::ResendApiConfig::default(),
@@ -1499,11 +1561,12 @@ Message-ID: <CAGj=2VKEn_MHfovWkBCqn4sp3AXPR=ZTLMso=mPjWtnMDStiRw@mail.gmail.com>
             channel_persistence,
             company_persistence.clone(),
             Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
-            config.clone(),
+            (config.clone()).thread_settings(),
         ));
 
-        let server =
-            Arc::new(SmtpServer::new(thread_use_cases, config).with_monitoring(monitor.clone()));
+        let server = Arc::new(
+            SmtpServer::for_test(thread_use_cases, config).with_monitoring(monitor.clone()),
+        );
 
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let local_addr = listener.local_addr().unwrap();
@@ -1562,9 +1625,9 @@ Message-ID: <CAGj=2VKEn_MHfovWkBCqn4sp3AXPR=ZTLMso=mPjWtnMDStiRw@mail.gmail.com>
             }),
             Arc::new(MockCompanyPersistence::failing()),
             Arc::new(InMemoryParticipantDirectory::new()),
-            config.clone(),
+            (config.clone()).thread_settings(),
         );
-        let server = SmtpServer::new(Arc::new(use_cases), config);
+        let server = SmtpServer::for_test(Arc::new(use_cases), config);
         let captured = Arc::new(Mutex::new(Vec::new()));
         let sink = captured.clone();
         let subscriber = tracing_subscriber::fmt()
@@ -1642,9 +1705,9 @@ Message-ID: <CAGj=2VKEn_MHfovWkBCqn4sp3AXPR=ZTLMso=mPjWtnMDStiRw@mail.gmail.com>
             persistence.clone(),
             persistence.clone(),
             persistence,
-            config.clone(),
+            (config.clone()).thread_settings(),
         ));
-        let server = SmtpServer::new(use_cases, config);
+        let server = SmtpServer::for_test(use_cases, config);
         let payload = |recipient: &str, sender: &str| RawInboundPayload {
             to: recipient.into(),
             from: sender.into(),

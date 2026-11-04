@@ -23,6 +23,9 @@ const FORBIDDEN: &[&str] = &[
     "axum::",
     "lettre::",
     "slack_morphism",
+    "infra::",
+    "reqwest::",
+    "tokio::net::",
     "adapters::protocols::slack",
 ];
 
@@ -33,7 +36,11 @@ fn is_test_only(path: &Path) -> bool {
         .file_name()
         .and_then(|name| name.to_str())
         .unwrap_or("");
-    name == "tests.rs" || name == "test_support.rs" || name.ends_with("_tests.rs")
+    path.components()
+        .any(|part| matches!(part.as_os_str().to_str(), Some("tests" | "test_support")))
+        || name == "tests.rs"
+        || name == "test_support.rs"
+        || name.ends_with("_tests.rs")
 }
 
 /// Everything from the file's inline `#[cfg(test)] mod` onwards.
@@ -174,4 +181,30 @@ mod scanner_tests {
                       use sqlx::query;\n";
         assert!(production_source(source).contains("sqlx"));
     }
+}
+
+#[test]
+fn workflow_and_transport_depend_on_shared_ports_without_reverse_usecase_imports() {
+    let mut checked = 0;
+    let mut unexpected = Vec::new();
+    for (file, source) in application_sources() {
+        if !(file.starts_with("workflow/") || file.starts_with("transport/")) {
+            continue;
+        }
+        checked += 1;
+        for (number, line) in source.lines().enumerate() {
+            if line.contains("use_cases::") {
+                unexpected.push(format!("{file}:{}: {}", number + 1, line.trim()));
+            }
+        }
+    }
+    assert!(
+        checked > 30,
+        "reverse-import check did not scan the intended subsystems"
+    );
+    assert!(
+        unexpected.is_empty(),
+        "workflow/transport must consume shared ports, not use-case modules: {}",
+        unexpected.join("\n")
+    );
 }

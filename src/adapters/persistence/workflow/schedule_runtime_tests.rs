@@ -80,8 +80,10 @@ async fn schedule_end_to_end_a_due_slot_runs_its_workflow_once() {
     .unwrap();
 
     // The first materializer admits the run, then crashes before recording it.
-    let crashing =
-        ScheduleMaterializer::new(d.p().clone(), CrashAfterAdmission(d.engine.service()));
+    let crashing = ScheduleMaterializer::new(
+        d.p().clone(),
+        CrashAfterAdmission(d.engine.services().service()),
+    );
     let worker = ScheduleWorkerId(Uuid::new_v4());
     let claimed = crashing.claim(worker).await.unwrap();
     assert_eq!(claimed.len(), 1);

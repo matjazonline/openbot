@@ -3,22 +3,27 @@
 //! Every field of an [`InboundEnvelope`] is validated, which is the point -- and would otherwise
 //! make "a message from someone, saying something" twenty lines at each call site.
 
-use crate::{
-    entities::{
-        auth::AuthVerdict,
-        correlation::CorrelationId,
-        email_message::EmailMessageMetadata,
-        transport::{
-            ChannelBindingId, ExternalMessageKey, ExternalThreadKey, IdentityNamespace,
-            IdentitySubject, QualifiedIdentity, TransportKind,
-        },
-        value_objects::MessageId,
-    },
-    transport::{
-        AddressedIdentity, BoundedVec, CanonicalContent, EmailIngressFacts, InboundDraft,
-        InboundEnvelope, IngressDirectives, IngressPolicyFacts, ProtocolExtension, RecipientRole,
-    },
-};
+use crate::application::ports::thread::ProtocolExtension;
+use crate::entities::auth::AuthVerdict;
+use crate::entities::correlation::CorrelationId;
+use crate::entities::email_message::EmailMessageMetadata;
+use crate::entities::transport::ChannelBindingId;
+use crate::entities::transport::ExternalMessageKey;
+use crate::entities::transport::ExternalThreadKey;
+use crate::entities::transport::IdentityNamespace;
+use crate::entities::transport::IdentitySubject;
+use crate::entities::transport::QualifiedIdentity;
+use crate::entities::transport::TransportKind;
+use crate::entities::value_objects::MessageId;
+use crate::transport::AddressedIdentity;
+use crate::transport::BoundedVec;
+use crate::transport::CanonicalContent;
+use crate::transport::EmailIngressFacts;
+use crate::transport::InboundDraft;
+use crate::transport::InboundEnvelope;
+use crate::transport::IngressDirectives;
+use crate::transport::IngressPolicyFacts;
+use crate::transport::RecipientRole;
 
 /// One email address as the qualified identity the platform stores it as.
 pub fn email_identity(address: &str) -> QualifiedIdentity {

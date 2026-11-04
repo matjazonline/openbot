@@ -10,19 +10,20 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::{
-    entities::{
-        correlation::CorrelationId,
-        email_message::EmailMessageMetadata,
-        message::{
-            AttachmentMetadata, CanonicalMessageId, MessageAudience, MessageDirection,
-            MessageParticipantKind, MessageRole, ThreadEntryKind,
-        },
-        participant::{IdentityClaimMetadata, IdentityProvenance},
-        transport::{PrincipalId, QualifiedIdentity},
-    },
-    use_cases::participant::IdentityObservation,
-};
+use crate::application::ports::participant::IdentityObservation;
+use crate::entities::correlation::CorrelationId;
+use crate::entities::email_message::EmailMessageMetadata;
+use crate::entities::message::AttachmentMetadata;
+use crate::entities::message::CanonicalMessageId;
+use crate::entities::message::MessageAudience;
+use crate::entities::message::MessageDirection;
+use crate::entities::message::MessageParticipantKind;
+use crate::entities::message::MessageRole;
+use crate::entities::message::ThreadEntryKind;
+use crate::entities::participant::IdentityClaimMetadata;
+use crate::entities::participant::IdentityProvenance;
+use crate::entities::transport::PrincipalId;
+use crate::entities::transport::QualifiedIdentity;
 
 /// Who a message is attributed to, as its producer states it.
 #[derive(Debug, Clone, Serialize, Deserialize)]

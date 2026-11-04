@@ -12,9 +12,9 @@ use crate::{
         NotificationPersistence, NotificationProjectionCommit, NotificationProjectionCommitOutcome,
         NotificationProjectionFailure,
     },
+    application::settings::NotificationMailSettings,
     domain::monitoring::MonitoringService,
     entities::{notification::NotificationDisposition, transport::DeliveryPurpose},
-    infra::config::AppConfig,
     transport::{
         CanonicalContent, DeliveryComposer, DeliveryContext, EmailDeliveryContext, EmailThreading,
         StandaloneDeliveryRequest, WorkerId,
@@ -28,7 +28,7 @@ const CENSUS_INTERVAL: Duration = Duration::from_secs(30);
 pub struct NotificationWorker {
     persistence: Arc<dyn NotificationPersistence>,
     deliveries: DeliveryComposer,
-    config: Arc<AppConfig>,
+    settings: NotificationMailSettings,
     monitoring: Arc<dyn MonitoringService>,
     worker_id: WorkerId,
 }
@@ -37,13 +37,13 @@ impl NotificationWorker {
     pub fn new(
         persistence: Arc<dyn NotificationPersistence>,
         deliveries: DeliveryComposer,
-        config: Arc<AppConfig>,
+        settings: NotificationMailSettings,
         monitoring: Arc<dyn MonitoringService>,
     ) -> Self {
         Self {
             persistence,
             deliveries,
-            config,
+            settings,
             monitoring,
             worker_id: WorkerId::random(),
         }
@@ -177,8 +177,7 @@ impl NotificationWorker {
         let subject = format!("Action required: {}", projection.event.action_kind.label());
         let link = format!(
             "{}/ui/notifications/{}/open",
-            self.config.public_base_url(),
-            projection.event.notification_id
+            self.settings.public_base_url, projection.event.notification_id
         );
         let body = format!(
             "{} in {} / {}.\n\nOpen it securely: {}",
@@ -200,7 +199,7 @@ impl NotificationWorker {
                 source_key,
                 content: &content,
                 context: DeliveryContext::Email(EmailDeliveryContext {
-                    from: format!("notifications@{}", self.config.app_domain_name).into(),
+                    from: format!("notifications@{}", self.settings.mail_domain).into(),
                     from_name: Some("Mail Agents".into()),
                     recipient_to: recipient.email.clone(),
                     recipients_cc: Vec::new(),

@@ -8,23 +8,23 @@ use std::{sync::Arc, time::Instant};
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use crate::{
-    app_error::AppResult,
-    domain::monitoring::MonitoringService,
-    entities::{
-        attention::{
-            AttentionCursor, AttentionPage, AttentionQuery, AttentionView, OperationalSummary,
-        },
-        company::CompanyAccess,
-        transport::PrincipalId,
-        user::Viewer,
-    },
-    use_cases::{
-        channel::{ChannelPersistence, ChannelReaders, readable_channels},
-        company::{CompanyPersistence, company_forbidden, readable_company},
-        participant::ParticipantPersistence,
-    },
-};
+use crate::app_error::AppResult;
+use crate::application::ports::channel::ChannelPersistence;
+use crate::domain::monitoring::MonitoringService;
+use crate::entities::attention::AttentionCursor;
+use crate::entities::attention::AttentionPage;
+use crate::entities::attention::AttentionQuery;
+use crate::entities::attention::AttentionView;
+use crate::entities::attention::OperationalSummary;
+use crate::entities::company::CompanyAccess;
+use crate::entities::transport::PrincipalId;
+use crate::entities::user::Viewer;
+use crate::use_cases::channel::ChannelReaders;
+use crate::use_cases::channel::readable_channels;
+use crate::use_cases::company::CompanyPersistence;
+use crate::use_cases::company::company_forbidden;
+use crate::use_cases::company::readable_company;
+use crate::use_cases::participant::ParticipantPersistence;
 
 #[async_trait]
 pub trait AttentionPersistence: Send + Sync {

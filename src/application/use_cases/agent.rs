@@ -31,7 +31,7 @@ pub fn agent_not_found() -> AppError {
 /// cannot transpose two same-typed arguments in a nine-parameter list.
 ///
 /// Values reach persistence already normalized — see [`AgentWrite::normalize`]. Mirrors
-/// [`crate::use_cases::channel::ChannelWrite`].
+/// [`crate::application::ports::channel::ChannelWrite`].
 #[derive(Debug, Clone, Default)]
 pub struct AgentWrite {
     pub name: String,

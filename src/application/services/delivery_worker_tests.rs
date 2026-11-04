@@ -530,11 +530,23 @@ impl TransportRenderer for NoopRenderer {
         Ok(vec![stored_part(0, DeliveryPartStatus::Prepared).rendered])
     }
 
-    fn predicted_provider_key(
+    fn rendered_correlation(
         &self,
         _part: &RenderedPart,
-    ) -> Option<crate::entities::transport::ExternalMessageKey> {
-        None
+    ) -> AppResult<crate::transport::ports::RenderedCorrelation> {
+        Ok(crate::transport::ports::RenderedCorrelation {
+            provider_key: None,
+            extension: crate::application::ports::thread::ProtocolExtension::none(),
+        })
+    }
+    fn application_message_key(
+        &self,
+        _company: &crate::entities::value_objects::CompanySlug,
+        _nonce: uuid::Uuid,
+    ) -> AppResult<crate::entities::transport::ExternalMessageKey> {
+        Err(crate::app_error::AppError::BadRequest(
+            "Fixture transport does not mint application ingress keys".into(),
+        ))
     }
 }
 

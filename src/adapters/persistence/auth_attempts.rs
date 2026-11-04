@@ -179,13 +179,12 @@ mod tests {
         let users = UserUseCases::new(
             Arc::new(crate::infra::argon2_password_hasher()),
             persistence.clone(),
-            config.jwt_secret.clone(),
+            config.auth_attempt_secret.clone(),
         )
         .with_email_confirmation(EmailConfirmation {
             registrations: persistence.clone(),
             account_changes: persistence.clone(),
             codes: Arc::new(FailingSender),
-            config,
             transport_available: true,
             allow_unverified_without_smtp: true,
         });
@@ -496,13 +495,13 @@ mod tests {
         let cases = UserUseCases::new(
             Arc::new(crate::infra::argon2_password_hasher()),
             persistence.clone(),
-            config.jwt_secret.clone(),
+            config.auth_attempt_secret.clone(),
         )
         .with_email_confirmation(EmailConfirmation {
             registrations: persistence.clone(),
             account_changes: persistence.clone(),
             codes: sender.clone(),
-            config: config.clone(),
+
             transport_available: true,
             allow_unverified_without_smtp: false,
         });
@@ -526,7 +525,7 @@ mod tests {
         );
         let canonical = persistence.canonical_auth_identifier(&email).await.unwrap();
         let key = auth_attempt_key(
-            &config.jwt_secret,
+            config.auth_attempt_secret.expose_secret(),
             "registration-code:v1",
             &[canonical.as_bytes()],
         );
@@ -659,8 +658,8 @@ mod tests {
         let hash = hasher.hash_password("correct-password").unwrap();
         first.create_user(&name, &email, &hash).await.unwrap();
         let cases = [
-            UserUseCases::new(hasher.clone(), first, SECRET),
-            UserUseCases::new(hasher, second, SECRET),
+            UserUseCases::new(hasher.clone(), first, (SECRET).into()),
+            UserUseCases::new(hasher, second, (SECRET).into()),
         ];
         let source: IpAddr = "192.0.2.10".parse().unwrap();
         for index in 0..5 {
@@ -772,7 +771,11 @@ mod tests {
             .create_user(&second_name, &second_email, &hash)
             .await
             .unwrap();
-        let users = Arc::new(UserUseCases::new(hasher, persistence.clone(), SECRET));
+        let users = Arc::new(UserUseCases::new(
+            hasher,
+            persistence.clone(),
+            (SECRET).into(),
+        ));
         let app = Router::new()
             .route(
                 "/api/json/user/login",

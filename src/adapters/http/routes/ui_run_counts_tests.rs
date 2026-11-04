@@ -63,19 +63,18 @@ async fn sustained_spaced_wakes_cannot_debounce_the_refresh() {
 }
 
 use super::super::ui::stream_tests::{Frames, test_config};
-use crate::{
-    adapters::{
-        monitoring::in_memory_monitor::InMemoryMonitor,
-        persistence::{PostgresPersistence, test_support::test_pool},
-    },
-    entities::run_counts::{RunCountRow, RunCountSnapshot},
-    infra::events::{MailboxEvent, RunScope},
-    use_cases::{
-        channel::{ChannelPersistence, ChannelWrite},
-        company::{CompanyPersistence, CompanyWrite},
-        user::UserPersistence,
-    },
-};
+use crate::adapters::monitoring::in_memory_monitor::InMemoryMonitor;
+use crate::adapters::persistence::PostgresPersistence;
+use crate::adapters::persistence::test_support::test_pool;
+use crate::application::ports::channel::ChannelPersistence;
+use crate::application::ports::channel::ChannelWrite;
+use crate::entities::run_counts::RunCountRow;
+use crate::entities::run_counts::RunCountSnapshot;
+use crate::infra::events::MailboxEvent;
+use crate::infra::events::RunScope;
+use crate::use_cases::company::CompanyPersistence;
+use crate::use_cases::company::CompanyWrite;
+use crate::use_cases::user::UserPersistence;
 use axum::response::IntoResponse;
 use std::collections::BTreeMap;
 use std::sync::Mutex;
@@ -221,7 +220,7 @@ fn workspace(
             f.persistence.clone(),
             f.persistence.clone(),
             f.persistence.clone(),
-            test_config(),
+            (test_config()).spam_scanning(),
         )),
         reader,
         monitoring,

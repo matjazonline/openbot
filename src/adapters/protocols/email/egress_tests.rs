@@ -604,7 +604,7 @@ fn a_delivery_key_separates_purpose_source_and_destination() {
     // the import honest about that.
     let _: fn(
         std::sync::Arc<crate::transport::ports::TransportRenderers>,
-        std::sync::Arc<dyn crate::use_cases::integration::ChannelBindingPersistence>,
+        std::sync::Arc<dyn crate::application::ports::integration::ChannelBindingPersistence>,
     ) -> DeliveryComposer = DeliveryComposer::new;
 }
 
@@ -671,4 +671,39 @@ async fn notification_delivery_tenant_notice_uses_the_deployment_relay() {
         ProviderSendOutcome::Delivered { .. }
     ));
     assert_eq!(accounts.company.sent().len(), 1);
+}
+
+#[test]
+fn frozen_correlation_reads_the_payload_even_with_a_different_renderer_domain() {
+    let original = renderer();
+    let rendered = original
+        .render(&envelope(context("customer@example.com")))
+        .unwrap();
+    let part = &rendered[0];
+    let wire = frozen(&rendered);
+    let after_rotation = EmailRenderer::new("new-domain.example");
+    let correlation = after_rotation.rendered_correlation(part).unwrap();
+    assert_eq!(
+        correlation.provider_key.as_ref().unwrap().as_str(),
+        wire.message_id.as_str()
+    );
+    let metadata = correlation.extension.email_metadata().unwrap();
+    assert_eq!(metadata.rfc_message_id, wire.message_id);
+    assert_eq!(metadata.in_reply_to, wire.in_reply_to);
+    assert_eq!(metadata.references, wire.references);
+    assert_eq!(metadata.references.last(), metadata.in_reply_to.as_ref());
+}
+#[test]
+fn application_message_keys_are_owned_by_email_egress_and_qualified_by_company() {
+    let nonce = Uuid::new_v4();
+    let first = renderer()
+        .application_message_key(&CompanySlug::from("acme"), nonce)
+        .unwrap();
+    assert_eq!(first.as_str(), format!("<{nonce}@acme.{DOMAIN}>"));
+    assert_ne!(
+        first,
+        renderer()
+            .application_message_key(&CompanySlug::from("other"), nonce)
+            .unwrap()
+    );
 }

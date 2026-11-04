@@ -361,8 +361,23 @@ impl TransportRenderer for EchoRenderer {
     }
 
     /// A provider whose key is its own answer. Slack's timestamp cannot be known before the post.
-    fn predicted_provider_key(&self, _part: &RenderedPart) -> Option<ExternalMessageKey> {
-        None
+    fn rendered_correlation(
+        &self,
+        _part: &RenderedPart,
+    ) -> AppResult<crate::transport::ports::RenderedCorrelation> {
+        Ok(crate::transport::ports::RenderedCorrelation {
+            provider_key: None,
+            extension: crate::application::ports::thread::ProtocolExtension::none(),
+        })
+    }
+    fn application_message_key(
+        &self,
+        _company: &crate::entities::value_objects::CompanySlug,
+        _nonce: uuid::Uuid,
+    ) -> AppResult<crate::entities::transport::ExternalMessageKey> {
+        Err(crate::app_error::AppError::BadRequest(
+            "Fixture transport does not mint application ingress keys".into(),
+        ))
     }
 }
 

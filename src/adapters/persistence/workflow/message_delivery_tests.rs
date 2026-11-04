@@ -466,7 +466,7 @@ async fn a_dead_workflow_delivery_notifies_its_run_actor_once() {
 /// p08 D4.6 (F079): a message a run wrote reads back with that run, through every thread read.
 #[tokio::test]
 async fn a_message_a_run_wrote_reads_back_with_its_run() {
-    use crate::application::use_cases::thread::ThreadPersistence;
+    use crate::application::ports::thread::ThreadPersistence;
     use crate::entities::message::CanonicalMessageId;
 
     let (setup, _delivery) = Box::pin(parked_user(&[To::User])).await;

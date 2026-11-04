@@ -4,7 +4,7 @@
 use super::thread_tests::inbound;
 use super::*;
 use crate::adapters::monitoring::in_memory_monitor::InMemoryMonitor;
-use crate::application::use_cases::thread::ThreadPersistence;
+use crate::application::ports::thread::ThreadPersistence;
 use crate::application::workflow::message_admission::*;
 use crate::domain::monitoring::MonitoringService;
 use crate::domain::workflow::{MAX_MESSAGE_BINDINGS_PER_CHANNEL, MessageTrigger};
@@ -1742,8 +1742,9 @@ async fn reconnect_batch_links_do_not_depend_on_the_newest_history_window() {
 
 #[tokio::test]
 async fn link_visibility_loads_only_requested_source_channels() {
+    use crate::application::ports::channel::ChannelPersistence;
+    use crate::application::ports::channel::ChannelWrite;
     use crate::application::thread_activity::ThreadActivityReader;
-    use crate::use_cases::channel::{ChannelPersistence, ChannelWrite};
     let s = Intents::new().await;
     let binding = s.binding(MessageTrigger::Any, None).await;
     s.intent(TO).await;

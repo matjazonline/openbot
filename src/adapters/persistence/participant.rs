@@ -4,26 +4,30 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
+use crate::adapters::persistence::PostgresPersistence;
 use crate::adapters::protocols::email::EmailIdentity;
+use crate::app_error::AppError;
+use crate::app_error::AppResult;
+use crate::application::ports::participant::IdentityObservation;
+use crate::application::ports::participant::PrincipalAccessPersistence;
+use crate::entities::company_member::CompanyMembership;
+use crate::entities::participant::IdentityClaimMetadata;
+use crate::entities::participant::IdentityProvenance;
+use crate::entities::participant::IdentityStatus;
+use crate::entities::participant::Principal;
+use crate::entities::participant::PrincipalAccessContext;
+use crate::entities::participant::PrincipalGrantAuthority;
+use crate::entities::participant::PrincipalIdentity;
+use crate::entities::participant::PrincipalKind;
+use crate::entities::transport::IdentityNamespace;
+use crate::entities::transport::IdentitySubject;
+use crate::entities::transport::ParticipantIdentityId;
+use crate::entities::transport::PrincipalId;
+use crate::entities::transport::QualifiedIdentity;
+use crate::entities::transport::TransportKind;
 use crate::entities::value_objects::EmailAddress;
-use crate::{
-    adapters::persistence::PostgresPersistence,
-    app_error::{AppError, AppResult},
-    entities::{
-        company_member::CompanyMembership,
-        participant::{
-            IdentityClaimMetadata, IdentityProvenance, IdentityStatus, Principal,
-            PrincipalAccessContext, PrincipalGrantAuthority, PrincipalIdentity, PrincipalKind,
-        },
-        transport::{
-            IdentityNamespace, IdentitySubject, ParticipantIdentityId, PrincipalId,
-            QualifiedIdentity, TransportKind,
-        },
-    },
-    use_cases::participant::{
-        IdentityDirectory, IdentityObservation, IdentityResolution, PrincipalAccessPersistence,
-    },
-};
+use crate::use_cases::participant::IdentityDirectory;
+use crate::use_cases::participant::IdentityResolution;
 
 #[derive(sqlx::FromRow)]
 struct PrincipalDb {
@@ -581,9 +585,9 @@ impl PrincipalAccessPersistence for PostgresPersistence {
 mod tests {
     use super::*;
     use crate::adapters::persistence::test_support::test_pool;
+    use crate::application::ports::participant::IdentityObservation;
     use crate::entities::company::CompanyAccess;
     use crate::use_cases::company::{CompanyPersistence, CompanyWrite};
-    use crate::use_cases::participant::IdentityObservation;
     use crate::use_cases::user::UserPersistence;
     use std::sync::Arc;
 

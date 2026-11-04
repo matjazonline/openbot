@@ -4,31 +4,34 @@ use std::sync::Arc;
 use axum::{http::StatusCode, response::IntoResponse};
 use uuid::Uuid;
 
-use crate::{
-    adapters::monitoring::InMemoryMonitor,
-    adapters::{
-        http::auth::AuthenticatedUser,
-        persistence::{PostgresPersistence, test_support::test_pool},
-    },
-    app_error::AppResult,
-    application::attention::AttentionUseCases,
-    entities::{
-        company::Company,
-        company_member::CompanyAccessRole,
-        user::{User, Viewer},
-        value_objects::EmailAddress,
-    },
-    infra::config::AppConfig,
-    use_cases::{
-        agent::AgentUseCases,
-        channel::{ChannelPersistence, ChannelUseCases, ChannelWrite},
-        company::{CompanyPersistence, CompanyUseCases, CompanyWrite},
-        company_invite::{CompanyInvitePersistence, CompanyInviteUseCases},
-        company_test_support::MockCompanyPersistence,
-        thread::{InboundIngestPorts, ThreadPersistence, ThreadStores, ThreadUseCases},
-        user::{UserPersistence, UserUseCases},
-    },
-};
+use crate::adapters::http::auth::AuthenticatedUser;
+use crate::adapters::monitoring::InMemoryMonitor;
+use crate::adapters::persistence::PostgresPersistence;
+use crate::adapters::persistence::test_support::test_pool;
+use crate::app_error::AppResult;
+use crate::application::attention::AttentionUseCases;
+use crate::application::ports::channel::ChannelPersistence;
+use crate::application::ports::channel::ChannelWrite;
+use crate::application::ports::thread::ThreadPersistence;
+use crate::entities::company::Company;
+use crate::entities::company_member::CompanyAccessRole;
+use crate::entities::user::User;
+use crate::entities::user::Viewer;
+use crate::entities::value_objects::EmailAddress;
+use crate::infra::config::AppConfig;
+use crate::use_cases::agent::AgentUseCases;
+use crate::use_cases::channel::ChannelUseCases;
+use crate::use_cases::company::CompanyPersistence;
+use crate::use_cases::company::CompanyUseCases;
+use crate::use_cases::company::CompanyWrite;
+use crate::use_cases::company_invite::CompanyInvitePersistence;
+use crate::use_cases::company_invite::CompanyInviteUseCases;
+use crate::use_cases::company_test_support::MockCompanyPersistence;
+use crate::use_cases::thread::InboundIngestPorts;
+use crate::use_cases::thread::ThreadStores;
+use crate::use_cases::thread::ThreadUseCases;
+use crate::use_cases::user::UserPersistence;
+use crate::use_cases::user::UserUseCases;
 
 pub(super) struct ScopeCase<'a> {
     pub companies: Arc<CompanyUseCases>,
@@ -96,13 +99,13 @@ impl Fixture {
                 p.clone(),
                 p.clone(),
                 p.clone(),
-                config.clone(),
+                (config.clone()).spam_scanning(),
             )),
             invites: Arc::new(CompanyInviteUseCases::new(p.clone(), p.clone())),
             users: Arc::new(UserUseCases::new(
                 Arc::new(crate::infra::argon2_password_hasher()),
                 p.clone(),
-                "test-secret",
+                ("test-secret").into(),
             )),
             attention: Arc::new(AttentionUseCases::new(
                 p.clone(),
@@ -266,6 +269,6 @@ fn thread_use_cases(p: &Arc<PostgresPersistence>, config: &Arc<AppConfig>) -> Ar
             standalone_deliveries: p.clone(),
         },
         renderers,
-        config.clone(),
+        (config.clone()).thread_settings(),
     ))
 }

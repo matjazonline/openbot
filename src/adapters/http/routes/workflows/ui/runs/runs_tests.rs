@@ -40,6 +40,7 @@ struct Fixture {
     _db: OwnDatabase,
     persistence: PostgresPersistence,
     engine: Engine,
+    workers: Arc<crate::infra::workflow::WorkflowEngine>,
     owner: Uuid,
     company: Uuid,
     admin: Uuid,
@@ -57,9 +58,13 @@ impl Fixture {
         let (stranger, other) = owner_and_company(&persistence, "Elsewhere").await;
         let admin = teammate(&persistence, company, "admin").await;
         let member = teammate(&persistence, company, "member").await;
+        let workers = Arc::new(crate::infra::workflow::WorkflowEngine::for_tests(
+            persistence.clone(),
+        ));
         Some(Self {
             _db: db,
-            engine: Arc::new(WorkflowEngine::for_tests(persistence.clone())),
+            engine: workers.services(),
+            workers,
             persistence,
             owner,
             company,
@@ -175,7 +180,7 @@ impl Fixture {
     /// Run the production workers until every run in `runs` is terminal.
     async fn run_until_done(&self, runs: &[Uuid]) {
         let shutdown = CancellationToken::new();
-        let handles = self.engine.spawn(&shutdown);
+        let handles = self.workers.spawn(&shutdown);
         let settled = tokio::time::timeout(Duration::from_secs(30), async {
             loop {
                 let mut done = true;
@@ -261,7 +266,8 @@ impl Fixture {
     }
 
     async fn channel(&self, name: &str, slug: &str, restricted: bool) -> Uuid {
-        use crate::use_cases::channel::{ChannelPersistence, ChannelWrite};
+        use crate::application::ports::channel::ChannelPersistence;
+        use crate::application::ports::channel::ChannelWrite;
         let channel = ChannelPersistence::create(
             &self.persistence,
             self.company,
@@ -327,7 +333,7 @@ fn ui_over(persistence: &PostgresPersistence, engine: &Engine, user: Uuid) -> Ui
         users: Arc::new(UserUseCases::new(
             Arc::new(crate::infra::argon2_password_hasher()),
             shared.clone(),
-            "test-attempt-secret",
+            ("test-attempt-secret").into(),
         )),
         agents: Arc::new(AgentUseCases::new(
             shared.clone(),

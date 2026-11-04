@@ -46,29 +46,37 @@ use std::{
 };
 use uuid::Uuid;
 
+use crate::adapters::persistence::PostgresPersistence;
 use crate::adapters::persistence::participant::resolve_or_create_external_identity_on;
 use crate::adapters::protocols::email::EmailIdentity;
-use crate::{
-    adapters::persistence::PostgresPersistence,
-    app_error::{AppError, AppResult},
-    entities::{
-        cursor::{MessageCursor, ThreadCursor},
-        internal_note::{AddInternalNote, InternalNoteView, TombstoneInternalNote},
-        message::{CanonicalMessageId, Message, MessageRole},
-        message_view::{
-            AgentHistoryMessage, EmailReplyContext, MessageAuditView, ThreadMessageView,
-        },
-        participant::{IdentityClaimMetadata, IdentityProvenance, ThreadPrincipalRole},
-        thread::{Thread, ThreadParticipantProjection},
-        transport::{PrincipalId, TransportKind},
-        value_objects::{EmailAddress, MessageId, ThreadIndex},
-    },
-    transport::ThreadPrincipalIntent,
-    use_cases::{
-        participant::IdentityObservation,
-        thread::{MessageWrite, ThreadPersistence},
-    },
-};
+use crate::app_error::AppError;
+use crate::app_error::AppResult;
+use crate::application::ports::participant::IdentityObservation;
+use crate::application::ports::thread::MessageWrite;
+use crate::application::ports::thread::ThreadPersistence;
+use crate::entities::cursor::MessageCursor;
+use crate::entities::cursor::ThreadCursor;
+use crate::entities::internal_note::AddInternalNote;
+use crate::entities::internal_note::InternalNoteView;
+use crate::entities::internal_note::TombstoneInternalNote;
+use crate::entities::message::CanonicalMessageId;
+use crate::entities::message::Message;
+use crate::entities::message::MessageRole;
+use crate::entities::message_view::AgentHistoryMessage;
+use crate::entities::message_view::EmailReplyContext;
+use crate::entities::message_view::MessageAuditView;
+use crate::entities::message_view::ThreadMessageView;
+use crate::entities::participant::IdentityClaimMetadata;
+use crate::entities::participant::IdentityProvenance;
+use crate::entities::participant::ThreadPrincipalRole;
+use crate::entities::thread::Thread;
+use crate::entities::thread::ThreadParticipantProjection;
+use crate::entities::transport::PrincipalId;
+use crate::entities::transport::TransportKind;
+use crate::entities::value_objects::EmailAddress;
+use crate::entities::value_objects::MessageId;
+use crate::entities::value_objects::ThreadIndex;
+use crate::transport::ThreadPrincipalIntent;
 
 use message::{MESSAGE_SELECT, MessageDb};
 
@@ -526,13 +534,13 @@ impl ThreadPersistence for PostgresPersistence {
         &self,
         company_id: Uuid,
         message_id: CanonicalMessageId,
-    ) -> AppResult<crate::transport::ProtocolExtension> {
+    ) -> AppResult<crate::application::ports::thread::ProtocolExtension> {
         Ok(
             email_metadata::load_email_metadata(&self.pool, company_id, message_id.as_uuid())
                 .await?
                 .map_or_else(
-                    crate::transport::ProtocolExtension::none,
-                    crate::transport::ProtocolExtension::email,
+                    crate::application::ports::thread::ProtocolExtension::none,
+                    crate::application::ports::thread::ProtocolExtension::email,
                 ),
         )
     }

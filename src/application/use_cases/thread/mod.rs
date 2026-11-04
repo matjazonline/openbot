@@ -11,55 +11,77 @@ use async_trait::async_trait;
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
-use crate::{
-    app_error::{AppError, AppResult},
-    domain::monitoring::MonitoringService,
-    entities::{
-        channel::Channel,
-        company::Company,
-        correlation::CorrelationId,
-        cursor::{MessageCursor, ThreadCursor},
-        email_message::EmailMessageMetadata,
-        internal_note::{AddInternalNote, InternalNoteView, TombstoneInternalNote},
-        message::{CanonicalMessageId, Message, MessageRole, ThreadEntryKind},
-        message_view::{
-            AgentHistoryMessage, EmailReplyContext, MessageAuditView, ThreadMessageView,
-        },
-        thread::Thread,
-        transport::{
-            ChannelSelector, ExternalMessageKey, ExternalThreadKey, IdentityNamespace,
-            IdentitySubject, QualifiedIdentity, TransportKind,
-        },
-        user::Viewer,
-        value_objects::{ChannelSlug, CompanySlug, EmailAddress, MessageId, ThreadIndex},
-    },
-    infra::config::AppConfig,
-    transport::{
-        AddressedIdentity, AddressedRecipient, AddressedTarget, BoundedVec, CanonicalContent,
-        DeliveryComposer, ExternalCorrelationStore, InboundDraft, InboundEnvelope,
-        InboundMessageCommitter, InboundRouting, IngressDirectives, IngressPolicyFacts,
-        InternalMailRelay, InternalRelayMail, MessageDisposition, ProtocolExtension,
-        RelayDisposition, StandaloneDeliveryEnqueuer, StandaloneDeliveryRequest,
-        ports::TransportRenderers,
-    },
-    use_cases::{
-        channel::{ChannelPersistence, ChannelReaders, readable_channel},
-        company::CompanyPersistence,
-        integration::ChannelBindingPersistence,
-        participant::ParticipantPersistence,
-    },
-};
+use crate::app_error::AppError;
+use crate::app_error::AppResult;
+use crate::application::ports::channel::ChannelPersistence;
+use crate::application::ports::integration::ChannelBindingPersistence;
+use crate::application::ports::thread::ProtocolExtension;
+use crate::application::settings::ThreadSettings;
+use crate::domain::monitoring::MonitoringService;
+use crate::entities::channel::Channel;
+use crate::entities::company::Company;
+use crate::entities::correlation::CorrelationId;
+use crate::entities::cursor::MessageCursor;
+use crate::entities::cursor::ThreadCursor;
+use crate::entities::email_message::EmailMessageMetadata;
+use crate::entities::internal_note::AddInternalNote;
+use crate::entities::internal_note::InternalNoteView;
+use crate::entities::internal_note::TombstoneInternalNote;
+use crate::entities::message::CanonicalMessageId;
+use crate::entities::message::Message;
+use crate::entities::message::MessageRole;
+use crate::entities::message::ThreadEntryKind;
+use crate::entities::message_view::EmailReplyContext;
+use crate::entities::message_view::MessageAuditView;
+use crate::entities::message_view::ThreadMessageView;
+use crate::entities::thread::Thread;
+use crate::entities::transport::ChannelSelector;
+use crate::entities::transport::ExternalMessageKey;
+use crate::entities::transport::ExternalThreadKey;
+use crate::entities::transport::QualifiedIdentity;
+use crate::entities::user::Viewer;
+use crate::entities::value_objects::ChannelSlug;
+use crate::entities::value_objects::CompanySlug;
+use crate::entities::value_objects::EmailAddress;
+use crate::entities::value_objects::MessageId;
+use crate::transport::AddressedIdentity;
+use crate::transport::BoundedVec;
+use crate::transport::CanonicalContent;
+use crate::transport::DeliveryComposer;
+use crate::transport::ExternalCorrelationStore;
+use crate::transport::InboundDraft;
+use crate::transport::InboundEnvelope;
+use crate::transport::InboundMessageCommitter;
+use crate::transport::IngressDirectives;
+use crate::transport::IngressPolicyFacts;
+use crate::transport::InternalMailRelay;
+use crate::transport::InternalRelayMail;
+use crate::transport::MessageDisposition;
+use crate::transport::RelayDisposition;
+use crate::transport::StandaloneDeliveryEnqueuer;
+use crate::transport::StandaloneDeliveryRequest;
+use crate::transport::ports::TransportRenderers;
+use crate::use_cases::channel::ChannelReaders;
+use crate::use_cases::channel::readable_channel;
+use crate::use_cases::company::CompanyPersistence;
+use crate::use_cases::participant::ParticipantPersistence;
 
 mod ingest;
+#[cfg(test)]
+use crate::application::ports::thread::MessageAuthorWrite;
+use crate::application::ports::thread::{
+    MessageWrite, ThreadPersistence, qualified_email_identity,
+};
 pub use ingest::{
     CanonicalMessageIngress, InboundMessage, InboundPreflight, IngestRejection, IngressOrigin,
     PreparedInbound, UnusableHint,
 };
-mod message_write;
-pub use message_write::{
-    AgentAuthor, MessageAuthorWrite, MessageCorrelation, MessageParticipantWrite, MessageWrite,
-};
+mod notices;
 mod support;
+pub use notices::{
+    BounceInfo, BounceSuggestion, ChannelDirectoryEntry, bounce_cause, format_bounce_email_body,
+    format_help_email_body,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SenderTrust {
@@ -71,39 +93,6 @@ pub enum SenderTrust {
 /// with the other transport contracts and re-exported here so call sites read unchanged.
 pub use crate::transport::{PipelineStep, RecipientRole, ReplyDelivery};
 
-/// One channel's agent answering another channel of the same company.
-///
-/// Registered with the email sender, which reaches it *before* SMTP: a message addressed to one of
-/// this deployment's own channels never leaves the building, so there is no DMARC verdict to earn
-/// and no mail to parse back. Rendering it to RFC 5322 and re-ingesting the result was how a
-/// mailbox became the internal identity of a channel.
-#[async_trait]
-impl InternalMailRelay for ThreadUseCases {
-    async fn relay_internal(&self, mail: &InternalRelayMail<'_>) -> AppResult<RelayDisposition> {
-        // A recipient outside this deployment, or one whose channel this source may not address,
-        // is not a fault: it is the ordinary case, and the sender posts it over SMTP.
-        let Some((selector, company_id)) = self.authorize_relay(mail).await? else {
-            return Ok(RelayDisposition::NotInternal);
-        };
-
-        let ingest = self
-            .ingest_relayed_message(mail, &selector, company_id)
-            .await?;
-        if ingest.accepted {
-            return Ok(RelayDisposition::Relayed);
-        }
-        // A refusal by one of our own channels -- a spent hop budget, a disabled channel, an ACL
-        // -- will read the same way on every retry, so it is reported as definite rather than left
-        // to burn five attempts reaching the same verdict.
-        Ok(RelayDisposition::Refused(
-            ingest
-                .reason()
-                .unwrap_or("The receiving channel refused the message")
-                .to_string(),
-        ))
-    }
-}
-
 #[cfg(test)]
 pub mod test_support;
 
@@ -111,18 +100,6 @@ pub mod test_support;
 mod tests;
 
 pub const MAX_THREAD_MESSAGES_PER_HOUR: usize = 60;
-
-pub fn qualified_email_identity(address: impl Into<String>) -> AppResult<QualifiedIdentity> {
-    let subject = IdentitySubject::parse(address.into().trim().to_ascii_lowercase())
-        .map_err(|error| AppError::Internal(format!("Invalid email identity: {error}")))?;
-    let namespace =
-        IdentityNamespace::parse("email").expect("the fixed email identity namespace is valid");
-    Ok(QualifiedIdentity::new(
-        TransportKind::Email,
-        namespace,
-        subject,
-    ))
-}
 
 /// One RFC Message-ID as an opaque provider message key, for the internal relay that mints them.
 fn external_message_key(id: &MessageId) -> AppResult<ExternalMessageKey> {
@@ -149,193 +126,6 @@ pub struct InboundIngestPorts {
     pub standalone_deliveries: Arc<dyn StandaloneDeliveryEnqueuer>,
 }
 
-#[async_trait]
-pub trait ThreadPersistence: Send + Sync {
-    async fn create_thread(
-        &self,
-        channel_id: Uuid,
-        subject: &str,
-        participant_emails: &[EmailAddress],
-    ) -> AppResult<Thread>;
-
-    async fn get_thread_by_id(&self, id: Uuid) -> AppResult<Option<Thread>>;
-
-    async fn list_threads_by_channel_id(
-        &self,
-        channel_id: Uuid,
-        before: Option<ThreadCursor>,
-        limit: usize,
-    ) -> AppResult<Vec<Thread>>;
-
-    /// Who sent the newest message in each of these threads.
-    ///
-    /// Only the live column asks for this, to tell an agent's reply apart from a person's message
-    /// when marking a thread the reader does not have open. A default of "nothing known" is a safe
-    /// degradation -- the mark is simply not shown -- so test doubles need not implement it.
-    async fn list_thread_last_roles(
-        &self,
-        _thread_ids: &[Uuid],
-    ) -> AppResult<HashMap<Uuid, MessageRole>> {
-        Ok(HashMap::new())
-    }
-
-    /// The channel's threads touched since `after`, oldest first — what a live column has not
-    /// reflected yet. `None` means from the start of the channel.
-    async fn list_threads_updated_after(
-        &self,
-        channel_id: Uuid,
-        after: Option<ThreadCursor>,
-        limit: usize,
-    ) -> AppResult<Vec<Thread>>;
-
-    async fn update_thread_participants(
-        &self,
-        id: Uuid,
-        participant_emails: &[EmailAddress],
-    ) -> AppResult<Thread>;
-
-    async fn find_thread_by_thread_index(
-        &self,
-        channel_id: Uuid,
-        thread_index: &ThreadIndex,
-    ) -> AppResult<Option<Thread>>;
-
-    async fn count_recent_messages(&self, thread_id: Uuid, duration_secs: i64) -> AppResult<usize>;
-
-    /// One canonical message as it appears in one thread.
-    ///
-    /// The reader a queued run starts from: it holds only ids, and this is what turns the one it
-    /// answers back into a message. `None` means the association is gone, which is a task failure
-    /// rather than an empty history.
-    async fn get_thread_message(
-        &self,
-        thread_id: Uuid,
-        message_id: CanonicalMessageId,
-    ) -> AppResult<Option<Message>>;
-
-    /// Find the thread containing this message within a given channel, if any.
-    async fn find_thread_for_message(
-        &self,
-        channel_id: Uuid,
-        message_id: CanonicalMessageId,
-    ) -> AppResult<Option<Thread>>;
-
-    /// The protocol extension stored beside a canonical message.
-    ///
-    /// Kept off [`Message`]: provider headers are reload input for the owning transport, not part
-    /// of the canonical payload read by every message consumer.
-    async fn get_message_protocol_extension(
-        &self,
-        company_id: Uuid,
-        message_id: CanonicalMessageId,
-    ) -> AppResult<ProtocolExtension>;
-
-    /// Store one canonical message and associate it with its thread.
-    ///
-    /// Idempotent per provider key: a redelivery of a message already stored returns what is
-    /// stored. A redelivery whose content changed is refused rather than allowed to rewrite a
-    /// message agents have already read -- see `ExternalMessageCollision`.
-    async fn create_message(&self, write: &MessageWrite) -> AppResult<Message>;
-
-    /// The newest outbound message this thread gained *after* the message named here, if any.
-    ///
-    /// This is the idempotency guard for "has the agent already answered?", and it is deliberately
-    /// positional rather than header-based: a scheduled run and a Slack reply have no `In-Reply-To`
-    /// to match on, and one dispatch produces one reply per thread. Outbound messages that an
-    /// outreach sent are excluded -- those are the agent asking a third party something, not the
-    /// answer to this turn.
-    async fn find_outbound_reply_after(
-        &self,
-        thread_id: Uuid,
-        answering: CanonicalMessageId,
-    ) -> AppResult<Option<Message>>;
-
-    /// Associate a canonical message that already exists with another thread of its own company.
-    ///
-    /// One message, several conversations: an email addressed to three channels is stored once and
-    /// associated three times. The composite foreign key refuses a thread in another company, so a
-    /// caller cannot leak a message across tenants by naming the wrong thread.
-    async fn associate_message(
-        &self,
-        thread_id: Uuid,
-        message: CanonicalMessageId,
-        entry_kind: ThreadEntryKind,
-    ) -> AppResult<Message>;
-
-    /// The newest turns of a thread, oldest first, as a page renders them.
-    ///
-    /// Bounded by `THREAD_HISTORY_LIMIT` at the query: a thread is appended to by everyone who can
-    /// reach the channel, so an unbounded read is a page whose size a correspondent chooses.
-    async fn list_thread_message_views(&self, thread_id: Uuid)
-    -> AppResult<Vec<ThreadMessageView>>;
-
-    /// The turns newer than `after`, oldest first — what a live reader has not seen yet. `None`
-    /// means from the start of the thread.
-    async fn list_thread_message_views_after(
-        &self,
-        thread_id: Uuid,
-        after: Option<MessageCursor>,
-        limit: usize,
-    ) -> AppResult<Vec<ThreadMessageView>>;
-
-    /// One message as a page renders it, reached through the thread it is being read from.
-    async fn get_thread_message_view(
-        &self,
-        thread_id: Uuid,
-        message_id: CanonicalMessageId,
-    ) -> AppResult<Option<ThreadMessageView>>;
-
-    /// The thread so far, as an agent prompt reads it: role, author name, topic, words.
-    async fn list_agent_history(&self, thread_id: Uuid) -> AppResult<Vec<AgentHistoryMessage>>;
-
-    /// What the mail renderer needs to answer this thread's newest turn.
-    ///
-    /// `Some` with empty header fields is the honest answer for a thread whose newest turn came
-    /// over a transport that has none; a caller that needs a `Message-ID` must say what it does
-    /// instead rather than be handed a fabricated one.
-    async fn latest_email_reply_context(
-        &self,
-        thread_id: Uuid,
-    ) -> AppResult<Option<EmailReplyContext>>;
-
-    /// The newest inbound email turn a human final response can safely answer, looking past
-    /// internal notes and agent turns that have no external author address.
-    ///
-    /// Required: falling back to the newest turn would let an internal note or an agent turn
-    /// redirect a human's final response.
-    async fn latest_replyable_email_context(
-        &self,
-        thread_id: Uuid,
-    ) -> AppResult<Option<EmailReplyContext>>;
-
-    /// The newest RFC Message-ID in a thread, looking back past turns with no email headers.
-    async fn latest_thread_rfc_message_id(&self, thread_id: Uuid) -> AppResult<Option<MessageId>>;
-
-    /// One message's operational detail, including the provider keys that reach it.
-    ///
-    /// Company-scoped in the query rather than by the caller's belief: this is the read that would
-    /// otherwise let a guessed association id return another tenant's correlation trail.
-    async fn get_message_audit(
-        &self,
-        company_id: Uuid,
-        association_id: Uuid,
-    ) -> AppResult<Option<MessageAuditView>>;
-
-    /// Create one private note and its immutable lifecycle row in the same transaction.
-    async fn create_internal_note(
-        &self,
-        command: &AddInternalNote,
-        actor: crate::entities::transport::PrincipalId,
-    ) -> AppResult<ThreadMessageView>;
-
-    /// Record removal without deleting or rewriting the canonical note body.
-    async fn tombstone_internal_note(
-        &self,
-        command: &TombstoneInternalNote,
-        actor: crate::entities::transport::PrincipalId,
-    ) -> AppResult<InternalNoteView>;
-}
-
 #[derive(Clone)]
 pub struct ThreadUseCases {
     thread_persistence: Arc<dyn ThreadPersistence>,
@@ -353,7 +143,7 @@ pub struct ThreadUseCases {
     monitoring: Option<Arc<dyn MonitoringService>>,
     /// Woken after a commit wrote workflow-admission intents (p08 D1.4); the worker also polls.
     intent_wakeups: Option<Arc<tokio::sync::Notify>>,
-    config: Arc<AppConfig>,
+    settings: Arc<ThreadSettings>,
 }
 
 /// The stores one [`ThreadUseCases`] reads and writes.
@@ -374,7 +164,7 @@ impl ThreadUseCases {
         stores: ThreadStores,
         ingest: InboundIngestPorts,
         renderers: Arc<TransportRenderers>,
-        config: Arc<AppConfig>,
+        settings: Arc<ThreadSettings>,
     ) -> Self {
         let deliveries = DeliveryComposer::new(renderers, ingest.bindings.clone());
 
@@ -390,7 +180,7 @@ impl ThreadUseCases {
             deliveries,
             monitoring: None,
             intent_wakeups: None,
-            config,
+            settings,
         }
     }
 
@@ -430,258 +220,6 @@ impl ThreadUseCases {
         } else {
             SenderTrust::Stranger
         })
-    }
-
-    pub fn config(&self) -> &Arc<AppConfig> {
-        &self.config
-    }
-
-    async fn resolve_internal_destination(
-        &self,
-        source_channel_id: Uuid,
-        selector: &ChannelSelector,
-    ) -> AppResult<Option<(Channel, Channel, Company)>> {
-        let source = self
-            .channel_persistence
-            .get_by_id(source_channel_id)
-            .await?
-            .ok_or_else(|| AppError::Internal("Internal source channel was not found".into()))?;
-        let target = match selector {
-            ChannelSelector::CurrentCompany(channel_slug) => self
-                .channel_persistence
-                .list_by_company_id(source.company_id)
-                .await?
-                .into_iter()
-                .find(|channel| channel.matches_slug(channel_slug)),
-            ChannelSelector::Qualified { company, channel } => {
-                self.channel_persistence
-                    .get_by_company_slug_and_channel_slug(company, channel)
-                    .await?
-            }
-        }
-        .ok_or_else(|| {
-            AppError::Internal(format!("Platform channel does not exist: {selector}"))
-        })?;
-        if source.company_id != target.company_id {
-            return Err(AppError::Internal(
-                "Cross-company internal channel delivery is not allowed".into(),
-            ));
-        }
-        if source.id == target.id {
-            return Err(AppError::Internal(
-                "A channel cannot deliver an internal message to itself".into(),
-            ));
-        }
-        if !target.enabled {
-            return Err(AppError::Internal(format!(
-                "Target channel '{}' is disabled",
-                target.slug
-            )));
-        }
-        let company = self
-            .company_persistence
-            .get_by_id(source.company_id)
-            .await?
-            .ok_or_else(|| AppError::Internal("Internal source company was not found".into()))?;
-        if selector
-            .company()
-            .is_some_and(|selected| !company.slug.eq_ignore_ascii_case(selected))
-        {
-            return Err(AppError::Internal(
-                "Internal recipient company does not match the source company".into(),
-            ));
-        }
-        Ok(Some((source, target, company)))
-    }
-
-    /// Ingest a message one channel's agent addressed to another channel of the same company.
-    ///
-    /// The relay is a *transport*, so it produces exactly what any other transport produces: an
-    /// [`InboundDraft`] and an [`InboundRouting`], built here from resolved values. Nothing is
-    /// rendered to RFC 5322 and re-parsed -- the previous shape serialized an outbound email purely
-    /// so the ingress path would have something email-shaped to read back.
-    ///
-    /// Authentication is the relay's own identity, not a header and not a fabricated DMARC pass:
-    /// [`IngressOrigin::InternalChannel`] can only be constructed by this path, and the guard
-    /// checks the stated source channel against it.
-    async fn ingest_relayed_message(
-        &self,
-        mail: &InternalRelayMail<'_>,
-        selector: &ChannelSelector,
-        company_id: Uuid,
-    ) -> AppResult<InboundIngestResult> {
-        let message = self.internal_inbound_message(mail, selector, company_id)?;
-        self.ingest(message).await
-    }
-
-    /// The canonical inbound message one internal hop produces.
-    ///
-    /// Every provider key is derived from the relay's own RFC ids, so the receiving channel
-    /// deduplicates a repeated hop exactly as it would a repeated delivery from outside.
-    fn internal_inbound_message(
-        &self,
-        mail: &InternalRelayMail<'_>,
-        selector: &ChannelSelector,
-        company_id: Uuid,
-    ) -> AppResult<InboundMessage> {
-        let metadata = EmailMessageMetadata::new(mail.message_id.clone())
-            .in_reply_to(mail.in_reply_to.cloned())
-            .references(mail.references.to_vec())
-            .raw_bodies(Some(mail.body_text.to_string()), None);
-        let author = qualified_email_identity(mail.from.clone())?;
-        let recipient_handle = qualified_email_identity(mail.recipient_to.clone())?;
-
-        let quiet_body = crate::entities::channel::strip_quiet_prefix(mail.body_text);
-        let disposition = if quiet_body.is_some() {
-            MessageDisposition::FileOnly
-        } else {
-            MessageDisposition::Answer
-        };
-        let draft = InboundDraft {
-            direct_parent_message_key: metadata
-                .direct_parent_id()
-                .map(external_message_key)
-                .transpose()?,
-            // No durable inbound event: the relay hands the message over in-process, and this
-            // ingest is the only claim on it.
-            event_key: None,
-            message_key: external_message_key(&metadata.rfc_message_id)?,
-            thread_key: external_thread_key(metadata.conversation_root_key())?,
-            reply_message_keys: BoundedVec::parse(
-                "reply message candidates",
-                metadata
-                    .reference_candidates()
-                    .iter()
-                    .map(external_message_key)
-                    .collect::<AppResult<Vec<_>>>()?,
-            )?,
-            reply_thread_keys: BoundedVec::parse(
-                "reply thread candidates",
-                vec![external_thread_key(metadata.conversation_root_key())?],
-            )?,
-            author,
-            addressed: BoundedVec::parse(
-                "addressed identities",
-                vec![AddressedIdentity::new(
-                    RecipientRole::To,
-                    recipient_handle.clone(),
-                )],
-            )?,
-            content: CanonicalContent::parse(mail.subject, quiet_body.unwrap_or(mail.body_text))?,
-            attachments: BoundedVec::empty(),
-            directives: IngressDirectives {
-                hop_count: mail.hop_count,
-                trace_channels: BoundedVec::parse("trace channels", mail.trace.clone())?,
-                disposition,
-                source_channel_id: Some(mail.source_channel_id),
-                target_thread_id: None,
-                reply_to_message_id: None,
-                // An agent answering another agent is machine-generated by construction; the guard
-                // exempts the internal path precisely because this is expected here.
-                is_auto_reply: true,
-                is_forwarded: false,
-            },
-            // The relay is trusted because of who ran it, not because of a verdict it could
-            // fabricate. There is no `AuthVerdict` on this path at all.
-            policy: IngressPolicyFacts::TrustedApplication,
-            // Carried, never re-minted: agent A's run and agent B's run are one chain.
-            correlation_id: mail.correlation_id,
-            extension: ProtocolExtension::email(metadata),
-        };
-
-        let routing = InboundRouting::parse(vec![AddressedRecipient {
-            role: RecipientRole::To,
-            handle: recipient_handle,
-            target: AddressedTarget::Channels(vec![selector.clone()]),
-            disposition,
-        }])?;
-
-        Ok(InboundMessage::arriving(
-            draft,
-            routing,
-            IngressOrigin::InternalChannel {
-                company_id,
-                channel_id: mail.source_channel_id,
-            },
-        ))
-    }
-
-    /// Everything an internal hop has to be true for before it is ingested on the target channel.
-    ///
-    /// The sender address is checked against the channel the mail *claims* to come from, so a
-    /// relayed message cannot borrow another channel's identity: the ingress guard trusts
-    /// [`IngressOrigin::InternalChannel`] absolutely, and this is what earns that trust.
-    async fn authorize_relay(
-        &self,
-        mail: &InternalRelayMail<'_>,
-    ) -> AppResult<Option<(ChannelSelector, Uuid)>> {
-        let Some((source, _target, company)) = self
-            .resolve_internal_destination(mail.source_channel_id, mail.target)
-            .await?
-        else {
-            return Ok(None);
-        };
-        let expected_sender =
-            Channel::address_for(&source.slug, &company.slug, &self.config.app_domain_name);
-        if !mail.from.eq_ignore_ascii_case(&expected_sender) {
-            return Err(AppError::Internal(
-                "Internal sender address does not match its source channel".into(),
-            ));
-        }
-        Ok(Some((mail.target.clone(), company.id)))
-    }
-
-    /// Tell a sender their message could not be routed.
-    ///
-    /// The HTTP request task that calls this method is supervised; this method makes the work
-    /// durable before that task returns. The generic delivery worker owns every provider attempt,
-    /// including retry and ambiguous-outcome handling.
-    pub async fn handle_bounce_dispatch(&self, ingest: &InboundIngestResult) -> AppResult<()> {
-        let Some(bounce) = ingest.bounce_info() else {
-            return Ok(());
-        };
-        let body = format_bounce_email_body(bounce, &self.config.app_domain_name);
-        let subject = if bounce
-            .original_subject
-            .to_ascii_lowercase()
-            .starts_with("[undeliverable]")
-        {
-            bounce.original_subject.clone()
-        } else {
-            format!("[Undeliverable] {}", bounce.original_subject)
-        };
-        let content = CanonicalContent::parse(subject, body)
-            .map_err(|error| AppError::Internal(error.to_string()))?;
-        let serialized = serde_json::to_vec(bounce).map_err(|error| {
-            AppError::Internal(format!("Could not key a rejection bounce: {error}"))
-        })?;
-        let source_key = format!("bounce:{:x}", Sha256::digest(serialized));
-        let delivery = self
-            .deliveries
-            .compose_standalone(StandaloneDeliveryRequest {
-                company_id: bounce.company_id,
-                correlation_id: CorrelationId::new(),
-                purpose: crate::entities::transport::DeliveryPurpose::Notification,
-                source_key,
-                content: &content,
-                context: crate::transport::DeliveryContext::Email(
-                    crate::transport::EmailDeliveryContext {
-                        from: EmailAddress::from(format!(
-                            "mailer-daemon@{}",
-                            self.config.app_domain_name
-                        )),
-                        from_name: Some("Mail Agents Server".to_string()),
-                        recipient_to: bounce.recipient_to.clone(),
-                        recipients_cc: Vec::new(),
-                        threading: crate::transport::EmailThreading::Standalone,
-                        relay: None,
-                    },
-                ),
-            })?;
-        self.standalone_deliveries
-            .enqueue_standalone_delivery(delivery)
-            .await?;
-        Ok(())
     }
 
     /// A thread the viewer may read, found by its whole path: the channel must be one the viewer
@@ -852,161 +390,6 @@ impl ThreadUseCases {
         Ok(None)
     }
 
-    /// Ingest a canonical message into a channel without synthesizing or parsing raw MIME strings.
-    ///
-    /// This is the protocol-agnostic entry point for trusted application callers (Web UI,
-    /// schedulers, internal tools, APIs). It validates tenant channel scope, resolves or verifies
-    /// target conversation/parent message, constructs a typed canonical inbound message, attaches
-    /// email extension metadata for outbound delivery threading when applicable, and runs the ingest pipeline.
-    pub async fn ingest_canonical(
-        &self,
-        ingress: CanonicalMessageIngress,
-    ) -> AppResult<InboundIngestResult> {
-        let company = self
-            .company_persistence
-            .get_by_id(ingress.company_id)
-            .await?
-            .ok_or_else(|| {
-                AppError::NotFound(format!("Company {} not found", ingress.company_id))
-            })?;
-
-        let channel = self
-            .channel_persistence
-            .get_by_id(ingress.channel_id)
-            .await?
-            .ok_or_else(|| {
-                AppError::NotFound(format!(
-                    "Channel {} not found in company {}",
-                    ingress.channel_id, ingress.company_id
-                ))
-            })?;
-
-        if channel.company_id != company.id {
-            return Ok(InboundIngestResult::rejected(
-                IngestRejection::UnknownRecipient,
-            ));
-        }
-
-        let target_thread = self
-            .resolve_target_thread(
-                channel.id,
-                ingress.target_thread_id,
-                ingress.reply_to_message_id,
-            )
-            .await?;
-
-        if (ingress.target_thread_id.is_some() || ingress.reply_to_message_id.is_some())
-            && target_thread.is_none()
-        {
-            return Ok(InboundIngestResult::rejected(
-                IngestRejection::UnknownRecipient,
-            ));
-        }
-
-        let target_thread_id = target_thread
-            .as_ref()
-            .map(|t| t.id)
-            .or(ingress.target_thread_id);
-
-        let subject = match ingress.subject {
-            Some(s) if !s.trim().is_empty() => s,
-            _ => match &target_thread {
-                Some(thread) => thread.reply_subject(),
-                None => "New conversation".to_string(),
-            },
-        };
-
-        let in_reply_to_rfc = self
-            .resolve_in_reply_to_rfc(company.id, target_thread_id, ingress.reply_to_message_id)
-            .await?;
-
-        let msg_uuid = Uuid::new_v4();
-        let rfc_message_id = MessageId::from(format!(
-            "<{msg_uuid}@{}.{}>",
-            company.slug, self.config.app_domain_name
-        ));
-        let mut metadata = EmailMessageMetadata::new(rfc_message_id.clone())
-            .raw_bodies(Some(ingress.text_body.clone()), None);
-        if let Some(parent_rfc) = in_reply_to_rfc.as_ref() {
-            metadata = metadata
-                .in_reply_to(Some(parent_rfc.clone()))
-                .references(vec![parent_rfc.clone()]);
-        }
-        let direct_parent_message_key = metadata
-            .direct_parent_id()
-            .map(external_message_key)
-            .transpose()?;
-        let extension = ProtocolExtension::email(metadata);
-
-        let message_key = external_message_key(&rfc_message_id)?;
-        let thread_key = external_thread_key(in_reply_to_rfc.as_ref().unwrap_or(&rfc_message_id))?;
-
-        let reply_message_keys = match &in_reply_to_rfc {
-            Some(ref_id) => BoundedVec::parse(
-                "reply message candidates",
-                vec![external_message_key(ref_id)?],
-            )?,
-            None => BoundedVec::empty(),
-        };
-
-        let channel_address = channel.inbound_address(&company.slug, &self.config.app_domain_name);
-        let recipient_handle = qualified_email_identity(channel_address)?;
-
-        let selector = ChannelSelector::Qualified {
-            company: company.slug.clone(),
-            channel: channel.slug.clone(),
-        };
-
-        let draft = InboundDraft {
-            direct_parent_message_key,
-            event_key: None,
-            message_key,
-            thread_key,
-            reply_message_keys,
-            reply_thread_keys: BoundedVec::empty(),
-            author: ingress.author.clone(),
-            addressed: BoundedVec::parse(
-                "addressed identities",
-                vec![AddressedIdentity::new(
-                    RecipientRole::To,
-                    recipient_handle.clone(),
-                )],
-            )?,
-            content: CanonicalContent::parse(subject, ingress.text_body)?,
-            attachments: BoundedVec::parse("attachments", ingress.attachments)?,
-            directives: IngressDirectives {
-                hop_count: 0,
-                trace_channels: BoundedVec::empty(),
-                disposition: ingress.disposition,
-                source_channel_id: None,
-                target_thread_id,
-                reply_to_message_id: ingress.reply_to_message_id,
-                is_auto_reply: false,
-                is_forwarded: false,
-            },
-            policy: IngressPolicyFacts::TrustedApplication,
-            correlation_id: ingress.correlation_id.unwrap_or_else(CorrelationId::new),
-            extension,
-        };
-
-        let routing = InboundRouting::parse(vec![AddressedRecipient {
-            role: RecipientRole::To,
-            handle: recipient_handle,
-            target: AddressedTarget::Channels(vec![selector]),
-            disposition: ingress.disposition,
-        }])?;
-
-        let message = InboundMessage {
-            draft,
-            routing,
-            origin: ingress.origin,
-            reply_delivery: ingress.reply_delivery,
-            unusable_hints: Vec::new(),
-        };
-
-        self.ingest(message).await
-    }
-
     /// One message's operational detail, for an authorized diagnostic pane.
     pub async fn get_message_audit(
         &self,
@@ -1168,182 +551,6 @@ impl ChannelMatch {
         self.matched_slug
             .clone()
             .unwrap_or_else(|| self.channel.slug.clone())
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct BounceSuggestion {
-    pub invalid_slug: ChannelSlug,
-    pub suggestions: Vec<ChannelSlug>,
-}
-
-/// One channel the bouncing sender could have written to instead.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ChannelDirectoryEntry {
-    pub address: EmailAddress,
-    pub name: String,
-    pub description: Option<String>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct BounceInfo {
-    /// The provider message this notification answers. Included in the delivery key so a webhook
-    /// redelivery is absorbed without merging two distinct rejected messages with the same
-    /// subject.
-    pub source_message_key: ExternalMessageKey,
-    pub recipient_to: EmailAddress,
-    /// The company whose address was mailed. A bounce is only ever earned once an address resolved
-    /// to a company, and the queued notice belongs to that company.
-    pub company_id: Uuid,
-    pub company_slug: CompanySlug,
-    pub invalid_slugs: Vec<ChannelSlug>,
-    /// Channels that exist but are switched off. Defaulted on deserialize so bounces queued
-    /// before this field existed still re-hydrate.
-    #[serde(default)]
-    pub disabled_slugs: Vec<ChannelSlug>,
-    pub suggestions: Vec<BounceSuggestion>,
-    /// The channels this sender may write to, listed only when they are on the company's team.
-    ///
-    /// Empty for everyone else, so a stranger who guesses at an address never learns the company's
-    /// channel directory from the bounce it earns. Defaulted on deserialize for the same reason as
-    /// `disabled_slugs`.
-    #[serde(default)]
-    pub available_channels: Vec<ChannelDirectoryEntry>,
-    pub original_subject: String,
-}
-
-pub fn format_bounce_email_body(bounce: &BounceInfo, app_domain: &str) -> String {
-    let domain_part = format!("{}.{app_domain}", bounce.company_slug);
-
-    let mut body = String::new();
-    body.push_str("Undeliverable Mail Notification\n\n");
-    body.push_str(&format!(
-        "Your email could not be delivered because {}.\n\n",
-        bounce_cause(bounce)
-    ));
-
-    body.push_str(&format!("Company Domain: {domain_part}\n\n"));
-
-    body.push_str("Details:\n");
-    for s in &bounce.suggestions {
-        body.push_str(&format!(
-            "  - Invalid Channel Slug: '{}@{}'\n",
-            s.invalid_slug, domain_part
-        ));
-        if !s.suggestions.is_empty() {
-            body.push_str("    Did you mean:\n");
-            for sug in &s.suggestions {
-                body.push_str(&format!("      * {sug}@{domain_part}\n"));
-            }
-        } else {
-            body.push_str("    No similar channel suggestions found.\n");
-        }
-        body.push('\n');
-    }
-
-    for slug in &bounce.disabled_slugs {
-        body.push_str(&format!(
-            "  - Disabled Channel: '{slug}@{domain_part}'\n    This address is correct, but the \
-             channel is currently switched off and is not accepting mail.\n\n"
-        ));
-    }
-
-    push_channel_directory(&mut body, &bounce.available_channels);
-
-    body.push_str("Please check the channel address and try sending your email again.\n");
-    body
-}
-
-/// The "here is what you could have written to" section, appended only for a sender the platform
-/// recognizes as one of the company's own people.
-///
-/// Nothing at all is rendered for an empty list, so a stranger's bounce is byte-for-byte what it
-/// was before this section existed.
-fn push_channel_directory(body: &mut String, entries: &[ChannelDirectoryEntry]) {
-    if entries.is_empty() {
-        return;
-    }
-
-    body.push_str("Channels you can write to:\n");
-    for entry in entries {
-        body.push_str(&format!("  - {} \u{2014} {}\n", entry.address, entry.name));
-        if let Some(description) = entry.description.as_deref().map(str::trim)
-            && !description.is_empty()
-        {
-            body.push_str(&format!("      {description}\n"));
-        }
-    }
-    body.push('\n');
-}
-
-/// The reply `_help@{company}.{app_domain}` sends back.
-///
-/// `entries` is whatever [`ThreadUseCases::writable_channel_directory`] allowed this sender, so the
-/// team-only rule is decided there rather than restated here; an empty list still gets the syntax
-/// section, which discloses nothing about the company.
-///
-/// Every example below is checked against the real parsers: the `+` split in
-/// `parse_recipient_address_pipeline`, the separators in `strip_context_suffix_from_slug`, and the
-/// bracket forms in `EmailParser::check_body_context_trigger`.
-pub fn format_help_email_body(
-    entries: &[ChannelDirectoryEntry],
-    company_slug: &CompanySlug,
-    app_domain: &str,
-) -> String {
-    let domain_part = format!("{company_slug}.{app_domain}");
-    let example = entries
-        .first()
-        .map(|entry| {
-            entry
-                .address
-                .split('@')
-                .next()
-                .unwrap_or("support")
-                .to_string()
-        })
-        .unwrap_or_else(|| "support".to_string());
-
-    let mut body = String::from("Mail Agents Help\n\n");
-    push_channel_directory(&mut body, entries);
-    if entries.is_empty() {
-        body.push_str(
-            "You are not currently a participant of any channel in this company, so there is \
-             nothing to list. Ask a colleague to add you.\n\n",
-        );
-    }
-
-    body.push_str("Addressing tricks:\n");
-    body.push_str(&format!(
-        "  {example}+billing@{domain_part}\n      Send to both channels, in that order.\n"
-    ));
-    body.push_str(&format!(
-        "  {example}+quiet@{domain_part}\n      File it on the thread without running the agent.\n"
-    ));
-    body.push_str(
-        "  [[quiet]]\n      As the first thing in the body, does the same as +quiet.\n\n",
-    );
-    body.push_str(&format!(
-        "  {} all mean \"file it, don't answer\", and attach to a\n  channel name with '+', '.', \
-         '-' or '_'.\n\n",
-        crate::entities::channel::RESERVED_SLUG_SUFFIXES.join(", ")
-    ));
-
-    body.push_str("Reply to this address at any time to see this again.\n");
-    body
-}
-
-/// The one sentence that says why a bounce happened, for both bounce renderers.
-pub fn bounce_cause(bounce: &BounceInfo) -> &'static str {
-    match (
-        !bounce.invalid_slugs.is_empty(),
-        !bounce.disabled_slugs.is_empty(),
-    ) {
-        (true, true) => {
-            "one or more channel addresses were not found or misspelled, and one or more are disabled"
-        }
-        (true, false) => "one or more channel addresses were not found or misspelled",
-        (false, true) => "one or more channels are currently disabled",
-        (false, false) => "the message could not be routed",
     }
 }
 

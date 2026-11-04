@@ -19,27 +19,23 @@ use serde::Deserialize;
 use tracing::instrument;
 use uuid::Uuid;
 
-use crate::{
-    adapters::http::{
-        app_state::AppState,
-        auth::{AuthError, AuthenticatedUser},
-        pages,
-    },
-    app_error::{AppError, AppResult},
-    entities::{
-        channel::Channel,
-        company::{Company, CompanyAccess},
-        schedule::ChannelSchedule,
-        value_objects::EmailAddress,
-    },
-    infra::config::AppConfig,
-    use_cases::{
-        channel::{ChannelUseCases, ChannelWrite},
-        company::CompanyUseCases,
-        schedule::ScheduleUseCases,
-        user::UserUseCases,
-    },
-};
+use crate::adapters::http::app_state::AppState;
+use crate::adapters::http::auth::AuthError;
+use crate::adapters::http::auth::AuthenticatedUser;
+use crate::adapters::http::pages;
+use crate::app_error::AppError;
+use crate::app_error::AppResult;
+use crate::application::ports::channel::ChannelWrite;
+use crate::entities::channel::Channel;
+use crate::entities::company::Company;
+use crate::entities::company::CompanyAccess;
+use crate::entities::schedule::ChannelSchedule;
+use crate::entities::value_objects::EmailAddress;
+use crate::infra::config::AppConfig;
+use crate::use_cases::channel::ChannelUseCases;
+use crate::use_cases::company::CompanyUseCases;
+use crate::use_cases::schedule::ScheduleUseCases;
+use crate::use_cases::user::UserUseCases;
 
 use super::{
     channel::{ChannelForm, parse_emails_form, parse_list_form, parse_text_form, slugify},

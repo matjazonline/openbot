@@ -3,8 +3,9 @@
 //! its claimed execution.
 use super::*;
 use crate::adapters::{protocols::email::EmailRenderer, workflow_message::MessageRuntime};
+use crate::application::ports::channel::ChannelPersistence;
+use crate::application::ports::channel::ChannelWrite;
 use crate::application::transport::{DeliveryComposer, TransportRenderers};
-use crate::application::use_cases::channel::{ChannelPersistence, ChannelWrite};
 use crate::application::workflow::{
     activation::{ActivationRequest, WorkflowJobId},
     lease::{ClaimedWorkflow, LeasePolicy, WorkflowWorkerId},

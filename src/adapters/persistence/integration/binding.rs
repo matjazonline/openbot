@@ -12,21 +12,20 @@ use super::{
     AuditEventDb, BindingDb, active_binding_select, binding_select, encoded_provenance,
     stored_reason,
 };
-use crate::{
-    adapters::persistence::PostgresPersistence,
-    app_error::{AppError, AppResult},
-    entities::{
-        creation::CreationProvenance,
-        transport::{
-            BindingAuditAction, BindingAuditEvent, BindingChangeReason, ChannelBinding,
-            ChannelBindingId,
-        },
-    },
-    use_cases::integration::{
-        BindingStatusChange, BindingWrite, ChannelBindingPersistence, InboundEndpoint,
-        MAX_BINDING_AUDIT_EVENTS,
-    },
-};
+use crate::adapters::persistence::PostgresPersistence;
+use crate::app_error::AppError;
+use crate::app_error::AppResult;
+use crate::application::ports::integration::BindingStatusChange;
+use crate::application::ports::integration::BindingWrite;
+use crate::application::ports::integration::ChannelBindingPersistence;
+use crate::application::ports::integration::InboundEndpoint;
+use crate::application::ports::integration::MAX_BINDING_AUDIT_EVENTS;
+use crate::entities::creation::CreationProvenance;
+use crate::entities::transport::BindingAuditAction;
+use crate::entities::transport::BindingAuditEvent;
+use crate::entities::transport::BindingChangeReason;
+use crate::entities::transport::ChannelBinding;
+use crate::entities::transport::ChannelBindingId;
 
 /// The Postgres unique-violation class. A binding write hits it when two channels try to claim the
 /// same external endpoint, which is ordinary contention rather than a fault.

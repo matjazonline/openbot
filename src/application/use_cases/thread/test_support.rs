@@ -20,52 +20,81 @@ use chrono::{DateTime, Utc};
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
-use crate::{
-    app_error::{AppError, AppResult},
-    entities::participant::{IdentityClaimMetadata, IdentityProvenance},
-    entities::{
-        correlation::CorrelationId,
-        creation::CreationProvenance,
-        cursor::{MessageCursor, ThreadCursor},
-        email_message::EmailMessageMetadata,
-        internal_note::{AddInternalNote, InternalNoteView, TombstoneInternalNote},
-        message::{
-            AttachmentMetadata, CanonicalMessageId, Message, MessageAuthor, MessageDirection,
-            MessageParticipant, MessageParticipantKind, MessageRole,
-        },
-        message_view::{
-            AgentHistoryMessage, AuthorView, EmailReplyContext, MessageAuditView,
-            THREAD_HISTORY_LIMIT, ThreadMessageView,
-        },
-        thread::{Thread, ThreadParticipantProjection},
-        transport::{
-            BindingAccessPolicy, BindingAccessSnapshot, BindingAuditEvent, BindingDeliveryPolicy,
-            BindingStatus, ChannelBinding, ChannelBindingId, EndpointNamespace,
-            ExternalEndpointKey, ExternalMessageKey, ExternalThreadKey, ParticipantIdentityId,
-            PrincipalId, QualifiedIdentity, TransportKind,
-        },
-        value_objects::{EmailAddress, MessageId, ThreadIndex},
-    },
-    infra::config::AppConfig,
-    transport::{
-        CommitDisposition, DeliveryCreation, ExternalCorrelationStore, InboundCommitOutcome,
-        InboundCommitRequest, InboundEnvelope, InboundMessageCommitter, NewStandaloneDelivery,
-        StandaloneDeliveryEnqueuer, ThreadTarget,
-    },
-    use_cases::{
-        channel::ChannelPersistence,
-        company::CompanyPersistence,
-        integration::{
-            BindingStatusChange, BindingWrite, ChannelBindingPersistence, InboundEndpoint,
-        },
-        participant::test_support::{principal_for_email, principal_for_identity},
-        participant::{IdentityObservation, ParticipantPersistence},
-        thread::{
-            InboundIngestPorts, MessageAuthorWrite, MessageCorrelation, MessageParticipantWrite,
-            MessageWrite, ThreadPersistence, ThreadStores, ThreadUseCases,
-        },
-    },
-};
+use crate::app_error::AppError;
+use crate::app_error::AppResult;
+use crate::application::ports::channel::ChannelPersistence;
+use crate::application::ports::integration::BindingStatusChange;
+use crate::application::ports::integration::BindingWrite;
+use crate::application::ports::integration::ChannelBindingPersistence;
+use crate::application::ports::integration::InboundEndpoint;
+use crate::application::ports::participant::IdentityObservation;
+use crate::application::ports::thread::MessageAuthorWrite;
+use crate::application::ports::thread::MessageCorrelation;
+use crate::application::ports::thread::MessageParticipantWrite;
+use crate::application::ports::thread::MessageWrite;
+use crate::application::ports::thread::ThreadPersistence;
+use crate::application::settings::ThreadSettings;
+use crate::entities::correlation::CorrelationId;
+use crate::entities::creation::CreationProvenance;
+use crate::entities::cursor::MessageCursor;
+use crate::entities::cursor::ThreadCursor;
+use crate::entities::email_message::EmailMessageMetadata;
+use crate::entities::internal_note::AddInternalNote;
+use crate::entities::internal_note::InternalNoteView;
+use crate::entities::internal_note::TombstoneInternalNote;
+use crate::entities::message::AttachmentMetadata;
+use crate::entities::message::CanonicalMessageId;
+use crate::entities::message::Message;
+use crate::entities::message::MessageAuthor;
+use crate::entities::message::MessageDirection;
+use crate::entities::message::MessageParticipant;
+use crate::entities::message::MessageParticipantKind;
+use crate::entities::message::MessageRole;
+use crate::entities::message_view::AgentHistoryMessage;
+use crate::entities::message_view::AuthorView;
+use crate::entities::message_view::EmailReplyContext;
+use crate::entities::message_view::MessageAuditView;
+use crate::entities::message_view::THREAD_HISTORY_LIMIT;
+use crate::entities::message_view::ThreadMessageView;
+use crate::entities::participant::IdentityClaimMetadata;
+use crate::entities::participant::IdentityProvenance;
+use crate::entities::thread::Thread;
+use crate::entities::thread::ThreadParticipantProjection;
+use crate::entities::transport::BindingAccessPolicy;
+use crate::entities::transport::BindingAccessSnapshot;
+use crate::entities::transport::BindingAuditEvent;
+use crate::entities::transport::BindingDeliveryPolicy;
+use crate::entities::transport::BindingStatus;
+use crate::entities::transport::ChannelBinding;
+use crate::entities::transport::ChannelBindingId;
+use crate::entities::transport::EndpointNamespace;
+use crate::entities::transport::ExternalEndpointKey;
+use crate::entities::transport::ExternalMessageKey;
+use crate::entities::transport::ExternalThreadKey;
+use crate::entities::transport::ParticipantIdentityId;
+use crate::entities::transport::PrincipalId;
+use crate::entities::transport::QualifiedIdentity;
+use crate::entities::transport::TransportKind;
+use crate::entities::value_objects::EmailAddress;
+use crate::entities::value_objects::MessageId;
+use crate::entities::value_objects::ThreadIndex;
+use crate::transport::CommitDisposition;
+use crate::transport::DeliveryCreation;
+use crate::transport::ExternalCorrelationStore;
+use crate::transport::InboundCommitOutcome;
+use crate::transport::InboundCommitRequest;
+use crate::transport::InboundEnvelope;
+use crate::transport::InboundMessageCommitter;
+use crate::transport::NewStandaloneDelivery;
+use crate::transport::StandaloneDeliveryEnqueuer;
+use crate::transport::ThreadTarget;
+use crate::use_cases::company::CompanyPersistence;
+use crate::use_cases::participant::ParticipantPersistence;
+use crate::use_cases::participant::test_support::principal_for_email;
+use crate::use_cases::participant::test_support::principal_for_identity;
+use crate::use_cases::thread::InboundIngestPorts;
+use crate::use_cases::thread::ThreadStores;
+use crate::use_cases::thread::ThreadUseCases;
 
 impl ThreadUseCases {
     pub fn for_test(
@@ -73,13 +102,13 @@ impl ThreadUseCases {
         channel_persistence: Arc<dyn ChannelPersistence>,
         company_persistence: Arc<dyn CompanyPersistence>,
         participant_persistence: Arc<dyn ParticipantPersistence>,
-        config: Arc<AppConfig>,
+        config: Arc<ThreadSettings>,
     ) -> Self {
         let ingest = InMemoryIngress::ports(thread_persistence.clone());
         let renderers = Arc::new(
             crate::transport::ports::TransportRenderers::new()
                 .register(Arc::new(
-                    crate::adapters::protocols::email::EmailRenderer::new(&config.app_domain_name),
+                    crate::adapters::protocols::email::EmailRenderer::new(&config.mail_domain),
                 ))
                 .expect("one renderer registers"),
         );
@@ -492,7 +521,7 @@ impl ThreadPersistence for InMemoryThreads {
         &self,
         _company_id: Uuid,
         message_id: CanonicalMessageId,
-    ) -> AppResult<crate::transport::ProtocolExtension> {
+    ) -> AppResult<crate::application::ports::thread::ProtocolExtension> {
         let metadata = self
             .store
             .lock()
@@ -502,8 +531,8 @@ impl ThreadPersistence for InMemoryThreads {
             .find(|message| message.id == message_id)
             .and_then(|message| message.email.clone());
         Ok(metadata.map_or_else(
-            crate::transport::ProtocolExtension::none,
-            crate::transport::ProtocolExtension::email,
+            crate::application::ports::thread::ProtocolExtension::none,
+            crate::application::ports::thread::ProtocolExtension::email,
         ))
     }
 
@@ -1610,7 +1639,8 @@ impl crate::use_cases::thread::ThreadUseCases {
             }
             _ => EmailIngressTrust::Application,
         };
-        let accepted = EmailIngressAdapter::for_config(self.config()).accept(payload, trust)?;
+        let accepted =
+            EmailIngressAdapter::new(&self.settings.mail_domain).accept(payload, trust)?;
         self.ingest(accepted.into_inbound(origin, crate::use_cases::thread::ReplyDelivery::Send))
             .await
     }

@@ -35,7 +35,8 @@ impl Fixture {
         let admin = teammate(&persistence, company, "admin").await;
         Some(Self {
             _db: db,
-            engine: Arc::new(WorkflowEngine::for_tests(persistence.clone())),
+            engine: crate::infra::workflow::WorkflowEngine::for_tests(persistence.clone())
+                .services(),
             persistence,
             owner,
             company,
@@ -54,7 +55,7 @@ impl Fixture {
             users: Arc::new(UserUseCases::new(
                 Arc::new(crate::infra::argon2_password_hasher()),
                 shared.clone(),
-                "test-attempt-secret",
+                ("test-attempt-secret").into(),
             )),
             agents: Arc::new(AgentUseCases::new(
                 shared.clone(),
@@ -159,7 +160,8 @@ impl Fixture {
     /// A channel of the company; `restricted` makes it one an admin who is not on its allowlist
     /// cannot see (the owner still can).
     async fn channel(&self, name: &str, slug: &str, restricted: bool) -> Uuid {
-        use crate::use_cases::channel::{ChannelPersistence, ChannelWrite};
+        use crate::application::ports::channel::ChannelPersistence;
+        use crate::application::ports::channel::ChannelWrite;
         let channel = ChannelPersistence::create(
             &self.persistence,
             self.company,

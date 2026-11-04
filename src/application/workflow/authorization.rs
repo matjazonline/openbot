@@ -1,8 +1,8 @@
 use super::CompanyId;
 use crate::application::app_error::{AppError, AppResult};
-use crate::application::use_cases::channel::ChannelPersistence;
-use crate::application::use_cases::participant::PrincipalAccessPersistence;
-use crate::application::use_cases::thread::ThreadPersistence;
+use crate::application::ports::channel::ChannelPersistence;
+use crate::application::ports::participant::PrincipalAccessPersistence;
+use crate::application::ports::thread::ThreadPersistence;
 use crate::domain::entities::channel::Channel;
 use crate::domain::entities::thread::Thread;
 use async_trait::async_trait;

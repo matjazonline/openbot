@@ -12,32 +12,32 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use super::*;
-use crate::{
-    adapters::{
-        persistence::{
-            PostgresPersistence, credentials::CredentialCipher, test_support::test_pool,
-        },
-        protocols::email::EmailEndpointKey,
-    },
-    entities::{
-        channel::Channel,
-        transport::{
-            BindingAccessSnapshot, BindingAuditAction, BindingChangeReason, InstallationStatus,
-            IntegrationCredentialKind, TransportKind,
-        },
-        value_objects::ChannelSlug,
-    },
-    use_cases::{
-        channel::{ChannelPersistence, ChannelWrite},
-        company::{CompanyPersistence, CompanyWrite},
-        integration::{
-            BindingStatusChange, BindingWrite, ChannelBindingPersistence, CredentialScope,
-            InboundEndpoint, InstallationCredentialStore, InstallationPersistence,
-            InstallationStatusChange, InstallationWrite,
-        },
-        user::UserPersistence,
-    },
-};
+use crate::adapters::persistence::PostgresPersistence;
+use crate::adapters::persistence::credentials::CredentialCipher;
+use crate::adapters::persistence::test_support::test_pool;
+use crate::adapters::protocols::email::EmailEndpointKey;
+use crate::application::ports::channel::ChannelPersistence;
+use crate::application::ports::channel::ChannelWrite;
+use crate::application::ports::integration::BindingStatusChange;
+use crate::application::ports::integration::BindingWrite;
+use crate::application::ports::integration::ChannelBindingPersistence;
+use crate::application::ports::integration::InboundEndpoint;
+use crate::entities::channel::Channel;
+use crate::entities::transport::BindingAccessSnapshot;
+use crate::entities::transport::BindingAuditAction;
+use crate::entities::transport::BindingChangeReason;
+use crate::entities::transport::InstallationStatus;
+use crate::entities::transport::IntegrationCredentialKind;
+use crate::entities::transport::TransportKind;
+use crate::entities::value_objects::ChannelSlug;
+use crate::use_cases::company::CompanyPersistence;
+use crate::use_cases::company::CompanyWrite;
+use crate::use_cases::integration::CredentialScope;
+use crate::use_cases::integration::InstallationCredentialStore;
+use crate::use_cases::integration::InstallationPersistence;
+use crate::use_cases::integration::InstallationStatusChange;
+use crate::use_cases::integration::InstallationWrite;
+use crate::use_cases::user::UserPersistence;
 
 struct TestCompany {
     id: Uuid,
@@ -784,7 +784,7 @@ async fn a_channel_gets_exactly_one_canonical_email_binding() {
         racers.spawn(async move {
             ChannelPersistence::update(
                 persistence.as_ref(),
-                crate::use_cases::channel::ChannelUpdate {
+                crate::application::ports::channel::ChannelUpdate {
                     company_id,
                     channel_id,
                     write: ChannelWrite {
@@ -834,7 +834,7 @@ async fn renaming_a_channel_address_moves_its_binding_and_records_the_move() {
 
     ChannelPersistence::update(
         &persistence,
-        crate::use_cases::channel::ChannelUpdate {
+        crate::application::ports::channel::ChannelUpdate {
             company_id: acme.id,
             channel_id: support.id,
             write: ChannelWrite {

@@ -365,7 +365,7 @@ pub fn channel_row_fragment(company: &Company, app_domain_name: &str, channel: &
         Some(emails) if !emails.is_empty() => emails.join(", "),
         _ => "None".to_string(),
     };
-    let display_slug = format!("{}@{}.{}", channel.slug, company.slug, app_domain_name);
+    let display_slug = channel.inbound_address(&company.slug, app_domain_name);
     let disabled_badge = if channel.enabled {
         ""
     } else {

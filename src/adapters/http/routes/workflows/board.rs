@@ -63,7 +63,7 @@ impl BoardReadTrace {
 /// The board of `scope` as `actor` sees it at `as_of`. The caller has authorized the company and
 /// resolved the scope company-scoped (a binding the caller may see, an agent of the company).
 pub(super) async fn visible_board(
-    engine: &WorkflowEngine,
+    engine: &WorkflowServices,
     company: CompanyId,
     actor: WorkflowActor,
     scope: &RunBoardScope,
@@ -119,7 +119,7 @@ pub(super) async fn visible_board(
 /// The counted channels `actor` may see, each authorized once; runs without a channel are the
 /// company's.
 async fn visible_channels(
-    engine: &WorkflowEngine,
+    engine: &WorkflowServices,
     company: CompanyId,
     actor: WorkflowActor,
     counts: &[BoardCount],

@@ -100,6 +100,13 @@ impl DeliveryPlanner for PolicyDeliveryPlanner {
     }
 }
 
+/// Correlation recorded from the exact part that will be sent, without re-rendering it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RenderedCorrelation {
+    pub provider_key: Option<ExternalMessageKey>,
+    pub extension: crate::application::ports::thread::ProtocolExtension,
+}
+
 /// Turns a resolved delivery into the bounded parts that will actually be sent.
 ///
 /// Deterministic and synchronous: the same envelope renders the same parts with the same keys, so
@@ -121,21 +128,17 @@ pub trait TransportRenderer: Send + Sync {
         envelope: &StandaloneDeliveryEnvelope,
     ) -> AppResult<Vec<RenderedPart>>;
 
-    /// The key this part will go out under, when the transport's own key is derivable before the
-    /// provider is called.
-    ///
-    /// Mail can: an RFC `Message-ID` is chosen by the sender, and deriving it from the part key
-    /// makes it stable across every attempt. A chat provider cannot -- the timestamp is the
-    /// provider's answer, not the caller's -- and says so with `None`.
-    ///
-    /// It matters because a producer sometimes has to record *what it sent* in the same
-    /// transaction that queues the send: an outreach's question has to be findable by the reply
-    /// that quotes it, and a reply that arrives before the send was recorded would resolve to no
-    /// conversation at all.
-    ///
-    /// Not defaulted: a renderer that quietly answered `None` would turn that into a thread
-    /// nobody can find, one delayed reply at a time.
-    fn predicted_provider_key(&self, part: &RenderedPart) -> Option<ExternalMessageKey>;
+    /// Recover protocol identity and headers from the exact frozen part. Malformed payloads fail
+    /// explicitly; computing them again from current deployment settings would change history.
+    fn rendered_correlation(&self, part: &RenderedPart) -> AppResult<RenderedCorrelation>;
+
+    /// Mint a key for trusted application ingress. The caller supplies its fresh nonce; the
+    /// transport owns its syntax and deployment qualification, separately from delivery keys.
+    fn application_message_key(
+        &self,
+        company: &crate::entities::value_objects::CompanySlug,
+        nonce: Uuid,
+    ) -> AppResult<ExternalMessageKey>;
 }
 
 /// One external request, and what the provider said about it.

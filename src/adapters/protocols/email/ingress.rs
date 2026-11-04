@@ -17,33 +17,47 @@
 
 use tracing::warn;
 
-use crate::{
-    adapters::{
-        protocols::email::{
-            EmailChannelSelectorParser, EmailIdentity, EmailMessageKey, EmailRecipientDestination,
-            attachments::{AttachmentStorageReport, store_inbound_attachments},
-            parser::{EmailParser, ParsedEmail, RawInboundPayload},
-        },
-        storage::FileStorage,
-    },
-    app_error::AppError,
-    entities::{
-        auth::AuthVerdict,
-        email_message::EmailMessageMetadata,
-        transport::{
-            ExternalMessageKey, ExternalThreadKey, QualifiedIdentity, TransportValueError,
-        },
-        value_objects::{EmailAddress, MessageId},
-    },
-    infra::config::AppConfig,
-    transport::{
-        AddressedIdentity, AddressedRecipient, AddressedTarget, BoundedVec, BoundsError,
-        CanonicalContent, EmailIngressFacts, InboundDraft, InboundRouting, IngressDirectives,
-        IngressPolicyFacts, MAX_ATTACHMENTS, MAX_REPLY_CANDIDATES, MessageDisposition,
-        ProtocolExtension, RecipientRole, SystemAddress,
-    },
-    use_cases::thread::{InboundMessage, IngressOrigin, ReplyDelivery, UnusableHint},
-};
+use crate::adapters::protocols::email::EmailChannelSelectorParser;
+use crate::adapters::protocols::email::EmailIdentity;
+use crate::adapters::protocols::email::EmailMessageKey;
+use crate::adapters::protocols::email::EmailRecipientDestination;
+use crate::adapters::protocols::email::attachments::AttachmentStorageReport;
+use crate::adapters::protocols::email::attachments::store_inbound_attachments;
+use crate::adapters::protocols::email::parser::EmailParser;
+use crate::adapters::protocols::email::parser::ParsedEmail;
+use crate::adapters::protocols::email::parser::RawInboundPayload;
+use crate::adapters::storage::FileStorage;
+use crate::app_error::AppError;
+use crate::application::ports::thread::ProtocolExtension;
+use crate::entities::auth::AuthVerdict;
+use crate::entities::email_message::EmailMessageMetadata;
+use crate::entities::transport::ExternalMessageKey;
+use crate::entities::transport::ExternalThreadKey;
+use crate::entities::transport::QualifiedIdentity;
+use crate::entities::transport::TransportValueError;
+use crate::entities::value_objects::EmailAddress;
+use crate::entities::value_objects::MessageId;
+use crate::infra::config::AppConfig;
+use crate::transport::AddressedIdentity;
+use crate::transport::AddressedRecipient;
+use crate::transport::AddressedTarget;
+use crate::transport::BoundedVec;
+use crate::transport::BoundsError;
+use crate::transport::CanonicalContent;
+use crate::transport::EmailIngressFacts;
+use crate::transport::InboundDraft;
+use crate::transport::InboundRouting;
+use crate::transport::IngressDirectives;
+use crate::transport::IngressPolicyFacts;
+use crate::transport::MAX_ATTACHMENTS;
+use crate::transport::MAX_REPLY_CANDIDATES;
+use crate::transport::MessageDisposition;
+use crate::transport::RecipientRole;
+use crate::transport::SystemAddress;
+use crate::use_cases::thread::InboundMessage;
+use crate::use_cases::thread::IngressOrigin;
+use crate::use_cases::thread::ReplyDelivery;
+use crate::use_cases::thread::UnusableHint;
 
 /// What a verifying mail boundary established about a message.
 ///

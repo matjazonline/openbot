@@ -10,8 +10,8 @@ use crate::adapters::persistence::workflow::provisioning::{
     ProvisioningEffects,
 };
 use crate::adapters::workflow_source::WorkflowSourceDecoder;
+use crate::application::ports::channel::ChannelWrite;
 use crate::application::use_cases::agent::{AgentPersistence, AgentWrite};
-use crate::application::use_cases::channel::ChannelWrite;
 use crate::application::use_cases::company::{CompanyModelConnectionWrite, CompanyPersistence};
 use crate::application::workflow::actions::*;
 use crate::application::workflow::provisioning::*;

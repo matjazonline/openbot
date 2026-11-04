@@ -14,33 +14,46 @@ use chrono::Utc;
 use uuid::Uuid;
 
 use super::*;
-use crate::{
-    adapters::persistence::{
-        PostgresPersistence,
-        test_support::{
-            DeliveryFixture, DeliveryFixtureRequest, delivery_fixture, own_database, test_pool,
-        },
-    },
-    entities::{
-        transport::{
-            DeliveryPartStatus, DeliveryPurpose, DeliveryStatus, ExternalDestination,
-            ExternalMessageKey, FailureClass, TransportKind,
-        },
-        value_objects::EmailAddress,
-    },
-    transport::{
-        ClaimedDelivery, ContentDigest, DeliveryFailure, DeliveryKey, DeliveryOutcome,
-        DeliveryQueue, Disposition, ExecutionLease, FailureDetail, MAX_DELIVERY_ATTEMPTS,
-        NewDelivery, NewStandaloneDelivery, PartIndex, PartKey, PartResult, ProviderSendOutcome,
-        RenderedPart, StandaloneDeliveryEnqueuer, TransportPayload, WorkerId,
-    },
-    use_cases::{
-        channel::{ChannelPersistence, ChannelWrite},
-        company::{CompanyPersistence, CompanyWrite},
-        thread::ThreadPersistence,
-        user::UserPersistence,
-    },
-};
+use crate::adapters::persistence::PostgresPersistence;
+use crate::adapters::persistence::test_support::DeliveryFixture;
+use crate::adapters::persistence::test_support::DeliveryFixtureRequest;
+use crate::adapters::persistence::test_support::delivery_fixture;
+use crate::adapters::persistence::test_support::own_database;
+use crate::adapters::persistence::test_support::test_pool;
+use crate::application::ports::channel::ChannelPersistence;
+use crate::application::ports::channel::ChannelWrite;
+use crate::application::ports::thread::ThreadPersistence;
+use crate::entities::transport::DeliveryPartStatus;
+use crate::entities::transport::DeliveryPurpose;
+use crate::entities::transport::DeliveryStatus;
+use crate::entities::transport::ExternalDestination;
+use crate::entities::transport::ExternalMessageKey;
+use crate::entities::transport::FailureClass;
+use crate::entities::transport::TransportKind;
+use crate::entities::value_objects::EmailAddress;
+use crate::transport::ClaimedDelivery;
+use crate::transport::ContentDigest;
+use crate::transport::DeliveryFailure;
+use crate::transport::DeliveryKey;
+use crate::transport::DeliveryOutcome;
+use crate::transport::DeliveryQueue;
+use crate::transport::Disposition;
+use crate::transport::ExecutionLease;
+use crate::transport::FailureDetail;
+use crate::transport::MAX_DELIVERY_ATTEMPTS;
+use crate::transport::NewDelivery;
+use crate::transport::NewStandaloneDelivery;
+use crate::transport::PartIndex;
+use crate::transport::PartKey;
+use crate::transport::PartResult;
+use crate::transport::ProviderSendOutcome;
+use crate::transport::RenderedPart;
+use crate::transport::StandaloneDeliveryEnqueuer;
+use crate::transport::TransportPayload;
+use crate::transport::WorkerId;
+use crate::use_cases::company::CompanyPersistence;
+use crate::use_cases::company::CompanyWrite;
+use crate::use_cases::user::UserPersistence;
 
 #[path = "tenant_tests.rs"]
 mod tenant_tests;

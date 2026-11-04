@@ -43,25 +43,29 @@ use sqlx::{Connection, PgConnection, PgPool};
 use tokio::sync::{Mutex, OnceCell};
 use uuid::Uuid;
 
-use crate::{
-    adapters::persistence::PostgresPersistence,
-    entities::{
-        correlation::CorrelationId,
-        message::{CanonicalMessageId, MessageDirection, MessageRole},
-        transport::{
-            ChannelBindingId, DeliveryId, DeliveryPurpose, ExternalDestination, TransportKind,
-        },
-        value_objects::EmailAddress,
-    },
-    transport::{
-        ContentDigest, DeliveryKey, MAX_DELIVERY_ATTEMPTS, NewDelivery, PartIndex, PartKey,
-        RenderedPart, TransportPayload,
-    },
-    use_cases::{
-        integration::ChannelBindingPersistence,
-        thread::{MessageAuthorWrite, MessageWrite, ThreadPersistence},
-    },
-};
+use crate::adapters::persistence::PostgresPersistence;
+use crate::application::ports::integration::ChannelBindingPersistence;
+use crate::application::ports::thread::MessageAuthorWrite;
+use crate::application::ports::thread::MessageWrite;
+use crate::application::ports::thread::ThreadPersistence;
+use crate::entities::correlation::CorrelationId;
+use crate::entities::message::CanonicalMessageId;
+use crate::entities::message::MessageDirection;
+use crate::entities::message::MessageRole;
+use crate::entities::transport::ChannelBindingId;
+use crate::entities::transport::DeliveryId;
+use crate::entities::transport::DeliveryPurpose;
+use crate::entities::transport::ExternalDestination;
+use crate::entities::transport::TransportKind;
+use crate::entities::value_objects::EmailAddress;
+use crate::transport::ContentDigest;
+use crate::transport::DeliveryKey;
+use crate::transport::MAX_DELIVERY_ATTEMPTS;
+use crate::transport::NewDelivery;
+use crate::transport::PartIndex;
+use crate::transport::PartKey;
+use crate::transport::RenderedPart;
+use crate::transport::TransportPayload;
 
 /// The suffix that separates the tests' database from the one you develop against.
 const TEST_DB_SUFFIX: &str = "_test";

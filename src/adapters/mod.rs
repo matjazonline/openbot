@@ -9,6 +9,7 @@ pub(crate) mod redaction;
 pub mod resend_api;
 pub mod sendgrid;
 pub mod smtp;
+pub mod spam_scanner;
 pub mod storage;
 
 pub mod response_schema;

@@ -14,25 +14,32 @@ use chrono::Utc;
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
-use crate::{
-    adapters::protocols::email::EmailIdentity,
-    app_error::{AppError, AppResult},
-    entities::{
-        channel::{ChannelAccessMode, PUBLIC_PARTICIPANT},
-        company::CompanyAccess,
-        company_member::CompanyMembership,
-        participant::{
-            ChannelPrincipalGrant, GrantProvenance, IdentityProvenance, IdentityStatus, Principal,
-            PrincipalAccessContext, PrincipalCapability, PrincipalGrantAuthority,
-            PrincipalIdentity, PrincipalKind,
-        },
-        transport::{ParticipantIdentityId, PrincipalId, QualifiedIdentity, TransportKind},
-        value_objects::EmailAddress,
-    },
-    use_cases::participant::{
-        IdentityDirectory, IdentityObservation, IdentityResolution, PrincipalAccessPersistence,
-    },
-};
+use crate::adapters::protocols::email::EmailIdentity;
+use crate::app_error::AppError;
+use crate::app_error::AppResult;
+use crate::application::ports::participant::IdentityObservation;
+use crate::application::ports::participant::PrincipalAccessPersistence;
+use crate::entities::channel::ChannelAccessMode;
+use crate::entities::channel::PUBLIC_PARTICIPANT;
+use crate::entities::company::CompanyAccess;
+use crate::entities::company_member::CompanyMembership;
+use crate::entities::participant::ChannelPrincipalGrant;
+use crate::entities::participant::GrantProvenance;
+use crate::entities::participant::IdentityProvenance;
+use crate::entities::participant::IdentityStatus;
+use crate::entities::participant::Principal;
+use crate::entities::participant::PrincipalAccessContext;
+use crate::entities::participant::PrincipalCapability;
+use crate::entities::participant::PrincipalGrantAuthority;
+use crate::entities::participant::PrincipalIdentity;
+use crate::entities::participant::PrincipalKind;
+use crate::entities::transport::ParticipantIdentityId;
+use crate::entities::transport::PrincipalId;
+use crate::entities::transport::QualifiedIdentity;
+use crate::entities::transport::TransportKind;
+use crate::entities::value_objects::EmailAddress;
+use crate::use_cases::participant::IdentityDirectory;
+use crate::use_cases::participant::IdentityResolution;
 
 /// The principal a qualified identity resolves to inside this directory.
 ///

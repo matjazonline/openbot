@@ -81,7 +81,7 @@ pub async fn list(
 
 /// Whether `actor` may see a record of `association`; refusal is `false`, anything else an error.
 async fn visible_to(
-    engine: &WorkflowEngine,
+    engine: &WorkflowServices,
     company: CompanyId,
     actor: WorkflowActor,
     association: RelatedAssociation,
@@ -103,7 +103,7 @@ const VISIBILITY_CHECKS_LOGGED: usize = 32;
 /// is all the thread check adds. So a page of mail-triggered runs, one thread each, checks each
 /// channel once.
 pub(super) struct Visibility<'a> {
-    engine: &'a WorkflowEngine,
+    engine: &'a WorkflowServices,
     company: CompanyId,
     actor: WorkflowActor,
     seen: HashMap<RelatedAssociation, bool>,
@@ -111,7 +111,7 @@ pub(super) struct Visibility<'a> {
 
 impl<'a> Visibility<'a> {
     pub(super) fn new(
-        engine: &'a WorkflowEngine,
+        engine: &'a WorkflowServices,
         company: CompanyId,
         actor: WorkflowActor,
     ) -> Self {
@@ -151,7 +151,7 @@ impl<'a> Visibility<'a> {
 }
 
 pub(super) async fn visible_binding(
-    engine: &WorkflowEngine,
+    engine: &WorkflowServices,
     company: CompanyId,
     actor: WorkflowActor,
     binding: Uuid,
@@ -233,7 +233,7 @@ pub(super) struct BindingRequest {
 /// Configure (or create) `binding` through the binding command, which authorizes, checks the
 /// revision, validates the params and checks readiness.
 pub(super) async fn configure_binding(
-    engine: &WorkflowEngine,
+    engine: &WorkflowServices,
     company_id: Uuid,
     actor: WorkflowActor,
     binding: Uuid,
@@ -285,7 +285,7 @@ pub struct ActivityBody {
 }
 
 async fn set_activity(
-    engine: &WorkflowEngine,
+    engine: &WorkflowServices,
     user: &AuthenticatedUser,
     company_id: Uuid,
     binding: Uuid,
@@ -306,7 +306,7 @@ async fn set_activity(
 
 /// Activate (readiness checked again) or deactivate `binding` at the state revision seen.
 pub(super) async fn set_binding_activity(
-    engine: &WorkflowEngine,
+    engine: &WorkflowServices,
     company_id: Uuid,
     actor: WorkflowActor,
     binding: Uuid,
@@ -388,7 +388,7 @@ pub async fn start_run(
 /// `rerun_of` names the top-level run this one reruns. The run and whether the key replayed.
 #[allow(clippy::too_many_arguments)]
 pub(super) async fn start_command(
-    engine: &WorkflowEngine,
+    engine: &WorkflowServices,
     company_id: Uuid,
     actor: WorkflowActor,
     binding: Uuid,
@@ -464,7 +464,7 @@ pub struct RunsQuery {
 /// `agent` when it is an agent of `company`; another company's, or a deleted one, is not found
 /// rather than an empty listing.
 pub(super) async fn company_agent(
-    engine: &WorkflowEngine,
+    engine: &WorkflowServices,
     company: CompanyId,
     agent: Uuid,
 ) -> AppResult<Uuid> {
@@ -479,7 +479,7 @@ pub(super) async fn company_agent(
 /// `workflow` when it is a workflow of `company`; another company's, or none, is not found rather
 /// than an empty listing.
 pub(super) async fn company_workflow(
-    engine: &WorkflowEngine,
+    engine: &WorkflowServices,
     company: CompanyId,
     workflow: Uuid,
 ) -> AppResult<crate::domain::workflow::WorkflowId> {
@@ -640,7 +640,7 @@ fn run_conflict(current: RunRevision) -> WorkflowError {
 /// The rule lives here because these routes are the only production caller of the service's
 /// cancel and retry; a later ingress that calls the service must apply it too.
 pub(super) async fn controllable_run(
-    engine: &WorkflowEngine,
+    engine: &WorkflowServices,
     company: CompanyId,
     actor: WorkflowActor,
     run: Uuid,
@@ -684,7 +684,7 @@ pub async fn cancel(
 
 /// Cancel a top-level run at the revision seen; the run's revision after it.
 pub(super) async fn cancel_command(
-    engine: &WorkflowEngine,
+    engine: &WorkflowServices,
     company_id: Uuid,
     actor: WorkflowActor,
     run: Uuid,
@@ -730,7 +730,7 @@ pub async fn retry(
 
 /// Retry a failed top-level run whose failed step is safe to repeat; the run's revision after.
 pub(super) async fn retry_command(
-    engine: &WorkflowEngine,
+    engine: &WorkflowServices,
     company_id: Uuid,
     actor: WorkflowActor,
     run: Uuid,

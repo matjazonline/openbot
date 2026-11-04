@@ -20,10 +20,10 @@ use super::{
     channel::write_channel_settings_on,
     channel_gate::{ChannelGateAccess, ChannelGateKey, acquire_channel_gate_on},
 };
-use crate::{
-    app_error::{AppError, AppResult},
-    use_cases::channel::{ChannelUpdate, channel_not_found},
-};
+use crate::app_error::AppError;
+use crate::app_error::AppResult;
+use crate::application::ports::channel::ChannelUpdate;
+use crate::use_cases::channel::channel_not_found;
 
 /// The bounds one channel edit must finish inside.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -1094,7 +1094,7 @@ mod tests {
         let use_cases = crate::use_cases::user::UserUseCases::new(
             std::sync::Arc::new(crate::infra::argon2_password_hasher()),
             persistence.clone(),
-            "test-attempt-secret",
+            ("test-attempt-secret").into(),
         );
         let repeated = use_cases.link_external(user.id, identity).await.unwrap();
         assert_eq!(repeated.email_verified_at, marked.email_verified_at);
@@ -1672,7 +1672,7 @@ mod tests {
         let use_cases = crate::use_cases::user::UserUseCases::new(
             std::sync::Arc::new(crate::infra::argon2_password_hasher()),
             persistence.clone(),
-            "test-attempt-secret",
+            ("test-attempt-secret").into(),
         );
         assert!(matches!(
             use_cases

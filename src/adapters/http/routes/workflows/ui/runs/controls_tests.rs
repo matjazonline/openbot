@@ -111,7 +111,8 @@ async fn an_uncertain_action_is_annotated_from_the_pane_and_its_step_shows_the_a
         HttpForm, uncertain_http,
     };
     let action = uncertain_http(HttpForm::Slot).await;
-    let engine: Engine = Arc::new(WorkflowEngine::for_tests(action.persistence.clone()));
+    let engine: Engine =
+        crate::infra::workflow::WorkflowEngine::for_tests(action.persistence.clone()).services();
     let ui = || ui_over(&action.persistence, &engine, action.owner);
     let query = || {
         Query(CompanyQuery {
@@ -401,7 +402,8 @@ async fn a_redraw_repeats_its_keys_until_the_command_shows_on_the_page() {
 async fn an_accepted_action_shows_its_receipt_and_cancel_names_it() {
     use crate::adapters::persistence::workflow::reconciliation_fixture::accepted_http;
     let action = accepted_http().await;
-    let engine: Engine = Arc::new(WorkflowEngine::for_tests(action.persistence.clone()));
+    let engine: Engine =
+        crate::infra::workflow::WorkflowEngine::for_tests(action.persistence.clone()).services();
     let ui = || ui_over(&action.persistence, &engine, action.owner);
     let shown = text(pane(ui(), Path(action.run), pane_query(action.company, None)).await)
         .await

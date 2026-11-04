@@ -1,6 +1,7 @@
 use super::*;
 use crate::adapters::persistence::test_support::wait_until_a_backend_is_blocked;
-use crate::use_cases::channel::{ChannelPersistence, ChannelWrite};
+use crate::application::ports::channel::ChannelPersistence;
+use crate::application::ports::channel::ChannelWrite;
 
 async fn channel_fixture() -> (DecisionFixture, Uuid) {
     let mut f = Box::pin(DecisionFixture::new(1, None)).await;

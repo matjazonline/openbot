@@ -1,6 +1,6 @@
 use super::*;
 use crate::application::app_error::{AppError, AppResult};
-use crate::application::use_cases::participant::PrincipalAccessPersistence;
+use crate::application::ports::participant::PrincipalAccessPersistence;
 use crate::application::workflow::{
     LifecycleAuthorizer, RelatedChannelId, RelatedThreadId, WorkflowChannelReader,
     WorkflowThreadReader,

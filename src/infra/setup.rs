@@ -47,272 +47,102 @@ use crate::{
 use std::sync::Arc;
 use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
-pub async fn init_app_state() -> anyhow::Result<AppState> {
-    let config = Arc::new(AppConfig::from_env());
+mod accounts;
+mod clients;
+mod foundation;
+mod inbound;
+mod mail;
+mod workers;
+#[cfg(test)]
+pub(crate) use accounts::user_use_cases;
+pub use workers::ApplicationWorkers;
 
-    // The relay every company that has *not* connected a provider account of its own sends
-    // through, and the one every platform notice sends through whatever its tenants have
-    // configured -- a confirmation code belongs to the deployment, not to a company.
-    let smtp_transport =
-        LettreMailTransport::from_config(&config, smtp_allow_plaintext_local_from_env()).await?;
-    let confirmation_transport_available = smtp_transport.is_configured();
-    let deployment_mail_transport: Arc<dyn MailTransport> = smtp_transport;
+pub struct Application {
+    pub http: AppState,
+    pub workers: ApplicationWorkers,
+}
 
-    let monitoring: Arc<dyn MonitoringService> = Arc::new(CompositeMonitor::new(vec![
-        Arc::new(TracingMonitor::new()),
-        Arc::new(InMemoryMonitor::new()),
-    ]));
-
-    // Built before anything else that could fail slowly: a bucket named in the environment but
-    // unreachable through its key should stop the boot, not the first person to pick a picture.
-    let file_storage = match config.gcs.as_ref() {
-        Some(gcs) => Some(Arc::new(GcsFileStorage::from_config(gcs)?) as Arc<dyn FileStorage>),
-        None => None,
-    };
-
-    let postgres_arc = Arc::new(postgres_persistence().await?);
-    let sessions = Arc::new(
-        SessionAuthority::new(&config, postgres_arc.clone()).with_monitoring(monitoring.clone()),
-    );
-    install_builtin_agent_library(postgres_arc.as_ref()).await?;
-    let database_query_health = Arc::new(DatabaseQueryHealthService::new(postgres_arc.clone()));
-    let dashboard_snapshots = Arc::new(DashboardSnapshotService::new(postgres_arc.clone()));
-    let runtime_identity = MachineIdentity::process().clone();
-    let argon_hasher = argon2_password_hasher();
-
-    let user_use_cases = UserUseCases::new(
-        Arc::new(argon_hasher),
-        postgres_arc.clone(),
-        config.jwt_secret.clone(),
-    )
-    .with_email_confirmation(EmailConfirmation {
-        registrations: postgres_arc.clone(),
-        account_changes: postgres_arc.clone(),
-        codes: Arc::new(SmtpConfirmationSender::new(
-            config.clone(),
-            deployment_mail_transport.clone(),
-        )),
-        config: config.clone(),
-        transport_available: confirmation_transport_available,
-        allow_unverified_without_smtp: allow_unverified_email_without_smtp_from_env(),
-    });
-    let company_use_cases = CompanyUseCases::new(postgres_arc.clone());
-    let mcp_policy = crate::adapters::mcp::policy::EndpointPolicy::new(
-        std::env::var("MCP_INTERNAL_ENDPOINTS")
-            .unwrap_or_default()
-            .split(',')
-            .map(str::trim)
-            .filter(|v| !v.is_empty())
-            .map(str::to_owned),
+pub async fn init_app_state() -> anyhow::Result<Application> {
+    let foundation = foundation::build(Arc::new(AppConfig::from_env())).await?;
+    let clients = clients::build(&foundation)?;
+    let mail = mail::build(&foundation)?;
+    let workflow = mail::workflow(&foundation, &clients, &mail)?;
+    let threads = mail::threads(&foundation, &mail, &workflow);
+    let transports = mail::transports(&foundation, &clients, &mail, threads.clone())?;
+    let inbound = inbound::build(&foundation, &clients, threads.clone(), &workflow)?;
+    let cases = accounts::build(&foundation, &workflow.services())?;
+    let workers = workers::build(
+        &foundation,
+        workers::Components {
+            workflow: workflow.clone(),
+            threads: threads.clone(),
+            composer: mail.composer,
+            transports: transports.clone(),
+            inbound: inbound.worker,
+        },
     )?;
-    let mcp_client = Arc::new(crate::adapters::mcp::HttpMcpClient::new(mcp_policy));
-    let mcp_use_cases = Arc::new(crate::use_cases::mcp::McpUseCases::new(
-        postgres_arc.clone(),
-        postgres_arc.clone(),
-        postgres_arc.clone(),
-        mcp_client.clone(),
-    ));
-    let company_resend_api_use_cases =
-        Arc::new(CompanyResendApiUseCases::new(postgres_arc.clone()));
-    // One resolver, shared by the three places that act as a company at Resend: the delivery
-    // worker sending its mail, the decoder fetching the mail its webhook announced, and nothing
-    // else. It holds the HTTP pool; the credentials stay in the database until each call.
-    let resend_api_clients = Arc::new(CompanyResendApiClients::new(
-        postgres_arc.clone(),
-        config.resend_api.clone(),
-    )?);
-    let company_invite_use_cases =
-        CompanyInviteUseCases::new(postgres_arc.clone(), postgres_arc.clone());
-    let channel_use_cases = Arc::new(ChannelUseCases::new(
-        postgres_arc.clone(),
-        postgres_arc.clone(),
-        postgres_arc.clone(),
-        config.clone(),
-    ));
-    // The system-prompt generator's one-shot completion; agents themselves run as workflow model
-    // steps.
-    let prompt_classifier: Arc<dyn TextClassifier> =
-        Arc::new(crate::adapters::harness::rig::RigTextClassifier::new(
-            crate::adapters::harness::rig::providers::ProviderRegistry::standard()?,
-        ));
+    let http = http_state(
+        foundation,
+        HttpComponents {
+            clients,
+            cases,
+            threads,
+            workflow: workflow.services(),
+            transports,
+            inbox: inbound.inbox,
+            wakeups: inbound.wakeups,
+        },
+    )?;
+    Ok(Application { http, workers })
+}
 
-    let agent_use_cases = AgentUseCases::new(
-        postgres_arc.clone(),
-        postgres_arc.clone(),
-        postgres_arc.clone(),
-    )
-    .with_prompt_classifier(prompt_classifier);
-    let skill_use_cases = Arc::new(SkillUseCases::new(
-        postgres_arc.clone(),
-        postgres_arc.clone(),
-        postgres_arc.clone(),
-    ));
-
-    // Renderers first, then the use cases that freeze parts with them, then the senders -- one of
-    // which needs those use cases as its internal relay. Building the pair in that order is what
-    // keeps the wiring acyclic; see `TransportRenderers`.
-    let email_renderer = Arc::new(EmailRenderer::new(&config.app_domain_name));
-    let renderers = Arc::new(
-        TransportRenderers::new()
-            .register(email_renderer.clone())
-            .map_err(|error| anyhow::anyhow!("Could not register the email renderer: {error}"))?,
-    );
-    let delivery_composer = DeliveryComposer::new(renderers.clone(), postgres_arc.clone());
-    let workflow = Arc::new(
-        crate::infra::workflow::WorkflowEngine::new(
-            (*postgres_arc).clone(),
-            &config.public_base_url(),
-            &config.app_domain_name,
-            delivery_composer.clone(),
-            mcp_client,
-            monitoring.clone(),
-            crate::infra::workflow::worker_slots(
-                std::env::var("WORKFLOW_WORKER_SLOTS").ok().as_deref(),
-                crate::infra::db::max_connections(),
-            )?,
-        )?
-        .with_jev_assets(Arc::new(
-            crate::adapters::workflow_jev::JevAssetReader::new(
-                (*postgres_arc).clone(),
-                file_storage.clone(),
-            ),
-        )),
-    );
-    let notification_worker = Arc::new(NotificationWorker::new(
-        postgres_arc.clone(),
-        delivery_composer.clone(),
-        config.clone(),
-        monitoring.clone(),
-    ));
-
-    let thread_use_cases = Arc::new(
-        ThreadUseCases::new(
-            ThreadStores {
-                threads: postgres_arc.clone(),
-                channels: postgres_arc.clone(),
-                companies: postgres_arc.clone(),
-                participants: postgres_arc.clone(),
-            },
-            InboundIngestPorts {
-                committer: postgres_arc.clone(),
-                correlation: postgres_arc.clone(),
-                bindings: postgres_arc.clone(),
-                standalone_deliveries: postgres_arc.clone(),
-            },
-            renderers.clone(),
-            config.clone(),
-        )
-        .with_monitoring(monitoring.clone())
-        .with_intent_wakeups(workflow.intent_wakeups.clone()),
-    );
-
-    // Registered unconditionally now that Resend is configured per company: any tenant may connect
-    // an account at any time, and a decoder that was left out at boot would leave that company's
-    // stored events unclaimed until the next deploy. A decoder for a company with no account
-    // fails the event terminally rather than silently, which is the honest answer.
-    let inbound_decoders = InboundEventDecoderRegistry::new()
-        .register(Arc::new(ResendApiInboundDecoder::new(
-            resend_api_clients.clone(),
-            config.clone(),
-            thread_use_cases.clone(),
-            file_storage.clone(),
-        )))
-        .map_err(|error| {
-            anyhow::anyhow!("Could not register the Resend inbound decoder: {error}")
-        })?;
-    let inbound_event_wakeups = InboundEventWakeups::new();
-    let inbound_event_worker = Arc::new(
-        InboundEventWorker::new(
-            postgres_arc.clone(),
-            postgres_arc.clone(),
-            Arc::new(inbound_decoders),
-            inbound_event_wakeups.clone(),
-        )
-        .with_monitoring(monitoring.clone())
-        .with_intent_wakeups(workflow.intent_wakeups.clone()),
-    );
-    let inbound_event_inbox = Arc::new(MonitoredInboundEventInbox::new(
-        postgres_arc.clone(),
-        monitoring.clone(),
-    ));
-
-    // The email sender reaches the internal relay before SMTP, so a channel answering another
-    // channel of the same company never leaves the building.
-    let transports = Arc::new(
-        TransportRegistry::new()
-            .register(
-                // The same renderer instance the producers freeze parts with, so a queued part and
-                // a re-render can never disagree about the deployment's own domain.
-                email_renderer,
-                Arc::new(EmailSender::new(
-                    Arc::new(ResendApiCompanyTransports::new(
-                        resend_api_clients.clone(),
-                        deployment_mail_transport.clone(),
-                    )),
-                    thread_use_cases.clone(),
-                )),
-            )
-            .map_err(|error| anyhow::anyhow!("Could not register the email transport: {error}"))?,
-    );
-
-    let agent_use_cases = Arc::new(agent_use_cases);
-    let onboarding_use_cases = Arc::new(crate::use_cases::onboarding::OnboardingUseCases::new(
-        postgres_arc.clone(),
-        postgres_arc.clone(),
-        workflow.onboarding_persistence(),
-        agent_use_cases.clone(),
-    ));
-    let schedule_use_cases = Arc::new(ScheduleUseCases::new(
-        postgres_arc.clone(),
-        workflow.authorization(),
-        workflow.schedule_run_now(),
-    ));
-
+struct HttpComponents {
+    clients: clients::Clients,
+    cases: accounts::UseCases,
+    threads: Arc<ThreadUseCases>,
+    workflow: Arc<crate::infra::workflow::WorkflowServices>,
+    transports: Arc<TransportRegistry>,
+    inbox: Arc<MonitoredInboundEventInbox>,
+    wakeups: InboundEventWakeups,
+}
+fn http_state(f: foundation::Foundation, c: HttpComponents) -> anyhow::Result<AppState> {
+    let p = f.persistence;
     Ok(AppState {
         auth_admission: Arc::new(crate::adapters::http::auth_admission::AuthAdmission::from_env()?),
-        model_usage: postgres_arc.clone(),
-        run_counts: postgres_arc.clone(),
-        thread_activity: postgres_arc.clone(),
-        message_outcomes: postgres_arc.clone(),
-        db: postgres_arc.pool().clone(),
-        mcp_use_cases,
-        config,
-        monitoring: monitoring.clone(),
-        user_use_cases: Arc::new(user_use_cases),
-        company_use_cases: Arc::new(company_use_cases),
-        company_invite_use_cases: Arc::new(company_invite_use_cases),
-        company_resend_api_use_cases,
-        company_resend_api_accounts: postgres_arc.clone(),
-        channel_use_cases,
-        schedule_use_cases,
-        agent_use_cases,
-        onboarding_use_cases,
-        skill_use_cases,
-        thread_use_cases,
-        inbound_event_worker,
-        inbound_event_inbox,
-        inbound_event_wakeups,
-        dashboard_snapshots,
-        attention_use_cases: Arc::new(crate::application::attention::AttentionUseCases::new(
-            postgres_arc.clone(),
-            postgres_arc.clone(),
-            postgres_arc.clone(),
-            postgres_arc.clone(),
-            monitoring.clone(),
-        )),
-        notifications: postgres_arc.clone(),
-        notification_worker,
-        database_query_health,
+        workflow: c.workflow,
+        model_usage: p.clone(),
+        run_counts: p.clone(),
+        thread_activity: p.clone(),
+        message_outcomes: p.clone(),
+        db: p.pool().clone(),
+        config: f.config,
+        monitoring: f.monitoring,
+        user_use_cases: c.cases.user,
+        mcp_use_cases: c.clients.mcp_use_cases,
+        company_use_cases: c.cases.company,
+        company_invite_use_cases: c.cases.invites,
+        company_resend_api_use_cases: c.cases.resend,
+        company_resend_api_accounts: p.clone(),
+        channel_use_cases: c.cases.channel,
+        schedule_use_cases: c.cases.schedules,
+        agent_use_cases: c.cases.agent,
+        onboarding_use_cases: c.cases.onboarding,
+        skill_use_cases: c.cases.skill,
+        thread_use_cases: c.threads,
+        inbound_event_inbox: c.inbox,
+        inbound_event_wakeups: c.wakeups,
+        dashboard_snapshots: Arc::new(DashboardSnapshotService::new(p.clone())),
+        attention_use_cases: c.cases.attention,
+        notifications: p.clone(),
+        database_query_health: Arc::new(DatabaseQueryHealthService::new(p.clone())),
         dashboard_sse_connections: Arc::new(std::sync::atomic::AtomicU64::new(0)),
-        runtime_metrics: postgres_arc.clone(),
-        runtime_identity,
-        sessions,
-        file_storage,
-        transports,
-        deliveries: postgres_arc.clone(),
-        delivery_queue: postgres_arc.clone(),
+        runtime_metrics: p.clone(),
+        runtime_identity: MachineIdentity::process().clone(),
+        sessions: f.sessions,
+        file_storage: f.storage,
+        transports: c.transports,
+        deliveries: p,
         events: MailboxEvents::new(),
-        workflow,
     })
 }
 

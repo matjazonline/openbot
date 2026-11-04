@@ -35,12 +35,12 @@ pub fn router() -> Router<AppState> {
 #[instrument(skip_all, fields(provider = "sendgrid"))]
 async fn sendgrid_inbound_webhook(
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
+    State(config): State<Arc<AppConfig>>,
     State(file_storage): State<Option<Arc<dyn FileStorage>>>,
     headers: HeaderMap,
     request: axum::extract::Request,
 ) -> Result<impl IntoResponse, StatusCode> {
-    let config = thread_use_cases.config();
-    let sendgrid_config = configured_sendgrid(config)?;
+    let sendgrid_config = configured_sendgrid(&config)?;
 
     // Authenticate the exact bounded bytes before any provider field or MIME header is parsed.
     let (parts, body) = request.into_parts();
@@ -50,7 +50,7 @@ async fn sendgrid_inbound_webhook(
     verify_sendgrid_signature(&headers, &body, sendgrid_config)?;
     let request = axum::extract::Request::from_parts(parts, axum::body::Body::from(body));
 
-    let accepted = decode_sendgrid_request(request, config)
+    let accepted = decode_sendgrid_request(request, &config)
         .await
         .inspect_err(|status| {
             if *status == StatusCode::UNPROCESSABLE_ENTITY {
@@ -69,7 +69,7 @@ async fn sendgrid_inbound_webhook(
         InboundPreflight::Rejected(result) => *result,
         InboundPreflight::Accepted(mut prepared) => {
             let persisted = attachments
-                .persist(config, file_storage.as_deref())
+                .persist(&config, file_storage.as_deref())
                 .await
                 .map_err(|_| {
                     warn!("Could not prepare inbound SendGrid attachment metadata");

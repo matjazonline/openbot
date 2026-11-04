@@ -13,25 +13,30 @@ use std::sync::Arc;
 
 use uuid::Uuid;
 
-use crate::{
-    app_error::{AppError, AppResult},
-    entities::{
-        correlation::CorrelationId,
-        message::{CanonicalMessageId, MessageAudience},
-        transport::{
-            ChannelBinding, DeliveryId, DeliveryPurpose, ExternalDestination, ExternalMessageKey,
-            TransportKind,
-        },
-    },
-    transport::{
-        DeliveryContext, DeliveryDestination, DeliveryEnvelope, DeliveryIntent, DeliveryKey,
-        EmailDeliveryContext, MAX_DELIVERY_ATTEMPTS, NewDelivery, NewStandaloneDelivery,
-        StandaloneDeliveryEnvelope,
-        ingress::CanonicalContent,
-        ports::{TransportRenderer, TransportRenderers},
-    },
-    use_cases::integration::ChannelBindingPersistence,
-};
+use crate::app_error::AppError;
+use crate::app_error::AppResult;
+use crate::application::ports::integration::ChannelBindingPersistence;
+use crate::entities::correlation::CorrelationId;
+use crate::entities::message::CanonicalMessageId;
+use crate::entities::message::MessageAudience;
+use crate::entities::transport::ChannelBinding;
+use crate::entities::transport::DeliveryId;
+use crate::entities::transport::DeliveryPurpose;
+use crate::entities::transport::ExternalDestination;
+use crate::entities::transport::TransportKind;
+use crate::transport::DeliveryContext;
+use crate::transport::DeliveryDestination;
+use crate::transport::DeliveryEnvelope;
+use crate::transport::DeliveryIntent;
+use crate::transport::DeliveryKey;
+use crate::transport::EmailDeliveryContext;
+use crate::transport::MAX_DELIVERY_ATTEMPTS;
+use crate::transport::NewDelivery;
+use crate::transport::NewStandaloneDelivery;
+use crate::transport::StandaloneDeliveryEnvelope;
+use crate::transport::ingress::CanonicalContent;
+use crate::transport::ports::TransportRenderer;
+use crate::transport::ports::TransportRenderers;
 
 /// One delivery a producer wants queued, before its interface is resolved and its parts frozen.
 ///
@@ -94,7 +99,7 @@ pub struct ComposedDelivery {
     /// to be findable by the reply that quotes it -- an outreach's question -- records it on the
     /// canonical message in the same transaction that queues the send. Without it, a reply that
     /// arrived before the send was recorded would resolve to no conversation at all.
-    pub provider_key: Option<ExternalMessageKey>,
+    pub correlation: crate::transport::ports::RenderedCorrelation,
 }
 
 /// Resolves an interface, renders parts, and hands back a delivery to commit.
@@ -159,12 +164,13 @@ impl DeliveryComposer {
 
         let renderer = self.renderer(transport)?;
         let parts = renderer.render(&envelope)?;
-        let provider_key = parts
-            .first()
-            .and_then(|part| renderer.predicted_provider_key(part));
+        let first = parts.first().ok_or_else(|| {
+            AppError::Internal("Renderer produced no frozen delivery parts".into())
+        })?;
+        let correlation = renderer.rendered_correlation(first)?;
 
         Ok(ComposedDelivery {
-            provider_key,
+            correlation,
             delivery: NewDelivery {
                 id,
                 company_id: request.company_id,

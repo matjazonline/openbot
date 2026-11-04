@@ -27,7 +27,7 @@ async fn fixture(slugs: &[&str]) -> ChannelFixture {
         }),
         fixture.use_cases.company_persistence.clone(),
         fixture.participants.clone(),
-        internal_test_config(),
+        internal_test_settings(),
     );
     fixture
 }

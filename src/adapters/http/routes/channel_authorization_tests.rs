@@ -1,4 +1,5 @@
 use super::super::authorization_test_support::{Fixture, ScopeCase, denied};
+use super::simulation::{OpenSimulatedThreadContext, open_simulated_thread_logic};
 use super::*;
 use axum::http::StatusCode;
 
@@ -56,7 +57,8 @@ async fn channel_management_and_simulation_hide_foreign_companies_and_refuse_mem
 #[tokio::test]
 async fn simulation_and_application_thread_reads_hide_other_channels_and_tenants_like_unknown_ids()
 {
-    use crate::use_cases::{channel::ChannelPersistence, thread::ThreadPersistence};
+    use crate::application::ports::channel::ChannelPersistence;
+    use crate::application::ports::thread::ThreadPersistence;
     let Some(f) = Fixture::new().await else {
         return;
     };

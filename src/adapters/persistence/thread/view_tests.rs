@@ -8,10 +8,12 @@
 
 use super::test_support::*;
 use super::*;
+use crate::application::ports::thread::AgentAuthor;
+use crate::application::ports::thread::MessageAuthorWrite;
+use crate::application::ports::thread::MessageWrite;
 use crate::entities::{
     message::MessageDirection, message_view::THREAD_HISTORY_LIMIT, transport::TransportKind,
 };
-use crate::use_cases::thread::{AgentAuthor, MessageAuthorWrite, MessageWrite};
 
 /// The shape every projection has to work for: no headers, no recipients, no address.
 fn internal_message(thread_id: Uuid, body: &str, author: MessageAuthorWrite) -> MessageWrite {

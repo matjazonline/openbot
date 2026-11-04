@@ -98,7 +98,8 @@ pub(crate) fn scripted_agent_base_url(agent_id: Uuid) -> Option<String> {
         .get(&agent_id)
         .cloned()
 }
-use crate::use_cases::channel::{ChannelPersistence, ChannelWrite};
+use crate::application::ports::channel::ChannelPersistence;
+use crate::application::ports::channel::ChannelWrite;
 
 /// The largest request body the double will read before giving up.
 ///
@@ -264,7 +265,7 @@ impl ChannelPersistence for ChannelDirectoryStub {
 
     async fn update(
         &self,
-        _request: crate::use_cases::channel::ChannelUpdate,
+        _request: crate::application::ports::channel::ChannelUpdate,
     ) -> AppResult<crate::entities::channel::Channel> {
         unimplemented!()
     }

@@ -48,6 +48,9 @@ use crate::application::workflow::worker::{WorkflowHandler, WorkflowWorker};
 use crate::application::workflow::{LifecycleAuthorizer, WorkflowAuthorization, WorkflowService};
 use crate::domain::monitoring::MonitoringService;
 
+mod services;
+pub use services::WorkflowServices;
+
 /// Registered step kinds this deployment has no handler for: memory is out of this release
 /// (NOT_PLANNED, 06-F032). Publication refuses them so no run can stall on one.
 pub const UNHANDLED_STEP_KINDS: &[&str] = &["memory.load", "memory.save"];
@@ -171,11 +174,8 @@ impl WorkflowHandler for ProductionHandler {
 
 /// The production workflow engine: its services, its handler and its wakeups.
 pub struct WorkflowEngine {
-    persistence: PostgresPersistence,
+    services: Arc<WorkflowServices>,
     handler: Arc<ProductionHandler>,
-    notices: DecisionNotices,
-    /// The shipped templates assistant provisioning compiles from (p08 D2.5).
-    templates: ProvisioningDeployment,
     slots: usize,
     /// The jobs the worker slots are executing, for the runtime panel's sampler.
     active_jobs: ActiveWorkflowJobs,
@@ -249,16 +249,22 @@ impl WorkflowEngine {
             message,
             history: WorkflowHistoryRuntime::new(persistence.clone()),
         });
-        Ok(Self {
+        let worker_wakeups = Arc::new(Notify::new());
+        let services = Arc::new(WorkflowServices {
             persistence,
-            handler,
             notices,
             templates,
+            monitoring: monitoring.clone(),
+            worker_wakeups: worker_wakeups.clone(),
+        });
+        Ok(Self {
+            services,
+            handler,
             slots,
             active_jobs: ActiveWorkflowJobs::default(),
             monitoring,
             intent_wakeups: Arc::new(Notify::new()),
-            worker_wakeups: Arc::new(Notify::new()),
+            worker_wakeups,
         })
     }
 
@@ -287,195 +293,15 @@ impl WorkflowEngine {
         self.active_jobs.clone()
     }
 
-    fn authorizer(&self) -> ProductionAuthorizer {
-        LifecycleAuthorizer::new(
-            self.persistence.clone(),
-            self.persistence.clone(),
-            self.persistence.clone(),
-        )
-    }
-
-    pub fn service(&self) -> ProductionWorkflowService {
-        let p = self.persistence.clone();
-        WorkflowService::new(p.clone(), p.clone(), p.clone(), p, self.authorizer())
-    }
-
-    /// Lifecycle authorization as the HTTP and schedule use cases preflight it.
-    pub fn authorization(&self) -> Arc<dyn WorkflowAuthorization> {
-        Arc::new(self.authorizer())
-    }
-
-    fn schedule_materializer(
-        &self,
-    ) -> ScheduleMaterializer<PostgresPersistence, ProductionWorkflowService> {
-        ScheduleMaterializer::new(self.persistence.clone(), self.service())
-            .with_monitoring(self.monitoring.clone())
-            .with_admitted(self.worker_wakeups.clone())
-    }
-
-    /// Run-now's inline materialization, through the materializer's own path (p08 D1.9).
-    pub fn schedule_run_now(&self) -> Arc<dyn ScheduleRunNow> {
-        Arc::new(self.schedule_materializer())
-    }
-
-    /// The workflow routes' read models (p08 B3b-1).
-    pub fn reads(&self) -> &dyn crate::application::workflow::reads::WorkflowReads {
-        &self.persistence
-    }
-
-    /// The authoring pages' read models (p09 B1a).
-    pub fn authoring_reads(&self) -> &dyn crate::application::workflow::reads::AuthoringReads {
-        &self.persistence
-    }
-
-    /// The run pages' read models (p09 B2a).
-    pub fn run_views(&self) -> &dyn crate::application::workflow::run_views::RunViews {
-        &self.persistence
-    }
-
-    /// A published version of this company whose workflow is not archived — the one a binding
-    /// may select — for the binding form's parameter fields and resource slots (p09 B1b). It
-    /// authorizes nothing; the route has.
-    pub async fn selectable_bundle(
-        &self,
-        company: crate::domain::workflow::CompanyId,
-        version: crate::domain::workflow::VersionId,
-    ) -> crate::app_error::AppResult<
-        Option<Arc<crate::application::workflow::publication::PublishedBundle>>,
-    > {
-        crate::application::workflow::lifecycle::WorkflowDefinitions::selectable_version(
-            &self.persistence,
-            company,
-            version,
-        )
-        .await
-    }
-
-    /// The editor's step catalogue reference: every kind this deployment runs, each derived from
-    /// a compiling example. Built once; it depends only on the binary.
-    pub fn step_catalogue(
-        &self,
-    ) -> &'static [crate::application::workflow::authoring::CatalogueEntry] {
-        static CATALOGUE: std::sync::LazyLock<
-            Vec<crate::application::workflow::authoring::CatalogueEntry>,
-        > = std::sync::LazyLock::new(|| {
-            crate::application::workflow::authoring::catalogue_reference(
-                &WorkflowSourceDecoder,
-                UNHANDLED_STEP_KINDS,
-            )
-        });
-        &CATALOGUE
-    }
-
-    /// An isolated sample receives only inert validated content and scripted data.
-    pub fn sample(
-        &self,
-        bundle: Arc<crate::application::workflow::publication::PublishedBundle>,
-        request: crate::application::workflow::sample::SampleRequest,
-    ) -> crate::app_error::AppResult<crate::application::workflow::sample::SampleReport> {
-        crate::application::workflow::sample::execute(bundle, request)
-    }
-
-    pub fn decisions(&self) -> &dyn crate::application::workflow::decisions::WorkflowDecisions {
-        &self.persistence
-    }
-
-    pub fn jev_connections(&self) -> &dyn crate::application::workflow::jev::JevConnections {
-        &self.persistence
-    }
-
-    /// Named workflow tool registrations (07-D2, notice WF-C003).
-    pub fn workflow_tools(&self) -> &dyn crate::application::workflow::tools::WorkflowTools {
-        &self.persistence
-    }
-
-    /// The shipped template catalogue (p08 D2.5).
-    pub fn template_catalogue(&self) -> &TemplateCatalogue {
-        self.templates.catalogue()
-    }
-
-    pub fn template_copies(
-        &self,
-    ) -> TemplateCopyService<ProductionAuthorizer, PostgresPersistence, WorkflowSourceDecoder> {
-        TemplateCopyService::new(
-            self.authorizer(),
-            self.persistence.clone(),
-            WorkflowSourceDecoder,
-        )
-    }
-
-    /// Action reconciliation as an operator annotation (P08-D3): the command actor's current
-    /// access to the action's resource, and no evidence verifier, so only an unknown note
-    /// settles and nothing reopens (§D3.2).
-    pub fn reconciliation(&self) -> ProductionReconciliation {
-        crate::application::workflow::actions::ActionReconciliationService::new(
-            crate::adapters::persistence::workflow::action_reconciliation::PostgresActionReconciliation::new(
-                self.persistence.clone(),
-                crate::adapters::persistence::workflow::action_reconciliation::CompanyReconciliationResources,
-            ),
-            self.authorizer(),
-            self.persistence.clone(),
-            None,
-        )
-    }
-
-    /// Wake an idle worker slot for work a route just committed (a decision's continuation).
-    pub fn wake_workers(&self) {
-        self.worker_wakeups.notify_one();
-    }
-
-    /// "Create assistant channel" (p08 D2.4), over the same provisioning as the Builder's tool.
-    pub fn onboarding_persistence(
-        &self,
-    ) -> Arc<dyn crate::use_cases::onboarding::OnboardingPersistence> {
-        Arc::new(
-            crate::adapters::persistence::onboarding::PostgresOnboarding::new(
-                self.persistence.clone(),
-                self.templates.clone(),
-            ),
-        )
-    }
-
-    pub fn assistant_channels(&self) -> Arc<dyn AssistantChannels> {
-        Arc::new(AssistantChannelService::new(
-            self.persistence.clone(),
-            self.templates.clone(),
-        ))
-    }
-
-    pub fn bindings(&self) -> ProductionBindings {
-        let p = self.persistence.clone();
-        BindingService::new(self.authorizer(), p.clone(), p.clone(), p)
-    }
-
-    /// The definition service for one publication, capturing exactly the HTTP and MCP
-    /// operations the publisher selected (WF-C001 r2 nesting; unhandled kinds refused).
-    pub fn definitions(
-        &self,
-        http: Vec<HttpPublicationSelection>,
-        mcp: Vec<McpPublicationSelection>,
-    ) -> ProductionDefinitions {
-        let p = self.persistence.clone();
-        let directory = ChildPublicationDirectory {
-            persistence: p.clone(),
-            inner: AgentPublicationDirectory {
-                persistence: p.clone(),
-                inner: ToolPublicationDirectory {
-                    persistence: p.clone(),
-                    http,
-                    mcp,
-                },
-            },
-        };
-        DefinitionService::new(self.authorizer(), p, WorkflowSourceDecoder, directory)
-            .with_refused_kinds(UNHANDLED_STEP_KINDS)
+    pub fn services(&self) -> Arc<WorkflowServices> {
+        self.services.clone()
     }
 
     /// Start workflow slots, the intent worker, schedule materializer and metrics sampler
     /// under `shutdown`. The caller keeps the handles and joins them on shutdown.
     pub fn spawn(&self, shutdown: &CancellationToken) -> Vec<(&'static str, JoinHandle<()>)> {
         let mut handles = Vec::with_capacity(self.slots + 4);
-        let metric_persistence = self.persistence.clone();
+        let metric_persistence = self.services.persistence.clone();
         let monitoring = self.monitoring.clone();
         let metric_shutdown = shutdown.clone();
         handles.push((
@@ -490,9 +316,9 @@ impl WorkflowEngine {
             }),
         ));
         for _ in 0..self.slots {
-            let persistence = self.persistence.clone();
+            let persistence = self.services.persistence.clone();
             let handler = self.handler.clone();
-            let notices = self.notices.clone();
+            let notices = self.services.notices.clone();
             let wakeup = self.worker_wakeups.clone();
             let active_jobs = self.active_jobs.clone();
             let monitoring = self.monitoring.clone();
@@ -515,9 +341,9 @@ impl WorkflowEngine {
             ));
         }
         let admissions = MessageAdmissions::new(
-            self.persistence.clone(),
-            self.service(),
-            self.persistence.clone(),
+            self.services.persistence.clone(),
+            self.services.service(),
+            self.services.persistence.clone(),
         )
         .with_monitoring(self.monitoring.clone());
         let intent_wakeup = self.intent_wakeups.clone();
@@ -535,7 +361,7 @@ impl WorkflowEngine {
             }),
         ));
         handles.push(self.spawn_storage(shutdown));
-        let materializer = self.schedule_materializer();
+        let materializer = self.services.schedule_materializer();
         let schedule_shutdown = shutdown.clone();
         handles.push((
             "workflow schedule materializer",
@@ -551,7 +377,7 @@ impl WorkflowEngine {
         handles
     }
     fn spawn_storage(&self, shutdown: &CancellationToken) -> (&'static str, JoinHandle<()>) {
-        let persistence = self.persistence.clone();
+        let persistence = self.services.persistence.clone();
         let monitoring = self.monitoring.clone();
         let shutdown = shutdown.clone();
         (
@@ -577,7 +403,7 @@ impl WorkflowEngine {
     ) -> Self {
         let handler = Arc::get_mut(&mut self.handler).expect("unshared test engine");
         handler.jev = crate::application::workflow::jev::JevRuntime::new(
-            self.persistence.clone(),
+            self.services.persistence.clone(),
             provider,
             LeasePolicy::new(LEASE).unwrap(),
         );
@@ -698,7 +524,7 @@ mod tests {
         mut source: serde_json::Value,
     ) -> Result<VersionId, LifecycleError> {
         source["workflow_id"] = serde_json::json!(target.workflow.to_string());
-        let definitions = engine.definitions(Vec::new(), Vec::new());
+        let definitions = engine.services().definitions(Vec::new(), Vec::new());
         definitions
             .save(SaveDraft {
                 target,
@@ -782,6 +608,7 @@ mod tests {
             ChildOrdinal::FIRST,
         ));
         let refused = engine
+            .services()
             .service()
             .admit(AdmitWorkflowRequest {
                 company_id: target.company,

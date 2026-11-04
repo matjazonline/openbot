@@ -9,14 +9,15 @@ use crate::adapters::persistence::{
     PostgresPersistence,
     test_support::{OwnDatabase, own_database},
 };
+use crate::application::ports::channel::ChannelPersistence;
+use crate::application::ports::channel::ChannelWrite;
 use crate::application::workflow::registry;
 use crate::infra::config::AppConfig;
-use crate::use_cases::{
-    agent::{AgentPersistence, AgentWrite},
-    channel::{ChannelPersistence, ChannelWrite},
-    company::{CompanyPersistence, CompanyWrite},
-    user::UserPersistence,
-};
+use crate::use_cases::agent::AgentPersistence;
+use crate::use_cases::agent::AgentWrite;
+use crate::use_cases::company::CompanyPersistence;
+use crate::use_cases::company::CompanyWrite;
+use crate::use_cases::user::UserPersistence;
 use axum::{
     Form,
     extract::{Path, Query, State},
@@ -31,6 +32,7 @@ struct Fixture {
     _db: OwnDatabase,
     persistence: PostgresPersistence,
     engine: Engine,
+    workers: Arc<crate::infra::workflow::WorkflowEngine>,
     owner: Uuid,
     company: Uuid,
     /// A plain member of `company`, and an admin of it: both with a principal, as the app makes.
@@ -133,9 +135,13 @@ impl Fixture {
         let (stranger, other) = owner_and_company(&persistence, "Elsewhere").await;
         let member = teammate(&persistence, company, "member").await;
         let admin = teammate(&persistence, company, "admin").await;
+        let workers = Arc::new(crate::infra::workflow::WorkflowEngine::for_tests(
+            persistence.clone(),
+        ));
         Some(Self {
             _db: db,
-            engine: Arc::new(WorkflowEngine::for_tests(persistence.clone())),
+            engine: workers.services(),
+            workers,
             persistence,
             owner,
             company,
@@ -338,7 +344,7 @@ impl Fixture {
     /// Run the production workers until `done` holds, then stop and join them.
     async fn run_until(&self, what: &str, done: impl AsyncFn() -> bool) {
         let shutdown = CancellationToken::new();
-        let handles = self.engine.spawn(&shutdown);
+        let handles = self.workers.spawn(&shutdown);
         let settled = tokio::time::timeout(Duration::from_secs(30), async {
             while !done().await {
                 tokio::time::sleep(Duration::from_millis(50)).await;

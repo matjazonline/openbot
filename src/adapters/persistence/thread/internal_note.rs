@@ -8,18 +8,18 @@ use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
 use super::{message::insert_message_on, views};
-use crate::{
-    app_error::{AppError, AppResult},
-    entities::{
-        correlation::CorrelationId,
-        internal_note::{
-            AddInternalNote, InternalNoteProvenance, InternalNoteView, TombstoneInternalNote,
-        },
-        message::{MessageDirection, MessageRole},
-        transport::PrincipalId,
-    },
-    use_cases::thread::{MessageAuthorWrite, MessageWrite},
-};
+use crate::app_error::AppError;
+use crate::app_error::AppResult;
+use crate::application::ports::thread::MessageAuthorWrite;
+use crate::application::ports::thread::MessageWrite;
+use crate::entities::correlation::CorrelationId;
+use crate::entities::internal_note::AddInternalNote;
+use crate::entities::internal_note::InternalNoteProvenance;
+use crate::entities::internal_note::InternalNoteView;
+use crate::entities::internal_note::TombstoneInternalNote;
+use crate::entities::message::MessageDirection;
+use crate::entities::message::MessageRole;
+use crate::entities::transport::PrincipalId;
 
 #[derive(sqlx::FromRow)]
 struct InternalNoteDb {
