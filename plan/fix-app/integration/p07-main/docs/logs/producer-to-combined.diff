@@ -1,0 +1,901 @@
+diff --git a/plan/attribution-service/01-application-boundaries-and-contracts.md b/plan/attribution-service/01-application-boundaries-and-contracts.md
+new file mode 100644
+index 0000000..b2b2eab
+--- /dev/null
++++ b/plan/attribution-service/01-application-boundaries-and-contracts.md
+@@ -0,0 +1,153 @@
++# 01 — Application boundaries and contracts
++
++> **No backward compatibility.** We don't need backward compatibility and will reset the database
++> when needed. Do not add data backfills, dual reads/writes, legacy decoders, compatibility shims,
++> or staged rollouts for existing data.
++
++## Outcome and implementation order
++
++Build attribution as a separate application with its own dashboard, HTTP API, PostgreSQL database,
++credentials, sessions, build, and deployment. Initially keep its source at `services/attribution/`
++in this repository and run it alongside Openbot. Moving it to another server must require only
++deployment, networking, and configuration changes. Moving its source to another repository must
++not require extracting application code from Openbot.
++
++This directory is a proposed implementation plan, not implemented functionality. Implement the
++numbered files in order. Each phase depends on its predecessors; each batch has focused checks.
++Run the final full-suite gate in phase 10 after all implementation is integrated.
++
++| Phase | Deliverable |
++| --- | --- |
++| [01 — Boundaries and contracts](01-application-boundaries-and-contracts.md) | Ownership, network contracts, product decisions |
++| [02 — Independent application](02-independent-application-foundation.md) | Standalone package, database, runtime, build, CI |
++| [03 — Login and company access](03-single-sign-on-and-company-access.md) | SSO, local sessions, live authorization, lifecycle integration |
++| [04 — Merchant setup and credentials](04-merchant-setup-and-api-credentials.md) | Store setup, approved domains, scoped keys, administration UI |
++| [05 — Links and clicks](05-links-and-durable-clicks.md) | Campaigns, ads, link API/UI, durable redirects |
++| [06 — Website tracking](06-website-tracking-and-checkout-handoff.md) | Pixel, browser events, consent-aware checkout handoff |
++| [07 — Orders and attribution](07-orders-refunds-and-attribution.md) | First merchant integration, deduplication, refunds, attribution |
++| [08 — Reports and dashboard](08-analytics-and-attribution-dashboard.md) | Reconciled reporting API and attribution-owned dashboard |
++| [09 — Operations and relocation](09-operations-retention-and-separate-deployment.md) | Retention, monitoring, backup restore, separate-server proof |
++| [10 — Verification and pilot](10-integration-verification-and-pilot.md) | End-to-end acceptance, final CI gates, pilot evidence |
++
++## Mandatory application separation
++
++| Concern | Openbot owns | Attribution owns | Permitted connection |
++| --- | --- | --- | --- |
++| Product UI | Openbot pages and navigation | All attribution pages, forms, assets, dashboard | Navigation links between applications |
++| User accounts | User identity, account security and account administration | External user references and local sessions only | Explicit SSO and identity API |
++| Companies and membership | Company identity, invitations, membership and roles | Local attribution configuration keyed by the same `company_id` | Authorized company-access and lifecycle APIs |
++| Tracking and commerce | No attribution records | Stores, domains, credentials, campaigns, ads, links, clicks, events, orders, refunds | Versioned attribution API when a real Openbot feature needs it |
++| Authorization | Current account/company authority | Enforcement on every attribution operation | Trusted identity plus current company permission, or a scoped machine credential |
++| Persistence | Openbot database and migrations | Attribution database and migrations | No cross-database access |
++| Runtime | Openbot server and workers | Attribution server and owned background work | HTTPS; no in-process calls |
++| Delivery | Openbot artifact and release | Attribution artifact and release | Independent release jobs and configuration |
++
++The following are forbidden shortcuts, including during the first local deployment:
++
++- No dependency on the `open_bots` Rust package, sibling source files, private Openbot modules,
++  shared `AppState`, shared database pool, or shared application/domain library.
++- No shared user/company tables, SQL joins across applications, cross-database foreign keys,
++  direct reads of the other database, or distributed database transactions.
++- No attribution pages in Openbot's route tree, templates, asset bundle, or frontend build. The
++  attribution browser talks to its own backend; ordinary dashboard operations never proxy through
++  Openbot. Reusing a visual style does not create a runtime/build dependency.
++- No shared cookies, session tables, session signing secrets, password hashes, or general API
++  master key. Public tracking identifiers, user sessions, merchant keys, and service credentials
++  are different credential classes and cannot substitute for one another.
++- No cross-application filesystem mounts, repository-relative runtime assets, parent lockfile,
++  parent `.env`, or deployment scripts that require the other application's source.
++
++Sharing identity means sharing stable identifiers and an explicit authority contract. Attribution
++does not run a second registration, password-reset, invitation, or membership system. Its local
++company record is attribution configuration, not a competing company directory. User display
++metadata may be cached as non-authoritative data; cached roles must not become access grants.
++
++Openbot implementation changes are limited to the selected identity integration, company-access
++API, reliable lifecycle delivery, navigation link, and their configuration/tests/CI. Tracking,
++merchant credentials, attribution jobs, reports and dashboard assets belong exclusively to the
++attribution project. Each cross-application credential is dedicated to its client, audience and
++scope; no application reuses the other's browser-session or merchant secrets.
++
++Independent deployment is the MVP requirement. Independence from Openbot's account service is
++not: login and company administration still depend on Openbot. A common account service replacing
++that dependency is a separate future architectural decision, not an implicit extra project here.
++
++## Batch 01A — Specify the network boundary
++
++1. Write OpenAPI contracts and an authentication sequence for the two applications. Openbot owns
++   the identity/company contract; attribution owns the tracking/management/reporting contract.
++   Share wire schemas as artifacts, not application source or a shared database model. Specify
++   status codes, bounded payloads, pagination, timeouts, retryability, idempotency, and errors.
++2. Specify the three cross-application paths: browser SSO into attribution; attribution's
++   authenticated identity/company permission checks; and reliable company suspension/deletion
++   delivery from Openbot. Public tracking and merchant callbacks go directly to attribution.
++3. Keep Openbot dashboard API integration optional. If an actual Openbot feature later needs
++   attribution data, use a company-scoped attribution key stored only by Openbot's backend. The
++   attribution dashboard itself must not need those keys or an Openbot rendering proxy.
++4. Define types for company/user external references, store/ad/link/click/event/order identities,
++   currency and money. Keep ad identifiers distinct from per-request click identifiers. Specify
++   tenant predicates and permissions for every resource and nested resource.
++
++Focused checks: contract examples cover every credential class, two companies, two stores, and
++permission denial; no caller-controlled company/user field grants authority. During implementation
++add `attribution_contract_` tests and contract validation for both APIs. Trace current owners before
++editing Openbot's authentication or membership paths.
++
++## Batch 01B — Set the smallest pilot and resolve material choices
++
++Defaults to carry through the plan:
++
++- One attribution HTTP backend and PostgreSQL; its dashboard uses ordinary refreshes. No queue
++  broker, ClickHouse, SpacetimeDB, live dashboard engine, or separate analytics service.
++- One Openbot company maps to one attribution tenant using the same `company_id`; several stores
++  can belong to that tenant. No additional workspace hierarchy or duplicate company mapping ID.
++- Last eligible tracked click within 30 days before order creation; freeze the chosen click and
++  policy on the first accepted paid order. No fingerprinting or cross-device matching.
++- Merchandise revenue uses actual line amounts after discounts; taxes and shipping stay separate.
++  Refunds reduce merchandise revenue according to their line allocation. Never add currencies.
++- Fail a redirect with a retryable 503 if its click cannot be durably stored; never issue an
++  apparently tracked click ID whose row was not committed. Confirm this pilot behavior explicitly.
++
++Before dependent implementation, record these decisions and the responsible owner in this file:
++
++- The first real checkout platform/store and its paid-order/refund signature and retry contracts.
++  A generic signed merchant adapter can be a test fixture, but does not count as the promised
++  first production checkout integration.
++- The supported SSO provider arrangement and maintained protocol components. Prefer standard
++  OIDC Authorization Code with PKCE. Determine how the provider maps to Openbot's authoritative
++  users; do not assume Openbot is already an OIDC issuer or silently build a new identity platform.
++  If provider adoption changes account ownership, resolve that architectural choice before phase 03.
++- Expected daily events, peak requests, retention periods, deployment region, consent behavior,
++  allowed tracking placements, and numeric redirect/report/error-budget targets for the pilot.
++- The exact mapping from existing Openbot roles to attribution read, link-management, and
++  integration-administration permissions; company suspend/delete propagation deadline.
++
++These are explicit implementation prerequisites, not reasons to leave this planning task unsaved.
++Record unanswered items as open; do not advertise defaults as approved deployment policy.
++
++Evaluate Shlink only against a demonstrated per-request click-ID checkout handoff and total
++maintenance cost. A native Rust implementation is the baseline; adoption must reduce overall
++complexity. Dub conversion licensing needs a separate decision and fresh license verification.
++Official platform impressions/spend, app installs, affiliate payouts, cross-device attribution,
++additional commerce adapters, currency conversion, and click-cohort reporting remain later scope.
++
++Focused checks: reconcile a concrete two-ad, multi-product, refund example on paper; validate the
++selected merchant can supply reliable payment/order/refund identifiers and checkout linkage. Record
++the SSO choice and pilot assumptions before starting the batches that depend on them.
++
++## Current repository anchors and evidence discipline
++
++- [HTTP state](../../src/adapters/http/app_state.rs): current Openbot composition; do not extend it
++  with attribution stores, reporting queries, or tracking handlers.
++- [Session authority](../../src/adapters/http/session.rs): Openbot sessions and revocation; this
++  is not evidence that an SSO issuer exists.
++- [Company routes](../../src/adapters/http/routes/company.rs): existing company management, reused
++  through its owning use cases when adding the narrowly scoped integration API.
++- [CI](../../.github/workflows/ci.yml) and [local checks](../../scripts/check.sh): current gates;
++  compare the live CI file at implementation time rather than assuming the local script is complete.
++
++All new test prefixes and service commands in this directory are future requirements. Per batch,
++record exact commands, nonzero selected/executed test counts, outcomes, and unavailable checks in
++the corresponding phase file. List filtered tests before running them. Use disposable databases;
++regenerate SQLx metadata in the owning application after SQL edits. Keep final full-suite work in
++[10](10-integration-verification-and-pilot.md); broaden checks earlier at shared identity boundaries.
+diff --git a/plan/attribution-service/02-independent-application-foundation.md b/plan/attribution-service/02-independent-application-foundation.md
+new file mode 100644
+index 0000000..020b368
+--- /dev/null
++++ b/plan/attribution-service/02-independent-application-foundation.md
+@@ -0,0 +1,56 @@
++# 02 — Independent application foundation
++
++> **No backward compatibility.** We don't need backward compatibility and will reset the database
++> when needed. Do not add data backfills, dual reads/writes, legacy decoders, compatibility shims,
++> or staged rollouts for existing data.
++
++## Outcome and dependency
++
++Depends on [01](01-application-boundaries-and-contracts.md). Attribution builds, starts, migrates,
++and tests from its own directory without the Openbot package or database. Co-location is a
++deployment convenience only.
++
++## Batch 02A — Create the standalone package and runtime
++
++1. Create `services/attribution/` with its own `Cargo.toml`, committed `Cargo.lock`, `src/`,
++   `migrations/`, SQLx metadata, tests, web assets, README, configuration example, Dockerfile, and
++   applicable instructions. Keep it an independent Cargo project; do not turn shared parent
++   dependency configuration into a build requirement. Package name: `attribution_service`.
++2. Use Rust/Axum/PostgreSQL and the repository's applicable safety patterns, with local ownership
++   of domain, application, HTTP, and persistence code. Share maintained dependencies, not private
++   Openbot source. Avoid placeholder abstractions and empty worker frameworks.
++3. Give the application its own listener, public origin, database configuration, tracing startup,
++   health/readiness endpoints, connection and request limits, graceful shutdown, and timeouts.
++   No agent runtime, workflow engine, email transport, or Openbot session authority is loaded.
++4. Use its own database role and database, even when the PostgreSQL server is shared. Neither
++   application's role may read the other's database. Attribution alone owns its migration history.
++5. Build a non-root production image with its assets inside the image. Pin git dependencies by
++   revision/tag and use locked builds. Document only implemented configuration keys and actual
++   startup validations; secret values never appear in logs or examples.
++
++Focused checks: `attribution_startup_` and `attribution_storage_boundary_` cover bad configuration,
++readiness, migration errors, graceful shutdown, and separate-role denial against real PostgreSQL.
++Run service formatting and offline all-target compilation after dependencies are available. A
++missing database must fail database tests rather than make them silently pass.
++
++## Batch 02B — Establish independent builds and extraction checks
++
++1. Add a service-local verification entrypoint and CI job that runs from `services/attribution/`.
++   Use its own frontend manifest/lockfile only if a frontend toolchain is needed; server-rendered
++   pages with small local browser scripts are sufficient. No Openbot asset pipeline dependency.
++2. Add an executable boundary check: reject parent path dependencies, imports of Openbot, parent
++   asset/config references, and SQL access to Openbot tables. Check Cargo's resolved dependency
++   graph as well as source references; a wrapper crate must not bypass this rule.
++3. In CI copy only the service directory into a temporary standalone checkout, provide explicitly
++   named test dependencies, and build/test it there. Exercise identity through a contract-faithful
++   HTTP test server; run real two-application contract tests in phase 10.
++4. Keep Openbot's existing build and CI independent. Add service gates without silently replacing
++   Openbot coverage or causing root-only commands to appear to test the service.
++
++Focused checks: `attribution_boundary_`, standalone-copy compilation/test, container non-root
++smoke, and fresh-database migration. Run dependency/boundary checks in CI from this phase onward.
++Use service-local `cargo test --locked --offline --all-targets PREFIX -- --list`, verify the intended
++nonzero selection, then run the same command without `-- --list`. Record commands and results here.
++
++Completion: only HTTPS contracts and external identifiers connect the applications. Full
++verification remains the gate in [10](10-integration-verification-and-pilot.md).
+diff --git a/plan/attribution-service/03-single-sign-on-and-company-access.md b/plan/attribution-service/03-single-sign-on-and-company-access.md
+new file mode 100644
+index 0000000..19c4be0
+--- /dev/null
++++ b/plan/attribution-service/03-single-sign-on-and-company-access.md
+@@ -0,0 +1,84 @@
++# 03 — Single sign-on and company access
++
++> **No backward compatibility.** We don't need backward compatibility and will reset the database
++> when needed. Do not add data backfills, dual reads/writes, legacy decoders, compatibility shims,
++> or staged rollouts for existing data.
++
++## Outcome and dependency
++
++Depends on [02](02-independent-application-foundation.md) and phase 01's SSO decision. Users enter
++attribution on its own origin, authenticate centrally, and use an attribution-owned session.
++Openbot remains the authority for accounts, companies, membership, and roles.
++
++## Batch 03A — Deliver login without shared sessions
++
++1. Integrate the selected standards-based SSO arrangement using maintained protocol components.
++   Specify issuer, registered confidential client, exact callback URLs, audience, state, nonce,
++   PKCE, token expiry, key rotation, and supported logout/revocation behavior. Existing Openbot
++   browser authentication is not itself a supported OIDC provider; implement the chosen bridge
++   explicitly rather than repurposing an Openbot session token as a cross-app bearer token.
++2. Attribution owns login/callback/logout routes and an opaque, revocable local session. Use
++   Secure, HttpOnly, host-only cookies with suitable SameSite handling; never set a shared parent
++   domain cookie. Rotate the local session at login and enforce idle/absolute expiry.
++3. Keep provider tokens and client credentials server-side, encrypted where recoverable storage
++   is required. Authentication codes are one-use and short-lived; validate redirects and return
++   paths. The browser never receives a merchant key or service administration key.
++4. Cover CSRF on state-changing routes, central response security headers, session fixation,
++   login rate limits, local logout, account-disable/security-change revocation, and upstream
++   expiry. Reuse Openbot's existing account/security owner for any new identity endpoint.
++
++Focused checks: `attribution_sso_` and `attribution_session_` cover code replay with competing
++redeemers, wrong issuer/audience/nonce/state, callback injection, expired identity, cookie scope,
++CSRF and security-change revocation. Exercise the actual browser redirect flow across two origins,
++including an already logged-in user and a user who must authenticate. Run affected Openbot session
++and revocation regressions, plus offline compilation, when changing that shared infrastructure.
++
++## Batch 03B — Enforce current company access and separate administration
++
++1. Add the minimum authenticated Openbot identity/company-access API needed by attribution.
++   Identity evidence must bind the requesting user and the attribution client; a service secret
++   plus an arbitrary submitted `user_id` is not proof of that user's login. Return stable IDs and
++   explicit permissions, using Openbot's existing membership use cases.
++2. For the MVP, check current account status and relevant company permissions on every protected
++   dashboard/API request made under a user session. Use bounded HTTP calls and fail closed with
++   a distinct retryable authority-unavailable response when Openbot cannot be reached. Do not
++   silently authorize from cached roles or equate an outage with a deleted user.
++3. Attribution's company selector lists only authorized companies. Resolve every requested object
++   under that active company even when the user belongs to several companies. Map roles to the
++   read/link-management/integration-administration permissions agreed in phase 01.
++4. Provision local company configuration idempotently from trusted identity/company responses.
++   The shared `company_id` is its key. A local record cannot confer membership or recreate a
++   suspended/deleted company. Display names are non-authoritative snapshots only.
++5. Attribution owns its own navigation and settings shell. Account/company/member management
++   links open Openbot settings with validated return navigation. Openbot may add an Attribution
++   navigation link. Do not embed the dashboard or proxy its pages through Openbot.
++
++Focused checks: `attribution_company_access_` for another tenant's IDs on every resource path,
++multi-company users, lost membership during a session, role downgrade, revoked account, timeout,
++forged actor IDs, and concurrent first-use provisioning. Assert attribution cannot connect to the
++Openbot database. Verify both browser applications keep separate session cookies.
++
++## Batch 03C — Propagate company lifecycle without a shared database
++
++1. Define authenticated, idempotent company suspension/deletion messages with monotonic lifecycle
++   versions. Openbot durably records the notification with its company change and retries bounded
++   deliveries. Attribution applies the lifecycle change transactionally and cannot revive a
++   tombstoned company from a delayed provisioning/login response.
++2. A suspension disables local credentials and public installations according to the agreed
++   policy; deletion starts the defined retention/purge process. Repeated lifecycle messages have
++   one effect. Use a narrowly scoped service credential that cannot submit sales or read reports.
++3. Reconcile company status periodically through the authenticated API and enforce a maximum
++   status freshness deadline agreed in phase 01. After that deadline fail closed for tenant
++   operations, including merchant/public ingestion. Merchant requests need no per-event Openbot
++   call while local status is valid. Document the exact bounded outage/revocation behavior.
++4. Keep delivery/reconciliation work supervised and durable with bounded retry/deadline policy.
++   Alerts surface undelivered changes and expired status; local counters are insufficient.
++
++Focused checks: `attribution_company_lifecycle_` with competing lifecycle deliveries, stale versions,
++delete versus first-use provisioning, crash after commit before acknowledgment, missed delivery
++repaired by reconciliation, and a simulated prolonged Openbot outage. Record observed revocation
++bounds and error behavior. Use isolated databases for global sweeps/worker assertions.
++
++Completion: moving attribution to another server does not move user/company administration or
++change any session semantics. An Openbot outage has a documented effect, not a hidden dependency.
++Record batch commands and counts here; final full-suite gate is in [10](10-integration-verification-and-pilot.md).
+diff --git a/plan/attribution-service/04-merchant-setup-and-api-credentials.md b/plan/attribution-service/04-merchant-setup-and-api-credentials.md
+new file mode 100644
+index 0000000..8d30be7
+--- /dev/null
++++ b/plan/attribution-service/04-merchant-setup-and-api-credentials.md
+@@ -0,0 +1,58 @@
++# 04 — Merchant setup and API credentials
++
++> **No backward compatibility.** We don't need backward compatibility and will reset the database
++> when needed. Do not add data backfills, dual reads/writes, legacy decoders, compatibility shims,
++> or staged rollouts for existing data.
++
++## Outcome and dependency
++
++Depends on [03](03-single-sign-on-and-company-access.md). A company administrator sets up stores,
++approved domains, installations, and merchant credentials entirely in attribution's UI. Attribution
++issues, validates, rotates, and revokes these credentials without a per-event Openbot login call.
++
++## Batch 04A — Model stores, domains and installations
++
++1. Store company-scoped merchant installations, store identifiers, approved exact HTTPS hosts,
++   and public tracking installation identifiers in attribution's database. Domain approval must
++   establish customer control through the agreed verification/administrator process; typing an
++   arbitrary hostname is not proof. Define re-verification and revocation behavior.
++2. Canonicalize hostnames, including internationalized domains; reject credentials in URLs,
++   non-HTTPS destinations, unsafe ports and invalid/local destinations. Match approved hosts
++   exactly; a suffix match must not permit `customer.example.attacker.test` or arbitrary subdomains.
++   Never fetch a submitted destination to validate it. Secure any domain-verification network
++   operation against arbitrary addresses and redirects.
++3. Public installation IDs select tenant/store configuration and allowed observation types. They
++   are not secrets and cannot authorize a paid order, refund, report or configuration change.
++4. Build accessible setup forms in the attribution application, including domain/installation
++   status and clear errors. State-changing actions use the user-session permission/CSRF boundary.
++
++Focused checks: `attribution_installation_` and `attribution_destination_` for cross-tenant/store
++references, Unicode/host confusion, revoked domains, malformed URLs, script escaping, and concurrent
++domain/configuration updates. Verify the UI never embeds a privileged credential in public snippets.
++
++## Batch 04B — Issue and enforce scoped credentials
++
++1. Create high-entropy keys with an identifiable public prefix and show the secret once. Persist
++   only a cryptographic verifier for our bearer keys; redact secrets from errors, traces, audit
++   events and URLs. Keep provider webhook-signing secrets encrypted because verification needs
++   their original value. Separate encryption material and deployment secrets between applications.
++2. Bind each merchant key to one company, one store, and explicit scopes such as conversion
++   ingestion. Scope comes from the credential; body/path IDs never override it. Management/report
++   credentials, if needed, have separate scopes and cannot masquerade as a user session.
++3. Expose creation/list/revoke/rotate in attribution's administration UI and authenticated API.
++   Listing returns metadata only. Document intentional overlap during secret rotation, expiry,
++   last use, and who may administer keys. Rotation is not a schema compatibility mechanism.
++4. Authenticate before trusting or fully parsing merchant payloads, impose request/tenant limits,
++   and return consistent authentication/permission failures. Native provider webhooks use verified
++   signatures over bounded raw bytes and replay protections, not an assumed bearer-key wrapper.
++5. Audit key creation/revocation and important configuration changes with trusted actor/company
++   identifiers. Local key revocation and company suspension are checked at the ingestion boundary.
++
++Focused checks: `attribution_credentials_` for missing/invalid/expired/revoked keys, wrong scope,
++foreign store, secret non-disclosure, rotation overlap, and concurrent revoke versus use with a
++documented transaction boundary. Provider signature fixtures include altered bytes, stale timestamps
++where supported, and oversized bodies. Keep public event endpoints unable to call trusted sales paths.
++
++Completion: browser sessions, merchant keys, public installation IDs, and lifecycle/identity service
++credentials have disjoint purposes. Record exact focused commands/counts/results here. Full-suite
++verification is reserved for [10](10-integration-verification-and-pilot.md).
+diff --git a/plan/attribution-service/05-links-and-durable-clicks.md b/plan/attribution-service/05-links-and-durable-clicks.md
+new file mode 100644
+index 0000000..f806015
+--- /dev/null
++++ b/plan/attribution-service/05-links-and-durable-clicks.md
+@@ -0,0 +1,55 @@
++# 05 — Links and durable clicks
++
++> **No backward compatibility.** We don't need backward compatibility and will reset the database
++> when needed. Do not add data backfills, dual reads/writes, legacy decoders, compatibility shims,
++> or staged rollouts for existing data.
++
++## Outcome and dependency
++
++Depends on [04](04-merchant-setup-and-api-credentials.md). A permitted user or management client
++creates an ad-specific link; a visitor receives a distinct durably stored click and a correct redirect.
++
++## Batch 05A — Create campaigns, ads and links
++
++1. Add company/store-scoped campaigns, ads, links, placement metadata, and optional advertised
++   product references. An ad ID identifies an ad; a link code identifies a placement link; each
++   click ID identifies one accepted redirect request. Use opaque unguessable tracking identifiers.
++2. Implement `POST /v1/links` and the bounded list/detail/update/disable APIs required by the
++   attribution-owned link UI. Include idempotency for retried creation, with a scoped key and
++   payload fingerprint; a reused key with a different payload conflicts.
++3. Validate destination URLs against active store-approved domains at creation and redirect time.
++   Store a canonical destination. Reject reserved tracking parameter collisions; merge the click
++   parameter using a URL parser while preserving unrelated parameters, duplicates and fragments.
++4. Keep historical attribution stable when names, destination or advertised product metadata
++   change: record the relevant ad/link revision or dimension snapshot with the click. Disabling
++   a link prevents new clicks without erasing historical reporting.
++
++Focused checks: `attribution_links_` for permission/scoped-object checks, identical and conflicting
++creation retries, competing idempotency requests, metadata history, disabled links, and query/fragment
++preservation. Execute real database constraints, not only in-memory authorization mocks.
++
++## Batch 05B — Commit clicks before redirecting
++
++1. Implement `GET /r/{code}`. Resolve the active company/store/link, allocate a per-request click
++   ID, timestamp it server-side, and durably commit before returning HTTP 302 with
++   `Cache-Control: no-store`. Apply privacy/referrer headers and disable CDN caching for tracking.
++2. Treat separate GET requests as separate raw clicks, including link scanners and browser
++   retries. HEAD/health probes must not create clicks. Do not deduplicate ordinary clicks by IP,
++   fingerprint, or visitor identity; there is no reliable browser delivery event ID on this route.
++3. Store a bounded bot/prefetch classification and classifier version with the click. Report raw
++   and filtered counts separately; heuristic filtering is not a guarantee of human activity.
++   Avoid raw IP retention and full user-agent/referrer collection unless explicitly justified.
++4. Implement phase 01's failure contract: database/commit uncertainty returns a retryable 503 and
++   no tracked redirect; unknown/disabled codes return an appropriate non-redirect error. Record
++   committed clicks even if the client disconnects after commit; receipt of a page is not assumed.
++5. Bound per-tenant and public endpoint load, connection concurrency, database pool waits and
++   request latency. Trust forwarded client information only from configured trusted proxies.
++
++Focused checks: `attribution_redirect_` for one committed row per GET, fresh IDs, 302/header/URL
++semantics, HEAD, bots, revoked domains/company, storage failure, unknown commit outcome, and client
++disconnect. Use concurrent requests against real PostgreSQL and prove no duplicate IDs or tenant
++crossing. Measure the initial redirect latency against the phase 01 pilot target.
++
++Completion: a link can be created, clicked, and inspected from attribution while Openbot contains
++no click storage or tracking route. Record batch commands/counts/results and regenerate owning SQLx
++metadata. Full-suite gate: [10](10-integration-verification-and-pilot.md).
+diff --git a/plan/attribution-service/06-website-tracking-and-checkout-handoff.md b/plan/attribution-service/06-website-tracking-and-checkout-handoff.md
+new file mode 100644
+index 0000000..29ab6ab
+--- /dev/null
++++ b/plan/attribution-service/06-website-tracking-and-checkout-handoff.md
+@@ -0,0 +1,62 @@
++# 06 — Website tracking and checkout handoff
++
++> **No backward compatibility.** We don't need backward compatibility and will reset the database
++> when needed. Do not add data backfills, dual reads/writes, legacy decoders, compatibility shims,
++> or staged rollouts for existing data.
++
++## Outcome and dependency
++
++Depends on [05](05-links-and-durable-clicks.md). Participating websites record observable loads and
++carry eligible click evidence into a merchant-controlled checkout. Browser observations never become
++trusted sales, and a tracking identifier never becomes a visitor's authenticated identity.
++
++## Batch 06A — Collect distinct, bounded website observations
++
++1. Add `GET /pixel.gif` returning a transparent image and `POST /v1/events` for a small enum of
++   observation types: image load, landing page load, and visible placement. Require an active
++   public installation and validate related click/link IDs within its company/store.
++2. Disable image/event response caching and document cache-busting for pixel embeds. A plain
++   pixel measures an observed image request, not viewability or a verified ad impression. A
++   visibility script records the chosen viewport threshold/duration and labels that separately.
++3. Validate body size, field lengths, timestamps, event type, payload shape and permitted origin
++   where available. Enforce exact origin CORS for approved sites; CORS/referrer checks are not
++   authentication and cannot make an observation trustworthy. Pixel requests may omit Origin.
++4. Deduplicate browser retries by installation plus opaque event ID with a bounded uniqueness
++   horizon at least as long as the documented retry window. A retry keeps its original ID; a new
++   page observation gets a new one. Pixel embeds should provide an observation ID; without one,
++   each request counts separately and the API/reporting contract must say so.
++5. Return success only after durable insertion/deduplication. On storage failure return a
++   retryable failure rather than a successful image/204 that pretends tracking was recorded.
++
++Focused checks: `attribution_website_event_` with permitted/forbidden kinds, forged sales, foreign
++IDs, duplicate/conflicting events, concurrent inserts, storage failure, correct GIF/no-store headers,
++origin handling, and public endpoint overload. Verify event-type labels against API and UI fixtures.
++
++## Batch 06B — Ship the small browser integration and merchant handoff
++
++1. Serve a versioned, pinned script from attribution with installation examples. It captures the
++   reserved click parameter, validates shape, records permitted observations, and exposes a small
++   explicit handoff to the participating shop. Do not embed merchant/service API keys in JavaScript.
++2. Implement the consent behavior agreed in phase 01. Do not persist click IDs across visits or
++   send optional tracking before the appropriate consent signal. Define withdrawal and expiry;
++   avoid fingerprinting and collecting customer email/name in event bodies or tracking URLs.
++3. The merchant backend binds click evidence to its own server-controlled cart/checkout session.
++   It validates the click's company/store and records the latest eligible consented click before
++   order creation. Keep enough candidate history to avoid a later ineligible/bot click blindly
++   replacing the last eligible click. Freeze checkout attribution evidence at order creation.
++4. Document that last-click means the merchant's observed, consented checkout history; attribution
++   cannot infer an unseen earlier/later click or cross-device identity. Attribution revalidates
++   the supplied chosen click when accepting the paid order. Browser form fields alone cannot
++   establish order identity or prove payment.
++5. Exercise navigation, return visits within policy, cart persistence, query removal after capture,
++   consent withdrawal, and checkout on the selected merchant platform. A cross-origin checkout
++   handoff must use that platform's supported server-side association, not third-party cookies.
++
++Focused checks: `attribution_checkout_handoff_` and real browser/script tests for Ad A then Ad B,
++expired/foreign/bot candidates, multiple tabs, blocked storage, no consent, and server-side checkout
++freeze. Assert emitted URLs/payloads contain no customer PII or privileged credentials. Record
++limitations caused by blocking or platform placement restrictions as product behavior.
++
++Completion: clicks and observations are independently labeled, click evidence survives the chosen
++checkout flow where permitted, and no pixel can create a sale. Record exact batch checks here;
++final full-suite gate is in [10](10-integration-verification-and-pilot.md).
+diff --git a/plan/attribution-service/07-orders-refunds-and-attribution.md b/plan/attribution-service/07-orders-refunds-and-attribution.md
+new file mode 100644
+index 0000000..f43fe7c
+--- /dev/null
++++ b/plan/attribution-service/07-orders-refunds-and-attribution.md
+@@ -0,0 +1,74 @@
++# 07 — Orders, refunds and attribution
++
++> **No backward compatibility.** We don't need backward compatibility and will reset the database
++> when needed. Do not add data backfills, dual reads/writes, legacy decoders, compatibility shims,
++> or staged rollouts for existing data.
++
++## Outcome and dependency
++
++Depends on [06](06-website-tracking-and-checkout-handoff.md) and the selected checkout platform.
++Verified paid orders produce stable ad/product attribution; retries, cancellation, refunds, and
++out-of-order delivery cannot duplicate revenue or silently change the chosen click.
++
++## Batch 07A — Authenticate and durably deduplicate merchant events
++
++1. Implement `POST /v1/conversions` for scoped merchant credentials and the selected platform's
++   native callback adapter. Verify its actual signature over the raw bounded body, timestamp and
++   replay contract before parsing trusted order data. Capture click evidence in that platform's
++   server-controlled checkout metadata as proved in phase 06.
++2. Normalize to paid-order, refund and cancellation events with store/external event ID, external
++   order ID, order-created/paid/event timestamps, click evidence, currency and actual line items.
++   Each line includes stable line/product IDs, quantity, discounted merchandise amount, and
++   separate tax/shipping allocations as required by the integration.
++3. Use integer minor units with an explicit supported currency exponent; reject floating-point
++   ambiguity, unsupported currencies, overflow, invalid quantities and inconsistent totals.
++   Event IDs and order IDs are distinct. Unique order identity is company + store + external ID.
++4. Persist an immutable event envelope/fingerprint with uniqueness on company + store + external
++   event ID. Exact retries return the existing result; differing bodies under the same ID conflict.
++   Commit accepted event storage and any immediate order mutation in one transaction. A successful
++   response implies durable storage; 202 may mean durably pending reconciliation, not a paid sale.
++5. Rate-limit and bound ingestion; use retryable failures for temporary storage/admission problems.
++   Ensure provider response semantics cause the expected retries. No browser endpoint can invoke
++   this trusted path and no API-supplied tenant field overrides the authenticated store.
++
++Focused checks: `attribution_merchant_ingress_` for real provider signature fixtures, malformed totals,
++foreign store/click, identical/conflicting retries, and multiple simultaneous deliveries of one
++event. Inject transaction failure and commit-acknowledgment loss; retries must leave one durable event.
++
++## Batch 07B — Settle orders, attribution and refunds transactionally
++
++1. Serialize changes on the scoped order row using database constraints/locking, including
++   concurrent first creation. Store a unique paid-order fact and stable product lines. A second
++   paid event with a different event ID cannot count the order twice; inconsistent paid facts
++   become a visible reconciliation conflict instead of overwriting history.
++2. At the first accepted paid fact, validate the merchant's selected click: same company/store,
++   permitted classification, `order_created_at - 30 days <= clicked_at <= order_created_at`.
++   Save chosen click, ad/campaign/advertised-product snapshot, policy/version and eligibility
++   reason on the order. Later clicks, refunds and duplicate events cannot reattribute it.
++3. Missing, expired or otherwise ineligible evidence leaves the paid order explicitly unattributed
++   with a reason. A foreign tenant's click must never expose its details or become attribution.
++   Keep received time, click time, order creation and paid time as distinct timestamps.
++4. Deduplicate refunds by their stable external refund ID as well as delivery event ID. Record
++   line-level refund amounts/quantities with separate tax/shipping amounts; reject over-refunds
++   and inconsistent currency. Support partial and full refunds using actual amounts, without
++   assuming a quantity return always equals a monetary refund. Paid-order counts remain historical
++   paid orders; refund and returned-unit counts are distinct metrics.
++5. A cancellation before payment creates no sale. Cancelling a paid order alone does not reverse
++   revenue; a verified refund does. A valid out-of-order payment/refund/cancellation sequence must
++   converge on the same facts as ordered delivery, using provider facts rather than arrival order.
++6. Durably retain events whose prerequisite paid fact has not arrived. Use a bounded supervised
++   reconciliation loop in the same application, with database claims, attempt/deadline policy and
++   observable unresolved state. Retry safely after crashes and lease loss; an early refund cannot
++   be acknowledged then forgotten. Terminal unresolved events remain inspectable/replayable under
++   permission. Do not add a separate broker or generic workflow engine.
++
++Focused checks: `attribution_order_`, `attribution_refund_`, `attribution_policy_`, and
++`attribution_reconciliation_` against real PostgreSQL. Include competing paid events, distinct refund
++events racing on the same balance, duplicate refund IDs with different event IDs, refund before
++payment, cancel/payment reordering, missing prerequisite, worker recovery, lease loss, and cleanup
++versus reconciliation. Test the exact 30-day boundary, future clicks, multiple currencies and
++multi-product orders. Every concurrency protocol needs actual competing claimants.
++
++Completion: a real selected-store test purchase travels from tracking link to paid order and refund,
++and replay preserves exact amounts and attribution. Record batch commands/counts/results and any
++unavailable provider sandbox checks. Full-suite gate: [10](10-integration-verification-and-pilot.md).
+diff --git a/plan/attribution-service/08-analytics-and-attribution-dashboard.md b/plan/attribution-service/08-analytics-and-attribution-dashboard.md
+new file mode 100644
+index 0000000..75c77c0
+--- /dev/null
++++ b/plan/attribution-service/08-analytics-and-attribution-dashboard.md
+@@ -0,0 +1,64 @@
++# 08 — Analytics and the attribution dashboard
++
++> **No backward compatibility.** We don't need backward compatibility and will reset the database
++> when needed. Do not add data backfills, dual reads/writes, legacy decoders, compatibility shims,
++> or staged rollouts for existing data.
++
++## Outcome and dependency
++
++Depends on [07](07-orders-refunds-and-attribution.md). Attribution serves its own complete dashboard
++and reporting API; report totals reconcile with durable order/refund facts and observable tracking.
++Openbot contains only navigation and the identity/company integration from phase 03.
++
++## Batch 08A — Define and implement reporting semantics
++
++1. Implement `GET /v1/analytics` with authorized company scope, bounded date ranges, store, ad,
++   campaign, advertised-product and sold-product filters, currency, and pagination. Validate IANA
++   reporting zones and use half-open timestamp intervals with explicit daylight-saving behavior.
++2. Return raw/filtered clicks, distinct observation types, attributed paid orders, unattributed
++   orders/reasons, sold units, merchandise amounts after discounts, refunded amounts/returned
++   units and net merchandise revenue. Keep taxes and shipping separate, and never sum currencies.
++3. Specify clock semantics in the API and UI: clicks by click time; observations by observation
++   time; paid orders and sales by paid time; refunds by refund occurrence time. Attribution
++   eligibility uses order creation time. All stored instants are UTC; grouping uses the selected
++   zone. Period net revenue can be negative when refunds relate to earlier-period orders.
++4. Label period conversion rate as attributed paid orders in the period divided by bot-filtered
++   clicks in the period. It is not a click-cohort rate, may exceed 100%, and is undefined with zero
++   clicks. Do not silently clamp or replace undefined with a meaningful-looking zero.
++5. Preserve advertised-product versus other-purchased-product breakdowns. A sold-product filter
++   cannot imply that all clicks were on that product: label its denominator explicitly or omit
++   the rate. Keep advertised-product click filtering distinct from sold-product order filtering.
++   Count multi-product orders distinctly; aggregate clicks/orders/lines/refunds independently before
++   joining so one-to-many joins cannot multiply metrics. Do not sum repeated click denominators
++   across currency rows.
++6. Start with indexed PostgreSQL queries; inspect representative query plans and enforce query
++   and export bounds. Add preaggregation only for measured need. ClickHouse and replayable
++   analytics replication remain later work with a separate measured justification.
++
++Focused checks: `attribution_analytics_` using a fixed ledger with two companies/stores, two ads,
++multi-product orders, unattributed orders, two currencies, partial/full refunds, zero clicks and
++timezone/DST boundaries. Reconcile query outputs by hand and via independent expected totals.
++Capture query plans/latency on the agreed pilot data volume; include foreign-object filter attacks.
++
++## Batch 08B — Complete the independent dashboard
++
++1. Build report overview, ad/campaign/product breakdowns, order/refund detail, unmatched events,
++   link creation, store setup and credential administration in attribution's frontend. The UI
++   consumes its own backend; it never reads Openbot tables or embeds Openbot-specific templates.
++2. Clearly label estimated pixel loads, viewport observations, heuristic bot-filtered counts,
++   reporting zone, date basis, currency, revenue definition and period conversion-rate formula.
++   State that blocked tracking and unobserved social impressions are not measured.
++3. Use ordinary refresh/filter navigation with accessible labels, keyboard focus, empty/error
++   states and responsive tables. Bound queries and cancel superseded reads safely; accepted
++   writes must not disappear because a browser navigation is cancelled.
++4. Expose installation instructions and merchant delivery/attribution diagnostics without secrets
++   or customer PII. Manage-account/company/member links take users to Openbot's authorized settings.
++   API keys are shown only once on authorized creation, never in analytics or public snippets.
++
++Focused checks: `attribution_dashboard_`, browser journeys for role-based controls, CSRF, HTML/script
++escaping, tenant switching, asynchronous filter races where applicable, and reconciliation with
++the API fixtures. Assert dashboard assets/routes are entirely owned by the service build.
++
++Completion: users can configure tracking, inspect a sale/refund and report its ad/product outcome
++without using Openbot's UI for attribution work. Record commands/counts/results; final gate in
++[10](10-integration-verification-and-pilot.md).
+diff --git a/plan/attribution-service/09-operations-retention-and-separate-deployment.md b/plan/attribution-service/09-operations-retention-and-separate-deployment.md
+new file mode 100644
+index 0000000..460db9f
+--- /dev/null
++++ b/plan/attribution-service/09-operations-retention-and-separate-deployment.md
+@@ -0,0 +1,68 @@
++# 09 — Operations, retention and separate deployment
++
++> **No backward compatibility.** We don't need backward compatibility and will reset the database
++> when needed. Do not add data backfills, dual reads/writes, legacy decoders, compatibility shims,
++> or staged rollouts for existing data.
++
++## Outcome and dependency
++
++Depends on [08](08-analytics-and-attribution-dashboard.md). Attribution has bounded operational
++behavior and can be deployed on another server, or copied into another repository, while keeping
++the same API and identity contracts.
++
++## Batch 09A — Make failure, retention and recovery explicit
++
++1. Instrument redirect latency/storage failure, ingestion acceptance/rejection, merchant delivery
++   lag, duplicate/conflicting events, unattributed reasons, pending reconciliation age, report
++   latency, rate limits, identity failures and lifecycle freshness. Carry safe correlation IDs;
++   never log tokens, full request bodies, authorization headers or PII-bearing URLs.
++2. Enforce the consent/retention policy from phase 01. Define separate lifetimes for raw clicks,
++   observations, order/refund financial facts, event deduplication records, audit records, and
++   tombstones. Retain the evidence needed for the attribution window and merchant retry/refund
++   horizon; deleting deduplication rows must not make old deliveries count again.
++3. Freeze reporting dimensions needed by retained orders before pruning raw click data. Never
++   silently change existing attribution because a click was deleted. Tenant deletion must cover
++   credentials, installations, observations, orders, exports and caches under the agreed policy,
++   and retain only the minimum tombstone needed to prevent delayed recreation.
++4. Run cleanup/reconciliation in bounded batches under owned shutdown/recovery. Test competing
++   cleanup and ingestion/settlement, and ensure one poison tenant cannot monopolize the worker.
++   Expose unresolved jobs and retry state with appropriate operator permissions.
++5. Back up the attribution database and required encryption material independently. Restore into
++   a fresh isolated database and verify orders, refunds, keys, pending events and tenant boundaries.
++   Document recovery objectives from measured results. A backup of one application is not a backup
++   of the other. An incompatible schema follows the reset policy; never invent rollback compatibility.
++
++Focused checks: `attribution_retention_`, `attribution_recovery_` and `attribution_limits_` with real
++database races, expiry boundaries, replay after pruning, process interruption and backup restore.
++Use representative load to measure the agreed targets. A raised resource limit must have a
++documented CI tripwire before the new limit is reached; do not weaken existing stack/lease budgets.
++
++## Batch 09B — Prove the deployment and source boundaries
++
++1. Ship the service's standalone non-root image, example deployment, secret provisioning, health
++   probes, TLS/proxy settings and exact configuration reference. Specify trusted proxies, public
++   tracking origin, app origin/callback URLs, Openbot authority URL and timeouts using keys that
++   the implementation actually reads. Keep the initial public deployment origin stable when
++   moving compute so existing tracking links and merchant callbacks continue to resolve.
++2. Exercise two deployment topologies with identical application artifacts: separate containers
++   on one host; attribution on another host/network with Openbot reachable only over HTTPS. Keep
++   the database private with its own role. Moving the database, if needed, is a separately tested
++   backup/restore and cutover operation, not a cross-database dependency.
++3. In the separate deployment test, deny attribution all access to Openbot's database, internal
++   filesystem and private service ports. Allow only the documented identity/company API and SSO
++   endpoints. Likewise deny Openbot direct attribution-database access. Verify a complete journey.
++4. Copy `services/attribution/` into a clean directory/repository and build, migrate, serve assets,
++   and test it without parent files. Verify Openbot still builds independently. The necessary
++   integration contracts and deployment docs must travel with the extracted service.
++5. Demonstrate Openbot outage behavior: new logins/current user-authorized actions fail as specified;
++   existing merchant/public traffic runs only within the configured company-status freshness bound;
++   expiration stops tenant operations, and reconnection reconciles status before access resumes.
++   Do not claim account-service independence merely because the server is remote.
++
++Focused checks: `attribution_deployment_`, standalone-copy/container tests, blocked cross-database
++connections, browser SSO across hosts, key verification on the remote instance, lifecycle expiry,
++restart/retry recovery and restoration. Record commands, topology and measured results here.
++
++Completion: service relocation requires no source extraction, UI rewrite, shared database access
++or new user credentials. Final integrated verification and pilot acceptance are in
++[10](10-integration-verification-and-pilot.md).
+diff --git a/plan/attribution-service/10-integration-verification-and-pilot.md b/plan/attribution-service/10-integration-verification-and-pilot.md
+new file mode 100644
+index 0000000..96e42dd
+--- /dev/null
++++ b/plan/attribution-service/10-integration-verification-and-pilot.md
+@@ -0,0 +1,146 @@
++# 10 — Integration verification and pilot
++
++> **No backward compatibility.** We don't need backward compatibility and will reset the database
++> when needed. Do not add data backfills, dual reads/writes, legacy decoders, compatibility shims,
++> or staged rollouts for existing data.
++
++## Outcome and dependency
++
++Depends on [09](09-operations-retention-and-separate-deployment.md) and all preceding phases. Prove
++the full tracking-to-sale flow, the application boundary, account access, and operational behavior
++with real PostgreSQL and the selected first merchant integration. Saving this plan does not imply
++that any implementation or integration verification below has happened.
++
++## Batch 10A — Cross-application and commerce acceptance
++
++Add `attribution_e2e_` acceptance tests and browser journeys covering:
++
++1. Start two independently built applications with distinct databases/roles, sessions, secrets,
++   assets and origins. Login centrally, enter attribution, select an authorized company and create
++   a store/key/link. Account/company/member administration remains in Openbot.
++2. Click Ad A then Ad B, observe the landing page with permitted consent, associate the latest
++   eligible click with a server-controlled checkout, pay for the advertised and another product,
++   and reconcile both products to Ad B. Later clicks cannot reassign that order.
++3. Deliver simultaneous duplicate paid events, different IDs for the same paid order, partial/full
++   refunds, cancellation, refund-before-payment, and a conflicting replay. Assert one paid order,
++   exact refund amounts, immutable attribution and visible reconciliation failures.
++4. Exercise missing/expired/foreign/bot click evidence, no consent, blocked browser tracking,
++   multiple currencies, period boundaries/DST, zero-click conversion rates, and filtered product
++   reports. Totals and labels must match the phase 08 contract.
++5. Try every detail/mutation/report/export with another company's IDs, including an actor who
++   legitimately belongs to both companies. Try another store's IDs with a merchant key. Public
++   installation IDs and browser events cannot authorize sales or management.
++6. Revoke a key, downgrade/remove membership, disable an account, suspend/delete a company, and
++   replay delayed lifecycle/provisioning messages. Verify local sessions cannot retain stale access,
++   and machine/public access stops within the documented company-status bound.
++7. Interrupt database commits, ingestion responses, reconciliation workers, company lifecycle
++   delivery and cleanup. Verify durable retry behavior and competing-claimant protection with
++   actual parallel transactions/processes. Do not substitute sequential mocks for race tests.
++8. Move attribution's running artifact to the separate-host topology and deny cross-database
++   access. Repeat login, link creation, real merchant sandbox purchase/refund and reporting. Build
++   the extracted directory without any parent Openbot files; do not hide a shared library or proxy.
++9. Verify production container UID, TLS/proxy trust, request/rate/body limits, CSRF, CSP/escaping,
++   secret redaction, retention, restored backups, and the agreed peak-load/latency/error targets.
++
++Focused checks: run `attribution_e2e_` and affected browser/contract suites while resolving these
++cases; record exact commands, counts, fixtures, topology, outcomes and any sandbox limitations.
++
++## Batch 10B — Final full-suite gate
++
++Run once after the complete implementation is integrated. Reconcile commands against the current
++[Openbot CI](../../.github/workflows/ci.yml) and the service CI added in phase 02. The existing
++[local check script](../../scripts/check.sh) does not currently cover every CI gate. Prepare locked
++dependencies, browser binaries and SQLx CLI before offline checks; use disposable PostgreSQL
++databases and CI's PostgreSQL/query-statistics setup. Never reset a development/customer database.
++
++For Openbot, from the repository root, run the complete current CI workflow, including:
++
++```sh
++cargo fmt --all -- --check
++git diff --check
++cargo check --locked --offline --all-targets
++cargo clippy --locked --offline --all-targets -- -D warnings
++SQLX_OFFLINE=false cargo sqlx migrate run
++SQLX_OFFLINE=false cargo sqlx prepare --check -- --all-targets
++cargo test --locked --offline --all-targets --no-run
++scripts/test-network-isolation.sh cargo test --locked --offline --all-targets
++scripts/test-network-isolation.sh scripts/stack-budget.sh --offline
++scripts/test-network-isolation.sh scripts/lease-budget.sh --offline
++npm run check:css
++npm run test:run-counts
++node --test scripts/tests/sse-navigation.mjs scripts/tests/agent-runtime.mjs scripts/tests/workflow-runs.mjs scripts/tests/workflow-conversations.mjs scripts/tests/workflow-samples.mjs
++scripts/tests/deploy.sh
++scripts/tests/credential-key-rotation.sh
++scripts/tests/transport-boundary.sh
++scripts/transport-boundary-check.sh
++python3 scripts/tests/workflow-sample-boundary.py
++python3 scripts/workflow-sample-boundary.py
++```
++
++Also execute CI's query-statistics activation assertions and fixture-backed HTML/team-autocomplete,
++session-revocation and workflow-decision browser gates; create their fixtures as CI requires rather
++than running browser tests against absent/stale artifacts. Preserve every existing gate.
++
++For attribution, run its service-local verification entrypoint from `services/attribution/`, with
++its own disposable `DATABASE_URL`/test configuration and offline metadata. It must include:
++
++```sh
++cargo fmt --all -- --check
++cargo check --locked --offline --all-targets
++cargo clippy --locked --offline --all-targets -- -D warnings
++SQLX_OFFLINE=false cargo sqlx migrate run
++SQLX_OFFLINE=false cargo sqlx prepare --check -- --all-targets
++cargo test --locked --offline --all-targets --no-run
++cargo test --locked --offline --all-targets
++```
++
++Add the service's actual browser/asset checks, OpenAPI validation, boundary/extracted-copy test,
++container test, network-isolated database suite, two-application contract suite, restore test and
++representative-load gate. Record their concrete command names when implemented; do not advertise
++future scripts as existing commands. Root Openbot commands alone never verify attribution.
++
++For both applications, set `SQLX_OFFLINE=true` for compilation/tests; use live mode only for fresh
++migrations/metadata generation and checking. Regenerate each application's own `.sqlx/` cache after
++SQL changes. Each database role/test pool is isolated; global claim/sweep tests use dedicated
++databases. No missing-database skipping or zero-match focused filter can count as a pass.
++
++Record revisions, environment, commands, selected/executed counts, outputs, latency data and any
++unavailable checks in this file. After final-verification fixes rerun affected checks; repeat the
++full suite when their impact warrants it. Refresh graft after substantial implementation and
++inspect the changes. Keep every plan file registered in Openbot's startup warning list.
++
++## Batch 10C — Pilot and completion criteria
++
++- The agreed first store completes a purchase and refund through the real supported integration;
++  generic test payloads alone do not satisfy the commerce pilot.
++- Reports reconcile with merchant order/line/refund facts, and remaining unmatched observations
++  have explicit reasons. Platform impressions/spend remain separately labeled future imports.
++- Phase 01's consent, retention, traffic, latency and failure decisions are recorded and met.
++  Demonstrate restore and verify secret rotation/revocation procedures.
++- Attribution is deployable and buildable independently, with its own UI and data. Its documented
++  Openbot identity/company dependency is the only required application integration. There are no
++  shared application modules, tables, cookies, session/merchant secrets or frontend assets.
++  Cross-application API credentials are dedicated to their explicitly scoped integration.
++- No unresolved cross-company access, lost acknowledged event, duplicate sale/refund, mutable
++  attribution, unbounded processing or hidden source/deployment dependency remains.
++- Additional commerce platforms, ad metrics imports, cohort reporting, currency conversion,
++  ClickHouse and independent account-service extraction stay out of this release.
++
++## Planning verification record
++
++This section records checks of the plan files and required startup-warning registration only.
++Implementation, database, browser, provider and performance gates above remain future work.
++
++### 2026-11-04 — Plan creation
++
++- `cargo fmt --all -- --check`: passed.
++- `git diff --check`: passed.
++- `python3` inline document audit: passed; ten consecutively numbered phase files, all 35 local
++  Markdown links resolve, every file has the database-policy note and focused/final verification
++  guidance, every file is registered exactly once in `NO_BACKWARD_COMPATIBILITY_NOTES`, and new
++  files have clean whitespace.
++- Source scope is ten required startup-warning paths in `src/main.rs`. No application feature,
++  dependency, schema, deployment or database reset was implemented.
++- Compilation, database-backed, browser, provider and load suites were not run for this
++  documentation/path-list change. The implementation gates above are requirements for future work,
++  not claims of completed verification.
+diff --git a/src/main.rs b/src/main.rs
+index cbd5b5b..0a023c8 100644
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -190,6 +190,16 @@ const NO_BACKWARD_COMPATIBILITY_NOTES: &[&str] = &[
+     "plan/04-autonomous-agent-history/05-callers-continuations-and-channel-integration.md",
+     "plan/04-autonomous-agent-history/06-history-views-retention-and-operations.md",
+     "plan/04-autonomous-agent-history/07-integration-and-verification.md",
++    "plan/attribution-service/01-application-boundaries-and-contracts.md",
++    "plan/attribution-service/02-independent-application-foundation.md",
++    "plan/attribution-service/03-single-sign-on-and-company-access.md",
++    "plan/attribution-service/04-merchant-setup-and-api-credentials.md",
++    "plan/attribution-service/05-links-and-durable-clicks.md",
++    "plan/attribution-service/06-website-tracking-and-checkout-handoff.md",
++    "plan/attribution-service/07-orders-refunds-and-attribution.md",
++    "plan/attribution-service/08-analytics-and-attribution-dashboard.md",
++    "plan/attribution-service/09-operations-retention-and-separate-deployment.md",
++    "plan/attribution-service/10-integration-verification-and-pilot.md",
+     "plan/db_improve/05-deferred-until-traffic.md",
+     "plan/db_improve/improve-key-credentials.md",
+     "plan/db_improve/run-agent-link-table.md",

@@ -1,0 +1,27 @@
+{
+  "base": "f8495f616a5f6ebce9218a6e1cd6c7c6d7bfda55",
+  "head": "45758786409390a708efb278fa9947f3b2caf674",
+  "exclusions": [
+    "plan/fix-app/integration/p07-main/docs/",
+    "plan/fix-app/COORDINATION.md"
+  ],
+  "tree_sha256": "d62af564bd5e0507adf774a3ea251101e823d3aa217929d8d8a550994e03250f",
+  "diff_sha256": "e8d2855984ec267510b66769c5665b537cc6ba840d5dd8b2e5c3b5c8b5fd68b0",
+  "files_count": 2222,
+  "authority_sha256": "3ceb504b4b74e9b2b98f83c84f4c64465de739225191f23a27cbab99314cb67f",
+  "producer_to_combined_paths": [
+    "plan/attribution-service/01-application-boundaries-and-contracts.md",
+    "plan/attribution-service/02-independent-application-foundation.md",
+    "plan/attribution-service/03-single-sign-on-and-company-access.md",
+    "plan/attribution-service/04-merchant-setup-and-api-credentials.md",
+    "plan/attribution-service/05-links-and-durable-clicks.md",
+    "plan/attribution-service/06-website-tracking-and-checkout-handoff.md",
+    "plan/attribution-service/07-orders-refunds-and-attribution.md",
+    "plan/attribution-service/08-analytics-and-attribution-dashboard.md",
+    "plan/attribution-service/09-operations-retention-and-separate-deployment.md",
+    "plan/attribution-service/10-integration-verification-and-pilot.md",
+    "src/main.rs"
+  ],
+  "remote_plan_preservation": true,
+  "main_exact_except_warning_paths": true
+}

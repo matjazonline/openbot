@@ -1,0 +1,11 @@
+A	plan/attribution-service/01-application-boundaries-and-contracts.md
+A	plan/attribution-service/02-independent-application-foundation.md
+A	plan/attribution-service/03-single-sign-on-and-company-access.md
+A	plan/attribution-service/04-merchant-setup-and-api-credentials.md
+A	plan/attribution-service/05-links-and-durable-clicks.md
+A	plan/attribution-service/06-website-tracking-and-checkout-handoff.md
+A	plan/attribution-service/07-orders-refunds-and-attribution.md
+A	plan/attribution-service/08-analytics-and-attribution-dashboard.md
+A	plan/attribution-service/09-operations-retention-and-separate-deployment.md
+A	plan/attribution-service/10-integration-verification-and-pilot.md
+M	src/main.rs
