@@ -1,6 +1,7 @@
 //! Isolated job fixtures use the fully migrated nullable workflow schema.
 use super::*;
-use crate::application::use_cases::channel::{ChannelPersistence, ChannelWrite};
+use crate::application::ports::channel::ChannelPersistence;
+use crate::application::ports::channel::ChannelWrite;
 
 #[path = "job_association_tests.rs"]
 mod job_association_tests;

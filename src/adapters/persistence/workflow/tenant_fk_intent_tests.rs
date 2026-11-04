@@ -1,7 +1,7 @@
 //! fix-app 05 batches 2 and 5 against PostgreSQL: an admitted intent names its own run's binding,
 //! and a settled reply intent no longer blocks the deletes that remove it.
 use super::*;
-use crate::application::use_cases::channel::ChannelPersistence;
+use crate::application::ports::channel::ChannelPersistence;
 use crate::application::use_cases::company::CompanyPersistence;
 
 fn foreign_key(error: &sqlx::Error) -> bool {

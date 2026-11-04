@@ -310,7 +310,7 @@ impl ThreadUseCases {
             return Ok(ChannelVerdict::Unauthorized);
         }
 
-        if exceeds_spam_threshold(&draft.policy, access, self.config.max_spam_score) {
+        if exceeds_spam_threshold(&draft.policy, access, self.settings.max_spam_score) {
             warn!(channel_id = %channel.id, "Refusing a message over the spam-score threshold");
             return Ok(ChannelVerdict::Reject(IngestRejection::SpamScore));
         }
@@ -625,7 +625,7 @@ impl ThreadUseCases {
     fn channel_was_mentioned(&self, candidate: &ChannelCandidate, body: &str) -> bool {
         let canonical_address = candidate
             .channel
-            .inbound_address(&candidate.company.slug, &self.config.app_domain_name);
+            .inbound_address(&candidate.company.slug, &self.settings.mail_domain);
         body_mentions_email(body, candidate.handle.subject().as_str())
             || body_mentions_email(body, &canonical_address)
             || body_mentions_slug(body, &candidate.matched_slug)
@@ -686,7 +686,7 @@ impl ThreadUseCases {
                 continue;
             }
             entries.push(ChannelDirectoryEntry {
-                address: channel.inbound_address(&company.slug, &self.config.app_domain_name),
+                address: channel.inbound_address(&company.slug, &self.settings.mail_domain),
                 name: channel.name.clone(),
                 description: channel.description.clone(),
             });
@@ -752,7 +752,7 @@ impl ThreadUseCases {
             SystemAddress::Help => crate::use_cases::thread::format_help_email_body(
                 &entries,
                 &company.slug,
-                &self.config.app_domain_name,
+                &self.settings.mail_domain,
             ),
         };
         let subject = match draft.content.subject().trim() {
@@ -786,7 +786,7 @@ impl ThreadUseCases {
                         "{}@{}.{}",
                         system.local_part(),
                         company.slug,
-                        self.config.app_domain_name
+                        self.settings.mail_domain
                     )),
                     from_name: Some("Mail Agents".to_string()),
                     recipient_to: sender_address(draft),

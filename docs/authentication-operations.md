@@ -56,6 +56,12 @@ application redaction cannot alter an upstream log or remove a signed path token
 
 ## Browser session storage
 
+`AUTH_ATTEMPT_SECRET` is required, must contain at least 32 bytes, and must differ from
+`JWT_SECRET`; startup checks these requirements. It signs authentication-attempt keys and
+domain-separated registration, email-change and password-change confirmation digests. Keep it
+stable when rotating `JWT_SECRET`, so pending codes and attempt budgets survive session-key
+rotation. Rotating `AUTH_ATTEMPT_SECRET` invalidates those codes and changes the budget keys.
+
 `REFRESH_TOKEN_TTL_DAYS` is the browser-session lifetime (default 30, startup-validated range
 1–365 days). `JWT_SECRET` signs HS256 session tokens, and `COOKIE_SECURE` controls the cookie's
 Secure flag; HttpOnly, SameSite=Lax and Path=/ are always set. Sessions have an unpredictable

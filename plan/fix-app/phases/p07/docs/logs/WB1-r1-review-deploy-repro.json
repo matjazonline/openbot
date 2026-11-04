@@ -1,0 +1,64 @@
+[
+  {
+    "bootstrap": false,
+    "exit": 0,
+    "calls": [
+      [
+        "secrets",
+        "list",
+        "--app",
+        "openbots",
+        "--json"
+      ],
+      [
+        "deploy"
+      ]
+    ],
+    "deploy_called": true
+  },
+  {
+    "bootstrap": true,
+    "exit": 0,
+    "calls": [
+      [
+        "status",
+        "--app",
+        "openbots"
+      ],
+      [
+        "apps",
+        "create",
+        "openbots"
+      ],
+      [
+        "ips",
+        "allocate-v4",
+        "--app",
+        "openbots"
+      ],
+      [
+        "secrets",
+        "set",
+        "DATABASE_URL=<redacted>",
+        "JWT_SECRET=<redacted>",
+        "SMTP_USERNAME=<redacted>",
+        "SMTP_PASSWORD=<redacted>",
+        "CREDENTIAL_ENCRYPTION_KEYS=<redacted>",
+        "CREDENTIAL_ENCRYPTION_ACTIVE_VERSION=<redacted>",
+        "--app",
+        "openbots"
+      ],
+      [
+        "secrets",
+        "list",
+        "--app",
+        "openbots",
+        "--json"
+      ],
+      [
+        "deploy"
+      ]
+    ],
+    "deploy_called": true
+  }
+]

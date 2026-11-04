@@ -71,7 +71,7 @@ fn with_unverified_bypass(users: UserUseCases) -> UserUseCases {
         registrations: disabled.clone(),
         account_changes: disabled.clone(),
         codes: disabled,
-        config: Arc::new(AppConfig::for_test()),
+
         transport_available: false,
         allow_unverified_without_smtp: true,
     })
@@ -365,7 +365,7 @@ fn registering_without_smtp_bypass(id: uuid::Uuid) -> Arc<UserUseCases> {
             id,
             create_error: None,
         }),
-        "test-attempt-secret",
+        ("test-attempt-secret").into(),
     ))
 }
 
@@ -373,7 +373,7 @@ fn registering_with_error(id: uuid::Uuid, create_error: Option<String>) -> Arc<U
     Arc::new(with_unverified_bypass(UserUseCases::new(
         Arc::new(StubHasher),
         Arc::new(StubUserPersistence { id, create_error }),
-        "test-attempt-secret",
+        ("test-attempt-secret").into(),
     )))
 }
 

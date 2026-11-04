@@ -1,7 +1,8 @@
 use super::binding_tests::*;
 use super::*;
-use crate::application::use_cases::channel::{ChannelPersistence, ChannelWrite};
-use crate::application::use_cases::participant::PrincipalAccessPersistence;
+use crate::application::ports::channel::ChannelPersistence;
+use crate::application::ports::channel::ChannelWrite;
+use crate::application::ports::participant::PrincipalAccessPersistence;
 use crate::application::workflow::{LifecycleAuthorizer, WorkflowAuthorization, WorkflowOperation};
 
 #[tokio::test]

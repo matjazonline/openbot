@@ -27,34 +27,33 @@ use tokio_stream::{Stream, StreamExt};
 use tracing::{instrument, warn};
 use uuid::Uuid;
 
-use crate::{
-    adapters::http::{app_state::AppState, auth::AuthenticatedUser, pages},
-    app_error::{AppError, AppResult},
-    application::thread_activity::ThreadActivityReader,
-    entities::{
-        channel::Channel,
-        company::{Company, CompanyAccess},
-        company_member::CompanyMembership,
-        message::CanonicalMessageId,
-        thread::Thread,
-        thread_activity::ThreadActivity,
-        user::{User, Viewer},
-        value_objects::EmailAddress,
-    },
-    infra::{
-        config::AppConfig,
-        events::{MailboxEvent, MailboxEvents},
-    },
-    use_cases::{
-        channel::ChannelUseCases,
-        company::CompanyUseCases,
-        thread::{
-            CanonicalMessageIngress, IngressOrigin, ReplyDelivery, ThreadUseCases,
-            qualified_email_identity,
-        },
-        user::UserUseCases,
-    },
-};
+use crate::adapters::http::app_state::AppState;
+use crate::adapters::http::auth::AuthenticatedUser;
+use crate::adapters::http::pages;
+use crate::app_error::AppError;
+use crate::app_error::AppResult;
+use crate::application::ports::thread::qualified_email_identity;
+use crate::application::thread_activity::ThreadActivityReader;
+use crate::entities::channel::Channel;
+use crate::entities::company::Company;
+use crate::entities::company::CompanyAccess;
+use crate::entities::company_member::CompanyMembership;
+use crate::entities::message::CanonicalMessageId;
+use crate::entities::thread::Thread;
+use crate::entities::thread_activity::ThreadActivity;
+use crate::entities::user::User;
+use crate::entities::user::Viewer;
+use crate::entities::value_objects::EmailAddress;
+use crate::infra::config::AppConfig;
+use crate::infra::events::MailboxEvent;
+use crate::infra::events::MailboxEvents;
+use crate::use_cases::channel::ChannelUseCases;
+use crate::use_cases::company::CompanyUseCases;
+use crate::use_cases::thread::CanonicalMessageIngress;
+use crate::use_cases::thread::IngressOrigin;
+use crate::use_cases::thread::ReplyDelivery;
+use crate::use_cases::thread::ThreadUseCases;
+use crate::use_cases::user::UserUseCases;
 
 use super::{
     channel::{ThreadListQuery, ThreadListResponse, load_thread_page},

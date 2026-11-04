@@ -1,0 +1,62 @@
+[
+  {
+    "symbol": "pub trait ThreadPersistence",
+    "unchanged": true
+  },
+  {
+    "symbol": "pub fn qualified_email_identity",
+    "unchanged": true
+  },
+  {
+    "symbol": "pub struct ChannelWrite",
+    "unchanged": true
+  },
+  {
+    "symbol": "pub struct ChannelUpdate",
+    "unchanged": true
+  },
+  {
+    "symbol": "pub trait ChannelPersistence",
+    "unchanged": true
+  },
+  {
+    "symbol": "pub struct BindingWrite",
+    "unchanged": true
+  },
+  {
+    "symbol": "impl BindingWrite",
+    "unchanged": true
+  },
+  {
+    "symbol": "pub struct BindingStatusChange",
+    "unchanged": true
+  },
+  {
+    "symbol": "impl BindingStatusChange",
+    "unchanged": true
+  },
+  {
+    "symbol": "pub struct InboundEndpoint",
+    "unchanged": true
+  },
+  {
+    "symbol": "pub trait ChannelBindingPersistence",
+    "unchanged": true
+  },
+  {
+    "symbol": "pub struct IdentityObservation",
+    "unchanged": true
+  },
+  {
+    "symbol": "pub trait PrincipalAccessPersistence",
+    "unchanged": true
+  },
+  {
+    "symbol": "pub enum ProtocolExtension",
+    "unchanged": true
+  },
+  {
+    "symbol": "impl ProtocolExtension",
+    "unchanged": true
+  }
+]

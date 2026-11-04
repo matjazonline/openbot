@@ -5,9 +5,10 @@
 use super::*;
 use crate::adapters::protocols::email::EmailRenderer;
 use crate::adapters::protocols::email::parser::RawInboundPayload;
+use crate::application::ports::channel::ChannelPersistence;
+use crate::application::ports::channel::ChannelWrite;
 use crate::application::transport::TransportRenderers;
 use crate::application::use_cases::agent::{AgentPersistence, AgentWrite};
-use crate::application::use_cases::channel::{ChannelPersistence, ChannelWrite};
 use crate::application::use_cases::company::{CompanyModelConnectionWrite, CompanyPersistence};
 use crate::application::use_cases::thread::{InboundIngestPorts, ThreadStores, ThreadUseCases};
 use crate::application::workflow::triggers::MessageTriggerInput;
@@ -137,7 +138,7 @@ impl Deployment {
                 standalone_deliveries: shared,
             },
             renderers,
-            config,
+            (config).thread_settings(),
         )
         .with_intent_wakeups(engine.intent_wakeups.clone());
         Self {
@@ -161,7 +162,7 @@ impl Deployment {
     async fn bind(&self, mut source: Value, trigger: Option<MessageTrigger>) -> BindingTarget {
         let workflow = WorkflowId::new(Uuid::new_v4());
         source["workflow_id"] = json!(workflow.to_string());
-        let definitions = self.engine.definitions(Vec::new(), Vec::new());
+        let definitions = self.engine.services().definitions(Vec::new(), Vec::new());
         let definition = DefinitionTarget {
             workflow,
             ..self.fixture.target
@@ -183,6 +184,7 @@ impl Deployment {
         };
         let state = self
             .engine
+            .services()
             .bindings()
             .configure(ConfigureBinding {
                 target,
@@ -197,6 +199,7 @@ impl Deployment {
             .await
             .unwrap();
         self.engine
+            .services()
             .bindings()
             .activate(SetBindingActivity {
                 target,

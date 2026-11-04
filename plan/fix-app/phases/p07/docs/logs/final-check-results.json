@@ -1,0 +1,79 @@
+[
+  {
+    "check": "final-lib-build",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "--no-run",
+      "--message-format=json"
+    ],
+    "exit_code": 0
+  },
+  {
+    "check": "final-affected-union",
+    "command": [
+      "/Users/mac02/dev/openbot-recovery/.worktrees/fix-app-p07/target/debug/deps/open_bots-7b3508cbfb62bd10",
+      "application::use_cases::user::",
+      "application::use_cases::channel::",
+      "application::use_cases::thread::",
+      "application::transport::",
+      "adapters::spam_scanner::",
+      "adapters::smtp::",
+      "adapters::protocols::email::",
+      "adapters::http::routes::channel",
+      "adapters::http::routes::webhooks::",
+      "adapters::http::routes::workflows::",
+      "adapters::http::routes::user",
+      "adapters::http::routes::ui_profile",
+      "adapters::http::session",
+      "adapters::persistence::user::",
+      "adapters::persistence::auth_attempts::",
+      "adapters::persistence::auth_key_rotation_tests::",
+      "adapters::persistence::account_identity::",
+      "adapters::persistence::channel::",
+      "adapters::persistence::thread::",
+      "adapters::persistence::integration::",
+      "application::workflow::tests",
+      "adapters::persistence::workflow::tests::message_tests::",
+      "message_ingress",
+      "::mcp_tests::",
+      "provisioning_runtime",
+      "infra::",
+      "notification",
+      "application::services::delivery_worker",
+      "application::services::inbound_event_worker",
+      "adapters::http::pages::tests::",
+      "stream_tests",
+      "onboarding"
+    ],
+    "exit_code": 0
+  },
+  {
+    "check": "final-sqlx-live",
+    "command": [
+      "cargo",
+      "sqlx",
+      "prepare",
+      "--",
+      "--all-targets"
+    ],
+    "exit_code": 0
+  },
+  {
+    "check": "final-clippy-offline",
+    "command": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "--offline",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 101
+  }
+]

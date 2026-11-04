@@ -102,7 +102,7 @@ pub struct SaveBody {
 /// Save a draft's content against the revision the caller saw (absent creates it): the one
 /// command the JSON route and the editor share.
 pub(in crate::adapters::http::routes) async fn save_draft(
-    engine: &WorkflowEngine,
+    engine: &WorkflowServices,
     company_id: Uuid,
     actor: WorkflowActor,
     workflow: Uuid,
@@ -165,7 +165,7 @@ pub struct ValidateBody {
 
 /// Compile the saved draft at `expected_revision` with the selections it would publish with.
 pub(in crate::adapters::http::routes) async fn validate_draft(
-    engine: &WorkflowEngine,
+    engine: &WorkflowServices,
     company_id: Uuid,
     actor: WorkflowActor,
     workflow: Uuid,
@@ -279,7 +279,7 @@ pub(in crate::adapters::http::routes) struct PublishRequest<'a> {
 
 /// Publish the draft at the expected revision as the version the key and selections name.
 pub(in crate::adapters::http::routes) async fn publish_draft(
-    engine: &WorkflowEngine,
+    engine: &WorkflowServices,
     company_id: Uuid,
     actor: WorkflowActor,
     workflow: Uuid,
@@ -334,7 +334,7 @@ pub async fn publish(
 }
 
 pub(in crate::adapters::http::routes) async fn archive_draft(
-    engine: &WorkflowEngine,
+    engine: &WorkflowServices,
     company_id: Uuid,
     actor: WorkflowActor,
     workflow: Uuid,
@@ -412,7 +412,7 @@ pub(in crate::adapters::http::routes) struct CopiedTemplate {
 /// Copy a shipped template at the catalogue revision the caller chose into a draft whose
 /// identity the key derives, so a retry names the same draft.
 pub(in crate::adapters::http::routes) async fn copy_template_draft(
-    engine: &WorkflowEngine,
+    engine: &WorkflowServices,
     company_id: Uuid,
     actor: WorkflowActor,
     template: &str,

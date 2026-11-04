@@ -1,17 +1,14 @@
 use super::*;
+use crate::adapters::persistence::PostgresPersistence;
+use crate::adapters::persistence::test_support::own_database;
+use crate::adapters::persistence::workflow::schedule_test_support::schedulable_binding;
+use crate::adapters::persistence::workflow::schedule_test_support::schedule_use_cases;
+use crate::application::ports::channel::ChannelPersistence;
+use crate::application::ports::channel::ChannelWrite;
 use crate::domain::workflow::CompanyId;
-use crate::{
-    adapters::persistence::{
-        PostgresPersistence,
-        test_support::own_database,
-        workflow::schedule_test_support::{schedulable_binding, schedule_use_cases},
-    },
-    use_cases::{
-        channel::{ChannelPersistence, ChannelWrite},
-        company::{CompanyPersistence, CompanyWrite},
-        user::UserPersistence,
-    },
-};
+use crate::use_cases::company::CompanyPersistence;
+use crate::use_cases::company::CompanyWrite;
+use crate::use_cases::user::UserPersistence;
 
 fn request(name: &str, binding_id: Uuid) -> ScheduleRequest {
     ScheduleRequest {

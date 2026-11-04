@@ -6,6 +6,12 @@
 
 use super::*;
 use crate::adapters::persistence::test_support::{OwnDatabase, own_database, test_pool};
+use crate::application::ports::channel::ChannelPersistence;
+use crate::application::ports::channel::ChannelWrite;
+use crate::application::ports::participant::IdentityObservation;
+use crate::application::ports::thread::MessageAuthorWrite;
+use crate::application::ports::thread::MessageCorrelation;
+use crate::application::ports::thread::MessageParticipantWrite;
 use crate::entities::{
     correlation::CorrelationId,
     email_message::EmailMessageMetadata,
@@ -14,13 +20,9 @@ use crate::entities::{
     transport::ChannelBindingId,
     value_objects::MessageId,
 };
-use crate::use_cases::{
-    channel::{ChannelPersistence, ChannelWrite},
-    company::{CompanyPersistence, CompanyWrite},
-    participant::IdentityObservation,
-    thread::{MessageAuthorWrite, MessageCorrelation, MessageParticipantWrite},
-    user::UserPersistence,
-};
+use crate::use_cases::company::CompanyPersistence;
+use crate::use_cases::company::CompanyWrite;
+use crate::use_cases::user::UserPersistence;
 use sqlx::PgPool;
 
 /// A company with one channel and one thread, plus the handles the tests write messages with.
@@ -261,7 +263,7 @@ impl TestChannel for PostgresPersistence {
 
 pub(super) fn observed(address: &str, provenance: IdentityProvenance) -> MessageAuthorWrite {
     MessageAuthorWrite::Observed(IdentityObservation {
-        identity: crate::use_cases::thread::qualified_email_identity(address).unwrap(),
+        identity: crate::application::ports::thread::qualified_email_identity(address).unwrap(),
         display_label: None,
         claim_metadata: IdentityClaimMetadata::observation(),
         provenance,
@@ -271,7 +273,7 @@ pub(super) fn observed(address: &str, provenance: IdentityProvenance) -> Message
 pub(super) fn participant(kind: MessageParticipantKind, address: &str) -> MessageParticipantWrite {
     MessageParticipantWrite::new(
         kind,
-        crate::use_cases::thread::qualified_email_identity(address).unwrap(),
+        crate::application::ports::thread::qualified_email_identity(address).unwrap(),
     )
 }
 

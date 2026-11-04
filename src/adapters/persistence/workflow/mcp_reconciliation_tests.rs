@@ -210,7 +210,9 @@ async fn workflow_mcp_unknown_note_through_the_production_composition() {
             claimed: ClaimedDisposition::Unknown,
         },
     };
-    let production = crate::infra::workflow::WorkflowEngine::for_tests(p.clone()).reconciliation();
+    let production = crate::infra::workflow::WorkflowEngine::for_tests(p.clone())
+        .services()
+        .reconciliation();
     let result =
         Box::pin(production.reconcile(&command, &CancellationToken::new(), Duration::from_secs(5)))
             .await

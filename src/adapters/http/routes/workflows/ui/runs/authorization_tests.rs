@@ -10,7 +10,9 @@ async fn reconciliation_and_step_refuse_foreign_and_hidden_channel_identities() 
     };
     for kind in [HttpForm::Slot, HttpForm::PrivateChannelSlot] {
         let action = uncertain_http(kind).await;
-        let engine: Engine = Arc::new(WorkflowEngine::for_tests(action.persistence.clone()));
+        let engine: Engine =
+            crate::infra::workflow::WorkflowEngine::for_tests(action.persistence.clone())
+                .services();
         let owner_ui = || ui_over(&action.persistence, &engine, action.owner);
         let shown = text(
             pane(

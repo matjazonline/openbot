@@ -458,3 +458,6 @@ pub mod mcp;
 mod mcp_tests;
 
 mod harness_checkpoint;
+
+#[cfg(test)]
+mod auth_key_rotation_tests;

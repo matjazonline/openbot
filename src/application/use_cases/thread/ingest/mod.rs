@@ -21,8 +21,10 @@
 //! function over already-loaded values, which is what lets those rules be unit-tested with no
 //! database and no mocks, and what keeps this chain's stack frames shallow.
 
+mod canonical;
 pub(crate) mod commit;
 pub(crate) mod policy;
+mod relay;
 mod routing;
 
 use std::{
@@ -499,4 +501,19 @@ fn should_warn_about_thread_index(error: ThreadIndexParseError) -> bool {
         + 1;
     LAST_THREAD_INDEX_WARNING_WINDOWS[error.warning_slot()].swap(window, Ordering::Relaxed)
         != window
+}
+
+/// Both trusted ingress producers address one channel through the same bounded routing shape.
+fn single_channel_routing(
+    handle: crate::entities::transport::QualifiedIdentity,
+    selector: crate::entities::transport::ChannelSelector,
+    disposition: crate::transport::MessageDisposition,
+) -> AppResult<crate::transport::InboundRouting> {
+    use crate::transport::{AddressedRecipient, AddressedTarget, InboundRouting, RecipientRole};
+    Ok(InboundRouting::parse(vec![AddressedRecipient {
+        role: RecipientRole::To,
+        handle,
+        target: AddressedTarget::Channels(vec![selector]),
+        disposition,
+    }])?)
 }

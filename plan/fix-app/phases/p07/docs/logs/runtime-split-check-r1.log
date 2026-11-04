@@ -1,0 +1,147 @@
+    Checking open_bots v0.1.0 (/Users/mac02/dev/openbot-recovery/.worktrees/fix-app-p07)
+warning: unused imports: `DeliveryQueue`, `InboundEventWorker`, and `notification_worker::NotificationWorker`
+  --> src/adapters/http/app_state.rs:18:53
+   |
+18 |         inbound_event_worker::{InboundEventWakeups, InboundEventWorker},
+   |                                                     ^^^^^^^^^^^^^^^^^^
+19 |         notification_worker::NotificationWorker,
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+22 |     transport::{DeliveryQueue, InboundEventInbox, TransportRegistry},
+   |                 ^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `accounts::user_use_cases`
+  --> src/infra/setup.rs:56:16
+   |
+56 | pub(crate) use accounts::user_use_cases;
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0599]: no method named `spawn` found for struct `std::sync::Arc<infra::workflow::services::WorkflowServices>` in the current scope
+   --> src/adapters/http/routes/workflows/ui/runs/runs_tests.rs:179:35
+    |
+179 |         let handles = self.engine.spawn(&shutdown);
+    |                                   ^^^^^ method not found in `std::sync::Arc<infra::workflow::services::WorkflowServices>`
+    |
+    = help: items from traits can only be used if the trait is implemented and in scope
+    = note: the following traits define an item `spawn`, perhaps you need to implement one of them:
+            candidate #1: `SpawnExt`
+            candidate #2: `lettre::Executor`
+
+error[E0599]: no method named `spawn` found for struct `std::sync::Arc<infra::workflow::services::WorkflowServices>` in the current scope
+   --> src/adapters/http/routes/workflows/tests.rs:343:35
+    |
+343 |         let handles = self.engine.spawn(&shutdown);
+    |                                   ^^^^^ method not found in `std::sync::Arc<infra::workflow::services::WorkflowServices>`
+    |
+    = help: items from traits can only be used if the trait is implemented and in scope
+    = note: the following traits define an item `spawn`, perhaps you need to implement one of them:
+            candidate #1: `SpawnExt`
+            candidate #2: `lettre::Executor`
+
+error[E0599]: no method named `assistant_channels` found for struct `infra::workflow::WorkflowEngine` in the current scope
+   --> src/adapters/persistence/workflow/provisioning_runtime_tests.rs:36:10
+    |
+ 34 |       let created = d
+    |  ___________________-
+ 35 | |         .engine
+ 36 | |         .assistant_channels()
+    | |         -^^^^^^^^^^^^^^^^^^ method not found in `infra::workflow::WorkflowEngine`
+    | |_________|
+    |
+    |
+   ::: src/infra/workflow.rs:176:1
+    |
+176 |   pub struct WorkflowEngine {
+    |   ------------------------- method `assistant_channels` not found for this struct
+
+error[E0599]: no method named `bindings` found for struct `infra::workflow::WorkflowEngine` in the current scope
+   --> src/adapters/persistence/workflow/message_ingress_tests.rs:187:14
+    |
+185 |           let state = self
+    |  _____________________-
+186 | |             .engine
+187 | |             .bindings()
+    | |             -^^^^^^^^ method not found in `infra::workflow::WorkflowEngine`
+    | |_____________|
+    |
+    |
+   ::: src/infra/workflow.rs:176:1
+    |
+176 |   pub struct WorkflowEngine {
+    |   ------------------------- method `bindings` not found for this struct
+
+error[E0599]: no method named `bindings` found for struct `infra::workflow::WorkflowEngine` in the current scope
+   --> src/adapters/persistence/workflow/message_ingress_tests.rs:201:14
+    |
+200 | /         self.engine
+201 | |             .bindings()
+    | |             -^^^^^^^^ method not found in `infra::workflow::WorkflowEngine`
+    | |_____________|
+    |
+    |
+   ::: src/infra/workflow.rs:176:1
+    |
+176 |   pub struct WorkflowEngine {
+    |   ------------------------- method `bindings` not found for this struct
+
+warning: `open_bots` (lib) generated 2 warnings (run `cargo fix --lib -p open_bots` to apply 2 suggestions)
+warning: unused imports: `delivery_worker::DeliveryWorker` and `smtp::SmtpServer`
+  --> src/main.rs:20:50
+   |
+20 |     adapters::{persistence::PostgresPersistence, smtp::SmtpServer},
+   |                                                  ^^^^^^^^^^^^^^^^
+...
+30 |         delivery_worker::DeliveryWorker, inbound_event_worker::InboundEventWorker,
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `open_bots` (bin "open_bots") generated 1 warning (run `cargo fix --bin "open_bots" -p open_bots` to apply 1 suggestion)
+warning: `open_bots` (bin "open_bots" test) generated 1 warning (1 duplicate)
+error[E0599]: no method named `reconciliation` found for struct `infra::workflow::WorkflowEngine` in the current scope
+   --> src/adapters/persistence/workflow/mcp_reconciliation_tests.rs:213:83
+    |
+213 |     let production = crate::infra::workflow::WorkflowEngine::for_tests(p.clone()).reconciliation();
+    |                                                                                   ^^^^^^^^^^^^^^ method not found in `infra::workflow::WorkflowEngine`
+    |
+   ::: src/infra/workflow.rs:176:1
+    |
+176 | pub struct WorkflowEngine {
+    | ------------------------- method `reconciliation` not found for this struct
+
+error[E0599]: no method named `reconciliation` found for struct `infra::workflow::WorkflowEngine` in the current scope
+   --> src/adapters/persistence/workflow/message_reconcile_tests.rs:945:83
+    |
+945 |     let production = crate::infra::workflow::WorkflowEngine::for_tests(p.clone()).reconciliation();
+    |                                                                                   ^^^^^^^^^^^^^^ method not found in `infra::workflow::WorkflowEngine`
+    |
+   ::: src/infra/workflow.rs:176:1
+    |
+176 | pub struct WorkflowEngine {
+    | ------------------------- method `reconciliation` not found for this struct
+
+error[E0599]: no method named `service` found for struct `infra::workflow::WorkflowEngine` in the current scope
+   --> src/infra/workflow.rs:611:14
+    |
+176 |   pub struct WorkflowEngine {
+    |   ------------------------- method `service` not found for this struct
+...
+610 |           let refused = engine
+    |  _______________________-
+611 | |             .service()
+    | |_____________-^^^^^^^
+    |
+help: one of the expressions' fields has a method of the same name
+    |
+611 |             .services.service()
+    |              +++++++++
+help: there is a method `services` with a similar name
+    |
+611 |             .services()
+    |                     +
+
+For more information about this error, try `rustc --explain E0599`.
+warning: `open_bots` (lib test) generated 2 warnings (2 duplicates)
+error: could not compile `open_bots` (lib test) due to 8 previous errors; 2 warnings emitted

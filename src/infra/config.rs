@@ -72,6 +72,7 @@ fn parse_smtp_allow_plaintext_local(value: Option<&str>) -> bool {
 
 pub struct AppConfig {
     pub jwt_secret: String,
+    pub auth_attempt_secret: crate::use_cases::user::AuthAttemptSecret,
     pub refresh_token_ttl: Duration,
     pub app_domain_name: String,
     pub cors_allowed_origins: Vec<String>,
@@ -111,6 +112,22 @@ pub struct AppConfig {
     pub sendgrid_inbound: Option<SendGridInboundConfig>,
     /// How this deployment reaches Resend, for the companies that have configured an account.
     pub resend_api: ResendApiConfig,
+}
+
+fn parse_auth_attempt_secret(
+    value: Option<&str>,
+    jwt_secret: &str,
+) -> crate::use_cases::user::AuthAttemptSecret {
+    let value = value.expect("AUTH_ATTEMPT_SECRET must be set independently of JWT_SECRET");
+    assert!(
+        value.len() >= MIN_SECRET_BYTES,
+        "AUTH_ATTEMPT_SECRET must be at least {MIN_SECRET_BYTES} bytes"
+    );
+    assert!(
+        value != jwt_secret,
+        "AUTH_ATTEMPT_SECRET must differ from JWT_SECRET"
+    );
+    value.into()
 }
 
 fn parse_positive_seconds(name: &str, value: String) -> StdDuration {
@@ -420,6 +437,8 @@ impl AppConfig {
              so a guessable one is every account at once",
         );
 
+        let auth_attempt_secret =
+            parse_auth_attempt_secret(env::var("AUTH_ATTEMPT_SECRET").ok().as_deref(), &jwt_secret);
         let refresh_token_ttl_days: i64 = env::var("REFRESH_TOKEN_TTL_DAYS")
             .unwrap_or("30".to_string())
             .parse()
@@ -561,6 +580,7 @@ impl AppConfig {
 
         Self {
             jwt_secret,
+            auth_attempt_secret,
             refresh_token_ttl: Duration::days(refresh_token_ttl_days),
             app_domain_name,
             cors_allowed_origins,
@@ -589,6 +609,45 @@ impl AppConfig {
         }
     }
 
+    pub fn spam_scanner_settings(&self) -> crate::adapters::spam_scanner::SpamScannerSettings {
+        use crate::adapters::spam_scanner::{ExternalScannerSettings, SpamScannerSettings};
+        let external = self.enable_spam_scanner.then(|| {
+            match self.spam_scanner_type.to_lowercase().as_str() {
+                "spamd" | "spamassassin" => ExternalScannerSettings::Spamd {
+                    endpoint: self.spam_scanner_url.clone(),
+                },
+                _ => ExternalScannerSettings::Rspamd {
+                    endpoint: self.spam_scanner_url.clone(),
+                },
+            }
+        });
+        SpamScannerSettings {
+            heuristic: self.enable_heuristic_scanner,
+            external,
+            threshold: self.max_spam_score,
+        }
+    }
+
+    pub fn thread_settings(&self) -> std::sync::Arc<crate::application::settings::ThreadSettings> {
+        std::sync::Arc::new(crate::application::settings::ThreadSettings {
+            mail_domain: self.app_domain_name.clone().into(),
+            max_spam_score: self.max_spam_score,
+        })
+    }
+    pub fn notification_settings(&self) -> crate::application::settings::NotificationMailSettings {
+        crate::application::settings::NotificationMailSettings {
+            mail_domain: self.app_domain_name.clone().into(),
+            public_base_url: self.public_base_url().into(),
+        }
+    }
+    pub fn spam_scanning(&self) -> crate::use_cases::agent::SpamScanning {
+        if self.is_spam_scan_enabled() {
+            crate::use_cases::agent::SpamScanning::Available
+        } else {
+            crate::use_cases::agent::SpamScanning::Unavailable
+        }
+    }
+
     pub fn is_spam_scan_enabled(&self) -> bool {
         self.enable_heuristic_scanner || self.enable_spam_scanner
     }
@@ -603,6 +662,7 @@ impl AppConfig {
     pub fn for_test() -> Self {
         Self {
             jwt_secret: "a-test-secret-long-enough-to-sign-with-01".to_string(),
+            auth_attempt_secret: "a-distinct-auth-attempt-test-secret-02".into(),
             refresh_token_ttl: Duration::days(30),
             app_domain_name: "localhost".to_string(),
             cors_allowed_origins: Vec::new(),
@@ -682,9 +742,27 @@ mod tests {
     }
 
     #[test]
+    fn auth_attempt_secret_is_required_strong_and_independent() {
+        for value in [None, Some("short"), Some(TEST_SECRET)] {
+            assert!(
+                std::panic::catch_unwind(|| parse_auth_attempt_secret(value, TEST_SECRET)).is_err()
+            );
+        }
+        let separate = "a-distinct-auth-attempt-test-secret-02";
+        assert_eq!(
+            parse_auth_attempt_secret(Some(separate), TEST_SECRET).expose_secret(),
+            separate
+        );
+    }
+
+    #[test]
     fn test_app_config_from_env() {
         unsafe {
             env::set_var("JWT_SECRET", TEST_SECRET);
+            env::set_var(
+                "AUTH_ATTEMPT_SECRET",
+                "a-distinct-auth-attempt-test-secret-02",
+            );
             env::set_var("APP_DOMAIN_NAME", "example.com");
         }
 

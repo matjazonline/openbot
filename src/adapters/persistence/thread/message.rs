@@ -14,27 +14,35 @@ use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
 use super::{email_metadata, external};
-use crate::{
-    adapters::persistence::participant::{
-        create_agent_principal_on, ensure_system_principal_on,
-        resolve_or_create_external_identity_on,
-    },
-    app_error::{AppError, AppResult},
-    entities::{
-        correlation::CorrelationId,
-        email_message::EmailMessageMetadata,
-        message::{
-            AttachmentMetadata, CanonicalMessageId, Message, MessageAttachments, MessageAudience,
-            MessageAuthor, MessageDirection, MessageParticipant, MessageParticipantKind,
-            MessageRole, ThreadEntryKind,
-        },
-        transport::{
-            ExternalMessageKey, ExternalThreadKey, IdentityNamespace, IdentitySubject,
-            ParticipantIdentityId, PrincipalId, QualifiedIdentity, TransportKind,
-        },
-    },
-    use_cases::thread::{MessageAuthorWrite, MessageCorrelation, MessageWrite},
-};
+use crate::adapters::persistence::participant::create_agent_principal_on;
+use crate::adapters::persistence::participant::ensure_system_principal_on;
+use crate::adapters::persistence::participant::resolve_or_create_external_identity_on;
+use crate::app_error::AppError;
+use crate::app_error::AppResult;
+use crate::application::ports::thread::MessageAuthorWrite;
+use crate::application::ports::thread::MessageCorrelation;
+use crate::application::ports::thread::MessageWrite;
+use crate::entities::correlation::CorrelationId;
+use crate::entities::email_message::EmailMessageMetadata;
+use crate::entities::message::AttachmentMetadata;
+use crate::entities::message::CanonicalMessageId;
+use crate::entities::message::Message;
+use crate::entities::message::MessageAttachments;
+use crate::entities::message::MessageAudience;
+use crate::entities::message::MessageAuthor;
+use crate::entities::message::MessageDirection;
+use crate::entities::message::MessageParticipant;
+use crate::entities::message::MessageParticipantKind;
+use crate::entities::message::MessageRole;
+use crate::entities::message::ThreadEntryKind;
+use crate::entities::transport::ExternalMessageKey;
+use crate::entities::transport::ExternalThreadKey;
+use crate::entities::transport::IdentityNamespace;
+use crate::entities::transport::IdentitySubject;
+use crate::entities::transport::ParticipantIdentityId;
+use crate::entities::transport::PrincipalId;
+use crate::entities::transport::QualifiedIdentity;
+use crate::entities::transport::TransportKind;
 
 /// One canonical message as it appears in one thread, plus the projections a reader needs.
 ///

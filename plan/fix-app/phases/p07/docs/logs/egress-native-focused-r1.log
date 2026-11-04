@@ -1,0 +1,31 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/dev/openbot-recovery/.worktrees/fix-app-p07)
+error[E0609]: no field `company` on type `persistence::workflow::tests::Fixture`
+   --> src/adapters/persistence/workflow/message_correlation_tests.rs:104:29
+    |
+104 |         .bind(setup.fixture.company.as_uuid()).fetch_one(setup.pool()).await.unwrap()
+    |                             ^^^^^^^ unknown field
+    |
+help: one of the expressions' fields has a field of the same name
+    |
+104 |         .bind(setup.fixture.target.company.as_uuid()).fetch_one(setup.pool()).await.unwrap()
+    |                             +++++++
+
+error[E0308]: mismatched types
+   --> src/adapters/protocols/email/egress_tests.rs:683:23
+    |
+683 |     let wire = frozen(part);
+    |                ------ ^^^^ expected `&[RenderedPart]`, found `&RenderedPart`
+    |                |
+    |                arguments to this function are incorrect
+    |
+    = note: expected reference `&[application::transport::delivery::RenderedPart]`
+               found reference `&application::transport::delivery::RenderedPart`
+note: function defined here
+   --> src/adapters/protocols/email/egress_tests.rs:78:4
+    |
+ 78 | fn frozen(parts: &[RenderedPart]) -> OutboundEmailV1 {
+    |    ^^^^^^ ----------------------
+
+Some errors have detailed explanations: E0308, E0609.
+For more information about an error, try `rustc --explain E0308`.
+error: could not compile `open_bots` (lib test) due to 2 previous errors

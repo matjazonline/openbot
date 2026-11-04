@@ -285,18 +285,18 @@ impl UndeliverableSlugs {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        entities::{
-            correlation::CorrelationId,
-            transport::{
-                ExternalMessageKey, ExternalThreadKey, IdentityNamespace, IdentitySubject,
-                QualifiedIdentity, TransportKind,
-            },
-        },
-        transport::{
-            BoundedVec, CanonicalContent, EmailIngressFacts, IngressDirectives, ProtocolExtension,
-        },
-    };
+    use crate::application::ports::thread::ProtocolExtension;
+    use crate::entities::correlation::CorrelationId;
+    use crate::entities::transport::ExternalMessageKey;
+    use crate::entities::transport::ExternalThreadKey;
+    use crate::entities::transport::IdentityNamespace;
+    use crate::entities::transport::IdentitySubject;
+    use crate::entities::transport::QualifiedIdentity;
+    use crate::entities::transport::TransportKind;
+    use crate::transport::BoundedVec;
+    use crate::transport::CanonicalContent;
+    use crate::transport::EmailIngressFacts;
+    use crate::transport::IngressDirectives;
     use uuid::Uuid;
 
     fn identity(subject: &str) -> QualifiedIdentity {

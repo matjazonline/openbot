@@ -1,0 +1,143 @@
+diff --git a/scripts/deploy.sh b/scripts/deploy.sh
+index cbaf82e..15f892f 100755
+--- a/scripts/deploy.sh
++++ b/scripts/deploy.sh
+@@ -12,8 +12,8 @@
+ # --bootstrap creates the openbots-db app, its pgdata volume, and sets
+ # POSTGRES_PASSWORD, before deploying; for the app target it creates the
+ # openbots app, allocates a dedicated IPv4 (required for inbound
+-# SMTP on port 25), and prompts for its secrets (DATABASE_URL, JWT_SECRET,
+-# SMTP_USERNAME/PASSWORD and credential-encryption keys) before deploying. It's a no-op
++# SMTP on port 25), prompts for database/SMTP credentials, and generates JWT_SECRET,
++# AUTH_ATTEMPT_SECRET and credential-encryption keys before deploying. It's a no-op
+ # (skipped with a message) once the app already exists, so it's safe to
+ # leave on. Remember to edit fly.toml (APP_DOMAIN_NAME,
+ # CORS_ALLOWED_ORIGINS, primary_region) before the app's first deploy; see
+@@ -95,9 +95,10 @@ bootstrap_app() {
+     read -rp "DATABASE_URL (postgres://open_bots:<POSTGRES_PASSWORD>@openbots-db.internal:5432/open_bots): " database_url
+   fi
+ 
+-  echo "==> Generating JWT_SECRET"
+-  local jwt_secret credential_key
++  echo "==> Generating independent session and authentication signing keys"
++  local jwt_secret auth_attempt_secret credential_key
+   jwt_secret="$(openssl rand -base64 48)"
++  auth_attempt_secret="$(openssl rand -base64 48)"
+   credential_key="$(openssl rand -base64 32 | tr -d '\n')"
+ 
+   local smtp_username smtp_password
+@@ -109,6 +110,7 @@ bootstrap_app() {
+   local secrets_args=(
+     "DATABASE_URL=$database_url"
+     "JWT_SECRET=$jwt_secret"
++    "AUTH_ATTEMPT_SECRET=$auth_attempt_secret"
+     "SMTP_USERNAME=$smtp_username"
+     "SMTP_PASSWORD=$smtp_password"
+     "CREDENTIAL_ENCRYPTION_KEYS=1:$credential_key"
+@@ -129,7 +131,7 @@ validate_app_secrets() {
+ 
+   local missing=()
+   local required
+-  for required in DATABASE_URL JWT_SECRET CREDENTIAL_ENCRYPTION_KEYS CREDENTIAL_ENCRYPTION_ACTIVE_VERSION; do
++  for required in DATABASE_URL JWT_SECRET AUTH_ATTEMPT_SECRET CREDENTIAL_ENCRYPTION_KEYS CREDENTIAL_ENCRYPTION_ACTIVE_VERSION; do
+     if [[ "$secret_list" != *"\"Name\":\"$required\""* && "$secret_list" != *"\"name\":\"$required\""* ]]; then
+       missing+=("$required")
+     fi
+diff --git a/scripts/tests/deploy.sh b/scripts/tests/deploy.sh
+index 7fd45b8..6750f90 100755
+--- a/scripts/tests/deploy.sh
++++ b/scripts/tests/deploy.sh
+@@ -13,7 +13,7 @@ set -euo pipefail
+ rendered=()
+ for arg in "$@"; do
+   case "$arg" in
+-    CREDENTIAL_ENCRYPTION_KEYS=*) rendered+=("CREDENTIAL_ENCRYPTION_KEYS=<redacted>") ;;
++    JWT_SECRET=*|AUTH_ATTEMPT_SECRET=*|CREDENTIAL_ENCRYPTION_KEYS=*) rendered+=("${arg%%=*}=<redacted>") ;;
+     *) rendered+=("$arg") ;;
+   esac
+ done
+@@ -25,6 +25,21 @@ fi
+ if [[ "${1:-}" == "secrets" && "${2:-}" == "list" ]]; then
+   printf '%s\n' "$FLY_SECRET_JSON"
+ fi
++if [[ "${1:-}" == "secrets" && "${2:-}" == "set" ]]; then
++  jwt_secret=""
++  auth_attempt_secret=""
++  for arg in "$@"; do
++    case "$arg" in
++      JWT_SECRET=*) jwt_secret="${arg#*=}" ;;
++      AUTH_ATTEMPT_SECRET=*) auth_attempt_secret="${arg#*=}" ;;
++    esac
++  done
++  if [[ ${#auth_attempt_secret} -lt 32 || "$auth_attempt_secret" == "$jwt_secret" ]]; then
++    echo "bootstrap omitted a strong independent authentication key" >&2
++    exit 1
++  fi
++  printf '%s\n' 'authentication key is strong and independent' >>"$FLY_TEST_LOG"
++fi
+ EOF
+ cat >"$TEST_DIR/bin/cargo" <<'EOF'
+ #!/usr/bin/env bash
+@@ -36,7 +51,7 @@ export PATH="$TEST_DIR/bin:$PATH"
+ export FLY_TEST_LOG="$TEST_DIR/fly.log"
+ 
+ export FLY_APP_EXISTS=1
+-export FLY_SECRET_JSON='[{"Name":"DATABASE_URL"},{"Name":"JWT_SECRET"},{"Name":"CREDENTIAL_ENCRYPTION_KEYS"}]'
++export FLY_SECRET_JSON='[{"Name":"DATABASE_URL"},{"Name":"JWT_SECRET"},{"Name":"AUTH_ATTEMPT_SECRET"},{"Name":"CREDENTIAL_ENCRYPTION_KEYS"}]'
+ if "$ROOT_DIR/scripts/deploy.sh" app >"$TEST_DIR/missing.out" 2>&1; then
+   echo "deploy unexpectedly accepted a missing active-version secret" >&2
+   exit 1
+@@ -47,13 +62,34 @@ if grep -q '^deploy' "$FLY_TEST_LOG"; then
+   exit 1
+ fi
+ 
++# An otherwise complete existing deployment must refuse the missing new key.
+ : >"$FLY_TEST_LOG"
+-export FLY_APP_EXISTS=0
+ export FLY_SECRET_JSON='[{"Name":"DATABASE_URL"},{"Name":"JWT_SECRET"},{"Name":"CREDENTIAL_ENCRYPTION_KEYS"},{"Name":"CREDENTIAL_ENCRYPTION_ACTIVE_VERSION"}]'
++if "$ROOT_DIR/scripts/deploy.sh" app >"$TEST_DIR/missing-auth.out" 2>&1; then
++  echo "deploy unexpectedly accepted a missing authentication key" >&2
++  exit 1
++fi
++grep -q "AUTH_ATTEMPT_SECRET" "$TEST_DIR/missing-auth.out"
++if grep -q '^deploy' "$FLY_TEST_LOG"; then
++  echo "deploy ran after authentication-key preflight failed" >&2
++  exit 1
++fi
++
++: >"$FLY_TEST_LOG"
++export FLY_APP_EXISTS=0
++export FLY_SECRET_JSON='[{"Name":"DATABASE_URL"},{"Name":"AUTH_ATTEMPT_SECRET"},{"Name":"JWT_SECRET"},{"Name":"CREDENTIAL_ENCRYPTION_KEYS"},{"Name":"CREDENTIAL_ENCRYPTION_ACTIVE_VERSION"}]'
+ printf 'postgres://open_bots:password@db/open_bots\nrelay-user\nrelay-password\n' | \
+   "$ROOT_DIR/scripts/deploy.sh" --bootstrap app >"$TEST_DIR/bootstrap.out" 2>&1
++grep -q 'AUTH_ATTEMPT_SECRET=<redacted>' "$FLY_TEST_LOG"
++grep -q 'authentication key is strong and independent' "$FLY_TEST_LOG"
+ grep -q 'CREDENTIAL_ENCRYPTION_KEYS=<redacted>' "$FLY_TEST_LOG"
+ grep -q 'CREDENTIAL_ENCRYPTION_ACTIVE_VERSION=1' "$FLY_TEST_LOG"
+ grep -q '^deploy$' "$FLY_TEST_LOG"
+ 
++# A complete secret inventory also permits an ordinary deployment.
++: >"$FLY_TEST_LOG"
++export FLY_APP_EXISTS=1
++"$ROOT_DIR/scripts/deploy.sh" app >"$TEST_DIR/normal.out" 2>&1
++grep -q '^deploy$' "$FLY_TEST_LOG"
++
+ echo "deploy script tests passed"
+diff --git a/src/application/use_cases/thread/mod.rs b/src/application/use_cases/thread/mod.rs
+index 5e09983..9758dea 100644
+--- a/src/application/use_cases/thread/mod.rs
++++ b/src/application/use_cases/thread/mod.rs
+@@ -93,13 +93,6 @@ pub enum SenderTrust {
+ /// with the other transport contracts and re-exported here so call sites read unchanged.
+ pub use crate::transport::{PipelineStep, RecipientRole, ReplyDelivery};
+ 
+-/// One channel's agent answering another channel of the same company.
+-///
+-/// Registered with the email sender, which reaches it *before* SMTP: a message addressed to one of
+-/// this deployment's own channels never leaves the building, so there is no DMARC verdict to earn
+-/// and no mail to parse back. Rendering it to RFC 5322 and re-ingesting the result was how a
+-/// mailbox became the internal identity of a channel.
+-
+ #[cfg(test)]
+ pub mod test_support;
+ 

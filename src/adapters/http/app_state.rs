@@ -15,11 +15,9 @@ use crate::{
     services::{
         dashboard_snapshot::DashboardSnapshotService,
         database_query_health::DatabaseQueryHealthService,
-        inbound_event_worker::{InboundEventWakeups, InboundEventWorker},
-        notification_worker::NotificationWorker,
-        runtime_metrics::RuntimeMetricPersistence,
+        inbound_event_worker::InboundEventWakeups, runtime_metrics::RuntimeMetricPersistence,
     },
-    transport::{DeliveryQueue, InboundEventInbox, TransportRegistry},
+    transport::{InboundEventInbox, TransportRegistry},
     use_cases::{
         agent::AgentUseCases,
         channel::ChannelUseCases,
@@ -37,8 +35,8 @@ use crate::{
 #[derive(Clone)]
 pub struct AppState {
     pub auth_admission: Arc<AuthAdmission>,
-    /// The production workflow engine: services for the workflow routes, loops for `serve`.
-    pub workflow: Arc<crate::infra::workflow::WorkflowEngine>,
+    /// Workflow commands and read models, without worker handlers or spawn capability.
+    pub workflow: Arc<crate::infra::workflow::WorkflowServices>,
     pub model_usage: Arc<dyn crate::services::model_usage::ModelUsageStore>,
     pub run_counts: Arc<dyn crate::application::run_counts::RunCountsReader>,
     pub thread_activity: Arc<dyn crate::application::thread_activity::ThreadActivityReader>,
@@ -61,8 +59,6 @@ pub struct AppState {
     pub onboarding_use_cases: Arc<crate::use_cases::onboarding::OnboardingUseCases>,
     pub skill_use_cases: Arc<SkillUseCases>,
     pub thread_use_cases: Arc<ThreadUseCases>,
-    /// Owns claims on authenticated provider events. Routes only store and wake it.
-    pub inbound_event_worker: Arc<InboundEventWorker>,
     /// Producer-only view used by future fast-ack webhook routes.
     pub inbound_event_inbox: Arc<dyn InboundEventInbox>,
     /// A latency hint after durable storage; polling remains authoritative.
@@ -74,8 +70,6 @@ pub struct AppState {
     pub attention_use_cases: Arc<AttentionUseCases>,
     /// Recipient-facing projection over the same operational sources as `attention`.
     pub notifications: Arc<dyn NotificationPersistence>,
-    /// Owns durable notification-event claims and enqueues optional email through deliveries.
-    pub notification_worker: Arc<NotificationWorker>,
     /// Shared across tabs so the operator query-statistics cache is process-wide.
     pub database_query_health: Arc<DatabaseQueryHealthService>,
     /// Current dashboard streams on this process; the stream guard updates it on disconnect too.
@@ -90,14 +84,10 @@ pub struct AppState {
     pub file_storage: Option<Arc<dyn FileStorage>>,
     /// Which transports this deployment can render for and send through.
     ///
-    /// Carried on the state because `main` builds the delivery worker from it, and because a
-    /// deployment's registered transports are what the integrations page reports as available.
+    /// The integrations page reports which transports this deployment has registered.
     pub transports: Arc<TransportRegistry>,
     /// Reads the delivery queue for `/ui/deliveries`.
     pub deliveries: Arc<dyn DeliveryReader>,
-    /// Claims and fences the same queue. Not used by any handler -- `main` builds the delivery
-    /// worker from it.
-    pub delivery_queue: Arc<dyn DeliveryQueue>,
     /// Committed messages, for the mailbox's live message stream.
     pub events: MailboxEvents,
 }
@@ -114,7 +104,7 @@ impl FromRef<AppState> for Arc<AppConfig> {
     }
 }
 
-impl FromRef<AppState> for Arc<crate::infra::workflow::WorkflowEngine> {
+impl FromRef<AppState> for Arc<crate::infra::workflow::WorkflowServices> {
     fn from_ref(app_state: &AppState) -> Self {
         app_state.workflow.clone()
     }

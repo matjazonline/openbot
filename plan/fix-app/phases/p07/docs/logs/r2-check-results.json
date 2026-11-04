@@ -1,0 +1,58 @@
+[
+  {
+    "check": "r2-deploy-regression",
+    "command": [
+      "bash",
+      "scripts/tests/deploy.sh"
+    ],
+    "exit_code": 0,
+    "seconds": 0.37
+  },
+  {
+    "check": "r2-shell-syntax",
+    "command": [
+      "bash",
+      "-n",
+      "scripts/deploy.sh",
+      "scripts/tests/deploy.sh"
+    ],
+    "exit_code": 0,
+    "seconds": 0.0
+  },
+  {
+    "check": "r2-clippy-offline",
+    "command": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "--offline",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 0,
+    "seconds": 75.39
+  },
+  {
+    "check": "r2-fmt",
+    "command": [
+      "cargo",
+      "fmt",
+      "--check"
+    ],
+    "exit_code": 0,
+    "seconds": 2.01
+  },
+  {
+    "check": "r2-whitespace",
+    "command": [
+      "git",
+      "diff",
+      "--check",
+      "f8495f616a5f6ebce9218a6e1cd6c7c6d7bfda55"
+    ],
+    "exit_code": 0,
+    "seconds": 0.07
+  }
+]

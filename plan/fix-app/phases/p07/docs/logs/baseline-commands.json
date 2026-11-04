@@ -1,0 +1,42 @@
+{
+  "commands": [
+    [
+      "migrate-dev",
+      [
+        "cargo",
+        "sqlx",
+        "migrate",
+        "run",
+        "--database-url",
+        "postgres://mac02@127.0.0.1:55407/open_bots"
+      ]
+    ],
+    [
+      "migrate-test",
+      [
+        "cargo",
+        "sqlx",
+        "migrate",
+        "run",
+        "--database-url",
+        "postgres://mac02@127.0.0.1:55407/open_bots_test"
+      ]
+    ],
+    [
+      "baseline-offline-check",
+      [
+        "cargo",
+        "check",
+        "--locked",
+        "--offline",
+        "--all-targets"
+      ]
+    ]
+  ],
+  "environment": {
+    "DATABASE_URL": "postgres://mac02@127.0.0.1:55407/open_bots",
+    "TEST_DATABASE_URL": "postgres://mac02@127.0.0.1:55407/open_bots_test",
+    "CARGO_INCREMENTAL": "0",
+    "SQLX_OFFLINE": "true"
+  }
+}

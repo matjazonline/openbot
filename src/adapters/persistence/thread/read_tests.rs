@@ -5,9 +5,9 @@
 
 use super::test_support::*;
 use super::*;
+use crate::application::ports::thread::MessageWrite;
 use crate::entities::email_message::EmailMessageMetadata;
 use crate::entities::value_objects::MessageId;
-use crate::use_cases::thread::MessageWrite;
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64_STANDARD};
 
 fn mapi_thread_index(response_levels: usize) -> ThreadIndex {

@@ -1,11 +1,14 @@
 //! 04.11-D2 §1.2-§1.5 (F005): replies resolve the exact source, sends never join a customer
 //! conversation, and existing thread consumers keep their meaning.
 use super::*;
+use crate::application::ports::participant::IdentityObservation;
+use crate::application::ports::thread::MessageAuthorWrite;
+use crate::application::ports::thread::MessageCorrelation;
+use crate::application::ports::thread::MessageParticipantWrite;
+use crate::application::ports::thread::MessageWrite;
+use crate::application::ports::thread::ThreadPersistence;
+use crate::application::ports::thread::qualified_email_identity;
 use crate::application::transport::ExternalCorrelationStore;
-use crate::application::use_cases::thread::{
-    MessageAuthorWrite, MessageCorrelation, MessageParticipantWrite, MessageWrite,
-    ThreadPersistence, qualified_email_identity,
-};
 use crate::application::workflow::DeliveryPolicy;
 use crate::application::workflow::lease::ClaimedWorkflow;
 use crate::domain::entities::correlation::CorrelationId;
@@ -19,7 +22,6 @@ use crate::entities::transport::{
     QualifiedIdentity, TransportKind,
 };
 use crate::entities::value_objects::{EmailAddress, MessageId};
-use crate::use_cases::participant::IdentityObservation;
 
 const CUSTOMER: &str = "customer@partner.test";
 
@@ -319,7 +321,14 @@ async fn workflow_message_thread_external_reply_answers_its_own_source() {
     )
     .bind(setup.scope().run.as_uuid()).fetch_one(setup.pool()).await.unwrap();
     assert_eq!(in_reply_to.as_deref(), Some("<question@partner.test>"));
-    assert_eq!(references, Some(vec!["<root@partner.test>".to_string()]));
+    assert_eq!(
+        references,
+        Some(vec![
+            "<root@partner.test>".to_string(),
+            "<question@partner.test>".to_string()
+        ])
+    );
+    correlation_tests::assert_frozen(setup).await;
     let p = &setup.fixture.persistence;
     let answer = p
         .find_outbound_reply_after(conversation.thread, conversation.question)
@@ -908,3 +917,6 @@ async fn message_thread_fk_destination_names_a_message_of_its_own_thread() {
     insert(elsewhere).execute(&mut *tx).await.unwrap();
     tx.rollback().await.unwrap();
 }
+
+#[path = "message_correlation_tests.rs"]
+mod correlation_tests;

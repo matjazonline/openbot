@@ -942,7 +942,9 @@ async fn workflow_message_unknown_note_through_the_production_composition() {
             .count(),
         1
     );
-    let production = crate::infra::workflow::WorkflowEngine::for_tests(p.clone()).reconciliation();
+    let production = crate::infra::workflow::WorkflowEngine::for_tests(p.clone())
+        .services()
+        .reconciliation();
     let note = EvidenceInput::UnknownNote {
         note: "the provider lost the response".into(),
         claimed: ClaimedDisposition::Unknown,

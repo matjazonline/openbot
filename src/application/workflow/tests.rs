@@ -1,6 +1,6 @@
 use super::*;
 use crate::application::app_error::{AppError, AppResult};
-use crate::application::use_cases::participant::PrincipalAccessPersistence;
+use crate::application::ports::participant::PrincipalAccessPersistence;
 use crate::domain::entities::{
     channel::Channel, company_member::CompanyMembership, correlation::CorrelationId,
     message::CanonicalMessageId, participant::PrincipalAccessContext, thread::Thread,

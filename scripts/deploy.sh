@@ -12,8 +12,8 @@
 # --bootstrap creates the openbots-db app, its pgdata volume, and sets
 # POSTGRES_PASSWORD, before deploying; for the app target it creates the
 # openbots app, allocates a dedicated IPv4 (required for inbound
-# SMTP on port 25), and prompts for its secrets (DATABASE_URL, JWT_SECRET,
-# SMTP_USERNAME/PASSWORD and credential-encryption keys) before deploying. It's a no-op
+# SMTP on port 25), prompts for database/SMTP credentials, and generates JWT_SECRET,
+# AUTH_ATTEMPT_SECRET and credential-encryption keys before deploying. It's a no-op
 # (skipped with a message) once the app already exists, so it's safe to
 # leave on. Remember to edit fly.toml (APP_DOMAIN_NAME,
 # CORS_ALLOWED_ORIGINS, primary_region) before the app's first deploy; see
@@ -95,9 +95,10 @@ bootstrap_app() {
     read -rp "DATABASE_URL (postgres://open_bots:<POSTGRES_PASSWORD>@openbots-db.internal:5432/open_bots): " database_url
   fi
 
-  echo "==> Generating JWT_SECRET"
-  local jwt_secret credential_key
+  echo "==> Generating independent session and authentication signing keys"
+  local jwt_secret auth_attempt_secret credential_key
   jwt_secret="$(openssl rand -base64 48)"
+  auth_attempt_secret="$(openssl rand -base64 48)"
   credential_key="$(openssl rand -base64 32 | tr -d '\n')"
 
   local smtp_username smtp_password
@@ -109,6 +110,7 @@ bootstrap_app() {
   local secrets_args=(
     "DATABASE_URL=$database_url"
     "JWT_SECRET=$jwt_secret"
+    "AUTH_ATTEMPT_SECRET=$auth_attempt_secret"
     "SMTP_USERNAME=$smtp_username"
     "SMTP_PASSWORD=$smtp_password"
     "CREDENTIAL_ENCRYPTION_KEYS=1:$credential_key"
@@ -129,7 +131,7 @@ validate_app_secrets() {
 
   local missing=()
   local required
-  for required in DATABASE_URL JWT_SECRET CREDENTIAL_ENCRYPTION_KEYS CREDENTIAL_ENCRYPTION_ACTIVE_VERSION; do
+  for required in DATABASE_URL JWT_SECRET AUTH_ATTEMPT_SECRET CREDENTIAL_ENCRYPTION_KEYS CREDENTIAL_ENCRYPTION_ACTIVE_VERSION; do
     if [[ "$secret_list" != *"\"Name\":\"$required\""* && "$secret_list" != *"\"name\":\"$required\""* ]]; then
       missing+=("$required")
     fi

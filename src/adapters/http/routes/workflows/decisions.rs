@@ -79,7 +79,7 @@ pub struct SubmitBody {
 }
 
 async fn submit_command(
-    engine: &WorkflowEngine,
+    engine: &WorkflowServices,
     company_id: Uuid,
     user: &AuthenticatedUser,
     decision: Uuid,
@@ -124,7 +124,7 @@ pub struct CommentBody {
 }
 
 async fn comment_command(
-    engine: &WorkflowEngine,
+    engine: &WorkflowServices,
     company_id: Uuid,
     user: &AuthenticatedUser,
     decision: Uuid,
@@ -164,7 +164,7 @@ pub async fn comment(
 
 /// The decision's company, from the decision row (the notice links name only the decision). The
 /// decision read then authorizes the viewer, so an unknown or foreign decision is not found.
-async fn page_company(engine: &WorkflowEngine, decision: Uuid) -> AppResult<Uuid> {
+async fn page_company(engine: &WorkflowServices, decision: Uuid) -> AppResult<Uuid> {
     engine
         .reads()
         .decision_company(decision)
@@ -196,7 +196,7 @@ pub struct CommentForm {
 /// a decision that changed, no access) is a banner over the current view; any other failure is
 /// the route's error, which the page's error feedback reports.
 async fn section_after(
-    engine: &WorkflowEngine,
+    engine: &WorkflowServices,
     company_id: Uuid,
     user: &AuthenticatedUser,
     decision: Uuid,

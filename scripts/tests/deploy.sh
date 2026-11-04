@@ -13,7 +13,7 @@ set -euo pipefail
 rendered=()
 for arg in "$@"; do
   case "$arg" in
-    CREDENTIAL_ENCRYPTION_KEYS=*) rendered+=("CREDENTIAL_ENCRYPTION_KEYS=<redacted>") ;;
+    JWT_SECRET=*|AUTH_ATTEMPT_SECRET=*|CREDENTIAL_ENCRYPTION_KEYS=*) rendered+=("${arg%%=*}=<redacted>") ;;
     *) rendered+=("$arg") ;;
   esac
 done
@@ -24,6 +24,21 @@ if [[ "${1:-}" == "status" ]]; then
 fi
 if [[ "${1:-}" == "secrets" && "${2:-}" == "list" ]]; then
   printf '%s\n' "$FLY_SECRET_JSON"
+fi
+if [[ "${1:-}" == "secrets" && "${2:-}" == "set" ]]; then
+  jwt_secret=""
+  auth_attempt_secret=""
+  for arg in "$@"; do
+    case "$arg" in
+      JWT_SECRET=*) jwt_secret="${arg#*=}" ;;
+      AUTH_ATTEMPT_SECRET=*) auth_attempt_secret="${arg#*=}" ;;
+    esac
+  done
+  if [[ ${#auth_attempt_secret} -lt 32 || "$auth_attempt_secret" == "$jwt_secret" ]]; then
+    echo "bootstrap omitted a strong independent authentication key" >&2
+    exit 1
+  fi
+  printf '%s\n' 'authentication key is strong and independent' >>"$FLY_TEST_LOG"
 fi
 EOF
 cat >"$TEST_DIR/bin/cargo" <<'EOF'
@@ -36,7 +51,7 @@ export PATH="$TEST_DIR/bin:$PATH"
 export FLY_TEST_LOG="$TEST_DIR/fly.log"
 
 export FLY_APP_EXISTS=1
-export FLY_SECRET_JSON='[{"Name":"DATABASE_URL"},{"Name":"JWT_SECRET"},{"Name":"CREDENTIAL_ENCRYPTION_KEYS"}]'
+export FLY_SECRET_JSON='[{"Name":"DATABASE_URL"},{"Name":"JWT_SECRET"},{"Name":"AUTH_ATTEMPT_SECRET"},{"Name":"CREDENTIAL_ENCRYPTION_KEYS"}]'
 if "$ROOT_DIR/scripts/deploy.sh" app >"$TEST_DIR/missing.out" 2>&1; then
   echo "deploy unexpectedly accepted a missing active-version secret" >&2
   exit 1
@@ -47,13 +62,34 @@ if grep -q '^deploy' "$FLY_TEST_LOG"; then
   exit 1
 fi
 
+# An otherwise complete existing deployment must refuse the missing new key.
+: >"$FLY_TEST_LOG"
+export FLY_SECRET_JSON='[{"Name":"DATABASE_URL"},{"Name":"JWT_SECRET"},{"Name":"CREDENTIAL_ENCRYPTION_KEYS"},{"Name":"CREDENTIAL_ENCRYPTION_ACTIVE_VERSION"}]'
+if "$ROOT_DIR/scripts/deploy.sh" app >"$TEST_DIR/missing-auth.out" 2>&1; then
+  echo "deploy unexpectedly accepted a missing authentication key" >&2
+  exit 1
+fi
+grep -q "AUTH_ATTEMPT_SECRET" "$TEST_DIR/missing-auth.out"
+if grep -q '^deploy' "$FLY_TEST_LOG"; then
+  echo "deploy ran after authentication-key preflight failed" >&2
+  exit 1
+fi
+
 : >"$FLY_TEST_LOG"
 export FLY_APP_EXISTS=0
-export FLY_SECRET_JSON='[{"Name":"DATABASE_URL"},{"Name":"JWT_SECRET"},{"Name":"CREDENTIAL_ENCRYPTION_KEYS"},{"Name":"CREDENTIAL_ENCRYPTION_ACTIVE_VERSION"}]'
+export FLY_SECRET_JSON='[{"Name":"DATABASE_URL"},{"Name":"AUTH_ATTEMPT_SECRET"},{"Name":"JWT_SECRET"},{"Name":"CREDENTIAL_ENCRYPTION_KEYS"},{"Name":"CREDENTIAL_ENCRYPTION_ACTIVE_VERSION"}]'
 printf 'postgres://open_bots:password@db/open_bots\nrelay-user\nrelay-password\n' | \
   "$ROOT_DIR/scripts/deploy.sh" --bootstrap app >"$TEST_DIR/bootstrap.out" 2>&1
+grep -q 'AUTH_ATTEMPT_SECRET=<redacted>' "$FLY_TEST_LOG"
+grep -q 'authentication key is strong and independent' "$FLY_TEST_LOG"
 grep -q 'CREDENTIAL_ENCRYPTION_KEYS=<redacted>' "$FLY_TEST_LOG"
 grep -q 'CREDENTIAL_ENCRYPTION_ACTIVE_VERSION=1' "$FLY_TEST_LOG"
+grep -q '^deploy$' "$FLY_TEST_LOG"
+
+# A complete secret inventory also permits an ordinary deployment.
+: >"$FLY_TEST_LOG"
+export FLY_APP_EXISTS=1
+"$ROOT_DIR/scripts/deploy.sh" app >"$TEST_DIR/normal.out" 2>&1
 grep -q '^deploy$' "$FLY_TEST_LOG"
 
 echo "deploy script tests passed"

@@ -1,14 +1,15 @@
 use super::*;
 use crate::adapters::monitoring::in_memory_monitor::InMemoryMonitor;
 use crate::adapters::protocols::email::parser::RawInboundPayload;
+use crate::application::ports::channel::ChannelPersistence;
+use crate::application::ports::channel::ChannelWrite;
 use crate::domain::monitoring::MonitoringService;
 use crate::entities::channel::{Channel, ChannelAccessMode};
 use crate::entities::correlation::CorrelationId;
 use crate::entities::message::MessageDirection;
-use crate::infra::config::ResendApiConfig;
+use crate::entities::transport::TransportKind;
 use crate::transport::InboundOrigin;
 use crate::transport::{MAX_ATTACHMENTS, MAX_BODY_BYTES, MAX_INGRESS_HOPS};
-use crate::use_cases::channel::{ChannelPersistence, ChannelWrite};
 use crate::use_cases::company_test_support::{MockCompanyPersistence, TeamByAddress};
 use crate::use_cases::participant::test_support::{
     InMemoryParticipantDirectory, email_allowlist_grants, email_allowlist_policy,
@@ -17,34 +18,10 @@ use crate::use_cases::thread::test_support::InMemoryThreads;
 use chrono::Utc;
 use std::sync::Mutex;
 
-fn internal_test_config() -> Arc<AppConfig> {
-    Arc::new(AppConfig {
-        jwt_secret: "secret".to_string(),
-        sendgrid_inbound: None,
-        resend_api: ResendApiConfig::default(),
-        refresh_token_ttl: time::Duration::days(30),
-        app_domain_name: "mailagents.com".to_string(),
-        cors_allowed_origins: vec![],
-        smtp_host: "smtp.invalid".to_string(),
-        smtp_port: 2525,
-        smtp_username: "".to_string(),
-        smtp_password: "".to_string(),
-        smtp_from_address: "noreply@mailagents.com".to_string(),
-        incoming_smtp_enabled: true,
-        incoming_smtp_host: "0.0.0.0".to_string(),
-        incoming_smtp_port: 2525,
+fn internal_test_settings() -> Arc<ThreadSettings> {
+    Arc::new(ThreadSettings {
+        mail_domain: ("mailagents.com".to_string()).into(),
         max_spam_score: 5.0,
-        dnsbl_enabled: false,
-        dnsbl_servers: vec![],
-        smtp_rate_limit_conns_per_ip: 30,
-        reject_self_domain_helo: true,
-        enable_heuristic_scanner: true,
-        enable_spam_scanner: false,
-        spam_scanner_type: "rspamd".to_string(),
-        spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
-        secure_cookies: false,
-        gcs: None,
-        operator_emails: Vec::new(),
     })
 }
 
@@ -114,7 +91,7 @@ impl ChannelPersistence for MockChannelPersistence {
     }
     async fn update(
         &self,
-        _request: crate::use_cases::channel::ChannelUpdate,
+        _request: crate::application::ports::channel::ChannelUpdate,
     ) -> AppResult<crate::entities::channel::Channel> {
         unimplemented!()
     }
@@ -256,33 +233,9 @@ async fn test_inter_channel_hop_limit_rejection() {
 
     let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
-    let config = Arc::new(AppConfig {
-        jwt_secret: "secret".to_string(),
-        sendgrid_inbound: None,
-        resend_api: ResendApiConfig::default(),
-        refresh_token_ttl: time::Duration::days(30),
-        app_domain_name: "mailagents.com".to_string(),
-        cors_allowed_origins: vec![],
-        smtp_host: "localhost".to_string(),
-        smtp_port: 1025,
-        smtp_username: "".to_string(),
-        smtp_password: "".to_string(),
-        smtp_from_address: "noreply@mailagents.com".to_string(),
-        incoming_smtp_enabled: true,
-        incoming_smtp_host: "0.0.0.0".to_string(),
-        incoming_smtp_port: 2525,
+    let config = Arc::new(ThreadSettings {
+        mail_domain: ("mailagents.com".to_string()).into(),
         max_spam_score: 5.0,
-        dnsbl_enabled: false,
-        dnsbl_servers: vec![],
-        smtp_rate_limit_conns_per_ip: 30,
-        reject_self_domain_helo: true,
-        enable_heuristic_scanner: true,
-        enable_spam_scanner: false,
-        spam_scanner_type: "rspamd".to_string(),
-        spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
-        secure_cookies: false,
-        gcs: None,
-        operator_emails: Vec::new(),
     });
 
     let thread_use_cases = ThreadUseCases::for_test(
@@ -353,33 +306,9 @@ async fn test_spf_authentication_failure_rejection() {
 
     let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
-    let config = Arc::new(AppConfig {
-        jwt_secret: "secret".to_string(),
-        sendgrid_inbound: None,
-        resend_api: ResendApiConfig::default(),
-        refresh_token_ttl: time::Duration::days(30),
-        app_domain_name: "mailagents.com".to_string(),
-        cors_allowed_origins: vec![],
-        smtp_host: "localhost".to_string(),
-        smtp_port: 1025,
-        smtp_username: "".to_string(),
-        smtp_password: "".to_string(),
-        smtp_from_address: "noreply@mailagents.com".to_string(),
-        incoming_smtp_enabled: true,
-        incoming_smtp_host: "0.0.0.0".to_string(),
-        incoming_smtp_port: 2525,
+    let config = Arc::new(ThreadSettings {
+        mail_domain: ("mailagents.com".to_string()).into(),
         max_spam_score: 5.0,
-        dnsbl_enabled: false,
-        dnsbl_servers: vec![],
-        smtp_rate_limit_conns_per_ip: 30,
-        reject_self_domain_helo: true,
-        enable_heuristic_scanner: true,
-        enable_spam_scanner: false,
-        spam_scanner_type: "rspamd".to_string(),
-        spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
-        secure_cookies: false,
-        gcs: None,
-        operator_emails: Vec::new(),
     });
 
     let thread_use_cases = ThreadUseCases::for_test(
@@ -445,33 +374,9 @@ async fn test_high_spam_score_rejection() {
 
     let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
-    let config = Arc::new(AppConfig {
-        jwt_secret: "secret".to_string(),
-        sendgrid_inbound: None,
-        resend_api: ResendApiConfig::default(),
-        refresh_token_ttl: time::Duration::days(30),
-        app_domain_name: "mailagents.com".to_string(),
-        cors_allowed_origins: vec![],
-        smtp_host: "localhost".to_string(),
-        smtp_port: 1025,
-        smtp_username: "".to_string(),
-        smtp_password: "".to_string(),
-        smtp_from_address: "noreply@mailagents.com".to_string(),
-        incoming_smtp_enabled: true,
-        incoming_smtp_host: "0.0.0.0".to_string(),
-        incoming_smtp_port: 2525,
+    let config = Arc::new(ThreadSettings {
+        mail_domain: ("mailagents.com".to_string()).into(),
         max_spam_score: 5.0,
-        dnsbl_enabled: false,
-        dnsbl_servers: vec![],
-        smtp_rate_limit_conns_per_ip: 30,
-        reject_self_domain_helo: true,
-        enable_heuristic_scanner: true,
-        enable_spam_scanner: false,
-        spam_scanner_type: "rspamd".to_string(),
-        spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
-        secure_cookies: false,
-        gcs: None,
-        operator_emails: Vec::new(),
     });
 
     let thread_use_cases = ThreadUseCases::for_test(
@@ -535,33 +440,9 @@ async fn test_dmarc_authentication_failure_rejection() {
 
     let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
-    let config = Arc::new(AppConfig {
-        jwt_secret: "secret".to_string(),
-        sendgrid_inbound: None,
-        resend_api: ResendApiConfig::default(),
-        refresh_token_ttl: time::Duration::days(30),
-        app_domain_name: "mailagents.com".to_string(),
-        cors_allowed_origins: vec![],
-        smtp_host: "localhost".to_string(),
-        smtp_port: 1025,
-        smtp_username: "".to_string(),
-        smtp_password: "".to_string(),
-        smtp_from_address: "noreply@mailagents.com".to_string(),
-        incoming_smtp_enabled: true,
-        incoming_smtp_host: "0.0.0.0".to_string(),
-        incoming_smtp_port: 2525,
+    let config = Arc::new(ThreadSettings {
+        mail_domain: ("mailagents.com".to_string()).into(),
         max_spam_score: 5.0,
-        dnsbl_enabled: false,
-        dnsbl_servers: vec![],
-        smtp_rate_limit_conns_per_ip: 30,
-        reject_self_domain_helo: true,
-        enable_heuristic_scanner: true,
-        enable_spam_scanner: false,
-        spam_scanner_type: "rspamd".to_string(),
-        spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
-        secure_cookies: false,
-        gcs: None,
-        operator_emails: Vec::new(),
     });
 
     let thread_use_cases = ThreadUseCases::for_test(
@@ -625,33 +506,9 @@ async fn test_unauthorized_sender_blocked_before_spam_checks() {
 
     let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
-    let config = Arc::new(AppConfig {
-        jwt_secret: "secret".to_string(),
-        sendgrid_inbound: None,
-        resend_api: ResendApiConfig::default(),
-        refresh_token_ttl: time::Duration::days(30),
-        app_domain_name: "mailagents.com".to_string(),
-        cors_allowed_origins: vec![],
-        smtp_host: "localhost".to_string(),
-        smtp_port: 1025,
-        smtp_username: "".to_string(),
-        smtp_password: "".to_string(),
-        smtp_from_address: "noreply@mailagents.com".to_string(),
-        incoming_smtp_enabled: true,
-        incoming_smtp_host: "0.0.0.0".to_string(),
-        incoming_smtp_port: 2525,
+    let config = Arc::new(ThreadSettings {
+        mail_domain: ("mailagents.com".to_string()).into(),
         max_spam_score: 5.0,
-        dnsbl_enabled: false,
-        dnsbl_servers: vec![],
-        smtp_rate_limit_conns_per_ip: 30,
-        reject_self_domain_helo: true,
-        enable_heuristic_scanner: true,
-        enable_spam_scanner: false,
-        spam_scanner_type: "rspamd".to_string(),
-        spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
-        secure_cookies: false,
-        gcs: None,
-        operator_emails: Vec::new(),
     });
 
     let thread_use_cases = ThreadUseCases::for_test(
@@ -716,33 +573,9 @@ async fn test_participant_sender_bypasses_spam_checks() {
 
     let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
-    let config = Arc::new(AppConfig {
-        jwt_secret: "secret".to_string(),
-        sendgrid_inbound: None,
-        resend_api: ResendApiConfig::default(),
-        refresh_token_ttl: time::Duration::days(30),
-        app_domain_name: "mailagents.com".to_string(),
-        cors_allowed_origins: vec![],
-        smtp_host: "localhost".to_string(),
-        smtp_port: 1025,
-        smtp_username: "".to_string(),
-        smtp_password: "".to_string(),
-        smtp_from_address: "noreply@mailagents.com".to_string(),
-        incoming_smtp_enabled: true,
-        incoming_smtp_host: "0.0.0.0".to_string(),
-        incoming_smtp_port: 2525,
+    let config = Arc::new(ThreadSettings {
+        mail_domain: ("mailagents.com".to_string()).into(),
         max_spam_score: 5.0,
-        dnsbl_enabled: false,
-        dnsbl_servers: vec![],
-        smtp_rate_limit_conns_per_ip: 30,
-        reject_self_domain_helo: true,
-        enable_heuristic_scanner: true,
-        enable_spam_scanner: false,
-        spam_scanner_type: "rspamd".to_string(),
-        spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
-        secure_cookies: false,
-        gcs: None,
-        operator_emails: Vec::new(),
     });
 
     let thread_use_cases = ThreadUseCases::for_test(
@@ -808,33 +641,9 @@ async fn test_channel_in_cc_resolves_properly() {
 
     let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
-    let config = Arc::new(AppConfig {
-        jwt_secret: "secret".to_string(),
-        sendgrid_inbound: None,
-        resend_api: ResendApiConfig::default(),
-        refresh_token_ttl: time::Duration::days(30),
-        app_domain_name: "mailagents.com".to_string(),
-        cors_allowed_origins: vec![],
-        smtp_host: "localhost".to_string(),
-        smtp_port: 1025,
-        smtp_username: "".to_string(),
-        smtp_password: "".to_string(),
-        smtp_from_address: "noreply@mailagents.com".to_string(),
-        incoming_smtp_enabled: true,
-        incoming_smtp_host: "0.0.0.0".to_string(),
-        incoming_smtp_port: 2525,
+    let config = Arc::new(ThreadSettings {
+        mail_domain: ("mailagents.com".to_string()).into(),
         max_spam_score: 5.0,
-        dnsbl_enabled: false,
-        dnsbl_servers: vec![],
-        smtp_rate_limit_conns_per_ip: 30,
-        reject_self_domain_helo: true,
-        enable_heuristic_scanner: true,
-        enable_spam_scanner: false,
-        spam_scanner_type: "rspamd".to_string(),
-        spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
-        secure_cookies: false,
-        gcs: None,
-        operator_emails: Vec::new(),
     });
 
     let thread_use_cases = ThreadUseCases::for_test(
@@ -922,33 +731,9 @@ async fn test_multi_channel_to_and_cc_execution() {
 
     let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
-    let config = Arc::new(AppConfig {
-        jwt_secret: "secret".to_string(),
-        sendgrid_inbound: None,
-        resend_api: ResendApiConfig::default(),
-        refresh_token_ttl: time::Duration::days(30),
-        app_domain_name: "mailagents.com".to_string(),
-        cors_allowed_origins: vec![],
-        smtp_host: "localhost".to_string(),
-        smtp_port: 1025,
-        smtp_username: "".to_string(),
-        smtp_password: "".to_string(),
-        smtp_from_address: "noreply@mailagents.com".to_string(),
-        incoming_smtp_enabled: true,
-        incoming_smtp_host: "0.0.0.0".to_string(),
-        incoming_smtp_port: 2525,
+    let config = Arc::new(ThreadSettings {
+        mail_domain: ("mailagents.com".to_string()).into(),
         max_spam_score: 5.0,
-        dnsbl_enabled: false,
-        dnsbl_servers: vec![],
-        smtp_rate_limit_conns_per_ip: 30,
-        reject_self_domain_helo: true,
-        enable_heuristic_scanner: true,
-        enable_spam_scanner: false,
-        spam_scanner_type: "rspamd".to_string(),
-        spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
-        secure_cookies: false,
-        gcs: None,
-        operator_emails: Vec::new(),
     });
 
     let thread_use_cases = ThreadUseCases::for_test(
@@ -1079,33 +864,9 @@ async fn test_pipeline_address_chaining_execution() {
 
     let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
-    let config = Arc::new(AppConfig {
-        jwt_secret: "secret".to_string(),
-        sendgrid_inbound: None,
-        resend_api: ResendApiConfig::default(),
-        refresh_token_ttl: time::Duration::days(30),
-        app_domain_name: "mailagents.com".to_string(),
-        cors_allowed_origins: vec![],
-        smtp_host: "localhost".to_string(),
-        smtp_port: 1025,
-        smtp_username: "".to_string(),
-        smtp_password: "".to_string(),
-        smtp_from_address: "noreply@mailagents.com".to_string(),
-        incoming_smtp_enabled: true,
-        incoming_smtp_host: "0.0.0.0".to_string(),
-        incoming_smtp_port: 2525,
+    let config = Arc::new(ThreadSettings {
+        mail_domain: ("mailagents.com".to_string()).into(),
         max_spam_score: 5.0,
-        dnsbl_enabled: false,
-        dnsbl_servers: vec![],
-        smtp_rate_limit_conns_per_ip: 30,
-        reject_self_domain_helo: true,
-        enable_heuristic_scanner: true,
-        enable_spam_scanner: false,
-        spam_scanner_type: "rspamd".to_string(),
-        spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
-        secure_cookies: false,
-        gcs: None,
-        operator_emails: Vec::new(),
     });
 
     let thread_use_cases = ThreadUseCases::for_test(
@@ -1197,33 +958,9 @@ async fn test_misspelled_channel_bounce_and_strict_pipeline_validation() {
 
     let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
-    let config = Arc::new(AppConfig {
-        jwt_secret: "secret".to_string(),
-        sendgrid_inbound: None,
-        resend_api: ResendApiConfig::default(),
-        refresh_token_ttl: time::Duration::days(30),
-        app_domain_name: "mailagents.com".to_string(),
-        cors_allowed_origins: vec![],
-        smtp_host: "".to_string(), // skip external SMTP in test
-        smtp_port: 1025,
-        smtp_username: "".to_string(),
-        smtp_password: "".to_string(),
-        smtp_from_address: "noreply@mailagents.com".to_string(),
-        incoming_smtp_enabled: true,
-        incoming_smtp_host: "0.0.0.0".to_string(),
-        incoming_smtp_port: 2525,
+    let config = Arc::new(ThreadSettings {
+        mail_domain: ("mailagents.com".to_string()).into(),
         max_spam_score: 5.0,
-        dnsbl_enabled: false,
-        dnsbl_servers: vec![],
-        smtp_rate_limit_conns_per_ip: 30,
-        reject_self_domain_helo: true,
-        enable_heuristic_scanner: true,
-        enable_spam_scanner: false,
-        spam_scanner_type: "rspamd".to_string(),
-        spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
-        secure_cookies: false,
-        gcs: None,
-        operator_emails: Vec::new(),
     });
 
     let thread_use_cases = ThreadUseCases::for_test(
@@ -1337,33 +1074,9 @@ async fn test_quote_stripping_rules_for_first_in_thread_and_forwarded_emails() {
 
     let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
-    let config = Arc::new(AppConfig {
-        jwt_secret: "secret".to_string(),
-        sendgrid_inbound: None,
-        resend_api: ResendApiConfig::default(),
-        refresh_token_ttl: time::Duration::days(30),
-        app_domain_name: "mailagents.com".to_string(),
-        cors_allowed_origins: vec![],
-        smtp_host: "localhost".to_string(),
-        smtp_port: 1025,
-        smtp_username: "".to_string(),
-        smtp_password: "".to_string(),
-        smtp_from_address: "noreply@mailagents.com".to_string(),
-        incoming_smtp_enabled: true,
-        incoming_smtp_host: "0.0.0.0".to_string(),
-        incoming_smtp_port: 2525,
+    let config = Arc::new(ThreadSettings {
+        mail_domain: ("mailagents.com".to_string()).into(),
         max_spam_score: 5.0,
-        dnsbl_enabled: false,
-        dnsbl_servers: vec![],
-        smtp_rate_limit_conns_per_ip: 30,
-        reject_self_domain_helo: true,
-        enable_heuristic_scanner: true,
-        enable_spam_scanner: false,
-        spam_scanner_type: "rspamd".to_string(),
-        spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
-        secure_cookies: false,
-        gcs: None,
-        operator_emails: Vec::new(),
     });
 
     let thread_use_cases = ThreadUseCases::for_test(
@@ -1515,33 +1228,9 @@ async fn test_participant_modes_company_team_public_and_explicit() {
 
     let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
-    let config = Arc::new(AppConfig {
-        jwt_secret: "secret".to_string(),
-        sendgrid_inbound: None,
-        resend_api: ResendApiConfig::default(),
-        refresh_token_ttl: time::Duration::days(30),
-        app_domain_name: "mailagents.com".to_string(),
-        cors_allowed_origins: vec![],
-        smtp_host: "localhost".to_string(),
-        smtp_port: 1025,
-        smtp_username: "".to_string(),
-        smtp_password: "".to_string(),
-        smtp_from_address: "noreply@mailagents.com".to_string(),
-        incoming_smtp_enabled: true,
-        incoming_smtp_host: "0.0.0.0".to_string(),
-        incoming_smtp_port: 2525,
+    let config = Arc::new(ThreadSettings {
+        mail_domain: ("mailagents.com".to_string()).into(),
         max_spam_score: 5.0,
-        dnsbl_enabled: false,
-        dnsbl_servers: vec![],
-        smtp_rate_limit_conns_per_ip: 30,
-        reject_self_domain_helo: true,
-        enable_heuristic_scanner: true,
-        enable_spam_scanner: false,
-        spam_scanner_type: "rspamd".to_string(),
-        spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
-        secure_cookies: false,
-        gcs: None,
-        operator_emails: Vec::new(),
     });
 
     let thread_use_cases = ThreadUseCases::for_test(
@@ -1655,33 +1344,9 @@ async fn test_sender_verification_refuses_strangers_replying_into_a_thread() {
 
     let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
-    let config = Arc::new(AppConfig {
-        jwt_secret: "secret".to_string(),
-        sendgrid_inbound: None,
-        resend_api: ResendApiConfig::default(),
-        refresh_token_ttl: time::Duration::days(30),
-        app_domain_name: "mailagents.com".to_string(),
-        cors_allowed_origins: vec![],
-        smtp_host: "localhost".to_string(),
-        smtp_port: 1025,
-        smtp_username: "".to_string(),
-        smtp_password: "".to_string(),
-        smtp_from_address: "noreply@mailagents.com".to_string(),
-        incoming_smtp_enabled: true,
-        incoming_smtp_host: "0.0.0.0".to_string(),
-        incoming_smtp_port: 2525,
+    let config = Arc::new(ThreadSettings {
+        mail_domain: ("mailagents.com".to_string()).into(),
         max_spam_score: 5.0,
-        dnsbl_enabled: false,
-        dnsbl_servers: vec![],
-        smtp_rate_limit_conns_per_ip: 30,
-        reject_self_domain_helo: true,
-        enable_heuristic_scanner: true,
-        enable_spam_scanner: false,
-        spam_scanner_type: "rspamd".to_string(),
-        spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
-        secure_cookies: false,
-        gcs: None,
-        operator_emails: Vec::new(),
     });
 
     let thread_use_cases = ThreadUseCases::for_test(
@@ -1805,7 +1470,7 @@ async fn uncorrelated_inter_channel_cycle_is_rejected() {
         channel_persistence,
         company_persistence.clone(),
         Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
-        internal_test_config(),
+        internal_test_settings(),
     );
 
     let disposition = relay_hop(
@@ -1891,7 +1556,7 @@ async fn a_hop_to_a_plain_channel_is_relayed() {
         channel_persistence,
         company_persistence.clone(),
         Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
-        internal_test_config(),
+        internal_test_settings(),
     );
 
     let disposition = relay_hop(
@@ -1968,7 +1633,7 @@ async fn inter_channel_max_hops_exceeded_is_rejected() {
         channel_persistence,
         company_persistence.clone(),
         Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
-        internal_test_config(),
+        internal_test_settings(),
     );
 
     let disposition = relay_hop(
@@ -2032,33 +1697,9 @@ async fn test_third_party_thread_participants_addition_and_authorization() {
 
     let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
-    let config = Arc::new(AppConfig {
-        jwt_secret: "secret".to_string(),
-        sendgrid_inbound: None,
-        resend_api: ResendApiConfig::default(),
-        refresh_token_ttl: time::Duration::days(30),
-        app_domain_name: "mailagents.com".to_string(),
-        cors_allowed_origins: vec![],
-        smtp_host: "localhost".to_string(),
-        smtp_port: 1025,
-        smtp_username: "".to_string(),
-        smtp_password: "".to_string(),
-        smtp_from_address: "noreply@mailagents.com".to_string(),
-        incoming_smtp_enabled: true,
-        incoming_smtp_host: "0.0.0.0".to_string(),
-        incoming_smtp_port: 2525,
+    let config = Arc::new(ThreadSettings {
+        mail_domain: ("mailagents.com".to_string()).into(),
         max_spam_score: 5.0,
-        dnsbl_enabled: false,
-        dnsbl_servers: vec![],
-        smtp_rate_limit_conns_per_ip: 30,
-        reject_self_domain_helo: true,
-        enable_heuristic_scanner: true,
-        enable_spam_scanner: false,
-        spam_scanner_type: "rspamd".to_string(),
-        spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
-        secure_cookies: false,
-        gcs: None,
-        operator_emails: Vec::new(),
     });
 
     let thread_use_cases = ThreadUseCases::for_test(
@@ -2235,33 +1876,9 @@ async fn test_context_only_quiet_mode_ingestion() {
 
     let thread_persistence = Arc::new(InMemoryThreads::for_company(company_id));
 
-    let config = Arc::new(AppConfig {
-        jwt_secret: "secret".to_string(),
-        sendgrid_inbound: None,
-        resend_api: ResendApiConfig::default(),
-        refresh_token_ttl: time::Duration::days(30),
-        app_domain_name: "mailagents.com".to_string(),
-        cors_allowed_origins: vec![],
-        smtp_host: "localhost".to_string(),
-        smtp_port: 1025,
-        smtp_username: "".to_string(),
-        smtp_password: "".to_string(),
-        smtp_from_address: "noreply@mailagents.com".to_string(),
-        incoming_smtp_enabled: true,
-        incoming_smtp_host: "0.0.0.0".to_string(),
-        incoming_smtp_port: 2525,
+    let config = Arc::new(ThreadSettings {
+        mail_domain: ("mailagents.com".to_string()).into(),
         max_spam_score: 5.0,
-        dnsbl_enabled: false,
-        dnsbl_servers: vec![],
-        smtp_rate_limit_conns_per_ip: 30,
-        reject_self_domain_helo: true,
-        enable_heuristic_scanner: true,
-        enable_spam_scanner: false,
-        spam_scanner_type: "rspamd".to_string(),
-        spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
-        secure_cookies: false,
-        gcs: None,
-        operator_emails: Vec::new(),
     });
 
     let thread_use_cases = ThreadUseCases::for_test(
@@ -2382,10 +1999,10 @@ impl ChannelFixture {
 }
 
 fn channel_fixture(spec: TestChannel) -> ChannelFixture {
-    channel_fixture_with_config(spec, internal_test_config())
+    channel_fixture_with_settings(spec, internal_test_settings())
 }
 
-fn channel_fixture_with_config(spec: TestChannel, config: Arc<AppConfig>) -> ChannelFixture {
+fn channel_fixture_with_settings(spec: TestChannel, config: Arc<ThreadSettings>) -> ChannelFixture {
     let TestChannel {
         enabled,
         add_3rd_party,
@@ -2596,16 +2213,8 @@ async fn ingress_rejections_create_no_identity_thread_message_task_delivery_or_a
     );
     assert_eq!(adapter_failures.durable_counts(), before);
 
-    let mut storage_config = internal_test_config();
-    Arc::get_mut(&mut storage_config).unwrap().gcs = Some(crate::infra::config::GcsConfig {
-        bucket: "public".into(),
-        service_account_json_base64: "unused-by-fake".into(),
-        public_base_url_override: None,
-        avatar_folder: "avatars".into(),
-        attachments_bucket: Some("private".into()),
-        attachments_folder: "attachments".into(),
-    });
-    let storage_fixture = channel_fixture_with_config(TestChannel::default(), storage_config);
+    let storage_fixture =
+        channel_fixture_with_settings(TestChannel::default(), internal_test_settings());
     let storage = crate::adapters::storage::test_support::FakeStorage::new();
     let mut rejected_attachment = rejection_message("reject-before-upload");
     rejected_attachment.from = "unauthorized@example.net".into();
@@ -2617,8 +2226,8 @@ async fn ingress_rejections_create_no_identity_thread_message_task_delivery_or_a
             stored_key: None,
         },
     ];
-    let accepted = crate::adapters::protocols::email::EmailIngressAdapter::for_config(
-        storage_fixture.use_cases.config(),
+    let accepted = crate::adapters::protocols::email::EmailIngressAdapter::new(
+        &storage_fixture.use_cases.settings.mail_domain,
     )
     .accept(
         rejected_attachment,
@@ -3207,7 +2816,7 @@ fn use_cases_with_directory(specs: Vec<DirectoryChannel>) -> ThreadUseCases {
         }),
         company_persistence.clone(),
         Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
-        internal_test_config(),
+        internal_test_settings(),
     )
 }
 
@@ -3636,7 +3245,7 @@ async fn send_reply_in_thread_with_prior_agent_turn_stays_in_same_thread() {
         channel_persistence,
         company_persistence.clone(),
         Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
-        internal_test_config(),
+        internal_test_settings(),
     );
 
     let first = thread_use_cases
@@ -3734,7 +3343,7 @@ async fn external_email_cannot_use_mailagents_thread_id_header_to_inject() {
         channel_persistence,
         company_persistence.clone(),
         Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
-        internal_test_config(),
+        internal_test_settings(),
     );
 
     let first = thread_use_cases
@@ -3812,7 +3421,7 @@ async fn ingest_canonical_threads_correctly_with_target_thread_and_reply_to() {
         channel_persistence,
         company_persistence.clone(),
         Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
-        internal_test_config(),
+        internal_test_settings(),
     );
 
     // 1. Compose a new thread canonical message

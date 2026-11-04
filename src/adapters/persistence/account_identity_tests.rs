@@ -9,27 +9,32 @@ use std::sync::Arc;
 use chrono::Utc;
 use uuid::Uuid;
 
-use crate::{
-    adapters::{persistence::PostgresPersistence, protocols::email::EmailIdentity},
-    app_error::AppError,
-    entities::{
-        company_member::{CompanyAccessRole, CompanyMembership},
-        participant::{IdentityClaimMetadata, IdentityProvenance, PrincipalAccessContext},
-        transport::QualifiedIdentity,
-        user::User,
-        value_objects::EmailAddress,
-    },
-    use_cases::{
-        channel::{ChannelPersistence, ChannelWrite},
-        company::{CompanyPersistence, CompanyWrite},
-        company_invite::CompanyInvitePersistence,
-        participant::{IdentityDirectory, IdentityObservation, PrincipalAccessPersistence},
-        user::{
-            AccountChange, AccountChangeKind, AccountChangePersistence, PendingAccountChange,
-            ProfileUpdate, UserPersistence, auth_attempt_key,
-        },
-    },
-};
+use crate::adapters::persistence::PostgresPersistence;
+use crate::adapters::protocols::email::EmailIdentity;
+use crate::app_error::AppError;
+use crate::application::ports::channel::ChannelPersistence;
+use crate::application::ports::channel::ChannelWrite;
+use crate::application::ports::participant::IdentityObservation;
+use crate::application::ports::participant::PrincipalAccessPersistence;
+use crate::entities::company_member::CompanyAccessRole;
+use crate::entities::company_member::CompanyMembership;
+use crate::entities::participant::IdentityClaimMetadata;
+use crate::entities::participant::IdentityProvenance;
+use crate::entities::participant::PrincipalAccessContext;
+use crate::entities::transport::QualifiedIdentity;
+use crate::entities::user::User;
+use crate::entities::value_objects::EmailAddress;
+use crate::use_cases::company::CompanyPersistence;
+use crate::use_cases::company::CompanyWrite;
+use crate::use_cases::company_invite::CompanyInvitePersistence;
+use crate::use_cases::participant::IdentityDirectory;
+use crate::use_cases::user::AccountChange;
+use crate::use_cases::user::AccountChangeKind;
+use crate::use_cases::user::AccountChangePersistence;
+use crate::use_cases::user::PendingAccountChange;
+use crate::use_cases::user::ProfileUpdate;
+use crate::use_cases::user::UserPersistence;
+use crate::use_cases::user::auth_attempt_key;
 
 use super::super::test_support::test_pool;
 

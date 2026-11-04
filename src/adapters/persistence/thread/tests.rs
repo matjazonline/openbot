@@ -383,11 +383,11 @@ async fn derived_attachments_cannot_publish_a_private_source() {
     assert!(refused.is_err());
     fixture.cleanup().await;
 }
+use crate::application::ports::thread::MessageAuthorWrite;
+use crate::application::ports::thread::MessageCorrelation;
+use crate::application::ports::thread::MessageWrite;
 use crate::transport::ExternalCorrelationStore;
-use crate::use_cases::{
-    company::CompanyPersistence,
-    thread::{MessageAuthorWrite, MessageCorrelation, MessageWrite},
-};
+use crate::use_cases::company::CompanyPersistence;
 
 /// The heart of the canonical store: one payload, many conversations -- and never a conversation
 /// belonging to somebody else.

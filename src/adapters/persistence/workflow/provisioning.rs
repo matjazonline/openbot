@@ -14,8 +14,8 @@ use crate::adapters::persistence::channel::{
     insert_channel_row_on, insert_channel_slugs, write_channel_email_binding,
 };
 use crate::adapters::persistence::participant::create_agent_principal_on;
+use crate::application::ports::channel::ChannelWrite;
 use crate::application::use_cases::agent::{AgentWrite, model_allowed};
-use crate::application::use_cases::channel::ChannelWrite;
 use crate::application::workflow::actions::*;
 use crate::application::workflow::binding::{ResourceReadiness, ResourceStatus};
 use crate::application::workflow::compiler::{

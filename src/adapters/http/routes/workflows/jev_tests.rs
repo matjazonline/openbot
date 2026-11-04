@@ -8,7 +8,7 @@ async fn jev_connection_routes_owner_admin_scope_revision_and_secret_free_views(
         f.persistence.pool().clone(),
         CredentialCipher::for_test(),
     );
-    f.engine = Arc::new(WorkflowEngine::for_tests(f.persistence.clone()));
+    f.engine = crate::infra::workflow::WorkflowEngine::for_tests(f.persistence.clone()).services();
     let create = |user| {
         jev::create(
             f.state(),

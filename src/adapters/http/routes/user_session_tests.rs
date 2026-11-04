@@ -44,7 +44,7 @@ async fn security_auth_limits_hash_overload_reaches_html_and_json_routes() {
             id: uuid::Uuid::new_v4(),
             create_error: None,
         }),
-        "test-attempt-secret",
+        ("test-attempt-secret").into(),
     )));
     let jobs: Vec<_> = (0..4)
         .map(|_| {

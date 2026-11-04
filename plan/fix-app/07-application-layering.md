@@ -63,7 +63,9 @@ There are no schema changes.
 
 **Change:**
 - Hash codes through the keyed helper the attempt keys already use (`auth_attempt_key`, with
-  `attempt_secret`). Give each kind of hash its own domain label, so no new secret is added.
+  `attempt_secret`). Give each kind of hash its own domain label.
+- User decision I006/r1: add required `AUTH_ATTEMPT_SECRET`, independent of `JWT_SECRET`, for
+  attempts and confirmation codes. Keep it stable during JWT rotation; use no JWT fallback.
 - Read that helper first, and confirm it is an HMAC.
 
 **Tests:**

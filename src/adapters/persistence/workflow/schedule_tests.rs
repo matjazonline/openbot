@@ -6,7 +6,8 @@ use crate::adapters::monitoring::in_memory_monitor::InMemoryMonitor;
 use crate::adapters::persistence::workflow::schedule_test_support::{
     bind, publish, schedule_use_cases, source,
 };
-use crate::application::use_cases::channel::{ChannelPersistence, ChannelWrite};
+use crate::application::ports::channel::ChannelPersistence;
+use crate::application::ports::channel::ChannelWrite;
 use crate::application::use_cases::schedule::{SchedulePersistence, ScheduleUseCases};
 use crate::application::workflow::manual::{self, StartRun};
 use crate::application::workflow::message_admission::WorkflowAdmitter;

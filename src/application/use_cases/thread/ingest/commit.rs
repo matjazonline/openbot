@@ -182,18 +182,23 @@ const fn inbound_origin(origin: IngressOrigin) -> InboundOrigin {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        entities::{
-            channel::{Channel, ChannelAccessMode, ParticipantAccess},
-            company::Company,
-            creation::CreationProvenance,
-            transport::{
-                ChannelBindingId, ExternalMessageKey, ExternalThreadKey, IdentityNamespace,
-                IdentitySubject, QualifiedIdentity, RecipientRole, TransportKind,
-            },
-        },
-        transport::{IngressDirectives, IngressPolicyFacts, PipelineStep, ProtocolExtension},
-    };
+    use crate::application::ports::thread::ProtocolExtension;
+    use crate::entities::channel::Channel;
+    use crate::entities::channel::ChannelAccessMode;
+    use crate::entities::channel::ParticipantAccess;
+    use crate::entities::company::Company;
+    use crate::entities::creation::CreationProvenance;
+    use crate::entities::transport::ChannelBindingId;
+    use crate::entities::transport::ExternalMessageKey;
+    use crate::entities::transport::ExternalThreadKey;
+    use crate::entities::transport::IdentityNamespace;
+    use crate::entities::transport::IdentitySubject;
+    use crate::entities::transport::QualifiedIdentity;
+    use crate::entities::transport::RecipientRole;
+    use crate::entities::transport::TransportKind;
+    use crate::transport::IngressDirectives;
+    use crate::transport::IngressPolicyFacts;
+    use crate::transport::PipelineStep;
     use chrono::Utc;
 
     fn company() -> Company {

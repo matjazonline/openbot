@@ -24,7 +24,7 @@ use crate::{
         lifecycle::LifecycleError,
     },
     domain::workflow::CompanyId,
-    infra::workflow::WorkflowEngine,
+    infra::workflow::WorkflowServices,
 };
 
 mod bindings;
@@ -227,7 +227,7 @@ fn company(id: Uuid) -> CompanyId {
 
 /// Owner/admin of the company who can see `association`; otherwise the record is not found.
 async fn authorize(
-    engine: &WorkflowEngine,
+    engine: &WorkflowServices,
     company: CompanyId,
     actor: WorkflowActor,
     association: RelatedAssociation,
@@ -324,7 +324,7 @@ fn revision<T>(value: u64, parse: impl FnOnce(u64) -> Option<T>) -> AppResult<T>
 }
 
 /// The engine a workflow route runs over, from the app state.
-pub type Engine = Arc<WorkflowEngine>;
+pub type Engine = Arc<WorkflowServices>;
 
 #[cfg(test)]
 #[path = "tests.rs"]

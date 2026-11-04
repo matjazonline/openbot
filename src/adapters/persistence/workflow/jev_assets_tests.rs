@@ -5,13 +5,13 @@ use crate::adapters::{
     storage::{BucketKind, FileStorage, test_support::FakeStorage},
     workflow_jev::{JevAssetReader, tests::server},
 };
-use crate::application::{
-    use_cases::channel::{ChannelPersistence, ChannelWrite},
-    workflow::{
-        jev::assets::tests as images, jev::*, lease::*, polling::WorkflowStepKind,
-        worker::WorkflowHandler,
-    },
-};
+use crate::application::ports::channel::ChannelPersistence;
+use crate::application::ports::channel::ChannelWrite;
+use crate::application::workflow::jev::assets::tests as images;
+use crate::application::workflow::jev::*;
+use crate::application::workflow::lease::*;
+use crate::application::workflow::polling::WorkflowStepKind;
+use crate::application::workflow::worker::WorkflowHandler;
 use crate::domain::entities::value_objects::ObjectKey;
 use serde_json::{Value, json};
 use std::time::Duration;

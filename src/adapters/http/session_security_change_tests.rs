@@ -19,7 +19,7 @@ async fn security_session_stolen_cookies_fail_after_password_change_and_new_logi
     let users = UserUseCases::new(
         Arc::new(test_support::TestHasher),
         persistence.clone(),
-        "attempt-key",
+        ("attempt-key").into(),
     );
     let sessions = SessionAuthority::new(&AppConfig::for_test(), persistence.clone());
     let current = sessions.cookie(&user).await.unwrap();

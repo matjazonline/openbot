@@ -7,10 +7,12 @@ use super::*;
 use crate::adapters::persistence::test_support::{
     own_database, test_pool, wait_until_a_backend_is_blocked,
 };
+use crate::application::ports::channel::ChannelPersistence;
+use crate::application::ports::channel::ChannelWrite;
+use crate::application::ports::participant::IdentityObservation;
 use crate::entities::participant::{IdentityClaimMetadata, IdentityProvenance};
-use crate::use_cases::channel::{ChannelPersistence, ChannelWrite};
 use crate::use_cases::company::{CompanyPersistence, CompanyWrite};
-use crate::use_cases::participant::{IdentityDirectory, IdentityObservation};
+use crate::use_cases::participant::IdentityDirectory;
 use crate::use_cases::user::UserPersistence;
 
 /// A company with one agent that has spoken in a thread to a customer.

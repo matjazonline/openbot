@@ -5,9 +5,9 @@
 //! email) its effect wait, and closes the step's attempt in the same commit. Provider I/O
 //! belongs to the delivery engine after commit. Handlers never see SMTP or SQL.
 use crate::app_error::{AppError, AppResult};
+use crate::application::ports::thread::MessageWrite;
 use crate::application::transport::queue::NewDelivery;
 use crate::application::transport::{BoundsError, CanonicalContent};
-use crate::application::use_cases::thread::MessageWrite;
 use crate::application::workflow::actions::*;
 use crate::application::workflow::lease::{ClaimedWorkflow, WorkflowFence};
 use crate::application::workflow::polling::WorkflowStepKind;

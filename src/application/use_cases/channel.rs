@@ -1,5 +1,8 @@
 use std::sync::Arc;
 
+use crate::application::ports::channel::{ChannelPersistence, ChannelUpdate, ChannelWrite};
+
+#[cfg(test)]
 use async_trait::async_trait;
 use tracing::{info, instrument};
 use uuid::Uuid;
@@ -17,31 +20,10 @@ use crate::{
         user::Viewer,
         value_objects::{ChannelSlug, CompanySlug},
     },
-    infra::config::AppConfig,
     use_cases::agent::SpamScanning,
     use_cases::company::{CompanyPersistence, managed_company},
     use_cases::participant::{ParticipantPersistence, observe_access_context},
 };
-
-/// Everything one channel write sets, so create and update cannot drift apart and so a caller
-/// cannot transpose two same-typed arguments in a nine-parameter list.
-///
-/// Values reach persistence already normalized — see [`ChannelWrite::normalize`].
-#[derive(Debug, Clone, Default)]
-pub struct ChannelWrite {
-    pub name: String,
-    /// What the channel is for, in one line. `None` and a blank string mean the same thing, so
-    /// every form boundary normalizes blank to `None` before building the write.
-    pub description: Option<String>,
-    pub slug: String,
-    /// Extra local parts the channel also answers on. Replaced wholesale by every write.
-    pub alias_slugs: Vec<String>,
-    pub participant_emails: Option<Vec<String>>,
-    pub enabled: bool,
-    /// Whether a trusted sender may pull CC'd outsiders onto this channel's threads.
-    pub add_3rd_party: bool,
-    pub created_by: Option<CreationProvenance>,
-}
 
 impl ChannelWrite {
     /// Trim and lower-case the fields that have canonical forms, and drop the blanks. Runs once,
@@ -127,37 +109,6 @@ pub fn channel_not_found() -> AppError {
     AppError::NotFound("Channel not found in this company.".into())
 }
 
-/// One authorized channel edit, as persistence receives it.
-///
-/// The tenant travels with the write rather than beside it: persistence re-checks the channel
-/// against `company_id` under its row lock.
-#[derive(Debug, Clone)]
-pub struct ChannelUpdate {
-    pub company_id: Uuid,
-    pub channel_id: Uuid,
-    pub write: ChannelWrite,
-}
-
-#[async_trait]
-pub trait ChannelPersistence: Send + Sync {
-    async fn create(&self, company_id: Uuid, write: ChannelWrite) -> AppResult<Channel>;
-
-    async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Channel>>;
-
-    async fn get_by_company_slug_and_channel_slug(
-        &self,
-        company_slug: &CompanySlug,
-        channel_slug: &ChannelSlug,
-    ) -> AppResult<Option<Channel>>;
-
-    async fn list_by_company_id(&self, company_id: Uuid) -> AppResult<Vec<Channel>>;
-
-    /// Save one channel edit under the channel's gate; any failure leaves it unchanged.
-    async fn update(&self, request: ChannelUpdate) -> AppResult<Channel>;
-
-    async fn delete(&self, id: Uuid) -> AppResult<()>;
-}
-
 /// The ports the channel read rule needs, borrowed from whichever use case asks.
 #[derive(Clone, Copy)]
 pub(crate) struct ChannelReaders<'a> {
@@ -224,7 +175,7 @@ pub(crate) async fn readable_channels(
 pub struct ChannelUseCases {
     company_persistence: Arc<dyn CompanyPersistence>,
     channel_persistence: Arc<dyn ChannelPersistence>,
-    config: Arc<AppConfig>,
+    spam_scanning: SpamScanning,
     participant_persistence: Arc<dyn ParticipantPersistence>,
 }
 
@@ -233,13 +184,13 @@ impl ChannelUseCases {
         company_persistence: Arc<dyn CompanyPersistence>,
         channel_persistence: Arc<dyn ChannelPersistence>,
         participant_persistence: Arc<dyn ParticipantPersistence>,
-        config: Arc<AppConfig>,
+        spam_scanning: SpamScanning,
     ) -> Self {
         Self {
             company_persistence,
             channel_persistence,
             participant_persistence,
-            config,
+            spam_scanning,
         }
     }
 
@@ -267,21 +218,12 @@ impl ChannelUseCases {
         self.channel_persistence.create(company_id, write).await
     }
 
-    /// This deployment's spam scanning, as the shared [`check_spam_interlock`] states it.
-    fn spam_scanning(&self) -> SpamScanning {
-        if self.config.is_spam_scan_enabled() {
-            SpamScanning::Available
-        } else {
-            SpamScanning::Unavailable
-        }
-    }
-
     fn check_spam_interlock(
         &self,
         write: &ChannelWrite,
         confirm_spam_disabled: bool,
     ) -> AppResult<()> {
-        check_spam_interlock(write, self.spam_scanning(), confirm_spam_disabled)
+        check_spam_interlock(write, self.spam_scanning, confirm_spam_disabled)
     }
 
     #[instrument(skip_all)]
@@ -699,35 +641,12 @@ mod tests {
         }
     }
 
-    fn test_config(spam_enabled: bool) -> Arc<AppConfig> {
-        Arc::new(AppConfig {
-            jwt_secret: "secret".to_string(),
-            sendgrid_inbound: None,
-            resend_api: crate::infra::config::ResendApiConfig::default(),
-            refresh_token_ttl: time::Duration::days(30),
-            app_domain_name: "mailagents.com".to_string(),
-            cors_allowed_origins: vec![],
-            smtp_host: "localhost".to_string(),
-            smtp_port: 1025,
-            smtp_username: "".to_string(),
-            smtp_password: "".to_string(),
-            smtp_from_address: "noreply@mailagents.com".to_string(),
-            incoming_smtp_enabled: false,
-            incoming_smtp_host: "0.0.0.0".to_string(),
-            incoming_smtp_port: 2525,
-            max_spam_score: 5.0,
-            dnsbl_enabled: false,
-            dnsbl_servers: vec![],
-            smtp_rate_limit_conns_per_ip: 30,
-            reject_self_domain_helo: true,
-            enable_heuristic_scanner: spam_enabled,
-            enable_spam_scanner: false,
-            spam_scanner_type: "rspamd".to_string(),
-            spam_scanner_url: "http://localhost:11333/checkv2".to_string(),
-            secure_cookies: false,
-            gcs: None,
-            operator_emails: Vec::new(),
-        })
+    fn test_scanning(spam_enabled: bool) -> SpamScanning {
+        if spam_enabled {
+            SpamScanning::Available
+        } else {
+            SpamScanning::Unavailable
+        }
     }
 
     #[tokio::test]
@@ -771,7 +690,7 @@ mod tests {
                 channels: Mutex::new(vec![channel]),
             }),
             directory.clone(),
-            test_config(false),
+            test_scanning(false),
         );
         let mut viewer = Viewer {
             user_id: member_id,
@@ -825,7 +744,7 @@ mod tests {
             company_persistence.clone(),
             channel_persistence,
             Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
-            test_config(true),
+            test_scanning(true),
         );
 
         // The owner owns both companies, so this is a cross-tenant id, not an authorization miss.
@@ -932,7 +851,7 @@ mod tests {
             company_persistence.clone(),
             channel_persistence,
             Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
-            test_config(true),
+            test_scanning(true),
         );
 
         assert!(
@@ -1028,7 +947,7 @@ mod tests {
             company_persistence.clone(),
             channel_persistence,
             Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
-            test_config(true),
+            test_scanning(true),
         );
 
         // 1. Owner creates channel with participant emails and config
@@ -1337,7 +1256,7 @@ mod tests {
             company_persistence.clone(),
             channel_persistence,
             Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
-            test_config(true),
+            test_scanning(true),
         );
 
         let _ = use_cases
@@ -1359,7 +1278,8 @@ mod tests {
             .preview_inbound_route(
                 "acme".into(),
                 "support".into(),
-                crate::use_cases::thread::qualified_email_identity("customer@example.com").unwrap(),
+                crate::application::ports::thread::qualified_email_identity("customer@example.com")
+                    .unwrap(),
             )
             .await
             .unwrap();
@@ -1393,7 +1313,8 @@ mod tests {
             .preview_inbound_route(
                 "acme".into(),
                 "restricted".into(),
-                crate::use_cases::thread::qualified_email_identity("agent@example.com").unwrap(),
+                crate::application::ports::thread::qualified_email_identity("agent@example.com")
+                    .unwrap(),
             )
             .await
             .unwrap();
@@ -1406,8 +1327,10 @@ mod tests {
             .preview_inbound_route(
                 "acme".into(),
                 "restricted".into(),
-                crate::use_cases::thread::qualified_email_identity("stranger@external.com")
-                    .unwrap(),
+                crate::application::ports::thread::qualified_email_identity(
+                    "stranger@external.com",
+                )
+                .unwrap(),
             )
             .await
             .unwrap();
@@ -1444,7 +1367,7 @@ mod tests {
             company_persistence.clone(),
             channel_persistence,
             Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
-            test_config(false),
+            test_scanning(false),
         );
 
         // 1. Trying to create public channel (@public) without confirmation fails when spam scanning is disabled

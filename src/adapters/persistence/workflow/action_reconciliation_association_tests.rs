@@ -2,7 +2,8 @@
 use super::proof_tests::all_tables;
 use super::*;
 use crate::adapters::persistence::workflow::tests::admission_tests::admission_history_tests::Conversation;
-use crate::application::use_cases::channel::{ChannelPersistence, ChannelWrite};
+use crate::application::ports::channel::ChannelPersistence;
+use crate::application::ports::channel::ChannelWrite;
 use crate::application::workflow::{
     RelatedChannelId, RelatedThreadId, WorkflowAuthorization, WorkflowOperation,
 };

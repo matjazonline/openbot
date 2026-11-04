@@ -5,18 +5,16 @@
 use uuid::Uuid;
 
 use super::*;
-use crate::{
-    adapters::persistence::{
-        PostgresPersistence,
-        channel_gate::{ChannelGateAccess, ChannelGateKey, acquire_channel_gate_on},
-        test_support::test_pool,
-    },
-    use_cases::{
-        channel::{ChannelPersistence, ChannelWrite},
-        company::{CompanyPersistence, CompanyWrite},
-        user::UserPersistence,
-    },
-};
+use crate::adapters::persistence::PostgresPersistence;
+use crate::adapters::persistence::channel_gate::ChannelGateAccess;
+use crate::adapters::persistence::channel_gate::ChannelGateKey;
+use crate::adapters::persistence::channel_gate::acquire_channel_gate_on;
+use crate::adapters::persistence::test_support::test_pool;
+use crate::application::ports::channel::ChannelPersistence;
+use crate::application::ports::channel::ChannelWrite;
+use crate::use_cases::company::CompanyPersistence;
+use crate::use_cases::company::CompanyWrite;
+use crate::use_cases::user::UserPersistence;
 
 /// A company with an "edited" channel and an "elsewhere" channel whose address an edit can
 /// collide with.

@@ -1,0 +1,35 @@
+{
+  "commands": [
+    [
+      "runtime-auth-focused-r1",
+      [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--lib",
+        "--",
+        "auth_key_rotation",
+        "infra::workflow::tests",
+        "infra::setup::tests"
+      ]
+    ],
+    [
+      "main-lifecycle-r1",
+      [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--bin",
+        "open_bots"
+      ]
+    ]
+  ],
+  "environment": {
+    "DATABASE_URL": "postgres://mac02@127.0.0.1:55407/open_bots",
+    "TEST_DATABASE_URL": "postgres://mac02@127.0.0.1:55407/open_bots_test",
+    "CARGO_INCREMENTAL": "0",
+    "SQLX_OFFLINE": "true"
+  }
+}

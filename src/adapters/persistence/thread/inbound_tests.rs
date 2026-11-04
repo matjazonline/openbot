@@ -9,6 +9,11 @@ use super::*;
 use crate::adapters::persistence::channel_edit::{
     EditBudget, update_channel_on, update_channel_within,
 };
+use crate::application::ports::channel::ChannelPersistence;
+use crate::application::ports::channel::ChannelUpdate;
+use crate::application::ports::channel::ChannelWrite;
+use crate::application::ports::participant::IdentityObservation;
+use crate::application::ports::thread::ProtocolExtension;
 use crate::entities::{
     correlation::CorrelationId,
     email_message::EmailMessageMetadata,
@@ -20,17 +25,33 @@ use crate::entities::{
     },
     value_objects::MessageId,
 };
-use crate::transport::{
-    AddressedIdentity, AuthenticatedInboundEvent, BoundedVec, CanonicalContent,
-    ClaimedInboundEvent, CommitDisposition, ExternalCorrelationStore, InboundAdmissionIntent,
-    InboundCommitOutcome, InboundCommitRequest, InboundEnvelope, InboundEventInbox,
-    InboundEventPayload, InboundEventQueue, InboundMessageCommitter, InboundOrigin,
-    IngressDirectives, IngressPolicyFacts, PipelineStep, ProtocolExtension, RecipientRole,
-    ReplyDelivery, SafeHeaderFacts, ThreadAssociation, ThreadPrincipalIntent, ThreadTarget,
-    WorkerId,
-};
-use crate::use_cases::channel::{ChannelPersistence, ChannelUpdate, ChannelWrite};
-use crate::use_cases::participant::{IdentityDirectory, IdentityObservation};
+use crate::transport::AddressedIdentity;
+use crate::transport::AuthenticatedInboundEvent;
+use crate::transport::BoundedVec;
+use crate::transport::CanonicalContent;
+use crate::transport::ClaimedInboundEvent;
+use crate::transport::CommitDisposition;
+use crate::transport::ExternalCorrelationStore;
+use crate::transport::InboundAdmissionIntent;
+use crate::transport::InboundCommitOutcome;
+use crate::transport::InboundCommitRequest;
+use crate::transport::InboundEnvelope;
+use crate::transport::InboundEventInbox;
+use crate::transport::InboundEventPayload;
+use crate::transport::InboundEventQueue;
+use crate::transport::InboundMessageCommitter;
+use crate::transport::InboundOrigin;
+use crate::transport::IngressDirectives;
+use crate::transport::IngressPolicyFacts;
+use crate::transport::PipelineStep;
+use crate::transport::RecipientRole;
+use crate::transport::ReplyDelivery;
+use crate::transport::SafeHeaderFacts;
+use crate::transport::ThreadAssociation;
+use crate::transport::ThreadPrincipalIntent;
+use crate::transport::ThreadTarget;
+use crate::transport::WorkerId;
+use crate::use_cases::participant::IdentityDirectory;
 
 #[path = "inbound_multi_task_tests.rs"]
 mod multi_task_tests;

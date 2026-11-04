@@ -18,17 +18,20 @@ use axum::response::IntoResponse;
 use std::sync::Mutex;
 
 use super::*;
-use crate::{
-    adapters::persistence::{PostgresPersistence, test_support::test_pool},
-    entities::thread_activity::ThreadWorkSummary,
-    infra::events::{AttentionScope, AttentionWakeSource, ThreadScope},
-    use_cases::{
-        channel::{ChannelPersistence, ChannelWrite},
-        company::{CompanyPersistence, CompanyWrite},
-        thread::{InboundIngestPorts, ThreadPersistence, ThreadStores},
-        user::UserPersistence,
-    },
-};
+use crate::adapters::persistence::PostgresPersistence;
+use crate::adapters::persistence::test_support::test_pool;
+use crate::application::ports::channel::ChannelPersistence;
+use crate::application::ports::channel::ChannelWrite;
+use crate::application::ports::thread::ThreadPersistence;
+use crate::entities::thread_activity::ThreadWorkSummary;
+use crate::infra::events::AttentionScope;
+use crate::infra::events::AttentionWakeSource;
+use crate::infra::events::ThreadScope;
+use crate::use_cases::company::CompanyPersistence;
+use crate::use_cases::company::CompanyWrite;
+use crate::use_cases::thread::InboundIngestPorts;
+use crate::use_cases::thread::ThreadStores;
+use crate::use_cases::user::UserPersistence;
 
 /// How long a frame may take to arrive before the test gives up.
 ///
@@ -137,6 +140,7 @@ impl Frames {
 /// A deployment with no spam scanning, which is all these streams need.
 pub(in crate::adapters::http::routes) fn test_config() -> Arc<AppConfig> {
     Arc::new(AppConfig {
+        auth_attempt_secret: "a-distinct-auth-attempt-test-secret-02".into(),
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,
         resend_api: crate::infra::config::ResendApiConfig::default(),
@@ -291,7 +295,7 @@ impl Harness {
                 persistence.clone(),
                 persistence.clone(),
                 persistence.clone(),
-                config.clone(),
+                (config.clone()).spam_scanning(),
             )),
             threads: Arc::new(ThreadUseCases::new(
                 ThreadStores {
@@ -307,7 +311,7 @@ impl Harness {
                     standalone_deliveries: persistence.clone(),
                 },
                 renderers,
-                config.clone(),
+                (config.clone()).thread_settings(),
             )),
             activity: Arc::new(ScriptedActivity::default()),
             events: MailboxEvents::new(),

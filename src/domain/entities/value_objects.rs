@@ -98,6 +98,10 @@ macro_rules! string_newtype {
 // A company's URL slug, e.g. the `acme` in `support@acme.mailagents.com`.
 string_newtype!(CompanySlug);
 
+// Deployment mail domain and public application origin have distinct uses.
+string_newtype!(MailDomain);
+string_newtype!(PublicBaseUrl);
+
 // A model vendor selected independently from the model name it offers.
 string_newtype!(ModelProvider);
 

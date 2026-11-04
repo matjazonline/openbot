@@ -1,10 +1,11 @@
 use super::*;
+use crate::application::ports::thread::MessageAuthorWrite;
+use crate::application::ports::thread::MessageCorrelation;
+use crate::application::ports::thread::MessageParticipantWrite;
+use crate::application::ports::thread::qualified_email_identity;
 use crate::application::transport::{
     DeliveryComposer, DeliveryContext, DeliveryPurpose, DeliveryRequest, EmailDeliveryContext,
     EmailRelayTrace, EmailThreading,
-};
-use crate::application::use_cases::thread::{
-    MessageAuthorWrite, MessageCorrelation, MessageParticipantWrite, qualified_email_identity,
 };
 use crate::application::workflow::lease::{
     LeasePolicy, SuspendedWorkflow, WorkflowFailure, WorkflowHandlerOutcome,
@@ -12,7 +13,6 @@ use crate::application::workflow::lease::{
 use crate::application::workflow::worker::WorkflowHandler;
 use crate::domain::workflow::{FailureClass, FailureCode, RetrySafety, StepFailure};
 use crate::entities::channel::Channel;
-use crate::entities::email_message::EmailMessageMetadata;
 use crate::entities::message::{
     MessageDirection, MessageParticipantKind, MessageRole, ThreadEntryKind,
 };
@@ -249,45 +249,8 @@ where
             .map_err(|error| {
                 AppError::BadRequest(format!("Message delivery cannot be composed: {error}"))
             })?;
-        let provider_key = composed.provider_key.ok_or_else(|| {
-            AppError::BadRequest("Email delivery has no predicted Message-ID".into())
-        })?;
-        let (in_reply_to, references) = match &email.threading {
-            EmailThreading::Received {
-                in_reply_to,
-                references,
-            } => (Some(in_reply_to.clone()), references.clone()),
-            EmailThreading::Standalone | EmailThreading::Anchored(_) => (None, Vec::new()),
-        };
-        let message = MessageWrite {
-            id: message_id,
-            ..MessageWrite::internal(
-                email.thread_id,
-                MessageAuthorWrite::Platform,
-                content.subject().to_string(),
-                content.body_text().to_string(),
-                MessageDirection::Outbound,
-                MessageRole::System,
-                routes.correlation_id,
-            )
-        }
-        .external_conversation()
-        .with_participants(vec![
-            MessageParticipantWrite::new(
-                MessageParticipantKind::Sender,
-                qualified_email_identity(from.as_str())?,
-            ),
-            MessageParticipantWrite::new(
-                MessageParticipantKind::To,
-                qualified_email_identity(email.recipient.as_str())?,
-            ),
-        ])
-        .with_correlation(MessageCorrelation::Email(
-            EmailMessageMetadata::new(MessageId::from(provider_key.as_str().to_string()))
-                .in_reply_to(in_reply_to)
-                .references(references)
-                .raw_bodies(Some(content.body_text().to_string()), None),
-        ));
+        let message =
+            email.message_write(routes, content, from, message_id, composed.correlation)?;
         Ok(PlannedDestination {
             kind,
             destination_id,
@@ -316,6 +279,57 @@ struct EmailPlan {
     check: RouteCheck,
 }
 impl EmailPlan {
+    fn message_write(
+        &self,
+        routes: &MessageRoutes,
+        content: &CanonicalContent,
+        from: EmailAddress,
+        message_id: CanonicalMessageId,
+        correlation: crate::transport::ports::RenderedCorrelation,
+    ) -> AppResult<MessageWrite> {
+        let provider_key = correlation.provider_key.ok_or_else(|| {
+            AppError::BadRequest("Email delivery has no frozen Message-ID".into())
+        })?;
+        let crate::application::ports::thread::ProtocolExtension::Email {
+            version: 1,
+            metadata,
+        } = correlation.extension
+        else {
+            return Err(AppError::Internal(
+                "Email renderer returned non-email correlation".into(),
+            ));
+        };
+        if metadata.rfc_message_id.as_str() != provider_key.as_str() {
+            return Err(AppError::Internal(
+                "Frozen email correlation disagrees with its provider key".into(),
+            ));
+        }
+        Ok(MessageWrite {
+            id: message_id,
+            ..MessageWrite::internal(
+                self.thread_id,
+                MessageAuthorWrite::Platform,
+                content.subject().to_string(),
+                content.body_text().to_string(),
+                MessageDirection::Outbound,
+                MessageRole::System,
+                routes.correlation_id,
+            )
+        }
+        .external_conversation()
+        .with_participants(vec![
+            MessageParticipantWrite::new(
+                MessageParticipantKind::Sender,
+                qualified_email_identity(from.as_str())?,
+            ),
+            MessageParticipantWrite::new(
+                MessageParticipantKind::To,
+                qualified_email_identity(self.recipient.as_str())?,
+            ),
+        ])
+        .with_correlation(MessageCorrelation::Email(metadata)))
+    }
+
     fn of(target: &RouteTarget, content: &CanonicalContent) -> AppResult<Self> {
         match target {
             RouteTarget::User {

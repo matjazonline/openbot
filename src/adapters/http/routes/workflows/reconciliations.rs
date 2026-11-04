@@ -81,7 +81,7 @@ pub async fn reconcile(
 /// Record what happened to one action of `run` under the body's key; the command's recorded
 /// result, refusals included (a 409 outcome is a result, not an error).
 pub(super) async fn reconcile_command(
-    engine: &WorkflowEngine,
+    engine: &WorkflowServices,
     company_id: Uuid,
     actor: WorkflowActor,
     run: Uuid,

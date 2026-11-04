@@ -1,5 +1,6 @@
 use super::*;
-use crate::application::use_cases::channel::{ChannelPersistence, ChannelWrite};
+use crate::application::ports::channel::ChannelPersistence;
+use crate::application::ports::channel::ChannelWrite;
 use crate::domain::entities::message::CanonicalMessageId;
 
 async fn history_fixture() -> AdmissionFixture {

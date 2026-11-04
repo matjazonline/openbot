@@ -14,13 +14,13 @@ use crate::adapters::persistence::{
     delivery::enqueue::insert_delivery_on,
     test_support::{DeliveryFixtureRequest, delivery_fixture, test_pool},
 };
+use crate::application::ports::channel::ChannelPersistence;
+use crate::application::ports::channel::ChannelWrite;
+use crate::application::ports::thread::ThreadPersistence;
 use crate::services::dashboard_snapshot::DashboardSnapshotService;
-use crate::use_cases::{
-    channel::{ChannelPersistence, ChannelWrite},
-    company::{CompanyPersistence, CompanyWrite},
-    thread::ThreadPersistence,
-    user::UserPersistence,
-};
+use crate::use_cases::company::CompanyPersistence;
+use crate::use_cases::company::CompanyWrite;
+use crate::use_cases::user::UserPersistence;
 
 async fn test_persistence() -> Option<PostgresPersistence> {
     Some(PostgresPersistence::new(test_pool().await?))

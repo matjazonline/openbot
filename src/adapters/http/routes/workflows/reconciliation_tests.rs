@@ -26,7 +26,7 @@ impl Reconciling {
         let member = teammate(p, action.company, "member").await;
         let (stranger, other) = owner_and_company(p, "Elsewhere").await;
         Self {
-            engine: Arc::new(WorkflowEngine::for_tests(p.clone())),
+            engine: crate::infra::workflow::WorkflowEngine::for_tests(p.clone()).services(),
             action,
             member,
             stranger,
