@@ -1,0 +1,55 @@
+    Checking open_bots v0.1.0 (/Users/mac02/dev/openbot-recovery/.worktrees/fix-app-p07)
+warning: unused import: `crate::entities::transport::ExternalMessageKey`
+  --> src/application/transport/compose.rs:26:5
+   |
+26 | use crate::entities::transport::ExternalMessageKey;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+error[E0369]: binary operation `==` cannot be applied to type `RenderedCorrelation`
+   --> src/application/transport/compose.rs:103:5
+    |
+ 94 | #[derive(Debug, Clone, PartialEq, Eq)]
+    |                        --------- in this derive macro expansion
+...
+103 |     pub correlation: crate::transport::ports::RenderedCorrelation,
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+note: an implementation of `PartialEq` might be missing for `RenderedCorrelation`
+   --> src/application/transport/ports.rs:105:1
+    |
+105 | pub struct RenderedCorrelation {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ must implement `PartialEq`
+help: consider annotating `RenderedCorrelation` with `#[derive(PartialEq)]`
+   --> src/application/transport/ports.rs:105:1
+    |
+105 + #[derive(PartialEq)]
+106 | pub struct RenderedCorrelation {
+    |
+
+error[E0277]: the trait bound `RenderedCorrelation: std::cmp::Eq` is not satisfied
+   --> src/application/transport/compose.rs:103:5
+    |
+ 94 | #[derive(Debug, Clone, PartialEq, Eq)]
+    |                                   -- in this derive macro expansion
+...
+103 |     pub correlation: crate::transport::ports::RenderedCorrelation,
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `std::cmp::Eq` is not implemented for `RenderedCorrelation`
+    |
+note: required by a bound in `std::cmp::AssertParamIsEq`
+   --> /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/cmp.rs:379:0
+help: consider annotating `RenderedCorrelation` with `#[derive(Eq)]`
+   --> src/application/transport/ports.rs:105:1
+    |
+105 + #[derive(Eq)]
+106 | pub struct RenderedCorrelation {
+    |
+
+Some errors have detailed explanations: E0277, E0369.
+For more information about an error, try `rustc --explain E0277`.
+warning: `open_bots` (lib) generated 1 warning
+error: could not compile `open_bots` (lib) due to 2 previous errors; 1 warning emitted
+warning: build failed, waiting for other jobs to finish...
+warning: `open_bots` (lib test) generated 1 warning (1 duplicate)
+error: could not compile `open_bots` (lib test) due to 2 previous errors; 1 warning emitted

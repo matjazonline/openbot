@@ -1,0 +1,10 @@
+error: this file contains an unclosed delimiter
+   --> /Users/mac02/dev/openbot-recovery/.worktrees/fix-app-p07/src/application/use_cases/user/confirmation.rs:160:3
+    |
+ 17 | impl EmailConfirmation {
+    |                        - unclosed delimiter
+...
+160 | }
+    |  ^
+
+Error writing files: failed to resolve mod `confirmation`: cannot parse /Users/mac02/dev/openbot-recovery/.worktrees/fix-app-p07/src/application/use_cases/user/confirmation.rs

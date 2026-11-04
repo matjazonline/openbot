@@ -1,0 +1,15 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/dev/openbot-recovery/.worktrees/fix-app-p07)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 51s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-7b3508cbfb62bd10)
+
+running 7 tests
+test infra::workflow::tests::worker_slots_respect_the_pool ... ok
+test infra::setup::tests::security_session_metrics_export_under_startup_fly_and_example_filters ... ok
+test infra::workflow::tests::production_handler_covers_every_io_kind_or_refuses_it ... ok
+test infra::workflow::tests::production_admission_refuses_a_child_trigger ... ok
+test infra::workflow::tests::production_publication_refuses_memory_steps_and_captures_children ... ok
+test infra::workflow::tests::production_workers_stop_on_the_shutdown_token ... ok
+test adapters::persistence::auth_key_rotation_tests::auth_key_rotation_pending_codes_survive_jwt_rotation_with_the_independent_key ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 2688 filtered out; finished in 2.54s
+

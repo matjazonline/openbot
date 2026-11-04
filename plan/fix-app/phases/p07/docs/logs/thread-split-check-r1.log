@@ -1,0 +1,77 @@
+    Checking open_bots v0.1.0 (/Users/mac02/dev/openbot-recovery/.worktrees/fix-app-p07)
+warning: unused import: `crate::transport::AddressedRecipient`
+  --> src/application/use_cases/thread/mod.rs:48:5
+   |
+48 | use crate::transport::AddressedRecipient;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `crate::transport::AddressedTarget`
+  --> src/application/use_cases/thread/mod.rs:49:5
+   |
+49 | use crate::transport::AddressedTarget;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `crate::transport::InboundRouting`
+  --> src/application/use_cases/thread/mod.rs:57:5
+   |
+57 | use crate::transport::InboundRouting;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0308]: mismatched types
+   --> src/application/use_cases/thread/ingest/mod.rs:513:5
+    |
+511 |   ) -> AppResult<crate::transport::InboundRouting> {
+    |        ------------------------------------------- expected `std::result::Result<InboundRouting, application::app_error::AppError>` because of return type
+512 |       use crate::transport::{AddressedRecipient, AddressedTarget, InboundRouting, RecipientRole};
+513 | /     InboundRouting::parse(vec![AddressedRecipient {
+514 | |         role: RecipientRole::To,
+515 | |         handle,
+516 | |         target: AddressedTarget::Channels(vec![selector]),
+517 | |         disposition,
+518 | |     }])
+    | |_______^ expected `Result<InboundRouting, AppError>`, found `Result<InboundRouting, BoundsError>`
+    |
+    = note: expected enum `std::result::Result<_, application::app_error::AppError>`
+               found enum `std::result::Result<_, BoundsError>`
+help: use `?` to coerce and return an appropriate `Err`, and wrap the resulting value in `Ok` so the expression remains of type `Result`
+    |
+513 ~     Ok(InboundRouting::parse(vec![AddressedRecipient {
+514 |         role: RecipientRole::To,
+...
+517 |         disposition,
+518 ~     }])?)
+    |
+
+For more information about this error, try `rustc --explain E0308`.
+warning: `open_bots` (lib) generated 3 warnings
+error: could not compile `open_bots` (lib) due to 1 previous error; 3 warnings emitted
+warning: build failed, waiting for other jobs to finish...
+error[E0308]: mismatched types
+   --> src/application/use_cases/thread/ingest/mod.rs:513:5
+    |
+511 |   ) -> AppResult<crate::transport::InboundRouting> {
+    |        ------------------------------------------- expected `std::result::Result<InboundRouting, application::app_error::AppError>` because of return type
+512 |       use crate::transport::{AddressedRecipient, AddressedTarget, InboundRouting, RecipientRole};
+513 | /     InboundRouting::parse(vec![AddressedRecipient {
+514 | |         role: RecipientRole::To,
+515 | |         handle,
+516 | |         target: AddressedTarget::Channels(vec![selector]),
+517 | |         disposition,
+518 | |     }])
+    | |_______^ expected `Result<InboundRouting, AppError>`, found `Result<InboundRouting, BoundsError>`
+    |
+    = note: expected enum `std::result::Result<_, application::app_error::AppError>`
+               found enum `std::result::Result<_, bounded::BoundsError>`
+help: use `?` to coerce and return an appropriate `Err`, and wrap the resulting value in `Ok` so the expression remains of type `Result`
+    |
+513 ~     Ok(InboundRouting::parse(vec![AddressedRecipient {
+514 |         role: RecipientRole::To,
+...
+517 |         disposition,
+518 ~     }])?)
+    |
+
+warning: `open_bots` (lib test) generated 3 warnings (3 duplicates)
+error: could not compile `open_bots` (lib test) due to 1 previous error; 3 warnings emitted

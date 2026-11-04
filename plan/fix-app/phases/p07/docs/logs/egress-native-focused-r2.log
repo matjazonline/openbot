@@ -1,0 +1,26 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/dev/openbot-recovery/.worktrees/fix-app-p07)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2m 15s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-7b3508cbfb62bd10)
+
+running 5 tests
+test adapters::protocols::email::egress::tests::application_message_keys_are_owned_by_email_egress_and_qualified_by_company ... ok
+test adapters::protocols::email::egress::tests::frozen_correlation_reads_the_payload_even_with_a_different_renderer_domain ... ok
+test adapters::persistence::workflow::tests::message_tests::thread_tests::correlation_tests::workflow_message_anchored_metadata_matches_the_frozen_payload ... FAILED
+test adapters::persistence::workflow::tests::message_tests::thread_tests::workflow_message_thread_external_reply_answers_its_own_source ... ok
+test adapters::persistence::workflow::tests::message_tests::thread_tests::correlation_tests::workflow_message_invalid_frozen_correlation_creates_no_message_or_delivery ... ok
+
+failures:
+
+---- adapters::persistence::workflow::tests::message_tests::thread_tests::correlation_tests::workflow_message_anchored_metadata_matches_the_frozen_payload stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::thread_tests::correlation_tests::workflow_message_anchored_metadata_matches_the_frozen_payload' (29810507) panicked at src/adapters/persistence/workflow/message_correlation_tests.rs:47:25:
+anchored mail has its actual parent
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::workflow::tests::message_tests::thread_tests::correlation_tests::workflow_message_anchored_metadata_matches_the_frozen_payload
+
+test result: FAILED. 4 passed; 1 failed; 0 ignored; 0 measured; 2689 filtered out; finished in 3.26s
+
+error: test failed, to rerun pass `--lib`
