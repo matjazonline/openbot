@@ -1,0 +1,99 @@
+{
+  "file": "src/adapters/persistence/workflow/action_reconciliation_attribution_assertions.rs",
+  "entries": [
+    {
+      "name": "NativeGuard",
+      "kind": "struct",
+      "span": "L4-L9",
+      "signature": "struct NativeGuard"
+    },
+    {
+      "name": "guard_definitions",
+      "kind": "function",
+      "span": "L11-L44",
+      "signature": "fn guard_definitions() -> [NativeGuard; 5]"
+    },
+    {
+      "name": "native_catalog",
+      "kind": "function",
+      "span": "L46-L70",
+      "signature": "pub(super) async fn native_catalog(f: &AdmissionFixture) -> Value"
+    },
+    {
+      "name": "positive_fact",
+      "kind": "function",
+      "span": "L72-L118",
+      "signature": "fn positive_fact<'a>("
+    },
+    {
+      "name": "positive_links",
+      "kind": "function",
+      "span": "L120-L159",
+      "signature": "pub(super) fn positive_links("
+    },
+    {
+      "name": "positive_owner_delta",
+      "kind": "function",
+      "span": "L161-L202",
+      "signature": "fn positive_owner_delta(before: &Value, after: &Value, result: &ReconciliationResult)"
+    },
+    {
+      "name": "rows",
+      "kind": "function",
+      "span": "L204-L206",
+      "signature": "pub(super) fn rows<'a>(state: &'a Value, table: &str) -> &'a [Value]"
+    },
+    {
+      "name": "append",
+      "kind": "function",
+      "span": "L207-L221",
+      "signature": "pub(super) fn append<'a>("
+    },
+    {
+      "name": "scope",
+      "kind": "function",
+      "span": "L222-L225",
+      "signature": "fn scope(row: &Value, request: &ActionDispatchRequest, marker: Uuid)"
+    },
+    {
+      "name": "subject_scope",
+      "kind": "function",
+      "span": "L226-L241",
+      "signature": "pub(super) fn subject_scope(row: &Value, request: &ActionDispatchRequest)"
+    },
+    {
+      "name": "restore_owner",
+      "kind": "function",
+      "span": "L242-L252",
+      "signature": "fn restore_owner(normalized: &mut Value, before: &Value, table: &str, fields: &[&str])"
+    },
+    {
+      "name": "applied_fact",
+      "kind": "function",
+      "span": "L254-L288",
+      "signature": "fn applied_fact<'a>("
+    },
+    {
+      "name": "receipt_conflict",
+      "kind": "function",
+      "span": "L290-L309",
+      "signature": "fn receipt_conflict("
+    },
+    {
+      "name": "committed_conflict",
+      "kind": "function",
+      "span": "L311-L365",
+      "signature": "pub(super) fn committed_conflict("
+    },
+    {
+      "name": "command_audit",
+      "kind": "function",
+      "span": "L367-L410",
+      "signature": "fn command_audit<'a>("
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 16150
+  }
+}

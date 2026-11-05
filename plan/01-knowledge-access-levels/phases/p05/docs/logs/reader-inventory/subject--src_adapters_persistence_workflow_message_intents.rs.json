@@ -1,0 +1,44 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 4,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_intents.rs#trigger_input",
+        "name": "trigger_input",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_intents.rs",
+        "span": "L227-L250"
+      },
+      "path": "src/adapters/persistence/workflow/message_intents.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 228,
+          "text": "let (subject, body, sender): (String, String, Option<String>) = sqlx::query_as("
+        },
+        {
+          "line": 229,
+          "text": "\"SELECT message.subject, message.clean_text_body, \\"
+        },
+        {
+          "line": 230,
+          "text": "COALESCE((SELECT identity.subject FROM message_participants AS participant \\"
+        },
+        {
+          "line": 247,
+          "text": "&subject,"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 17567
+  }
+}

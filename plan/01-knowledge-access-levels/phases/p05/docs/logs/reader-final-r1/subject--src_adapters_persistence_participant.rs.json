@@ -1,0 +1,251 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 20,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/participant.rs#resolve_or_create_external_identity_on",
+        "name": "resolve_or_create_external_identity_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/participant.rs",
+        "span": "L270-L322"
+      },
+      "path": "src/adapters/persistence/participant.rs",
+      "inDegree": 5,
+      "hits": [
+        {
+          "line": 285,
+          "text": "observation.identity.subject().as_str(),"
+        },
+        {
+          "line": 302,
+          "text": "(id, company_id, principal_id, transport, namespace, subject, display_label,"
+        },
+        {
+          "line": 311,
+          "text": ".bind(observation.identity.subject().as_str())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/participant.rs#lock_identity_key",
+        "name": "lock_identity_key",
+        "kind": "function",
+        "path": "src/adapters/persistence/participant.rs",
+        "span": "L196-L213"
+      },
+      "path": "src/adapters/persistence/participant.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 208,
+          "text": ".bind(identity.subject().as_str())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/participant.rs#upsert_account_identity_on",
+        "name": "upsert_account_identity_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/participant.rs",
+        "span": "L227-L268"
+      },
+      "path": "src/adapters/persistence/participant.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 239,
+          "text": "(id, company_id, principal_id, transport, namespace, subject, display_label,"
+        },
+        {
+          "line": 242,
+          "text": "ON CONFLICT (company_id, transport, namespace, subject) DO UPDATE SET"
+        },
+        {
+          "line": 261,
+          "text": ".bind(identity.subject().as_str())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/participant.rs#create_person_principal_on",
+        "name": "create_person_principal_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/participant.rs",
+        "span": "L330-L411"
+      },
+      "path": "src/adapters/persistence/participant.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 347,
+          "text": "AND identity.namespace = $2 AND identity.subject = $3"
+        },
+        {
+          "line": 352,
+          "text": ".bind(qualified.subject().as_str())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/participant.rs#load_resolution",
+        "name": "load_resolution",
+        "kind": "function",
+        "path": "src/adapters/persistence/participant.rs",
+        "span": "L162-L192"
+      },
+      "path": "src/adapters/persistence/participant.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 168,
+          "text": "\"{IDENTITY_SELECT} WHERE company_id = $1 AND transport = $2 AND namespace = $3 AND subject = $4\""
+        },
+        {
+          "line": 174,
+          "text": ".bind(identity.subject().as_str())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/participant.rs#access_context_for_identity",
+        "name": "access_context_for_identity",
+        "kind": "function",
+        "path": "src/adapters/persistence/participant.rs",
+        "span": "L534-L572"
+      },
+      "path": "src/adapters/persistence/participant.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 547,
+          "text": "WHERE identity.company_id=$1 AND identity.transport=$2 AND identity.namespace=$3 AND identity.subject=$4\"#)"
+        },
+        {
+          "line": 549,
+          "text": ".bind(identity.subject().as_str()).fetch_optional(&self.pool).await?;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/participant.rs#IdentityDb",
+        "name": "IdentityDb",
+        "kind": "struct",
+        "path": "src/adapters/persistence/participant.rs",
+        "span": "L64-L77"
+      },
+      "path": "src/adapters/persistence/participant.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 70,
+          "text": "subject: String,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/participant.rs#try_from~2",
+        "name": "try_from~2",
+        "kind": "function",
+        "path": "src/adapters/persistence/participant.rs",
+        "span": "L82-L136"
+      },
+      "path": "src/adapters/persistence/participant.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 113,
+          "text": "subject: IdentitySubject::parse(row.subject).map_err(|error| {"
+        },
+        {
+          "line": 115,
+          "text": "\"Invalid participant_identities.subject for {}: {error}\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/participant.rs#IDENTITY_SELECT",
+        "name": "IDENTITY_SELECT",
+        "kind": "constant",
+        "path": "src/adapters/persistence/participant.rs",
+        "span": "L144-L148"
+      },
+      "path": "src/adapters/persistence/participant.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 145,
+          "text": "SELECT id, company_id, principal_id, transport, namespace, subject, display_label, status,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/participant.rs#the_database_rejects_every_cross_tenant_participant_row",
+        "name": "the_database_rejects_every_cross_tenant_participant_row",
+        "kind": "function",
+        "path": "src/adapters/persistence/participant.rs",
+        "span": "L659-L728"
+      },
+      "path": "src/adapters/persistence/participant.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 691,
+          "text": "(id, company_id, principal_id, transport, namespace, subject, status,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/participant.rs#tests",
+        "name": "tests",
+        "kind": "module",
+        "path": "src/adapters/persistence/participant.rs",
+        "span": "L607-L891"
+      },
+      "path": "src/adapters/persistence/participant.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 783,
+          "text": "/// A subject is only unique inside its namespace. Two Slack workspaces can hand out the same"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/participant.rs#the_same_subject_in_two_namespaces_does_not_collide",
+        "name": "the_same_subject_in_two_namespaces_does_not_collide",
+        "kind": "function",
+        "path": "src/adapters/persistence/participant.rs",
+        "span": "L786-L811"
+      },
+      "path": "src/adapters/persistence/participant.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 786,
+          "text": "async fn the_same_subject_in_two_namespaces_does_not_collide() {"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 34796
+  }
+}

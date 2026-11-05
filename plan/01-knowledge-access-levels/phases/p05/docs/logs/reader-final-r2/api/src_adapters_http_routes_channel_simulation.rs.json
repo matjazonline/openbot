@@ -1,0 +1,135 @@
+{
+  "file": "src/adapters/http/routes/channel/simulation.rs",
+  "entries": [
+    {
+      "name": "simulate_channel_page",
+      "kind": "function",
+      "span": "L9-L64",
+      "signature": "pub(super) async fn simulate_channel_page("
+    },
+    {
+      "name": "simulation_scope",
+      "kind": "function",
+      "span": "L69-L82",
+      "signature": "async fn simulation_scope("
+    },
+    {
+      "name": "SimulationTarget",
+      "kind": "struct",
+      "span": "L86-L90",
+      "signature": "struct SimulationTarget<'a>"
+    },
+    {
+      "name": "load_simulation_thread_fragment",
+      "kind": "function",
+      "span": "L94-L151",
+      "signature": "async fn load_simulation_thread_fragment("
+    },
+    {
+      "name": "simulation_thread_url",
+      "kind": "function",
+      "span": "L154-L156",
+      "signature": "fn simulation_thread_url(company_id: Uuid, channel_id: Uuid, thread_id: Uuid) -> String"
+    },
+    {
+      "name": "simulate_channel_handler",
+      "kind": "function",
+      "span": "L164-L213",
+      "signature": "pub(super) async fn simulate_channel_handler("
+    },
+    {
+      "name": "SimulationCommand",
+      "kind": "struct",
+      "span": "L215-L224",
+      "signature": "struct SimulationCommand<'a>"
+    },
+    {
+      "name": "PreviewRecipient",
+      "kind": "struct",
+      "span": "L225-L229",
+      "signature": "struct PreviewRecipient"
+    },
+    {
+      "name": "failure",
+      "kind": "function",
+      "span": "L231-L245",
+      "signature": "fn failure(&self, sender: &str, message: impl AsRef<str>) -> Response"
+    },
+    {
+      "name": "preview_recipient",
+      "kind": "function",
+      "span": "L246-L266",
+      "signature": "fn preview_recipient(&self, sender: &str) -> Result<PreviewRecipient, String>"
+    },
+    {
+      "name": "verify",
+      "kind": "function",
+      "span": "L267-L300",
+      "signature": "async fn verify(&self) -> Response"
+    },
+    {
+      "name": "payload",
+      "kind": "function",
+      "span": "L301-L311",
+      "signature": "fn payload(&self, sender: &str) -> RawInboundPayload"
+    },
+    {
+      "name": "run",
+      "kind": "function",
+      "span": "L312-L364",
+      "signature": "async fn run(&self, mode: SimulationMode) -> Response"
+    },
+    {
+      "name": "simulation_stream",
+      "kind": "function",
+      "span": "L379-L454",
+      "signature": "pub(super) async fn simulation_stream("
+    },
+    {
+      "name": "compose_and_ingest",
+      "kind": "function",
+      "span": "L468-L479",
+      "signature": "pub(crate) async fn compose_and_ingest("
+    },
+    {
+      "name": "delivery_for",
+      "kind": "function",
+      "span": "L482-L488",
+      "signature": "fn delivery_for(mode: SimulationMode) -> ReplyDelivery"
+    },
+    {
+      "name": "simulation_recipient_matches",
+      "kind": "function",
+      "span": "L491-L509",
+      "signature": "fn simulation_recipient_matches("
+    },
+    {
+      "name": "OpenSimulatedThreadContext",
+      "kind": "struct",
+      "span": "L511-L520",
+      "signature": "pub(super) struct OpenSimulatedThreadContext"
+    },
+    {
+      "name": "open_simulated_thread_logic",
+      "kind": "function",
+      "span": "L522-L566",
+      "signature": "pub(super) async fn open_simulated_thread_logic("
+    },
+    {
+      "name": "open_simulated_thread_get",
+      "kind": "function",
+      "span": "L573-L598",
+      "signature": "pub(super) async fn open_simulated_thread_get("
+    },
+    {
+      "name": "open_simulated_thread_post",
+      "kind": "function",
+      "span": "L605-L630",
+      "signature": "pub(super) async fn open_simulated_thread_post("
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 22791
+  }
+}

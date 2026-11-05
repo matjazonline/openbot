@@ -1,0 +1,117 @@
+{
+  "file": "src/adapters/persistence/workflow/message_publish.rs",
+  "entries": [
+    {
+      "name": "Reader",
+      "kind": "enum",
+      "span": "L18-L21",
+      "signature": "enum Reader"
+    },
+    {
+      "name": "StoredAction",
+      "kind": "struct",
+      "span": "L24-L29",
+      "signature": "struct StoredAction"
+    },
+    {
+      "name": "stored_on",
+      "kind": "function",
+      "span": "L31-L67",
+      "signature": "async fn stored_on("
+    },
+    {
+      "name": "recheck_routes_on",
+      "kind": "function",
+      "span": "L70-L119",
+      "signature": "async fn recheck_routes_on("
+    },
+    {
+      "name": "channel_exists_on",
+      "kind": "function",
+      "span": "L121-L134",
+      "signature": "async fn channel_exists_on("
+    },
+    {
+      "name": "admission_full_on",
+      "kind": "function",
+      "span": "L136-L148",
+      "signature": "async fn admission_full_on("
+    },
+    {
+      "name": "continuations_exhausted_on",
+      "kind": "function",
+      "span": "L151-L166",
+      "signature": "async fn continuations_exhausted_on("
+    },
+    {
+      "name": "DestinationTarget",
+      "kind": "struct",
+      "span": "L170-L174",
+      "signature": "struct DestinationTarget"
+    },
+    {
+      "name": "of",
+      "kind": "function",
+      "span": "L176-L194",
+      "signature": "const fn of(kind: DestinationKind, id: Uuid) -> Self"
+    },
+    {
+      "name": "write_destinations_on",
+      "kind": "function",
+      "span": "L198-L280",
+      "signature": "async fn write_destinations_on("
+    },
+    {
+      "name": "insert_action_on",
+      "kind": "function",
+      "span": "L282-L307",
+      "signature": "async fn insert_action_on("
+    },
+    {
+      "name": "accept_in_app_on",
+      "kind": "function",
+      "span": "L310-L324",
+      "signature": "async fn accept_in_app_on("
+    },
+    {
+      "name": "park_on",
+      "kind": "function",
+      "span": "L327-L351",
+      "signature": "async fn park_on("
+    },
+    {
+      "name": "publish_on",
+      "kind": "function",
+      "span": "L354-L453",
+      "signature": "async fn publish_on("
+    },
+    {
+      "name": "rejected_on",
+      "kind": "function",
+      "span": "L458-L471",
+      "signature": "async fn rejected_on("
+    },
+    {
+      "name": "resolve_on",
+      "kind": "function",
+      "span": "L473-L510",
+      "signature": "async fn resolve_on("
+    },
+    {
+      "name": "observe",
+      "kind": "function",
+      "span": "L515-L554",
+      "signature": "async fn observe("
+    },
+    {
+      "name": "publish",
+      "kind": "function",
+      "span": "L556-L582",
+      "signature": "async fn publish("
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 24590
+  }
+}

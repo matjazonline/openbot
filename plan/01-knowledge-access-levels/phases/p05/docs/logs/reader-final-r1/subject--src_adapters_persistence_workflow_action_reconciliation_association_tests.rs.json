@@ -1,0 +1,32 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 1,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_association_tests.rs#foreign_associations",
+        "name": "foreign_associations",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_association_tests.rs",
+        "span": "L118-L168"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_association_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 142,
+          "text": "sqlx::query(\"INSERT INTO threads(id,company_id,channel_id,subject) VALUES($1,$2,$3,'Foreign')\")"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 13351
+  }
+}

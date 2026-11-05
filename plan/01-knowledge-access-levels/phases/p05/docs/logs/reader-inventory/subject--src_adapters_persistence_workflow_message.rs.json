@@ -1,0 +1,32 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 1,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message.rs#reply_target_on",
+        "name": "reply_target_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message.rs",
+        "span": "L371-L434"
+      },
+      "path": "src/adapters/persistence/workflow/message.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 384,
+          "text": "(SELECT identity.subject FROM message_participants AS participant \\"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 17971
+  }
+}

@@ -1,0 +1,74 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 5,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_command_probe_tests.rs#expected",
+        "name": "expected",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_command_probe_tests.rs",
+        "span": "L118-L132"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_command_probe_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 121,
+          "text": "\"execution_id\":scope.execution.as_uuid(), \"invocation_id\":command.subject.invocation.as_uuid(),"
+        },
+        {
+          "line": 122,
+          "text": "\"argument_digest\":command.subject.argument_digest.as_str(), \"dispatch_id\":command.marker.as_uuid(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_command_probe_tests.rs#assert_distinct",
+        "name": "assert_distinct",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_command_probe_tests.rs",
+        "span": "L205-L224"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_command_probe_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 215,
+          "text": "request.subject.invocation,"
+        },
+        {
+          "line": 216,
+          "text": "foreign.request.subject.invocation"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_command_probe_tests.rs#positive",
+        "name": "positive",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_command_probe_tests.rs",
+        "span": "L265-L337"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_command_probe_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 284,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 16383
+  }
+}

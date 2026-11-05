@@ -1,0 +1,91 @@
+{
+  "pattern": "subject",
+  "filesSearched": 7,
+  "totalHits": 6,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/application/ports/thread/message_write.rs#internal",
+        "name": "internal",
+        "kind": "function",
+        "path": "src/application/ports/thread/message_write.rs",
+        "span": "L121-L150"
+      },
+      "path": "src/application/ports/thread/message_write.rs",
+      "inDegree": 17,
+      "hits": [
+        {
+          "line": 124,
+          "text": "subject: impl Into<String>,"
+        },
+        {
+          "line": 134,
+          "text": "subject: subject.into(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/ports/thread/mod.rs#qualified_email_identity",
+        "name": "qualified_email_identity",
+        "kind": "function",
+        "path": "src/application/ports/thread/mod.rs",
+        "span": "L25-L35"
+      },
+      "path": "src/application/ports/thread/mod.rs",
+      "inDegree": 13,
+      "hits": [
+        {
+          "line": 26,
+          "text": "let subject = IdentitySubject::parse(address.into().trim().to_ascii_lowercase())"
+        },
+        {
+          "line": 33,
+          "text": "subject,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/ports/thread/message_write.rs#MessageWrite",
+        "name": "MessageWrite",
+        "kind": "struct",
+        "path": "src/application/ports/thread/message_write.rs",
+        "span": "L90-L116"
+      },
+      "path": "src/application/ports/thread/message_write.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 102,
+          "text": "pub subject: String,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/ports/thread/mod.rs#create_thread",
+        "name": "create_thread",
+        "kind": "function",
+        "path": "src/application/ports/thread/mod.rs",
+        "span": "L45-L50"
+      },
+      "path": "src/application/ports/thread/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 48,
+          "text": "subject: &str,"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 2,
+    "baselineChars": 18512
+  }
+}

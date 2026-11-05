@@ -1,0 +1,432 @@
+{
+  "pattern": "subject",
+  "filesSearched": 66,
+  "totalHits": 42,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/domain/entities/thread.rs#subjects_for",
+        "name": "subjects_for",
+        "kind": "function",
+        "path": "src/domain/entities/thread.rs",
+        "span": "L28-L34"
+      },
+      "path": "src/domain/entities/thread.rs",
+      "inDegree": 8,
+      "hits": [
+        {
+          "line": 28,
+          "text": "pub fn subjects_for(&self, transport: TransportKind) -> Vec<&str> {"
+        },
+        {
+          "line": 32,
+          "text": ".map(|identity| identity.subject().as_str())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/delivery.rs#entry",
+        "name": "entry",
+        "kind": "function",
+        "path": "src/domain/entities/delivery.rs",
+        "span": "L199-L223"
+      },
+      "path": "src/domain/entities/delivery.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 212,
+          "text": "subject: \"Re: order\".to_string(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/skill.rs#validate_bounded_text",
+        "name": "validate_bounded_text",
+        "kind": "function",
+        "path": "src/domain/entities/skill.rs",
+        "span": "L68-L76"
+      },
+      "path": "src/domain/entities/skill.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 68,
+          "text": "fn validate_bounded_text(subject: &str, value: &str, max_chars: usize) -> Result<(), String> {"
+        },
+        {
+          "line": 70,
+          "text": "return Err(format!(\"{subject} is required.\"));"
+        },
+        {
+          "line": 73,
+          "text": "return Err(format!(\"{subject} may be at most {max_chars} characters.\"));"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/domain/entities/delivery.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 9,
+          "text": "//! email-shaped was not the name but the shape: one provider id per row, a subject and a recipient"
+        },
+        {
+          "line": 10,
+          "text": "//! dug out of a JSON payload with `payload.get(\"subject\")`, and a status vocabulary with no word"
+        },
+        {
+          "line": 12,
+          "text": "//! interface and the canonical subject as columns, and every provider key its parts earned."
+        },
+        {
+          "line": 28,
+          "text": "/// The subject and the interface label are joined rather than copied onto the row: the canonical"
+        },
+        {
+          "line": 95,
+          "text": "/// that dug into it would be re-deriving the subject and recipient that the columns above already"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/delivery.rs#DeliveryEntry",
+        "name": "DeliveryEntry",
+        "kind": "struct",
+        "path": "src/domain/entities/delivery.rs",
+        "span": "L31-L62"
+      },
+      "path": "src/domain/entities/delivery.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 50,
+          "text": "pub subject: String,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/message_view.rs#ThreadMessageView",
+        "name": "ThreadMessageView",
+        "kind": "struct",
+        "path": "src/domain/entities/message_view.rs",
+        "span": "L83-L108"
+      },
+      "path": "src/domain/entities/message_view.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 99,
+          "text": "pub subject: String,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/message_view.rs#AgentHistoryMessage",
+        "name": "AgentHistoryMessage",
+        "kind": "struct",
+        "path": "src/domain/entities/message_view.rs",
+        "span": "L131-L140"
+      },
+      "path": "src/domain/entities/message_view.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 138,
+          "text": "pub subject: String,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/domain/entities/message.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 3,
+          "text": "//! Nothing here is email-shaped. A message has an author *principal*, a subject, a body and a"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/message.rs#display",
+        "name": "display",
+        "kind": "function",
+        "path": "src/domain/entities/message.rs",
+        "span": "L289-L294"
+      },
+      "path": "src/domain/entities/message.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 291,
+          "text": "Some(identity) => identity.subject().as_str(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/message.rs#Message",
+        "name": "Message",
+        "kind": "struct",
+        "path": "src/domain/entities/message.rs",
+        "span": "L302-L329"
+      },
+      "path": "src/domain/entities/message.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 311,
+          "text": "pub subject: String,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/participant.rs#PrincipalIdentity",
+        "name": "PrincipalIdentity",
+        "kind": "struct",
+        "path": "src/domain/entities/participant.rs",
+        "span": "L174-L187"
+      },
+      "path": "src/domain/entities/participant.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 180,
+          "text": "pub subject: IdentitySubject,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/thread.rs#Thread",
+        "name": "Thread",
+        "kind": "struct",
+        "path": "src/domain/entities/thread.rs",
+        "span": "L8-L18"
+      },
+      "path": "src/domain/entities/thread.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 11,
+          "text": "pub subject: String,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/domain/entities/thread.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 44,
+          "text": "/// The subject a further message in this thread carries: `Re:` once, never `Re: Re:`."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/thread.rs#reply_subject",
+        "name": "reply_subject",
+        "kind": "function",
+        "path": "src/domain/entities/thread.rs",
+        "span": "L45-L52"
+      },
+      "path": "src/domain/entities/thread.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 45,
+          "text": "pub fn reply_subject(&self) -> String {"
+        },
+        {
+          "line": 46,
+          "text": "let subject = self.subject.trim();"
+        },
+        {
+          "line": 47,
+          "text": "if subject.to_lowercase().starts_with(\"re:\") {"
+        },
+        {
+          "line": 48,
+          "text": "subject.to_string()"
+        },
+        {
+          "line": 50,
+          "text": "format!(\"Re: {subject}\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/thread.rs#thread_with_subject",
+        "name": "thread_with_subject",
+        "kind": "function",
+        "path": "src/domain/entities/thread.rs",
+        "span": "L63-L73"
+      },
+      "path": "src/domain/entities/thread.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 63,
+          "text": "fn thread_with_subject(subject: &str) -> Thread {"
+        },
+        {
+          "line": 67,
+          "text": "subject: subject.to_string(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/thread.rs#reply_subject_prefixes_once",
+        "name": "reply_subject_prefixes_once",
+        "kind": "function",
+        "path": "src/domain/entities/thread.rs",
+        "span": "L76-L89"
+      },
+      "path": "src/domain/entities/thread.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 76,
+          "text": "fn reply_subject_prefixes_once() {"
+        },
+        {
+          "line": 78,
+          "text": "thread_with_subject(\"Invoice question\").reply_subject(),"
+        },
+        {
+          "line": 82,
+          "text": "thread_with_subject(\"Re: Invoice question\").reply_subject(),"
+        },
+        {
+          "line": 86,
+          "text": "thread_with_subject(\"  RE: Invoice question \").reply_subject(),"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/domain/entities/transport/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 399,
+          "text": "/// A provider identity qualified by the scope in which its subject is unique."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/transport/mod.rs#QualifiedIdentity",
+        "name": "QualifiedIdentity",
+        "kind": "struct",
+        "path": "src/domain/entities/transport/mod.rs",
+        "span": "L401-L405"
+      },
+      "path": "src/domain/entities/transport/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 404,
+          "text": "subject: IdentitySubject,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/transport/mod.rs#new~3",
+        "name": "new~3",
+        "kind": "function",
+        "path": "src/domain/entities/transport/mod.rs",
+        "span": "L409-L419"
+      },
+      "path": "src/domain/entities/transport/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 412,
+          "text": "subject: IdentitySubject,"
+        },
+        {
+          "line": 417,
+          "text": "subject,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/transport/mod.rs#subject",
+        "name": "subject",
+        "kind": "function",
+        "path": "src/domain/entities/transport/mod.rs",
+        "span": "L429-L431"
+      },
+      "path": "src/domain/entities/transport/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 429,
+          "text": "pub const fn subject(&self) -> &IdentitySubject {"
+        },
+        {
+          "line": 430,
+          "text": "&self.subject"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/transport/mod.rs#slack_subjects_retain_case_and_installations_qualify_identity",
+        "name": "slack_subjects_retain_case_and_installations_qualify_identity",
+        "kind": "function",
+        "path": "src/domain/entities/transport/mod.rs",
+        "span": "L639-L654"
+      },
+      "path": "src/domain/entities/transport/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 639,
+          "text": "fn slack_subjects_retain_case_and_installations_qualify_identity() {"
+        },
+        {
+          "line": 640,
+          "text": "let subject = IdentitySubject::parse(\"UAbC123\").unwrap();"
+        },
+        {
+          "line": 641,
+          "text": "assert_eq!(subject.as_str(), \"UAbC123\");"
+        },
+        {
+          "line": 646,
+          "text": "subject.clone(),"
+        },
+        {
+          "line": 651,
+          "text": "subject,"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 7,
+    "baselineChars": 77824
+  }
+}

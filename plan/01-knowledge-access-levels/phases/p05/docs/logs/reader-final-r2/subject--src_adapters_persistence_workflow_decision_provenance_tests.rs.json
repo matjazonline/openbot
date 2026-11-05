@@ -1,0 +1,32 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 1,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/decision_provenance_tests.rs#workflow_decision_cross_tenant_relationships_and_access",
+        "name": "workflow_decision_cross_tenant_relationships_and_access",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/decision_provenance_tests.rs",
+        "span": "L59-L122"
+      },
+      "path": "src/adapters/persistence/workflow/decision_provenance_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 112,
+          "text": "let error = sqlx::query(\"INSERT INTO workflow_decisions(company_id,run_id,execution_id,id,wait_id,subject_kind,proposal_digest) SELECT $1,run_id,execution_id,$2"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 10850
+  }
+}

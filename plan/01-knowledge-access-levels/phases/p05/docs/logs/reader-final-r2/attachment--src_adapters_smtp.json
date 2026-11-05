@@ -1,0 +1,72 @@
+{
+  "pattern": "attachment",
+  "filesSearched": 3,
+  "totalHits": 6,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/smtp/server.rs#finish_data_transaction",
+        "name": "finish_data_transaction",
+        "kind": "function",
+        "path": "src/adapters/smtp/server.rs",
+        "span": "L536-L626"
+      },
+      "path": "src/adapters/smtp/server.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 576,
+          "text": "let (inbound, attachments) = accepted"
+        },
+        {
+          "line": 581,
+          "text": "let persisted = attachments"
+        },
+        {
+          "line": 584,
+          "text": "prepared.replace_attachments("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/smtp/server.rs#SmtpServer",
+        "name": "SmtpServer",
+        "kind": "struct",
+        "path": "src/adapters/smtp/server.rs",
+        "span": "L96-L117"
+      },
+      "path": "src/adapters/smtp/server.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 104,
+          "text": "/// Where inbound attachments are kept; `None` on a deployment with no private bucket."
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/smtp/server.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 151,
+          "text": "/// Where attachments on arriving mail are stored. Without it mail still arrives; its"
+        },
+        {
+          "line": 152,
+          "text": "/// attachments are recorded but their bytes are not kept."
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 68523
+  }
+}

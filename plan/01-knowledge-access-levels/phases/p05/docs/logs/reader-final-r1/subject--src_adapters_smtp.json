@@ -1,0 +1,155 @@
+{
+  "pattern": "subject",
+  "filesSearched": 3,
+  "totalHits": 9,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/smtp/server.rs#apply_spam_score",
+        "name": "apply_spam_score",
+        "kind": "function",
+        "path": "src/adapters/smtp/server.rs",
+        "span": "L654-L672"
+      },
+      "path": "src/adapters/smtp/server.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 659,
+          "text": "subject: raw_payload.subject.as_deref(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/smtp/server.rs#bounce",
+        "name": "bounce",
+        "kind": "function",
+        "path": "src/adapters/smtp/server.rs",
+        "span": "L873-L888"
+      },
+      "path": "src/adapters/smtp/server.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 886,
+          "text": "original_subject: \"Hello\".to_string(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/smtp/server.rs#scan",
+        "name": "scan",
+        "kind": "function",
+        "path": "src/adapters/smtp/server.rs",
+        "span": "L978-L987"
+      },
+      "path": "src/adapters/smtp/server.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 980,
+          "text": "assert_eq!(input.subject, Some(\"subject\"));"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/smtp/transport.rs#build_message",
+        "name": "build_message",
+        "kind": "function",
+        "path": "src/adapters/smtp/transport.rs",
+        "span": "L183-L215"
+      },
+      "path": "src/adapters/smtp/transport.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 186,
+          "text": ".subject(mail.subject)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/smtp/server.rs#smtp_reuses_the_injected_scanner_across_messages",
+        "name": "smtp_reuses_the_injected_scanner_across_messages",
+        "kind": "function",
+        "path": "src/adapters/smtp/server.rs",
+        "span": "L972-L1014"
+      },
+      "path": "src/adapters/smtp/server.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1007,
+          "text": "subject: Some(\"subject\".into()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/smtp/server.rs#test_parse_raw_mime_to_payload",
+        "name": "test_parse_raw_mime_to_payload",
+        "kind": "function",
+        "path": "src/adapters/smtp/server.rs",
+        "span": "L1118-L1151"
+      },
+      "path": "src/adapters/smtp/server.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1134,
+          "text": "assert_eq!(payload.subject.as_deref(), Some(\"Test Email\"));"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/smtp/server.rs#test_dkim_verification_with_gmail_raw_email",
+        "name": "test_dkim_verification_with_gmail_raw_email",
+        "kind": "function",
+        "path": "src/adapters/smtp/server.rs",
+        "span": "L1323-L1355"
+      },
+      "path": "src/adapters/smtp/server.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1325,
+          "text": "DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;d=gmail.com; s=20230601; t=1739834309; x=1740439109; darn=populus.network; h=to:subject:message-id:date:fro"
+        },
+        {
+          "line": 1326,
+          "text": "X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;d=1e100.net; s=20230601; t=1739834309; x=1740439109;h=to:subject:message-id:date:from:mime-version"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/smtp/server.rs#stale_dkim_and_submitted_auth_headers_do_not_authorize_smtp_mail",
+        "name": "stale_dkim_and_submitted_auth_headers_do_not_authorize_smtp_mail",
+        "kind": "function",
+        "path": "src/adapters/smtp/server.rs",
+        "span": "L1374-L1518"
+      },
+      "path": "src/adapters/smtp/server.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1496,
+          "text": "DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;d=gmail.com; s=20230601; t=1739834309; x=1740439109; darn=populus.network; h=to:subject:message-id:date:fro"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 2,
+    "baselineChars": 79099
+  }
+}

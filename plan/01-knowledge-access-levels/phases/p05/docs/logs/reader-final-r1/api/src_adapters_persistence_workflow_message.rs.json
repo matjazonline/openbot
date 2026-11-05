@@ -1,0 +1,165 @@
+{
+  "file": "src/adapters/persistence/workflow/message.rs",
+  "entries": [
+    {
+      "name": "publish",
+      "kind": "module",
+      "span": "L20-L20",
+      "signature": "mod publish;"
+    },
+    {
+      "name": "receipts",
+      "kind": "module",
+      "span": "L22-L22",
+      "signature": "pub(crate) mod receipts;"
+    },
+    {
+      "name": "MESSAGING",
+      "kind": "constant",
+      "span": "L24-L24",
+      "signature": "pub(super) const MESSAGING: &str = \"messaging\";"
+    },
+    {
+      "name": "MessageActionAuthority",
+      "kind": "struct",
+      "span": "L28-L28",
+      "signature": "pub struct MessageActionAuthority;"
+    },
+    {
+      "name": "lock_current",
+      "kind": "function",
+      "span": "L31-L51",
+      "signature": "async fn lock_current("
+    },
+    {
+      "name": "lock_resource",
+      "kind": "function",
+      "span": "L58-L70",
+      "signature": "async fn lock_resource("
+    },
+    {
+      "name": "messaging_status",
+      "kind": "function",
+      "span": "L73-L85",
+      "signature": "pub(super) fn messaging_status(company: CompanyId) -> AppResult<ResourceStatus>"
+    },
+    {
+      "name": "message_target",
+      "kind": "function",
+      "span": "L87-L95",
+      "signature": "pub(super) fn message_target(target: &ActionTarget) -> AppResult<Uuid>"
+    },
+    {
+      "name": "message_request",
+      "kind": "function",
+      "span": "L98-L128",
+      "signature": "fn message_request("
+    },
+    {
+      "name": "message_step_request",
+      "kind": "function",
+      "span": "L132-L153",
+      "signature": "async fn message_step_request("
+    },
+    {
+      "name": "message_tool_request",
+      "kind": "function",
+      "span": "L155-L166",
+      "signature": "async fn message_tool_request("
+    },
+    {
+      "name": "message_routes",
+      "kind": "function",
+      "span": "L168-L196",
+      "signature": "async fn message_routes("
+    },
+    {
+      "name": "RunRoute",
+      "kind": "struct",
+      "span": "L200-L206",
+      "signature": "pub(super) struct RunRoute"
+    },
+    {
+      "name": "run_route_on",
+      "kind": "function",
+      "span": "L208-L228",
+      "signature": "async fn run_route_on("
+    },
+    {
+      "name": "channel_route_on",
+      "kind": "function",
+      "span": "L230-L251",
+      "signature": "pub(super) async fn channel_route_on("
+    },
+    {
+      "name": "refused",
+      "kind": "function",
+      "span": "L253-L255",
+      "signature": "fn refused(reason: &str) -> AppError"
+    },
+    {
+      "name": "MemberRoute",
+      "kind": "struct",
+      "span": "L258-L261",
+      "signature": "pub(super) struct MemberRoute"
+    },
+    {
+      "name": "member_on",
+      "kind": "function",
+      "span": "L262-L287",
+      "signature": "pub(super) async fn member_on("
+    },
+    {
+      "name": "send_target_on",
+      "kind": "function",
+      "span": "L289-L333",
+      "signature": "async fn send_target_on("
+    },
+    {
+      "name": "source_association_on",
+      "kind": "function",
+      "span": "L336-L360",
+      "signature": "pub(super) async fn source_association_on("
+    },
+    {
+      "name": "SourceFacts",
+      "kind": "struct",
+      "span": "L363-L369",
+      "signature": "struct SourceFacts"
+    },
+    {
+      "name": "reply_target_on",
+      "kind": "function",
+      "span": "L371-L434",
+      "signature": "async fn reply_target_on("
+    },
+    {
+      "name": "source_relay_on",
+      "kind": "function",
+      "span": "L439-L462",
+      "signature": "async fn source_relay_on("
+    },
+    {
+      "name": "MessagePublicationDirectory",
+      "kind": "struct",
+      "span": "L465-L467",
+      "signature": "pub struct MessagePublicationDirectory"
+    },
+    {
+      "name": "capture",
+      "kind": "function",
+      "span": "L470-L479",
+      "signature": "async fn capture("
+    },
+    {
+      "name": "message_builtins",
+      "kind": "function",
+      "span": "L484-L495",
+      "signature": "pub(super) fn message_builtins(company: CompanyId) -> AppResult<PublicationDependencies>"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 17971
+  }
+}

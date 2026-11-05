@@ -1,0 +1,108 @@
+{
+  "pattern": "snapshot",
+  "filesSearched": 46,
+  "totalHits": 7,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/ui/authoring/tests.rs#approved_rows",
+        "name": "approved_rows",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/ui/authoring/tests.rs",
+        "span": "L431-L472"
+      },
+      "path": "src/adapters/http/routes/workflows/ui/authoring/tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 453,
+          "text": "let snapshot = json!({"
+        },
+        {
+          "line": 459,
+          "text": "\"INSERT INTO workflow_mcp_operations(company_id, connection_id, name, snapshot, approval_required, version) \\"
+        },
+        {
+          "line": 465,
+          "text": ".bind(&snapshot)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/ui/runs/mod.rs#frozen_agent",
+        "name": "frozen_agent",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/ui/runs/mod.rs",
+        "span": "L690-L706"
+      },
+      "path": "src/adapters/http/routes/workflows/ui/runs/mod.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 696,
+          "text": ".snapshots()"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/reconciliation_tests.rs#reconciliation_refuses_strangers_members_and_foreign_markers",
+        "name": "reconciliation_refuses_strangers_members_and_foreign_markers",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/reconciliation_tests.rs",
+        "span": "L252-L271"
+      },
+      "path": "src/adapters/http/routes/workflows/reconciliation_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 267,
+          "text": "// An unknown marker is missing inside the snapshot, so it reads like any other absent target."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/reconciliation_tests.rs#competing_reconciliations_record_once",
+        "name": "competing_reconciliations_record_once",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/reconciliation_tests.rs",
+        "span": "L276-L314"
+      },
+      "path": "src/adapters/http/routes/workflows/reconciliation_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 292,
+          "text": "assert_eq!(answer[\"outcome\"][\"reason\"], \"stale_snapshot\", \"{answer}\");"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/ui/authoring/publish_tests.rs#an_mcp_step_validates_publishes_through_the_selected_slot_and_locates_bad_arguments",
+        "name": "an_mcp_step_validates_publishes_through_the_selected_slot_and_locates_bad_arguments",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/ui/authoring/publish_tests.rs",
+        "span": "L204-L312"
+      },
+      "path": "src/adapters/http/routes/workflows/ui/authoring/publish_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 286,
+          "text": ".snapshots()"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 4,
+    "baselineChars": 74121
+  }
+}

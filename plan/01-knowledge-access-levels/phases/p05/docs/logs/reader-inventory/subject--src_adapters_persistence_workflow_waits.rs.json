@@ -1,0 +1,32 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 1,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/waits.rs#row",
+        "name": "row",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/waits.rs",
+        "span": "L130-L144"
+      },
+      "path": "src/adapters/persistence/workflow/waits.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 142,
+          "text": "Ok(sqlx::query_as::<_,WaitRow>(\"SELECT id,deadline,reason,state,event_name,correlation,failure_code FROM workflow_waits AS wait WHERE company_id=$1 AND run_id=$"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 17023
+  }
+}

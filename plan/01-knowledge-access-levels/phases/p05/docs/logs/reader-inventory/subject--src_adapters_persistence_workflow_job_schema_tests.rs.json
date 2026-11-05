@@ -1,0 +1,32 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 1,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/job_schema_tests.rs#new",
+        "name": "new",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/job_schema_tests.rs",
+        "span": "L20-L60"
+      },
+      "path": "src/adapters/persistence/workflow/job_schema_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 37,
+          "text": "sqlx::query(\"INSERT INTO threads (id, company_id, channel_id, subject) VALUES ($1, $2, $3, 'Workflow')\")"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 6602
+  }
+}

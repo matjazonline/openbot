@@ -1,0 +1,108 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 7,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_receipt_tests.rs#register_ledger",
+        "name": "register_ledger",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_receipt_tests.rs",
+        "span": "L117-L146"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_receipt_tests.rs",
+      "inDegree": 9,
+      "hits": [
+        {
+          "line": 123,
+          "text": ".action_authority(request.scope(), &request.subject)"
+        },
+        {
+          "line": 130,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_receipt_tests.rs#ledger_row",
+        "name": "ledger_row",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_receipt_tests.rs",
+        "span": "L152-L166"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_receipt_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 160,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_receipt_tests.rs#sql_observation",
+        "name": "sql_observation",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_receipt_tests.rs",
+        "span": "L594-L604"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_receipt_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 602,
+          "text": ".bind(request.subject.invocation.as_uuid()).bind(request.subject.argument_digest.as_str()).bind(entry.marker).bind(entry.entry).bind(result)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_receipt_tests.rs#verify",
+        "name": "verify",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_receipt_tests.rs",
+        "span": "L46-L95"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_receipt_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 57,
+          "text": ".bind(snapshot.subject.invocation.as_uuid()).fetch_one(&mut *tx).await?;"
+        },
+        {
+          "line": 62,
+          "text": ".bind(snapshot.action.scope().company.as_uuid()).bind(snapshot.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_receipt_tests.rs#workflow_action_reconciliation_sql_actual_receipt_conflict_and_audit_guards",
+        "name": "workflow_action_reconciliation_sql_actual_receipt_conflict_and_audit_guards",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_receipt_tests.rs",
+        "span": "L606-L659"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_receipt_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 634,
+          "text": ".bind(request.subject.invocation.as_uuid()).bind(request.subject.argument_digest.as_str()).bind(entry.marker).bind(entry.entry)"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 27819
+  }
+}

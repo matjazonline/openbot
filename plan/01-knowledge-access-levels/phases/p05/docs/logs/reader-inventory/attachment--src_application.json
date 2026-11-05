@@ -1,0 +1,643 @@
+{
+  "pattern": "attachment",
+  "filesSearched": 279,
+  "totalHits": 56,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/application/ports/thread/message_write.rs#internal",
+        "name": "internal",
+        "kind": "function",
+        "path": "src/application/ports/thread/message_write.rs",
+        "span": "L120-L149"
+      },
+      "path": "src/application/ports/thread/message_write.rs",
+      "inDegree": 17,
+      "hits": [
+        {
+          "line": 136,
+          "text": "attachments: Vec::new(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/jev_assets.rs#parse_assets",
+        "name": "parse_assets",
+        "kind": "function",
+        "path": "src/application/workflow/jev_assets.rs",
+        "span": "L74-L118"
+      },
+      "path": "src/application/workflow/jev_assets.rs",
+      "inDegree": 11,
+      "hits": [
+        {
+          "line": 88,
+          "text": ".ok_or(\"Assets must be a literal map of private attachment references\")?;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/test_support.rs#read",
+        "name": "read",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/test_support.rs",
+        "span": "L255-L279"
+      },
+      "path": "src/application/use_cases/thread/test_support.rs",
+      "inDegree": 8,
+      "hits": [
+        {
+          "line": 270,
+          "text": "attachments: canonical.attachments.clone(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/ingest/mod.rs#new",
+        "name": "new",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/ingest/mod.rs",
+        "span": "L91-L112"
+      },
+      "path": "src/application/use_cases/thread/ingest/mod.rs",
+      "inDegree": 5,
+      "hits": [
+        {
+          "line": 106,
+          "text": "attachments: Vec::new(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/ingest/mod.rs#preflight_inbound",
+        "name": "preflight_inbound",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/ingest/mod.rs",
+        "span": "L245-L305"
+      },
+      "path": "src/application/use_cases/thread/ingest/mod.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 302,
+          "text": "stored_attachment_count: 0,"
+        },
+        {
+          "line": 303,
+          "text": "failed_attachment_count: 0,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/ingest/canonical.rs#ingest_canonical",
+        "name": "ingest_canonical",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/ingest/canonical.rs",
+        "span": "L18-L84"
+      },
+      "path": "src/application/use_cases/thread/ingest/canonical.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 70,
+          "text": "attachments: BoundedVec::parse(\"attachments\", ingress.attachments)?,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/ingest/mod.rs#commit_prepared_inbound",
+        "name": "commit_prepared_inbound",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/ingest/mod.rs",
+        "span": "L310-L357"
+      },
+      "path": "src/application/use_cases/thread/ingest/mod.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 316,
+          "text": "stored_attachment_count,"
+        },
+        {
+          "line": 317,
+          "text": "failed_attachment_count,"
+        },
+        {
+          "line": 319,
+          "text": "if failed_attachment_count > 0"
+        },
+        {
+          "line": 323,
+          "text": "\"inbound_attachment_storage_failures_total\","
+        },
+        {
+          "line": 324,
+          "text": "failed_attachment_count as u64,"
+        },
+        {
+          "line": 338,
+          "text": "if stored_attachment_count > 0"
+        },
+        {
+          "line": 342,
+          "text": "\"inbound_attachment_orphan_candidates_total\","
+        },
+        {
+          "line": 343,
+          "text": "stored_attachment_count as u64,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/ingest/policy.rs#draft",
+        "name": "draft",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/ingest/policy.rs",
+        "span": "L310-L327"
+      },
+      "path": "src/application/use_cases/thread/ingest/policy.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 321,
+          "text": "attachments: BoundedVec::empty(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/test_support.rs#create_message",
+        "name": "create_message",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/test_support.rs",
+        "span": "L587-L668"
+      },
+      "path": "src/application/use_cases/thread/test_support.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 601,
+          "text": "attachments: (!write.attachments.is_empty()).then(|| write.attachments.clone()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/test_support.rs#thread_message_view",
+        "name": "thread_message_view",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/test_support.rs",
+        "span": "L1009-L1041"
+      },
+      "path": "src/application/use_cases/thread/test_support.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 1033,
+          "text": "attachments: message.attachments.clone().unwrap_or_default(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/test_support.rs#default",
+        "name": "default",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/test_support.rs",
+        "span": "L1106-L1126"
+      },
+      "path": "src/application/use_cases/thread/test_support.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 1120,
+          "text": "attachments: None,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/transport/test_support.rs#draft_from",
+        "name": "draft_from",
+        "kind": "function",
+        "path": "src/application/transport/test_support.rs",
+        "span": "L39-L63"
+      },
+      "path": "src/application/transport/test_support.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 52,
+          "text": "attachments: BoundedVec::empty(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/ingest/commit.rs#draft",
+        "name": "draft",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/ingest/commit.rs",
+        "span": "L243-L263"
+      },
+      "path": "src/application/use_cases/thread/ingest/commit.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 254,
+          "text": "attachments: BoundedVec::empty(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/ingest/mod.rs#replace_attachments",
+        "name": "replace_attachments",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/ingest/mod.rs",
+        "span": "L195-L204"
+      },
+      "path": "src/application/use_cases/thread/ingest/mod.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 195,
+          "text": "pub fn replace_attachments("
+        },
+        {
+          "line": 197,
+          "text": "attachments: BoundedVec<crate::entities::message::AttachmentMetadata, MAX_ATTACHMENTS>,"
+        },
+        {
+          "line": 201,
+          "text": "self.plan.replace_attachments(attachments);"
+        },
+        {
+          "line": 202,
+          "text": "self.stored_attachment_count = stored_count;"
+        },
+        {
+          "line": 203,
+          "text": "self.failed_attachment_count = failed_count;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/ingest/relay.rs#internal_inbound_message",
+        "name": "internal_inbound_message",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/ingest/relay.rs",
+        "span": "L99-L181"
+      },
+      "path": "src/application/use_cases/thread/ingest/relay.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 149,
+          "text": "attachments: BoundedVec::empty(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/test_support.rs#stored_email",
+        "name": "stored_email",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/test_support.rs",
+        "span": "L1130-L1174"
+      },
+      "path": "src/application/use_cases/thread/test_support.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 1165,
+          "text": "attachments: draft.attachments,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/test_support.rs#inbound_message_write",
+        "name": "inbound_message_write",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/test_support.rs",
+        "span": "L1556-L1606"
+      },
+      "path": "src/application/use_cases/thread/test_support.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 1581,
+          "text": "attachments: envelope.attachments.to_vec(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/ports/thread/message_write.rs#MessageWrite",
+        "name": "MessageWrite",
+        "kind": "struct",
+        "path": "src/application/ports/thread/message_write.rs",
+        "span": "L89-L115"
+      },
+      "path": "src/application/ports/thread/message_write.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 105,
+          "text": "pub attachments: Vec<AttachmentMetadata>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/ports/thread/message_write.rs#with_attachments",
+        "name": "with_attachments",
+        "kind": "function",
+        "path": "src/application/ports/thread/message_write.rs",
+        "span": "L156-L159"
+      },
+      "path": "src/application/ports/thread/message_write.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 156,
+          "text": "pub fn with_attachments(mut self, attachments: Vec<AttachmentMetadata>) -> Self {"
+        },
+        {
+          "line": 157,
+          "text": "self.attachments = attachments;"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/transport/bounded.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 3,
+          "text": "//! Every list that arrives from a provider -- addressed identities, attachments, reply candidates,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/transport/ingress.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 48,
+          "text": "/// The most attachments one message may carry metadata for."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/transport/ingress.rs#InboundDraft",
+        "name": "InboundDraft",
+        "kind": "struct",
+        "path": "src/application/transport/ingress.rs",
+        "span": "L288-L304"
+      },
+      "path": "src/application/transport/ingress.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 299,
+          "text": "pub attachments: BoundedVec<AttachmentMetadata, MAX_ATTACHMENTS>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/transport/ingress.rs#bind",
+        "name": "bind",
+        "kind": "function",
+        "path": "src/application/transport/ingress.rs",
+        "span": "L308-L337"
+      },
+      "path": "src/application/transport/ingress.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 327,
+          "text": "attachments: self.attachments,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/transport/ingress.rs#InboundEnvelope",
+        "name": "InboundEnvelope",
+        "kind": "struct",
+        "path": "src/application/transport/ingress.rs",
+        "span": "L348-L365"
+      },
+      "path": "src/application/transport/ingress.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 357,
+          "text": "pub attachments: BoundedVec<AttachmentMetadata, MAX_ATTACHMENTS>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/ingest/commit.rs#replace_attachments",
+        "name": "replace_attachments",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/ingest/commit.rs",
+        "span": "L139-L147"
+      },
+      "path": "src/application/use_cases/thread/ingest/commit.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 139,
+          "text": "pub(crate) fn replace_attachments("
+        },
+        {
+          "line": 141,
+          "text": "attachments: crate::transport::BoundedVec<"
+        },
+        {
+          "line": 146,
+          "text": "self.envelope.attachments = attachments;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/ingest/mod.rs#CanonicalMessageIngress",
+        "name": "CanonicalMessageIngress",
+        "kind": "struct",
+        "path": "src/application/use_cases/thread/ingest/mod.rs",
+        "span": "L65-L88"
+      },
+      "path": "src/application/use_cases/thread/ingest/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 78,
+          "text": "/// Canonical attachment metadata already stored or associated with the message."
+        },
+        {
+          "line": 79,
+          "text": "pub attachments: Vec<AttachmentMetadata>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/ingest/mod.rs#with_attachments",
+        "name": "with_attachments",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/ingest/mod.rs",
+        "span": "L129-L132"
+      },
+      "path": "src/application/use_cases/thread/ingest/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 129,
+          "text": "pub fn with_attachments(mut self, attachments: Vec<AttachmentMetadata>) -> Self {"
+        },
+        {
+          "line": 130,
+          "text": "self.attachments = attachments;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/ingest/mod.rs#PreparedInbound",
+        "name": "PreparedInbound",
+        "kind": "struct",
+        "path": "src/application/use_cases/thread/ingest/mod.rs",
+        "span": "L174-L178"
+      },
+      "path": "src/application/use_cases/thread/ingest/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 176,
+          "text": "stored_attachment_count: usize,"
+        },
+        {
+          "line": 177,
+          "text": "failed_attachment_count: usize,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/ingest/mod.rs#ingest",
+        "name": "ingest",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/ingest/mod.rs",
+        "span": "L233-L242"
+      },
+      "path": "src/application/use_cases/thread/ingest/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 234,
+          "text": "// Box the two-phase seam so callers without attachment bytes keep this already-deep"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/test_support.rs#Canonical",
+        "name": "Canonical",
+        "kind": "struct",
+        "path": "src/application/use_cases/thread/test_support.rs",
+        "span": "L131-L143"
+      },
+      "path": "src/application/use_cases/thread/test_support.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 136,
+          "text": "attachments: Option<Vec<AttachmentMetadata>>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/test_support.rs#EmailMessageDraft",
+        "name": "EmailMessageDraft",
+        "kind": "struct",
+        "path": "src/application/use_cases/thread/test_support.rs",
+        "span": "L1085-L1103"
+      },
+      "path": "src/application/use_cases/thread/test_support.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1098,
+          "text": "pub attachments: Option<Vec<AttachmentMetadata>>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/tests.rs#ingress_rejections_create_no_identity_thread_message_task_delivery_or_attachment_state",
+        "name": "ingress_rejections_create_no_identity_thread_message_task_delivery_or_attachment_state",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/tests.rs",
+        "span": "L2111-L2267"
+      },
+      "path": "src/application/use_cases/thread/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 2111,
+          "text": "async fn ingress_rejections_create_no_identity_thread_message_task_delivery_or_attachment_state() {"
+        },
+        {
+          "line": 2196,
+          "text": "let mut too_many = rejection_message(\"reject-attachments\");"
+        },
+        {
+          "line": 2197,
+          "text": "too_many.attachments_data = (0..=MAX_ATTACHMENTS)"
+        },
+        {
+          "line": 2230,
+          "text": "let mut rejected_attachment = rejection_message(\"reject-before-upload\");"
+        },
+        {
+          "line": 2231,
+          "text": "rejected_attachment.from = \"unauthorized@example.net\".into();"
+        },
+        {
+          "line": 2232,
+          "text": "rejected_attachment.attachments_data = vec!["
+        },
+        {
+          "line": 2244,
+          "text": "rejected_attachment,"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 12,
+    "baselineChars": 316581
+  }
+}

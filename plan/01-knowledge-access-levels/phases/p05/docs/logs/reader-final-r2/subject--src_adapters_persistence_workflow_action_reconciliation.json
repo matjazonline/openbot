@@ -1,0 +1,461 @@
+{
+  "pattern": "subject",
+  "filesSearched": 5,
+  "totalHits": 61,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation/delivery.rs#subject_on",
+        "name": "subject_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation/delivery.rs",
+        "span": "L38-L113"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation/delivery.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 38,
+          "text": "pub(super) async fn subject_on("
+        },
+        {
+          "line": 53,
+          "text": ".bind(command.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 54,
+          "text": ".bind(command.subject.argument_digest.as_str())"
+        },
+        {
+          "line": 79,
+          "text": ".bind(command.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 87,
+          "text": "// Email renders exactly one part; anything else is not a subject this path can attest."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation/mod.rs#restore_on",
+        "name": "restore_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation/mod.rs",
+        "span": "L198-L237"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation/mod.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 217,
+          "text": ".bind(command.subject.invocation.as_uuid()).bind(command.subject.argument_digest.as_str())"
+        },
+        {
+          "line": 235,
+          "text": "validate_run_authority(command.scope, &command.subject, &frozen)?;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation/mod.rs#record_refusal_on",
+        "name": "record_refusal_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation/mod.rs",
+        "span": "L288-L302"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation/mod.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 297,
+          "text": ".bind(command.scope.run.as_uuid()).bind(command.scope.execution.as_uuid()).bind(command.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 298,
+          "text": ".bind(command.subject.argument_digest.as_str()).bind(command.marker.as_uuid()).bind(command.actor.user_id())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation/mod.rs#overflow_on",
+        "name": "overflow_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation/mod.rs",
+        "span": "L303-L309"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation/mod.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 308,
+          "text": ".bind(command.scope.company.as_uuid()).bind(command.subject.invocation.as_uuid()).bind(command.scope.execution.as_uuid()).fetch_one(&mut **tx).await.map_err(Int"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation/mod.rs#entries_on",
+        "name": "entries_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation/mod.rs",
+        "span": "L318-L337"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation/mod.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 323,
+          "text": ".bind(command.scope.company.as_uuid()).bind(command.subject.invocation.as_uuid()).fetch_all(&mut **tx).await?;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation/delivery.rs#current_coverage_on",
+        "name": "current_coverage_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation/delivery.rs",
+        "span": "L117-L130"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation/delivery.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 122,
+          "text": "let Some((subject, status)) = subject_on(tx, command, Lock::Settle).await? else {"
+        },
+        {
+          "line": 128,
+          "text": "ReconciliationSnapshot::delivery_coverage(action, &command.subject, command.marker, &subject)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation/facts.rs#prior_applied_conflicts_on",
+        "name": "prior_applied_conflicts_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation/facts.rs",
+        "span": "L144-L153"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation/facts.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 150,
+          "text": ".bind(command.scope.company.as_uuid()).bind(command.subject.invocation.as_uuid()).bind(id.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation/facts.rs#disagreement_on",
+        "name": "disagreement_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation/facts.rs",
+        "span": "L165-L173"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation/facts.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 171,
+          "text": ".bind(command.scope.company.as_uuid()).bind(command.subject.invocation.as_uuid()).bind(id.as_uuid()).execute(&mut **tx).await?;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation/mod.rs#marker_on",
+        "name": "marker_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation/mod.rs",
+        "span": "L239-L249"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation/mod.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 243,
+          "text": "// The target names the marker's effect kind; a mismatch is a missing subject."
+        },
+        {
+          "line": 246,
+          "text": ".bind(command.subject.invocation.as_uuid()).bind(command.subject.argument_digest.as_str()).bind(command.marker.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation/settlement.rs#refusal_on",
+        "name": "refusal_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation/settlement.rs",
+        "span": "L125-L172"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation/settlement.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 142,
+          "text": "&command.subject,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/action_reconciliation/delivery.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1,
+          "text": "//! Message delivery subjects through the 04.7 service (04.11-D3 §H, D4 §N-§R)."
+        },
+        {
+          "line": 3,
+          "text": "//! A subject is one destination delivery of the invocation that is `outcome_unknown`. Locks,"
+        },
+        {
+          "line": 5,
+          "text": "//! the subject parent (`FOR SHARE` to snapshot, `FOR UPDATE` to settle). Settlement never"
+        },
+        {
+          "line": 36,
+          "text": "/// The subject delivery with its current status, or `None` when the invocation has no such"
+        },
+        {
+          "line": 115,
+          "text": "/// Settlement's re-read under the parent `FOR UPDATE`: the current coverage of a subject that"
+        },
+        {
+          "line": 132,
+          "text": "/// The effective disposition, applied to the one subject delivery."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation/delivery.rs#truth_on",
+        "name": "truth_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation/delivery.rs",
+        "span": "L133-L240"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation/delivery.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 140,
+          "text": "let subject = snapshot.delivery.as_ref().ok_or_else(invalid)?;"
+        },
+        {
+          "line": 151,
+          "text": "subject.delivery,"
+        },
+        {
+          "line": 152,
+          "text": "subject.part,"
+        },
+        {
+          "line": 169,
+          "text": ".bind(subject.delivery)"
+        },
+        {
+          "line": 195,
+          "text": "&& subject.cancellation.is_none()"
+        },
+        {
+          "line": 196,
+          "text": "&& subject.attempt_count < subject.max_attempts"
+        },
+        {
+          "line": 206,
+          "text": ".bind(command.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 207,
+          "text": ".bind(command.subject.argument_digest.as_str())"
+        },
+        {
+          "line": 211,
+          "text": ".bind(i16::from(subject.ordinal))"
+        },
+        {
+          "line": 212,
+          "text": ".bind(subject.delivery)"
+        },
+        {
+          "line": 213,
+          "text": ".bind(i32::try_from(subject.attempt_count).map_err(|_| invalid())?)"
+        },
+        {
+          "line": 218,
+          "text": "} else if !live || subject.cancellation.is_some() {"
+        },
+        {
+          "line": 219,
+          "text": "let reason = match subject.cancellation.as_deref() {"
+        },
+        {
+          "line": 233,
+          "text": "settle_unknown_delivery_on(tx, subject.delivery, subject.part, settlement).await?;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation/facts.rs#insert_on",
+        "name": "insert_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation/facts.rs",
+        "span": "L4-L82"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation/facts.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 19,
+          "text": ".bind(command.scope.company.as_uuid()).bind(command.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 28,
+          "text": "// A message proof names its one subject delivery and has no remote coverage rows; the"
+        },
+        {
+          "line": 30,
+          "text": "let subject = snapshot"
+        },
+        {
+          "line": 33,
+          "text": ".map(|subject| (i16::from(subject.ordinal), subject.delivery));"
+        },
+        {
+          "line": 34,
+          "text": "let (subject_columns, subject_values) = match subject {"
+        },
+        {
+          "line": 43,
+          "text": "\"INSERT INTO workflow_action_evidence(company_id,run_id,execution_id,invocation_id,argument_digest,dispatch_id,id,actor_id,command_id,command_key,request_digest"
+        },
+        {
+          "line": 49,
+          "text": ".bind(command.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 50,
+          "text": ".bind(command.subject.argument_digest.as_str())"
+        },
+        {
+          "line": 71,
+          "text": "if let Some((ordinal, delivery)) = subject {"
+        },
+        {
+          "line": 78,
+          "text": ".bind(command.subject.invocation.as_uuid()).bind(command.subject.argument_digest.as_str()).bind(command.marker.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation/facts.rs#truth_on",
+        "name": "truth_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation/facts.rs",
+        "span": "L84-L142"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation/facts.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 94,
+          "text": ".bind(command.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 122,
+          "text": ".bind(command.subject.invocation.as_uuid()).bind(command.subject.argument_digest.as_str()).bind(command.marker.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation/mod.rs#snapshot",
+        "name": "snapshot",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation/mod.rs",
+        "span": "L73-L164"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 122,
+          "text": "// the same non-disclosing refusal as a missing subject."
+        },
+        {
+          "line": 124,
+          "text": "match delivery::subject_on(&mut tx, command, delivery::Lock::Snapshot).await? {"
+        },
+        {
+          "line": 125,
+          "text": "Some((subject, status)) if status == \"outcome_unknown\" => {"
+        },
+        {
+          "line": 126,
+          "text": "(Vec::new(), Some(subject))"
+        },
+        {
+          "line": 138,
+          "text": "&command.subject,"
+        },
+        {
+          "line": 143,
+          "text": "Some(subject) => ReconciliationSnapshot::delivery_coverage("
+        },
+        {
+          "line": 145,
+          "text": "&command.subject,"
+        },
+        {
+          "line": 147,
+          "text": "subject,"
+        },
+        {
+          "line": 152,
+          "text": "subject: command.subject.clone(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation/settlement.rs#settle",
+        "name": "settle",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation/settlement.rs",
+        "span": "L5-L89"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation/settlement.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 77,
+          "text": ".bind(command.scope.run.as_uuid()).bind(command.scope.execution.as_uuid()).bind(command.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 78,
+          "text": ".bind(command.subject.argument_digest.as_str()).bind(command.marker.as_uuid()).bind(command.actor.user_id())"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 4,
+    "baselineChars": 48146
+  }
+}

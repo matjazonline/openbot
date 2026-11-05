@@ -1,0 +1,111 @@
+{
+  "file": "src/application/workflow/history.rs",
+  "entries": [
+    {
+      "name": "KIND",
+      "kind": "constant",
+      "span": "L18-L18",
+      "signature": "pub const KIND: &str = \"context.history\";"
+    },
+    {
+      "name": "MAX_HISTORY_ITEMS",
+      "kind": "constant",
+      "span": "L20-L20",
+      "signature": "pub const MAX_HISTORY_ITEMS: usize = 256;"
+    },
+    {
+      "name": "MAX_HISTORY_TEXT",
+      "kind": "constant",
+      "span": "L22-L22",
+      "signature": "pub const MAX_HISTORY_TEXT: usize = 16_384;"
+    },
+    {
+      "name": "HistoryMessage",
+      "kind": "struct",
+      "span": "L24-L33",
+      "signature": "pub struct HistoryMessage"
+    },
+    {
+      "name": "FrozenHistory",
+      "kind": "struct",
+      "span": "L36-L42",
+      "signature": "pub struct FrozenHistory"
+    },
+    {
+      "name": "WorkflowHistory",
+      "kind": "interface",
+      "span": "L45-L49",
+      "signature": "pub trait WorkflowHistory: Send + Sync"
+    },
+    {
+      "name": "frozen_history",
+      "kind": "function",
+      "span": "L48-L48",
+      "signature": "async fn frozen_history(&self, claim: &ClaimedWorkflow) -> AppResult<FrozenHistory>;"
+    },
+    {
+      "name": "cut",
+      "kind": "function",
+      "span": "L51-L56",
+      "signature": "fn cut(text: &str) -> (String, bool)"
+    },
+    {
+      "name": "item",
+      "kind": "function",
+      "span": "L58-L71",
+      "signature": "fn item(message: &HistoryMessage) -> Value"
+    },
+    {
+      "name": "size",
+      "kind": "function",
+      "span": "L73-L77",
+      "signature": "fn size(value: &Value) -> AppResult<u64>"
+    },
+    {
+      "name": "select",
+      "kind": "function",
+      "span": "L82-L105",
+      "signature": "pub fn select(history: &FrozenHistory, max_result_bytes: usize) -> AppResult<Value>"
+    },
+    {
+      "name": "WorkflowHistoryRuntime",
+      "kind": "struct",
+      "span": "L108-L110",
+      "signature": "pub struct WorkflowHistoryRuntime<P>"
+    },
+    {
+      "name": "new",
+      "kind": "function",
+      "span": "L113-L115",
+      "signature": "pub fn new(port: P) -> Self"
+    },
+    {
+      "name": "supports",
+      "kind": "function",
+      "span": "L120-L122",
+      "signature": "fn supports(&self, kind: &WorkflowStepKind) -> bool"
+    },
+    {
+      "name": "execute",
+      "kind": "function",
+      "span": "L124-L134",
+      "signature": "async fn execute("
+    },
+    {
+      "name": "failure",
+      "kind": "function",
+      "span": "L139-L156",
+      "signature": "fn failure(error: &AppError) -> WorkflowFailure"
+    },
+    {
+      "name": "tests",
+      "kind": "module",
+      "span": "L160-L160",
+      "signature": "mod tests;"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 5788
+  }
+}

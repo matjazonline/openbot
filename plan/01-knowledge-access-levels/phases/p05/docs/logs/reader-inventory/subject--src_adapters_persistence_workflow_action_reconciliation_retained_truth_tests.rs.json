@@ -1,0 +1,66 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 3,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_retained_truth_tests.rs#verified_conflict",
+        "name": "verified_conflict",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_retained_truth_tests.rs",
+        "span": "L135-L212"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_retained_truth_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 189,
+          "text": ".bind(h.requests[1].subject.invocation.as_uuid()).execute(h.fixture.persistence().pool()).await.unwrap();"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_retained_truth_tests.rs#scoped_projection",
+        "name": "scoped_projection",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_retained_truth_tests.rs",
+        "span": "L55-L60"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_retained_truth_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 58,
+          "text": ".bind(h.requests[index].subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_retained_truth_tests.rs#available_proof",
+        "name": "available_proof",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_retained_truth_tests.rs",
+        "span": "L297-L304"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_retained_truth_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 300,
+          "text": ".bind(h.requests[0].subject.invocation.as_uuid())"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 13876
+  }
+}

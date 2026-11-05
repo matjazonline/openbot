@@ -1,0 +1,75 @@
+{
+  "file": "src/adapters/http/routes/webhooks/resend_api.rs",
+  "entries": [
+    {
+      "name": "MAX_REQUEST_BODY_BYTES",
+      "kind": "constant",
+      "span": "L55-L55",
+      "signature": "const MAX_REQUEST_BODY_BYTES: usize = MAX_INBOUND_EVENT_PAYLOAD_BYTES;"
+    },
+    {
+      "name": "router",
+      "kind": "function",
+      "span": "L57-L64",
+      "signature": "pub fn router() -> Router<AppState>"
+    },
+    {
+      "name": "ResendApiWebhookEnvelope",
+      "kind": "struct",
+      "span": "L68-L72",
+      "signature": "struct ResendApiWebhookEnvelope"
+    },
+    {
+      "name": "ResendApiWebhookData",
+      "kind": "struct",
+      "span": "L75-L77",
+      "signature": "struct ResendApiWebhookData"
+    },
+    {
+      "name": "ResendApiWebhookState",
+      "kind": "struct",
+      "span": "L84-L90",
+      "signature": "pub struct ResendApiWebhookState"
+    },
+    {
+      "name": "from_ref",
+      "kind": "function",
+      "span": "L93-L101",
+      "signature": "fn from_ref(state: &AppState) -> Self"
+    },
+    {
+      "name": "resend_api_inbound_webhook",
+      "kind": "function",
+      "span": "L105-L195",
+      "signature": "async fn resend_api_inbound_webhook("
+    },
+    {
+      "name": "SVIX_ID_FACT",
+      "kind": "constant",
+      "span": "L201-L201",
+      "signature": "const SVIX_ID_FACT: &str = \"svix_id\";"
+    },
+    {
+      "name": "SVIX_TIMESTAMP_FACT",
+      "kind": "constant",
+      "span": "L202-L202",
+      "signature": "const SVIX_TIMESTAMP_FACT: &str = \"svix_timestamp\";"
+    },
+    {
+      "name": "safe_header_facts",
+      "kind": "function",
+      "span": "L213-L222",
+      "signature": "fn safe_header_facts(svix_id: &str, svix_timestamp: &str) -> SafeHeaderFacts"
+    },
+    {
+      "name": "tests",
+      "kind": "module",
+      "span": "L226-L226",
+      "signature": "mod tests;"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 9508
+  }
+}

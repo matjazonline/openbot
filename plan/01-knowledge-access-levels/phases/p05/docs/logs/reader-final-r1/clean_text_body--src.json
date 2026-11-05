@@ -1,0 +1,1079 @@
+{
+  "pattern": "clean_text_body",
+  "filesSearched": 1137,
+  "totalHits": 74,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/test_support.rs#inbound_email",
+        "name": "inbound_email",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/test_support.rs",
+        "span": "L281-L307"
+      },
+      "path": "src/adapters/persistence/thread/test_support.rs",
+      "inDegree": 17,
+      "hits": [
+        {
+          "line": 292,
+          "text": "clean_text_body: body.into(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/ports/thread/message_write.rs#internal",
+        "name": "internal",
+        "kind": "function",
+        "path": "src/application/ports/thread/message_write.rs",
+        "span": "L121-L150"
+      },
+      "path": "src/application/ports/thread/message_write.rs",
+      "inDegree": 17,
+      "hits": [
+        {
+          "line": 125,
+          "text": "clean_text_body: impl Into<String>,"
+        },
+        {
+          "line": 135,
+          "text": "clean_text_body: clean_text_body.into(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/test_support.rs#read",
+        "name": "read",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/test_support.rs",
+        "span": "L255-L279"
+      },
+      "path": "src/application/use_cases/thread/test_support.rs",
+      "inDegree": 8,
+      "hits": [
+        {
+          "line": 269,
+          "text": "clean_text_body: canonical.clean_text_body.clone(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/tests.rs#mailbox_message_draft",
+        "name": "mailbox_message_draft",
+        "kind": "function",
+        "path": "src/adapters/http/pages/tests.rs",
+        "span": "L1861-L1881"
+      },
+      "path": "src/adapters/http/pages/tests.rs",
+      "inDegree": 6,
+      "hits": [
+        {
+          "line": 1872,
+          "text": "clean_text_body: body.to_string(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_knowledge_view_tests.rs#classified",
+        "name": "classified",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui_knowledge_view_tests.rs",
+        "span": "L50-L76"
+      },
+      "path": "src/adapters/http/routes/ui_knowledge_view_tests.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 61,
+          "text": "sqlx::query(\"INSERT INTO messages(id,company_id,author_principal_id,subject,clean_text_body,attachments,direction,role,correlation_id,content_hash,audience,acce"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/message.rs#try_from",
+        "name": "try_from",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/message.rs",
+        "span": "L144-L186"
+      },
+      "path": "src/adapters/persistence/thread/message.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 172,
+          "text": "clean_text_body: db.clean_text_body,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/jev_assets_tests.rs#attachment",
+        "name": "attachment",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/jev_assets_tests.rs",
+        "span": "L25-L57"
+      },
+      "path": "src/adapters/persistence/workflow/jev_assets_tests.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 50,
+          "text": "sqlx::query(\"INSERT INTO messages(id,company_id,author_principal_id,subject,clean_text_body,direction,role,correlation_id,content_hash,attachments,audience) SEL"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/knowledge_admission_tests.rs#stamped",
+        "name": "stamped",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/knowledge_admission_tests.rs",
+        "span": "L22-L29"
+      },
+      "path": "src/adapters/persistence/workflow/knowledge_admission_tests.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 24,
+          "text": "sqlx::query(\"INSERT INTO messages(id,company_id,author_principal_id,subject,clean_text_body,direction,role,correlation_id,content_hash,audience,access_level) SE"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/run_schema_tests.rs#new",
+        "name": "new",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/run_schema_tests.rs",
+        "span": "L257-L287"
+      },
+      "path": "src/adapters/persistence/workflow/run_schema_tests.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 281,
+          "text": "sqlx::query(\"INSERT INTO messages (id, company_id, author_principal_id, subject, clean_text_body, direction, role, correlation_id, content_hash, audience) SELEC"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/agent_retire_tests.rs#spoken_agent",
+        "name": "spoken_agent",
+        "kind": "function",
+        "path": "src/adapters/persistence/agent_retire_tests.rs",
+        "span": "L27-L171"
+      },
+      "path": "src/adapters/persistence/agent_retire_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 111,
+          "text": "(id, company_id, author_principal_id, subject, clean_text_body, direction, role,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/message.rs#canonical_message_hash",
+        "name": "canonical_message_hash",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/message.rs",
+        "span": "L402-L452"
+      },
+      "path": "src/adapters/persistence/thread/message.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 433,
+          "text": "\"canonical_body\": email.is_none().then_some(write.clean_text_body.as_str()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/message.rs#insert_canonical_message",
+        "name": "insert_canonical_message",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/message.rs",
+        "span": "L774-L820"
+      },
+      "path": "src/adapters/persistence/thread/message.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 788,
+          "text": "&write.clean_text_body,"
+        },
+        {
+          "line": 797,
+          "text": "clean_text_body, attachments, direction, role, correlation_id, content_hash,"
+        },
+        {
+          "line": 806,
+          "text": ".bind(&write.clean_text_body)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/views.rs#into_view",
+        "name": "into_view",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/views.rs",
+        "span": "L121-L171"
+      },
+      "path": "src/adapters/persistence/thread/views.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 158,
+          "text": "body: self.clean_text_body,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/views.rs#thread_message_select",
+        "name": "thread_message_select",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/views.rs",
+        "span": "L247-L278"
+      },
+      "path": "src/adapters/persistence/thread/views.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 256,
+          "text": "message.clean_text_body, message.structured_response->'contract' AS response_contract,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/history_reader_tests.rs#message",
+        "name": "message",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/history_reader_tests.rs",
+        "span": "L23-L40"
+      },
+      "path": "src/adapters/persistence/workflow/history_reader_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 33,
+          "text": "sqlx::query(\"INSERT INTO messages (id, company_id, author_principal_id, subject, clean_text_body, direction, role, audience, correlation_id, content_hash) SELEC"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/account_identity_tests.rs#mail_from",
+        "name": "mail_from",
+        "kind": "function",
+        "path": "src/adapters/persistence/account_identity_tests.rs",
+        "span": "L150-L211"
+      },
+      "path": "src/adapters/persistence/account_identity_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 184,
+          "text": "clean_text_body, direction, role, correlation_id, content_hash, audience)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/inbound.rs#message_write",
+        "name": "message_write",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/inbound.rs",
+        "span": "L813-L866"
+      },
+      "path": "src/adapters/persistence/thread/inbound.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 840,
+          "text": "clean_text_body: envelope.content.body_text().to_string(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/admission_history_tests.rs#insert_message",
+        "name": "insert_message",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/admission_history_tests.rs",
+        "span": "L47-L52"
+      },
+      "path": "src/adapters/persistence/workflow/admission_history_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 49,
+          "text": "sqlx::query(\"INSERT INTO messages (id, company_id, author_principal_id, subject, clean_text_body, direction, role, correlation_id, content_hash, audience) SELEC"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/parser.rs#parse",
+        "name": "parse",
+        "kind": "function",
+        "path": "src/adapters/protocols/email/parser.rs",
+        "span": "L145-L290"
+      },
+      "path": "src/adapters/protocols/email/parser.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 214,
+          "text": "// Preserve full text in clean_text_body; quote stripping is applied during thread ingestion"
+        },
+        {
+          "line": 219,
+          "text": "let clean_text_body = quiet_body.unwrap_or(&base_clean_text).to_string();"
+        },
+        {
+          "line": 255,
+          "text": "clean_text_body.clone()"
+        },
+        {
+          "line": 257,
+          "text": "format!(\"{}\\n\\n{}\", clean_text_body, attachment_prompts.join(\"\\n\"))"
+        },
+        {
+          "line": 272,
+          "text": "clean_text_body,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/test_support.rs#create_message",
+        "name": "create_message",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/test_support.rs",
+        "span": "L606-L687"
+      },
+      "path": "src/application/use_cases/thread/test_support.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 619,
+          "text": "clean_text_body: write.clean_text_body.clone(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/test_support.rs#thread_message_view",
+        "name": "thread_message_view",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/test_support.rs",
+        "span": "L1028-L1061"
+      },
+      "path": "src/application/use_cases/thread/test_support.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 1052,
+          "text": "body: message.clean_text_body.clone(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/test_support.rs#default",
+        "name": "default",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/test_support.rs",
+        "span": "L1126-L1146"
+      },
+      "path": "src/application/use_cases/thread/test_support.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 1137,
+          "text": "clean_text_body: String::new(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_message_tests.rs#seed",
+        "name": "seed",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui_message_tests.rs",
+        "span": "L325-L341"
+      },
+      "path": "src/adapters/http/routes/ui_message_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 334,
+          "text": "\"INSERT INTO messages(id,company_id,author_principal_id,subject,clean_text_body,direction,role,correlation_id,content_hash,created_at,audience) \\"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/views.rs#list_thread_messages",
+        "name": "list_thread_messages",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/views.rs",
+        "span": "L285-L326"
+      },
+      "path": "src/adapters/persistence/thread/views.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 294,
+          "text": "recent.clean_text_body, recent.attachments, recent.direction, recent.role,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/history_reader.rs#read_rows",
+        "name": "read_rows",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/history_reader.rs",
+        "span": "L138-L168"
+      },
+      "path": "src/adapters/persistence/workflow/history_reader.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 147,
+          "text": "left(message.subject, $3) AS subject, left(message.clean_text_body, $3) AS body \\"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/ingress.rs#draft",
+        "name": "draft",
+        "kind": "function",
+        "path": "src/adapters/protocols/email/ingress.rs",
+        "span": "L352-L410"
+      },
+      "path": "src/adapters/protocols/email/ingress.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 390,
+          "text": "content: CanonicalContent::parse(&parsed.subject, &parsed.clean_text_body)?,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/test_support.rs#stored_email",
+        "name": "stored_email",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/test_support.rs",
+        "span": "L1150-L1194"
+      },
+      "path": "src/application/use_cases/thread/test_support.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 1184,
+          "text": "clean_text_body: draft.clean_text_body,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/test_support.rs#inbound_message_write",
+        "name": "inbound_message_write",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/test_support.rs",
+        "span": "L1576-L1626"
+      },
+      "path": "src/application/use_cases/thread/test_support.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 1600,
+          "text": "clean_text_body: envelope.content.body_text().to_string(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/tests.rs#message_pane_puts_the_viewers_messages_on_the_right_and_everyone_else_on_the_left",
+        "name": "message_pane_puts_the_viewers_messages_on_the_right_and_everyone_else_on_the_left",
+        "kind": "function",
+        "path": "src/adapters/http/pages/tests.rs",
+        "span": "L1693-L1767"
+      },
+      "path": "src/adapters/http/pages/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1708,
+          "text": "clean_text_body: \"Plain <b>text</b> body\".to_string(),"
+        },
+        {
+          "line": 1727,
+          "text": "clean_text_body: \"**Answered**\".to_string(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/channel.rs#channel_pages_and_fragments_render_correctly",
+        "name": "channel_pages_and_fragments_render_correctly",
+        "kind": "function",
+        "path": "src/adapters/http/routes/channel.rs",
+        "span": "L839-L1168"
+      },
+      "path": "src/adapters/http/routes/channel.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1016,
+          "text": "clean_text_body: \"Body text\".to_string(),"
+        },
+        {
+          "line": 1035,
+          "text": "clean_text_body: \"### Thread Result\\n\\n- **First** item\\n- Second item\".to_string(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_attachments.rs#message",
+        "name": "message",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui_attachments.rs",
+        "span": "L225-L245"
+      },
+      "path": "src/adapters/http/routes/ui_attachments.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 236,
+          "text": "clean_text_body: \"See attached.\".to_string(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/delivery/tests.rs#jsonb_row_context_delivery_reports_id_before_creating_queue_rows",
+        "name": "jsonb_row_context_delivery_reports_id_before_creating_queue_rows",
+        "kind": "function",
+        "path": "src/adapters/persistence/delivery/tests.rs",
+        "span": "L1379-L1436"
+      },
+      "path": "src/adapters/persistence/delivery/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1393,
+          "text": "sqlx::query(\"UPDATE messages SET structured_response=jsonb_build_object('body',clean_text_body,'fingerprint',repeat('a',64),'contract',jsonb_build_object('versi"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/inbound_tests.rs#an_accepted_message_lands_with_its_mapping_thread_and_intent_at_once",
+        "name": "an_accepted_message_lands_with_its_mapping_thread_and_intent_at_once",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/inbound_tests.rs",
+        "span": "L307-L407"
+      },
+      "path": "src/adapters/persistence/thread/inbound_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 404,
+          "text": "assert_eq!(stored.clean_text_body, \"Anyone there?\");"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/inbound_tests.rs#a_repeated_key_with_changed_content_is_a_collision_rather_than_a_rewrite",
+        "name": "a_repeated_key_with_changed_content_is_a_collision_rather_than_a_rewrite",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/inbound_tests.rs",
+        "span": "L451-L480"
+      },
+      "path": "src/adapters/persistence/thread/inbound_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 472,
+          "text": "sqlx::query_scalar(\"SELECT clean_text_body FROM messages WHERE company_id = $1\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/inbound_tests.rs#authored_identity_cannot_belong_to_a_different_author_principal",
+        "name": "authored_identity_cannot_belong_to_a_different_author_principal",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/inbound_tests.rs",
+        "span": "L970-L1025"
+      },
+      "path": "src/adapters/persistence/thread/inbound_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1004,
+          "text": "clean_text_body, direction, role, correlation_id, content_hash, audience"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/jsonb_row_context_tests.rs#jsonb_row_context_thread_contract_is_optional_per_message",
+        "name": "jsonb_row_context_thread_contract_is_optional_per_message",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/jsonb_row_context_tests.rs",
+        "span": "L6-L83"
+      },
+      "path": "src/adapters/persistence/thread/jsonb_row_context_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 40,
+          "text": "assert_eq!(broken.clean_text_body, \"{}\");"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/message.rs#MessageDb",
+        "name": "MessageDb",
+        "kind": "struct",
+        "path": "src/adapters/persistence/thread/message.rs",
+        "span": "L54-L77"
+      },
+      "path": "src/adapters/persistence/thread/message.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 67,
+          "text": "pub clean_text_body: String,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/message.rs#MESSAGE_SELECT",
+        "name": "MESSAGE_SELECT",
+        "kind": "constant",
+        "path": "src/adapters/persistence/thread/message.rs",
+        "span": "L93-L139"
+      },
+      "path": "src/adapters/persistence/thread/message.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 105,
+          "text": "message.clean_text_body,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/thread/message.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 397,
+          "text": "/// Email hashes its raw body representations: `clean_text_body` is a rendering produced by quote"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/message.rs#tests",
+        "name": "tests",
+        "kind": "module",
+        "path": "src/adapters/persistence/thread/message.rs",
+        "span": "L938-L1084"
+      },
+      "path": "src/adapters/persistence/thread/message.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 971,
+          "text": "/// The reason `clean_text_body` is not hashed: one email fanned out to two channels is stripped"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/message.rs#a_differently_stripped_body_is_the_same_provider_payload",
+        "name": "a_differently_stripped_body_is_the_same_provider_payload",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/message.rs",
+        "span": "L975-L987"
+      },
+      "path": "src/adapters/persistence/thread/message.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 981,
+          "text": "second.clean_text_body = \"Body\\n\\n> quoted history\".into();"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/tests.rs#internal_notes_are_idempotent_immutable_and_auditable",
+        "name": "internal_notes_are_idempotent_immutable_and_auditable",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/tests.rs",
+        "span": "L21-L225"
+      },
+      "path": "src/adapters/persistence/thread/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 184,
+          "text": "\"SELECT clean_text_body FROM messages WHERE company_id = $1 AND id = $2\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/tests.rs#one_message_joins_several_threads_but_never_a_foreign_one",
+        "name": "one_message_joins_several_threads_but_never_a_foreign_one",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/tests.rs",
+        "span": "L400-L468"
+      },
+      "path": "src/adapters/persistence/thread/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 433,
+          "text": "assert_eq!(joined.clean_text_body, stored.clean_text_body);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/tests.rs#identical_redelivery_is_reused_and_changed_content_collides",
+        "name": "identical_redelivery_is_reused_and_changed_content_collides",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/tests.rs",
+        "span": "L557-L622"
+      },
+      "path": "src/adapters/persistence/thread/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 586,
+          "text": "// delivered payload -- this is precisely why `clean_text_body` is not hashed."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/tests.rs#find_outbound_reply_after_sees_answers_and_ignores_relayed_mail",
+        "name": "find_outbound_reply_after_sees_answers_and_ignores_relayed_mail",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/tests.rs",
+        "span": "L1057-L1156"
+      },
+      "path": "src/adapters/persistence/thread/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1091,
+          "text": "clean_text_body: \"Handed to another channel\".into(),"
+        },
+        {
+          "line": 1126,
+          "text": "clean_text_body: \"Here is the answer\".into(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/views.rs#ThreadMessageDb",
+        "name": "ThreadMessageDb",
+        "kind": "struct",
+        "path": "src/adapters/persistence/thread/views.rs",
+        "span": "L95-L118"
+      },
+      "path": "src/adapters/persistence/thread/views.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 105,
+          "text": "clean_text_body: String,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/views.rs#AgentHistoryDb",
+        "name": "AgentHistoryDb",
+        "kind": "struct",
+        "path": "src/adapters/persistence/thread/views.rs",
+        "span": "L400-L409"
+      },
+      "path": "src/adapters/persistence/thread/views.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 408,
+          "text": "clean_text_body: String,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/views.rs#list_agent_history",
+        "name": "list_agent_history",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/views.rs",
+        "span": "L415-L479"
+      },
+      "path": "src/adapters/persistence/thread/views.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 421,
+          "text": "recent.author_label, recent.author_subject, recent.subject, recent.clean_text_body"
+        },
+        {
+          "line": 430,
+          "text": "message.clean_text_body,"
+        },
+        {
+          "line": 475,
+          "text": "body: row.clean_text_body,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/admission_history_tests.rs#workflow_admit_sql_long_history_retains_only_newest_256",
+        "name": "workflow_admit_sql_long_history_retains_only_newest_256",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/admission_history_tests.rs",
+        "span": "L213-L254"
+      },
+      "path": "src/adapters/persistence/workflow/admission_history_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 218,
+          "text": "sqlx::query(\"WITH inserted AS (INSERT INTO messages (id,company_id,author_principal_id,subject,clean_text_body,direction,role,correlation_id,content_hash,audien"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/admission_source_tests.rs#new",
+        "name": "new",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/admission_source_tests.rs",
+        "span": "L36-L68"
+      },
+      "path": "src/adapters/persistence/workflow/admission_source_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 61,
+          "text": "sqlx::query(\"INSERT INTO messages (id,company_id,author_principal_id,subject,clean_text_body,direction,role,correlation_id,content_hash,audience) SELECT $1,$2,i"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_intents.rs#trigger_input",
+        "name": "trigger_input",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_intents.rs",
+        "span": "L229-L252"
+      },
+      "path": "src/adapters/persistence/workflow/message_intents.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 231,
+          "text": "\"SELECT message.subject, message.clean_text_body, \\"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/parser.rs#ParsedEmail",
+        "name": "ParsedEmail",
+        "kind": "struct",
+        "path": "src/adapters/protocols/email/parser.rs",
+        "span": "L33-L69"
+      },
+      "path": "src/adapters/protocols/email/parser.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 53,
+          "text": "pub clean_text_body: String,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/parser.rs#parse_inbound_email_sanitizes_invisible_unicode_injection_characters",
+        "name": "parse_inbound_email_sanitizes_invisible_unicode_injection_characters",
+        "kind": "function",
+        "path": "src/adapters/protocols/email/parser.rs",
+        "span": "L561-L575"
+      },
+      "path": "src/adapters/protocols/email/parser.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 573,
+          "text": "assert_eq!(parsed.clean_text_body, \"Clean linereversed.\");"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/ports/thread/message_write.rs#MessageWrite",
+        "name": "MessageWrite",
+        "kind": "struct",
+        "path": "src/application/ports/thread/message_write.rs",
+        "span": "L90-L116"
+      },
+      "path": "src/application/ports/thread/message_write.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 103,
+          "text": "pub clean_text_body: String,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/test_support.rs#Canonical",
+        "name": "Canonical",
+        "kind": "struct",
+        "path": "src/application/use_cases/thread/test_support.rs",
+        "span": "L131-L143"
+      },
+      "path": "src/application/use_cases/thread/test_support.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 135,
+          "text": "clean_text_body: String,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/use_cases/thread/test_support.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 149,
+          "text": "/// actually sent, and deliberately *not* `clean_text_body`, which is derived per thread."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/test_support.rs#list_agent_history",
+        "name": "list_agent_history",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/test_support.rs",
+        "span": "L780-L806"
+      },
+      "path": "src/application/use_cases/thread/test_support.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 803,
+          "text": "body: message.clean_text_body.clone(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/test_support.rs#EmailMessageDraft",
+        "name": "EmailMessageDraft",
+        "kind": "struct",
+        "path": "src/application/use_cases/thread/test_support.rs",
+        "span": "L1105-L1123"
+      },
+      "path": "src/application/use_cases/thread/test_support.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1115,
+          "text": "pub clean_text_body: String,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/tests.rs#test_quote_stripping_rules_for_first_in_thread_and_forwarded_emails",
+        "name": "test_quote_stripping_rules_for_first_in_thread_and_forwarded_emails",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/tests.rs",
+        "span": "L1053-L1165"
+      },
+      "path": "src/application/use_cases/thread/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1120,
+          "text": "assert_eq!(msg1.clean_text_body, msg1_text); // Preserved full text!"
+        },
+        {
+          "line": 1143,
+          "text": "assert_eq!(msg2.clean_text_body, \"Thanks for looking into this.\"); // Stripped quotes!"
+        },
+        {
+          "line": 1164,
+          "text": "assert_eq!(msg3.clean_text_body, fwd_text); // Preserved full forwarded text!"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/message.rs#Message",
+        "name": "Message",
+        "kind": "struct",
+        "path": "src/domain/entities/message.rs",
+        "span": "L302-L329"
+      },
+      "path": "src/domain/entities/message.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 314,
+          "text": "pub clean_text_body: String,"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 29,
+    "baselineChars": 934822
+  }
+}

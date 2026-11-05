@@ -1,0 +1,1503 @@
+{
+  "pattern": "subject",
+  "filesSearched": 198,
+  "totalHits": 136,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/tests.rs#mailbox_thread",
+        "name": "mailbox_thread",
+        "kind": "function",
+        "path": "src/adapters/http/pages/tests.rs",
+        "span": "L152-L170"
+      },
+      "path": "src/adapters/http/pages/tests.rs",
+      "inDegree": 28,
+      "hits": [
+        {
+          "line": 156,
+          "text": "subject: \"Question <script>\".to_string(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/mailbox.rs#message_pane",
+        "name": "message_pane",
+        "kind": "function",
+        "path": "src/adapters/http/pages/mailbox.rs",
+        "span": "L2253-L2350"
+      },
+      "path": "src/adapters/http/pages/mailbox.rs",
+      "inDegree": 11,
+      "hits": [
+        {
+          "line": 2257,
+          "text": ".subjects_for(TransportKind::Email);"
+        },
+        {
+          "line": 2300,
+          "text": "<h2 class=\"truncate text-lg font-bold sm:text-xl\">{subject}</h2>"
+        },
+        {
+          "line": 2330,
+          "text": "subject = escape_html_text(&pane.thread.subject),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_profile_session_tests.rs#new",
+        "name": "new",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui_profile_session_tests.rs",
+        "span": "L52-L104"
+      },
+      "path": "src/adapters/http/routes/ui_profile_session_tests.rs",
+      "inDegree": 8,
+      "hits": [
+        {
+          "line": 65,
+          "text": "subject: &id,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/tests.rs#mailbox_message_draft",
+        "name": "mailbox_message_draft",
+        "kind": "function",
+        "path": "src/adapters/http/pages/tests.rs",
+        "span": "L1860-L1880"
+      },
+      "path": "src/adapters/http/pages/tests.rs",
+      "inDegree": 6,
+      "hits": [
+        {
+          "line": 1870,
+          "text": "subject: \"Question\".to_string(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/channel/simulation.rs#payload",
+        "name": "payload",
+        "kind": "function",
+        "path": "src/adapters/http/routes/channel/simulation.rs",
+        "span": "L286-L296"
+      },
+      "path": "src/adapters/http/routes/channel/simulation.rs",
+      "inDegree": 6,
+      "hits": [
+        {
+          "line": 290,
+          "text": "subject: self.form.subject.clone(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/webhooks/resend_api_tests.rs#received_event",
+        "name": "received_event",
+        "kind": "function",
+        "path": "src/adapters/http/routes/webhooks/resend_api_tests.rs",
+        "span": "L201-L215"
+      },
+      "path": "src/adapters/http/routes/webhooks/resend_api_tests.rs",
+      "inDegree": 6,
+      "hits": [
+        {
+          "line": 210,
+          "text": "\"subject\": \"hello\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/mailbox.rs#thread_row_fragment",
+        "name": "thread_row_fragment",
+        "kind": "function",
+        "path": "src/adapters/http/pages/mailbox.rs",
+        "span": "L2147-L2204"
+      },
+      "path": "src/adapters/http/pages/mailbox.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 2156,
+          "text": ".subjects_for(TransportKind::Email);"
+        },
+        {
+          "line": 2174,
+          "text": "<span class=\"flex min-w-0 items-center gap-1.5\">{channel_glyph}<span class=\"truncate font-semibold\">{subject}</span></span>"
+        },
+        {
+          "line": 2189,
+          "text": "subject = escape_html_text(&thread.subject),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/tests.rs#queued_delivery",
+        "name": "queued_delivery",
+        "kind": "function",
+        "path": "src/adapters/http/pages/tests.rs",
+        "span": "L3699-L3723"
+      },
+      "path": "src/adapters/http/pages/tests.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 3712,
+          "text": "subject: \"Re: order <script>\".to_string(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_stream_tests.rs#thread",
+        "name": "thread",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui_stream_tests.rs",
+        "span": "L331-L336"
+      },
+      "path": "src/adapters/http/routes/ui_stream_tests.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 331,
+          "text": "async fn thread(&self, subject: &str) -> Uuid {"
+        },
+        {
+          "line": 332,
+          "text": "ThreadPersistence::create_thread(self.persistence.as_ref(), self.channel_id, subject, &[])"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/deliveries.rs#delivery_detail_pane",
+        "name": "delivery_detail_pane",
+        "kind": "function",
+        "path": "src/adapters/http/pages/deliveries.rs",
+        "span": "L371-L410"
+      },
+      "path": "src/adapters/http/pages/deliveries.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 382,
+          "text": "<span class=\"truncate\">{subject}</span>"
+        },
+        {
+          "line": 402,
+          "text": "subject = escape_html_text(&entry.subject),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/mailbox.rs#compose_pane",
+        "name": "compose_pane",
+        "kind": "function",
+        "path": "src/adapters/http/pages/mailbox.rs",
+        "span": "L2757-L2805"
+      },
+      "path": "src/adapters/http/pages/mailbox.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 2774,
+          "text": "<input type=\"text\" name=\"subject\" required placeholder=\"Subject\" value=\"{subject}\""
+        },
+        {
+          "line": 2792,
+          "text": "subject = escape_html_text(pane.subject),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/mailbox.rs#reply_pane",
+        "name": "reply_pane",
+        "kind": "function",
+        "path": "src/adapters/http/pages/mailbox.rs",
+        "span": "L2811-L2858"
+      },
+      "path": "src/adapters/http/pages/mailbox.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 2816,
+          "text": "<h2 class=\"text-xl font-bold\">New message in {subject}</h2>"
+        },
+        {
+          "line": 2827,
+          "text": "{subject_field}"
+        },
+        {
+          "line": 2838,
+          "text": "subject = escape_html_text(&pane.thread.subject),"
+        },
+        {
+          "line": 2844,
+          "text": "subject_field = readonly_field(\"Subject\", &pane.thread.reply_subject()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/onboarding.rs#onboarding_complete_page",
+        "name": "onboarding_complete_page",
+        "kind": "function",
+        "path": "src/adapters/http/pages/onboarding.rs",
+        "span": "L169-L223"
+      },
+      "path": "src/adapters/http/pages/onboarding.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 198,
+          "text": "<section class=\"rounded-box border border-base-300 p-4\"><span class=\"badge badge-primary badge-outline\">1 · New request</span><h2 class=\"mt-3 font-semibold\">Sen"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/simulation/live.rs#channel_simulation_loaded_thread_fragment",
+        "name": "channel_simulation_loaded_thread_fragment",
+        "kind": "function",
+        "path": "src/adapters/http/pages/simulation/live.rs",
+        "span": "L492-L563"
+      },
+      "path": "src/adapters/http/pages/simulation/live.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 508,
+          "text": ".subjects_for(TransportKind::Email)"
+        },
+        {
+          "line": 542,
+          "text": "subject: &if thread.subject.to_lowercase().starts_with(\"re:\") {"
+        },
+        {
+          "line": 543,
+          "text": "thread.subject.clone()"
+        },
+        {
+          "line": 545,
+          "text": "format!(\"Re: {}\", thread.subject)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/tests.rs#mailbox_message_view",
+        "name": "mailbox_message_view",
+        "kind": "function",
+        "path": "src/adapters/http/pages/tests.rs",
+        "span": "L1776-L1800"
+      },
+      "path": "src/adapters/http/pages/tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 1790,
+          "text": "subject: \"Question\".into(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/workflow_decision.rs#workflow_decision_section",
+        "name": "workflow_decision_section",
+        "kind": "function",
+        "path": "src/adapters/http/pages/workflow_decision.rs",
+        "span": "L38-L87"
+      },
+      "path": "src/adapters/http/pages/workflow_decision.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 64,
+          "text": "<header class=\"space-y-1\"><h1 class=\"text-xl font-bold\">{subject}</h1>"
+        },
+        {
+          "line": 72,
+          "text": "subject = view.subject.label(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/workflow_decision/forms.rs#data",
+        "name": "data",
+        "kind": "function",
+        "path": "src/adapters/http/pages/workflow_decision/forms.rs",
+        "span": "L44-L88"
+      },
+      "path": "src/adapters/http/pages/workflow_decision/forms.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 45,
+          "text": "if view.subject != DecisionSubject::Business {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/mailbox.rs#opened_by_another_channel",
+        "name": "opened_by_another_channel",
+        "kind": "function",
+        "path": "src/adapters/http/pages/mailbox.rs",
+        "span": "L2086-L2092"
+      },
+      "path": "src/adapters/http/pages/mailbox.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 2089,
+          "text": ".subjects_for(TransportKind::Email)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/mailbox.rs#message_bubble",
+        "name": "message_bubble",
+        "kind": "function",
+        "path": "src/adapters/http/pages/mailbox.rs",
+        "span": "L2479-L2575"
+      },
+      "path": "src/adapters/http/pages/mailbox.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 2532,
+          "text": "<div class=\"chat-footer font-mono text-[11px] opacity-50\">{boundary} · {subject}{diagnostics}</div>{run_attribution}"
+        },
+        {
+          "line": 2567,
+          "text": "subject = escape_html_text(&message.subject),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/simulation/outcomes.rs#channel_simulation_failure_fragment",
+        "name": "channel_simulation_failure_fragment",
+        "kind": "function",
+        "path": "src/adapters/http/pages/simulation/outcomes.rs",
+        "span": "L44-L153"
+      },
+      "path": "src/adapters/http/pages/simulation/outcomes.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 52,
+          "text": "subject: subject_str,"
+        },
+        {
+          "line": 131,
+          "text": "<span class=\"text-base-content font-sans font-medium text-sm\">{subject_str}</span>"
+        },
+        {
+          "line": 151,
+          "text": "subject_str = escape_html_text(subject_str),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/simulation/outcomes.rs#channel_simulation_result_fragment",
+        "name": "channel_simulation_result_fragment",
+        "kind": "function",
+        "path": "src/adapters/http/pages/simulation/outcomes.rs",
+        "span": "L292-L367"
+      },
+      "path": "src/adapters/http/pages/simulation/outcomes.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 347,
+          "text": "let subject_str = result.subject.as_deref().unwrap_or(\"(No subject)\");"
+        },
+        {
+          "line": 361,
+          "text": "subject: subject_str,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/workflow_decision.rs#workflow_decision_page",
+        "name": "workflow_decision_page",
+        "kind": "function",
+        "path": "src/adapters/http/pages/workflow_decision.rs",
+        "span": "L28-L36"
+      },
+      "path": "src/adapters/http/pages/workflow_decision.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 30,
+          "text": "view.subject.label(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/workflow_decision/tests.rs#view",
+        "name": "view",
+        "kind": "function",
+        "path": "src/adapters/http/pages/workflow_decision/tests.rs",
+        "span": "L6-L39"
+      },
+      "path": "src/adapters/http/pages/workflow_decision/tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 8,
+          "text": "subject: DecisionSubject::Business,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/channel/simulation.rs#failure",
+        "name": "failure",
+        "kind": "function",
+        "path": "src/adapters/http/routes/channel/simulation.rs",
+        "span": "L216-L230"
+      },
+      "path": "src/adapters/http/routes/channel/simulation.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 225,
+          "text": "subject: self.form.subject.as_deref().unwrap_or(\"(No subject)\"),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/reconciliations.rs#reconcile_command",
+        "name": "reconcile_command",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/reconciliations.rs",
+        "span": "L83-L124"
+      },
+      "path": "src/adapters/http/routes/workflows/reconciliations.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 97,
+          "text": "subject: ApprovalSubject {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/channels.rs#channel_thread_card",
+        "name": "channel_thread_card",
+        "kind": "function",
+        "path": "src/adapters/http/pages/channels.rs",
+        "span": "L266-L311"
+      },
+      "path": "src/adapters/http/pages/channels.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 274,
+          "text": ".subjects_for(TransportKind::Email);"
+        },
+        {
+          "line": 286,
+          "text": "<h3 class=\"flex items-center gap-1.5 font-semibold text-base-content break-words\">{channel_glyph}{subject}</h3>"
+        },
+        {
+          "line": 304,
+          "text": "subject = escape_html_text(&thread.subject),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/deliveries.rs#delivery_menu_entry",
+        "name": "delivery_menu_entry",
+        "kind": "function",
+        "path": "src/adapters/http/pages/deliveries.rs",
+        "span": "L268-L303"
+      },
+      "path": "src/adapters/http/pages/deliveries.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 282,
+          "text": "<span class=\"min-w-0 truncate text-xs\">{subject}</span>"
+        },
+        {
+          "line": 297,
+          "text": "subject = escape_html_text(&entry.subject),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/simulation/compose.rs#simulation_compose_form",
+        "name": "simulation_compose_form",
+        "kind": "function",
+        "path": "src/adapters/http/pages/simulation/compose.rs",
+        "span": "L30-L139"
+      },
+      "path": "src/adapters/http/pages/simulation/compose.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 58,
+          "text": "<label for=\"subject\" class=\"block text-xs font-medium text-base-content/80 mb-1\">Subject</label>"
+        },
+        {
+          "line": 59,
+          "text": "<input type=\"text\" id=\"subject\" name=\"subject\" value=\"Simulated Webhook Trigger\" required"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/simulation/live.rs#message_bubble",
+        "name": "message_bubble",
+        "kind": "function",
+        "path": "src/adapters/http/pages/simulation/live.rs",
+        "span": "L198-L276"
+      },
+      "path": "src/adapters/http/pages/simulation/live.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 259,
+          "text": "Subject: <span class=\"font-normal text-base-content/80\">{subject}</span>"
+        },
+        {
+          "line": 271,
+          "text": "subject = super::escape_html_text(&msg.subject),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/simulation/live.rs#simulate_reply_form",
+        "name": "simulate_reply_form",
+        "kind": "function",
+        "path": "src/adapters/http/pages/simulation/live.rs",
+        "span": "L346-L447"
+      },
+      "path": "src/adapters/http/pages/simulation/live.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 354,
+          "text": "subject,"
+        },
+        {
+          "line": 365,
+          "text": "let subject = escape_html_attr(subject);"
+        },
+        {
+          "line": 398,
+          "text": "<label for=\"subject_reply\" class=\"block text-xs font-medium text-base-content/80 mb-1\">Subject</label>"
+        },
+        {
+          "line": 399,
+          "text": "<input type=\"text\" id=\"subject_reply\" name=\"subject\" value=\"{subject}\" required"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/simulation/live.rs#loaded_thread_overview_card",
+        "name": "loaded_thread_overview_card",
+        "kind": "function",
+        "path": "src/adapters/http/pages/simulation/live.rs",
+        "span": "L565-L619"
+      },
+      "path": "src/adapters/http/pages/simulation/live.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 573,
+          "text": ".subjects_for(TransportKind::Email);"
+        },
+        {
+          "line": 590,
+          "text": "<span class=\"text-base-content font-bold\">{subject}</span>"
+        },
+        {
+          "line": 615,
+          "text": "subject = super::escape_html_text(&thread.subject),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/simulation/outcomes.rs#simulation_routing_report",
+        "name": "simulation_routing_report",
+        "kind": "function",
+        "path": "src/adapters/http/pages/simulation/outcomes.rs",
+        "span": "L194-L275"
+      },
+      "path": "src/adapters/http/pages/simulation/outcomes.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 204,
+          "text": "subject: subject_str,"
+        },
+        {
+          "line": 248,
+          "text": "<span class=\"text-base-content font-sans font-medium text-sm\">{subject_str}</span>"
+        },
+        {
+          "line": 271,
+          "text": "subject_str = super::escape_html_text(subject_str),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/tests.rs#agent_reply_view",
+        "name": "agent_reply_view",
+        "kind": "function",
+        "path": "src/adapters/http/pages/tests.rs",
+        "span": "L1844-L1857"
+      },
+      "path": "src/adapters/http/pages/tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 1852,
+          "text": "subject: \"Re: Question\".into(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/apple_auth.rs#complete_flow",
+        "name": "complete_flow",
+        "kind": "function",
+        "path": "src/adapters/http/routes/apple_auth.rs",
+        "span": "L209-L268"
+      },
+      "path": "src/adapters/http/routes/apple_auth.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 252,
+          "text": "subject: &identity.sub,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/channel/simulation.rs#verify",
+        "name": "verify",
+        "kind": "function",
+        "path": "src/adapters/http/routes/channel/simulation.rs",
+        "span": "L252-L285"
+      },
+      "path": "src/adapters/http/routes/channel/simulation.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 273,
+          "text": "subject: self.form.subject.clone(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_message_tests.rs#seed",
+        "name": "seed",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui_message_tests.rs",
+        "span": "L325-L341"
+      },
+      "path": "src/adapters/http/routes/ui_message_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 334,
+          "text": "\"INSERT INTO messages(id,company_id,author_principal_id,subject,clean_text_body,direction,role,correlation_id,content_hash,created_at,audience) \\"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/user.rs#complete_google_flow",
+        "name": "complete_google_flow",
+        "kind": "function",
+        "path": "src/adapters/http/routes/user.rs",
+        "span": "L296-L364"
+      },
+      "path": "src/adapters/http/routes/user.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 341,
+          "text": "subject: &profile.sub,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/decisions.rs#view_json",
+        "name": "view_json",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/decisions.rs",
+        "span": "L20-L51"
+      },
+      "path": "src/adapters/http/routes/workflows/decisions.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 22,
+          "text": "\"subject\":view.subject.as_str(),\"data_schema\":view.data_schema,\"feedback_required\":view.feedback_required,\"can_submit\":view.can_submit,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/chart.rs#an_unmeasured_bucket_breaks_the_line_instead_of_diving_to_zero",
+        "name": "an_unmeasured_bucket_breaks_the_line_instead_of_diving_to_zero",
+        "kind": "function",
+        "path": "src/adapters/http/pages/chart.rs",
+        "span": "L681-L694"
+      },
+      "path": "src/adapters/http/pages/chart.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 688,
+          "text": "let subject = chart(&marks, &series, ChartKind::Line);"
+        },
+        {
+          "line": 689,
+          "text": "let runs = measured_runs(&subject, &Frame::new(&subject), &series[0]);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/chart.rs#every_bucket_answers_when_pointed_at_including_the_empty_ones",
+        "name": "every_bucket_answers_when_pointed_at_including_the_empty_ones",
+        "kind": "function",
+        "path": "src/adapters/http/pages/chart.rs",
+        "span": "L735-L751"
+      },
+      "path": "src/adapters/http/pages/chart.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 742,
+          "text": "let subject = chart(&marks, &series, ChartKind::StackedColumn);"
+        },
+        {
+          "line": 745,
+          "text": "hover_bands(&subject, &Frame::new(&subject))"
+        },
+        {
+          "line": 750,
+          "text": "assert!(readout(&subject, 1).contains(\"0 completed\"));"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/chart.rs#an_unmeasured_bucket_reads_as_unmeasured_rather_than_as_zero",
+        "name": "an_unmeasured_bucket_reads_as_unmeasured_rather_than_as_zero",
+        "kind": "function",
+        "path": "src/adapters/http/pages/chart.rs",
+        "span": "L754-L768"
+      },
+      "path": "src/adapters/http/pages/chart.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 761,
+          "text": "let subject = TimeChart {"
+        },
+        {
+          "line": 766,
+          "text": "assert!(subject.peak() == 0.0);"
+        },
+        {
+          "line": 767,
+          "text": "assert!(readout(&subject, 0).contains(\"no p50\"));"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/chart.rs#a_value_too_small_to_see_is_still_drawn",
+        "name": "a_value_too_small_to_see_is_still_drawn",
+        "kind": "function",
+        "path": "src/adapters/http/pages/chart.rs",
+        "span": "L779-L792"
+      },
+      "path": "src/adapters/http/pages/chart.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 788,
+          "text": "let subject = chart(&marks, &series, ChartKind::StackedColumn);"
+        },
+        {
+          "line": 789,
+          "text": "let svg = stacked_columns(&subject, &Frame::new(&subject));"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/mailbox.rs#ComposePane",
+        "name": "ComposePane",
+        "kind": "struct",
+        "path": "src/adapters/http/pages/mailbox.rs",
+        "span": "L243-L253"
+      },
+      "path": "src/adapters/http/pages/mailbox.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 249,
+          "text": "pub subject: &'a str,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/http/pages/mailbox.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 2434,
+          "text": "/// and the subject underneath. Agent replies sit on the right, everyone else on the left."
+        },
+        {
+          "line": 2724,
+          "text": "/// An envelope field the sender cannot change: the addresses, and a reply's subject."
+        },
+        {
+          "line": 2809,
+          "text": "/// The subject is fixed to the thread's own, because the message is threaded by its `In-Reply-To`"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/simulation.rs#EmailSimulationResult",
+        "name": "EmailSimulationResult",
+        "kind": "struct",
+        "path": "src/adapters/http/pages/simulation.rs",
+        "span": "L10-L21"
+      },
+      "path": "src/adapters/http/pages/simulation.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 19,
+          "text": "pub subject: Option<String>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/simulation/live.rs#ReplyFormFields",
+        "name": "ReplyFormFields",
+        "kind": "struct",
+        "path": "src/adapters/http/pages/simulation/live.rs",
+        "span": "L332-L344"
+      },
+      "path": "src/adapters/http/pages/simulation/live.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 339,
+          "text": "subject: &'a str,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/simulation/outcomes.rs#ChannelSimulationFailure",
+        "name": "ChannelSimulationFailure",
+        "kind": "struct",
+        "path": "src/adapters/http/pages/simulation/outcomes.rs",
+        "span": "L33-L42"
+      },
+      "path": "src/adapters/http/pages/simulation/outcomes.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 40,
+          "text": "pub subject: &'a str,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/simulation/outcomes.rs#SimulationRoutingReport",
+        "name": "SimulationRoutingReport",
+        "kind": "struct",
+        "path": "src/adapters/http/pages/simulation/outcomes.rs",
+        "span": "L180-L192"
+      },
+      "path": "src/adapters/http/pages/simulation/outcomes.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 189,
+          "text": "subject: &'a str,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/tests.rs#simulation_attribute_values_and_message_ids_are_escaped",
+        "name": "simulation_attribute_values_and_message_ids_are_escaped",
+        "kind": "function",
+        "path": "src/adapters/http/pages/tests.rs",
+        "span": "L51-L91"
+      },
+      "path": "src/adapters/http/pages/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 67,
+          "text": "subject: \"<id><script>alert(1)</script>\".into(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/tests.rs#mailbox_page_renders_three_columns_and_escapes_thread_subjects",
+        "name": "mailbox_page_renders_three_columns_and_escapes_thread_subjects",
+        "kind": "function",
+        "path": "src/adapters/http/pages/tests.rs",
+        "span": "L188-L218"
+      },
+      "path": "src/adapters/http/pages/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 188,
+          "text": "fn mailbox_page_renders_three_columns_and_escapes_thread_subjects() {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/tests.rs#message_pane_puts_the_viewers_messages_on_the_right_and_everyone_else_on_the_left",
+        "name": "message_pane_puts_the_viewers_messages_on_the_right_and_everyone_else_on_the_left",
+        "kind": "function",
+        "path": "src/adapters/http/pages/tests.rs",
+        "span": "L1693-L1767"
+      },
+      "path": "src/adapters/http/pages/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1707,
+          "text": "subject: \"Question\".to_string(),"
+        },
+        {
+          "line": 1726,
+          "text": "subject: \"Re: Question\".to_string(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/tests.rs#a_thread_opened_by_another_channel_is_marked_and_one_from_a_person_is_not",
+        "name": "a_thread_opened_by_another_channel_is_marked_and_one_from_a_person_is_not",
+        "kind": "function",
+        "path": "src/adapters/http/pages/tests.rs",
+        "span": "L2385-L2429"
+      },
+      "path": "src/adapters/http/pages/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 2413,
+          "text": "// The subject still truncates beside the glyph rather than being replaced by it."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/tests.rs#a_message_renders_for_every_transport_including_none_at_all",
+        "name": "a_message_renders_for_every_transport_including_none_at_all",
+        "kind": "function",
+        "path": "src/adapters/http/pages/tests.rs",
+        "span": "L2516-L2572"
+      },
+      "path": "src/adapters/http/pages/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 2544,
+          "text": "subject: \"Nightly audit\".into(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/tests.rs#reply_pane_fixes_the_subject_to_the_thread_it_continues",
+        "name": "reply_pane_fixes_the_subject_to_the_thread_it_continues",
+        "kind": "function",
+        "path": "src/adapters/http/pages/tests.rs",
+        "span": "L2808-L2839"
+      },
+      "path": "src/adapters/http/pages/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 2808,
+          "text": "fn reply_pane_fixes_the_subject_to_the_thread_it_continues() {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/tests.rs#compose_pane_shows_the_channel_address_and_errors",
+        "name": "compose_pane_shows_the_channel_address_and_errors",
+        "kind": "function",
+        "path": "src/adapters/http/pages/tests.rs",
+        "span": "L2842-L2866"
+      },
+      "path": "src/adapters/http/pages/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 2851,
+          "text": "subject: \"Draft subject\","
+        },
+        {
+          "line": 2859,
+          "text": "assert!(html.contains(\"value=\\\"Draft subject\\\"\"));"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/tests.rs#deliveries_page_lists_queued_work_and_escapes_its_subject",
+        "name": "deliveries_page_lists_queued_work_and_escapes_its_subject",
+        "kind": "function",
+        "path": "src/adapters/http/pages/tests.rs",
+        "span": "L3730-L3777"
+      },
+      "path": "src/adapters/http/pages/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 3730,
+          "text": "fn deliveries_page_lists_queued_work_and_escapes_its_subject() {"
+        },
+        {
+          "line": 3754,
+          "text": "// The shell carries its own <script> tag, so this pins the subject rather than the document."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/workflow_decision.rs#history",
+        "name": "history",
+        "kind": "function",
+        "path": "src/adapters/http/pages/workflow_decision.rs",
+        "span": "L149-L171"
+      },
+      "path": "src/adapters/http/pages/workflow_decision.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 154,
+          "text": "<a class=\"link\" href=\"/ui/workflow-decisions/{id}\">{subject} · {step}{round}{current}</a>"
+        },
+        {
+          "line": 156,
+          "text": "id=entry.decision.0,subject=entry.subject.label(),step=escape_html_text(entry.step.as_str()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/workflow_decision/tests.rs#decision_data_forms_preserve_raw_errors_and_protected_requests_are_immutable",
+        "name": "decision_data_forms_preserve_raw_errors_and_protected_requests_are_immutable",
+        "kind": "function",
+        "path": "src/adapters/http/pages/workflow_decision/tests.rs",
+        "span": "L42-L85"
+      },
+      "path": "src/adapters/http/pages/workflow_decision/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 69,
+          "text": "for subject in ["
+        },
+        {
+          "line": 73,
+          "text": "view.subject = subject;"
+        },
+        {
+          "line": 76,
+          "text": "assert!(page.contains(subject.label()));"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/workflow_runs/detail.rs#waits",
+        "name": "waits",
+        "kind": "function",
+        "path": "src/adapters/http/pages/workflow_runs/detail.rs",
+        "span": "L574-L604"
+      },
+      "path": "src/adapters/http/pages/workflow_runs/detail.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 585,
+          "text": "let subject = match (wait.decision, wait.child_run) {"
+        },
+        {
+          "line": 594,
+          "text": "r#\"<li class=\"py-1 text-sm\">{reason} · {state} · deadline {deadline}{subject}</li>\"#,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/apple_auth.rs#security_email_identity_apple_rejects_missing_false_and_ambiguous_claims",
+        "name": "security_email_identity_apple_rejects_missing_false_and_ambiguous_claims",
+        "kind": "function",
+        "path": "src/adapters/http/routes/apple_auth.rs",
+        "span": "L433-L453"
+      },
+      "path": "src/adapters/http/routes/apple_auth.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 435,
+          "text": "r#\"{\"sub\":\"subject\",\"email\":\"a@example.com\",\"nonce\":\"nonce\",\"email_verified\":\"true\"}\"#;"
+        },
+        {
+          "line": 443,
+          "text": "r#\"{\"sub\":\"subject\",\"email\":\"a@example.com\",\"nonce\":\"nonce\"}\"#,"
+        },
+        {
+          "line": 444,
+          "text": "r#\"{\"sub\":\"subject\",\"email\":\"a@example.com\",\"nonce\":\"nonce\",\"email_verified\":false}\"#,"
+        },
+        {
+          "line": 445,
+          "text": "r#\"{\"sub\":\"subject\",\"email\":\"a@example.com\",\"nonce\":\"nonce\",\"email_verified\":\"TRUE\"}\"#,"
+        },
+        {
+          "line": 446,
+          "text": "r#\"{\"sub\":\"subject\",\"email\":\"a@example.com\",\"nonce\":\"nonce\",\"email_verified\":\"yes\"}\"#,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/channel.rs#SimulationForm",
+        "name": "SimulationForm",
+        "kind": "struct",
+        "path": "src/adapters/http/routes/channel.rs",
+        "span": "L558-L566"
+      },
+      "path": "src/adapters/http/routes/channel.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 561,
+          "text": "pub subject: Option<String>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/channel.rs#thread_cursor_round_trips",
+        "name": "thread_cursor_round_trips",
+        "kind": "function",
+        "path": "src/adapters/http/routes/channel.rs",
+        "span": "L817-L834"
+      },
+      "path": "src/adapters/http/routes/channel.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 821,
+          "text": "subject: \"Subject\".into(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/channel.rs#channel_pages_and_fragments_render_correctly",
+        "name": "channel_pages_and_fragments_render_correctly",
+        "kind": "function",
+        "path": "src/adapters/http/routes/channel.rs",
+        "span": "L837-L1165"
+      },
+      "path": "src/adapters/http/routes/channel.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 904,
+          "text": "subject: \"Question <script>\".into(),"
+        },
+        {
+          "line": 997,
+          "text": "subject: Some(\"Test\".to_string()),"
+        },
+        {
+          "line": 1013,
+          "text": "subject: \"Test\".to_string(),"
+        },
+        {
+          "line": 1032,
+          "text": "subject: \"Re: Test\".to_string(),"
+        },
+        {
+          "line": 1051,
+          "text": "subject: \"Test Subject\","
+        },
+        {
+          "line": 1064,
+          "text": "subject: \"Existing Thread Subject\".to_string(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_attachments.rs#message",
+        "name": "message",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui_attachments.rs",
+        "span": "L219-L239"
+      },
+      "path": "src/adapters/http/routes/ui_attachments.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 229,
+          "text": "subject: \"Invoice\".to_string(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_schedules.rs#the_schedule_form_picks_a_binding_and_nothing_it_replaced",
+        "name": "the_schedule_form_picks_a_binding_and_nothing_it_replaced",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui_schedules.rs",
+        "span": "L982-L1011"
+      },
+      "path": "src/adapters/http/routes/ui_schedules.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1003,
+          "text": "\"subject_template\","
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/http/routes/ui_stream_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 11,
+          "text": "//! the subject -- the simulation and schedule-run streams -- it is asserted at the predicate in"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui.rs#ComposeForm",
+        "name": "ComposeForm",
+        "kind": "struct",
+        "path": "src/adapters/http/routes/ui.rs",
+        "span": "L127-L134"
+      },
+      "path": "src/adapters/http/routes/ui.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 130,
+          "text": "pub subject: Option<String>,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/http/routes/ui.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 136,
+          "text": "/// A further message in a thread that is already open; its subject comes from the thread."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui.rs#compose_form",
+        "name": "compose_form",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui.rs",
+        "span": "L815-L843"
+      },
+      "path": "src/adapters/http/routes/ui.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 838,
+          "text": "subject: \"\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui.rs#create_thread",
+        "name": "create_thread",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui.rs",
+        "span": "L857-L935"
+      },
+      "path": "src/adapters/http/routes/ui.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 878,
+          "text": "let subject = form.subject.unwrap_or_default();"
+        },
+        {
+          "line": 888,
+          "text": "subject: &subject,"
+        },
+        {
+          "line": 896,
+          "text": "if subject.trim().is_empty() || text_body.trim().is_empty() {"
+        },
+        {
+          "line": 910,
+          "text": ".with_subject(&subject)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/user_tests.rs#security_email_identity_google_requires_explicit_true_claim",
+        "name": "security_email_identity_google_requires_explicit_true_claim",
+        "kind": "function",
+        "path": "src/adapters/http/routes/user_tests.rs",
+        "span": "L112-L130"
+      },
+      "path": "src/adapters/http/routes/user_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 114,
+          "text": "serde_json::from_str(r#\"{\"sub\":\"subject\",\"email\":\"a@example.com\"}\"#).unwrap();"
+        },
+        {
+          "line": 117,
+          "text": "serde_json::from_str(r#\"{\"sub\":\"subject\",\"email\":\"a@example.com\",\"email_verified\":false}\"#)"
+        },
+        {
+          "line": 121,
+          "text": "serde_json::from_str(r#\"{\"sub\":\"subject\",\"email\":\"a@example.com\",\"email_verified\":true}\"#)"
+        },
+        {
+          "line": 126,
+          "text": "r#\"{\"sub\":\"subject\",\"email\":\"a@example.com\",\"email_verified\":\"true\"}\"#"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/webhooks/resend_api_tests.rs#a_body_past_the_inbox_bound_is_refused_before_it_is_parsed",
+        "name": "a_body_past_the_inbox_bound_is_refused_before_it_is_parsed",
+        "kind": "function",
+        "path": "src/adapters/http/routes/webhooks/resend_api_tests.rs",
+        "span": "L385-L397"
+      },
+      "path": "src/adapters/http/routes/webhooks/resend_api_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 388,
+          "text": "r#\"{{\"type\":\"email.received\",\"data\":{{\"email_id\":\"email-1\",\"subject\":\"{}\"}}}}\"#,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/decision_review_tests.rs#reviewer_comments_revises_reads_next_draft_and_accepts_exact_artifact",
+        "name": "reviewer_comments_revises_reads_next_draft_and_accepts_exact_artifact",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/decision_review_tests.rs",
+        "span": "L80-L142"
+      },
+      "path": "src/adapters/http/routes/workflows/decision_review_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 88,
+          "text": "assert_eq!(first_view[\"subject\"], \"business\");"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/session_tests.rs#security_session_oauth_accounts_persist_before_cookie",
+        "name": "security_session_oauth_accounts_persist_before_cookie",
+        "kind": "function",
+        "path": "src/adapters/http/session_tests.rs",
+        "span": "L211-L247"
+      },
+      "path": "src/adapters/http/session_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 222,
+          "text": "let subject = Uuid::new_v4().to_string();"
+        },
+        {
+          "line": 223,
+          "text": "let email = EmailAddress::from(format!(\"{subject}@example.test\"));"
+        },
+        {
+          "line": 227,
+          "text": "subject: &subject,"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 30,
+    "baselineChars": 830784
+  }
+}

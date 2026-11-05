@@ -1,0 +1,49 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 2,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_native_fk_assertions.rs#owner_view",
+        "name": "owner_view",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_native_fk_assertions.rs",
+        "span": "L4-L14"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_native_fk_assertions.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 9,
+          "text": "&& row[\"invocation_id\"] != json!(foreign.request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_native_fk_assertions.rs#assert_sources",
+        "name": "assert_sources",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_native_fk_assertions.rs",
+        "span": "L202-L224"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_native_fk_assertions.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 211,
+          "text": "foreign.request.subject.invocation.as_uuid(),"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 7773
+  }
+}

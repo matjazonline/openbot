@@ -1,0 +1,145 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 13,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_source.rs#retire_retry",
+        "name": "retire_retry",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_source.rs",
+        "span": "L137-L182"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_source.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 142,
+          "text": "assert_subject(f, request, number, \"processing\").await;"
+        },
+        {
+          "line": 160,
+          "text": "assert_subject(f, request, number, \"failed\").await;"
+        },
+        {
+          "line": 181,
+          "text": "assert_subject(f, request, number, \"pending\").await;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_source.rs#assert_lapsed_backstop",
+        "name": "assert_lapsed_backstop",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_source.rs",
+        "span": "L86-L104"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_source.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 99,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_source.rs#real_history",
+        "name": "real_history",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_source.rs",
+        "span": "L184-L225"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_source.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 191,
+          "text": "assert_subject(f, request, number, \"processing\").await;"
+        },
+        {
+          "line": 211,
+          "text": "subject_counts(f, request).await,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_source.rs#final_proof",
+        "name": "final_proof",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_source.rs",
+        "span": "L227-L251"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_source.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 248,
+          "text": "assert_subject(f, request, 128, \"pending\").await;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_source.rs#foreign_entry",
+        "name": "foreign_entry",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_source.rs",
+        "span": "L253-L323"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_source.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 317,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_source.rs#try_high_source",
+        "name": "try_high_source",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_source.rs",
+        "span": "L340-L416"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_source.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 352,
+          "text": "// Bootstrap the other tenant before starting the short subject fence."
+        },
+        {
+          "line": 362,
+          "text": "subject_counts(&f, &request).await,"
+        },
+        {
+          "line": 394,
+          "text": ".bind(sibling.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 398,
+          "text": "assert_ne!(sibling.subject.invocation, request.subject.invocation);"
+        },
+        {
+          "line": 402,
+          "text": "assert_subject(&f, &request, 130, \"processing\").await;"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 16357
+  }
+}

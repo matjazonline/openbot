@@ -1,0 +1,369 @@
+{
+  "file": "src/domain/entities/transport/mod.rs",
+  "entries": [
+    {
+      "name": "delivery",
+      "kind": "module",
+      "span": "L6-L6",
+      "signature": "mod delivery;"
+    },
+    {
+      "name": "inbound",
+      "kind": "module",
+      "span": "L7-L7",
+      "signature": "mod inbound;"
+    },
+    {
+      "name": "integration",
+      "kind": "module",
+      "span": "L8-L8",
+      "signature": "mod integration;"
+    },
+    {
+      "name": "TransportKind",
+      "kind": "enum",
+      "span": "L34-L37",
+      "signature": "pub enum TransportKind"
+    },
+    {
+      "name": "ALL",
+      "kind": "constant",
+      "span": "L41-L41",
+      "signature": "pub const ALL: &'static [Self] = &[Self::Email, Self::Slack];"
+    },
+    {
+      "name": "as_str",
+      "kind": "function",
+      "span": "L43-L48",
+      "signature": "pub const fn as_str(self) -> &'static str"
+    },
+    {
+      "name": "label",
+      "kind": "function",
+      "span": "L51-L56",
+      "signature": "pub const fn label(self) -> &'static str"
+    },
+    {
+      "name": "requires_installation",
+      "kind": "function",
+      "span": "L68-L73",
+      "signature": "pub const fn requires_installation(self) -> bool"
+    },
+    {
+      "name": "fmt",
+      "kind": "function",
+      "span": "L77-L79",
+      "signature": "fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result"
+    },
+    {
+      "name": "Err",
+      "kind": "type",
+      "span": "L83-L83",
+      "signature": "type Err = UnsupportedTransport;"
+    },
+    {
+      "name": "from_str",
+      "kind": "function",
+      "span": "L85-L91",
+      "signature": "fn from_str(value: &str) -> Result<Self, Self::Err>"
+    },
+    {
+      "name": "UnsupportedTransport",
+      "kind": "struct",
+      "span": "L96-L96",
+      "signature": "pub struct UnsupportedTransport(String);"
+    },
+    {
+      "name": "new",
+      "kind": "function",
+      "span": "L101-L103",
+      "signature": "pub fn new(transport: impl Into<String>) -> Self"
+    },
+    {
+      "name": "InvalidTransportValue",
+      "kind": "struct",
+      "span": "L112-L115",
+      "signature": "pub struct InvalidTransportValue"
+    },
+    {
+      "name": "new",
+      "kind": "function",
+      "span": "L118-L123",
+      "signature": "pub(crate) fn new(field: &'static str, value: impl Into<String>) -> Self"
+    },
+    {
+      "name": "stored_enum",
+      "kind": "function",
+      "span": "L130-L172",
+      "signature": "macro_rules! stored_enum"
+    },
+    {
+      "name": "uuid_id",
+      "kind": "function",
+      "span": "L179-L219",
+      "signature": "macro_rules! uuid_id"
+    },
+    {
+      "name": "MAX_IDENTITY_NAMESPACE_BYTES",
+      "kind": "constant",
+      "span": "L240-L240",
+      "signature": "pub const MAX_IDENTITY_NAMESPACE_BYTES: usize = 255;"
+    },
+    {
+      "name": "MAX_IDENTITY_SUBJECT_BYTES",
+      "kind": "constant",
+      "span": "L241-L241",
+      "signature": "pub const MAX_IDENTITY_SUBJECT_BYTES: usize = 320;"
+    },
+    {
+      "name": "MAX_ENDPOINT_NAMESPACE_BYTES",
+      "kind": "constant",
+      "span": "L242-L242",
+      "signature": "pub const MAX_ENDPOINT_NAMESPACE_BYTES: usize = 255;"
+    },
+    {
+      "name": "MAX_EXTERNAL_TENANT_KEY_BYTES",
+      "kind": "constant",
+      "span": "L243-L243",
+      "signature": "pub const MAX_EXTERNAL_TENANT_KEY_BYTES: usize = 255;"
+    },
+    {
+      "name": "MAX_EXTERNAL_ENDPOINT_KEY_BYTES",
+      "kind": "constant",
+      "span": "L244-L244",
+      "signature": "pub const MAX_EXTERNAL_ENDPOINT_KEY_BYTES: usize = 512;"
+    },
+    {
+      "name": "MAX_EXTERNAL_EVENT_KEY_BYTES",
+      "kind": "constant",
+      "span": "L245-L245",
+      "signature": "pub const MAX_EXTERNAL_EVENT_KEY_BYTES: usize = 512;"
+    },
+    {
+      "name": "MAX_EXTERNAL_THREAD_KEY_BYTES",
+      "kind": "constant",
+      "span": "L246-L246",
+      "signature": "pub const MAX_EXTERNAL_THREAD_KEY_BYTES: usize = 998;"
+    },
+    {
+      "name": "MAX_EXTERNAL_MESSAGE_KEY_BYTES",
+      "kind": "constant",
+      "span": "L247-L247",
+      "signature": "pub const MAX_EXTERNAL_MESSAGE_KEY_BYTES: usize = 998;"
+    },
+    {
+      "name": "TransportValueError",
+      "kind": "enum",
+      "span": "L250-L257",
+      "signature": "pub enum TransportValueError"
+    },
+    {
+      "name": "validate_bounded",
+      "kind": "function",
+      "span": "L264-L275",
+      "signature": "pub(crate) fn validate_bounded(value: &str, max_bytes: usize) -> Result<(), TransportValueError>"
+    },
+    {
+      "name": "bounded_string",
+      "kind": "function",
+      "span": "L277-L331",
+      "signature": "macro_rules! bounded_string"
+    },
+    {
+      "name": "RecipientRole",
+      "kind": "enum",
+      "span": "L354-L357",
+      "signature": "pub enum RecipientRole"
+    },
+    {
+      "name": "as_str",
+      "kind": "function",
+      "span": "L360-L365",
+      "signature": "pub const fn as_str(&self) -> &'static str"
+    },
+    {
+      "name": "parse",
+      "kind": "function",
+      "span": "L372-L378",
+      "signature": "pub fn parse(value: &str) -> Result<Self, UnknownRecipientRole>"
+    },
+    {
+      "name": "participant_kind",
+      "kind": "function",
+      "span": "L381-L386",
+      "signature": "pub const fn participant_kind(self) -> MessageParticipantKind"
+    },
+    {
+      "name": "UnknownRecipientRole",
+      "kind": "struct",
+      "span": "L391-L391",
+      "signature": "pub struct UnknownRecipientRole(String);"
+    },
+    {
+      "name": "from",
+      "kind": "function",
+      "span": "L394-L396",
+      "signature": "fn from(error: UnknownRecipientRole) -> Self"
+    },
+    {
+      "name": "QualifiedIdentity",
+      "kind": "struct",
+      "span": "L401-L405",
+      "signature": "pub struct QualifiedIdentity"
+    },
+    {
+      "name": "new",
+      "kind": "function",
+      "span": "L409-L419",
+      "signature": "pub fn new("
+    },
+    {
+      "name": "transport",
+      "kind": "function",
+      "span": "L421-L423",
+      "signature": "pub const fn transport(&self) -> TransportKind"
+    },
+    {
+      "name": "namespace",
+      "kind": "function",
+      "span": "L425-L427",
+      "signature": "pub const fn namespace(&self) -> &IdentityNamespace"
+    },
+    {
+      "name": "subject",
+      "kind": "function",
+      "span": "L429-L431",
+      "signature": "pub const fn subject(&self) -> &IdentitySubject"
+    },
+    {
+      "name": "ChannelSelector",
+      "kind": "enum",
+      "span": "L436-L442",
+      "signature": "pub enum ChannelSelector"
+    },
+    {
+      "name": "InvalidChannelSelector",
+      "kind": "enum",
+      "span": "L446-L451",
+      "signature": "pub enum InvalidChannelSelector"
+    },
+    {
+      "name": "parse",
+      "kind": "function",
+      "span": "L460-L478",
+      "signature": "pub fn parse(value: &str) -> Result<Self, InvalidChannelSelector>"
+    },
+    {
+      "name": "channel",
+      "kind": "function",
+      "span": "L480-L484",
+      "signature": "pub fn channel(&self) -> &ChannelSlug"
+    },
+    {
+      "name": "company",
+      "kind": "function",
+      "span": "L486-L491",
+      "signature": "pub fn company(&self) -> Option<&CompanySlug>"
+    },
+    {
+      "name": "fmt",
+      "kind": "function",
+      "span": "L495-L500",
+      "signature": "fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result"
+    },
+    {
+      "name": "ExternalDestination",
+      "kind": "enum",
+      "span": "L505-L507",
+      "signature": "pub enum ExternalDestination"
+    },
+    {
+      "name": "transport",
+      "kind": "function",
+      "span": "L511-L515",
+      "signature": "pub const fn transport(&self) -> TransportKind"
+    },
+    {
+      "name": "as_str",
+      "kind": "function",
+      "span": "L519-L523",
+      "signature": "pub fn as_str(&self) -> &str"
+    },
+    {
+      "name": "parse",
+      "kind": "function",
+      "span": "L532-L537",
+      "signature": "pub fn parse(transport: TransportKind, value: &str) -> Result<Self, UnsupportedTransport>"
+    },
+    {
+      "name": "InboundSource",
+      "kind": "struct",
+      "span": "L542-L547",
+      "signature": "pub struct InboundSource"
+    },
+    {
+      "name": "ReplyMessageKeyCandidate",
+      "kind": "struct",
+      "span": "L551-L554",
+      "signature": "pub struct ReplyMessageKeyCandidate"
+    },
+    {
+      "name": "ReplyThreadKeyCandidate",
+      "kind": "struct",
+      "span": "L558-L561",
+      "signature": "pub struct ReplyThreadKeyCandidate"
+    },
+    {
+      "name": "tests",
+      "kind": "module",
+      "span": "L564-L714",
+      "signature": "mod tests"
+    },
+    {
+      "name": "a_channel_selector_reads_a_channel_or_a_company_and_channel_and_nothing_else",
+      "kind": "function",
+      "span": "L572-L593",
+      "signature": "fn a_channel_selector_reads_a_channel_or_a_company_and_channel_and_nothing_else()"
+    },
+    {
+      "name": "a_selector_round_trips_through_its_displayed_form",
+      "kind": "function",
+      "span": "L598-L611",
+      "signature": "fn a_selector_round_trips_through_its_displayed_form()"
+    },
+    {
+      "name": "assert_round_trip",
+      "kind": "function",
+      "span": "L613-L619",
+      "signature": "fn assert_round_trip<T>(value: T)"
+    },
+    {
+      "name": "bounded_values_reject_empty_control_and_oversized_input",
+      "kind": "function",
+      "span": "L622-L636",
+      "signature": "fn bounded_values_reject_empty_control_and_oversized_input()"
+    },
+    {
+      "name": "slack_subjects_retain_case_and_installations_qualify_identity",
+      "kind": "function",
+      "span": "L639-L654",
+      "signature": "fn slack_subjects_retain_case_and_installations_qualify_identity()"
+    },
+    {
+      "name": "the_same_provider_key_in_two_bindings_is_distinct",
+      "kind": "function",
+      "span": "L657-L668",
+      "signature": "fn the_same_provider_key_in_two_bindings_is_distinct()"
+    },
+    {
+      "name": "validated_strings_round_trip_and_invalid_json_is_rejected",
+      "kind": "function",
+      "span": "L671-L713",
+      "signature": "fn validated_strings_round_trip_and_invalid_json_is_rejected()"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 26067
+  }
+}

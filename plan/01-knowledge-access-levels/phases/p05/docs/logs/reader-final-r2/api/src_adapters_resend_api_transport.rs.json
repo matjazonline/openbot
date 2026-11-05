@@ -1,0 +1,63 @@
+{
+  "file": "src/adapters/resend_api/transport.rs",
+  "entries": [
+    {
+      "name": "MAX_IDEMPOTENCY_KEY_BYTES",
+      "kind": "constant",
+      "span": "L28-L28",
+      "signature": "const MAX_IDEMPOTENCY_KEY_BYTES: usize = 256;"
+    },
+    {
+      "name": "RESERVED_HEADERS",
+      "kind": "constant",
+      "span": "L36-L36",
+      "signature": "const RESERVED_HEADERS: [&str; 4] = [\"message-id\", \"in-reply-to\", \"references\", \"subject\"];"
+    },
+    {
+      "name": "ResendApiMailTransport",
+      "kind": "struct",
+      "span": "L39-L41",
+      "signature": "pub struct ResendApiMailTransport"
+    },
+    {
+      "name": "new",
+      "kind": "function",
+      "span": "L44-L46",
+      "signature": "pub fn new(api: Arc<dyn ResendApi>) -> Self"
+    },
+    {
+      "name": "send",
+      "kind": "function",
+      "span": "L51-L88",
+      "signature": "async fn send(&self, mail: MailMessage) -> MailSendOutcome"
+    },
+    {
+      "name": "accepted_key",
+      "kind": "function",
+      "span": "L97-L106",
+      "signature": "fn accepted_key(message_id: Option<&MessageId>, provider_id: &str) -> Option<ExternalMessageKey>"
+    },
+    {
+      "name": "refusal_class",
+      "kind": "function",
+      "span": "L109-L115",
+      "signature": "fn refusal_class(status: u16) -> FailureClass"
+    },
+    {
+      "name": "build_request",
+      "kind": "function",
+      "span": "L123-L177",
+      "signature": "fn build_request(mail: MailMessage) -> ResendApiSendRequest"
+    },
+    {
+      "name": "tests",
+      "kind": "module",
+      "span": "L181-L181",
+      "signature": "mod tests;"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 7994
+  }
+}

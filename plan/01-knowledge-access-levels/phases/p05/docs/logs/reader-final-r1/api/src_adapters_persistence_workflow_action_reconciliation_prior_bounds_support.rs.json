@@ -1,0 +1,159 @@
+{
+  "file": "src/adapters/persistence/workflow/action_reconciliation_prior_bounds_support.rs",
+  "entries": [
+    {
+      "name": "lapsed",
+      "kind": "function",
+      "span": "L4-L10",
+      "signature": "pub(super) async fn lapsed(f: &AdmissionFixture, request: &ActionDispatchRequest) -> bool"
+    },
+    {
+      "name": "no_result",
+      "kind": "function",
+      "span": "L12-L23",
+      "signature": "async fn no_result(f: &AdmissionFixture, request: &ActionDispatchRequest)"
+    },
+    {
+      "name": "pending_loss",
+      "kind": "function",
+      "span": "L25-L33",
+      "signature": "pub(super) async fn pending_loss("
+    },
+    {
+      "name": "observe_pending",
+      "kind": "function",
+      "span": "L35-L53",
+      "signature": "pub(super) async fn observe_pending("
+    },
+    {
+      "name": "classify_pending",
+      "kind": "function",
+      "span": "L55-L98",
+      "signature": "pub(super) async fn classify_pending("
+    },
+    {
+      "name": "park_live",
+      "kind": "function",
+      "span": "L100-L103",
+      "signature": "pub(super) async fn park_live(f: &AdmissionFixture, request: &ActionDispatchRequest) -> Option<()>"
+    },
+    {
+      "name": "park_observed",
+      "kind": "function",
+      "span": "L105-L110",
+      "signature": "pub(super) async fn park_observed("
+    },
+    {
+      "name": "park_observed_as",
+      "kind": "function",
+      "span": "L113-L144",
+      "signature": "pub(super) async fn park_observed_as("
+    },
+    {
+      "name": "Stamp",
+      "kind": "type",
+      "span": "L146-L146",
+      "signature": "type Stamp = std::sync::Mutex<Option<std::time::Instant>>;"
+    },
+    {
+      "name": "stamp",
+      "kind": "function",
+      "span": "L148-L150",
+      "signature": "fn stamp(at: &Stamp)"
+    },
+    {
+      "name": "PausedVerifier",
+      "kind": "struct",
+      "span": "L152-L167",
+      "signature": "pub(super) struct PausedVerifier"
+    },
+    {
+      "name": "SettleTimes",
+      "kind": "struct",
+      "span": "L170-L173",
+      "signature": "struct SettleTimes"
+    },
+    {
+      "name": "TimedSettlement",
+      "kind": "struct",
+      "span": "L177-L180",
+      "signature": "struct TimedSettlement"
+    },
+    {
+      "name": "association",
+      "kind": "function",
+      "span": "L183-L185",
+      "signature": "async fn association(&self, command: &ReconcileActionCommand) -> AppResult<RelatedAssociation>"
+    },
+    {
+      "name": "snapshot",
+      "kind": "function",
+      "span": "L186-L191",
+      "signature": "async fn snapshot("
+    },
+    {
+      "name": "settle",
+      "kind": "function",
+      "span": "L192-L202",
+      "signature": "async fn settle("
+    },
+    {
+      "name": "run",
+      "kind": "function",
+      "span": "L207-L231",
+      "signature": "pub(super) async fn run("
+    },
+    {
+      "name": "timeline",
+      "kind": "function",
+      "span": "L233-L249",
+      "signature": "pub(super) fn timeline(&self, command_started: std::time::Instant, result: &str)"
+    },
+    {
+      "name": "wait_started",
+      "kind": "function",
+      "span": "L251-L257",
+      "signature": "pub(super) async fn wait_started(&self) -> bool"
+    },
+    {
+      "name": "new",
+      "kind": "function",
+      "span": "L259-L274",
+      "signature": "pub(super) fn new(ledger: Arc<LedgerVerifier>) -> Self"
+    },
+    {
+      "name": "registration",
+      "kind": "function",
+      "span": "L278-L280",
+      "signature": "fn registration(&self) -> &EvidenceVerifierRegistration"
+    },
+    {
+      "name": "verify",
+      "kind": "function",
+      "span": "L281-L302",
+      "signature": "async fn verify("
+    },
+    {
+      "name": "withheld_timeout",
+      "kind": "function",
+      "span": "L305-L322",
+      "signature": "pub(super) fn withheld_timeout("
+    },
+    {
+      "name": "prior_bounds_timeout_discriminator_rejects_prompt_release_and_wrong_errors",
+      "kind": "function",
+      "span": "L325-L367",
+      "signature": "fn prior_bounds_timeout_discriminator_rejects_prompt_release_and_wrong_errors()"
+    },
+    {
+      "name": "fresh_proof",
+      "kind": "function",
+      "span": "L370-L386",
+      "signature": "pub(super) async fn fresh_proof<F, Fut>(mut attempt: F) -> Result<(), &'static str>"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 13149
+  }
+}

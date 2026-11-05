@@ -1,0 +1,87 @@
+{
+  "file": "src/application/workflow/registry/schemas.rs",
+  "entries": [
+    {
+      "name": "text",
+      "kind": "function",
+      "span": "L3-L5",
+      "signature": "pub(super) fn text(max: usize) -> Value"
+    },
+    {
+      "name": "identifier",
+      "kind": "function",
+      "span": "L6-L8",
+      "signature": "pub(super) fn identifier() -> Value"
+    },
+    {
+      "name": "integer",
+      "kind": "function",
+      "span": "L9-L11",
+      "signature": "pub(super) fn integer(max: usize) -> Value"
+    },
+    {
+      "name": "array",
+      "kind": "function",
+      "span": "L12-L14",
+      "signature": "pub(super) fn array(items: Value, min: usize, max: usize) -> Value"
+    },
+    {
+      "name": "object",
+      "kind": "function",
+      "span": "L15-L17",
+      "signature": "pub(super) fn object(properties: Value, required: &[&str]) -> Value"
+    },
+    {
+      "name": "scope",
+      "kind": "function",
+      "span": "L18-L23",
+      "signature": "pub(super) fn scope() -> Value"
+    },
+    {
+      "name": "reviewers",
+      "kind": "function",
+      "span": "L26-L37",
+      "signature": "pub(super) fn reviewers() -> Value"
+    },
+    {
+      "name": "content",
+      "kind": "function",
+      "span": "L40-L43",
+      "signature": "pub(super) fn content() -> Value"
+    },
+    {
+      "name": "uuid",
+      "kind": "function",
+      "span": "L44-L46",
+      "signature": "pub(super) fn uuid() -> Value"
+    },
+    {
+      "name": "history_item",
+      "kind": "function",
+      "span": "L49-L69",
+      "signature": "pub(super) fn history_item() -> Value"
+    },
+    {
+      "name": "provenance_item",
+      "kind": "function",
+      "span": "L70-L75",
+      "signature": "pub(super) fn provenance_item() -> Value"
+    },
+    {
+      "name": "message_result",
+      "kind": "function",
+      "span": "L78-L91",
+      "signature": "pub(super) fn message_result() -> Value"
+    },
+    {
+      "name": "headers",
+      "kind": "function",
+      "span": "L92-L94",
+      "signature": "pub(super) fn headers() -> Value"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 4072
+  }
+}

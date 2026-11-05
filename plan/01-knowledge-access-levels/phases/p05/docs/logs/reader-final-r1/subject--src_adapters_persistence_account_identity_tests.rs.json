@@ -1,0 +1,100 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 5,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/account_identity_tests.rs#mail_from",
+        "name": "mail_from",
+        "kind": "function",
+        "path": "src/adapters/persistence/account_identity_tests.rs",
+        "span": "L150-L211"
+      },
+      "path": "src/adapters/persistence/account_identity_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 183,
+          "text": "(id, company_id, author_principal_id, authored_identity_id, subject,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/account_identity_tests.rs#identity_id",
+        "name": "identity_id",
+        "kind": "function",
+        "path": "src/adapters/persistence/account_identity_tests.rs",
+        "span": "L137-L146"
+      },
+      "path": "src/adapters/persistence/account_identity_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 139,
+          "text": "\"SELECT id FROM participant_identities WHERE company_id = $1 AND subject = $2\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/account_identity_tests.rs#account_email_change_adopts_an_allowlisted_outsider_address",
+        "name": "account_email_change_adopts_an_allowlisted_outsider_address",
+        "kind": "function",
+        "path": "src/adapters/persistence/account_identity_tests.rs",
+        "span": "L472-L569"
+      },
+      "path": "src/adapters/persistence/account_identity_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 502,
+          "text": "\"INSERT INTO threads (id, company_id, channel_id, subject) VALUES ($1, $2, $3, 'Hi')\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/account_identity_tests.rs#account_email_change_refuses_an_address_another_person_holds",
+        "name": "account_email_change_refuses_an_address_another_person_holds",
+        "kind": "function",
+        "path": "src/adapters/persistence/account_identity_tests.rs",
+        "span": "L574-L623"
+      },
+      "path": "src/adapters/persistence/account_identity_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 586,
+          "text": "\"UPDATE participant_identities SET subject = $2 WHERE company_id = $1 AND subject = $3\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/account_identity_tests.rs#account_email_change_races_inbound_observation",
+        "name": "account_email_change_races_inbound_observation",
+        "kind": "function",
+        "path": "src/adapters/persistence/account_identity_tests.rs",
+        "span": "L693-L756"
+      },
+      "path": "src/adapters/persistence/account_identity_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 746,
+          "text": "\"SELECT COUNT(*) FROM participant_identities WHERE company_id = $1 AND subject = ANY($2)\","
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 27989
+  }
+}

@@ -1,0 +1,183 @@
+{
+  "file": "src/application/ports/thread/mod.rs",
+  "entries": [
+    {
+      "name": "message_write",
+      "kind": "module",
+      "span": "L19-L19",
+      "signature": "mod message_write;"
+    },
+    {
+      "name": "protocol_extension",
+      "kind": "module",
+      "span": "L20-L20",
+      "signature": "mod protocol_extension;"
+    },
+    {
+      "name": "qualified_email_identity",
+      "kind": "function",
+      "span": "L25-L35",
+      "signature": "pub fn qualified_email_identity(address: impl Into<String>) -> AppResult<QualifiedIdentity>"
+    },
+    {
+      "name": "ThreadPersistence",
+      "kind": "interface",
+      "span": "L38-L228",
+      "signature": "pub trait ThreadPersistence: Send + Sync"
+    },
+    {
+      "name": "thread_access_levels",
+      "kind": "function",
+      "span": "L40-L44",
+      "signature": "async fn thread_access_levels("
+    },
+    {
+      "name": "create_thread",
+      "kind": "function",
+      "span": "L45-L50",
+      "signature": "async fn create_thread("
+    },
+    {
+      "name": "get_thread_by_id",
+      "kind": "function",
+      "span": "L52-L52",
+      "signature": "async fn get_thread_by_id(&self, id: Uuid) -> AppResult<Option<Thread>>;"
+    },
+    {
+      "name": "list_threads_by_channel_id",
+      "kind": "function",
+      "span": "L54-L59",
+      "signature": "async fn list_threads_by_channel_id("
+    },
+    {
+      "name": "list_thread_last_roles",
+      "kind": "function",
+      "span": "L66-L71",
+      "signature": "async fn list_thread_last_roles("
+    },
+    {
+      "name": "list_threads_updated_after",
+      "kind": "function",
+      "span": "L75-L80",
+      "signature": "async fn list_threads_updated_after("
+    },
+    {
+      "name": "update_thread_participants",
+      "kind": "function",
+      "span": "L82-L86",
+      "signature": "async fn update_thread_participants("
+    },
+    {
+      "name": "find_thread_by_thread_index",
+      "kind": "function",
+      "span": "L88-L92",
+      "signature": "async fn find_thread_by_thread_index("
+    },
+    {
+      "name": "count_recent_messages",
+      "kind": "function",
+      "span": "L94-L94",
+      "signature": "async fn count_recent_messages(&self, thread_id: Uuid, duration_secs: i64) -> AppResult<usize>;"
+    },
+    {
+      "name": "get_thread_message",
+      "kind": "function",
+      "span": "L101-L105",
+      "signature": "async fn get_thread_message("
+    },
+    {
+      "name": "find_thread_for_message",
+      "kind": "function",
+      "span": "L108-L112",
+      "signature": "async fn find_thread_for_message("
+    },
+    {
+      "name": "get_message_protocol_extension",
+      "kind": "function",
+      "span": "L118-L122",
+      "signature": "async fn get_message_protocol_extension("
+    },
+    {
+      "name": "create_message",
+      "kind": "function",
+      "span": "L129-L129",
+      "signature": "async fn create_message(&self, write: &MessageWrite) -> AppResult<Message>;"
+    },
+    {
+      "name": "find_outbound_reply_after",
+      "kind": "function",
+      "span": "L138-L142",
+      "signature": "async fn find_outbound_reply_after("
+    },
+    {
+      "name": "associate_message",
+      "kind": "function",
+      "span": "L149-L154",
+      "signature": "async fn associate_message("
+    },
+    {
+      "name": "list_thread_message_views",
+      "kind": "function",
+      "span": "L160-L161",
+      "signature": "async fn list_thread_message_views(&self, thread_id: Uuid)"
+    },
+    {
+      "name": "list_thread_message_views_after",
+      "kind": "function",
+      "span": "L165-L170",
+      "signature": "async fn list_thread_message_views_after("
+    },
+    {
+      "name": "get_thread_message_view",
+      "kind": "function",
+      "span": "L173-L177",
+      "signature": "async fn get_thread_message_view("
+    },
+    {
+      "name": "list_agent_history",
+      "kind": "function",
+      "span": "L180-L180",
+      "signature": "async fn list_agent_history(&self, thread_id: Uuid) -> AppResult<Vec<AgentHistoryMessage>>;"
+    },
+    {
+      "name": "latest_email_reply_context",
+      "kind": "function",
+      "span": "L187-L190",
+      "signature": "async fn latest_email_reply_context("
+    },
+    {
+      "name": "latest_replyable_email_context",
+      "kind": "function",
+      "span": "L197-L200",
+      "signature": "async fn latest_replyable_email_context("
+    },
+    {
+      "name": "latest_thread_rfc_message_id",
+      "kind": "function",
+      "span": "L203-L203",
+      "signature": "async fn latest_thread_rfc_message_id(&self, thread_id: Uuid) -> AppResult<Option<MessageId>>;"
+    },
+    {
+      "name": "get_message_audit",
+      "kind": "function",
+      "span": "L209-L213",
+      "signature": "async fn get_message_audit("
+    },
+    {
+      "name": "create_internal_note",
+      "kind": "function",
+      "span": "L216-L220",
+      "signature": "async fn create_internal_note("
+    },
+    {
+      "name": "tombstone_internal_note",
+      "kind": "function",
+      "span": "L223-L227",
+      "signature": "async fn tombstone_internal_note("
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 9504
+  }
+}

@@ -1,0 +1,387 @@
+{
+  "file": "src/application/workflow/reads.rs",
+  "entries": [
+    {
+      "name": "MAX_LISTED",
+      "kind": "constant",
+      "span": "L16-L16",
+      "signature": "pub const MAX_LISTED: i64 = 200;"
+    },
+    {
+      "name": "Page",
+      "kind": "struct",
+      "span": "L21-L24",
+      "signature": "pub struct Page<T>"
+    },
+    {
+      "name": "PageRequest",
+      "kind": "struct",
+      "span": "L29-L32",
+      "signature": "pub struct PageRequest"
+    },
+    {
+      "name": "new",
+      "kind": "function",
+      "span": "L34-L42",
+      "signature": "pub fn new(after: Option<Uuid>, size: Option<i64>) -> AppResult<Self>"
+    },
+    {
+      "name": "VersionSummary",
+      "kind": "struct",
+      "span": "L46-L51",
+      "signature": "pub struct VersionSummary"
+    },
+    {
+      "name": "DefinitionSummary",
+      "kind": "struct",
+      "span": "L54-L61",
+      "signature": "pub struct DefinitionSummary"
+    },
+    {
+      "name": "DefinitionDetail",
+      "kind": "struct",
+      "span": "L64-L71",
+      "signature": "pub struct DefinitionDetail"
+    },
+    {
+      "name": "BindingSummary",
+      "kind": "struct",
+      "span": "L74-L85",
+      "signature": "pub struct BindingSummary"
+    },
+    {
+      "name": "RunSummary",
+      "kind": "struct",
+      "span": "L88-L105",
+      "signature": "pub struct RunSummary"
+    },
+    {
+      "name": "RunStateName",
+      "kind": "enum",
+      "span": "L112-L119",
+      "signature": "pub enum RunStateName"
+    },
+    {
+      "name": "ALL",
+      "kind": "constant",
+      "span": "L122-L129",
+      "signature": "pub const ALL: [Self; 6] = ["
+    },
+    {
+      "name": "as_str",
+      "kind": "function",
+      "span": "L131-L140",
+      "signature": "pub const fn as_str(self) -> &'static str"
+    },
+    {
+      "name": "parse",
+      "kind": "function",
+      "span": "L143-L145",
+      "signature": "pub fn parse(name: &str) -> Option<Self>"
+    },
+    {
+      "name": "is_open",
+      "kind": "function",
+      "span": "L148-L150",
+      "signature": "pub const fn is_open(self) -> bool"
+    },
+    {
+      "name": "ExecutionSummary",
+      "kind": "struct",
+      "span": "L154-L161",
+      "signature": "pub struct ExecutionSummary"
+    },
+    {
+      "name": "WaitSummary",
+      "kind": "struct",
+      "span": "L164-L174",
+      "signature": "pub struct WaitSummary"
+    },
+    {
+      "name": "DestinationSummary",
+      "kind": "struct",
+      "span": "L178-L183",
+      "signature": "pub struct DestinationSummary"
+    },
+    {
+      "name": "reconcilable",
+      "kind": "function",
+      "span": "L187-L189",
+      "signature": "pub fn reconcilable(&self) -> bool"
+    },
+    {
+      "name": "ActionSummary",
+      "kind": "struct",
+      "span": "L195-L211",
+      "signature": "pub struct ActionSummary"
+    },
+    {
+      "name": "reconcilable",
+      "kind": "function",
+      "span": "L215-L220",
+      "signature": "pub fn reconcilable(&self, run: &RunSummary) -> bool"
+    },
+    {
+      "name": "RunDetail",
+      "kind": "struct",
+      "span": "L224-L235",
+      "signature": "pub struct RunDetail"
+    },
+    {
+      "name": "RunLineage",
+      "kind": "enum",
+      "span": "L240-L249",
+      "signature": "pub enum RunLineage"
+    },
+    {
+      "name": "RunFilter",
+      "kind": "struct",
+      "span": "L252-L265",
+      "signature": "pub struct RunFilter"
+    },
+    {
+      "name": "MAX_ROLLUP_PARENTS",
+      "kind": "constant",
+      "span": "L269-L269",
+      "signature": "pub const MAX_ROLLUP_PARENTS: usize = 300;"
+    },
+    {
+      "name": "ChildCounts",
+      "kind": "struct",
+      "span": "L276-L281",
+      "signature": "pub struct ChildCounts"
+    },
+    {
+      "name": "WorkflowReads",
+      "kind": "interface",
+      "span": "L284-L344",
+      "signature": "pub trait WorkflowReads: Send + Sync"
+    },
+    {
+      "name": "list_definitions",
+      "kind": "function",
+      "span": "L286-L290",
+      "signature": "async fn list_definitions("
+    },
+    {
+      "name": "definition",
+      "kind": "function",
+      "span": "L291-L295",
+      "signature": "async fn definition("
+    },
+    {
+      "name": "list_bindings",
+      "kind": "function",
+      "span": "L297-L301",
+      "signature": "async fn list_bindings("
+    },
+    {
+      "name": "binding_summary",
+      "kind": "function",
+      "span": "L302-L306",
+      "signature": "async fn binding_summary("
+    },
+    {
+      "name": "list_runs",
+      "kind": "function",
+      "span": "L308-L313",
+      "signature": "async fn list_runs("
+    },
+    {
+      "name": "run_summary",
+      "kind": "function",
+      "span": "L314-L314",
+      "signature": "async fn run_summary(&self, company: CompanyId, run: RunId) -> AppResult<Option<RunSummary>>;"
+    },
+    {
+      "name": "run_board_counts",
+      "kind": "function",
+      "span": "L318-L323",
+      "signature": "async fn run_board_counts("
+    },
+    {
+      "name": "run_board_cards",
+      "kind": "function",
+      "span": "L327-L333",
+      "signature": "async fn run_board_cards("
+    },
+    {
+      "name": "child_rollup",
+      "kind": "function",
+      "span": "L336-L340",
+      "signature": "async fn child_rollup("
+    },
+    {
+      "name": "run_detail",
+      "kind": "function",
+      "span": "L341-L341",
+      "signature": "async fn run_detail(&self, company: CompanyId, run: RunId) -> AppResult<Option<RunDetail>>;"
+    },
+    {
+      "name": "decision_company",
+      "kind": "function",
+      "span": "L343-L343",
+      "signature": "async fn decision_company(&self, decision: Uuid) -> AppResult<Option<CompanyId>>;"
+    },
+    {
+      "name": "VersionSource",
+      "kind": "struct",
+      "span": "L348-L355",
+      "signature": "pub struct VersionSource"
+    },
+    {
+      "name": "ScheduleUse",
+      "kind": "struct",
+      "span": "L358-L362",
+      "signature": "pub struct ScheduleUse"
+    },
+    {
+      "name": "BindingUse",
+      "kind": "struct",
+      "span": "L367-L376",
+      "signature": "pub struct BindingUse"
+    },
+    {
+      "name": "MAX_SCHEDULES_PER_BINDING",
+      "kind": "constant",
+      "span": "L378-L378",
+      "signature": "pub const MAX_SCHEDULES_PER_BINDING: i64 = 20;"
+    },
+    {
+      "name": "WorkflowUsage",
+      "kind": "struct",
+      "span": "L383-L386",
+      "signature": "pub struct WorkflowUsage"
+    },
+    {
+      "name": "OperationOption",
+      "kind": "struct",
+      "span": "L392-L400",
+      "signature": "pub struct OperationOption"
+    },
+    {
+      "name": "MAX_CONNECTIONS_PER_TOOL",
+      "kind": "constant",
+      "span": "L403-L403",
+      "signature": "pub const MAX_CONNECTIONS_PER_TOOL: i64 = 20;"
+    },
+    {
+      "name": "MAX_OPTION_NAMES",
+      "kind": "constant",
+      "span": "L405-L405",
+      "signature": "pub const MAX_OPTION_NAMES: usize = 256;"
+    },
+    {
+      "name": "PublicationOptions",
+      "kind": "struct",
+      "span": "L410-L417",
+      "signature": "pub struct PublicationOptions"
+    },
+    {
+      "name": "MAX_AGENT_USES",
+      "kind": "constant",
+      "span": "L420-L420",
+      "signature": "pub const MAX_AGENT_USES: i64 = 50;"
+    },
+    {
+      "name": "MAX_BINDING_OPTIONS",
+      "kind": "constant",
+      "span": "L423-L423",
+      "signature": "pub const MAX_BINDING_OPTIONS: i64 = 200;"
+    },
+    {
+      "name": "ChoiceOption",
+      "kind": "struct",
+      "span": "L428-L434",
+      "signature": "pub struct ChoiceOption"
+    },
+    {
+      "name": "BindingOptions",
+      "kind": "struct",
+      "span": "L439-L447",
+      "signature": "pub struct BindingOptions"
+    },
+    {
+      "name": "ToolTarget",
+      "kind": "struct",
+      "span": "L451-L457",
+      "signature": "pub struct ToolTarget"
+    },
+    {
+      "name": "AuthoringReads",
+      "kind": "interface",
+      "span": "L461-L507",
+      "signature": "pub trait AuthoringReads: Send + Sync"
+    },
+    {
+      "name": "version_source",
+      "kind": "function",
+      "span": "L462-L467",
+      "signature": "async fn version_source("
+    },
+    {
+      "name": "workflow_usage",
+      "kind": "function",
+      "span": "L468-L472",
+      "signature": "async fn workflow_usage("
+    },
+    {
+      "name": "publication_options",
+      "kind": "function",
+      "span": "L475-L480",
+      "signature": "async fn publication_options("
+    },
+    {
+      "name": "binding_use",
+      "kind": "function",
+      "span": "L482-L483",
+      "signature": "async fn binding_use(&self, company: CompanyId, binding: Uuid)"
+    },
+    {
+      "name": "channel_usage",
+      "kind": "function",
+      "span": "L485-L485",
+      "signature": "async fn channel_usage(&self, company: CompanyId, channel: Uuid) -> AppResult<WorkflowUsage>;"
+    },
+    {
+      "name": "agent_usage",
+      "kind": "function",
+      "span": "L490-L490",
+      "signature": "async fn agent_usage(&self, company: CompanyId, agent: Uuid) -> AppResult<WorkflowUsage>;"
+    },
+    {
+      "name": "binding_options",
+      "kind": "function",
+      "span": "L491-L491",
+      "signature": "async fn binding_options(&self, company: CompanyId) -> AppResult<BindingOptions>;"
+    },
+    {
+      "name": "agent_options",
+      "kind": "function",
+      "span": "L494-L494",
+      "signature": "async fn agent_options(&self, company: CompanyId) -> AppResult<(Vec<ChoiceOption>, bool)>;"
+    },
+    {
+      "name": "agent_tool_grants",
+      "kind": "function",
+      "span": "L496-L500",
+      "signature": "async fn agent_tool_grants("
+    },
+    {
+      "name": "tool_targets",
+      "kind": "function",
+      "span": "L502-L506",
+      "signature": "async fn tool_targets("
+    },
+    {
+      "name": "project",
+      "kind": "function",
+      "span": "L510-L519",
+      "signature": "pub fn project(&mut self, visibility: crate::application::knowledge::PayloadVisibility)"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 19214
+  }
+}

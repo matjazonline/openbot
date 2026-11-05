@@ -1,0 +1,86 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 8,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/knowledge_view_delivery_tests.rs#classified_delivery",
+        "name": "classified_delivery",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/knowledge_view_delivery_tests.rs",
+        "span": "L12-L66"
+      },
+      "path": "src/adapters/persistence/workflow/knowledge_view_delivery_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 27,
+          "text": "sqlx::query(\"INSERT INTO participant_identities(id,company_id,principal_id,transport,namespace,subject,status,claim_metadata,provenance) SELECT $1,$2,principal."
+        },
+        {
+          "line": 37,
+          "text": "let with = json!({\"content\":{\"literal\":{\"subject\":SUBJECT,\"body\":BODY}},\"destinations\":{\"literal\":[{\"kind\":\"user\",\"id\":user.to_string()}]}});"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/knowledge_view_delivery_tests.rs#SUBJECT",
+        "name": "SUBJECT",
+        "kind": "constant",
+        "path": "src/adapters/persistence/workflow/knowledge_view_delivery_tests.rs",
+        "span": "L9-L9"
+      },
+      "path": "src/adapters/persistence/workflow/knowledge_view_delivery_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 9,
+          "text": "const SUBJECT: &str = \"classified-subject-canary\";"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/knowledge_view_delivery_tests.rs#knowledge_view_delivery_subjects_use_current_level_and_foreign_id_is_concealed",
+        "name": "knowledge_view_delivery_subjects_use_current_level_and_foreign_id_is_concealed",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/knowledge_view_delivery_tests.rs",
+        "span": "L84-L148"
+      },
+      "path": "src/adapters/persistence/workflow/knowledge_view_delivery_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 84,
+          "text": "async fn knowledge_view_delivery_subjects_use_current_level_and_foreign_id_is_concealed() {"
+        },
+        {
+          "line": 95,
+          "text": "assert_eq!(full.subject, SUBJECT);"
+        },
+        {
+          "line": 119,
+          "text": "assert_eq!(entry.subject, \"Restricted message\");"
+        },
+        {
+          "line": 126,
+          "text": ".any(|entry| entry.id == id && entry.subject == \"Restricted message\")"
+        },
+        {
+          "line": 133,
+          "text": ".subject,"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 8599
+  }
+}

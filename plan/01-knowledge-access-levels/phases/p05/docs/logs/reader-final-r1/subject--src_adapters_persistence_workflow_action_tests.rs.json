@@ -1,0 +1,120 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 10,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_tests.rs#workflow_action_competing_step_and_tool_prepare_one_intent_restart_replays",
+        "name": "workflow_action_competing_step_and_tool_prepare_one_intent_restart_replays",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_tests.rs",
+        "span": "L37-L68"
+      },
+      "path": "src/adapters/persistence/workflow/action_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 66,
+          "text": "assert_eq!(saved.approval_subject(), first.approval_subject());"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_tests.rs#workflow_action_changed_arguments_need_new_call_and_context_changes_conflict",
+        "name": "workflow_action_changed_arguments_need_new_call_and_context_changes_conflict",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_tests.rs",
+        "span": "L71-L98"
+      },
+      "path": "src/adapters/persistence/workflow/action_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 92,
+          "text": "assert_ne!(first.approval_subject(), second.approval_subject());"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_tests.rs#workflow_action_authority_sql_scope_actor_and_current_membership",
+        "name": "workflow_action_authority_sql_scope_actor_and_current_membership",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_tests.rs",
+        "span": "L158-L210"
+      },
+      "path": "src/adapters/persistence/workflow/action_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 169,
+          "text": "let subject = intent.approval_subject();"
+        },
+        {
+          "line": 172,
+          "text": ".action_authority(request.scope, &subject)"
+        },
+        {
+          "line": 183,
+          "text": "let mut wrong = subject.clone();"
+        },
+        {
+          "line": 205,
+          "text": ".action_authority(request.scope, &subject)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_tests.rs#workflow_action_authority_revocation_contender_blocks_then_rechecks",
+        "name": "workflow_action_authority_revocation_contender_blocks_then_rechecks",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_tests.rs",
+        "span": "L213-L243"
+      },
+      "path": "src/adapters/persistence/workflow/action_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 236,
+          "text": "let subject = intent.approval_subject();"
+        },
+        {
+          "line": 239,
+          "text": "f.persistence().action_authority(request.scope, &subject)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_tests.rs#workflow_action_authority_run_lock_wait_cannot_cross_deadline",
+        "name": "workflow_action_authority_run_lock_wait_cannot_cross_deadline",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_tests.rs",
+        "span": "L246-L272"
+      },
+      "path": "src/adapters/persistence/workflow/action_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 266,
+          "text": "let subject = intent.approval_subject();"
+        },
+        {
+          "line": 269,
+          "text": "f.persistence().action_authority(request.scope, &subject)"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 11120
+  }
+}

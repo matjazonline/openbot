@@ -1,0 +1,263 @@
+{
+  "query": "readable_thread",
+  "matches": [
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/mod.rs#readable_thread",
+        "name": "readable_thread",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/mod.rs",
+        "span": "L230-L251"
+      },
+      "hits": [
+        {
+          "id": "src/adapters/http/routes/channel/simulation.rs#load_simulation_thread_fragment",
+          "relation": "calls",
+          "depth": 1,
+          "name": "load_simulation_thread_fragment",
+          "kind": "function",
+          "path": "src/adapters/http/routes/channel/simulation.rs",
+          "span": "L94-L136"
+        },
+        {
+          "id": "src/adapters/http/routes/channel/simulation.rs#simulation_stream",
+          "relation": "calls",
+          "depth": 1,
+          "name": "simulation_stream",
+          "kind": "function",
+          "path": "src/adapters/http/routes/channel/simulation.rs",
+          "span": "L364-L439"
+        },
+        {
+          "id": "src/adapters/http/routes/ui_attachments.rs#download_attachment",
+          "relation": "calls",
+          "depth": 1,
+          "name": "download_attachment",
+          "kind": "function",
+          "path": "src/adapters/http/routes/ui_attachments.rs",
+          "span": "L63-L108"
+        },
+        {
+          "id": "src/adapters/http/routes/ui_internal_notes.rs#load_scope",
+          "relation": "calls",
+          "depth": 1,
+          "name": "load_scope",
+          "kind": "function",
+          "path": "src/adapters/http/routes/ui_internal_notes.rs",
+          "span": "L97-L128"
+        },
+        {
+          "id": "src/adapters/http/routes/ui_message_diagnostics.rs#message_diagnostics",
+          "relation": "calls",
+          "depth": 1,
+          "name": "message_diagnostics",
+          "kind": "function",
+          "path": "src/adapters/http/routes/ui_message_diagnostics.rs",
+          "span": "L47-L76"
+        },
+        {
+          "id": "src/adapters/http/routes/ui_message.rs#page",
+          "relation": "calls",
+          "depth": 1,
+          "name": "page",
+          "kind": "function",
+          "path": "src/adapters/http/routes/ui_message.rs",
+          "span": "L12-L48"
+        },
+        {
+          "id": "src/adapters/http/routes/ui.rs#mailbox_page",
+          "relation": "calls",
+          "depth": 1,
+          "name": "mailbox_page",
+          "kind": "function",
+          "path": "src/adapters/http/routes/ui.rs",
+          "span": "L299-L386"
+        },
+        {
+          "id": "src/adapters/http/routes/ui.rs#message_pane_fragment",
+          "relation": "calls",
+          "depth": 1,
+          "name": "message_pane_fragment",
+          "kind": "function",
+          "path": "src/adapters/http/routes/ui.rs",
+          "span": "L470-L498"
+        },
+        {
+          "id": "src/adapters/http/routes/ui.rs#reply_form",
+          "relation": "calls",
+          "depth": 1,
+          "name": "reply_form",
+          "kind": "function",
+          "path": "src/adapters/http/routes/ui.rs",
+          "span": "L939-L972"
+        },
+        {
+          "id": "src/adapters/http/routes/ui.rs#send_reply",
+          "relation": "calls",
+          "depth": 1,
+          "name": "send_reply",
+          "kind": "function",
+          "path": "src/adapters/http/routes/ui.rs",
+          "span": "L983-L1071"
+        },
+        {
+          "id": "src/adapters/http/routes/ui.rs#thread_message_stream",
+          "relation": "calls",
+          "depth": 1,
+          "name": "thread_message_stream",
+          "kind": "function",
+          "path": "src/adapters/http/routes/ui.rs",
+          "span": "L525-L644"
+        },
+        {
+          "id": "src/adapters/http/routes/channel/simulation.rs#open_simulated_thread_logic",
+          "relation": "calls",
+          "depth": 2,
+          "name": "open_simulated_thread_logic",
+          "kind": "function",
+          "path": "src/adapters/http/routes/channel/simulation.rs",
+          "span": "L507-L551"
+        },
+        {
+          "id": "src/adapters/http/routes/channel/simulation.rs#run",
+          "relation": "calls",
+          "depth": 2,
+          "name": "run",
+          "kind": "function",
+          "path": "src/adapters/http/routes/channel/simulation.rs",
+          "span": "L297-L349"
+        },
+        {
+          "id": "src/adapters/http/routes/channel/simulation.rs#simulate_channel_page",
+          "relation": "calls",
+          "depth": 2,
+          "name": "simulate_channel_page",
+          "kind": "function",
+          "path": "src/adapters/http/routes/channel/simulation.rs",
+          "span": "L9-L64"
+        },
+        {
+          "id": "src/adapters/http/routes/ui_internal_notes.rs#add_note_api",
+          "relation": "calls",
+          "depth": 2,
+          "name": "add_note_api",
+          "kind": "function",
+          "path": "src/adapters/http/routes/ui_internal_notes.rs",
+          "span": "L238-L281"
+        },
+        {
+          "id": "src/adapters/http/routes/ui_internal_notes.rs#add_note_ui",
+          "relation": "calls",
+          "depth": 2,
+          "name": "add_note_ui",
+          "kind": "function",
+          "path": "src/adapters/http/routes/ui_internal_notes.rs",
+          "span": "L151-L193"
+        },
+        {
+          "id": "src/adapters/http/routes/ui_internal_notes.rs#tombstone_note_api",
+          "relation": "calls",
+          "depth": 2,
+          "name": "tombstone_note_api",
+          "kind": "function",
+          "path": "src/adapters/http/routes/ui_internal_notes.rs",
+          "span": "L283-L318"
+        },
+        {
+          "id": "src/adapters/http/routes/ui_internal_notes.rs#tombstone_note_ui",
+          "relation": "calls",
+          "depth": 2,
+          "name": "tombstone_note_ui",
+          "kind": "function",
+          "path": "src/adapters/http/routes/ui_internal_notes.rs",
+          "span": "L195-L236"
+        },
+        {
+          "id": "src/adapters/http/routes/ui_conversation_stream_tests.rs#conversation_reads_refuse_foreign_scope_and_private_channels",
+          "relation": "calls",
+          "depth": 2,
+          "name": "conversation_reads_refuse_foreign_scope_and_private_channels",
+          "kind": "function",
+          "path": "src/adapters/http/routes/ui_conversation_stream_tests.rs",
+          "span": "L64-L118"
+        },
+        {
+          "id": "src/adapters/http/routes/ui_stream_tests.rs#message_stream",
+          "relation": "calls",
+          "depth": 2,
+          "name": "message_stream",
+          "kind": "function",
+          "path": "src/adapters/http/routes/ui_stream_tests.rs",
+          "span": "L385-L405"
+        },
+        {
+          "id": "src/adapters/http/routes/channel_authorization_tests.rs#simulation_and_application_thread_reads_hide_other_channels_and_tenants_like_unknown_ids",
+          "relation": "calls",
+          "depth": 3,
+          "name": "simulation_and_application_thread_reads_hide_other_channels_and_tenants_like_unknown_ids",
+          "kind": "function",
+          "path": "src/adapters/http/routes/channel_authorization_tests.rs",
+          "span": "L58-L122"
+        },
+        {
+          "id": "src/adapters/http/routes/channel/simulation.rs#open_simulated_thread_get",
+          "relation": "calls",
+          "depth": 3,
+          "name": "open_simulated_thread_get",
+          "kind": "function",
+          "path": "src/adapters/http/routes/channel/simulation.rs",
+          "span": "L558-L583"
+        },
+        {
+          "id": "src/adapters/http/routes/channel/simulation.rs#open_simulated_thread_post",
+          "relation": "calls",
+          "depth": 3,
+          "name": "open_simulated_thread_post",
+          "kind": "function",
+          "path": "src/adapters/http/routes/channel/simulation.rs",
+          "span": "L590-L615"
+        },
+        {
+          "id": "src/adapters/http/routes/channel/simulation.rs#simulate_channel_handler",
+          "relation": "calls",
+          "depth": 3,
+          "name": "simulate_channel_handler",
+          "kind": "function",
+          "path": "src/adapters/http/routes/channel/simulation.rs",
+          "span": "L149-L198"
+        },
+        {
+          "id": "src/adapters/http/routes/channel_authorization_tests.rs#channel_management_and_simulation_hide_foreign_companies_and_refuse_members",
+          "relation": "calls",
+          "depth": 3,
+          "name": "channel_management_and_simulation_hide_foreign_companies_and_refuse_members",
+          "kind": "function",
+          "path": "src/adapters/http/routes/channel_authorization_tests.rs",
+          "span": "L7-L55"
+        },
+        {
+          "id": "src/adapters/http/routes/ui_conversation_stream_tests.rs#both_runs_reconcile_on_connect_wakeup_and_reconnect",
+          "relation": "calls",
+          "depth": 3,
+          "name": "both_runs_reconcile_on_connect_wakeup_and_reconnect",
+          "kind": "function",
+          "path": "src/adapters/http/routes/ui_conversation_stream_tests.rs",
+          "span": "L5-L61"
+        },
+        {
+          "id": "src/adapters/http/routes/ui_stream_tests.rs#the_open_thread_streams_its_activity_strip",
+          "relation": "calls",
+          "depth": 3,
+          "name": "the_open_thread_streams_its_activity_strip",
+          "kind": "function",
+          "path": "src/adapters/http/routes/ui_stream_tests.rs",
+          "span": "L508-L532"
+        }
+      ]
+    }
+  ],
+  "saved": {
+    "files": 10,
+    "baselineChars": 142488
+  }
+}

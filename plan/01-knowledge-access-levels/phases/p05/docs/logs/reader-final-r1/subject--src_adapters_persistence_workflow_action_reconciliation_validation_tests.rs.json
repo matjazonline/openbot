@@ -1,0 +1,87 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 5,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_validation_tests.rs#insert_outcome_on",
+        "name": "insert_outcome_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_validation_tests.rs",
+        "span": "L63-L88"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_validation_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 79,
+          "text": ".bind(command.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 80,
+          "text": ".bind(command.subject.argument_digest.as_str())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_validation_tests.rs#different_target_registration",
+        "name": "different_target_registration",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_validation_tests.rs",
+        "span": "L144-L171"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_validation_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 159,
+          "text": ".action_authority(original.scope(), &intent.approval_subject())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_validation_tests.rs#entry_times",
+        "name": "entry_times",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_validation_tests.rs",
+        "span": "L277-L290"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_validation_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 286,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_validation_tests.rs#workflow_action_reconciliation_validation_installed_source_mismatches",
+        "name": "workflow_action_reconciliation_validation_installed_source_mismatches",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_validation_tests.rs",
+        "span": "L199-L269"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_validation_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 211,
+          "text": ".action_authority(request.scope(), &request.subject)"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 13232
+  }
+}

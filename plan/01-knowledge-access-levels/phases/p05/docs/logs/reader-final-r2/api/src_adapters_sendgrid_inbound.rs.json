@@ -1,0 +1,105 @@
+{
+  "file": "src/adapters/sendgrid/inbound.rs",
+  "entries": [
+    {
+      "name": "MAX_SENDGRID_REQUEST_BODY_BYTES",
+      "kind": "constant",
+      "span": "L32-L32",
+      "signature": "pub const MAX_SENDGRID_REQUEST_BODY_BYTES: usize = MAX_INBOUND_MESSAGE_BYTES + 1024 * 1024;"
+    },
+    {
+      "name": "SendGridPayload",
+      "kind": "struct",
+      "span": "L35-L45",
+      "signature": "struct SendGridPayload"
+    },
+    {
+      "name": "SendGridEnvelope",
+      "kind": "struct",
+      "span": "L48-L51",
+      "signature": "struct SendGridEnvelope"
+    },
+    {
+      "name": "DecodedRequest",
+      "kind": "struct",
+      "span": "L53-L57",
+      "signature": "struct DecodedRequest"
+    },
+    {
+      "name": "decode_sendgrid_request",
+      "kind": "function",
+      "span": "L60-L104",
+      "signature": "pub async fn decode_sendgrid_request("
+    },
+    {
+      "name": "decode_provider_request",
+      "kind": "function",
+      "span": "L106-L129",
+      "signature": "async fn decode_provider_request("
+    },
+    {
+      "name": "decode_multipart",
+      "kind": "function",
+      "span": "L131-L169",
+      "signature": "async fn decode_multipart("
+    },
+    {
+      "name": "apply_field",
+      "kind": "function",
+      "span": "L171-L187",
+      "signature": "fn apply_field(payload: &mut RawInboundPayload, name: &str, value: String)"
+    },
+    {
+      "name": "apply_payload",
+      "kind": "function",
+      "span": "L189-L209",
+      "signature": "fn apply_payload(provider: SendGridPayload, payload: &mut RawInboundPayload)"
+    },
+    {
+      "name": "apply_envelope",
+      "kind": "function",
+      "span": "L211-L224",
+      "signature": "fn apply_envelope(payload: &mut RawInboundPayload, envelope: &str)"
+    },
+    {
+      "name": "tests",
+      "kind": "module",
+      "span": "L227-L294",
+      "signature": "mod tests"
+    },
+    {
+      "name": "the_envelope_is_the_routing_source_of_truth",
+      "kind": "function",
+      "span": "L231-L255",
+      "signature": "fn the_envelope_is_the_routing_source_of_truth()"
+    },
+    {
+      "name": "multipart_decode_preserves_the_raw_mail_and_reads_transport_facts",
+      "kind": "function",
+      "span": "L258-L282",
+      "signature": "async fn multipart_decode_preserves_the_raw_mail_and_reads_transport_facts()"
+    },
+    {
+      "name": "BOUNDARY",
+      "kind": "constant",
+      "span": "L259-L259",
+      "signature": "const BOUNDARY: &str = \"sendgrid-test-boundary\";"
+    },
+    {
+      "name": "RAW_MIME",
+      "kind": "constant",
+      "span": "L260-L261",
+      "signature": "const RAW_MIME: &str ="
+    },
+    {
+      "name": "provider_authentication_fields_are_ignored",
+      "kind": "function",
+      "span": "L285-L293",
+      "signature": "fn provider_authentication_fields_are_ignored()"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 10490
+  }
+}

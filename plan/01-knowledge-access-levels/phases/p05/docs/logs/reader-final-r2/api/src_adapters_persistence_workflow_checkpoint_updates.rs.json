@@ -1,0 +1,27 @@
+{
+  "file": "src/adapters/persistence/workflow/checkpoint_updates.rs",
+  "entries": [
+    {
+      "name": "update_on",
+      "kind": "function",
+      "span": "L4-L61",
+      "signature": "pub(super) async fn update_on("
+    },
+    {
+      "name": "mutation",
+      "kind": "function",
+      "span": "L63-L73",
+      "signature": "fn mutation(update: WorkflowCheckpointUpdate) -> Mutation"
+    },
+    {
+      "name": "approved_settlement",
+      "kind": "function",
+      "span": "L75-L93",
+      "signature": "async fn approved_settlement("
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 4063
+  }
+}

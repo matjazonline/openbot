@@ -1,0 +1,147 @@
+{
+  "file": "src/adapters/protocols/email/types.rs",
+  "entries": [
+    {
+      "name": "EMAIL_IDENTITY_NAMESPACE",
+      "kind": "constant",
+      "span": "L16-L16",
+      "signature": "pub const EMAIL_IDENTITY_NAMESPACE: &str = \"email\";"
+    },
+    {
+      "name": "EmailEndpointKey",
+      "kind": "struct",
+      "span": "L39-L39",
+      "signature": "pub struct EmailEndpointKey(ExternalEndpointKey);"
+    },
+    {
+      "name": "canonical",
+      "kind": "function",
+      "span": "L43-L45",
+      "signature": "pub fn canonical(channel: &ChannelSlug) -> Result<Self, TransportValueError>"
+    },
+    {
+      "name": "namespace",
+      "kind": "function",
+      "span": "L50-L53",
+      "signature": "pub fn namespace(company_id: Uuid) -> EndpointNamespace"
+    },
+    {
+      "name": "as_str",
+      "kind": "function",
+      "span": "L55-L57",
+      "signature": "pub fn as_str(&self) -> &str"
+    },
+    {
+      "name": "into_external",
+      "kind": "function",
+      "span": "L59-L61",
+      "signature": "pub fn into_external(self) -> ExternalEndpointKey"
+    },
+    {
+      "name": "EmailIdentity",
+      "kind": "struct",
+      "span": "L67-L67",
+      "signature": "pub struct EmailIdentity(IdentitySubject);"
+    },
+    {
+      "name": "EmailIdentityError",
+      "kind": "enum",
+      "span": "L70-L75",
+      "signature": "pub enum EmailIdentityError"
+    },
+    {
+      "name": "deserialize",
+      "kind": "function",
+      "span": "L78-L84",
+      "signature": "fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>"
+    },
+    {
+      "name": "parse",
+      "kind": "function",
+      "span": "L88-L96",
+      "signature": "pub fn parse(address: EmailAddress) -> Result<Self, EmailIdentityError>"
+    },
+    {
+      "name": "subject",
+      "kind": "function",
+      "span": "L98-L100",
+      "signature": "pub fn subject(&self) -> &IdentitySubject"
+    },
+    {
+      "name": "qualify",
+      "kind": "function",
+      "span": "L102-L104",
+      "signature": "pub fn qualify(self, namespace: IdentityNamespace) -> QualifiedIdentity"
+    },
+    {
+      "name": "qualify_default",
+      "kind": "function",
+      "span": "L106-L111",
+      "signature": "pub fn qualify_default(self) -> QualifiedIdentity"
+    },
+    {
+      "name": "EmailMessageKey",
+      "kind": "struct",
+      "span": "L117-L117",
+      "signature": "pub struct EmailMessageKey(ExternalMessageKey);"
+    },
+    {
+      "name": "parse",
+      "kind": "function",
+      "span": "L120-L124",
+      "signature": "pub fn parse(message_id: MessageId) -> Result<Self, TransportValueError>"
+    },
+    {
+      "name": "into_external",
+      "kind": "function",
+      "span": "L126-L128",
+      "signature": "pub fn into_external(self) -> ExternalMessageKey"
+    },
+    {
+      "name": "as_external",
+      "kind": "function",
+      "span": "L130-L132",
+      "signature": "pub fn as_external(&self) -> &ExternalMessageKey"
+    },
+    {
+      "name": "deserialize",
+      "kind": "function",
+      "span": "L136-L142",
+      "signature": "fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>"
+    },
+    {
+      "name": "tests",
+      "kind": "module",
+      "span": "L146-L199",
+      "signature": "mod tests"
+    },
+    {
+      "name": "email_identity_normalization_is_case_insensitive",
+      "kind": "function",
+      "span": "L150-L155",
+      "signature": "fn email_identity_normalization_is_case_insensitive()"
+    },
+    {
+      "name": "a_channel_endpoint_key_holds_only_the_part_of_the_address_that_is_stable",
+      "kind": "function",
+      "span": "L158-L174",
+      "signature": "fn a_channel_endpoint_key_holds_only_the_part_of_the_address_that_is_stable()"
+    },
+    {
+      "name": "malformed_email_is_rejected_at_the_adapter_boundary",
+      "kind": "function",
+      "span": "L177-L179",
+      "signature": "fn malformed_email_is_rejected_at_the_adapter_boundary()"
+    },
+    {
+      "name": "adapter_newtypes_round_trip_without_permissive_deserialization",
+      "kind": "function",
+      "span": "L182-L198",
+      "signature": "fn adapter_newtypes_round_trip_without_permissive_deserialization()"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 7456
+  }
+}

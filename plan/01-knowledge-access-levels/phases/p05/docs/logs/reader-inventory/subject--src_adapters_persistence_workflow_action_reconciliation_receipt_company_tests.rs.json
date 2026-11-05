@@ -1,0 +1,78 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 6,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_receipt_company_tests.rs#applied_history",
+        "name": "applied_history",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_receipt_company_tests.rs",
+        "span": "L60-L130"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_receipt_company_tests.rs",
+      "inDegree": 6,
+      "hits": [
+        {
+          "line": 93,
+          "text": ".bind(request.scope().company.as_uuid()).bind(request.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 99,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_receipt_company_tests.rs#company_positive",
+        "name": "company_positive",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_receipt_company_tests.rs",
+        "span": "L132-L174"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_receipt_company_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 159,
+          "text": ".bind(history.request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_receipt_company_tests.rs#workflow_action_reconciliation_receipt_sql_authentic_foreign_company_guard",
+        "name": "workflow_action_reconciliation_receipt_sql_authentic_foreign_company_guard",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_receipt_company_tests.rs",
+        "span": "L177-L233"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_receipt_company_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 186,
+          "text": "assert_ne!(a.request.subject.invocation, b.request.subject.invocation);"
+        },
+        {
+          "line": 208,
+          "text": "for (subject, source) in [(&a, &b), (&b, &a)] {"
+        },
+        {
+          "line": 215,
+          "text": "subject.marker,"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 8814
+  }
+}

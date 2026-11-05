@@ -1,0 +1,36 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 2,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/wait_commit.rs#decision_timed_out",
+        "name": "decision_timed_out",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/wait_commit.rs",
+        "span": "L148-L190"
+      },
+      "path": "src/adapters/persistence/workflow/wait_commit.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 157,
+          "text": "let token: Option<Uuid> = sqlx::query_scalar(\"SELECT id FROM workflow_decisions WHERE company_id=$1 AND wait_id=$2 AND subject_kind='token_allowance'\")"
+        },
+        {
+          "line": 169,
+          "text": "let approval: Option<Uuid> = sqlx::query_scalar(\"SELECT id FROM workflow_decisions WHERE company_id=$1 AND wait_id=$2 AND subject_kind='action_approval'\")"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 19312
+  }
+}

@@ -1,0 +1,63 @@
+{
+  "file": "src/adapters/protocols/email/mod.rs",
+  "entries": [
+    {
+      "name": "attachments",
+      "kind": "module",
+      "span": "L12-L12",
+      "signature": "pub mod attachments;"
+    },
+    {
+      "name": "authentication",
+      "kind": "module",
+      "span": "L13-L13",
+      "signature": "pub mod authentication;"
+    },
+    {
+      "name": "egress",
+      "kind": "module",
+      "span": "L14-L14",
+      "signature": "pub mod egress;"
+    },
+    {
+      "name": "ingress",
+      "kind": "module",
+      "span": "L15-L15",
+      "signature": "pub mod ingress;"
+    },
+    {
+      "name": "mail",
+      "kind": "module",
+      "span": "L16-L16",
+      "signature": "pub mod mail;"
+    },
+    {
+      "name": "parser",
+      "kind": "module",
+      "span": "L17-L17",
+      "signature": "pub mod parser;"
+    },
+    {
+      "name": "selector",
+      "kind": "module",
+      "span": "L18-L18",
+      "signature": "mod selector;"
+    },
+    {
+      "name": "test_support",
+      "kind": "module",
+      "span": "L20-L20",
+      "signature": "pub mod test_support;"
+    },
+    {
+      "name": "types",
+      "kind": "module",
+      "span": "L21-L21",
+      "signature": "mod types;"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 1632
+  }
+}

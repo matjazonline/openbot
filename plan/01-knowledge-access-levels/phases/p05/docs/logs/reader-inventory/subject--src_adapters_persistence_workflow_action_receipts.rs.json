@@ -1,0 +1,160 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 20,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_receipts.rs#receipt_on",
+        "name": "receipt_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_receipts.rs",
+        "span": "L10-L35"
+      },
+      "path": "src/adapters/persistence/workflow/action_receipts.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 23,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 24,
+          "text": ".bind(request.subject.argument_digest.as_str())"
+        },
+        {
+          "line": 30,
+          "text": "subject: request.subject.clone(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_receipts.rs#reserve_entry_on",
+        "name": "reserve_entry_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_receipts.rs",
+        "span": "L107-L136"
+      },
+      "path": "src/adapters/persistence/workflow/action_receipts.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 116,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 124,
+          "text": ".bind(request.scope().execution.as_uuid()).bind(request.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 125,
+          "text": ".bind(request.subject.argument_digest.as_str()).bind(marker).bind(entry)"
+        },
+        {
+          "line": 132,
+          "text": ".bind(request.subject.invocation.as_uuid()).bind(request.subject.argument_digest.as_str()).bind(marker).bind(proof).bind(entry)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_receipts.rs#verify_entry_on",
+        "name": "verify_entry_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_receipts.rs",
+        "span": "L138-L166"
+      },
+      "path": "src/adapters/persistence/workflow/action_receipts.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 154,
+          "text": "AND marker.replay_subject=$13 AND intent.operation=$14)\","
+        },
+        {
+          "line": 156,
+          "text": ".bind(request.scope().execution.as_uuid()).bind(request.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 157,
+          "text": ".bind(request.subject.argument_digest.as_str()).bind(marker).bind(entry)"
+        },
+        {
+          "line": 160,
+          "text": ".bind(replay_subject(&action.request().contract,&action.request().target)?)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_receipts.rs#insert_receipt_on",
+        "name": "insert_receipt_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_receipts.rs",
+        "span": "L256-L279"
+      },
+      "path": "src/adapters/persistence/workflow/action_receipts.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 268,
+          "text": ".bind(request.scope().execution.as_uuid()).bind(request.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 269,
+          "text": ".bind(request.subject.argument_digest.as_str()).bind(entry.marker).bind(entry.entry).bind(&result)"
+        },
+        {
+          "line": 275,
+          "text": ".bind(request.scope().execution.as_uuid()).bind(request.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 276,
+          "text": ".bind(request.subject.argument_digest.as_str()).bind(entry.marker).bind(entry.entry).bind(result)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_receipts.rs#marker_on",
+        "name": "marker_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_receipts.rs",
+        "span": "L61-L105"
+      },
+      "path": "src/adapters/persistence/workflow/action_receipts.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 74,
+          "text": "AND effect_kind='remote' AND replay_subject=$4\","
+        },
+        {
+          "line": 77,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 79,
+          "text": ".bind(replay_subject("
+        },
+        {
+          "line": 92,
+          "text": "Self::insert_subject("
+        },
+        {
+          "line": 98,
+          "text": "Some(replay_subject("
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 17465
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "phase": "p05",
+  "stage": "whole WB1 code review",
+  "base": "b7e63b01433ba7a77341ff6c7f158d75d082a8a2",
+  "head": "b7e63b01433ba7a77341ff6c7f158d75d082a8a2",
+  "exclusions": [
+    "plan/01-knowledge-access-levels/phases/p05/docs"
+  ],
+  "installed_digest": "85b5ea486c25f8aa6da8a0032a09c6438edba4edbec3118242a694716a7d7f5c",
+  "tree_sha256": "f48a4d56920291e12f23567b18229ab7d033f5eac052f0cf0f4aa8a9f8de9005",
+  "files_count": 3256,
+  "staged_changed_paths": 82,
+  "authority_revision": 14,
+  "authority_sha256": "e4ab96e9c2704fd3544799497901fecd5da497730dcc2b11499cb8500b0834af",
+  "decision": "KNOW-P05-G1-r1",
+  "decision_sha256": "46e5df05700f7f9d6fbbae24a2b914bafc6ee36ea8ae0a11966e2b5c518bcaa3",
+  "author_checks": {
+    "regression": 990,
+    "final_affected": 132,
+    "knowledge_view_": 17,
+    "browser_protocols": 2,
+    "clippy": "PASS alltargets/offline -Dwarnings",
+    "migrations": "both fresh owned DBs match45f9d7a4...",
+    "live_sqlx_cache": "PASS alltargets",
+    "offline_alltargets": "PASS",
+    "fmt_css_source_whitespace": "PASS",
+    "reader_sweep": "74clean_text_body/1301subject/384attachment; all leaves zero truncated;896 classified candidates incl26 verifiedtesthelper hits;863 explicitly excluded test hits"
+  },
+  "q001": "confirmed unrelated existing reverse-import guard; untouched, mandatory06 correction/fullgate; no fullsuiteclaim"
+}

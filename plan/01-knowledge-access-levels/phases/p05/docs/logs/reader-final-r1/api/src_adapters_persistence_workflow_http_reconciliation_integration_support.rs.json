@@ -1,0 +1,123 @@
+{
+  "file": "src/adapters/persistence/workflow/http_reconciliation_integration_support.rs",
+  "entries": [
+    {
+      "name": "ProviderState",
+      "kind": "struct",
+      "span": "L16-L20",
+      "signature": "struct ProviderState"
+    },
+    {
+      "name": "Provider",
+      "kind": "struct",
+      "span": "L22-L27",
+      "signature": "pub(super) struct Provider"
+    },
+    {
+      "name": "start",
+      "kind": "function",
+      "span": "L30-L51",
+      "signature": "pub async fn start() -> Self"
+    },
+    {
+      "name": "call",
+      "kind": "function",
+      "span": "L53-L71",
+      "signature": "async fn call(State(state): State<Arc<ProviderState>>) -> Response"
+    },
+    {
+      "name": "apply_next",
+      "kind": "function",
+      "span": "L73-L75",
+      "signature": "pub fn apply_next(&self)"
+    },
+    {
+      "name": "calls",
+      "kind": "function",
+      "span": "L76-L78",
+      "signature": "pub fn calls(&self) -> usize"
+    },
+    {
+      "name": "effects",
+      "kind": "function",
+      "span": "L79-L81",
+      "signature": "pub fn effects(&self) -> usize"
+    },
+    {
+      "name": "finish",
+      "kind": "function",
+      "span": "L83-L89",
+      "signature": "pub async fn finish(mut self)"
+    },
+    {
+      "name": "drop",
+      "kind": "function",
+      "span": "L93-L98",
+      "signature": "fn drop(&mut self)"
+    },
+    {
+      "name": "Truth",
+      "kind": "enum",
+      "span": "L101-L104",
+      "signature": "pub(super) enum Truth"
+    },
+    {
+      "name": "CapturedProof",
+      "kind": "struct",
+      "span": "L108-L112",
+      "signature": "pub(super) struct CapturedProof"
+    },
+    {
+      "name": "capture",
+      "kind": "function",
+      "span": "L115-L131",
+      "signature": "pub async fn capture(setup: &Setup, request: &ActionRequest, truth: Truth) -> Arc<Self>"
+    },
+    {
+      "name": "registration",
+      "kind": "function",
+      "span": "L136-L138",
+      "signature": "fn registration(&self) -> &EvidenceVerifierRegistration"
+    },
+    {
+      "name": "verify",
+      "kind": "function",
+      "span": "L139-L160",
+      "signature": "async fn verify("
+    },
+    {
+      "name": "command",
+      "kind": "function",
+      "span": "L163-L200",
+      "signature": "pub(super) async fn command("
+    },
+    {
+      "name": "reconcile",
+      "kind": "function",
+      "span": "L202-L221",
+      "signature": "pub(super) async fn reconcile("
+    },
+    {
+      "name": "snapshot",
+      "kind": "function",
+      "span": "L223-L252",
+      "signature": "pub(super) async fn snapshot(setup: &Setup) -> Value"
+    },
+    {
+      "name": "count",
+      "kind": "function",
+      "span": "L254-L256",
+      "signature": "pub(super) fn count(state: &Value, table: &str) -> usize"
+    },
+    {
+      "name": "claim_competitors",
+      "kind": "function",
+      "span": "L258-L274",
+      "signature": "pub(super) async fn claim_competitors(setup: &Setup) -> ClaimedWorkflow"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 9215
+  }
+}

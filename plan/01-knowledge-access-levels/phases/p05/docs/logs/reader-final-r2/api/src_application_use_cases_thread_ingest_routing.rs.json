@@ -1,0 +1,171 @@
+{
+  "file": "src/application/use_cases/thread/ingest/routing.rs",
+  "entries": [
+    {
+      "name": "ChannelCandidate",
+      "kind": "struct",
+      "span": "L56-L68",
+      "signature": "pub(crate) struct ChannelCandidate"
+    },
+    {
+      "name": "ResolvedAddresses",
+      "kind": "struct",
+      "span": "L71-L74",
+      "signature": "pub(crate) struct ResolvedAddresses"
+    },
+    {
+      "name": "ChannelVerdict",
+      "kind": "enum",
+      "span": "L80-L84",
+      "signature": "enum ChannelVerdict"
+    },
+    {
+      "name": "ThreadAccess",
+      "kind": "enum",
+      "span": "L87-L90",
+      "signature": "enum ThreadAccess"
+    },
+    {
+      "name": "ThreadSender",
+      "kind": "struct",
+      "span": "L98-L101",
+      "signature": "pub(crate) struct ThreadSender<'a>"
+    },
+    {
+      "name": "new",
+      "kind": "function",
+      "span": "L104-L106",
+      "signature": "pub fn new(handle: &'a QualifiedIdentity, context: PrincipalAccessContext) -> Self"
+    },
+    {
+      "name": "address",
+      "kind": "function",
+      "span": "L108-L110",
+      "signature": "pub fn address(self) -> &'a str"
+    },
+    {
+      "name": "is_party_to",
+      "kind": "function",
+      "span": "L114-L118",
+      "signature": "fn is_party_to(self, thread: &Thread) -> bool"
+    },
+    {
+      "name": "resolve_addresses",
+      "kind": "function",
+      "span": "L131-L231",
+      "signature": "pub(crate) async fn resolve_addresses("
+    },
+    {
+      "name": "selector_company",
+      "kind": "function",
+      "span": "L235-L248",
+      "signature": "async fn selector_company("
+    },
+    {
+      "name": "inbound_binding",
+      "kind": "function",
+      "span": "L255-L272",
+      "signature": "async fn inbound_binding("
+    },
+    {
+      "name": "authorize_channel",
+      "kind": "function",
+      "span": "L278-L319",
+      "signature": "async fn authorize_channel("
+    },
+    {
+      "name": "thread_access_for",
+      "kind": "function",
+      "span": "L323-L341",
+      "signature": "async fn thread_access_for("
+    },
+    {
+      "name": "resolve_thread",
+      "kind": "function",
+      "span": "L348-L399",
+      "signature": "async fn resolve_thread("
+    },
+    {
+      "name": "find_ancestor_thread",
+      "kind": "function",
+      "span": "L403-L425",
+      "signature": "async fn find_ancestor_thread("
+    },
+    {
+      "name": "prepare_channels",
+      "kind": "function",
+      "span": "L428-L482",
+      "signature": "pub(crate) async fn prepare_channels("
+    },
+    {
+      "name": "prepare_channel",
+      "kind": "function",
+      "span": "L486-L549",
+      "signature": "async fn prepare_channel("
+    },
+    {
+      "name": "authorize_thread_injection",
+      "kind": "function",
+      "span": "L554-L589",
+      "signature": "fn authorize_thread_injection("
+    },
+    {
+      "name": "direct_parent",
+      "kind": "function",
+      "span": "L594-L622",
+      "signature": "async fn direct_parent("
+    },
+    {
+      "name": "channel_was_mentioned",
+      "kind": "function",
+      "span": "L625-L638",
+      "signature": "fn channel_was_mentioned(&self, candidate: &ChannelCandidate, body: &str) -> bool"
+    },
+    {
+      "name": "undeliverable_rejection",
+      "kind": "function",
+      "span": "L641-L664",
+      "signature": "async fn undeliverable_rejection("
+    },
+    {
+      "name": "writable_channel_directory",
+      "kind": "function",
+      "span": "L672-L696",
+      "signature": "pub(crate) async fn writable_channel_directory("
+    },
+    {
+      "name": "answer_system_addresses",
+      "kind": "function",
+      "span": "L703-L739",
+      "signature": "pub(crate) async fn answer_system_addresses("
+    },
+    {
+      "name": "send_system_reply",
+      "kind": "function",
+      "span": "L744-L805",
+      "signature": "async fn send_system_reply("
+    },
+    {
+      "name": "sender_address",
+      "kind": "function",
+      "span": "L813-L815",
+      "signature": "pub(crate) fn sender_address(draft: &InboundDraft) -> EmailAddress"
+    },
+    {
+      "name": "third_party_handles",
+      "kind": "function",
+      "span": "L821-L833",
+      "signature": "fn third_party_handles("
+    },
+    {
+      "name": "email_metadata",
+      "kind": "function",
+      "span": "L835-L837",
+      "signature": "fn email_metadata(draft: &InboundDraft) -> Option<&EmailMessageMetadata>"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 33706
+  }
+}

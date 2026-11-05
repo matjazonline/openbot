@@ -1,0 +1,49 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 2,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/checkpoint_models.rs#reserve_on",
+        "name": "reserve_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/checkpoint_models.rs",
+        "span": "L11-L83"
+      },
+      "path": "src/adapters/persistence/workflow/checkpoint_models.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 61,
+          "text": "subject: decisions::tokens::TokenSubject::Request(request),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/checkpoint_models.rs#settle_on",
+        "name": "settle_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/checkpoint_models.rs",
+        "span": "L144-L201"
+      },
+      "path": "src/adapters/persistence/workflow/checkpoint_models.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 188,
+          "text": "subject: decisions::tokens::TokenSubject::Settlement(turn.request_id),"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 9571
+  }
+}

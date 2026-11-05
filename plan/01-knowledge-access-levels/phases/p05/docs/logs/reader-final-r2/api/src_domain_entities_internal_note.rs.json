@@ -1,0 +1,87 @@
+{
+  "file": "src/domain/entities/internal_note.rs",
+  "entries": [
+    {
+      "name": "MAX_INTERNAL_NOTE_BYTES",
+      "kind": "constant",
+      "span": "L13-L13",
+      "signature": "pub const MAX_INTERNAL_NOTE_BYTES: usize = 65_536;"
+    },
+    {
+      "name": "InternalNoteProvenance",
+      "kind": "enum",
+      "span": "L17-L22",
+      "signature": "pub enum InternalNoteProvenance"
+    },
+    {
+      "name": "as_str",
+      "kind": "function",
+      "span": "L25-L32",
+      "signature": "pub const fn as_str(self) -> &'static str"
+    },
+    {
+      "name": "Err",
+      "kind": "type",
+      "span": "L36-L36",
+      "signature": "type Err = String;"
+    },
+    {
+      "name": "from_str",
+      "kind": "function",
+      "span": "L38-L46",
+      "signature": "fn from_str(value: &str) -> Result<Self, Self::Err>"
+    },
+    {
+      "name": "AddInternalNote",
+      "kind": "struct",
+      "span": "L50-L58",
+      "signature": "pub struct AddInternalNote"
+    },
+    {
+      "name": "validate",
+      "kind": "function",
+      "span": "L61-L72",
+      "signature": "pub fn validate(&self) -> Result<(), String>"
+    },
+    {
+      "name": "TombstoneInternalNote",
+      "kind": "struct",
+      "span": "L76-L82",
+      "signature": "pub struct TombstoneInternalNote"
+    },
+    {
+      "name": "InternalNoteView",
+      "kind": "struct",
+      "span": "L86-L93",
+      "signature": "pub struct InternalNoteView"
+    },
+    {
+      "name": "is_active",
+      "kind": "function",
+      "span": "L96-L98",
+      "signature": "pub const fn is_active(&self) -> bool"
+    },
+    {
+      "name": "tests",
+      "kind": "module",
+      "span": "L102-L127",
+      "signature": "mod tests"
+    },
+    {
+      "name": "note",
+      "kind": "function",
+      "span": "L105-L115",
+      "signature": "fn note(text: String) -> AddInternalNote"
+    },
+    {
+      "name": "note_text_is_nonempty_and_bounded_in_bytes",
+      "kind": "function",
+      "span": "L118-L126",
+      "signature": "fn note_text_is_nonempty_and_bounded_in_bytes()"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 3596
+  }
+}

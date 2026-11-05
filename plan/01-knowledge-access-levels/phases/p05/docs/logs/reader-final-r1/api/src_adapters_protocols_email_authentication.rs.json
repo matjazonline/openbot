@@ -1,0 +1,99 @@
+{
+  "file": "src/adapters/protocols/email/authentication.rs",
+  "entries": [
+    {
+      "name": "verify_email_authentication",
+      "kind": "function",
+      "span": "L25-L94",
+      "signature": "pub async fn verify_email_authentication("
+    },
+    {
+      "name": "AuthResults",
+      "kind": "struct",
+      "span": "L98-L102",
+      "signature": "pub struct AuthResults"
+    },
+    {
+      "name": "extract_address_str",
+      "kind": "function",
+      "span": "L104-L116",
+      "signature": "fn extract_address_str(addr: &mail_parser::Address) -> Option<String>"
+    },
+    {
+      "name": "parse_raw_mime_to_payload",
+      "kind": "function",
+      "span": "L118-L218",
+      "signature": "pub fn parse_raw_mime_to_payload("
+    },
+    {
+      "name": "AuthenticationResults",
+      "kind": "struct",
+      "span": "L236-L240",
+      "signature": "pub struct AuthenticationResults"
+    },
+    {
+      "name": "from_raw_mime",
+      "kind": "function",
+      "span": "L244-L259",
+      "signature": "pub fn from_raw_mime(raw_mime: &[u8], expected_authserv_id: &str) -> Self"
+    },
+    {
+      "name": "parse_header",
+      "kind": "function",
+      "span": "L266-L292",
+      "signature": "fn parse_header(header: &str, expected_authserv_id: &str) -> Self"
+    },
+    {
+      "name": "tests",
+      "kind": "module",
+      "span": "L296-L381",
+      "signature": "mod tests"
+    },
+    {
+      "name": "AUTHSERV",
+      "kind": "constant",
+      "span": "L299-L299",
+      "signature": "const AUTHSERV: &str = \"resend.com\";"
+    },
+    {
+      "name": "mime",
+      "kind": "function",
+      "span": "L301-L303",
+      "signature": "fn mime(headers: &str) -> Vec<u8>"
+    },
+    {
+      "name": "the_configured_authserv_ids_verdicts_are_read",
+      "kind": "function",
+      "span": "L306-L321",
+      "signature": "fn the_configured_authserv_ids_verdicts_are_read()"
+    },
+    {
+      "name": "a_forged_header_beneath_the_receiving_mtas_own_is_never_read",
+      "kind": "function",
+      "span": "L327-L336",
+      "signature": "fn a_forged_header_beneath_the_receiving_mtas_own_is_never_read()"
+    },
+    {
+      "name": "a_header_from_any_other_authserv_id_asserts_nothing",
+      "kind": "function",
+      "span": "L339-L351",
+      "signature": "fn a_header_from_any_other_authserv_id_asserts_nothing()"
+    },
+    {
+      "name": "a_missing_or_unreadable_header_leaves_every_verdict_unknown",
+      "kind": "function",
+      "span": "L354-L371",
+      "signature": "fn a_missing_or_unreadable_header_leaves_every_verdict_unknown()"
+    },
+    {
+      "name": "an_authserv_id_may_carry_the_optional_version_token",
+      "kind": "function",
+      "span": "L374-L380",
+      "signature": "fn an_authserv_id_may_carry_the_optional_version_token()"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 14702
+  }
+}

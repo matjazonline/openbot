@@ -1,0 +1,180 @@
+{
+  "pattern": "run_detail|reconciliation_snapshot|action_snapshot|read_decision|run_bundle|step_view",
+  "filesSearched": 46,
+  "totalHits": 12,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/decisions.rs#section_after",
+        "name": "section_after",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/decisions.rs",
+        "span": "L199-L227"
+      },
+      "path": "src/adapters/http/routes/workflows/decisions.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 216,
+          "text": ".read_decision(company(company_id), actor(user)?, DecisionId(decision))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/decisions.rs#ui_submit",
+        "name": "ui_submit",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/decisions.rs",
+        "span": "L229-L263"
+      },
+      "path": "src/adapters/http/routes/workflows/decisions.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 238,
+          "text": ".read_decision(company(company_id), actor(&user)?, DecisionId(decision))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/ui/runs/mod.rs#pane_parts",
+        "name": "pane_parts",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/ui/runs/mod.rs",
+        "span": "L263-L283"
+      },
+      "path": "src/adapters/http/routes/workflows/ui/runs/mod.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 268,
+          "text": ".run_bundle(super::company(company), RunId::new(run))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/bindings.rs#run_detail_json",
+        "name": "run_detail_json",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/bindings.rs",
+        "span": "L574-L634"
+      },
+      "path": "src/adapters/http/routes/workflows/bindings.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 574,
+          "text": "fn run_detail_json(detail: &crate::application::workflow::reads::RunDetail) -> Value {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/bindings.rs#run",
+        "name": "run",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/bindings.rs",
+        "span": "L543-L572"
+      },
+      "path": "src/adapters/http/routes/workflows/bindings.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 553,
+          "text": ".run_detail(company, RunId::new(run))"
+        },
+        {
+          "line": 569,
+          "text": "let mut body = run_detail_json(&detail);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/decisions.rs#read",
+        "name": "read",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/decisions.rs",
+        "span": "L58-L68"
+      },
+      "path": "src/adapters/http/routes/workflows/decisions.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 65,
+          "text": ".read_decision(company(company_id), actor(&user)?, DecisionId(decision))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/decisions.rs#page",
+        "name": "page",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/decisions.rs",
+        "span": "L177-L188"
+      },
+      "path": "src/adapters/http/routes/workflows/decisions.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 185,
+          "text": ".read_decision(company(company_id), actor(&user)?, DecisionId(decision))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/ui/runs/mod.rs#step",
+        "name": "step",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/ui/runs/mod.rs",
+        "span": "L709-L744"
+      },
+      "path": "src/adapters/http/routes/workflows/ui/runs/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 720,
+          "text": ".step_view("
+        },
+        {
+          "line": 733,
+          "text": ".run_bundle(company_id, RunId::new(run))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/ui/runs/pages_tests.rs#reconciliation_is_offered_as_an_annotation_and_a_step_shows_usage_and_receipts",
+        "name": "reconciliation_is_offered_as_an_annotation_and_a_step_shows_usage_and_receipts",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/ui/runs/pages_tests.rs",
+        "span": "L9-L107"
+      },
+      "path": "src/adapters/http/routes/workflows/ui/runs/pages_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 45,
+          "text": "let step_view = StepView {"
+        },
+        {
+          "line": 89,
+          "text": "step: &step_view,"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 4,
+    "baselineChars": 72721
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "pattern": "struct Harness",
+  "filesSearched": 122,
+  "totalHits": 2,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_stream_tests.rs#Harness",
+        "name": "Harness",
+        "kind": "struct",
+        "path": "src/adapters/http/routes/ui_stream_tests.rs",
+        "span": "L238-L248"
+      },
+      "path": "src/adapters/http/routes/ui_stream_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 238,
+          "text": "struct Harness {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/webhooks/resend_api_tests.rs#Harness",
+        "name": "Harness",
+        "kind": "struct",
+        "path": "src/adapters/http/routes/webhooks/resend_api_tests.rs",
+        "span": "L90-L94"
+      },
+      "path": "src/adapters/http/routes/webhooks/resend_api_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 90,
+          "text": "struct Harness {"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 2,
+    "baselineChars": 33592
+  }
+}

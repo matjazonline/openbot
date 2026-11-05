@@ -1,0 +1,8 @@
+{
+  "count": 16,
+  "exit": 101,
+  "binary": "target/debug/deps/open_bots-c19a0b960dacdcef",
+  "selector": "knowledge_view_",
+  "rust_min_stack": "unset stock2MiB",
+  "fixture": "55505/open_bots_test + isolated workflow OwnDatabase"
+}

@@ -1,0 +1,226 @@
+{
+  "pattern": "subject",
+  "filesSearched": 2,
+  "totalHits": 17,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/decisions/read.rs#read_on",
+        "name": "read_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/decisions/read.rs",
+        "span": "L36-L93"
+      },
+      "path": "src/adapters/persistence/workflow/decisions/read.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 59,
+          "text": "let subject = subject(&row.subject_kind)?;"
+        },
+        {
+          "line": 61,
+          "text": "let choices = choices(tx, scope, context.binding_id, &step, subject).await?;"
+        },
+        {
+          "line": 62,
+          "text": "let proposal = proposal(tx, company, decision, subject, &row.proposal).await?;"
+        },
+        {
+          "line": 74,
+          "text": "subject,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/decisions/read.rs#assemble",
+        "name": "assemble",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/decisions/read.rs",
+        "span": "L107-L167"
+      },
+      "path": "src/adapters/persistence/workflow/decisions/read.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 139,
+          "text": "subject: parts.subject,"
+        },
+        {
+          "line": 141,
+          "text": "data_schema: if parts.subject == DecisionSubject::Business {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/decisions/read.rs#subject",
+        "name": "subject",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/decisions/read.rs",
+        "span": "L169-L176"
+      },
+      "path": "src/adapters/persistence/workflow/decisions/read.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 169,
+          "text": "fn subject(value: &str) -> AppResult<DecisionSubject> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/decisions/read.rs#choices",
+        "name": "choices",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/decisions/read.rs",
+        "span": "L178-L210"
+      },
+      "path": "src/adapters/persistence/workflow/decisions/read.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 183,
+          "text": "subject: DecisionSubject,"
+        },
+        {
+          "line": 185,
+          "text": "if subject != DecisionSubject::Business {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/decisions/read.rs#proposal",
+        "name": "proposal",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/decisions/read.rs",
+        "span": "L212-L230"
+      },
+      "path": "src/adapters/persistence/workflow/decisions/read.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 216,
+          "text": "subject: DecisionSubject,"
+        },
+        {
+          "line": 219,
+          "text": "match subject {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/decisions/read.rs#ViewRow",
+        "name": "ViewRow",
+        "kind": "struct",
+        "path": "src/adapters/persistence/workflow/decisions/read.rs",
+        "span": "L7-L22"
+      },
+      "path": "src/adapters/persistence/workflow/decisions/read.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 8,
+          "text": "subject_kind: String,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/decisions/read.rs#DecisionReadParts",
+        "name": "DecisionReadParts",
+        "kind": "struct",
+        "path": "src/adapters/persistence/workflow/decisions/read.rs",
+        "span": "L95-L105"
+      },
+      "path": "src/adapters/persistence/workflow/decisions/read.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 96,
+          "text": "subject: DecisionSubject,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/decisions/read.rs#READ_SQL",
+        "name": "READ_SQL",
+        "kind": "constant",
+        "path": "src/adapters/persistence/workflow/decisions/read.rs",
+        "span": "L257-L267"
+      },
+      "path": "src/adapters/persistence/workflow/decisions/read.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 258,
+          "text": "SELECT decision.subject_kind,execution.step_id,decision.revision,decision.proposal_digest,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/decisions/read/history.rs#read",
+        "name": "read",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/decisions/read/history.rs",
+        "span": "L14-L65"
+      },
+      "path": "src/adapters/persistence/workflow/decisions/read/history.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 56,
+          "text": "subject: subject(&row.subject_kind)?,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/decisions/read/history.rs#Row",
+        "name": "Row",
+        "kind": "struct",
+        "path": "src/adapters/persistence/workflow/decisions/read/history.rs",
+        "span": "L68-L78"
+      },
+      "path": "src/adapters/persistence/workflow/decisions/read/history.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 73,
+          "text": "subject_kind: String,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/decisions/read/history.rs#HISTORY_SQL",
+        "name": "HISTORY_SQL",
+        "kind": "constant",
+        "path": "src/adapters/persistence/workflow/decisions/read/history.rs",
+        "span": "L82-L102"
+      },
+      "path": "src/adapters/persistence/workflow/decisions/read/history.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 95,
+          "text": "SELECT decision.id,decision.run_id,execution.step_id,decision.proposal_digest,decision.subject_kind,"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 2,
+    "baselineChars": 13270
+  }
+}

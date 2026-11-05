@@ -1,0 +1,32 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 1,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_runtime_tests.rs#new",
+        "name": "new",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_runtime_tests.rs",
+        "span": "L16-L37"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_runtime_tests.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 23,
+          "text": ".action_authority(request.scope(), &request.subject)"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 8831
+  }
+}

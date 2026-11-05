@@ -1,0 +1,32 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 1,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_uncertainty_tests.rs#parked",
+        "name": "parked",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_uncertainty_tests.rs",
+        "span": "L29-L62"
+      },
+      "path": "src/adapters/persistence/workflow/action_uncertainty_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 50,
+          "text": "request.subject.invocation.as_uuid().to_string()"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 14462
+  }
+}

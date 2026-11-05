@@ -1,0 +1,32 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 1,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_other_audit_tests.rs#unknown_owner",
+        "name": "unknown_owner",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_other_audit_tests.rs",
+        "span": "L33-L101"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_other_audit_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 76,
+          "text": "\"invocation_id\":candidate.subject.invocation.as_uuid(),\"argument_digest\":candidate.subject.argument_digest.as_str(),"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 14195
+  }
+}

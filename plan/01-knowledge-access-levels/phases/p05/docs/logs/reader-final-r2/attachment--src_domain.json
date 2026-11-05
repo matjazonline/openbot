@@ -1,0 +1,120 @@
+{
+  "pattern": "attachment",
+  "filesSearched": 66,
+  "totalHits": 8,
+  "groups": [
+    {
+      "symbol": null,
+      "path": "src/domain/entities/internal_note.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 11,
+          "text": "/// not an alternate upload path; attachments remain unsupported until their security lifecycle is"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/domain/entities/message_view.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 4,
+          "text": "//! headers, raw bodies, attachments. Almost nothing reads all of that. A mailbox bubble wants a"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/message_view.rs#ThreadMessageView",
+        "name": "ThreadMessageView",
+        "kind": "struct",
+        "path": "src/domain/entities/message_view.rs",
+        "span": "L83-L108"
+      },
+      "path": "src/domain/entities/message_view.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 101,
+          "text": "pub attachments: Vec<AttachmentMetadata>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/message.rs#AttachmentMetadata",
+        "name": "AttachmentMetadata",
+        "kind": "struct",
+        "path": "src/domain/entities/message.rs",
+        "span": "L223-L240"
+      },
+      "path": "src/domain/entities/message.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 235,
+          "text": "/// The canonical attachment this artifact was derived from, when it is not original input."
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/domain/entities/message.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 248,
+          "text": "/// The stored form of a message's attachments."
+        },
+        {
+          "line": 252,
+          "text": "/// payload from a newer writer is an error rather than a panic. The `messages_attachments_check`"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/message.rs#Message",
+        "name": "Message",
+        "kind": "struct",
+        "path": "src/domain/entities/message.rs",
+        "span": "L302-L329"
+      },
+      "path": "src/domain/entities/message.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 315,
+          "text": "pub attachments: Option<Vec<AttachmentMetadata>>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/message.rs#attachments_decode_only_from_their_own_version",
+        "name": "attachments_decode_only_from_their_own_version",
+        "kind": "function",
+        "path": "src/domain/entities/message.rs",
+        "span": "L346-L364"
+      },
+      "path": "src/domain/entities/message.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 346,
+          "text": "fn attachments_decode_only_from_their_own_version() {"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 3,
+    "baselineChars": 26183
+  }
+}

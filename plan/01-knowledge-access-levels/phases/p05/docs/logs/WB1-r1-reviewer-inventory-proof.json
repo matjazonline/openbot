@@ -1,0 +1,17 @@
+{
+  "clean_text_body": {
+    "hits": 74,
+    "leaves": 1,
+    "truncated": 0
+  },
+  "subject": {
+    "hits": 1301,
+    "leaves": 492,
+    "truncated": 0
+  },
+  "attachment": {
+    "hits": 384,
+    "leaves": 29,
+    "truncated": 0
+  }
+}

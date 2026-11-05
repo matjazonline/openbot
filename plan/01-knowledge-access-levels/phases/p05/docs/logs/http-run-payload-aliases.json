@@ -1,0 +1,284 @@
+{
+  "pattern": "frozen_inputs|committed_output|frozen_agent|tool_calls|observations|receipts|model_calls|run\\.input|run\\.params",
+  "filesSearched": 201,
+  "totalHits": 28,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/workflow_runs/step.rs#run_step_body",
+        "name": "run_step_body",
+        "kind": "function",
+        "path": "src/adapters/http/pages/workflow_runs/step.rs",
+        "span": "L21-L212"
+      },
+      "path": "src/adapters/http/pages/workflow_runs/step.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 88,
+          "text": "step.frozen_inputs"
+        },
+        {
+          "line": 95,
+          "text": "step.committed_output"
+        },
+        {
+          "line": 102,
+          "text": "if !step.model_calls.is_empty() {"
+        },
+        {
+          "line": 104,
+          "text": ".model_calls"
+        },
+        {
+          "line": 131,
+          "text": "if !step.receipts.is_empty() {"
+        },
+        {
+          "line": 133,
+          "text": ".receipts"
+        },
+        {
+          "line": 146,
+          "text": "\"Action receipts\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/ui/authoring/sample_tests.rs#counts",
+        "name": "counts",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/ui/authoring/sample_tests.rs",
+        "span": "L11-L31"
+      },
+      "path": "src/adapters/http/routes/workflows/ui/authoring/sample_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 18,
+          "text": "\"workflow_action_receipts\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/workflow_authoring/preview.rs#frozen_agents",
+        "name": "frozen_agents",
+        "kind": "function",
+        "path": "src/adapters/http/pages/workflow_authoring/preview.rs",
+        "span": "L78-L102"
+      },
+      "path": "src/adapters/http/pages/workflow_authoring/preview.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 78,
+          "text": "fn frozen_agents(view: &PreviewView<'_>) -> String {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/workflow_runs/detail.rs#run_body",
+        "name": "run_body",
+        "kind": "function",
+        "path": "src/adapters/http/pages/workflow_runs/detail.rs",
+        "span": "L156-L216"
+      },
+      "path": "src/adapters/http/pages/workflow_runs/detail.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 208,
+          "text": "json_preview(&run.input)"
+        },
+        {
+          "line": 213,
+          "text": "json_preview(&run.params)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/ui/runs/mod.rs#frozen_agent",
+        "name": "frozen_agent",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/ui/runs/mod.rs",
+        "span": "L690-L706"
+      },
+      "path": "src/adapters/http/routes/workflows/ui/runs/mod.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 690,
+          "text": "fn frozen_agent<'a>("
+        },
+        {
+          "line": 694,
+          "text": "let handle = step.frozen_inputs.as_ref()?.get(\"agent\")?.as_str()?;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/dashboard.rs#process_panel",
+        "name": "process_panel",
+        "kind": "function",
+        "path": "src/adapters/http/pages/dashboard.rs",
+        "span": "L812-L887"
+      },
+      "path": "src/adapters/http/pages/dashboard.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 859,
+          "text": "\"1000+ offset observations since boot\","
+        },
+        {
+          "line": 864,
+          "text": "\"1000+ offset observations since boot\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/workflow_authoring/preview.rs#capabilities",
+        "name": "capabilities",
+        "kind": "function",
+        "path": "src/adapters/http/pages/workflow_authoring/preview.rs",
+        "span": "L166-L178"
+      },
+      "path": "src/adapters/http/pages/workflow_authoring/preview.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 167,
+          "text": "let agents = frozen_agents(view);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/workflow_runs/detail.rs#steps",
+        "name": "steps",
+        "kind": "function",
+        "path": "src/adapters/http/pages/workflow_runs/detail.rs",
+        "span": "L530-L580"
+      },
+      "path": "src/adapters/http/pages/workflow_runs/detail.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 578,
+          "text": "r#\"<section class=\"space-y-2\"><h3 class=\"font-semibold\">Steps</h3><p class=\"text-xs opacity-70\">Newest first. Open a step for what it froze, what it produced, i"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/http/pages/workflow_runs/step.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 2,
+          "text": "//! with and that agent's frozen tools and skills, its model calls, action receipts and child"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/ui/runs/controls_tests.rs#an_accepted_action_shows_its_receipt_and_cancel_names_it",
+        "name": "an_accepted_action_shows_its_receipt_and_cancel_names_it",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/ui/runs/controls_tests.rs",
+        "span": "L402-L439"
+      },
+      "path": "src/adapters/http/routes/workflows/ui/runs/controls_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 432,
+          "text": "body.contains(\"Action receipts\") && body.contains(\"remote action accepted\"),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/ui/runs/mod.rs#step",
+        "name": "step",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/ui/runs/mod.rs",
+        "span": "L709-L744"
+      },
+      "path": "src/adapters/http/routes/workflows/ui/runs/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 738,
+          "text": ".and_then(|bundle| frozen_agent(bundle, &step));"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/http/routes/workflows/ui/runs/pages_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 2,
+          "text": "//! receipts, attempts, the annotation offer, and how an ended run shows a step it never finished."
+        },
+        {
+          "line": 7,
+          "text": "/// step lists its model usage and receipts, escaped."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/ui/runs/pages_tests.rs#reconciliation_is_offered_as_an_annotation_and_a_step_shows_usage_and_receipts",
+        "name": "reconciliation_is_offered_as_an_annotation_and_a_step_shows_usage_and_receipts",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/ui/runs/pages_tests.rs",
+        "span": "L9-L107"
+      },
+      "path": "src/adapters/http/routes/workflows/ui/runs/pages_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 9,
+          "text": "fn reconciliation_is_offered_as_an_annotation_and_a_step_shows_usage_and_receipts() {"
+        },
+        {
+          "line": 53,
+          "text": "frozen_inputs: Some(json!({\"q\": hostile})),"
+        },
+        {
+          "line": 54,
+          "text": "committed_output: Some(json!({\"answer\": hostile})),"
+        },
+        {
+          "line": 58,
+          "text": "model_calls: vec![ModelCall {"
+        },
+        {
+          "line": 67,
+          "text": "receipts: vec![Receipt {"
+        },
+        {
+          "line": 101,
+          "text": "assert!(body.contains(\"Action receipts\") && body.contains(\"accepted\"));"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 8,
+    "baselineChars": 177965
+  }
+}

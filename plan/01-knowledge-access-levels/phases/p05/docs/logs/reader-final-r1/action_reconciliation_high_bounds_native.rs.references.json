@@ -1,0 +1,26 @@
+{
+  "pattern": "action_reconciliation_high_bounds_native.rs",
+  "filesSearched": 1137,
+  "totalHits": 1,
+  "groups": [
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 9,
+          "text": "#[path = \"action_reconciliation_high_bounds_native.rs\"]"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 3787
+  }
+}

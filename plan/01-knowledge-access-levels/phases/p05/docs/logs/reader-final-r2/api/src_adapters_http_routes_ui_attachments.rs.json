@@ -1,0 +1,117 @@
+{
+  "file": "src/adapters/http/routes/ui_attachments.rs",
+  "entries": [
+    {
+      "name": "NO_SNIFF",
+      "kind": "constant",
+      "span": "L42-L42",
+      "signature": "const NO_SNIFF: (&str, &str) = (\"x-content-type-options\", \"nosniff\");"
+    },
+    {
+      "name": "PRIVATE_NO_STORE",
+      "kind": "constant",
+      "span": "L45-L45",
+      "signature": "const PRIVATE_NO_STORE: &str = \"private, no-store\";"
+    },
+    {
+      "name": "router",
+      "kind": "function",
+      "span": "L47-L52",
+      "signature": "pub fn router() -> Router<AppState>"
+    },
+    {
+      "name": "AttachmentQuery",
+      "kind": "struct",
+      "span": "L56-L59",
+      "signature": "pub struct AttachmentQuery"
+    },
+    {
+      "name": "download_attachment",
+      "kind": "function",
+      "span": "L63-L127",
+      "signature": "pub(super) async fn download_attachment("
+    },
+    {
+      "name": "AttachmentSelection",
+      "kind": "struct",
+      "span": "L130-L133",
+      "signature": "struct AttachmentSelection"
+    },
+    {
+      "name": "find_attachment",
+      "kind": "function",
+      "span": "L136-L153",
+      "signature": "fn find_attachment("
+    },
+    {
+      "name": "missing",
+      "kind": "function",
+      "span": "L157-L159",
+      "signature": "fn missing() -> AppError"
+    },
+    {
+      "name": "attachment_response",
+      "kind": "function",
+      "span": "L162-L186",
+      "signature": "fn attachment_response("
+    },
+    {
+      "name": "content_disposition",
+      "kind": "function",
+      "span": "L194-L216",
+      "signature": "fn content_disposition(filename: &str) -> String"
+    },
+    {
+      "name": "percent_encode",
+      "kind": "function",
+      "span": "L219-L229",
+      "signature": "fn percent_encode(value: &str) -> String"
+    },
+    {
+      "name": "tests",
+      "kind": "module",
+      "span": "L232-L326",
+      "signature": "mod tests"
+    },
+    {
+      "name": "attachment",
+      "kind": "function",
+      "span": "L241-L250",
+      "signature": "fn attachment(sha: &str, filename: &str, key: Option<&str>) -> AttachmentMetadata"
+    },
+    {
+      "name": "message",
+      "kind": "function",
+      "span": "L252-L272",
+      "signature": "fn message(attachments: Vec<AttachmentMetadata>) -> ThreadMessageView"
+    },
+    {
+      "name": "an_attachment_is_found_by_its_hash_only_within_the_thread_it_hangs_on",
+      "kind": "function",
+      "span": "L275-L293",
+      "signature": "fn an_attachment_is_found_by_its_hash_only_within_the_thread_it_hangs_on()"
+    },
+    {
+      "name": "a_name_from_a_stranger_cannot_break_out_of_the_header",
+      "kind": "function",
+      "span": "L296-L311",
+      "signature": "fn a_name_from_a_stranger_cannot_break_out_of_the_header()"
+    },
+    {
+      "name": "a_name_in_another_script_survives_in_the_encoded_form",
+      "kind": "function",
+      "span": "L314-L319",
+      "signature": "fn a_name_in_another_script_survives_in_the_encoded_form()"
+    },
+    {
+      "name": "a_nameless_attachment_still_downloads",
+      "kind": "function",
+      "span": "L322-L325",
+      "signature": "fn a_nameless_attachment_still_downloads()"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 11512
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "file": "src/adapters/http/pages/simulation/compose.rs",
+  "entries": [
+    {
+      "name": "simulation_loaded_thread_header",
+      "kind": "function",
+      "span": "L4-L26",
+      "signature": "fn simulation_loaded_thread_header(company_id: Uuid, channel_id: Uuid, tid: &str) -> String"
+    },
+    {
+      "name": "simulation_compose_form",
+      "kind": "function",
+      "span": "L30-L139",
+      "signature": "fn simulation_compose_form("
+    },
+    {
+      "name": "channel_simulation_page",
+      "kind": "function",
+      "span": "L141-L181",
+      "signature": "pub fn channel_simulation_page("
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 12778
+  }
+}

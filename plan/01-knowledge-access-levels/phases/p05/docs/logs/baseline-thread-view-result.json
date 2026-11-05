@@ -1,0 +1,8 @@
+{
+  "binary": "target/debug/deps/open_bots-c19a0b960dacdcef",
+  "selector": "adapters::persistence::thread::view_tests::",
+  "count": 8,
+  "exit": 0,
+  "rust_min_stack": "unset stock native libtest",
+  "fixture": "55505/open_bots_test"
+}

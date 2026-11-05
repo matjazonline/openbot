@@ -1,0 +1,261 @@
+{
+  "file": "src/application/workflow/message.rs",
+  "entries": [
+    {
+      "name": "runtime",
+      "kind": "module",
+      "span": "L28-L28",
+      "signature": "mod runtime;"
+    },
+    {
+      "name": "MAX_MESSAGE_ACTIONS_PER_EXECUTION",
+      "kind": "constant",
+      "span": "L34-L34",
+      "signature": "pub const MAX_MESSAGE_ACTIONS_PER_EXECUTION: usize = 128;"
+    },
+    {
+      "name": "is_builtin_message_tool",
+      "kind": "function",
+      "span": "L37-L39",
+      "signature": "pub fn is_builtin_message_tool(name: &str) -> bool"
+    },
+    {
+      "name": "MessageKind",
+      "kind": "enum",
+      "span": "L42-L45",
+      "signature": "pub enum MessageKind"
+    },
+    {
+      "name": "parse",
+      "kind": "function",
+      "span": "L47-L53",
+      "signature": "pub fn parse(name: &str) -> Option<Self>"
+    },
+    {
+      "name": "name",
+      "kind": "function",
+      "span": "L54-L59",
+      "signature": "pub const fn name(self) -> &'static str"
+    },
+    {
+      "name": "builtin_message_snapshot",
+      "kind": "function",
+      "span": "L65-L86",
+      "signature": "pub fn builtin_message_snapshot(company: CompanyId, kind: MessageKind) -> AppResult<ToolSnapshot>"
+    },
+    {
+      "name": "is_trusted_message_snapshot",
+      "kind": "function",
+      "span": "L89-L101",
+      "signature": "pub fn is_trusted_message_snapshot(snapshot: &ToolSnapshot) -> AppResult<bool>"
+    },
+    {
+      "name": "DestinationKind",
+      "kind": "enum",
+      "span": "L104-L108",
+      "signature": "pub enum DestinationKind"
+    },
+    {
+      "name": "as_str",
+      "kind": "function",
+      "span": "L110-L116",
+      "signature": "pub const fn as_str(self) -> &'static str"
+    },
+    {
+      "name": "MessageDestinationInput",
+      "kind": "struct",
+      "span": "L120-L123",
+      "signature": "pub struct MessageDestinationInput"
+    },
+    {
+      "name": "MessageArguments",
+      "kind": "enum",
+      "span": "L127-L136",
+      "signature": "pub enum MessageArguments"
+    },
+    {
+      "name": "parse",
+      "kind": "function",
+      "span": "L138-L157",
+      "signature": "pub fn parse(kind: MessageKind, arguments: &Value) -> AppResult<Self>"
+    },
+    {
+      "name": "content",
+      "kind": "function",
+      "span": "L158-L162",
+      "signature": "pub fn content(&self) -> &CanonicalContent"
+    },
+    {
+      "name": "parse_content",
+      "kind": "function",
+      "span": "L165-L184",
+      "signature": "fn parse_content(content: Option<&Value>) -> AppResult<CanonicalContent>"
+    },
+    {
+      "name": "parse_destinations",
+      "kind": "function",
+      "span": "L186-L221",
+      "signature": "fn parse_destinations(value: Option<&Value>) -> AppResult<Vec<MessageDestinationInput>>"
+    },
+    {
+      "name": "bounds",
+      "kind": "function",
+      "span": "L223-L225",
+      "signature": "fn bounds(error: BoundsError) -> AppError"
+    },
+    {
+      "name": "invalid_message",
+      "kind": "function",
+      "span": "L226-L228",
+      "signature": "pub(crate) fn invalid_message() -> AppError"
+    },
+    {
+      "name": "ChannelRoute",
+      "kind": "struct",
+      "span": "L232-L236",
+      "signature": "pub struct ChannelRoute"
+    },
+    {
+      "name": "MessageRoutes",
+      "kind": "struct",
+      "span": "L241-L247",
+      "signature": "pub struct MessageRoutes"
+    },
+    {
+      "name": "RouteTarget",
+      "kind": "enum",
+      "span": "L250-L275",
+      "signature": "pub enum RouteTarget"
+    },
+    {
+      "name": "SourceRelay",
+      "kind": "struct",
+      "span": "L281-L284",
+      "signature": "pub struct SourceRelay"
+    },
+    {
+      "name": "RouteCheck",
+      "kind": "enum",
+      "span": "L288-L303",
+      "signature": "pub enum RouteCheck"
+    },
+    {
+      "name": "NewThread",
+      "kind": "struct",
+      "span": "L306-L310",
+      "signature": "pub struct NewThread"
+    },
+    {
+      "name": "PlannedDestination",
+      "kind": "struct",
+      "span": "L313-L326",
+      "signature": "pub struct PlannedDestination"
+    },
+    {
+      "name": "MessagePlan",
+      "kind": "struct",
+      "span": "L330-L332",
+      "signature": "pub struct MessagePlan"
+    },
+    {
+      "name": "has_delivery",
+      "kind": "function",
+      "span": "L334-L338",
+      "signature": "pub fn has_delivery(&self) -> bool"
+    },
+    {
+      "name": "accepted_result",
+      "kind": "function",
+      "span": "L340-L349",
+      "signature": "pub fn accepted_result(&self) -> Value"
+    },
+    {
+      "name": "MessageOrigin",
+      "kind": "enum",
+      "span": "L353-L356",
+      "signature": "pub enum MessageOrigin"
+    },
+    {
+      "name": "as_str",
+      "kind": "function",
+      "span": "L358-L363",
+      "signature": "pub const fn as_str(self) -> &'static str"
+    },
+    {
+      "name": "MessagePublication",
+      "kind": "enum",
+      "span": "L367-L390",
+      "signature": "pub enum MessagePublication"
+    },
+    {
+      "name": "MessageActionPreparation",
+      "kind": "interface",
+      "span": "L393-L411",
+      "signature": "pub trait MessageActionPreparation: Send + Sync"
+    },
+    {
+      "name": "message_step_request",
+      "kind": "function",
+      "span": "L394-L398",
+      "signature": "async fn message_step_request("
+    },
+    {
+      "name": "message_tool_request",
+      "kind": "function",
+      "span": "L399-L404",
+      "signature": "async fn message_tool_request("
+    },
+    {
+      "name": "message_routes",
+      "kind": "function",
+      "span": "L406-L410",
+      "signature": "async fn message_routes("
+    },
+    {
+      "name": "MessageDispatch",
+      "kind": "interface",
+      "span": "L414-L427",
+      "signature": "pub trait MessageDispatch: Send + Sync"
+    },
+    {
+      "name": "observe",
+      "kind": "function",
+      "span": "L416-L420",
+      "signature": "async fn observe("
+    },
+    {
+      "name": "publish",
+      "kind": "function",
+      "span": "L421-L426",
+      "signature": "async fn publish("
+    },
+    {
+      "name": "MessageToolCall",
+      "kind": "struct",
+      "span": "L430-L434",
+      "signature": "pub struct MessageToolCall"
+    },
+    {
+      "name": "MessageObservation",
+      "kind": "enum",
+      "span": "L437-L448",
+      "signature": "pub enum MessageObservation"
+    },
+    {
+      "name": "tool_scope",
+      "kind": "function",
+      "span": "L450-L456",
+      "signature": "pub(crate) fn tool_scope(fence: WorkflowFence) -> ActionScope"
+    },
+    {
+      "name": "tests",
+      "kind": "module",
+      "span": "L460-L460",
+      "signature": "mod tests;"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 15445
+  }
+}

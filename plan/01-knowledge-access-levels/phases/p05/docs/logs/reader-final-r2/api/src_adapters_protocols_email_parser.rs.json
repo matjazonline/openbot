@@ -1,0 +1,147 @@
+{
+  "file": "src/adapters/protocols/email/parser.rs",
+  "entries": [
+    {
+      "name": "MAX_INBOUND_MESSAGE_BYTES",
+      "kind": "constant",
+      "span": "L30-L30",
+      "signature": "pub const MAX_INBOUND_MESSAGE_BYTES: usize = 20 * 1024 * 1024;"
+    },
+    {
+      "name": "ParsedEmail",
+      "kind": "struct",
+      "span": "L33-L69",
+      "signature": "pub struct ParsedEmail"
+    },
+    {
+      "name": "ParsedHeaders",
+      "kind": "struct",
+      "span": "L72-L84",
+      "signature": "struct ParsedHeaders"
+    },
+    {
+      "name": "RawInboundPayload",
+      "kind": "struct",
+      "span": "L87-L100",
+      "signature": "pub struct RawInboundPayload"
+    },
+    {
+      "name": "default",
+      "kind": "function",
+      "span": "L103-L118",
+      "signature": "fn default() -> Self"
+    },
+    {
+      "name": "default_test_auth_verdict",
+      "kind": "function",
+      "span": "L122-L124",
+      "signature": "fn default_test_auth_verdict() -> AuthVerdict"
+    },
+    {
+      "name": "default_test_auth_verdict",
+      "kind": "function",
+      "span": "L128-L130",
+      "signature": "fn default_test_auth_verdict() -> AuthVerdict"
+    },
+    {
+      "name": "RawAttachmentData",
+      "kind": "struct",
+      "span": "L133-L140",
+      "signature": "pub struct RawAttachmentData"
+    },
+    {
+      "name": "EmailParser",
+      "kind": "struct",
+      "span": "L142-L142",
+      "signature": "pub struct EmailParser;"
+    },
+    {
+      "name": "parse",
+      "kind": "function",
+      "span": "L145-L290",
+      "signature": "pub fn parse("
+    },
+    {
+      "name": "html_to_markdown",
+      "kind": "function",
+      "span": "L292-L295",
+      "signature": "pub fn html_to_markdown(html: &str) -> String"
+    },
+    {
+      "name": "parse_headers",
+      "kind": "function",
+      "span": "L297-L413",
+      "signature": "fn parse_headers(headers_str: &str) -> ParsedHeaders"
+    },
+    {
+      "name": "is_auto_reply_subject",
+      "kind": "function",
+      "span": "L415-L423",
+      "signature": "pub fn is_auto_reply_subject(subject: &str) -> bool"
+    },
+    {
+      "name": "is_forwarded_email",
+      "kind": "function",
+      "span": "L425-L437",
+      "signature": "pub fn is_forwarded_email(subject: &str, body: &str) -> bool"
+    },
+    {
+      "name": "extract_email",
+      "kind": "function",
+      "span": "L440-L447",
+      "signature": "pub fn extract_email(input: &str) -> String"
+    },
+    {
+      "name": "parse_email_list",
+      "kind": "function",
+      "span": "L449-L455",
+      "signature": "pub fn parse_email_list(input: &str) -> Vec<String>"
+    },
+    {
+      "name": "tests",
+      "kind": "module",
+      "span": "L458-L576",
+      "signature": "mod tests"
+    },
+    {
+      "name": "test_parse_headers_and_auto_reply",
+      "kind": "function",
+      "span": "L462-L496",
+      "signature": "fn test_parse_headers_and_auto_reply()"
+    },
+    {
+      "name": "thread_index_header_preserves_folding_for_bounded_canonicalization",
+      "kind": "function",
+      "span": "L499-L518",
+      "signature": "fn thread_index_header_preserves_folding_for_bounded_canonicalization()"
+    },
+    {
+      "name": "test_body_and_header_context_trigger",
+      "kind": "function",
+      "span": "L521-L534",
+      "signature": "fn test_body_and_header_context_trigger()"
+    },
+    {
+      "name": "test_forwarded_email_detection",
+      "kind": "function",
+      "span": "L537-L550",
+      "signature": "fn test_forwarded_email_detection()"
+    },
+    {
+      "name": "test_html_to_markdown",
+      "kind": "function",
+      "span": "L553-L558",
+      "signature": "fn test_html_to_markdown()"
+    },
+    {
+      "name": "parse_inbound_email_sanitizes_invisible_unicode_injection_characters",
+      "kind": "function",
+      "span": "L561-L575",
+      "signature": "fn parse_inbound_email_sanitizes_invisible_unicode_injection_characters()"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 20990
+  }
+}

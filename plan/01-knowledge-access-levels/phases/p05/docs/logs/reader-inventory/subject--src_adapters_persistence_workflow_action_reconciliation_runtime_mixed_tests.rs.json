@@ -1,0 +1,40 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 3,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_tests.rs#mixed_requests",
+        "name": "mixed_requests",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_tests.rs",
+        "span": "L30-L99"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 36,
+          "text": ".action_authority(first.scope(), &first.subject)"
+        },
+        {
+          "line": 81,
+          "text": "subject: intent.approval_subject(),"
+        },
+        {
+          "line": 86,
+          "text": ".action_authority(third.scope(), &third.subject)"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 7890
+  }
+}

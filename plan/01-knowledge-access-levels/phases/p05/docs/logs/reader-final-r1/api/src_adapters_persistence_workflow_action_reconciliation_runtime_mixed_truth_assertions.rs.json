@@ -1,0 +1,111 @@
+{
+  "file": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_assertions.rs",
+  "entries": [
+    {
+      "name": "rows",
+      "kind": "function",
+      "span": "L4-L6",
+      "signature": "pub(super) fn rows<'a>(state: &'a Value, table: &str) -> &'a [Value]"
+    },
+    {
+      "name": "by_id",
+      "kind": "function",
+      "span": "L7-L14",
+      "signature": "pub(super) fn by_id<'a>(state: &'a Value, table: &str, id: Uuid) -> &'a Value"
+    },
+    {
+      "name": "by_command",
+      "kind": "function",
+      "span": "L15-L22",
+      "signature": "pub(super) fn by_command<'a>(state: &'a Value, command: &ReconcileActionCommand) -> &'a Value"
+    },
+    {
+      "name": "append",
+      "kind": "function",
+      "span": "L23-L36",
+      "signature": "pub(super) fn append<'a>("
+    },
+    {
+      "name": "scope",
+      "kind": "function",
+      "span": "L37-L52",
+      "signature": "pub(super) fn scope(row: &Value, request: &ActionDispatchRequest)"
+    },
+    {
+      "name": "owner",
+      "kind": "function",
+      "span": "L53-L77",
+      "signature": "pub(super) fn owner("
+    },
+    {
+      "name": "inventory",
+      "kind": "function",
+      "span": "L78-L90",
+      "signature": "pub(super) fn inventory(before: &Value, after: &Value, normalized: Value)"
+    },
+    {
+      "name": "attempt",
+      "kind": "function",
+      "span": "L92-L102",
+      "signature": "pub(super) fn attempt(state: &Value, fence: WorkflowFence) -> &Value"
+    },
+    {
+      "name": "live_fence",
+      "kind": "function",
+      "span": "L103-L117",
+      "signature": "pub(super) fn live_fence(state: &Value, fence: WorkflowFence)"
+    },
+    {
+      "name": "parked_fence",
+      "kind": "function",
+      "span": "L118-L184",
+      "signature": "pub(super) fn parked_fence(before: &Value, after: &Value, request: &ActionDispatchRequest)"
+    },
+    {
+      "name": "parked_attempt",
+      "kind": "function",
+      "span": "L186-L215",
+      "signature": "fn parked_attempt(before: &Value, after: &Value, normalized: &mut Value, fence: WorkflowFence)"
+    },
+    {
+      "name": "parked_facts",
+      "kind": "function",
+      "span": "L217-L277",
+      "signature": "fn parked_facts(before: &Value, after: &Value, normalized: &mut Value, fence: WorkflowFence)"
+    },
+    {
+      "name": "retrieval_boundary",
+      "kind": "function",
+      "span": "L279-L301",
+      "signature": "pub(super) fn retrieval_boundary(before: &Value, after: &Value, request: &ActionDispatchRequest)"
+    },
+    {
+      "name": "claim_boundary",
+      "kind": "function",
+      "span": "L303-L340",
+      "signature": "pub(super) fn claim_boundary(before: &Value, after: &Value, fence: WorkflowFence)"
+    },
+    {
+      "name": "supported_boundary",
+      "kind": "function",
+      "span": "L342-L373",
+      "signature": "pub(super) fn supported_boundary(before: &Value, after: &Value, request: &ActionDispatchRequest)"
+    },
+    {
+      "name": "completed_boundary",
+      "kind": "function",
+      "span": "L375-L445",
+      "signature": "pub(super) fn completed_boundary(before: &Value, after: &Value, fence: WorkflowFence)"
+    },
+    {
+      "name": "completed_owners",
+      "kind": "function",
+      "span": "L447-L491",
+      "signature": "fn completed_owners(before: &Value, normalized: &mut Value, fence: WorkflowFence)"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 16417
+  }
+}

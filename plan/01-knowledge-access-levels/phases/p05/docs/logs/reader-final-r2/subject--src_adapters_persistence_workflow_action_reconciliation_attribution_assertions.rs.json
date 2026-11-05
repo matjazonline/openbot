@@ -1,0 +1,57 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 4,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_attribution_assertions.rs#scope",
+        "name": "scope",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_attribution_assertions.rs",
+        "span": "L222-L225"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_attribution_assertions.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 223,
+          "text": "subject_scope(row, request);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_attribution_assertions.rs#subject_scope",
+        "name": "subject_scope",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_attribution_assertions.rs",
+        "span": "L226-L241"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_attribution_assertions.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 226,
+          "text": "pub(super) fn subject_scope(row: &Value, request: &ActionDispatchRequest) {"
+        },
+        {
+          "line": 235,
+          "text": "json!(request.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 239,
+          "text": "json!(request.subject.argument_digest.as_str())"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 16150
+  }
+}

@@ -1,0 +1,63 @@
+{
+  "file": "src/application/workflow/actions/replay.rs",
+  "entries": [
+    {
+      "name": "ProviderReplayMode",
+      "kind": "enum",
+      "span": "L12-L19",
+      "signature": "pub enum ProviderReplayMode"
+    },
+    {
+      "name": "ProviderReplayContract",
+      "kind": "struct",
+      "span": "L24-L29",
+      "signature": "pub struct ProviderReplayContract"
+    },
+    {
+      "name": "approve",
+      "kind": "function",
+      "span": "L31-L54",
+      "signature": "pub fn approve("
+    },
+    {
+      "name": "ProviderInvocation",
+      "kind": "struct",
+      "span": "L58-L61",
+      "signature": "pub struct ProviderInvocation"
+    },
+    {
+      "name": "idempotency_key",
+      "kind": "function",
+      "span": "L63-L65",
+      "signature": "pub fn idempotency_key(&self) -> Option<&ActionIdempotencyKey>"
+    },
+    {
+      "name": "proof",
+      "kind": "function",
+      "span": "L66-L68",
+      "signature": "pub(crate) fn proof(&self) -> AppResult<Value>"
+    },
+    {
+      "name": "prepare_provider",
+      "kind": "function",
+      "span": "L71-L99",
+      "signature": "pub(crate) fn prepare_provider("
+    },
+    {
+      "name": "signature",
+      "kind": "function",
+      "span": "L101-L107",
+      "signature": "fn signature(tool: &ToolSnapshot, target: &ActionTarget) -> AppResult<ArgumentDigest>"
+    },
+    {
+      "name": "replay_subject",
+      "kind": "function",
+      "span": "L111-L117",
+      "signature": "pub(crate) fn replay_subject(tool: &ToolSnapshot, target: &ActionTarget) -> AppResult<Vec<u8>>"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 4411
+  }
+}

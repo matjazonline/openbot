@@ -1,0 +1,369 @@
+{
+  "file": "src/application/workflow/registry/mod.rs",
+  "entries": [
+    {
+      "name": "actions",
+      "kind": "module",
+      "span": "L3-L3",
+      "signature": "mod actions;"
+    },
+    {
+      "name": "budget",
+      "kind": "module",
+      "span": "L4-L4",
+      "signature": "mod budget;"
+    },
+    {
+      "name": "checks",
+      "kind": "module",
+      "span": "L5-L5",
+      "signature": "mod checks;"
+    },
+    {
+      "name": "examples",
+      "kind": "module",
+      "span": "L6-L6",
+      "signature": "mod examples;"
+    },
+    {
+      "name": "facts",
+      "kind": "module",
+      "span": "L7-L7",
+      "signature": "mod facts;"
+    },
+    {
+      "name": "families",
+      "kind": "module",
+      "span": "L8-L8",
+      "signature": "mod families;"
+    },
+    {
+      "name": "help",
+      "kind": "module",
+      "span": "L9-L9",
+      "signature": "mod help;"
+    },
+    {
+      "name": "jev",
+      "kind": "module",
+      "span": "L10-L10",
+      "signature": "pub mod jev;"
+    },
+    {
+      "name": "mcp",
+      "kind": "module",
+      "span": "L11-L11",
+      "signature": "pub(crate) mod mcp;"
+    },
+    {
+      "name": "metadata",
+      "kind": "module",
+      "span": "L13-L13",
+      "signature": "mod metadata;"
+    },
+    {
+      "name": "schemas",
+      "kind": "module",
+      "span": "L14-L14",
+      "signature": "mod schemas;"
+    },
+    {
+      "name": "CONTRACT_REVISION",
+      "kind": "constant",
+      "span": "L33-L33",
+      "signature": "pub const CONTRACT_REVISION: &str = \"workflow-catalogue-v1.6\";"
+    },
+    {
+      "name": "MAX_FACTS",
+      "kind": "constant",
+      "span": "L34-L34",
+      "signature": "pub const MAX_FACTS: usize = 256;"
+    },
+    {
+      "name": "MAX_SELECTIONS",
+      "kind": "constant",
+      "span": "L35-L35",
+      "signature": "pub const MAX_SELECTIONS: usize = 128;"
+    },
+    {
+      "name": "MAX_REVIEWERS",
+      "kind": "constant",
+      "span": "L38-L38",
+      "signature": "pub const MAX_REVIEWERS: usize = crate::domain::workflow::TokenAllowance::MAX_REVIEWERS;"
+    },
+    {
+      "name": "MAX_MESSAGE_DESTINATIONS",
+      "kind": "constant",
+      "span": "L42-L42",
+      "signature": "pub const MAX_MESSAGE_DESTINATIONS: usize = 20;"
+    },
+    {
+      "name": "MAX_ITEMS",
+      "kind": "constant",
+      "span": "L43-L43",
+      "signature": "pub const MAX_ITEMS: usize = 256;"
+    },
+    {
+      "name": "MAX_TEXT",
+      "kind": "constant",
+      "span": "L44-L44",
+      "signature": "pub const MAX_TEXT: usize = 16_384;"
+    },
+    {
+      "name": "MAX_HEADERS",
+      "kind": "constant",
+      "span": "L45-L45",
+      "signature": "pub const MAX_HEADERS: usize = 64;"
+    },
+    {
+      "name": "MAX_CONTEXT_TOKENS",
+      "kind": "constant",
+      "span": "L46-L46",
+      "signature": "pub const MAX_CONTEXT_TOKENS: usize = 131_072;"
+    },
+    {
+      "name": "MAX_IDENTIFIER",
+      "kind": "constant",
+      "span": "L47-L47",
+      "signature": "pub const MAX_IDENTIFIER: usize = 128;"
+    },
+    {
+      "name": "MAX_PATH",
+      "kind": "constant",
+      "span": "L48-L48",
+      "signature": "pub const MAX_PATH: usize = 2048;"
+    },
+    {
+      "name": "MAX_DEADLINE",
+      "kind": "constant",
+      "span": "L49-L49",
+      "signature": "pub const MAX_DEADLINE: usize = 64;"
+    },
+    {
+      "name": "MAX_CORRELATION",
+      "kind": "constant",
+      "span": "L50-L50",
+      "signature": "pub const MAX_CORRELATION: usize = 256;"
+    },
+    {
+      "name": "TYPES",
+      "kind": "constant",
+      "span": "L51-L71",
+      "signature": "pub const TYPES: [&str; 19] = ["
+    },
+    {
+      "name": "ModelStep",
+      "kind": "enum",
+      "span": "L77-L81",
+      "signature": "pub enum ModelStep"
+    },
+    {
+      "name": "of",
+      "kind": "function",
+      "span": "L83-L90",
+      "signature": "pub fn of(kind: &str) -> Option<Self>"
+    },
+    {
+      "name": "kind",
+      "kind": "function",
+      "span": "L91-L97",
+      "signature": "pub fn kind(self) -> &'static str"
+    },
+    {
+      "name": "uses_capabilities",
+      "kind": "function",
+      "span": "L98-L100",
+      "signature": "pub fn uses_capabilities(self) -> bool"
+    },
+    {
+      "name": "compile",
+      "kind": "function",
+      "span": "L105-L133",
+      "signature": "pub fn compile("
+    },
+    {
+      "name": "Registration",
+      "kind": "struct",
+      "span": "L135-L142",
+      "signature": "struct Registration<'a>"
+    },
+    {
+      "name": "new",
+      "kind": "function",
+      "span": "L144-L153",
+      "signature": "fn new(parsed: &'a ParsedWorkflow, id: &'a StepId, facts: &'a CatalogueFacts) -> Self"
+    },
+    {
+      "name": "name",
+      "kind": "function",
+      "span": "L154-L156",
+      "signature": "fn name(&self) -> &str"
+    },
+    {
+      "name": "path",
+      "kind": "function",
+      "span": "L157-L163",
+      "signature": "fn path(&self, field: &str) -> String"
+    },
+    {
+      "name": "error",
+      "kind": "function",
+      "span": "L164-L173",
+      "signature": "fn error(&self, code: &'static str, message: &str, field: &str) -> Diagnostic"
+    },
+    {
+      "name": "literal",
+      "kind": "function",
+      "span": "L174-L184",
+      "signature": "fn literal(&mut self, field: &'static str) -> Result<Value, Diagnostic>"
+    },
+    {
+      "name": "static_roots",
+      "kind": "function",
+      "span": "L188-L201",
+      "signature": "fn static_roots(&self, field: &'static str, refusal: StaticRefusal) -> Result<(), Diagnostic>"
+    },
+    {
+      "name": "event_identity",
+      "kind": "function",
+      "span": "L204-L220",
+      "signature": "fn event_identity(&mut self, schema: &Value) -> Result<(), Diagnostic>"
+    },
+    {
+      "name": "message_reply_wait",
+      "kind": "function",
+      "span": "L224-L261",
+      "signature": "fn message_reply_wait(&mut self, schema: &Value) -> Result<(), Diagnostic>"
+    },
+    {
+      "name": "declared_schema",
+      "kind": "function",
+      "span": "L262-L265",
+      "signature": "fn declared_schema(&mut self, field: &'static str) -> Result<Value, Diagnostic>"
+    },
+    {
+      "name": "choices",
+      "kind": "function",
+      "span": "L266-L275",
+      "signature": "fn choices(&self) -> Result<Vec<String>, Diagnostic>"
+    },
+    {
+      "name": "check",
+      "kind": "function",
+      "span": "L276-L300",
+      "signature": "fn check(&mut self, check: InputCheck) -> Result<(), Diagnostic>"
+    },
+    {
+      "name": "resolve",
+      "kind": "function",
+      "span": "L301-L358",
+      "signature": "fn resolve(mut self) -> Result<SpecializedDescriptor, Diagnostic>"
+    },
+    {
+      "name": "StaticRefusal",
+      "kind": "struct",
+      "span": "L362-L365",
+      "signature": "pub(super) struct StaticRefusal"
+    },
+    {
+      "name": "STATIC_REVIEWERS",
+      "kind": "constant",
+      "span": "L366-L369",
+      "signature": "pub(super) const STATIC_REVIEWERS: StaticRefusal = StaticRefusal"
+    },
+    {
+      "name": "STATIC_PARAMS",
+      "kind": "constant",
+      "span": "L370-L373",
+      "signature": "pub(super) const STATIC_PARAMS: StaticRefusal = StaticRefusal"
+    },
+    {
+      "name": "Contract",
+      "kind": "struct",
+      "span": "L375-L378",
+      "signature": "struct Contract"
+    },
+    {
+      "name": "contract",
+      "kind": "function",
+      "span": "L379-L384",
+      "signature": "fn contract(properties: Value, required: &[&str], output: Value) -> Contract"
+    },
+    {
+      "name": "embedded",
+      "kind": "function",
+      "span": "L386-L393",
+      "signature": "fn embedded(mut schema: Value, field: &str) -> Value"
+    },
+    {
+      "name": "tests",
+      "kind": "module",
+      "span": "L396-L396",
+      "signature": "mod tests;"
+    },
+    {
+      "name": "contract_tests",
+      "kind": "module",
+      "span": "L399-L399",
+      "signature": "mod contract_tests;"
+    },
+    {
+      "name": "decision_tests",
+      "kind": "module",
+      "span": "L401-L401",
+      "signature": "mod decision_tests;"
+    },
+    {
+      "name": "runtime_tests",
+      "kind": "module",
+      "span": "L403-L403",
+      "signature": "mod runtime_tests;"
+    },
+    {
+      "name": "schema_tests",
+      "kind": "module",
+      "span": "L405-L405",
+      "signature": "mod schema_tests;"
+    },
+    {
+      "name": "review1_tests",
+      "kind": "module",
+      "span": "L408-L408",
+      "signature": "mod review1_tests;"
+    },
+    {
+      "name": "message_tests",
+      "kind": "module",
+      "span": "L411-L411",
+      "signature": "mod message_tests;"
+    },
+    {
+      "name": "validate_declarations",
+      "kind": "function",
+      "span": "L413-L428",
+      "signature": "fn validate_declarations(parsed: &ParsedWorkflow) -> Result<(), Diagnostic>"
+    },
+    {
+      "name": "validate_jev_resources",
+      "kind": "function",
+      "span": "L430-L449",
+      "signature": "fn validate_jev_resources(parsed: &ParsedWorkflow) -> Result<(), Diagnostic>"
+    },
+    {
+      "name": "jev_tests",
+      "kind": "module",
+      "span": "L452-L452",
+      "signature": "mod jev_tests;"
+    },
+    {
+      "name": "jev_box_tests",
+      "kind": "module",
+      "span": "L455-L455",
+      "signature": "mod jev_box_tests;"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 16601
+  }
+}

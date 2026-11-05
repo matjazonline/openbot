@@ -1,0 +1,33 @@
+{
+  "file": "src/adapters/spam_scanner/heuristic.rs",
+  "entries": [
+    {
+      "name": "HeuristicScanner",
+      "kind": "struct",
+      "span": "L4-L4",
+      "signature": "pub(super) struct HeuristicScanner;"
+    },
+    {
+      "name": "scan",
+      "kind": "function",
+      "span": "L6-L31",
+      "signature": "pub(super) fn scan("
+    },
+    {
+      "name": "score_subject",
+      "kind": "function",
+      "span": "L33-L71",
+      "signature": "fn score_subject(result: &mut SpamScanResult, subj: &str)"
+    },
+    {
+      "name": "score_body",
+      "kind": "function",
+      "span": "L72-L113",
+      "signature": "fn score_body(result: &mut SpamScanResult, combined_body: &str, body_html: Option<&str>)"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 3665
+  }
+}

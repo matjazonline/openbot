@@ -1,0 +1,36 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 2,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_revision_tests.rs#scoped_truth",
+        "name": "scoped_truth",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_revision_tests.rs",
+        "span": "L137-L193"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_revision_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 148,
+          "text": "(\"invocation_id\", json!(command.subject.invocation.as_uuid())),"
+        },
+        {
+          "line": 151,
+          "text": "json!(command.subject.argument_digest.as_str()),"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 13216
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 3,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/provisioning_runtime_tests.rs#write_with",
+        "name": "write_with",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/provisioning_runtime_tests.rs",
+        "span": "L73-L97"
+      },
+      "path": "src/adapters/persistence/workflow/provisioning_runtime_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 88,
+          "text": "subject: Some(\"Assistant\".into()),"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/provisioning_runtime_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 387,
+          "text": "/// the message's subject as well as its body."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/provisioning_runtime_tests.rs#builder_stops_a_listing_loop_once_its_result_repeats",
+        "name": "builder_stops_a_listing_loop_once_its_result_repeats",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/provisioning_runtime_tests.rs",
+        "span": "L389-L446"
+      },
+      "path": "src/adapters/persistence/workflow/provisioning_runtime_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 442,
+          "text": "first.contains(r#\"\\\"untrusted_subject\\\":\\\"Assistant\\\"\"#),"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 21208
+  }
+}

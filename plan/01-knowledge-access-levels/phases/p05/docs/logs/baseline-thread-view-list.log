@@ -1,0 +1,10 @@
+adapters::persistence::thread::view_tests::a_message_is_not_readable_through_a_thread_that_does_not_hold_it: test
+adapters::persistence::thread::view_tests::a_message_no_transport_carried_reads_back_through_every_projection: test
+adapters::persistence::thread::view_tests::find_thread_for_message_resolves_thread_and_scopes_by_channel: test
+adapters::persistence::thread::view_tests::history_keeps_role_and_order_within_a_bounded_newest_window: test
+adapters::persistence::thread::view_tests::latest_thread_rfc_message_id_reaches_past_turns_without_headers: test
+adapters::persistence::thread::view_tests::the_audit_view_qualifies_provider_keys_by_their_interface: test
+adapters::persistence::thread::view_tests::the_audit_view_refuses_a_valid_id_read_under_another_company: test
+adapters::persistence::thread::view_tests::the_reply_context_carries_the_headers_mail_arrived_with: test
+
+8 tests, 0 benchmarks

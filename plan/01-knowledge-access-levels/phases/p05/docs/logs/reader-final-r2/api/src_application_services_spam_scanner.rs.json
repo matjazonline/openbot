@@ -1,0 +1,45 @@
+{
+  "file": "src/application/services/spam_scanner.rs",
+  "entries": [
+    {
+      "name": "SpamScanResult",
+      "kind": "struct",
+      "span": "L4-L8",
+      "signature": "pub struct SpamScanResult"
+    },
+    {
+      "name": "new",
+      "kind": "function",
+      "span": "L11-L13",
+      "signature": "pub fn new() -> Self"
+    },
+    {
+      "name": "add",
+      "kind": "function",
+      "span": "L15-L18",
+      "signature": "pub fn add(&mut self, score_delta: f64, reason: impl Into<String>)"
+    },
+    {
+      "name": "SpamScanInput",
+      "kind": "struct",
+      "span": "L23-L29",
+      "signature": "pub struct SpamScanInput<'a>"
+    },
+    {
+      "name": "SpamScanner",
+      "kind": "interface",
+      "span": "L31-L33",
+      "signature": "pub trait SpamScanner: Send + Sync"
+    },
+    {
+      "name": "scan",
+      "kind": "function",
+      "span": "L32-L32",
+      "signature": "async fn scan(&self, input: SpamScanInput<'_>) -> SpamScanResult;"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 946
+  }
+}

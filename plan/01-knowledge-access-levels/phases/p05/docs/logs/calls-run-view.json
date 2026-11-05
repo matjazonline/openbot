@@ -1,0 +1,66 @@
+{
+  "pattern": "run_view\\(",
+  "filesSearched": 1128,
+  "totalHits": 3,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/ui/runs/mod.rs#visible_run",
+        "name": "visible_run",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/ui/runs/mod.rs",
+        "span": "L214-L228"
+      },
+      "path": "src/adapters/http/routes/workflows/ui/runs/mod.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 220,
+          "text": ".run_view(company_id, RunId::new(run))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/run_views.rs#run_view",
+        "name": "run_view",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/run_views.rs",
+        "span": "L421-L459"
+      },
+      "path": "src/adapters/persistence/workflow/run_views.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 421,
+          "text": "async fn run_view(&self, company: CompanyId, run: RunId) -> AppResult<Option<RunView>> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/run_views.rs#run_view",
+        "name": "run_view",
+        "kind": "function",
+        "path": "src/application/workflow/run_views.rs",
+        "span": "L160-L160"
+      },
+      "path": "src/application/workflow/run_views.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 160,
+          "text": "async fn run_view(&self, company: CompanyId, run: RunId) -> AppResult<Option<RunView>>;"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 3,
+    "baselineChars": 51360
+  }
+}

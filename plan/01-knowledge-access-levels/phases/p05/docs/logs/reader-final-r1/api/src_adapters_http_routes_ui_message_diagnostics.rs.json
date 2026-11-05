@@ -1,0 +1,27 @@
+{
+  "file": "src/adapters/http/routes/ui_message_diagnostics.rs",
+  "entries": [
+    {
+      "name": "router",
+      "kind": "function",
+      "span": "L33-L38",
+      "signature": "pub fn router() -> Router<AppState>"
+    },
+    {
+      "name": "message_diagnostics",
+      "kind": "function",
+      "span": "L47-L80",
+      "signature": "async fn message_diagnostics("
+    },
+    {
+      "name": "missing",
+      "kind": "function",
+      "span": "L84-L86",
+      "signature": "fn missing() -> AppError"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 3218
+  }
+}

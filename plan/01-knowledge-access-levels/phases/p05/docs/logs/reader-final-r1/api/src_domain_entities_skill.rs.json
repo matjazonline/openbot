@@ -1,0 +1,87 @@
+{
+  "file": "src/domain/entities/skill.rs",
+  "entries": [
+    {
+      "name": "MAX_SKILL_INSTRUCTIONS_BYTES",
+      "kind": "constant",
+      "span": "L17-L17",
+      "signature": "pub const MAX_SKILL_INSTRUCTIONS_BYTES: usize = 16_384;"
+    },
+    {
+      "name": "MAX_SKILL_DESCRIPTION_CHARS",
+      "kind": "constant",
+      "span": "L18-L18",
+      "signature": "pub const MAX_SKILL_DESCRIPTION_CHARS: usize = 500;"
+    },
+    {
+      "name": "MAX_SKILL_NAME_CHARS",
+      "kind": "constant",
+      "span": "L19-L19",
+      "signature": "pub const MAX_SKILL_NAME_CHARS: usize = 120;"
+    },
+    {
+      "name": "Skill",
+      "kind": "struct",
+      "span": "L23-L36",
+      "signature": "pub struct Skill"
+    },
+    {
+      "name": "is_library",
+      "kind": "function",
+      "span": "L39-L41",
+      "signature": "pub fn is_library(&self) -> bool"
+    },
+    {
+      "name": "validate",
+      "kind": "function",
+      "span": "L48-L65",
+      "signature": "pub fn validate(&self) -> Result<(), String>"
+    },
+    {
+      "name": "validate_bounded_text",
+      "kind": "function",
+      "span": "L68-L76",
+      "signature": "fn validate_bounded_text(subject: &str, value: &str, max_chars: usize) -> Result<(), String>"
+    },
+    {
+      "name": "tests",
+      "kind": "module",
+      "span": "L79-L130",
+      "signature": "mod tests"
+    },
+    {
+      "name": "skill",
+      "kind": "function",
+      "span": "L82-L94",
+      "signature": "fn skill(instructions: &str) -> Skill"
+    },
+    {
+      "name": "a_skill_with_instructions_is_accepted",
+      "kind": "function",
+      "span": "L97-L102",
+      "signature": "fn a_skill_with_instructions_is_accepted()"
+    },
+    {
+      "name": "blank_instructions_are_refused",
+      "kind": "function",
+      "span": "L105-L108",
+      "signature": "fn blank_instructions_are_refused()"
+    },
+    {
+      "name": "instructions_are_bounded_in_bytes_not_characters",
+      "kind": "function",
+      "span": "L113-L122",
+      "signature": "fn instructions_are_bounded_in_bytes_not_characters()"
+    },
+    {
+      "name": "a_blank_description_is_refused",
+      "kind": "function",
+      "span": "L125-L129",
+      "signature": "fn a_blank_description_is_refused()"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 4783
+  }
+}

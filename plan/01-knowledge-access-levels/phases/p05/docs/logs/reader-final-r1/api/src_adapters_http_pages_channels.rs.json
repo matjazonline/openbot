@@ -1,0 +1,81 @@
+{
+  "file": "src/adapters/http/pages/channels.rs",
+  "entries": [
+    {
+      "name": "render_spam_disabled_warning",
+      "kind": "function",
+      "span": "L5-L35",
+      "signature": "pub(crate) fn render_spam_disabled_warning("
+    },
+    {
+      "name": "advanced_channel_form",
+      "kind": "function",
+      "span": "L39-L90",
+      "signature": "fn advanced_channel_form("
+    },
+    {
+      "name": "ChannelsPageFocus",
+      "kind": "struct",
+      "span": "L97-L100",
+      "signature": "pub struct ChannelsPageFocus"
+    },
+    {
+      "name": "ChannelsPage",
+      "kind": "struct",
+      "span": "L103-L109",
+      "signature": "pub struct ChannelsPage<'a>"
+    },
+    {
+      "name": "channels_page",
+      "kind": "function",
+      "span": "L111-L177",
+      "signature": "pub fn channels_page(page: &ChannelsPage<'_>) -> String"
+    },
+    {
+      "name": "focused_channel_list",
+      "kind": "function",
+      "span": "L181-L205",
+      "signature": "fn focused_channel_list(page: &ChannelsPage<'_>) -> String"
+    },
+    {
+      "name": "channel_list_fragment",
+      "kind": "function",
+      "span": "L207-L225",
+      "signature": "pub fn channel_list_fragment("
+    },
+    {
+      "name": "channel_threads_page",
+      "kind": "function",
+      "span": "L227-L260",
+      "signature": "pub fn channel_threads_page("
+    },
+    {
+      "name": "channel_thread_card",
+      "kind": "function",
+      "span": "L266-L311",
+      "signature": "fn channel_thread_card("
+    },
+    {
+      "name": "channel_thread_list_fragment",
+      "kind": "function",
+      "span": "L313-L360",
+      "signature": "pub fn channel_thread_list_fragment("
+    },
+    {
+      "name": "channel_row_fragment",
+      "kind": "function",
+      "span": "L362-L419",
+      "signature": "pub fn channel_row_fragment(company: &Company, app_domain_name: &str, channel: &Channel) -> String"
+    },
+    {
+      "name": "channel_edit_fragment",
+      "kind": "function",
+      "span": "L421-L518",
+      "signature": "pub fn channel_edit_fragment("
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 25909
+  }
+}

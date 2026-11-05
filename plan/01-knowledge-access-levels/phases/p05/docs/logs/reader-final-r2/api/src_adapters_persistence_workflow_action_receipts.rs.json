@@ -1,0 +1,69 @@
+{
+  "file": "src/adapters/persistence/workflow/action_receipts.rs",
+  "entries": [
+    {
+      "name": "receipt_on",
+      "kind": "function",
+      "span": "L10-L35",
+      "signature": "pub(super) async fn receipt_on("
+    },
+    {
+      "name": "provider_on",
+      "kind": "function",
+      "span": "L37-L59",
+      "signature": "pub(super) async fn provider_on("
+    },
+    {
+      "name": "marker_on",
+      "kind": "function",
+      "span": "L61-L105",
+      "signature": "pub(super) async fn marker_on("
+    },
+    {
+      "name": "reserve_entry_on",
+      "kind": "function",
+      "span": "L107-L136",
+      "signature": "pub(super) async fn reserve_entry_on("
+    },
+    {
+      "name": "verify_entry_on",
+      "kind": "function",
+      "span": "L138-L166",
+      "signature": "pub(super) async fn verify_entry_on("
+    },
+    {
+      "name": "commit_remote",
+      "kind": "function",
+      "span": "L168-L195",
+      "signature": "pub(super) async fn commit_remote("
+    },
+    {
+      "name": "commit_once",
+      "kind": "function",
+      "span": "L199-L254",
+      "signature": "async fn commit_once("
+    },
+    {
+      "name": "insert_receipt_on",
+      "kind": "function",
+      "span": "L256-L279",
+      "signature": "async fn insert_receipt_on("
+    },
+    {
+      "name": "observed_on",
+      "kind": "function",
+      "span": "L283-L311",
+      "signature": "async fn observed_on("
+    },
+    {
+      "name": "return_authorized",
+      "kind": "function",
+      "span": "L313-L359",
+      "signature": "pub(super) async fn return_authorized(&self, entry: &RemoteEntry) -> AppResult<bool>"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 17465
+  }
+}

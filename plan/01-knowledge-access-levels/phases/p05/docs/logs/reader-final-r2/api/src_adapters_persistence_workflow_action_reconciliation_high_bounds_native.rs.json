@@ -1,0 +1,105 @@
+{
+  "file": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_native.rs",
+  "entries": [
+    {
+      "name": "Attack",
+      "kind": "enum",
+      "span": "L4-L9",
+      "signature": "pub(super) enum Attack"
+    },
+    {
+      "name": "ReservationIdentity",
+      "kind": "struct",
+      "span": "L13-L13",
+      "signature": "struct ReservationIdentity(String);"
+    },
+    {
+      "name": "PgTx",
+      "kind": "type",
+      "span": "L15-L15",
+      "signature": "type PgTx<'a> = sqlx::Transaction<'a, sqlx::Postgres>;"
+    },
+    {
+      "name": "xid",
+      "kind": "function",
+      "span": "L17-L22",
+      "signature": "async fn xid(tx: &mut PgTx<'_>) -> ReservationIdentity"
+    },
+    {
+      "name": "insert_entry",
+      "kind": "function",
+      "span": "L24-L39",
+      "signature": "async fn insert_entry("
+    },
+    {
+      "name": "historical_entry",
+      "kind": "function",
+      "span": "L41-L67",
+      "signature": "pub(super) async fn historical_entry("
+    },
+    {
+      "name": "assert_native",
+      "kind": "function",
+      "span": "L69-L110",
+      "signature": "fn assert_native(error: &sqlx::Error, attack: Attack)"
+    },
+    {
+      "name": "Diagnostic",
+      "kind": "struct",
+      "span": "L74-L78",
+      "signature": "struct Diagnostic"
+    },
+    {
+      "name": "flush",
+      "kind": "function",
+      "span": "L112-L123",
+      "signature": "async fn flush(tx: &mut PgTx<'_>, attack: Attack) -> sqlx::Error"
+    },
+    {
+      "name": "invalid_exclusions",
+      "kind": "function",
+      "span": "L125-L148",
+      "signature": "pub(super) async fn invalid_exclusions(source: &HighSource)"
+    },
+    {
+      "name": "insert_consumption",
+      "kind": "function",
+      "span": "L150-L154",
+      "signature": "async fn insert_consumption(tx: &mut PgTx<'_>, source: &HighSource, entry: Uuid)"
+    },
+    {
+      "name": "candidate_predicates",
+      "kind": "function",
+      "span": "L156-L187",
+      "signature": "async fn candidate_predicates("
+    },
+    {
+      "name": "reject_candidate",
+      "kind": "function",
+      "span": "L189-L199",
+      "signature": "pub(super) async fn reject_candidate(source: &HighSource, attack: Attack)"
+    },
+    {
+      "name": "reject_historical",
+      "kind": "function",
+      "span": "L201-L229",
+      "signature": "pub(super) async fn reject_historical(source: &HighSource, attack: Attack)"
+    },
+    {
+      "name": "refused",
+      "kind": "function",
+      "span": "L233-L250",
+      "signature": "async fn refused(source: &HighSource, operation: &str, error: AppError) -> !"
+    },
+    {
+      "name": "supported_positive",
+      "kind": "function",
+      "span": "L252-L310",
+      "signature": "pub(super) async fn supported_positive(source: &HighSource)"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 16121
+  }
+}

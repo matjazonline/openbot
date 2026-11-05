@@ -1,0 +1,32 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 1,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_agent_tests.rs#workflow_agent_message_tool_parks_on_delivery_and_continues_with_its_receipt",
+        "name": "workflow_agent_message_tool_parks_on_delivery_and_continues_with_its_receipt",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_agent_tests.rs",
+        "span": "L33-L178"
+      },
+      "path": "src/adapters/persistence/workflow/message_agent_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 89,
+          "text": "json!({\"content\":{\"subject\":\"Status\",\"body\":\"Your request is in progress.\"},"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 6875
+  }
+}

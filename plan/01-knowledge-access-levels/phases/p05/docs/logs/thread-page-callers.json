@@ -1,0 +1,151 @@
+{
+  "pattern": "load_thread_page\\(",
+  "filesSearched": 1128,
+  "totalHits": 8,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/channel.rs#load_thread_page",
+        "name": "load_thread_page",
+        "kind": "function",
+        "path": "src/adapters/http/routes/channel.rs",
+        "span": "L225-L254"
+      },
+      "path": "src/adapters/http/routes/channel.rs",
+      "inDegree": 7,
+      "hits": [
+        {
+          "line": 225,
+          "text": "pub(crate) async fn load_thread_page("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui.rs#sent_message_response",
+        "name": "sent_message_response",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui.rs",
+        "span": "L1074-L1116"
+      },
+      "path": "src/adapters/http/routes/ui.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 1093,
+          "text": "let page = load_thread_page(thread_use_cases, channel.id, &ThreadListQuery::default()).await?;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui.rs#mailbox_page",
+        "name": "mailbox_page",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui.rs",
+        "span": "L299-L386"
+      },
+      "path": "src/adapters/http/routes/ui.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 334,
+          "text": "load_thread_page(&thread_use_cases, channel.id, &ThreadListQuery::default()).await?"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/channel.rs#list_channel_threads_page",
+        "name": "list_channel_threads_page",
+        "kind": "function",
+        "path": "src/adapters/http/routes/channel.rs",
+        "span": "L605-L638"
+      },
+      "path": "src/adapters/http/routes/channel.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 621,
+          "text": "let page = load_thread_page("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/channel.rs#list_channel_threads_fragment",
+        "name": "list_channel_threads_fragment",
+        "kind": "function",
+        "path": "src/adapters/http/routes/channel.rs",
+        "span": "L641-L663"
+      },
+      "path": "src/adapters/http/routes/channel.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 653,
+          "text": "let page = load_thread_page(&thread_use_cases, channel_id, &query).await?;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/channel.rs#list_channel_threads_json",
+        "name": "list_channel_threads_json",
+        "kind": "function",
+        "path": "src/adapters/http/routes/channel.rs",
+        "span": "L678-L693"
+      },
+      "path": "src/adapters/http/routes/channel.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 690,
+          "text": "let page = load_thread_page(&thread_use_cases, channel_id, &query).await?;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui.rs#thread_column_fragment",
+        "name": "thread_column_fragment",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui.rs",
+        "span": "L390-L426"
+      },
+      "path": "src/adapters/http/routes/ui.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 403,
+          "text": "let page = load_thread_page(&thread_use_cases, channel.id, &ThreadListQuery::default()).await?;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui.rs#thread_page_fragment",
+        "name": "thread_page_fragment",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui.rs",
+        "span": "L430-L466"
+      },
+      "path": "src/adapters/http/routes/ui.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 443,
+          "text": "let page = load_thread_page("
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 2,
+    "baselineChars": 88704
+  }
+}

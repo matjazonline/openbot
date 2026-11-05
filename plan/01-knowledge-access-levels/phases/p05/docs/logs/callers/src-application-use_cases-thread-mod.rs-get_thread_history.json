@@ -1,0 +1,209 @@
+{
+  "query": "get_thread_history",
+  "matches": [
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/mod.rs#get_thread_history",
+        "name": "get_thread_history",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/mod.rs",
+        "span": "L290-L294"
+      },
+      "hits": [
+        {
+          "id": "src/adapters/http/routes/channel/simulation.rs#load_simulation_thread_fragment",
+          "relation": "calls",
+          "depth": 1,
+          "name": "load_simulation_thread_fragment",
+          "kind": "function",
+          "path": "src/adapters/http/routes/channel/simulation.rs",
+          "span": "L94-L136"
+        },
+        {
+          "id": "src/adapters/http/routes/ui_attachments.rs#download_attachment",
+          "relation": "calls",
+          "depth": 1,
+          "name": "download_attachment",
+          "kind": "function",
+          "path": "src/adapters/http/routes/ui_attachments.rs",
+          "span": "L63-L108"
+        },
+        {
+          "id": "src/adapters/http/routes/ui_message_tests.rs#source_message_outside_window_is_exact_and_authorized",
+          "relation": "calls",
+          "depth": 1,
+          "name": "source_message_outside_window_is_exact_and_authorized",
+          "kind": "function",
+          "path": "src/adapters/http/routes/ui_message_tests.rs",
+          "span": "L344-L396"
+        },
+        {
+          "id": "src/adapters/http/routes/ui.rs#render_message_pane",
+          "relation": "calls",
+          "depth": 1,
+          "name": "render_message_pane",
+          "kind": "function",
+          "path": "src/adapters/http/routes/ui.rs",
+          "span": "L264-L291"
+        },
+        {
+          "id": "src/adapters/http/routes/channel/simulation.rs#open_simulated_thread_logic",
+          "relation": "calls",
+          "depth": 2,
+          "name": "open_simulated_thread_logic",
+          "kind": "function",
+          "path": "src/adapters/http/routes/channel/simulation.rs",
+          "span": "L507-L551"
+        },
+        {
+          "id": "src/adapters/http/routes/channel/simulation.rs#run",
+          "relation": "calls",
+          "depth": 2,
+          "name": "run",
+          "kind": "function",
+          "path": "src/adapters/http/routes/channel/simulation.rs",
+          "span": "L297-L349"
+        },
+        {
+          "id": "src/adapters/http/routes/channel/simulation.rs#simulate_channel_page",
+          "relation": "calls",
+          "depth": 2,
+          "name": "simulate_channel_page",
+          "kind": "function",
+          "path": "src/adapters/http/routes/channel/simulation.rs",
+          "span": "L9-L64"
+        },
+        {
+          "id": "src/adapters/http/routes/ui_internal_notes.rs#render_result",
+          "relation": "calls",
+          "depth": 2,
+          "name": "render_result",
+          "kind": "function",
+          "path": "src/adapters/http/routes/ui_internal_notes.rs",
+          "span": "L130-L149"
+        },
+        {
+          "id": "src/adapters/http/routes/ui.rs#mailbox_page",
+          "relation": "calls",
+          "depth": 2,
+          "name": "mailbox_page",
+          "kind": "function",
+          "path": "src/adapters/http/routes/ui.rs",
+          "span": "L299-L386"
+        },
+        {
+          "id": "src/adapters/http/routes/ui.rs#message_pane_fragment",
+          "relation": "calls",
+          "depth": 2,
+          "name": "message_pane_fragment",
+          "kind": "function",
+          "path": "src/adapters/http/routes/ui.rs",
+          "span": "L470-L498"
+        },
+        {
+          "id": "src/adapters/http/routes/ui.rs#sent_message_response",
+          "relation": "calls",
+          "depth": 2,
+          "name": "sent_message_response",
+          "kind": "function",
+          "path": "src/adapters/http/routes/ui.rs",
+          "span": "L1074-L1116"
+        },
+        {
+          "id": "src/adapters/http/routes/channel_authorization_tests.rs#simulation_and_application_thread_reads_hide_other_channels_and_tenants_like_unknown_ids",
+          "relation": "calls",
+          "depth": 3,
+          "name": "simulation_and_application_thread_reads_hide_other_channels_and_tenants_like_unknown_ids",
+          "kind": "function",
+          "path": "src/adapters/http/routes/channel_authorization_tests.rs",
+          "span": "L58-L122"
+        },
+        {
+          "id": "src/adapters/http/routes/channel/simulation.rs#open_simulated_thread_get",
+          "relation": "calls",
+          "depth": 3,
+          "name": "open_simulated_thread_get",
+          "kind": "function",
+          "path": "src/adapters/http/routes/channel/simulation.rs",
+          "span": "L558-L583"
+        },
+        {
+          "id": "src/adapters/http/routes/channel/simulation.rs#open_simulated_thread_post",
+          "relation": "calls",
+          "depth": 3,
+          "name": "open_simulated_thread_post",
+          "kind": "function",
+          "path": "src/adapters/http/routes/channel/simulation.rs",
+          "span": "L590-L615"
+        },
+        {
+          "id": "src/adapters/http/routes/channel/simulation.rs#simulate_channel_handler",
+          "relation": "calls",
+          "depth": 3,
+          "name": "simulate_channel_handler",
+          "kind": "function",
+          "path": "src/adapters/http/routes/channel/simulation.rs",
+          "span": "L149-L198"
+        },
+        {
+          "id": "src/adapters/http/routes/channel_authorization_tests.rs#channel_management_and_simulation_hide_foreign_companies_and_refuse_members",
+          "relation": "calls",
+          "depth": 3,
+          "name": "channel_management_and_simulation_hide_foreign_companies_and_refuse_members",
+          "kind": "function",
+          "path": "src/adapters/http/routes/channel_authorization_tests.rs",
+          "span": "L7-L55"
+        },
+        {
+          "id": "src/adapters/http/routes/ui_internal_notes.rs#add_note_ui",
+          "relation": "calls",
+          "depth": 3,
+          "name": "add_note_ui",
+          "kind": "function",
+          "path": "src/adapters/http/routes/ui_internal_notes.rs",
+          "span": "L151-L193"
+        },
+        {
+          "id": "src/adapters/http/routes/ui_internal_notes.rs#tombstone_note_ui",
+          "relation": "calls",
+          "depth": 3,
+          "name": "tombstone_note_ui",
+          "kind": "function",
+          "path": "src/adapters/http/routes/ui_internal_notes.rs",
+          "span": "L195-L236"
+        },
+        {
+          "id": "src/adapters/http/routes/ui_conversation_stream_tests.rs#conversation_reads_refuse_foreign_scope_and_private_channels",
+          "relation": "calls",
+          "depth": 3,
+          "name": "conversation_reads_refuse_foreign_scope_and_private_channels",
+          "kind": "function",
+          "path": "src/adapters/http/routes/ui_conversation_stream_tests.rs",
+          "span": "L64-L118"
+        },
+        {
+          "id": "src/adapters/http/routes/ui.rs#create_thread",
+          "relation": "calls",
+          "depth": 3,
+          "name": "create_thread",
+          "kind": "function",
+          "path": "src/adapters/http/routes/ui.rs",
+          "span": "L857-L935"
+        },
+        {
+          "id": "src/adapters/http/routes/ui.rs#send_reply",
+          "relation": "calls",
+          "depth": 3,
+          "name": "send_reply",
+          "kind": "function",
+          "path": "src/adapters/http/routes/ui.rs",
+          "span": "L983-L1071"
+        }
+      ]
+    }
+  ],
+  "saved": {
+    "files": 8,
+    "baselineChars": 134899
+  }
+}

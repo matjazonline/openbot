@@ -1,0 +1,39 @@
+{
+  "file": "src/adapters/persistence/workflow/action_reconciliation/facts.rs",
+  "entries": [
+    {
+      "name": "insert_on",
+      "kind": "function",
+      "span": "L4-L82",
+      "signature": "pub(super) async fn insert_on("
+    },
+    {
+      "name": "truth_on",
+      "kind": "function",
+      "span": "L84-L142",
+      "signature": "pub(super) async fn truth_on("
+    },
+    {
+      "name": "prior_applied_conflicts_on",
+      "kind": "function",
+      "span": "L144-L153",
+      "signature": "async fn prior_applied_conflicts_on("
+    },
+    {
+      "name": "applied_conflicts_on",
+      "kind": "function",
+      "span": "L155-L163",
+      "signature": "async fn applied_conflicts_on("
+    },
+    {
+      "name": "disagreement_on",
+      "kind": "function",
+      "span": "L165-L173",
+      "signature": "async fn disagreement_on("
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 10472
+  }
+}

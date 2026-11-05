@@ -1,0 +1,201 @@
+{
+  "file": "src/application/use_cases/thread/ingest/mod.rs",
+  "entries": [
+    {
+      "name": "canonical",
+      "kind": "module",
+      "span": "L24-L24",
+      "signature": "mod canonical;"
+    },
+    {
+      "name": "commit",
+      "kind": "module",
+      "span": "L25-L25",
+      "signature": "pub(crate) mod commit;"
+    },
+    {
+      "name": "policy",
+      "kind": "module",
+      "span": "L26-L26",
+      "signature": "pub(crate) mod policy;"
+    },
+    {
+      "name": "relay",
+      "kind": "module",
+      "span": "L27-L27",
+      "signature": "mod relay;"
+    },
+    {
+      "name": "routing",
+      "kind": "module",
+      "span": "L28-L28",
+      "signature": "mod routing;"
+    },
+    {
+      "name": "CanonicalMessageIngress",
+      "kind": "struct",
+      "span": "L65-L88",
+      "signature": "pub struct CanonicalMessageIngress"
+    },
+    {
+      "name": "new",
+      "kind": "function",
+      "span": "L91-L112",
+      "signature": "pub fn new("
+    },
+    {
+      "name": "with_target_thread",
+      "kind": "function",
+      "span": "L114-L117",
+      "signature": "pub fn with_target_thread(mut self, thread_id: Uuid) -> Self"
+    },
+    {
+      "name": "with_reply_to_message",
+      "kind": "function",
+      "span": "L119-L122",
+      "signature": "pub fn with_reply_to_message(mut self, message_id: CanonicalMessageId) -> Self"
+    },
+    {
+      "name": "with_subject",
+      "kind": "function",
+      "span": "L124-L127",
+      "signature": "pub fn with_subject(mut self, subject: impl Into<String>) -> Self"
+    },
+    {
+      "name": "with_attachments",
+      "kind": "function",
+      "span": "L129-L132",
+      "signature": "pub fn with_attachments(mut self, attachments: Vec<AttachmentMetadata>) -> Self"
+    },
+    {
+      "name": "with_reply_delivery",
+      "kind": "function",
+      "span": "L134-L137",
+      "signature": "pub fn with_reply_delivery(mut self, delivery: ReplyDelivery) -> Self"
+    },
+    {
+      "name": "with_disposition",
+      "kind": "function",
+      "span": "L139-L142",
+      "signature": "pub fn with_disposition(mut self, disposition: MessageDisposition) -> Self"
+    },
+    {
+      "name": "with_correlation_id",
+      "kind": "function",
+      "span": "L144-L147",
+      "signature": "pub fn with_correlation_id(mut self, correlation_id: CorrelationId) -> Self"
+    },
+    {
+      "name": "InboundMessage",
+      "kind": "struct",
+      "span": "L156-L163",
+      "signature": "pub struct InboundMessage"
+    },
+    {
+      "name": "InboundPreflight",
+      "kind": "enum",
+      "span": "L167-L170",
+      "signature": "pub enum InboundPreflight"
+    },
+    {
+      "name": "PreparedInbound",
+      "kind": "struct",
+      "span": "L174-L178",
+      "signature": "pub struct PreparedInbound"
+    },
+    {
+      "name": "into_commit_request",
+      "kind": "function",
+      "span": "L191-L193",
+      "signature": "pub fn into_commit_request(self) -> InboundCommitRequest"
+    },
+    {
+      "name": "replace_attachments",
+      "kind": "function",
+      "span": "L195-L204",
+      "signature": "pub fn replace_attachments("
+    },
+    {
+      "name": "arriving",
+      "kind": "function",
+      "span": "L209-L217",
+      "signature": "pub fn arriving(draft: InboundDraft, routing: InboundRouting, origin: IngressOrigin) -> Self"
+    },
+    {
+      "name": "with_unusable_hints",
+      "kind": "function",
+      "span": "L219-L222",
+      "signature": "pub fn with_unusable_hints(mut self, hints: Vec<UnusableHint>) -> Self"
+    },
+    {
+      "name": "with_reply_delivery",
+      "kind": "function",
+      "span": "L224-L227",
+      "signature": "pub fn with_reply_delivery(mut self, reply_delivery: ReplyDelivery) -> Self"
+    },
+    {
+      "name": "ingest",
+      "kind": "function",
+      "span": "L233-L242",
+      "signature": "pub async fn ingest(&self, message: InboundMessage) -> AppResult<InboundIngestResult>"
+    },
+    {
+      "name": "preflight_inbound",
+      "kind": "function",
+      "span": "L245-L305",
+      "signature": "pub async fn preflight_inbound(&self, message: InboundMessage) -> AppResult<InboundPreflight>"
+    },
+    {
+      "name": "commit_prepared_inbound",
+      "kind": "function",
+      "span": "L310-L357",
+      "signature": "pub async fn commit_prepared_inbound("
+    },
+    {
+      "name": "record_unusable_hints",
+      "kind": "function",
+      "span": "L365-L390",
+      "signature": "fn record_unusable_hints(&self, hints: &[UnusableHint])"
+    },
+    {
+      "name": "assemble_result",
+      "kind": "function",
+      "span": "L398-L472",
+      "signature": "async fn assemble_result("
+    },
+    {
+      "name": "UnusableHint",
+      "kind": "enum",
+      "span": "L480-L483",
+      "signature": "pub enum UnusableHint"
+    },
+    {
+      "name": "THREAD_INDEX_WARNING_INTERVAL_SECS",
+      "kind": "constant",
+      "span": "L485-L485",
+      "signature": "const THREAD_INDEX_WARNING_INTERVAL_SECS: u64 = 60;"
+    },
+    {
+      "name": "LAST_THREAD_INDEX_WARNING_WINDOWS",
+      "kind": "constant",
+      "span": "L486-L493",
+      "signature": "static LAST_THREAD_INDEX_WARNING_WINDOWS: [AtomicU64; 6] = ["
+    },
+    {
+      "name": "should_warn_about_thread_index",
+      "kind": "function",
+      "span": "L495-L504",
+      "signature": "fn should_warn_about_thread_index(error: ThreadIndexParseError) -> bool"
+    },
+    {
+      "name": "single_channel_routing",
+      "kind": "function",
+      "span": "L507-L519",
+      "signature": "fn single_channel_routing("
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 20520
+  }
+}

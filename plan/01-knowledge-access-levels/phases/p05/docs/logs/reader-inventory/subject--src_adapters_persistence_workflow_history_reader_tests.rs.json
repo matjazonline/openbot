@@ -1,0 +1,32 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 1,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/history_reader_tests.rs#message",
+        "name": "message",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/history_reader_tests.rs",
+        "span": "L23-L40"
+      },
+      "path": "src/adapters/persistence/workflow/history_reader_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 33,
+          "text": "sqlx::query(\"INSERT INTO messages (id, company_id, author_principal_id, subject, clean_text_body, direction, role, audience, correlation_id, content_hash) SELEC"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 10535
+  }
+}

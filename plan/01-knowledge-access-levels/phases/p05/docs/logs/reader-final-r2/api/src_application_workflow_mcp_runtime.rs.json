@@ -1,0 +1,171 @@
+{
+  "file": "src/application/workflow/mcp_runtime.rs",
+  "entries": [
+    {
+      "name": "McpToolCall",
+      "kind": "struct",
+      "span": "L13-L18",
+      "signature": "pub struct McpToolCall"
+    },
+    {
+      "name": "McpActionPreparation",
+      "kind": "interface",
+      "span": "L21-L34",
+      "signature": "pub trait McpActionPreparation: Send + Sync"
+    },
+    {
+      "name": "mcp_step_request",
+      "kind": "function",
+      "span": "L24-L28",
+      "signature": "async fn mcp_step_request("
+    },
+    {
+      "name": "mcp_tool_request",
+      "kind": "function",
+      "span": "L29-L33",
+      "signature": "async fn mcp_tool_request("
+    },
+    {
+      "name": "McpUse",
+      "kind": "struct",
+      "span": "L38-L43",
+      "signature": "pub struct McpUse"
+    },
+    {
+      "name": "McpActionUse",
+      "kind": "interface",
+      "span": "L45-L47",
+      "signature": "pub trait McpActionUse: Send + Sync"
+    },
+    {
+      "name": "mcp_use",
+      "kind": "function",
+      "span": "L46-L46",
+      "signature": "async fn mcp_use(&self, request: &ActionRequest) -> AppResult<McpUse>;"
+    },
+    {
+      "name": "McpActions",
+      "kind": "struct",
+      "span": "L50-L55",
+      "signature": "pub struct McpActions<P, D>"
+    },
+    {
+      "name": "new",
+      "kind": "function",
+      "span": "L57-L69",
+      "signature": "pub fn new("
+    },
+    {
+      "name": "Failure",
+      "kind": "enum",
+      "span": "L72-L77",
+      "signature": "enum Failure"
+    },
+    {
+      "name": "into_error",
+      "kind": "function",
+      "span": "L79-L87",
+      "signature": "fn into_error(self) -> AppError"
+    },
+    {
+      "name": "call_tool",
+      "kind": "function",
+      "span": "L95-L113",
+      "signature": "pub async fn call_tool("
+    },
+    {
+      "name": "step",
+      "kind": "function",
+      "span": "L115-L131",
+      "signature": "async fn step("
+    },
+    {
+      "name": "dispatch_prepared",
+      "kind": "function",
+      "span": "L137-L176",
+      "signature": "async fn dispatch_prepared("
+    },
+    {
+      "name": "supports",
+      "kind": "function",
+      "span": "L185-L187",
+      "signature": "fn supports(&self, kind: &WorkflowStepKind) -> bool"
+    },
+    {
+      "name": "execute",
+      "kind": "function",
+      "span": "L188-L194",
+      "signature": "async fn execute("
+    },
+    {
+      "name": "run",
+      "kind": "function",
+      "span": "L202-L232",
+      "signature": "pub async fn run("
+    },
+    {
+      "name": "Opened",
+      "kind": "struct",
+      "span": "L235-L238",
+      "signature": "struct Opened"
+    },
+    {
+      "name": "McpCall",
+      "kind": "struct",
+      "span": "L243-L247",
+      "signature": "struct McpCall<P>"
+    },
+    {
+      "name": "open",
+      "kind": "function",
+      "span": "L249-L262",
+      "signature": "async fn open(&self, request: &ActionRequest) -> Result<(), Failure>"
+    },
+    {
+      "name": "take",
+      "kind": "function",
+      "span": "L263-L265",
+      "signature": "fn take(&self) -> Option<Opened>"
+    },
+    {
+      "name": "close_unused",
+      "kind": "function",
+      "span": "L266-L270",
+      "signature": "async fn close_unused(&self)"
+    },
+    {
+      "name": "connect_checked",
+      "kind": "function",
+      "span": "L273-L296",
+      "signature": "async fn connect_checked("
+    },
+    {
+      "name": "close",
+      "kind": "function",
+      "span": "L298-L302",
+      "signature": "async fn close(session: Box<dyn McpSession>)"
+    },
+    {
+      "name": "replay_contract",
+      "kind": "function",
+      "span": "L307-L309",
+      "signature": "fn replay_contract(&self) -> Option<&ProviderReplayContract>"
+    },
+    {
+      "name": "invoke",
+      "kind": "function",
+      "span": "L310-L347",
+      "signature": "async fn invoke(&self, action: &FrozenAction, _: &ProviderInvocation) -> AppResult<Value>"
+    },
+    {
+      "name": "fail",
+      "kind": "function",
+      "span": "L350-L352",
+      "signature": "fn fail(outcome: ActionStepOutcome<'_>) -> WorkflowHandlerResult"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 12151
+  }
+}

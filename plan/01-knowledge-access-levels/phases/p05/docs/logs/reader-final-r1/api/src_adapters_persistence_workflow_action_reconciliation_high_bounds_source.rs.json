@@ -1,0 +1,81 @@
+{
+  "file": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_source.rs",
+  "entries": [
+    {
+      "name": "ALLOWANCE",
+      "kind": "constant",
+      "span": "L3-L3",
+      "signature": "const ALLOWANCE: i32 = 132;"
+    },
+    {
+      "name": "provider_timeout",
+      "kind": "function",
+      "span": "L12-L51",
+      "signature": "async fn provider_timeout("
+    },
+    {
+      "name": "observation",
+      "kind": "function",
+      "span": "L54-L67",
+      "signature": "fn observation(observed: &AppResult<RemoteDispatchObservation>) -> String"
+    },
+    {
+      "name": "window_lapsed",
+      "kind": "function",
+      "span": "L71-L82",
+      "signature": "async fn window_lapsed(f: &AdmissionFixture, request: &ActionDispatchRequest) -> bool"
+    },
+    {
+      "name": "assert_lapsed_backstop",
+      "kind": "function",
+      "span": "L86-L104",
+      "signature": "async fn assert_lapsed_backstop("
+    },
+    {
+      "name": "supported_fixture",
+      "kind": "function",
+      "span": "L106-L135",
+      "signature": "async fn supported_fixture() -> (AdmissionFixture, ActionDispatchRequest)"
+    },
+    {
+      "name": "retire_retry",
+      "kind": "function",
+      "span": "L137-L182",
+      "signature": "pub(super) async fn retire_retry("
+    },
+    {
+      "name": "real_history",
+      "kind": "function",
+      "span": "L184-L225",
+      "signature": "async fn real_history("
+    },
+    {
+      "name": "final_proof",
+      "kind": "function",
+      "span": "L227-L251",
+      "signature": "async fn final_proof("
+    },
+    {
+      "name": "foreign_entry",
+      "kind": "function",
+      "span": "L253-L323",
+      "signature": "async fn foreign_entry(f: &AdmissionFixture, attempt: usize) -> Option<Uuid>"
+    },
+    {
+      "name": "high_source",
+      "kind": "function",
+      "span": "L329-L338",
+      "signature": "pub(super) async fn high_source() -> HighSource"
+    },
+    {
+      "name": "try_high_source",
+      "kind": "function",
+      "span": "L340-L416",
+      "signature": "async fn try_high_source(attempt: usize) -> Option<HighSource>"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 16357
+  }
+}

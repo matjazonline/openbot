@@ -1,0 +1,111 @@
+{
+  "file": "src/adapters/smtp/transport.rs",
+  "entries": [
+    {
+      "name": "DynamicHeader",
+      "kind": "struct",
+      "span": "L23-L23",
+      "signature": "struct DynamicHeader(MailHeader);"
+    },
+    {
+      "name": "name",
+      "kind": "function",
+      "span": "L26-L28",
+      "signature": "fn name() -> HeaderName"
+    },
+    {
+      "name": "parse",
+      "kind": "function",
+      "span": "L30-L32",
+      "signature": "fn parse(_: &str) -> Result<Self, Box<dyn std::error::Error + Send + Sync>>"
+    },
+    {
+      "name": "display",
+      "kind": "function",
+      "span": "L34-L40",
+      "signature": "fn display(&self) -> HeaderValue"
+    },
+    {
+      "name": "LettreMailTransport",
+      "kind": "struct",
+      "span": "L44-L48",
+      "signature": "pub struct LettreMailTransport"
+    },
+    {
+      "name": "is_configured",
+      "kind": "function",
+      "span": "L52-L54",
+      "signature": "pub fn is_configured(&self) -> bool"
+    },
+    {
+      "name": "from_config",
+      "kind": "function",
+      "span": "L56-L104",
+      "signature": "pub async fn from_config("
+    },
+    {
+      "name": "ensure_resolves_only_to_loopback",
+      "kind": "function",
+      "span": "L107-L129",
+      "signature": "async fn ensure_resolves_only_to_loopback(host: &str, port: u16) -> AppResult<()>"
+    },
+    {
+      "name": "mailbox",
+      "kind": "function",
+      "span": "L131-L139",
+      "signature": "fn mailbox("
+    },
+    {
+      "name": "send",
+      "kind": "function",
+      "span": "L151-L176",
+      "signature": "async fn send(&self, mail: MailMessage) -> MailSendOutcome"
+    },
+    {
+      "name": "build_message",
+      "kind": "function",
+      "span": "L183-L215",
+      "signature": "fn build_message(mail: MailMessage) -> AppResult<Message>"
+    },
+    {
+      "name": "tests",
+      "kind": "module",
+      "span": "L218-L305",
+      "signature": "mod tests"
+    },
+    {
+      "name": "plaintext_accepts_ipv4_and_ipv6_loopback_without_credentials",
+      "kind": "function",
+      "span": "L222-L233",
+      "signature": "async fn plaintext_accepts_ipv4_and_ipv6_loopback_without_credentials()"
+    },
+    {
+      "name": "security_email_identity_transport_availability_matches_built_client",
+      "kind": "function",
+      "span": "L236-L261",
+      "signature": "async fn security_email_identity_transport_availability_matches_built_client()"
+    },
+    {
+      "name": "plaintext_rejects_credentials",
+      "kind": "function",
+      "span": "L264-L276",
+      "signature": "async fn plaintext_rejects_credentials()"
+    },
+    {
+      "name": "plaintext_rejects_remote_ip",
+      "kind": "function",
+      "span": "L279-L289",
+      "signature": "async fn plaintext_rejects_remote_ip()"
+    },
+    {
+      "name": "remote_credentials_build_only_a_tls_transport",
+      "kind": "function",
+      "span": "L292-L304",
+      "signature": "async fn remote_credentials_build_only_a_tls_transport()"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 10576
+  }
+}

@@ -1,0 +1,63 @@
+{
+  "file": "src/adapters/persistence/delivery/read.rs",
+  "entries": [
+    {
+      "name": "DeliveryViewDb",
+      "kind": "struct",
+      "span": "L26-L31",
+      "signature": "struct DeliveryViewDb"
+    },
+    {
+      "name": "DELIVERY_VIEW_SELECT",
+      "kind": "constant",
+      "span": "L41-L59",
+      "signature": "const DELIVERY_VIEW_SELECT: &str = r#\""
+    },
+    {
+      "name": "list_company_deliveries",
+      "kind": "function",
+      "span": "L63-L115",
+      "signature": "async fn list_company_deliveries("
+    },
+    {
+      "name": "get_delivery",
+      "kind": "function",
+      "span": "L117-L137",
+      "signature": "async fn get_delivery("
+    },
+    {
+      "name": "project_delivery_entries",
+      "kind": "function",
+      "span": "L141-L166",
+      "signature": "async fn project_delivery_entries("
+    },
+    {
+      "name": "with_parts",
+      "kind": "function",
+      "span": "L171-L173",
+      "signature": "async fn with_parts(&self, rows: Vec<DeliveryViewDb>) -> AppResult<Vec<DeliveryEntry>>"
+    },
+    {
+      "name": "attach_parts",
+      "kind": "function",
+      "span": "L176-L203",
+      "signature": "async fn attach_parts("
+    },
+    {
+      "name": "entry",
+      "kind": "function",
+      "span": "L205-L240",
+      "signature": "fn entry(row: DeliveryViewDb, parts: Vec<DeliveryPartEntry>) -> AppResult<DeliveryEntry>"
+    },
+    {
+      "name": "part_entry",
+      "kind": "function",
+      "span": "L242-L258",
+      "signature": "fn part_entry(row: &PartDb) -> AppResult<DeliveryPartEntry>"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 10105
+  }
+}

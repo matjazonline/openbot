@@ -1,0 +1,29 @@
+{
+  "query": "list_thread_messages",
+  "matches": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/views.rs#list_thread_messages",
+        "name": "list_thread_messages",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/views.rs",
+        "span": "L282-L323"
+      },
+      "hits": [
+        {
+          "id": "src/adapters/persistence/thread/mod.rs#list_thread_message_views",
+          "relation": "calls",
+          "depth": 1,
+          "name": "list_thread_message_views",
+          "kind": "function",
+          "path": "src/adapters/persistence/thread/mod.rs",
+          "span": "L594-L599"
+        }
+      ]
+    }
+  ],
+  "saved": {
+    "files": 2,
+    "baselineChars": 54456
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "pattern": "http_reconciliation_integration_support.rs",
+  "filesSearched": 1137,
+  "totalHits": 1,
+  "groups": [
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/http_reconciliation_integration_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 10,
+          "text": "#[path = \"http_reconciliation_integration_support.rs\"]"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 7688
+  }
+}

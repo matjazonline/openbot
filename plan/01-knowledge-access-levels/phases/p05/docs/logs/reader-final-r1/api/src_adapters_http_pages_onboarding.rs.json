@@ -1,0 +1,75 @@
+{
+  "file": "src/adapters/http/pages/onboarding.rs",
+  "entries": [
+    {
+      "name": "onboarding_shell",
+      "kind": "function",
+      "span": "L5-L28",
+      "signature": "fn onboarding_shell("
+    },
+    {
+      "name": "busy_submit_handler",
+      "kind": "function",
+      "span": "L35-L37",
+      "signature": "fn busy_submit_handler(pending_label: &str) -> String"
+    },
+    {
+      "name": "busy_submit_button",
+      "kind": "function",
+      "span": "L44-L48",
+      "signature": "pub(super) fn busy_submit_button(label: &str) -> String"
+    },
+    {
+      "name": "onboarding_company_page",
+      "kind": "function",
+      "span": "L50-L79",
+      "signature": "pub fn onboarding_company_page("
+    },
+    {
+      "name": "OnboardingAgentDraft",
+      "kind": "struct",
+      "span": "L82-L87",
+      "signature": "pub struct OnboardingAgentDraft<'a>"
+    },
+    {
+      "name": "onboarding_channel_page",
+      "kind": "function",
+      "span": "L89-L105",
+      "signature": "pub fn onboarding_channel_page("
+    },
+    {
+      "name": "onboarding_channel_draft_page",
+      "kind": "function",
+      "span": "L107-L146",
+      "signature": "pub fn onboarding_channel_draft_page("
+    },
+    {
+      "name": "OnboardingChannel",
+      "kind": "enum",
+      "span": "L150-L162",
+      "signature": "pub enum OnboardingChannel"
+    },
+    {
+      "name": "OnboardedAgent",
+      "kind": "struct",
+      "span": "L164-L167",
+      "signature": "pub struct OnboardedAgent<'a>"
+    },
+    {
+      "name": "onboarding_complete_page",
+      "kind": "function",
+      "span": "L169-L223",
+      "signature": "pub fn onboarding_complete_page("
+    },
+    {
+      "name": "onboarded_agent_row",
+      "kind": "function",
+      "span": "L227-L257",
+      "signature": "fn onboarded_agent_row(company: &Company, index: usize, onboarded: &OnboardedAgent<'_>) -> String"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 13768
+  }
+}

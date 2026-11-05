@@ -1,0 +1,26 @@
+{
+  "pattern": "impl DeliveryReader",
+  "filesSearched": 1133,
+  "totalHits": 1,
+  "groups": [
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/delivery/read.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 62,
+          "text": "impl DeliveryReader for PostgresPersistence {"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 8804
+  }
+}

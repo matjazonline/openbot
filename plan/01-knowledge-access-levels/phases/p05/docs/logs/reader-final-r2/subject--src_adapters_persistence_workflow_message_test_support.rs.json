@@ -1,0 +1,49 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 2,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_test_support.rs#send_arguments",
+        "name": "send_arguments",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_test_support.rs",
+        "span": "L397-L400"
+      },
+      "path": "src/adapters/persistence/workflow/message_test_support.rs",
+      "inDegree": 11,
+      "hits": [
+        {
+          "line": 398,
+          "text": "json!({\"content\":{\"subject\":\"Status\",\"body\":body},"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_test_support.rs#send",
+        "name": "send",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_test_support.rs",
+        "span": "L113-L131"
+      },
+      "path": "src/adapters/persistence/workflow/message_test_support.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 126,
+          "text": "json!({\"content\":{\"literal\":{\"subject\":\"Status\",\"body\":\"The run finished.\"}},"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 21179
+  }
+}

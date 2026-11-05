@@ -1,0 +1,100 @@
+{
+  "pattern": "mod knowledge_message_tests|struct Setup|fn send\\(",
+  "filesSearched": 393,
+  "totalHits": 5,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/reviewed_delivery_tests.rs#send",
+        "name": "send",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/reviewed_delivery_tests.rs",
+        "span": "L115-L124"
+      },
+      "path": "src/adapters/persistence/workflow/reviewed_delivery_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 115,
+          "text": "async fn send(&self, delivery: &DeliveryRecord, part: &RenderedPart) -> ProviderSendOutcome {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/http_test_support.rs#Setup",
+        "name": "Setup",
+        "kind": "struct",
+        "path": "src/adapters/persistence/workflow/http_test_support.rs",
+        "span": "L45-L51"
+      },
+      "path": "src/adapters/persistence/workflow/http_test_support.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 45,
+          "text": "pub(super) struct Setup {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_test_support.rs#Setup",
+        "name": "Setup",
+        "kind": "struct",
+        "path": "src/adapters/persistence/workflow/message_test_support.rs",
+        "span": "L25-L37"
+      },
+      "path": "src/adapters/persistence/workflow/message_test_support.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 25,
+          "text": "pub(super) struct Setup {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_test_support.rs#send",
+        "name": "send",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_test_support.rs",
+        "span": "L113-L131"
+      },
+      "path": "src/adapters/persistence/workflow/message_test_support.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 113,
+          "text": "pub(super) async fn send(to: &[To]) -> Setup {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_tests.rs#knowledge_message_tests",
+        "name": "knowledge_message_tests",
+        "kind": "module",
+        "path": "src/adapters/persistence/workflow/message_tests.rs",
+        "span": "L594-L594"
+      },
+      "path": "src/adapters/persistence/workflow/message_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 594,
+          "text": "mod knowledge_message_tests;"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 4,
+    "baselineChars": 66814
+  }
+}

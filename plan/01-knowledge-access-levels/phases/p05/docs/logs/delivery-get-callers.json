@@ -1,0 +1,66 @@
+{
+  "pattern": "get_delivery",
+  "filesSearched": 1133,
+  "totalHits": 3,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_deliveries.rs#entry",
+        "name": "entry",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui_deliveries.rs",
+        "span": "L289-L296"
+      },
+      "path": "src/adapters/http/routes/ui_deliveries.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 292,
+          "text": ".get_delivery(DeliveryId::new(entry_id))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/delivery/read.rs#get_delivery",
+        "name": "get_delivery",
+        "kind": "function",
+        "path": "src/adapters/persistence/delivery/read.rs",
+        "span": "L116-L130"
+      },
+      "path": "src/adapters/persistence/delivery/read.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 116,
+          "text": "async fn get_delivery(&self, delivery_id: DeliveryId) -> AppResult<Option<DeliveryEntry>> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/delivery.rs#get_delivery",
+        "name": "get_delivery",
+        "kind": "function",
+        "path": "src/application/use_cases/delivery.rs",
+        "span": "L33-L33"
+      },
+      "path": "src/application/use_cases/delivery.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 33,
+          "text": "async fn get_delivery(&self, delivery_id: DeliveryId) -> AppResult<Option<DeliveryEntry>>;"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 3,
+    "baselineChars": 21677
+  }
+}

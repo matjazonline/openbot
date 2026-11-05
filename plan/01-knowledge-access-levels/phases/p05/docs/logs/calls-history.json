@@ -1,0 +1,100 @@
+{
+  "pattern": "get_thread_history\\(",
+  "filesSearched": 1128,
+  "totalHits": 5,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui.rs#render_message_pane",
+        "name": "render_message_pane",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui.rs",
+        "span": "L264-L291"
+      },
+      "path": "src/adapters/http/routes/ui.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 273,
+          "text": "let messages = thread_use_cases.get_thread_history(thread.id).await?;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/mod.rs#get_thread_history",
+        "name": "get_thread_history",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/mod.rs",
+        "span": "L290-L294"
+      },
+      "path": "src/application/use_cases/thread/mod.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 290,
+          "text": "pub async fn get_thread_history(&self, thread_id: Uuid) -> AppResult<Vec<ThreadMessageView>> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/channel/simulation.rs#load_simulation_thread_fragment",
+        "name": "load_simulation_thread_fragment",
+        "kind": "function",
+        "path": "src/adapters/http/routes/channel/simulation.rs",
+        "span": "L94-L136"
+      },
+      "path": "src/adapters/http/routes/channel/simulation.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 113,
+          "text": "let messages = thread_use_cases.get_thread_history(thread.id).await?;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_attachments.rs#download_attachment",
+        "name": "download_attachment",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui_attachments.rs",
+        "span": "L63-L108"
+      },
+      "path": "src/adapters/http/routes/ui_attachments.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 89,
+          "text": "let messages = thread_use_cases.get_thread_history(thread.id).await?;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_message_tests.rs#source_message_outside_window_is_exact_and_authorized",
+        "name": "source_message_outside_window_is_exact_and_authorized",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui_message_tests.rs",
+        "span": "L344-L396"
+      },
+      "path": "src/adapters/http/routes/ui_message_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 353,
+          "text": "let history = h.threads.get_thread_history(thread).await.unwrap();"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 5,
+    "baselineChars": 118231
+  }
+}

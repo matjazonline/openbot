@@ -1,0 +1,189 @@
+{
+  "file": "src/adapters/persistence/thread/inbound.rs",
+  "entries": [
+    {
+      "name": "ResolvedThread",
+      "kind": "struct",
+      "span": "L67-L71",
+      "signature": "struct ResolvedThread"
+    },
+    {
+      "name": "StoredMessage",
+      "kind": "struct",
+      "span": "L73-L76",
+      "signature": "struct StoredMessage"
+    },
+    {
+      "name": "commit_inbound",
+      "kind": "function",
+      "span": "L80-L88",
+      "signature": "async fn commit_inbound("
+    },
+    {
+      "name": "commit_on",
+      "kind": "function",
+      "span": "L93-L136",
+      "signature": "pub(super) async fn commit_on("
+    },
+    {
+      "name": "hold_channel_settings",
+      "kind": "function",
+      "span": "L143-L157",
+      "signature": "pub(super) async fn hold_channel_settings("
+    },
+    {
+      "name": "verify_channel_settings",
+      "kind": "function",
+      "span": "L165-L193",
+      "signature": "async fn verify_channel_settings("
+    },
+    {
+      "name": "recognise_redelivery",
+      "kind": "function",
+      "span": "L203-L249",
+      "signature": "async fn recognise_redelivery("
+    },
+    {
+      "name": "threads_holding",
+      "kind": "function",
+      "span": "L252-L268",
+      "signature": "async fn threads_holding("
+    },
+    {
+      "name": "intents_for_message",
+      "kind": "function",
+      "span": "L271-L288",
+      "signature": "async fn intents_for_message("
+    },
+    {
+      "name": "verify_association_bindings",
+      "kind": "function",
+      "span": "L291-L313",
+      "signature": "async fn verify_association_bindings("
+    },
+    {
+      "name": "first_unbound_association",
+      "kind": "function",
+      "span": "L320-L353",
+      "signature": "async fn first_unbound_association("
+    },
+    {
+      "name": "lock_provider_keys",
+      "kind": "function",
+      "span": "L360-L386",
+      "signature": "async fn lock_provider_keys("
+    },
+    {
+      "name": "existing_message_mappings",
+      "kind": "function",
+      "span": "L388-L403",
+      "signature": "async fn existing_message_mappings("
+    },
+    {
+      "name": "ThreadResolution",
+      "kind": "struct",
+      "span": "L409-L412",
+      "signature": "struct ThreadResolution<'a>"
+    },
+    {
+      "name": "LockedThread",
+      "kind": "struct",
+      "span": "L415-L418",
+      "signature": "struct LockedThread"
+    },
+    {
+      "name": "resolve_threads",
+      "kind": "function",
+      "span": "L420-L448",
+      "signature": "async fn resolve_threads("
+    },
+    {
+      "name": "plan_thread_resolution",
+      "kind": "function",
+      "span": "L450-L478",
+      "signature": "async fn plan_thread_resolution<'a>("
+    },
+    {
+      "name": "lock_existing_threads",
+      "kind": "function",
+      "span": "L480-L518",
+      "signature": "async fn lock_existing_threads("
+    },
+    {
+      "name": "open_thread",
+      "kind": "function",
+      "span": "L520-L547",
+      "signature": "async fn open_thread("
+    },
+    {
+      "name": "add_thread_principals",
+      "kind": "function",
+      "span": "L553-L576",
+      "signature": "async fn add_thread_principals("
+    },
+    {
+      "name": "bind_conversations",
+      "kind": "function",
+      "span": "L582-L602",
+      "signature": "async fn bind_conversations("
+    },
+    {
+      "name": "store_canonical",
+      "kind": "function",
+      "span": "L608-L645",
+      "signature": "async fn store_canonical("
+    },
+    {
+      "name": "associate_threads",
+      "kind": "function",
+      "span": "L648-L675",
+      "signature": "async fn associate_threads("
+    },
+    {
+      "name": "map_provider_message",
+      "kind": "function",
+      "span": "L682-L705",
+      "signature": "async fn map_provider_message("
+    },
+    {
+      "name": "create_intents",
+      "kind": "function",
+      "span": "L712-L769",
+      "signature": "async fn create_intents("
+    },
+    {
+      "name": "create_deliveries",
+      "kind": "function",
+      "span": "L771-L786",
+      "signature": "async fn create_deliveries("
+    },
+    {
+      "name": "complete_claimed_event",
+      "kind": "function",
+      "span": "L791-L806",
+      "signature": "async fn complete_claimed_event("
+    },
+    {
+      "name": "message_write",
+      "kind": "function",
+      "span": "L813-L866",
+      "signature": "fn message_write("
+    },
+    {
+      "name": "correlation_of",
+      "kind": "function",
+      "span": "L868-L877",
+      "signature": "fn correlation_of(envelope: &InboundEnvelope) -> MessageCorrelation"
+    },
+    {
+      "name": "observation",
+      "kind": "function",
+      "span": "L881-L892",
+      "signature": "fn observation(identity: QualifiedIdentity) -> IdentityObservation"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 34792
+  }
+}

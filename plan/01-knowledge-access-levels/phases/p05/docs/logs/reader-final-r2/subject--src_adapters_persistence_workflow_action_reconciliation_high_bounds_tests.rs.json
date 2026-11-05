@@ -1,0 +1,32 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 1,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_tests.rs#unchanged",
+        "name": "unchanged",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_tests.rs",
+        "span": "L91-L102"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 101,
+          "text": "assert_subject(&source.fixture, &source.request, 130, \"processing\").await;"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 3787
+  }
+}

@@ -1,0 +1,63 @@
+{
+  "file": "src/domain/entities/thread.rs",
+  "entries": [
+    {
+      "name": "Thread",
+      "kind": "struct",
+      "span": "L8-L18",
+      "signature": "pub struct Thread"
+    },
+    {
+      "name": "ThreadParticipantProjection",
+      "kind": "struct",
+      "span": "L21-L23",
+      "signature": "pub struct ThreadParticipantProjection"
+    },
+    {
+      "name": "subjects_for",
+      "kind": "function",
+      "span": "L28-L34",
+      "signature": "pub fn subjects_for(&self, transport: TransportKind) -> Vec<&str>"
+    },
+    {
+      "name": "cursor",
+      "kind": "function",
+      "span": "L40-L42",
+      "signature": "pub fn cursor(&self) -> ThreadCursor"
+    },
+    {
+      "name": "reply_subject",
+      "kind": "function",
+      "span": "L45-L52",
+      "signature": "pub fn reply_subject(&self) -> String"
+    },
+    {
+      "name": "contains_principal",
+      "kind": "function",
+      "span": "L54-L56",
+      "signature": "pub fn contains_principal(&self, principal_id: PrincipalId) -> bool"
+    },
+    {
+      "name": "tests",
+      "kind": "module",
+      "span": "L60-L90",
+      "signature": "mod tests"
+    },
+    {
+      "name": "thread_with_subject",
+      "kind": "function",
+      "span": "L63-L73",
+      "signature": "fn thread_with_subject(subject: &str) -> Thread"
+    },
+    {
+      "name": "reply_subject_prefixes_once",
+      "kind": "function",
+      "span": "L76-L89",
+      "signature": "fn reply_subject_prefixes_once()"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 2982
+  }
+}

@@ -1,0 +1,145 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 13,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_publish.rs#stored_on",
+        "name": "stored_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_publish.rs",
+        "span": "L31-L67"
+      },
+      "path": "src/adapters/persistence/workflow/message_publish.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 43,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 44,
+          "text": ".bind(request.subject.argument_digest.as_str())"
+        },
+        {
+          "line": 52,
+          "text": "subject: request.subject.clone(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_publish.rs#write_destinations_on",
+        "name": "write_destinations_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_publish.rs",
+        "span": "L198-L280"
+      },
+      "path": "src/adapters/persistence/workflow/message_publish.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 207,
+          "text": "\"INSERT INTO threads (id, company_id, channel_id, subject) VALUES ($1,$2,$3,$4)\","
+        },
+        {
+          "line": 212,
+          "text": ".bind(&thread.subject)"
+        },
+        {
+          "line": 264,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_publish.rs#insert_action_on",
+        "name": "insert_action_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_publish.rs",
+        "span": "L282-L307"
+      },
+      "path": "src/adapters/persistence/workflow/message_publish.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 298,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 299,
+          "text": ".bind(request.subject.argument_digest.as_str())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_publish.rs#accept_in_app_on",
+        "name": "accept_in_app_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_publish.rs",
+        "span": "L310-L324"
+      },
+      "path": "src/adapters/persistence/workflow/message_publish.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 319,
+          "text": ".bind(request.subject.invocation.as_uuid()).bind(request.subject.argument_digest.as_str())"
+        },
+        {
+          "line": 322,
+          "text": ".bind(scope.company.as_uuid()).bind(request.subject.invocation.as_uuid()).execute(&mut **tx).await?;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_publish.rs#publish_on",
+        "name": "publish_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_publish.rs",
+        "span": "L354-L453"
+      },
+      "path": "src/adapters/persistence/workflow/message_publish.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 442,
+          "text": "subject: request.subject.clone(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_publish.rs#resolve_on",
+        "name": "resolve_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_publish.rs",
+        "span": "L473-L510"
+      },
+      "path": "src/adapters/persistence/workflow/message_publish.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 498,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 499,
+          "text": ".bind(request.subject.argument_digest.as_str())"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 24590
+  }
+}

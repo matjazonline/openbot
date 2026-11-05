@@ -1,0 +1,99 @@
+{
+  "file": "src/application/workflow/triggers.rs",
+  "entries": [
+    {
+      "name": "MESSAGE_INPUT_BODY_BYTES",
+      "kind": "constant",
+      "span": "L10-L10",
+      "signature": "pub const MESSAGE_INPUT_BODY_BYTES: usize = 16 * 1024;"
+    },
+    {
+      "name": "MESSAGE_INPUT_SENDER_BYTES",
+      "kind": "constant",
+      "span": "L12-L12",
+      "signature": "pub const MESSAGE_INPUT_SENDER_BYTES: usize = 320;"
+    },
+    {
+      "name": "MESSAGE_REPLY_EVENT",
+      "kind": "constant",
+      "span": "L14-L14",
+      "signature": "pub const MESSAGE_REPLY_EVENT: &str = \"message.reply\";"
+    },
+    {
+      "name": "MessageTriggerInput",
+      "kind": "struct",
+      "span": "L18-L23",
+      "signature": "pub struct MessageTriggerInput"
+    },
+    {
+      "name": "new",
+      "kind": "function",
+      "span": "L27-L39",
+      "signature": "pub fn new("
+    },
+    {
+      "name": "to_value",
+      "kind": "function",
+      "span": "L41-L48",
+      "signature": "pub fn to_value(&self) -> Value"
+    },
+    {
+      "name": "representative",
+      "kind": "function",
+      "span": "L51-L59",
+      "signature": "pub fn representative() -> Value"
+    },
+    {
+      "name": "schema",
+      "kind": "function",
+      "span": "L62-L77",
+      "signature": "pub fn schema() -> Value"
+    },
+    {
+      "name": "ScheduleTriggerInput",
+      "kind": "struct",
+      "span": "L82-L84",
+      "signature": "pub struct ScheduleTriggerInput"
+    },
+    {
+      "name": "to_value",
+      "kind": "function",
+      "span": "L87-L89",
+      "signature": "pub fn to_value(self) -> Value"
+    },
+    {
+      "name": "representative",
+      "kind": "function",
+      "span": "L91-L96",
+      "signature": "pub fn representative() -> Value"
+    },
+    {
+      "name": "truncate",
+      "kind": "function",
+      "span": "L99-L108",
+      "signature": "fn truncate(text: &str, max: usize) -> &str"
+    },
+    {
+      "name": "tests",
+      "kind": "module",
+      "span": "L111-L140",
+      "signature": "mod tests"
+    },
+    {
+      "name": "message_trigger_input_is_bounded_at_char_boundaries_and_matches_its_schema",
+      "kind": "function",
+      "span": "L115-L131",
+      "signature": "fn message_trigger_input_is_bounded_at_char_boundaries_and_matches_its_schema()"
+    },
+    {
+      "name": "schedule_trigger_input_renders_utc_seconds",
+      "kind": "function",
+      "span": "L134-L139",
+      "signature": "fn schedule_trigger_input_renders_utc_seconds()"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 4909
+  }
+}

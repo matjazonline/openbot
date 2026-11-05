@@ -1,0 +1,291 @@
+{
+  "file": "src/adapters/persistence/thread/mod.rs",
+  "entries": [
+    {
+      "name": "email_metadata",
+      "kind": "module",
+      "span": "L8-L8",
+      "signature": "mod email_metadata;"
+    },
+    {
+      "name": "external",
+      "kind": "module",
+      "span": "L9-L9",
+      "signature": "mod external;"
+    },
+    {
+      "name": "inbound",
+      "kind": "module",
+      "span": "L10-L10",
+      "signature": "mod inbound;"
+    },
+    {
+      "name": "internal_note",
+      "kind": "module",
+      "span": "L11-L11",
+      "signature": "mod internal_note;"
+    },
+    {
+      "name": "message",
+      "kind": "module",
+      "span": "L12-L12",
+      "signature": "mod message;"
+    },
+    {
+      "name": "views",
+      "kind": "module",
+      "span": "L13-L13",
+      "signature": "mod views;"
+    },
+    {
+      "name": "test_support",
+      "kind": "module",
+      "span": "L18-L18",
+      "signature": "mod test_support;"
+    },
+    {
+      "name": "tests",
+      "kind": "module",
+      "span": "L22-L22",
+      "signature": "mod tests;"
+    },
+    {
+      "name": "read_tests",
+      "kind": "module",
+      "span": "L26-L26",
+      "signature": "mod read_tests;"
+    },
+    {
+      "name": "inbound_tests",
+      "kind": "module",
+      "span": "L30-L30",
+      "signature": "mod inbound_tests;"
+    },
+    {
+      "name": "view_tests",
+      "kind": "module",
+      "span": "L34-L34",
+      "signature": "mod view_tests;"
+    },
+    {
+      "name": "ThreadDb",
+      "kind": "struct",
+      "span": "L84-L92",
+      "signature": "pub struct ThreadDb"
+    },
+    {
+      "name": "ThreadIdentityRow",
+      "kind": "struct",
+      "span": "L95-L99",
+      "signature": "struct ThreadIdentityRow"
+    },
+    {
+      "name": "Error",
+      "kind": "type",
+      "span": "L102-L102",
+      "signature": "type Error = AppError;"
+    },
+    {
+      "name": "try_from",
+      "kind": "function",
+      "span": "L104-L146",
+      "signature": "fn try_from(db: ThreadDb) -> AppResult<Self>"
+    },
+    {
+      "name": "THREAD_SELECT",
+      "kind": "constant",
+      "span": "L149-L177",
+      "signature": "const THREAD_SELECT: &str = r#\""
+    },
+    {
+      "name": "load_thread",
+      "kind": "function",
+      "span": "L179-L187",
+      "signature": "async fn load_thread(pool: &PgPool, id: Uuid) -> AppResult<Option<Thread>>"
+    },
+    {
+      "name": "load_message",
+      "kind": "function",
+      "span": "L189-L197",
+      "signature": "async fn load_message(pool: &PgPool, association_id: Uuid) -> AppResult<Message>"
+    },
+    {
+      "name": "normalized_participants",
+      "kind": "function",
+      "span": "L199-L208",
+      "signature": "fn normalized_participants(participants: &[EmailAddress]) -> Vec<String>"
+    },
+    {
+      "name": "insert_thread_email_participants",
+      "kind": "function",
+      "span": "L210-L231",
+      "signature": "async fn insert_thread_email_participants("
+    },
+    {
+      "name": "insert_thread_principals",
+      "kind": "function",
+      "span": "L234-L274",
+      "signature": "pub(super) async fn insert_thread_principals("
+    },
+    {
+      "name": "thread_access_levels",
+      "kind": "function",
+      "span": "L278-L303",
+      "signature": "async fn thread_access_levels("
+    },
+    {
+      "name": "LevelRow",
+      "kind": "struct",
+      "span": "L285-L288",
+      "signature": "struct LevelRow"
+    },
+    {
+      "name": "create_thread",
+      "kind": "function",
+      "span": "L304-L335",
+      "signature": "async fn create_thread("
+    },
+    {
+      "name": "get_thread_by_id",
+      "kind": "function",
+      "span": "L337-L339",
+      "signature": "async fn get_thread_by_id(&self, id: Uuid) -> AppResult<Option<Thread>>"
+    },
+    {
+      "name": "list_threads_by_channel_id",
+      "kind": "function",
+      "span": "L341-L378",
+      "signature": "async fn list_threads_by_channel_id("
+    },
+    {
+      "name": "list_thread_last_roles",
+      "kind": "function",
+      "span": "L380-L411",
+      "signature": "async fn list_thread_last_roles("
+    },
+    {
+      "name": "list_threads_updated_after",
+      "kind": "function",
+      "span": "L413-L440",
+      "signature": "async fn list_threads_updated_after("
+    },
+    {
+      "name": "update_thread_participants",
+      "kind": "function",
+      "span": "L442-L474",
+      "signature": "async fn update_thread_participants("
+    },
+    {
+      "name": "find_thread_by_thread_index",
+      "kind": "function",
+      "span": "L476-L507",
+      "signature": "async fn find_thread_by_thread_index("
+    },
+    {
+      "name": "count_recent_messages",
+      "kind": "function",
+      "span": "L509-L521",
+      "signature": "async fn count_recent_messages(&self, thread_id: Uuid, duration_secs: i64) -> AppResult<usize>"
+    },
+    {
+      "name": "get_thread_message",
+      "kind": "function",
+      "span": "L523-L538",
+      "signature": "async fn get_thread_message("
+    },
+    {
+      "name": "find_thread_for_message",
+      "kind": "function",
+      "span": "L540-L557",
+      "signature": "async fn find_thread_for_message("
+    },
+    {
+      "name": "get_message_protocol_extension",
+      "kind": "function",
+      "span": "L559-L572",
+      "signature": "async fn get_message_protocol_extension("
+    },
+    {
+      "name": "create_message",
+      "kind": "function",
+      "span": "L574-L580",
+      "signature": "async fn create_message(&self, write: &MessageWrite) -> AppResult<Message>"
+    },
+    {
+      "name": "find_outbound_reply_after",
+      "kind": "function",
+      "span": "L582-L606",
+      "signature": "async fn find_outbound_reply_after("
+    },
+    {
+      "name": "associate_message",
+      "kind": "function",
+      "span": "L608-L618",
+      "signature": "async fn associate_message("
+    },
+    {
+      "name": "list_thread_message_views",
+      "kind": "function",
+      "span": "L620-L625",
+      "signature": "async fn list_thread_message_views("
+    },
+    {
+      "name": "list_thread_message_views_after",
+      "kind": "function",
+      "span": "L627-L634",
+      "signature": "async fn list_thread_message_views_after("
+    },
+    {
+      "name": "get_thread_message_view",
+      "kind": "function",
+      "span": "L636-L642",
+      "signature": "async fn get_thread_message_view("
+    },
+    {
+      "name": "list_agent_history",
+      "kind": "function",
+      "span": "L644-L646",
+      "signature": "async fn list_agent_history(&self, thread_id: Uuid) -> AppResult<Vec<AgentHistoryMessage>>"
+    },
+    {
+      "name": "latest_email_reply_context",
+      "kind": "function",
+      "span": "L648-L653",
+      "signature": "async fn latest_email_reply_context("
+    },
+    {
+      "name": "latest_replyable_email_context",
+      "kind": "function",
+      "span": "L655-L660",
+      "signature": "async fn latest_replyable_email_context("
+    },
+    {
+      "name": "latest_thread_rfc_message_id",
+      "kind": "function",
+      "span": "L662-L664",
+      "signature": "async fn latest_thread_rfc_message_id(&self, thread_id: Uuid) -> AppResult<Option<MessageId>>"
+    },
+    {
+      "name": "get_message_audit",
+      "kind": "function",
+      "span": "L666-L672",
+      "signature": "async fn get_message_audit("
+    },
+    {
+      "name": "create_internal_note",
+      "kind": "function",
+      "span": "L674-L680",
+      "signature": "async fn create_internal_note("
+    },
+    {
+      "name": "tombstone_internal_note",
+      "kind": "function",
+      "span": "L682-L688",
+      "signature": "async fn tombstone_internal_note("
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 25401
+  }
+}

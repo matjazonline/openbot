@@ -1,0 +1,113 @@
+{
+  "pattern": "subject",
+  "filesSearched": 10,
+  "totalHits": 8,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/delivery/evidence.rs#settle_unknown_delivery_on",
+        "name": "settle_unknown_delivery_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/delivery/evidence.rs",
+        "span": "L33-L121"
+      },
+      "path": "src/adapters/persistence/delivery/evidence.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 115,
+          "text": "// Rolled back by the caller: the subject left `outcome_unknown` under another owner."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/delivery/read.rs#entry",
+        "name": "entry",
+        "kind": "function",
+        "path": "src/adapters/persistence/delivery/read.rs",
+        "span": "L205-L240"
+      },
+      "path": "src/adapters/persistence/delivery/read.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 208,
+          "text": "subject,"
+        },
+        {
+          "line": 229,
+          "text": "subject,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/delivery/queue.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 855,
+          "text": "/// The same fence for a statement whose subject *is* the delivery: binds `$1`/`$2`/`$3`."
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/delivery/read.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 3,
+          "text": "//! What a reader needs beyond the row itself is the subject of the message being delivered and the"
+        },
+        {
+          "line": 6,
+          "text": "//! called, so a renamed channel or an edited subject reads correctly without a backfill."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/delivery/read.rs#DeliveryViewDb",
+        "name": "DeliveryViewDb",
+        "kind": "struct",
+        "path": "src/adapters/persistence/delivery/read.rs",
+        "span": "L26-L31"
+      },
+      "path": "src/adapters/persistence/delivery/read.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 29,
+          "text": "subject: String,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/delivery/read.rs#DELIVERY_VIEW_SELECT",
+        "name": "DELIVERY_VIEW_SELECT",
+        "kind": "constant",
+        "path": "src/adapters/persistence/delivery/read.rs",
+        "span": "L41-L59"
+      },
+      "path": "src/adapters/persistence/delivery/read.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 52,
+          "text": "message.subject AS subject,"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 3,
+    "baselineChars": 55313
+  }
+}

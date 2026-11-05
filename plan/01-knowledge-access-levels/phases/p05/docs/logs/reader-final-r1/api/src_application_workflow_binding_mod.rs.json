@@ -1,0 +1,111 @@
+{
+  "file": "src/application/workflow/binding/mod.rs",
+  "entries": [
+    {
+      "name": "resources",
+      "kind": "module",
+      "span": "L5-L5",
+      "signature": "mod resources;"
+    },
+    {
+      "name": "BindingConfiguration",
+      "kind": "struct",
+      "span": "L22-L32",
+      "signature": "pub struct BindingConfiguration"
+    },
+    {
+      "name": "ConfiguredBinding",
+      "kind": "struct",
+      "span": "L36-L39",
+      "signature": "pub struct ConfiguredBinding"
+    },
+    {
+      "name": "new",
+      "kind": "function",
+      "span": "L42-L60",
+      "signature": "pub fn new("
+    },
+    {
+      "name": "id",
+      "kind": "function",
+      "span": "L62-L64",
+      "signature": "pub fn id(&self) -> WorkflowBindingId"
+    },
+    {
+      "name": "revision",
+      "kind": "function",
+      "span": "L65-L67",
+      "signature": "pub fn revision(&self) -> BindingRevision"
+    },
+    {
+      "name": "company_id",
+      "kind": "function",
+      "span": "L68-L70",
+      "signature": "pub fn company_id(&self) -> CompanyId"
+    },
+    {
+      "name": "params",
+      "kind": "function",
+      "span": "L71-L73",
+      "signature": "pub fn params(&self) -> &Value"
+    },
+    {
+      "name": "resources",
+      "kind": "function",
+      "span": "L74-L76",
+      "signature": "pub fn resources(&self) -> &BTreeMap<ResourceName, RuntimeResourceId>"
+    },
+    {
+      "name": "run_as",
+      "kind": "function",
+      "span": "L77-L79",
+      "signature": "pub fn run_as(&self) -> WorkflowActor"
+    },
+    {
+      "name": "message_trigger",
+      "kind": "function",
+      "span": "L80-L82",
+      "signature": "pub fn message_trigger(&self) -> Option<MessageTrigger>"
+    },
+    {
+      "name": "bundle",
+      "kind": "function",
+      "span": "L83-L85",
+      "signature": "pub fn bundle(&self) -> &Arc<PublishedBundle>"
+    },
+    {
+      "name": "check_message_trigger",
+      "kind": "function",
+      "span": "L90-L117",
+      "signature": "pub fn check_message_trigger("
+    },
+    {
+      "name": "check_readiness",
+      "kind": "function",
+      "span": "L123-L150",
+      "signature": "pub async fn check_readiness("
+    },
+    {
+      "name": "validate_slots",
+      "kind": "function",
+      "span": "L153-L178",
+      "signature": "fn validate_slots("
+    },
+    {
+      "name": "configuration_error",
+      "kind": "function",
+      "span": "L180-L192",
+      "signature": "fn configuration_error("
+    },
+    {
+      "name": "tests",
+      "kind": "module",
+      "span": "L195-L195",
+      "signature": "mod tests;"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 7178
+  }
+}

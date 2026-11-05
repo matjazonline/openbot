@@ -1,0 +1,32 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 1,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_prior_bounds_support.rs#no_result",
+        "name": "no_result",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_prior_bounds_support.rs",
+        "span": "L12-L23"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_prior_bounds_support.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 17,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 13149
+  }
+}

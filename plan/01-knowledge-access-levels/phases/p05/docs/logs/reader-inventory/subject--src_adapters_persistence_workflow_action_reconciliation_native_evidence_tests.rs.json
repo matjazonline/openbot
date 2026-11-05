@@ -1,0 +1,36 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 2,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_native_evidence_tests.rs#assert_source",
+        "name": "assert_source",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_native_evidence_tests.rs",
+        "span": "L94-L141"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_native_evidence_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 109,
+          "text": "json!(request.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 113,
+          "text": "request.subject.argument_digest.as_str()"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 12917
+  }
+}

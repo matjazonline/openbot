@@ -1,0 +1,36 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 2,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_evidence_binding_tests.rs#workflow_action_evidence_remote_entry_transaction_identity_cannot_be_spoofed",
+        "name": "workflow_action_evidence_remote_entry_transaction_identity_cannot_be_spoofed",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_evidence_binding_tests.rs",
+        "span": "L49-L84"
+      },
+      "path": "src/adapters/persistence/workflow/action_evidence_binding_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 65,
+          "text": ".bind(request.scope().execution.as_uuid()).bind(request.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 66,
+          "text": ".bind(request.subject.argument_digest.as_str()).bind(marker).bind(Uuid::new_v4())"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 4287
+  }
+}

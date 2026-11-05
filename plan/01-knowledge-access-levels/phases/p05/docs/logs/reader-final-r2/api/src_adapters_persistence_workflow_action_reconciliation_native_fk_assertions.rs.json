@@ -1,0 +1,51 @@
+{
+  "file": "src/adapters/persistence/workflow/action_reconciliation_native_fk_assertions.rs",
+  "entries": [
+    {
+      "name": "owner_view",
+      "kind": "function",
+      "span": "L4-L14",
+      "signature": "pub(super) fn owner_view(state: &Value, foreign: &CompanyReceipt) -> Value"
+    },
+    {
+      "name": "target_owner",
+      "kind": "function",
+      "span": "L16-L57",
+      "signature": "pub(super) fn target_owner(catalog: &[Value], target: Target) -> &Value"
+    },
+    {
+      "name": "assert_native_owners",
+      "kind": "function",
+      "span": "L59-L103",
+      "signature": "pub(super) fn assert_native_owners(catalog: &[Value], native: &Value)"
+    },
+    {
+      "name": "production",
+      "kind": "function",
+      "span": "L105-L116",
+      "signature": "pub(super) fn production(mut catalog: Value) -> Value"
+    },
+    {
+      "name": "original_images",
+      "kind": "function",
+      "span": "L118-L146",
+      "signature": "pub(super) fn original_images("
+    },
+    {
+      "name": "transport",
+      "kind": "function",
+      "span": "L148-L200",
+      "signature": "pub(super) fn transport("
+    },
+    {
+      "name": "assert_sources",
+      "kind": "function",
+      "span": "L202-L224",
+      "signature": "pub(super) fn assert_sources(source: &UnknownSource, foreign: &CompanyReceipt, initial: &Value)"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 7773
+  }
+}

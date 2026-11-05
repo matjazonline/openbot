@@ -1,0 +1,70 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 4,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/account_identity.rs#rekey_account_identity_on",
+        "name": "rekey_account_identity_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/account_identity.rs",
+        "span": "L52-L100"
+      },
+      "path": "src/adapters/persistence/account_identity.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 87,
+          "text": "keys.sort_by(|left, right| left.subject().as_str().cmp(right.subject().as_str()));"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/account_identity.rs#identity_holder",
+        "name": "identity_holder",
+        "kind": "function",
+        "path": "src/adapters/persistence/account_identity.rs",
+        "span": "L102-L124"
+      },
+      "path": "src/adapters/persistence/account_identity.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 114,
+          "text": "AND identity.namespace = $3 AND identity.subject = $4"
+        },
+        {
+          "line": 120,
+          "text": ".bind(identity.subject().as_str())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/account_identity.rs#detach_old_address",
+        "name": "detach_old_address",
+        "kind": "function",
+        "path": "src/adapters/persistence/account_identity.rs",
+        "span": "L131-L178"
+      },
+      "path": "src/adapters/persistence/account_identity.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 151,
+          "text": ".bind(old.subject().as_str())"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 10742
+  }
+}

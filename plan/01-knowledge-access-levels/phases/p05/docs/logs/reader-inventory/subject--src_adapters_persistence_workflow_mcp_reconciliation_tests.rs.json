@@ -1,0 +1,49 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 2,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/mcp_reconciliation_tests.rs#settle_rejected",
+        "name": "settle_rejected",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/mcp_reconciliation_tests.rs",
+        "span": "L57-L120"
+      },
+      "path": "src/adapters/persistence/workflow/mcp_reconciliation_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 89,
+          "text": "subject: intent.approval_subject(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/mcp_reconciliation_tests.rs#workflow_mcp_unknown_note_through_the_production_composition",
+        "name": "workflow_mcp_unknown_note_through_the_production_composition",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/mcp_reconciliation_tests.rs",
+        "span": "L172-L221"
+      },
+      "path": "src/adapters/persistence/workflow/mcp_reconciliation_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 198,
+          "text": "subject: intent.approval_subject(),"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 7934
+  }
+}

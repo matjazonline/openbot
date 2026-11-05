@@ -1,0 +1,123 @@
+{
+  "file": "src/adapters/persistence/delivery/queue.rs",
+  "entries": [
+    {
+      "name": "enqueue_standalone_delivery",
+      "kind": "function",
+      "span": "L49-L57",
+      "signature": "async fn enqueue_standalone_delivery("
+    },
+    {
+      "name": "claim_deliveries",
+      "kind": "function",
+      "span": "L62-L144",
+      "signature": "async fn claim_deliveries("
+    },
+    {
+      "name": "renew_delivery_leases",
+      "kind": "function",
+      "span": "L146-L193",
+      "signature": "async fn renew_delivery_leases("
+    },
+    {
+      "name": "begin_part",
+      "kind": "function",
+      "span": "L195-L272",
+      "signature": "async fn begin_part("
+    },
+    {
+      "name": "complete_part",
+      "kind": "function",
+      "span": "L274-L338",
+      "signature": "async fn complete_part(&self, result: PartResult<'_>) -> AppResult<DeliveryOutcome>"
+    },
+    {
+      "name": "fail_delivery",
+      "kind": "function",
+      "span": "L340-L401",
+      "signature": "async fn fail_delivery(&self, failure: DeliveryFailure<'_>) -> AppResult<DeliveryOutcome>"
+    },
+    {
+      "name": "release_delivery",
+      "kind": "function",
+      "span": "L403-L454",
+      "signature": "async fn release_delivery("
+    },
+    {
+      "name": "census_stuck_deliveries",
+      "kind": "function",
+      "span": "L456-L486",
+      "signature": "async fn census_stuck_deliveries("
+    },
+    {
+      "name": "reap_expired_deliveries",
+      "kind": "function",
+      "span": "L488-L497",
+      "signature": "async fn reap_expired_deliveries(&self) -> AppResult<DeliveryReaping>"
+    },
+    {
+      "name": "aggregate_parent_on",
+      "kind": "function",
+      "span": "L507-L548",
+      "signature": "async fn aggregate_parent_on("
+    },
+    {
+      "name": "retry_parent_on",
+      "kind": "function",
+      "span": "L555-L609",
+      "signature": "async fn retry_parent_on("
+    },
+    {
+      "name": "settle_parent_on",
+      "kind": "function",
+      "span": "L612-L649",
+      "signature": "async fn settle_parent_on("
+    },
+    {
+      "name": "reap_expired_leases_on",
+      "kind": "function",
+      "span": "L657-L740",
+      "signature": "async fn reap_expired_leases_on(tx: &mut Transaction<'_, Postgres>) -> AppResult<u64>"
+    },
+    {
+      "name": "expire_reopened_part_on",
+      "kind": "function",
+      "span": "L744-L789",
+      "signature": "async fn expire_reopened_part_on("
+    },
+    {
+      "name": "orphan_stuck_dependents_on",
+      "kind": "function",
+      "span": "L798-L825",
+      "signature": "async fn orphan_stuck_dependents_on(tx: &mut Transaction<'_, Postgres>) -> AppResult<u64>"
+    },
+    {
+      "name": "own_fence_sql",
+      "kind": "function",
+      "span": "L836-L842",
+      "signature": "fn own_fence_sql() -> String"
+    },
+    {
+      "name": "live_fence_sql",
+      "kind": "function",
+      "span": "L848-L853",
+      "signature": "fn live_fence_sql() -> String"
+    },
+    {
+      "name": "own_row_fence_sql",
+      "kind": "function",
+      "span": "L861-L866",
+      "signature": "pub(super) fn own_row_fence_sql() -> String"
+    },
+    {
+      "name": "sql_part_list",
+      "kind": "function",
+      "span": "L868-L874",
+      "signature": "fn sql_part_list(statuses: &[DeliveryPartStatus]) -> String"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 39402
+  }
+}

@@ -1,0 +1,129 @@
+{
+  "file": "src/adapters/persistence/workflow/waits.rs",
+  "entries": [
+    {
+      "name": "WaitRun",
+      "kind": "struct",
+      "span": "L8-L13",
+      "signature": "pub(super) struct WaitRun"
+    },
+    {
+      "name": "WaitRow",
+      "kind": "struct",
+      "span": "L15-L23",
+      "signature": "pub(super) struct WaitRow"
+    },
+    {
+      "name": "park_wait",
+      "kind": "function",
+      "span": "L26-L35",
+      "signature": "async fn park_wait(&self, scope: ActivationRequest) -> AppResult<Option<ParkedWorkflow>>"
+    },
+    {
+      "name": "record_event",
+      "kind": "function",
+      "span": "L36-L49",
+      "signature": "async fn record_event(&self, event: WorkflowEvent) -> AppResult<EventIngress>"
+    },
+    {
+      "name": "deliver_reply",
+      "kind": "function",
+      "span": "L50-L52",
+      "signature": "async fn deliver_reply(&self, delivery: IngressReply) -> AppResult<ReplyIngress>"
+    },
+    {
+      "name": "resume_wait",
+      "kind": "function",
+      "span": "L53-L62",
+      "signature": "async fn resume_wait(&self, scope: ActivationRequest) -> AppResult<WaitProgress>"
+    },
+    {
+      "name": "sweep_waits",
+      "kind": "function",
+      "span": "L63-L91",
+      "signature": "async fn sweep_waits(&self, limit: u16) -> AppResult<u16>"
+    },
+    {
+      "name": "consume_message_receipts",
+      "kind": "function",
+      "span": "L92-L98",
+      "signature": "async fn consume_message_receipts("
+    },
+    {
+      "name": "lock",
+      "kind": "function",
+      "span": "L101-L125",
+      "signature": "pub(super) async fn lock("
+    },
+    {
+      "name": "WaitSelection",
+      "kind": "enum",
+      "span": "L126-L129",
+      "signature": "pub(super) enum WaitSelection"
+    },
+    {
+      "name": "row",
+      "kind": "function",
+      "span": "L130-L144",
+      "signature": "pub(super) async fn row("
+    },
+    {
+      "name": "now",
+      "kind": "function",
+      "span": "L145-L149",
+      "signature": "pub(super) async fn now(db: &mut PgConnection) -> AppResult<DateTime<Utc>>"
+    },
+    {
+      "name": "audit_wait",
+      "kind": "function",
+      "span": "L151-L160",
+      "signature": "pub(super) async fn audit_wait("
+    },
+    {
+      "name": "audit",
+      "kind": "function",
+      "span": "L161-L169",
+      "signature": "pub(super) async fn audit("
+    },
+    {
+      "name": "park_on",
+      "kind": "function",
+      "span": "L170-L237",
+      "signature": "async fn park_on("
+    },
+    {
+      "name": "record_event_on",
+      "kind": "function",
+      "span": "L241-L312",
+      "signature": "async fn record_event_on(db: &mut PgConnection, event: WorkflowEvent) -> AppResult<EventIngress>"
+    },
+    {
+      "name": "SweepCandidate",
+      "kind": "struct",
+      "span": "L315-L320",
+      "signature": "struct SweepCandidate"
+    },
+    {
+      "name": "SavedEvent",
+      "kind": "struct",
+      "span": "L322-L327",
+      "signature": "struct SavedEvent"
+    },
+    {
+      "name": "select_due",
+      "kind": "function",
+      "span": "L329-L336",
+      "signature": "async fn select_due(pool: &sqlx::PgPool, limit: u16) -> AppResult<Vec<SweepCandidate>>"
+    },
+    {
+      "name": "is_wait",
+      "kind": "function",
+      "span": "L338-L363",
+      "signature": "async fn is_wait("
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 17023
+  }
+}

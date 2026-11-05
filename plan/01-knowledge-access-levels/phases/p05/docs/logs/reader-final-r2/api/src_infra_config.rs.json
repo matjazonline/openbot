@@ -1,0 +1,327 @@
+{
+  "file": "src/infra/config.rs",
+  "entries": [
+    {
+      "name": "DEFAULT_RUNTIME_THREAD_STACK_BYTES",
+      "kind": "constant",
+      "span": "L21-L21",
+      "signature": "pub const DEFAULT_RUNTIME_THREAD_STACK_BYTES: usize = 16 * 1024 * 1024;"
+    },
+    {
+      "name": "MIN_RUNTIME_THREAD_STACK_BYTES",
+      "kind": "constant",
+      "span": "L23-L23",
+      "signature": "pub const MIN_RUNTIME_THREAD_STACK_BYTES: usize = 2 * 1024 * 1024;"
+    },
+    {
+      "name": "MAX_RUNTIME_THREAD_STACK_BYTES",
+      "kind": "constant",
+      "span": "L24-L24",
+      "signature": "pub const MAX_RUNTIME_THREAD_STACK_BYTES: usize = 256 * 1024 * 1024;"
+    },
+    {
+      "name": "runtime_thread_stack_bytes_from_env",
+      "kind": "function",
+      "span": "L27-L29",
+      "signature": "pub fn runtime_thread_stack_bytes_from_env() -> usize"
+    },
+    {
+      "name": "parse_runtime_thread_stack_bytes",
+      "kind": "function",
+      "span": "L31-L43",
+      "signature": "fn parse_runtime_thread_stack_bytes(value: Option<&str>) -> usize"
+    },
+    {
+      "name": "smtp_allow_plaintext_local_from_env",
+      "kind": "function",
+      "span": "L45-L47",
+      "signature": "pub fn smtp_allow_plaintext_local_from_env() -> bool"
+    },
+    {
+      "name": "allow_unverified_email_without_smtp_from_env",
+      "kind": "function",
+      "span": "L51-L57",
+      "signature": "pub fn allow_unverified_email_without_smtp_from_env() -> bool"
+    },
+    {
+      "name": "parse_allow_unverified_email_without_smtp",
+      "kind": "function",
+      "span": "L59-L64",
+      "signature": "fn parse_allow_unverified_email_without_smtp(value: Option<&str>) -> bool"
+    },
+    {
+      "name": "parse_smtp_allow_plaintext_local",
+      "kind": "function",
+      "span": "L66-L71",
+      "signature": "fn parse_smtp_allow_plaintext_local(value: Option<&str>) -> bool"
+    },
+    {
+      "name": "AppConfig",
+      "kind": "struct",
+      "span": "L73-L116",
+      "signature": "pub struct AppConfig"
+    },
+    {
+      "name": "parse_auth_attempt_secret",
+      "kind": "function",
+      "span": "L118-L132",
+      "signature": "fn parse_auth_attempt_secret("
+    },
+    {
+      "name": "parse_positive_seconds",
+      "kind": "function",
+      "span": "L134-L140",
+      "signature": "fn parse_positive_seconds(name: &str, value: String) -> StdDuration"
+    },
+    {
+      "name": "SendGridInboundConfig",
+      "kind": "struct",
+      "span": "L142-L145",
+      "signature": "pub struct SendGridInboundConfig"
+    },
+    {
+      "name": "MAX_RESEND_API_RETRY_AFTER_SECS",
+      "kind": "constant",
+      "span": "L149-L149",
+      "signature": "pub const MAX_RESEND_API_RETRY_AFTER_SECS: u64 = 900;"
+    },
+    {
+      "name": "DEFAULT_RESEND_API_BASE_URL",
+      "kind": "constant",
+      "span": "L150-L150",
+      "signature": "pub const DEFAULT_RESEND_API_BASE_URL: &str = \"https://api.resend.com\";"
+    },
+    {
+      "name": "DEFAULT_RESEND_API_REQUEST_TIMEOUT_SECS",
+      "kind": "constant",
+      "span": "L151-L151",
+      "signature": "pub const DEFAULT_RESEND_API_REQUEST_TIMEOUT_SECS: u64 = 30;"
+    },
+    {
+      "name": "MAX_RESEND_API_REQUEST_TIMEOUT_SECS",
+      "kind": "constant",
+      "span": "L152-L152",
+      "signature": "pub const MAX_RESEND_API_REQUEST_TIMEOUT_SECS: u64 = 120;"
+    },
+    {
+      "name": "DEFAULT_RESEND_API_WEBHOOK_MAX_AGE_SECS",
+      "kind": "constant",
+      "span": "L153-L153",
+      "signature": "pub const DEFAULT_RESEND_API_WEBHOOK_MAX_AGE_SECS: u64 = 300;"
+    },
+    {
+      "name": "ResendApiConfig",
+      "kind": "struct",
+      "span": "L166-L170",
+      "signature": "pub struct ResendApiConfig"
+    },
+    {
+      "name": "default",
+      "kind": "function",
+      "span": "L173-L179",
+      "signature": "fn default() -> Self"
+    },
+    {
+      "name": "from_env",
+      "kind": "function",
+      "span": "L183-L189",
+      "signature": "fn from_env() -> Self"
+    },
+    {
+      "name": "from_values",
+      "kind": "function",
+      "span": "L193-L229",
+      "signature": "fn from_values("
+    },
+    {
+      "name": "GoogleOAuthConfig",
+      "kind": "struct",
+      "span": "L233-L236",
+      "signature": "pub struct GoogleOAuthConfig"
+    },
+    {
+      "name": "AppleOAuthConfig",
+      "kind": "struct",
+      "span": "L239-L244",
+      "signature": "pub struct AppleOAuthConfig"
+    },
+    {
+      "name": "from_env",
+      "kind": "function",
+      "span": "L247-L268",
+      "signature": "pub fn from_env() -> Option<Self>"
+    },
+    {
+      "name": "from_env",
+      "kind": "function",
+      "span": "L274-L288",
+      "signature": "pub fn from_env() -> Option<Self>"
+    },
+    {
+      "name": "GcsConfig",
+      "kind": "struct",
+      "span": "L297-L313",
+      "signature": "pub struct GcsConfig"
+    },
+    {
+      "name": "from_env",
+      "kind": "function",
+      "span": "L321-L351",
+      "signature": "fn from_env(app_domain_name: &str) -> Option<Self>"
+    },
+    {
+      "name": "public_base_url",
+      "kind": "function",
+      "span": "L354-L361",
+      "signature": "pub fn public_base_url(&self) -> String"
+    },
+    {
+      "name": "default_attachments_folder",
+      "kind": "function",
+      "span": "L364-L366",
+      "signature": "fn default_attachments_folder(app_domain_name: &str) -> String"
+    },
+    {
+      "name": "is_loopback_host",
+      "kind": "function",
+      "span": "L369-L376",
+      "signature": "pub fn is_loopback_host(host: &str) -> bool"
+    },
+    {
+      "name": "is_local_domain",
+      "kind": "function",
+      "span": "L378-L386",
+      "signature": "fn is_local_domain(domain: &str) -> bool"
+    },
+    {
+      "name": "non_empty_var",
+      "kind": "function",
+      "span": "L392-L397",
+      "signature": "fn non_empty_var(name: &str) -> Option<String>"
+    },
+    {
+      "name": "public_base_url",
+      "kind": "function",
+      "span": "L409-L417",
+      "signature": "pub fn public_base_url(&self) -> String"
+    },
+    {
+      "name": "is_operator",
+      "kind": "function",
+      "span": "L420-L427",
+      "signature": "pub fn is_operator(&self, user: &User) -> bool"
+    },
+    {
+      "name": "from_env",
+      "kind": "function",
+      "span": "L429-L612",
+      "signature": "pub fn from_env() -> Self"
+    },
+    {
+      "name": "spam_scanner_settings",
+      "kind": "function",
+      "span": "L614-L631",
+      "signature": "pub fn spam_scanner_settings(&self) -> crate::adapters::spam_scanner::SpamScannerSettings"
+    },
+    {
+      "name": "thread_settings",
+      "kind": "function",
+      "span": "L633-L638",
+      "signature": "pub fn thread_settings(&self) -> std::sync::Arc<crate::application::settings::ThreadSettings>"
+    },
+    {
+      "name": "notification_settings",
+      "kind": "function",
+      "span": "L639-L644",
+      "signature": "pub fn notification_settings(&self) -> crate::application::settings::NotificationMailSettings"
+    },
+    {
+      "name": "spam_scanning",
+      "kind": "function",
+      "span": "L645-L651",
+      "signature": "pub fn spam_scanning(&self) -> crate::use_cases::agent::SpamScanning"
+    },
+    {
+      "name": "is_spam_scan_enabled",
+      "kind": "function",
+      "span": "L653-L655",
+      "signature": "pub fn is_spam_scan_enabled(&self) -> bool"
+    },
+    {
+      "name": "for_test",
+      "kind": "function",
+      "span": "L664-L695",
+      "signature": "pub fn for_test() -> Self"
+    },
+    {
+      "name": "tests",
+      "kind": "module",
+      "span": "L699-L791",
+      "signature": "mod tests"
+    },
+    {
+      "name": "TEST_SECRET",
+      "kind": "constant",
+      "span": "L703-L703",
+      "signature": "const TEST_SECRET: &str = \"a-test-secret-long-enough-to-sign-with-01\";"
+    },
+    {
+      "name": "runtime_thread_stack_is_bounded_and_defaults_to_sixteen_mebibytes",
+      "kind": "function",
+      "span": "L706-L712",
+      "signature": "fn runtime_thread_stack_is_bounded_and_defaults_to_sixteen_mebibytes()"
+    },
+    {
+      "name": "runtime_thread_stack_below_the_tokio_default_is_rejected",
+      "kind": "function",
+      "span": "L716-L718",
+      "signature": "fn runtime_thread_stack_below_the_tokio_default_is_rejected()"
+    },
+    {
+      "name": "smtp_plaintext_local_is_an_explicit_opt_in",
+      "kind": "function",
+      "span": "L721-L724",
+      "signature": "fn smtp_plaintext_local_is_an_explicit_opt_in()"
+    },
+    {
+      "name": "security_email_identity_smtp_bypass_is_explicit_and_strict",
+      "kind": "function",
+      "span": "L727-L731",
+      "signature": "fn security_email_identity_smtp_bypass_is_explicit_and_strict()"
+    },
+    {
+      "name": "security_email_identity_smtp_bypass_rejects_invalid_value",
+      "kind": "function",
+      "span": "L735-L737",
+      "signature": "fn security_email_identity_smtp_bypass_rejects_invalid_value()"
+    },
+    {
+      "name": "attachments_are_namespaced_by_application_domain_by_default",
+      "kind": "function",
+      "span": "L740-L745",
+      "signature": "fn attachments_are_namespaced_by_application_domain_by_default()"
+    },
+    {
+      "name": "auth_attempt_secret_is_required_strong_and_independent",
+      "kind": "function",
+      "span": "L748-L759",
+      "signature": "fn auth_attempt_secret_is_required_strong_and_independent()"
+    },
+    {
+      "name": "test_app_config_from_env",
+      "kind": "function",
+      "span": "L762-L777",
+      "signature": "fn test_app_config_from_env()"
+    },
+    {
+      "name": "a_developer_machine_gets_cookies_it_can_send",
+      "kind": "function",
+      "span": "L780-L790",
+      "signature": "fn a_developer_machine_gets_cookies_it_can_send()"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 31735
+  }
+}

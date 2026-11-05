@@ -1,0 +1,45 @@
+{
+  "file": "src/adapters/persistence/workflow/action_reconciliation_retained_truth_assertions.rs",
+  "entries": [
+    {
+      "name": "TruthChange",
+      "kind": "struct",
+      "span": "L4-L9",
+      "signature": "pub(super) struct TruthChange<'a>"
+    },
+    {
+      "name": "command_scope",
+      "kind": "function",
+      "span": "L11-L26",
+      "signature": "fn command_scope(row: &Value, command: &ReconcileActionCommand)"
+    },
+    {
+      "name": "evidence_and_coverage",
+      "kind": "function",
+      "span": "L28-L81",
+      "signature": "fn evidence_and_coverage<'a>("
+    },
+    {
+      "name": "command_and_audit",
+      "kind": "function",
+      "span": "L83-L111",
+      "signature": "fn command_and_audit("
+    },
+    {
+      "name": "receipt_and_conflict",
+      "kind": "function",
+      "span": "L113-L146",
+      "signature": "fn receipt_and_conflict("
+    },
+    {
+      "name": "truth_boundary",
+      "kind": "function",
+      "span": "L148-L184",
+      "signature": "pub(super) fn truth_boundary("
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 6626
+  }
+}

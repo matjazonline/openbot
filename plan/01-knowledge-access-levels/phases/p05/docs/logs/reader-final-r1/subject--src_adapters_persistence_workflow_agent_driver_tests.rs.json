@@ -1,0 +1,32 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 1,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/agent_driver_tests.rs#workflow_agent_run_token_pause_resumes_with_the_saved_request",
+        "name": "workflow_agent_run_token_pause_resumes_with_the_saved_request",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/agent_driver_tests.rs",
+        "span": "L65-L102"
+      },
+      "path": "src/adapters/persistence/workflow/agent_driver_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 92,
+          "text": "let same: bool = sqlx::query_scalar(\"SELECT EXISTS(SELECT 1 FROM workflow_decisions AS decision JOIN model_usage_calls AS usage ON usage.request_id=decision.tok"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 10737
+  }
+}

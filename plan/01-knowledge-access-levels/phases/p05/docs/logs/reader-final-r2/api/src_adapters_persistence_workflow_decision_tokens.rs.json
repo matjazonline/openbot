@@ -1,0 +1,57 @@
+{
+  "file": "src/adapters/persistence/workflow/decision_tokens.rs",
+  "entries": [
+    {
+      "name": "TokenSubject",
+      "kind": "enum",
+      "span": "L6-L9",
+      "signature": "pub(in crate::adapters::persistence::workflow) enum TokenSubject<'a>"
+    },
+    {
+      "name": "TokenPause",
+      "kind": "struct",
+      "span": "L10-L15",
+      "signature": "pub(in crate::adapters::persistence::workflow) struct TokenPause<'a>"
+    },
+    {
+      "name": "TokenParked",
+      "kind": "struct",
+      "span": "L16-L19",
+      "signature": "pub(in crate::adapters::persistence::workflow) struct TokenParked"
+    },
+    {
+      "name": "Head",
+      "kind": "struct",
+      "span": "L22-L27",
+      "signature": "struct Head"
+    },
+    {
+      "name": "park",
+      "kind": "function",
+      "span": "L29-L95",
+      "signature": "pub(in crate::adapters::persistence::workflow) async fn park("
+    },
+    {
+      "name": "approved_request",
+      "kind": "function",
+      "span": "L97-L112",
+      "signature": "pub(in crate::adapters::persistence::workflow) async fn approved_request("
+    },
+    {
+      "name": "submit",
+      "kind": "function",
+      "span": "L114-L151",
+      "signature": "pub(super) async fn submit("
+    },
+    {
+      "name": "fail",
+      "kind": "function",
+      "span": "L153-L169",
+      "signature": "pub(in crate::adapters::persistence::workflow) async fn fail("
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 8551
+  }
+}

@@ -1,0 +1,201 @@
+{
+  "file": "src/adapters/persistence/participant.rs",
+  "entries": [
+    {
+      "name": "PrincipalDb",
+      "kind": "struct",
+      "span": "L33-L42",
+      "signature": "struct PrincipalDb"
+    },
+    {
+      "name": "Error",
+      "kind": "type",
+      "span": "L45-L45",
+      "signature": "type Error = AppError;"
+    },
+    {
+      "name": "try_from",
+      "kind": "function",
+      "span": "L47-L60",
+      "signature": "fn try_from(row: PrincipalDb) -> AppResult<Self>"
+    },
+    {
+      "name": "IdentityDb",
+      "kind": "struct",
+      "span": "L64-L77",
+      "signature": "struct IdentityDb"
+    },
+    {
+      "name": "Error",
+      "kind": "type",
+      "span": "L80-L80",
+      "signature": "type Error = AppError;"
+    },
+    {
+      "name": "try_from",
+      "kind": "function",
+      "span": "L82-L136",
+      "signature": "fn try_from(row: IdentityDb) -> AppResult<Self>"
+    },
+    {
+      "name": "PRINCIPAL_SELECT",
+      "kind": "constant",
+      "span": "L139-L142",
+      "signature": "const PRINCIPAL_SELECT: &str = r#\""
+    },
+    {
+      "name": "IDENTITY_SELECT",
+      "kind": "constant",
+      "span": "L144-L148",
+      "signature": "const IDENTITY_SELECT: &str = r#\""
+    },
+    {
+      "name": "checked_label",
+      "kind": "function",
+      "span": "L150-L160",
+      "signature": "fn checked_label(label: Option<String>, fallback: &str) -> AppResult<String>"
+    },
+    {
+      "name": "load_resolution",
+      "kind": "function",
+      "span": "L162-L192",
+      "signature": "async fn load_resolution("
+    },
+    {
+      "name": "lock_identity_key",
+      "kind": "function",
+      "span": "L196-L213",
+      "signature": "pub(super) async fn lock_identity_key("
+    },
+    {
+      "name": "account_email_identity",
+      "kind": "function",
+      "span": "L216-L220",
+      "signature": "pub(super) fn account_email_identity(email: &str) -> AppResult<QualifiedIdentity>"
+    },
+    {
+      "name": "upsert_account_identity_on",
+      "kind": "function",
+      "span": "L227-L268",
+      "signature": "pub(super) async fn upsert_account_identity_on("
+    },
+    {
+      "name": "resolve_or_create_external_identity_on",
+      "kind": "function",
+      "span": "L270-L322",
+      "signature": "pub(crate) async fn resolve_or_create_external_identity_on("
+    },
+    {
+      "name": "create_person_principal_on",
+      "kind": "function",
+      "span": "L330-L411",
+      "signature": "pub(crate) async fn create_person_principal_on("
+    },
+    {
+      "name": "ensure_system_principal_on",
+      "kind": "function",
+      "span": "L419-L437",
+      "signature": "pub(crate) async fn ensure_system_principal_on("
+    },
+    {
+      "name": "create_agent_principal_on",
+      "kind": "function",
+      "span": "L439-L462",
+      "signature": "pub(crate) async fn create_agent_principal_on("
+    },
+    {
+      "name": "IdentityAccessRow",
+      "kind": "struct",
+      "span": "L465-L470",
+      "signature": "struct IdentityAccessRow"
+    },
+    {
+      "name": "UserAccessRow",
+      "kind": "struct",
+      "span": "L472-L477",
+      "signature": "struct UserAccessRow"
+    },
+    {
+      "name": "reader_level",
+      "kind": "function",
+      "span": "L478-L500",
+      "signature": "pub(super) fn reader_level("
+    },
+    {
+      "name": "resolve_or_create_external_identity",
+      "kind": "function",
+      "span": "L504-L517",
+      "signature": "async fn resolve_or_create_external_identity("
+    },
+    {
+      "name": "membership_from_db",
+      "kind": "function",
+      "span": "L520-L530",
+      "signature": "pub(super) fn membership_from_db(value: Option<&str>) -> AppResult<CompanyMembership>"
+    },
+    {
+      "name": "access_context_for_identity",
+      "kind": "function",
+      "span": "L534-L572",
+      "signature": "async fn access_context_for_identity("
+    },
+    {
+      "name": "access_context_for_user",
+      "kind": "function",
+      "span": "L574-L603",
+      "signature": "async fn access_context_for_user("
+    },
+    {
+      "name": "tests",
+      "kind": "module",
+      "span": "L607-L891",
+      "signature": "mod tests"
+    },
+    {
+      "name": "company",
+      "kind": "function",
+      "span": "L617-L638",
+      "signature": "async fn company(persistence: &PostgresPersistence, label: &str) -> (Uuid, Uuid)"
+    },
+    {
+      "name": "email_identity",
+      "kind": "function",
+      "span": "L640-L644",
+      "signature": "fn email_identity(address: &str) -> QualifiedIdentity"
+    },
+    {
+      "name": "observation",
+      "kind": "function",
+      "span": "L646-L653",
+      "signature": "fn observation(identity: QualifiedIdentity) -> IdentityObservation"
+    },
+    {
+      "name": "the_database_rejects_every_cross_tenant_participant_row",
+      "kind": "function",
+      "span": "L659-L728",
+      "signature": "async fn the_database_rejects_every_cross_tenant_participant_row()"
+    },
+    {
+      "name": "concurrent_observation_of_one_identity_creates_one_principal",
+      "kind": "function",
+      "span": "L733-L781",
+      "signature": "async fn concurrent_observation_of_one_identity_creates_one_principal()"
+    },
+    {
+      "name": "the_same_subject_in_two_namespaces_does_not_collide",
+      "kind": "function",
+      "span": "L786-L811",
+      "signature": "async fn the_same_subject_in_two_namespaces_does_not_collide()"
+    },
+    {
+      "name": "a_profile_email_claim_neither_merges_a_principal_nor_grants_access",
+      "kind": "function",
+      "span": "L816-L890",
+      "signature": "async fn a_profile_email_claim_neither_merges_a_principal_nor_grants_access()"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 34796
+  }
+}

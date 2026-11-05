@@ -1,0 +1,105 @@
+{
+  "file": "src/domain/entities/message_view.rs",
+  "entries": [
+    {
+      "name": "THREAD_HISTORY_LIMIT",
+      "kind": "constant",
+      "span": "L36-L36",
+      "signature": "pub const THREAD_HISTORY_LIMIT: usize = 200;"
+    },
+    {
+      "name": "AuthorView",
+      "kind": "struct",
+      "span": "L44-L52",
+      "signature": "pub struct AuthorView"
+    },
+    {
+      "name": "display",
+      "kind": "function",
+      "span": "L60-L65",
+      "signature": "pub fn display(&self) -> &str"
+    },
+    {
+      "name": "email_address",
+      "kind": "function",
+      "span": "L68-L73",
+      "signature": "pub fn email_address(&self) -> Option<EmailAddress>"
+    },
+    {
+      "name": "ThreadMessageView",
+      "kind": "struct",
+      "span": "L83-L108",
+      "signature": "pub struct ThreadMessageView"
+    },
+    {
+      "name": "cursor",
+      "kind": "function",
+      "span": "L112-L117",
+      "signature": "pub fn cursor(&self) -> MessageCursor"
+    },
+    {
+      "name": "is_agent",
+      "kind": "function",
+      "span": "L120-L122",
+      "signature": "pub fn is_agent(&self) -> bool"
+    },
+    {
+      "name": "AgentHistoryMessage",
+      "kind": "struct",
+      "span": "L131-L140",
+      "signature": "pub struct AgentHistoryMessage"
+    },
+    {
+      "name": "EmailReplyContext",
+      "kind": "struct",
+      "span": "L148-L158",
+      "signature": "pub struct EmailReplyContext"
+    },
+    {
+      "name": "MessageAuditView",
+      "kind": "struct",
+      "span": "L166-L182",
+      "signature": "pub struct MessageAuditView"
+    },
+    {
+      "name": "ExternalMessageRef",
+      "kind": "struct",
+      "span": "L190-L194",
+      "signature": "pub struct ExternalMessageRef"
+    },
+    {
+      "name": "tests",
+      "kind": "module",
+      "span": "L197-L242",
+      "signature": "mod tests"
+    },
+    {
+      "name": "author",
+      "kind": "function",
+      "span": "L201-L208",
+      "signature": "fn author(label: &str, handle: Option<&str>) -> AuthorView"
+    },
+    {
+      "name": "a_named_principal_is_shown_by_name_not_by_the_handle_it_used",
+      "kind": "function",
+      "span": "L211-L218",
+      "signature": "fn a_named_principal_is_shown_by_name_not_by_the_handle_it_used()"
+    },
+    {
+      "name": "a_handle_on_another_transport_is_not_an_email_address",
+      "kind": "function",
+      "span": "L223-L230",
+      "signature": "fn a_handle_on_another_transport_is_not_an_email_address()"
+    },
+    {
+      "name": "a_blank_label_falls_back_to_the_handle_and_then_to_a_placeholder",
+      "kind": "function",
+      "span": "L235-L241",
+      "signature": "fn a_blank_label_falls_back_to_the_handle_and_then_to_a_placeholder()"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 9993
+  }
+}

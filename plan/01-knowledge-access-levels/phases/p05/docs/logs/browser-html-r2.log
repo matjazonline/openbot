@@ -1,0 +1,22 @@
+TAP version 13
+# Subtest: form feedback and another member’s team autocomplete stay text under production CSP
+ok 1 - form feedback and another member’s team autocomplete stay text under production CSP
+  ---
+  duration_ms: 946.653584
+  type: 'test'
+  ...
+# Subtest: served team autocomplete renders account strings as text and keeps selection working
+ok 2 - served team autocomplete renders account strings as text and keeps selection working
+  ---
+  duration_ms: 516.189917
+  type: 'test'
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 2
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1437.695959

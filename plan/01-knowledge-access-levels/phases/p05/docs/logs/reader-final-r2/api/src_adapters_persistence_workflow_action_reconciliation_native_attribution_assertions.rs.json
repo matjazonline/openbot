@@ -1,0 +1,99 @@
+{
+  "file": "src/adapters/persistence/workflow/action_reconciliation_native_attribution_assertions.rs",
+  "entries": [
+    {
+      "name": "SHAPE",
+      "kind": "constant",
+      "span": "L2-L2",
+      "signature": "const SHAPE: &str = \"workflow_action_applied_request_shape\";"
+    },
+    {
+      "name": "SCOPE",
+      "kind": "constant",
+      "span": "L3-L3",
+      "signature": "const SCOPE: &str = \"workflow_action_applied_request_scope\";"
+    },
+    {
+      "name": "GRAMMAR",
+      "kind": "constant",
+      "span": "L4-L4",
+      "signature": "const GRAMMAR: &str = \"workflow_action_evidence_applied_request_check\";"
+    },
+    {
+      "name": "assert_owners",
+      "kind": "function",
+      "span": "L6-L75",
+      "signature": "pub(super) fn assert_owners(catalog: &[Value], native: &Value)"
+    },
+    {
+      "name": "assert_before_owner",
+      "kind": "function",
+      "span": "L77-L113",
+      "signature": "fn assert_before_owner(native: &Value)"
+    },
+    {
+      "name": "production",
+      "kind": "function",
+      "span": "L115-L135",
+      "signature": "pub(super) fn production(mut catalog: Value) -> Value"
+    },
+    {
+      "name": "FIXTURES",
+      "kind": "constant",
+      "span": "L116-L120",
+      "signature": "const FIXTURES: [&str; 3] = ["
+    },
+    {
+      "name": "transport",
+      "kind": "function",
+      "span": "L137-L190",
+      "signature": "pub(super) fn transport(error: AppError, cell: Cell) -> Envelope"
+    },
+    {
+      "name": "rejected",
+      "kind": "function",
+      "span": "L191-L231",
+      "signature": "fn rejected(cell: Cell, native: &NativeDiagnostic)"
+    },
+    {
+      "name": "predicates",
+      "kind": "function",
+      "span": "L232-L249",
+      "signature": "fn predicates(cell: Cell, values: &Value)"
+    },
+    {
+      "name": "original",
+      "kind": "function",
+      "span": "L251-L300",
+      "signature": "pub(super) fn original("
+    },
+    {
+      "name": "original_attestation",
+      "kind": "function",
+      "span": "L302-L339",
+      "signature": "fn original_attestation(source: &Source, cell: Cell, row: &Value, before: &Value)"
+    },
+    {
+      "name": "owner_view",
+      "kind": "function",
+      "span": "L341-L349",
+      "signature": "fn owner_view(state: &Value, company: Uuid) -> Value"
+    },
+    {
+      "name": "candidate",
+      "kind": "function",
+      "span": "L350-L402",
+      "signature": "pub(super) fn candidate("
+    },
+    {
+      "name": "foreign_entry",
+      "kind": "function",
+      "span": "L404-L434",
+      "signature": "fn foreign_entry("
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 15925
+  }
+}

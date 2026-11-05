@@ -1,0 +1,36 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 2,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/agent_retire_tests.rs#spoken_agent",
+        "name": "spoken_agent",
+        "kind": "function",
+        "path": "src/adapters/persistence/agent_retire_tests.rs",
+        "span": "L27-L171"
+      },
+      "path": "src/adapters/persistence/agent_retire_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 101,
+          "text": "\"INSERT INTO threads (id, company_id, channel_id, subject) VALUES ($1, $2, $3, 'Help')\","
+        },
+        {
+          "line": 111,
+          "text": "(id, company_id, author_principal_id, subject, clean_text_body, direction, role,"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 11906
+  }
+}

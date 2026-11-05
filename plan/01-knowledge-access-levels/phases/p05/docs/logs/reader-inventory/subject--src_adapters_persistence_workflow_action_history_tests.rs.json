@@ -1,0 +1,261 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 29,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_history_tests.rs#historical",
+        "name": "historical",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_history_tests.rs",
+        "span": "L9-L33"
+      },
+      "path": "src/adapters/persistence/workflow/action_history_tests.rs",
+      "inDegree": 7,
+      "hits": [
+        {
+          "line": 12,
+          "text": ".action_authority(request.scope(), &request.subject)"
+        },
+        {
+          "line": 29,
+          "text": "subject: Some("
+        },
+        {
+          "line": 30,
+          "text": "replay_subject(&action.request().contract, &action.request().target).unwrap(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_history_tests.rs#insert_history",
+        "name": "insert_history",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_history_tests.rs",
+        "span": "L34-L51"
+      },
+      "path": "src/adapters/persistence/workflow/action_history_tests.rs",
+      "inDegree": 7,
+      "hits": [
+        {
+          "line": 40,
+          "text": "Dispatch::insert_subject("
+        },
+        {
+          "line": 46,
+          "text": "evidence.subject,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_history_tests.rs#corrupt",
+        "name": "corrupt",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_history_tests.rs",
+        "span": "L64-L99"
+      },
+      "path": "src/adapters/persistence/workflow/action_history_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 83,
+          "text": "\"null_subject\" => evidence.subject = None,"
+        },
+        {
+          "line": 84,
+          "text": "\"utf8\" => evidence.subject = Some(vec![255]),"
+        },
+        {
+          "line": 85,
+          "text": "\"shape\" => evidence.subject = Some(b\"[]\".to_vec()),"
+        },
+        {
+          "line": 87,
+          "text": "let mut subject: Value ="
+        },
+        {
+          "line": 88,
+          "text": "serde_json::from_slice(evidence.subject.as_ref().unwrap()).unwrap();"
+        },
+        {
+          "line": 89,
+          "text": "subject[\"tool\"][\"contract\"][\"output_schema\"] = json!(false);"
+        },
+        {
+          "line": 90,
+          "text": "let bytes = serde_json::to_vec(&subject).unwrap();"
+        },
+        {
+          "line": 92,
+          "text": "evidence.subject = Some(bytes);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_history_tests.rs#cloned_intent",
+        "name": "cloned_intent",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_history_tests.rs",
+        "span": "L148-L163"
+      },
+      "path": "src/adapters/persistence/workflow/action_history_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 154,
+          "text": "cloned.subject.invocation = ActionInvocationId::new(Uuid::new_v4());"
+        },
+        {
+          "line": 157,
+          "text": "Sha256::digest(cloned.subject.invocation.as_uuid().as_bytes())"
+        },
+        {
+          "line": 160,
+          "text": ".bind(request.subject.invocation.as_uuid()).bind(cloned.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_history_tests.rs#wrong_entry_request",
+        "name": "wrong_entry_request",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_history_tests.rs",
+        "span": "L411-L425"
+      },
+      "path": "src/adapters/persistence/workflow/action_history_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 417,
+          "text": "3 => wrong.subject.invocation = ActionInvocationId::new(Uuid::new_v4()),"
+        },
+        {
+          "line": 418,
+          "text": "4 => wrong.subject.argument_digest = serde_json::from_value(json!(\"0\".repeat(64))).unwrap(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_history_tests.rs#HistoricalEvidence",
+        "name": "HistoricalEvidence",
+        "kind": "struct",
+        "path": "src/adapters/persistence/workflow/action_history_tests.rs",
+        "span": "L5-L8"
+      },
+      "path": "src/adapters/persistence/workflow/action_history_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 7,
+          "text": "subject: Option<Vec<u8>>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_history_tests.rs#workflow_action_history_matrix_shared_predicate_and_actual_rust_retirement",
+        "name": "workflow_action_history_matrix_shared_predicate_and_actual_rust_retirement",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_history_tests.rs",
+        "span": "L102-L146"
+      },
+      "path": "src/adapters/persistence/workflow/action_history_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 122,
+          "text": "\"null_subject\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_history_tests.rs#workflow_action_history_numeric_subject_and_u64_revision_domain",
+        "name": "workflow_action_history_numeric_subject_and_u64_revision_domain",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_history_tests.rs",
+        "span": "L166-L223"
+      },
+      "path": "src/adapters/persistence/workflow/action_history_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 166,
+          "text": "async fn workflow_action_history_numeric_subject_and_u64_revision_domain() {"
+        },
+        {
+          "line": 170,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 192,
+          "text": "let subject = json!({\"tool\":operation[\"contract\"],\"target\":operation[\"target\"]});"
+        },
+        {
+          "line": 198,
+          "text": "replay_subject("
+        },
+        {
+          "line": 204,
+          "text": "serde_json::to_vec(&subject).unwrap()"
+        },
+        {
+          "line": 209,
+          "text": "evidence.subject = Some(bytes);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_history_tests.rs#workflow_action_history_unsafe_sibling_and_129_fact_overflow",
+        "name": "workflow_action_history_unsafe_sibling_and_129_fact_overflow",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_history_tests.rs",
+        "span": "L226-L256"
+      },
+      "path": "src/adapters/persistence/workflow/action_history_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 230,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_history_tests.rs#workflow_action_history_remote_entry_append_only_and_receipt_requires_entry",
+        "name": "workflow_action_history_remote_entry_append_only_and_receipt_requires_entry",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_history_tests.rs",
+        "span": "L474-L518"
+      },
+      "path": "src/adapters/persistence/workflow/action_history_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 505,
+          "text": ".bind(request.scope().execution.as_uuid()).bind(request.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 506,
+          "text": ".bind(request.subject.argument_digest.as_str()).bind(marker).bind(remote_entry).bind(json!({\"written\":true}))"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 22497
+  }
+}

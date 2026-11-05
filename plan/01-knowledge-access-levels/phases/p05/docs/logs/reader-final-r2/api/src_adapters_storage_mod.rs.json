@@ -1,0 +1,63 @@
+{
+  "file": "src/adapters/storage/mod.rs",
+  "entries": [
+    {
+      "name": "gcs",
+      "kind": "module",
+      "span": "L7-L7",
+      "signature": "pub mod gcs;"
+    },
+    {
+      "name": "test_support",
+      "kind": "module",
+      "span": "L9-L9",
+      "signature": "pub mod test_support;"
+    },
+    {
+      "name": "BucketKind",
+      "kind": "enum",
+      "span": "L27-L32",
+      "signature": "pub enum BucketKind"
+    },
+    {
+      "name": "StoredObject",
+      "kind": "struct",
+      "span": "L35-L38",
+      "signature": "pub struct StoredObject"
+    },
+    {
+      "name": "FileStorage",
+      "kind": "interface",
+      "span": "L42-L65",
+      "signature": "pub trait FileStorage: Send + Sync"
+    },
+    {
+      "name": "upload_image",
+      "kind": "function",
+      "span": "L44-L44",
+      "signature": "async fn upload_image(&self, key: &ObjectKey, image: &ImageUpload) -> AppResult<ObjectUrl>;"
+    },
+    {
+      "name": "store_object",
+      "kind": "function",
+      "span": "L47-L53",
+      "signature": "async fn store_object("
+    },
+    {
+      "name": "read_object_bounded",
+      "kind": "function",
+      "span": "L56-L61",
+      "signature": "async fn read_object_bounded("
+    },
+    {
+      "name": "read_object",
+      "kind": "function",
+      "span": "L64-L64",
+      "signature": "async fn read_object(&self, bucket: BucketKind, key: &ObjectKey) -> AppResult<StoredObject>;"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 2224
+  }
+}

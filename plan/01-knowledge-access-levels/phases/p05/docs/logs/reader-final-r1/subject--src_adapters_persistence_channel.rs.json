@@ -1,0 +1,78 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 6,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/channel.rs#CHANNEL_SELECT",
+        "name": "CHANNEL_SELECT",
+        "kind": "constant",
+        "path": "src/adapters/persistence/channel.rs",
+        "span": "L88-L135"
+      },
+      "path": "src/adapters/persistence/channel.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 99,
+          "text": "(SELECT array_agg(identity.subject ORDER BY identity.subject)"
+        },
+        {
+          "line": 110,
+          "text": "(SELECT array_agg(identity.subject ORDER BY identity.subject)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/channel.rs#postgres_channel_persistence_works",
+        "name": "postgres_channel_persistence_works",
+        "kind": "function",
+        "path": "src/adapters/persistence/channel.rs",
+        "span": "L641-L801"
+      },
+      "path": "src/adapters/persistence/channel.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 772,
+          "text": "sqlx::query(\"INSERT INTO threads (id, company_id, channel_id, subject) VALUES ($1,$2,$3,'Retained')\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/channel.rs#a_channel_form_round_trips_its_email_allowlist_through_principal_grants",
+        "name": "a_channel_form_round_trips_its_email_allowlist_through_principal_grants",
+        "kind": "function",
+        "path": "src/adapters/persistence/channel.rs",
+        "span": "L993-L1134"
+      },
+      "path": "src/adapters/persistence/channel.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1068,
+          "text": "let subject: String = sqlx::query_scalar("
+        },
+        {
+          "line": 1069,
+          "text": "r#\"SELECT identity.subject"
+        },
+        {
+          "line": 1080,
+          "text": "assert_eq!(subject, \"dana@partner.test\");"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 42624
+  }
+}

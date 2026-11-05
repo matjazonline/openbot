@@ -1,0 +1,193 @@
+{
+  "pattern": "list_thread_message_views|get_thread_message_view|get_thread_message|latest_email_reply_context|clean_text_body",
+  "filesSearched": 201,
+  "totalHits": 12,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/tests.rs#mailbox_message_draft",
+        "name": "mailbox_message_draft",
+        "kind": "function",
+        "path": "src/adapters/http/pages/tests.rs",
+        "span": "L1861-L1881"
+      },
+      "path": "src/adapters/http/pages/tests.rs",
+      "inDegree": 6,
+      "hits": [
+        {
+          "line": 1872,
+          "text": "clean_text_body: body.to_string(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_knowledge_view_tests.rs#classified",
+        "name": "classified",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui_knowledge_view_tests.rs",
+        "span": "L50-L76"
+      },
+      "path": "src/adapters/http/routes/ui_knowledge_view_tests.rs",
+      "inDegree": 5,
+      "hits": [
+        {
+          "line": 61,
+          "text": "sqlx::query(\"INSERT INTO messages(id,company_id,author_principal_id,subject,clean_text_body,attachments,direction,role,correlation_id,content_hash,audience,acce"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui.rs#thread_message_stream",
+        "name": "thread_message_stream",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui.rs",
+        "span": "L544-L663"
+      },
+      "path": "src/adapters/http/routes/ui.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 599,
+          "text": ".get_thread_messages_after(&viewer, crate::use_cases::thread::ThreadReadScope::new(&channel, thread_id), cursor, STREAM_BATCH_LIMIT)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_attachments.rs#download_attachment",
+        "name": "download_attachment",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui_attachments.rs",
+        "span": "L63-L127"
+      },
+      "path": "src/adapters/http/routes/ui_attachments.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 110,
+          "text": ".get_thread_message_view("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_message_tests.rs#seed",
+        "name": "seed",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui_message_tests.rs",
+        "span": "L325-L341"
+      },
+      "path": "src/adapters/http/routes/ui_message_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 334,
+          "text": "\"INSERT INTO messages(id,company_id,author_principal_id,subject,clean_text_body,direction,role,correlation_id,content_hash,created_at,audience) \\"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/tests.rs#message_pane_puts_the_viewers_messages_on_the_right_and_everyone_else_on_the_left",
+        "name": "message_pane_puts_the_viewers_messages_on_the_right_and_everyone_else_on_the_left",
+        "kind": "function",
+        "path": "src/adapters/http/pages/tests.rs",
+        "span": "L1693-L1767"
+      },
+      "path": "src/adapters/http/pages/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1708,
+          "text": "clean_text_body: \"Plain <b>text</b> body\".to_string(),"
+        },
+        {
+          "line": 1727,
+          "text": "clean_text_body: \"**Answered**\".to_string(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/channel.rs#channel_pages_and_fragments_render_correctly",
+        "name": "channel_pages_and_fragments_render_correctly",
+        "kind": "function",
+        "path": "src/adapters/http/routes/channel.rs",
+        "span": "L839-L1168"
+      },
+      "path": "src/adapters/http/routes/channel.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1016,
+          "text": "clean_text_body: \"Body text\".to_string(),"
+        },
+        {
+          "line": 1035,
+          "text": "clean_text_body: \"### Thread Result\\n\\n- **First** item\\n- Second item\".to_string(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_attachments.rs#message",
+        "name": "message",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui_attachments.rs",
+        "span": "L252-L272"
+      },
+      "path": "src/adapters/http/routes/ui_attachments.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 263,
+          "text": "clean_text_body: \"See attached.\".to_string(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_knowledge_view_tests.rs#knowledge_view_public_reader_has_placeholder_and_restricted_thread_title",
+        "name": "knowledge_view_public_reader_has_placeholder_and_restricted_thread_title",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui_knowledge_view_tests.rs",
+        "span": "L96-L133"
+      },
+      "path": "src/adapters/http/routes/ui_knowledge_view_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 128,
+          "text": ".get_thread_message_view(&viewer, scope(&h, thread), id)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_message.rs#page",
+        "name": "page",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui_message.rs",
+        "span": "L12-L52"
+      },
+      "path": "src/adapters/http/routes/ui_message.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 33,
+          "text": ".get_thread_message_view("
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 7,
+    "baselineChars": 313749
+  }
+}

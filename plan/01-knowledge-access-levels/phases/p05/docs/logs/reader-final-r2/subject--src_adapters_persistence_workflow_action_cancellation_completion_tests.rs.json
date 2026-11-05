@@ -1,0 +1,32 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 1,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_cancellation_completion_tests.rs#receipt_kept",
+        "name": "receipt_kept",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_cancellation_completion_tests.rs",
+        "span": "L63-L77"
+      },
+      "path": "src/adapters/persistence/workflow/action_cancellation_completion_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 73,
+          "text": "json!(request.subject.invocation.as_uuid()),"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 28835
+  }
+}

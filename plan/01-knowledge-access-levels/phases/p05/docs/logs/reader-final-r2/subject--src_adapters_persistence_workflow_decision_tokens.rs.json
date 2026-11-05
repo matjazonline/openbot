@@ -1,0 +1,74 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 5,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/decision_tokens.rs#TokenPause",
+        "name": "TokenPause",
+        "kind": "struct",
+        "path": "src/adapters/persistence/workflow/decision_tokens.rs",
+        "span": "L10-L15"
+      },
+      "path": "src/adapters/persistence/workflow/decision_tokens.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 14,
+          "text": "pub subject: TokenSubject<'a>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/decision_tokens.rs#park",
+        "name": "park",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/decision_tokens.rs",
+        "span": "L29-L95"
+      },
+      "path": "src/adapters/persistence/workflow/decision_tokens.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 64,
+          "text": "let proposal = pause.root.proposal(match &pause.subject {"
+        },
+        {
+          "line": 68,
+          "text": "let (stage, request) = match pause.subject {"
+        },
+        {
+          "line": 83,
+          "text": "sqlx::query(\"INSERT INTO workflow_decisions(company_id,run_id,execution_id,id,wait_id,subject_kind,proposal_digest,job_id,parked_attempt_number,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/decision_tokens.rs#approved_request",
+        "name": "approved_request",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/decision_tokens.rs",
+        "span": "L97-L112"
+      },
+      "path": "src/adapters/persistence/workflow/decision_tokens.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 106,
+          "text": "AND decision.subject_kind='token_allowance' AND decision.choice='approve' AND wait.state='completed'\")"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 8551
+  }
+}

@@ -1,0 +1,111 @@
+{
+  "file": "src/adapters/persistence/workflow/mcp.rs",
+  "entries": [
+    {
+      "name": "publication_owner",
+      "kind": "module",
+      "span": "L19-L19",
+      "signature": "mod publication_owner;"
+    },
+    {
+      "name": "runtime",
+      "kind": "module",
+      "span": "L22-L22",
+      "signature": "mod runtime;"
+    },
+    {
+      "name": "connection_on",
+      "kind": "function",
+      "span": "L26-L37",
+      "signature": "pub(super) async fn connection_on("
+    },
+    {
+      "name": "status_on",
+      "kind": "function",
+      "span": "L39-L66",
+      "signature": "pub(super) async fn status_on("
+    },
+    {
+      "name": "approved",
+      "kind": "function",
+      "span": "L70-L92",
+      "signature": "fn approved("
+    },
+    {
+      "name": "policy_on",
+      "kind": "function",
+      "span": "L95-L115",
+      "signature": "pub(super) async fn policy_on("
+    },
+    {
+      "name": "registered_on",
+      "kind": "function",
+      "span": "L119-L139",
+      "signature": "pub(super) async fn registered_on("
+    },
+    {
+      "name": "mcp_target",
+      "kind": "function",
+      "span": "L141-L149",
+      "signature": "pub(super) fn mcp_target(target: &ActionTarget) -> AppResult<Uuid>"
+    },
+    {
+      "name": "current_on",
+      "kind": "function",
+      "span": "L152-L165",
+      "signature": "pub(super) async fn current_on("
+    },
+    {
+      "name": "McpActionAuthority",
+      "kind": "struct",
+      "span": "L167-L167",
+      "signature": "pub struct McpActionAuthority;"
+    },
+    {
+      "name": "lock_current",
+      "kind": "function",
+      "span": "L170-L183",
+      "signature": "async fn lock_current("
+    },
+    {
+      "name": "edit_on",
+      "kind": "function",
+      "span": "L187-L204",
+      "signature": "async fn edit_on("
+    },
+    {
+      "name": "current_version",
+      "kind": "function",
+      "span": "L205-L213",
+      "signature": "async fn current_version("
+    },
+    {
+      "name": "register_mcp_operation",
+      "kind": "function",
+      "span": "L217-L266",
+      "signature": "async fn register_mcp_operation("
+    },
+    {
+      "name": "revoke_mcp_operation",
+      "kind": "function",
+      "span": "L267-L289",
+      "signature": "async fn revoke_mcp_operation("
+    },
+    {
+      "name": "mcp_use",
+      "kind": "function",
+      "span": "L296-L333",
+      "signature": "async fn mcp_use(&self, request: &ActionRequest) -> AppResult<McpUse>"
+    },
+    {
+      "name": "effect_state",
+      "kind": "function",
+      "span": "L338-L356",
+      "signature": "async fn effect_state("
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 15311
+  }
+}

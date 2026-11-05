@@ -1,0 +1,70 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 4,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_prior_bounds_tests.rs#only_refusal",
+        "name": "only_refusal",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_prior_bounds_tests.rs",
+        "span": "L220-L282"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_prior_bounds_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 259,
+          "text": "(\"invocation_id\", json!(command.subject.invocation.as_uuid())),"
+        },
+        {
+          "line": 262,
+          "text": "json!(command.subject.argument_digest.as_str()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_prior_bounds_tests.rs#scheduled_128",
+        "name": "scheduled_128",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_prior_bounds_tests.rs",
+        "span": "L144-L158"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_prior_bounds_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 152,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_prior_bounds_tests.rs#available",
+        "name": "available",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_prior_bounds_tests.rs",
+        "span": "L114-L126"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_prior_bounds_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 121,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 17280
+  }
+}

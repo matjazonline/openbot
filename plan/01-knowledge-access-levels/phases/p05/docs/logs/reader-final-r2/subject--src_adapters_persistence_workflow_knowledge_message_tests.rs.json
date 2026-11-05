@@ -1,0 +1,32 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 1,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/knowledge_message_tests.rs#knowledge_run_level_verified_member_email_uses_current_member_level",
+        "name": "knowledge_run_level_verified_member_email_uses_current_member_level",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/knowledge_message_tests.rs",
+        "span": "L106-L128"
+      },
+      "path": "src/adapters/persistence/workflow/knowledge_message_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 120,
+          "text": "sqlx::query(\"INSERT INTO participant_identities(id,company_id,principal_id,transport,namespace,subject,status,claim_metadata,provenance) SELECT $1,$2,principal."
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 16590
+  }
+}

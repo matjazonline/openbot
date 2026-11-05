@@ -1,0 +1,99 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 8,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_claim_recovery_tests.rs#subject_attempt",
+        "name": "subject_attempt",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_claim_recovery_tests.rs",
+        "span": "L49-L61"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_claim_recovery_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 49,
+          "text": "fn subject_attempt(state: &Value, s: &Scheduled, ordinal: i32) -> Value {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_claim_recovery_tests.rs#finish_accepted",
+        "name": "finish_accepted",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_claim_recovery_tests.rs",
+        "span": "L107-L156"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_claim_recovery_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 151,
+          "text": "subject_attempt(&after, s, s.request.fence.attempt.0)[\"status\"],"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_claim_recovery_tests.rs#recover_discarded",
+        "name": "recover_discarded",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_claim_recovery_tests.rs",
+        "span": "L206-L277"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_claim_recovery_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 223,
+          "text": "let attempt = subject_attempt(&retired, s, 2);"
+        },
+        {
+          "line": 229,
+          "text": "subject_attempt(&charged, s, 1),"
+        },
+        {
+          "line": 230,
+          "text": "subject_attempt(&retired, s, 1)"
+        },
+        {
+          "line": 254,
+          "text": "subject_attempt(&retired, s, 2),"
+        },
+        {
+          "line": 255,
+          "text": "subject_attempt(&recovered, s, 2)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_claim_recovery_tests.rs#workflow_action_reconciliation_claim_recovery_lost_response_automatic_saved_retry",
+        "name": "workflow_action_reconciliation_claim_recovery_lost_response_automatic_saved_retry",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_claim_recovery_tests.rs",
+        "span": "L159-L204"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_claim_recovery_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 182,
+          "text": "let lost = subject_attempt(&installed, &s, 2);"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 15797
+  }
+}

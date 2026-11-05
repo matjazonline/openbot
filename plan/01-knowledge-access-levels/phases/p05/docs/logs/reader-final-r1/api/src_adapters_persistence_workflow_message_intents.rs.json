@@ -1,0 +1,105 @@
+{
+  "file": "src/adapters/persistence/workflow/message_intents.rs",
+  "entries": [
+    {
+      "name": "IntentRow",
+      "kind": "struct",
+      "span": "L14-L33",
+      "signature": "struct IntentRow"
+    },
+    {
+      "name": "claimed",
+      "kind": "function",
+      "span": "L36-L67",
+      "signature": "fn claimed(self, worker: MessageIntentWorkerId) -> AppResult<ClaimedIntent>"
+    },
+    {
+      "name": "CandidateRow",
+      "kind": "struct",
+      "span": "L71-L76",
+      "signature": "struct CandidateRow"
+    },
+    {
+      "name": "candidate",
+      "kind": "function",
+      "span": "L79-L89",
+      "signature": "fn candidate(self) -> AppResult<CandidateBinding>"
+    },
+    {
+      "name": "CANDIDATES",
+      "kind": "constant",
+      "span": "L93-L107",
+      "signature": "const CANDIDATES: &str = \"SELECT binding.id, binding.configuration_revision, \\"
+    },
+    {
+      "name": "FENCE",
+      "kind": "constant",
+      "span": "L110-L112",
+      "signature": "const FENCE: &str = \"SELECT id FROM workflow_message_intents WHERE company_id = $1 AND id = $2 \\"
+    },
+    {
+      "name": "fail_expired_intents",
+      "kind": "function",
+      "span": "L116-L144",
+      "signature": "async fn fail_expired_intents(&self, page: u16) -> AppResult<Vec<FailedIntent>>"
+    },
+    {
+      "name": "claim_intents",
+      "kind": "function",
+      "span": "L146-L200",
+      "signature": "async fn claim_intents("
+    },
+    {
+      "name": "candidate_bindings",
+      "kind": "function",
+      "span": "L202-L212",
+      "signature": "async fn candidate_bindings(&self, intent: &ClaimedIntent) -> AppResult<Vec<CandidateBinding>>"
+    },
+    {
+      "name": "candidate_binding",
+      "kind": "function",
+      "span": "L214-L227",
+      "signature": "async fn candidate_binding("
+    },
+    {
+      "name": "trigger_input",
+      "kind": "function",
+      "span": "L229-L252",
+      "signature": "async fn trigger_input(&self, intent: &ClaimedIntent) -> AppResult<MessageTriggerInput>"
+    },
+    {
+      "name": "record_binding_outcome",
+      "kind": "function",
+      "span": "L254-L289",
+      "signature": "async fn record_binding_outcome("
+    },
+    {
+      "name": "settle_reply",
+      "kind": "function",
+      "span": "L291-L305",
+      "signature": "async fn settle_reply(&self, claim: IntentClaim) -> AppResult<bool>"
+    },
+    {
+      "name": "finish_intent",
+      "kind": "function",
+      "span": "L307-L327",
+      "signature": "async fn finish_intent(&self, claim: IntentClaim, matched: Option<RunId>) -> AppResult<bool>"
+    },
+    {
+      "name": "defer_intent",
+      "kind": "function",
+      "span": "L329-L368",
+      "signature": "async fn defer_intent(&self, claim: IntentClaim, deferral: IntentDeferral) -> AppResult<bool>"
+    },
+    {
+      "name": "fence_holds",
+      "kind": "function",
+      "span": "L371-L383",
+      "signature": "async fn fence_holds(pool: &sqlx::PgPool, claim: IntentClaim) -> AppResult<bool>"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 17752
+  }
+}

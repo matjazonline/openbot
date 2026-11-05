@@ -1,0 +1,36 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 2,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/jev_assets_tests.rs#attachment",
+        "name": "attachment",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/jev_assets_tests.rs",
+        "span": "L25-L57"
+      },
+      "path": "src/adapters/persistence/workflow/jev_assets_tests.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 42,
+          "text": "sqlx::query(\"INSERT INTO threads(id,company_id,channel_id,subject) VALUES($1,$2,$3,'Images')\")"
+        },
+        {
+          "line": 50,
+          "text": "sqlx::query(\"INSERT INTO messages(id,company_id,author_principal_id,subject,clean_text_body,direction,role,correlation_id,content_hash,attachments,audience) SEL"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 10022
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "pattern": "RunViews",
+  "filesSearched": 1128,
+  "totalHits": 4,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/infra/workflow/services.rs#run_views",
+        "name": "run_views",
+        "kind": "function",
+        "path": "src/infra/workflow/services.rs",
+        "span": "L53-L55"
+      },
+      "path": "src/infra/workflow/services.rs",
+      "inDegree": 5,
+      "hits": [
+        {
+          "line": 53,
+          "text": "pub fn run_views(&self) -> &dyn crate::application::workflow::run_views::RunViews {"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/jev_end_to_end_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 7,
+          "text": "decisions::*, lease::*, polling::*, reads::WorkflowReads, run_views::RunViews, worker::*,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/run_views.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 420,
+          "text": "impl RunViews for PostgresPersistence {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/run_views.rs#RunViews",
+        "name": "RunViews",
+        "kind": "interface",
+        "path": "src/application/workflow/run_views.rs",
+        "span": "L159-L179"
+      },
+      "path": "src/application/workflow/run_views.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 159,
+          "text": "pub trait RunViews: Send + Sync {"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 4,
+    "baselineChars": 42161
+  }
+}

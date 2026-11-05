@@ -1,0 +1,32 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 1,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/knowledge_history_race_tests.rs#request",
+        "name": "request",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/knowledge_history_race_tests.rs",
+        "span": "L43-L71"
+      },
+      "path": "src/adapters/persistence/workflow/knowledge_history_race_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 63,
+          "text": "arguments: json!({\"content\":{\"subject\":\"Racing branch\",\"body\":body},\"destinations\":[{\"kind\":kind,\"id\":destination.to_string()}]}),"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 6083
+  }
+}

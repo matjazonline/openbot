@@ -1,0 +1,74 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 5,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_sibling_tests.rs#scoped_marker",
+        "name": "scoped_marker",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_sibling_tests.rs",
+        "span": "L74-L80"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_sibling_tests.rs",
+      "inDegree": 23,
+      "hits": [
+        {
+          "line": 76,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_sibling_tests.rs#sibling",
+        "name": "sibling",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_sibling_tests.rs",
+        "span": "L37-L72"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_sibling_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 44,
+          "text": ".action_authority(original.scope(), &original.subject)"
+        },
+        {
+          "line": 56,
+          "text": ".action_authority(original.scope(), &intent.approval_subject())"
+        },
+        {
+          "line": 69,
+          "text": "subject: intent.approval_subject(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_sibling_tests.rs#workflow_action_reconciliation_siblings_later_valid_result_resolves_positive_truth",
+        "name": "workflow_action_reconciliation_siblings_later_valid_result_resolves_positive_truth",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_sibling_tests.rs",
+        "span": "L329-L363"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_sibling_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 341,
+          "text": ".bind(requests[1].subject.invocation.as_uuid()).execute(f.persistence().pool()).await.unwrap();"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 11622
+  }
+}

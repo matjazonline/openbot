@@ -1,0 +1,219 @@
+{
+  "file": "src/adapters/storage/gcs.rs",
+  "entries": [
+    {
+      "name": "SCOPE",
+      "kind": "constant",
+      "span": "L34-L34",
+      "signature": "const SCOPE: &str = \"https://www.googleapis.com/auth/devstorage.read_write\";"
+    },
+    {
+      "name": "ASSERTION_TTL_SECS",
+      "kind": "constant",
+      "span": "L37-L37",
+      "signature": "const ASSERTION_TTL_SECS: i64 = 3600;"
+    },
+    {
+      "name": "EXPIRY_SKEW_SECS",
+      "kind": "constant",
+      "span": "L41-L41",
+      "signature": "const EXPIRY_SKEW_SECS: i64 = 60;"
+    },
+    {
+      "name": "REQUEST_TIMEOUT",
+      "kind": "constant",
+      "span": "L45-L45",
+      "signature": "const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);"
+    },
+    {
+      "name": "OBJECT_CACHE_CONTROL",
+      "kind": "constant",
+      "span": "L48-L48",
+      "signature": "const OBJECT_CACHE_CONTROL: &str = \"public, max-age=31536000, immutable\";"
+    },
+    {
+      "name": "ServiceAccountKey",
+      "kind": "struct",
+      "span": "L55-L61",
+      "signature": "struct ServiceAccountKey"
+    },
+    {
+      "name": "default_token_uri",
+      "kind": "function",
+      "span": "L63-L65",
+      "signature": "fn default_token_uri() -> String"
+    },
+    {
+      "name": "Assertion",
+      "kind": "struct",
+      "span": "L69-L75",
+      "signature": "struct Assertion<'a>"
+    },
+    {
+      "name": "TokenResponse",
+      "kind": "struct",
+      "span": "L78-L81",
+      "signature": "struct TokenResponse"
+    },
+    {
+      "name": "AccessToken",
+      "kind": "struct",
+      "span": "L85-L88",
+      "signature": "struct AccessToken"
+    },
+    {
+      "name": "is_usable",
+      "kind": "function",
+      "span": "L91-L93",
+      "signature": "fn is_usable(&self) -> bool"
+    },
+    {
+      "name": "GcsFileStorage",
+      "kind": "struct",
+      "span": "L96-L109",
+      "signature": "pub struct GcsFileStorage"
+    },
+    {
+      "name": "from_config",
+      "kind": "function",
+      "span": "L113-L136",
+      "signature": "pub fn from_config(config: &GcsConfig) -> anyhow::Result<Self>"
+    },
+    {
+      "name": "access_token",
+      "kind": "function",
+      "span": "L139-L160",
+      "signature": "async fn access_token(&self) -> AppResult<String>"
+    },
+    {
+      "name": "mint_access_token",
+      "kind": "function",
+      "span": "L163-L203",
+      "signature": "async fn mint_access_token(&self) -> AppResult<AccessToken>"
+    },
+    {
+      "name": "bucket_for",
+      "kind": "function",
+      "span": "L211-L222",
+      "signature": "fn bucket_for(&self, kind: BucketKind) -> AppResult<&str>"
+    },
+    {
+      "name": "upload",
+      "kind": "function",
+      "span": "L225-L253",
+      "signature": "async fn upload("
+    },
+    {
+      "name": "upload_image",
+      "kind": "function",
+      "span": "L259-L269",
+      "signature": "async fn upload_image(&self, key: &ObjectKey, image: &ImageUpload) -> AppResult<ObjectUrl>"
+    },
+    {
+      "name": "store_object",
+      "kind": "function",
+      "span": "L272-L281",
+      "signature": "async fn store_object("
+    },
+    {
+      "name": "read_object",
+      "kind": "function",
+      "span": "L284-L286",
+      "signature": "async fn read_object(&self, bucket: BucketKind, key: &ObjectKey) -> AppResult<StoredObject>"
+    },
+    {
+      "name": "read_object_bounded",
+      "kind": "function",
+      "span": "L288-L330",
+      "signature": "async fn read_object_bounded("
+    },
+    {
+      "name": "read_bounded_body",
+      "kind": "function",
+      "span": "L333-L362",
+      "signature": "async fn read_bounded_body(response: reqwest::Response, max_bytes: usize) -> AppResult<Vec<u8>>"
+    },
+    {
+      "name": "DEFAULT_CONTENT_TYPE",
+      "kind": "constant",
+      "span": "L365-L365",
+      "signature": "const DEFAULT_CONTENT_TYPE: &str = \"application/octet-stream\";"
+    },
+    {
+      "name": "urlencoding",
+      "kind": "function",
+      "span": "L372-L381",
+      "signature": "fn urlencoding(key: &str) -> String"
+    },
+    {
+      "name": "object_url",
+      "kind": "function",
+      "span": "L388-L393",
+      "signature": "fn object_url(public_base_url: &str, key: &ObjectKey) -> ObjectUrl"
+    },
+    {
+      "name": "decode_service_account_key",
+      "kind": "function",
+      "span": "L396-L406",
+      "signature": "fn decode_service_account_key(encoded: &str) -> anyhow::Result<ServiceAccountKey>"
+    },
+    {
+      "name": "require_success",
+      "kind": "function",
+      "span": "L412-L426",
+      "signature": "async fn require_success(response: reqwest::Response, what: &str) -> AppResult<reqwest::Response>"
+    },
+    {
+      "name": "tests",
+      "kind": "module",
+      "span": "L429-L521",
+      "signature": "mod tests"
+    },
+    {
+      "name": "jev_assets_storage_read_bound_declared_and_streamed",
+      "kind": "function",
+      "span": "L433-L461",
+      "signature": "async fn jev_assets_storage_read_bound_declared_and_streamed()"
+    },
+    {
+      "name": "response",
+      "kind": "function",
+      "span": "L434-L444",
+      "signature": "fn response(chunks: Vec<&'static [u8]>, length: Option<usize>) -> reqwest::Response"
+    },
+    {
+      "name": "a_base64_key_is_decoded_into_its_fields",
+      "kind": "function",
+      "span": "L464-L480",
+      "signature": "fn a_base64_key_is_decoded_into_its_fields()"
+    },
+    {
+      "name": "whitespace_around_the_encoded_key_is_tolerated",
+      "kind": "function",
+      "span": "L483-L488",
+      "signature": "fn whitespace_around_the_encoded_key_is_tolerated()"
+    },
+    {
+      "name": "an_object_url_joins_the_base_and_the_key_exactly_once",
+      "kind": "function",
+      "span": "L491-L503",
+      "signature": "fn an_object_url_joins_the_base_and_the_key_exactly_once()"
+    },
+    {
+      "name": "an_object_name_is_encoded_whole_for_the_read_url",
+      "kind": "function",
+      "span": "L506-L514",
+      "signature": "fn an_object_name_is_encoded_whole_for_the_read_url()"
+    },
+    {
+      "name": "a_key_that_is_not_base64_or_not_a_key_is_refused",
+      "kind": "function",
+      "span": "L517-L520",
+      "signature": "fn a_key_that_is_not_base64_or_not_a_key_is_refused()"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 18524
+  }
+}

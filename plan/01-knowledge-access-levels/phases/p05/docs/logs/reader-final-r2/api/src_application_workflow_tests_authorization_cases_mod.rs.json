@@ -1,0 +1,81 @@
+{
+  "file": "src/application/workflow/tests/authorization_cases/mod.rs",
+  "entries": [
+    {
+      "name": "channel",
+      "kind": "function",
+      "span": "L11-L28",
+      "signature": "fn channel(company_id: CompanyId, mode: ChannelAccessMode) -> Channel"
+    },
+    {
+      "name": "thread",
+      "kind": "function",
+      "span": "L30-L40",
+      "signature": "fn thread(channel_id: Uuid) -> Thread"
+    },
+    {
+      "name": "related",
+      "kind": "function",
+      "span": "L42-L44",
+      "signature": "fn related(channel: &Channel) -> RelatedAssociation"
+    },
+    {
+      "name": "admitted_request",
+      "kind": "function",
+      "span": "L46-L55",
+      "signature": "fn admitted_request("
+    },
+    {
+      "name": "set_membership",
+      "kind": "function",
+      "span": "L57-L72",
+      "signature": "fn set_membership("
+    },
+    {
+      "name": "association",
+      "kind": "module",
+      "span": "L74-L74",
+      "signature": "mod association;"
+    },
+    {
+      "name": "cancellation",
+      "kind": "module",
+      "span": "L75-L75",
+      "signature": "mod cancellation;"
+    },
+    {
+      "name": "membership",
+      "kind": "module",
+      "span": "L76-L76",
+      "signature": "mod membership;"
+    },
+    {
+      "name": "reader_errors",
+      "kind": "module",
+      "span": "L77-L77",
+      "signature": "mod reader_errors;"
+    },
+    {
+      "name": "replay",
+      "kind": "module",
+      "span": "L78-L78",
+      "signature": "mod replay;"
+    },
+    {
+      "name": "resources",
+      "kind": "module",
+      "span": "L79-L79",
+      "signature": "mod resources;"
+    },
+    {
+      "name": "visibility",
+      "kind": "module",
+      "span": "L80-L80",
+      "signature": "mod visibility;"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 2237
+  }
+}

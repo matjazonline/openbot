@@ -1,0 +1,42 @@
+{
+  "query": "new",
+  "matches": [
+    {
+      "symbol": {
+        "id": "src/domain/workflow/outcome.rs#new",
+        "name": "new",
+        "kind": "function",
+        "path": "src/domain/workflow/outcome.rs",
+        "span": "L27-L34"
+      },
+      "hits": [],
+      "note": "  no indexed callers — the graph has no incoming call/reference edges for this symbol as written. 3 definitions share the name \"new\"; a cross-file caller of an ambiguous name is dropped rather than guessed, so this may undercount. Check the name (try the bare symbol, or \"Type.method\"), or find its uses with graft grep \"new\". Fall back to raw grep -rn only for unindexed files"
+    },
+    {
+      "symbol": {
+        "id": "src/domain/workflow/outcome.rs#new~2",
+        "name": "new",
+        "kind": "function",
+        "path": "src/domain/workflow/outcome.rs",
+        "span": "L59-L73"
+      },
+      "hits": [],
+      "note": "  no indexed callers — the graph has no incoming call/reference edges for this symbol as written. 3 definitions share the name \"new\"; a cross-file caller of an ambiguous name is dropped rather than guessed, so this may undercount. Check the name (try the bare symbol, or \"Type.method\"), or find its uses with graft grep \"new\". Fall back to raw grep -rn only for unindexed files"
+    },
+    {
+      "symbol": {
+        "id": "src/domain/workflow/outcome.rs#new~3",
+        "name": "new",
+        "kind": "function",
+        "path": "src/domain/workflow/outcome.rs",
+        "span": "L103-L119"
+      },
+      "hits": [],
+      "note": "  no indexed callers — the graph has no incoming call/reference edges for this symbol as written. 3 definitions share the name \"new\"; a cross-file caller of an ambiguous name is dropped rather than guessed, so this may undercount. Check the name (try the bare symbol, or \"Type.method\"), or find its uses with graft grep \"new\". Fall back to raw grep -rn only for unindexed files"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 20653
+  }
+}

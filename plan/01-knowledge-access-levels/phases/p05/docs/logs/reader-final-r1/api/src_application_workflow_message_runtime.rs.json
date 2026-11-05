@@ -1,0 +1,123 @@
+{
+  "file": "src/application/workflow/message_runtime.rs",
+  "entries": [
+    {
+      "name": "MessageActions",
+      "kind": "struct",
+      "span": "L21-L27",
+      "signature": "pub struct MessageActions<P, D>"
+    },
+    {
+      "name": "new",
+      "kind": "function",
+      "span": "L29-L43",
+      "signature": "pub fn new("
+    },
+    {
+      "name": "StepError",
+      "kind": "enum",
+      "span": "L46-L49",
+      "signature": "enum StepError"
+    },
+    {
+      "name": "call_tool",
+      "kind": "function",
+      "span": "L57-L90",
+      "signature": "pub async fn call_tool("
+    },
+    {
+      "name": "dispatch_request",
+      "kind": "function",
+      "span": "L92-L102",
+      "signature": "fn dispatch_request("
+    },
+    {
+      "name": "step",
+      "kind": "function",
+      "span": "L104-L125",
+      "signature": "async fn step("
+    },
+    {
+      "name": "publish",
+      "kind": "function",
+      "span": "L128-L156",
+      "signature": "async fn publish("
+    },
+    {
+      "name": "plan",
+      "kind": "function",
+      "span": "L158-L211",
+      "signature": "async fn plan("
+    },
+    {
+      "name": "plan_email",
+      "kind": "function",
+      "span": "L213-L266",
+      "signature": "async fn plan_email("
+    },
+    {
+      "name": "EmailPlan",
+      "kind": "struct",
+      "span": "L270-L280",
+      "signature": "struct EmailPlan"
+    },
+    {
+      "name": "message_write",
+      "kind": "function",
+      "span": "L282-L331",
+      "signature": "fn message_write("
+    },
+    {
+      "name": "of",
+      "kind": "function",
+      "span": "L333-L409",
+      "signature": "fn of(target: &RouteTarget, content: &CanonicalContent) -> AppResult<Self>"
+    },
+    {
+      "name": "plan_channel",
+      "kind": "function",
+      "span": "L412-L447",
+      "signature": "fn plan_channel("
+    },
+    {
+      "name": "plan_in_app",
+      "kind": "function",
+      "span": "L452-L482",
+      "signature": "fn plan_in_app("
+    },
+    {
+      "name": "plan_internal_reply",
+      "kind": "function",
+      "span": "L484-L518",
+      "signature": "fn plan_internal_reply("
+    },
+    {
+      "name": "failure",
+      "kind": "function",
+      "span": "L520-L530",
+      "signature": "fn failure(class: FailureClass, code: &'static str) -> WorkflowFailure"
+    },
+    {
+      "name": "message_delivery_failed",
+      "kind": "function",
+      "span": "L533-L535",
+      "signature": "pub fn message_delivery_failed() -> WorkflowFailure"
+    },
+    {
+      "name": "supports",
+      "kind": "function",
+      "span": "L543-L545",
+      "signature": "fn supports(&self, kind: &WorkflowStepKind) -> bool"
+    },
+    {
+      "name": "execute",
+      "kind": "function",
+      "span": "L546-L596",
+      "signature": "async fn execute("
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 21935
+  }
+}

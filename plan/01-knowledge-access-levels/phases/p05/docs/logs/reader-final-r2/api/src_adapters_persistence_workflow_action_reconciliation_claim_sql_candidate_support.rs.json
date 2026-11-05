@@ -1,0 +1,81 @@
+{
+  "file": "src/adapters/persistence/workflow/action_reconciliation_claim_sql_candidate_support.rs",
+  "entries": [
+    {
+      "name": "Preparation",
+      "kind": "enum",
+      "span": "L4-L7",
+      "signature": "pub(super) enum Preparation"
+    },
+    {
+      "name": "assert_preparation",
+      "kind": "function",
+      "span": "L9-L63",
+      "signature": "pub(super) fn assert_preparation(before: &Value, after: &Value, preparation: Preparation)"
+    },
+    {
+      "name": "remove_fresh_topology",
+      "kind": "function",
+      "span": "L65-L96",
+      "signature": "fn remove_fresh_topology(before: &Value, normalized: &mut Value, scope: ActivationRequest)"
+    },
+    {
+      "name": "capture_catalog",
+      "kind": "function",
+      "span": "L98-L124",
+      "signature": "pub(super) async fn capture_catalog(f: &AdmissionFixture) -> Value"
+    },
+    {
+      "name": "candidate_keys",
+      "kind": "function",
+      "span": "L126-L132",
+      "signature": "pub(super) async fn candidate_keys("
+    },
+    {
+      "name": "assert_run_prerequisites",
+      "kind": "function",
+      "span": "L134-L144",
+      "signature": "pub(super) async fn assert_run_prerequisites("
+    },
+    {
+      "name": "waiting_transition",
+      "kind": "function",
+      "span": "L146-L152",
+      "signature": "pub(super) async fn waiting_transition("
+    },
+    {
+      "name": "job_status",
+      "kind": "function",
+      "span": "L154-L160",
+      "signature": "pub(super) async fn job_status(f: &AdmissionFixture, scope: ActivationRequest) -> String"
+    },
+    {
+      "name": "assert_distinct_histories",
+      "kind": "function",
+      "span": "L162-L195",
+      "signature": "pub(super) async fn assert_distinct_histories("
+    },
+    {
+      "name": "single_transition",
+      "kind": "function",
+      "span": "L197-L218",
+      "signature": "pub(super) async fn single_transition("
+    },
+    {
+      "name": "normal_control",
+      "kind": "function",
+      "span": "L220-L242",
+      "signature": "pub(super) async fn normal_control()"
+    },
+    {
+      "name": "verifier_for",
+      "kind": "function",
+      "span": "L245-L266",
+      "signature": "pub(super) async fn verifier_for("
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 11662
+  }
+}

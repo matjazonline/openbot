@@ -1,0 +1,136 @@
+{
+  "pattern": "(RunView|StepView) \\{",
+  "filesSearched": 1133,
+  "totalHits": 9,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/ui/runs/pages_tests.rs#sample_view",
+        "name": "sample_view",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/ui/runs/pages_tests.rs",
+        "span": "L109-L163"
+      },
+      "path": "src/adapters/http/routes/workflows/ui/runs/pages_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 114,
+          "text": ") -> RunView {"
+        },
+        {
+          "line": 118,
+          "text": "RunView {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/ui/runs/pages_tests.rs#reconciliation_is_offered_as_an_annotation_and_a_step_shows_usage_and_receipts",
+        "name": "reconciliation_is_offered_as_an_annotation_and_a_step_shows_usage_and_receipts",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/ui/runs/pages_tests.rs",
+        "span": "L9-L106"
+      },
+      "path": "src/adapters/http/routes/workflows/ui/runs/pages_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 45,
+          "text": "let step_view = StepView {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/run_views.rs#run_view",
+        "name": "run_view",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/run_views.rs",
+        "span": "L421-L477"
+      },
+      "path": "src/adapters/persistence/workflow/run_views.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 444,
+          "text": "let mut view = RunView {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/run_views.rs#step_view",
+        "name": "step_view",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/run_views.rs",
+        "span": "L479-L545"
+      },
+      "path": "src/adapters/persistence/workflow/run_views.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 514,
+          "text": "let mut view = StepView {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/run_views.rs#RunView",
+        "name": "RunView",
+        "kind": "struct",
+        "path": "src/application/workflow/run_views.rs",
+        "span": "L76-L102"
+      },
+      "path": "src/application/workflow/run_views.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 76,
+          "text": "pub struct RunView {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/run_views.rs#StepView",
+        "name": "StepView",
+        "kind": "struct",
+        "path": "src/application/workflow/run_views.rs",
+        "span": "L138-L158"
+      },
+      "path": "src/application/workflow/run_views.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 138,
+          "text": "pub struct StepView {"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/run_views.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 185,
+          "text": "impl RunView {"
+        },
+        {
+          "line": 199,
+          "text": "impl StepView {"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 3,
+    "baselineChars": 36054
+  }
+}

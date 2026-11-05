@@ -1,0 +1,327 @@
+{
+  "file": "src/application/transport/delivery.rs",
+  "entries": [
+    {
+      "name": "MAX_DELIVERY_PARTS",
+      "kind": "constant",
+      "span": "L33-L33",
+      "signature": "pub const MAX_DELIVERY_PARTS: usize = 50;"
+    },
+    {
+      "name": "MAX_DELIVERY_KEY_BYTES",
+      "kind": "constant",
+      "span": "L37-L37",
+      "signature": "pub const MAX_DELIVERY_KEY_BYTES: usize = 512;"
+    },
+    {
+      "name": "MAX_PART_KEY_BYTES",
+      "kind": "constant",
+      "span": "L38-L38",
+      "signature": "pub const MAX_PART_KEY_BYTES: usize = 200;"
+    },
+    {
+      "name": "MAX_FAILURE_DETAIL_BYTES",
+      "kind": "constant",
+      "span": "L39-L39",
+      "signature": "pub const MAX_FAILURE_DETAIL_BYTES: usize = 512;"
+    },
+    {
+      "name": "MAX_CONTENT_DIGEST_BYTES",
+      "kind": "constant",
+      "span": "L40-L40",
+      "signature": "pub const MAX_CONTENT_DIGEST_BYTES: usize = 128;"
+    },
+    {
+      "name": "MAX_CONVERSATION_ANCHOR_BYTES",
+      "kind": "constant",
+      "span": "L43-L43",
+      "signature": "pub const MAX_CONVERSATION_ANCHOR_BYTES: usize = 200;"
+    },
+    {
+      "name": "MAX_PART_PAYLOAD_BYTES",
+      "kind": "constant",
+      "span": "L46-L46",
+      "signature": "pub const MAX_PART_PAYLOAD_BYTES: usize = 256 * 1024;"
+    },
+    {
+      "name": "DELIVERY_ENVELOPE_VERSION",
+      "kind": "constant",
+      "span": "L49-L49",
+      "signature": "pub const DELIVERY_ENVELOPE_VERSION: u8 = 1;"
+    },
+    {
+      "name": "sha256_of",
+      "kind": "function",
+      "span": "L66-L69",
+      "signature": "pub fn sha256_of(bytes: &[u8]) -> Self"
+    },
+    {
+      "name": "DeliveryDestination",
+      "kind": "enum",
+      "span": "L79-L82",
+      "signature": "pub enum DeliveryDestination"
+    },
+    {
+      "name": "key_fragment",
+      "kind": "function",
+      "span": "L89-L96",
+      "signature": "pub(crate) fn key_fragment(&self) -> String"
+    },
+    {
+      "name": "DeliveryIntent",
+      "kind": "struct",
+      "span": "L101-L111",
+      "signature": "pub struct DeliveryIntent"
+    },
+    {
+      "name": "stable_key",
+      "kind": "function",
+      "span": "L123-L129",
+      "signature": "pub fn stable_key("
+    },
+    {
+      "name": "destination_binding",
+      "kind": "function",
+      "span": "L132-L137",
+      "signature": "pub const fn destination_binding(&self) -> Option<ChannelBindingId>"
+    },
+    {
+      "name": "DeliveryCandidate",
+      "kind": "struct",
+      "span": "L146-L151",
+      "signature": "pub struct DeliveryCandidate<'a>"
+    },
+    {
+      "name": "deployment",
+      "kind": "function",
+      "span": "L155-L160",
+      "signature": "pub const fn deployment(binding: &'a ChannelBinding) -> Self"
+    },
+    {
+      "name": "DeliveryPlanRequest",
+      "kind": "struct",
+      "span": "L165-L176",
+      "signature": "pub struct DeliveryPlanRequest<'a>"
+    },
+    {
+      "name": "plan_deliveries",
+      "kind": "function",
+      "span": "L186-L210",
+      "signature": "pub fn plan_deliveries(request: &DeliveryPlanRequest<'_>) -> Vec<DeliveryIntent>"
+    },
+    {
+      "name": "eligible",
+      "kind": "function",
+      "span": "L212-L219",
+      "signature": "fn eligible(request: &DeliveryPlanRequest<'_>, candidate: &DeliveryCandidate<'_>) -> bool"
+    },
+    {
+      "name": "PartIndex",
+      "kind": "struct",
+      "span": "L224-L224",
+      "signature": "pub struct PartIndex(u16);"
+    },
+    {
+      "name": "new",
+      "kind": "function",
+      "span": "L227-L229",
+      "signature": "pub const fn new(index: u16) -> Self"
+    },
+    {
+      "name": "get",
+      "kind": "function",
+      "span": "L231-L233",
+      "signature": "pub const fn get(self) -> u16"
+    },
+    {
+      "name": "TransportPayload",
+      "kind": "struct",
+      "span": "L243-L247",
+      "signature": "pub struct TransportPayload"
+    },
+    {
+      "name": "PayloadError",
+      "kind": "enum",
+      "span": "L250-L276",
+      "signature": "pub enum PayloadError"
+    },
+    {
+      "name": "encode",
+      "kind": "function",
+      "span": "L279-L289",
+      "signature": "pub fn encode<T: Serialize>("
+    },
+    {
+      "name": "from_value",
+      "kind": "function",
+      "span": "L291-L313",
+      "signature": "fn from_value("
+    },
+    {
+      "name": "decode",
+      "kind": "function",
+      "span": "L316-L338",
+      "signature": "pub fn decode<T: serde::de::DeserializeOwned>("
+    },
+    {
+      "name": "transport",
+      "kind": "function",
+      "span": "L340-L342",
+      "signature": "pub const fn transport(&self) -> TransportKind"
+    },
+    {
+      "name": "version",
+      "kind": "function",
+      "span": "L344-L346",
+      "signature": "pub const fn version(&self) -> u16"
+    },
+    {
+      "name": "deserialize",
+      "kind": "function",
+      "span": "L352-L365",
+      "signature": "fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>"
+    },
+    {
+      "name": "Raw",
+      "kind": "struct",
+      "span": "L357-L361",
+      "signature": "struct Raw"
+    },
+    {
+      "name": "RenderedPart",
+      "kind": "struct",
+      "span": "L370-L378",
+      "signature": "pub struct RenderedPart"
+    },
+    {
+      "name": "DeliveryContext",
+      "kind": "enum",
+      "span": "L392-L394",
+      "signature": "pub enum DeliveryContext"
+    },
+    {
+      "name": "transport",
+      "kind": "function",
+      "span": "L399-L403",
+      "signature": "pub const fn transport(&self) -> TransportKind"
+    },
+    {
+      "name": "email",
+      "kind": "function",
+      "span": "L405-L409",
+      "signature": "pub const fn email(&self) -> Option<&EmailDeliveryContext>"
+    },
+    {
+      "name": "external_destination",
+      "kind": "function",
+      "span": "L412-L416",
+      "signature": "pub fn external_destination(&self) -> ExternalDestination"
+    },
+    {
+      "name": "EmailDeliveryContext",
+      "kind": "struct",
+      "span": "L425-L439",
+      "signature": "pub struct EmailDeliveryContext"
+    },
+    {
+      "name": "EmailThreading",
+      "kind": "enum",
+      "span": "L453-L471",
+      "signature": "pub enum EmailThreading"
+    },
+    {
+      "name": "received",
+      "kind": "function",
+      "span": "L479-L487",
+      "signature": "pub fn received(in_reply_to: Option<MessageId>, references: Vec<MessageId>) -> Self"
+    },
+    {
+      "name": "EmailRelayTrace",
+      "kind": "struct",
+      "span": "L495-L502",
+      "signature": "pub struct EmailRelayTrace"
+    },
+    {
+      "name": "DeliveryEnvelope",
+      "kind": "struct",
+      "span": "L510-L520",
+      "signature": "pub struct DeliveryEnvelope"
+    },
+    {
+      "name": "StandaloneDeliveryEnvelope",
+      "kind": "struct",
+      "span": "L529-L538",
+      "signature": "pub struct StandaloneDeliveryEnvelope"
+    },
+    {
+      "name": "new",
+      "kind": "function",
+      "span": "L541-L559",
+      "signature": "pub fn new("
+    },
+    {
+      "name": "ContextMismatch",
+      "kind": "struct",
+      "span": "L564-L567",
+      "signature": "pub struct ContextMismatch"
+    },
+    {
+      "name": "new",
+      "kind": "function",
+      "span": "L574-L597",
+      "signature": "pub fn new("
+    },
+    {
+      "name": "CanonicalContentV1",
+      "kind": "struct",
+      "span": "L605-L609",
+      "signature": "pub struct CanonicalContentV1"
+    },
+    {
+      "name": "from",
+      "kind": "function",
+      "span": "L612-L618",
+      "signature": "fn from(content: &CanonicalContent) -> Self"
+    },
+    {
+      "name": "ProviderSendOutcome",
+      "kind": "enum",
+      "span": "L629-L656",
+      "signature": "pub enum ProviderSendOutcome"
+    },
+    {
+      "name": "retry_after",
+      "kind": "function",
+      "span": "L660-L665",
+      "signature": "pub const fn retry_after(&self) -> Option<Duration>"
+    },
+    {
+      "name": "is_safely_retryable",
+      "kind": "function",
+      "span": "L670-L672",
+      "signature": "pub const fn is_safely_retryable(&self) -> bool"
+    },
+    {
+      "name": "class",
+      "kind": "function",
+      "span": "L674-L682",
+      "signature": "pub const fn class(&self) -> Option<FailureClass>"
+    },
+    {
+      "name": "PartTransition",
+      "kind": "struct",
+      "span": "L691-L706",
+      "signature": "pub struct PartTransition"
+    },
+    {
+      "name": "of",
+      "kind": "function",
+      "span": "L709-L758",
+      "signature": "pub fn of(outcome: &ProviderSendOutcome) -> Self"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 30570
+  }
+}

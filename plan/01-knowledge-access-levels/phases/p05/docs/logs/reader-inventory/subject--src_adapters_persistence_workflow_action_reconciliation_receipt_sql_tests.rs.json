@@ -1,0 +1,69 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 7,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_receipt_sql_tests.rs#history",
+        "name": "history",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_receipt_sql_tests.rs",
+        "span": "L16-L83"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_receipt_sql_tests.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 52,
+          "text": ".bind(request.scope().company.as_uuid()).bind(request.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 59,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_receipt_sql_tests.rs#workflow_action_reconciliation_receipt_sql_authentic_foreign_bindings",
+        "name": "workflow_action_reconciliation_receipt_sql_authentic_foreign_bindings",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_receipt_sql_tests.rs",
+        "span": "L224-L260"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_receipt_sql_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 227,
+          "text": "h.requests[0].subject.invocation,"
+        },
+        {
+          "line": 228,
+          "text": "h.requests[1].subject.invocation"
+        },
+        {
+          "line": 231,
+          "text": "h.requests[0].subject.argument_digest,"
+        },
+        {
+          "line": 232,
+          "text": "h.requests[1].subject.argument_digest"
+        },
+        {
+          "line": 249,
+          "text": "json!({\"argument_digest\":h.requests[1].subject.argument_digest.as_str(),\"reconciliation_evidence_id\":h.evidence[0]}),"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 9887
+  }
+}

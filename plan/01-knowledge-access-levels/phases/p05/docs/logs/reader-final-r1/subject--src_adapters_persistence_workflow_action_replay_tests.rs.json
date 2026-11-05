@@ -1,0 +1,70 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 4,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_replay_tests.rs#saved",
+        "name": "saved",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_replay_tests.rs",
+        "span": "L52-L58"
+      },
+      "path": "src/adapters/persistence/workflow/action_replay_tests.rs",
+      "inDegree": 6,
+      "hits": [
+        {
+          "line": 54,
+          "text": ".action_authority(request.scope(), &request.subject)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_replay_tests.rs#workflow_action_replay_approved_first_dispatch_stable_key_competing_tool_and_restart",
+        "name": "workflow_action_replay_approved_first_dispatch_stable_key_competing_tool_and_restart",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_replay_tests.rs",
+        "span": "L88-L143"
+      },
+      "path": "src/adapters/persistence/workflow/action_replay_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 102,
+          "text": "assert_eq!(intent.approval_subject(), request.subject);"
+        },
+        {
+          "line": 106,
+          "text": "tool.subject = intent.approval_subject();"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_replay_tests.rs#workflow_action_replay_metadata_headers_and_changed_arguments_cannot_grant_retry",
+        "name": "workflow_action_replay_metadata_headers_and_changed_arguments_cannot_grant_retry",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_replay_tests.rs",
+        "span": "L295-L324"
+      },
+      "path": "src/adapters/persistence/workflow/action_replay_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 321,
+          "text": "assert_ne!(changed.approval_subject(), request.subject);"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 16230
+  }
+}

@@ -1,0 +1,465 @@
+{
+  "file": "src/adapters/smtp/server.rs",
+  "entries": [
+    {
+      "name": "MAIL_FROM_RE",
+      "kind": "constant",
+      "span": "L30-L32",
+      "signature": "static MAIL_FROM_RE: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(||"
+    },
+    {
+      "name": "RCPT_TO_RE",
+      "kind": "constant",
+      "span": "L33-L34",
+      "signature": "static RCPT_TO_RE: std::sync::LazyLock<regex::Regex> ="
+    },
+    {
+      "name": "MAX_COMMAND_LINE_BYTES",
+      "kind": "constant",
+      "span": "L36-L36",
+      "signature": "const MAX_COMMAND_LINE_BYTES: usize = 512;"
+    },
+    {
+      "name": "MAX_DATA_LINE_BYTES",
+      "kind": "constant",
+      "span": "L37-L37",
+      "signature": "const MAX_DATA_LINE_BYTES: usize = 1_000;"
+    },
+    {
+      "name": "MAX_RECIPIENTS",
+      "kind": "constant",
+      "span": "L38-L38",
+      "signature": "const MAX_RECIPIENTS: usize = 100;"
+    },
+    {
+      "name": "MAX_COMMANDS",
+      "kind": "constant",
+      "span": "L39-L39",
+      "signature": "const MAX_COMMANDS: usize = 1_000;"
+    },
+    {
+      "name": "MAX_CONNECTIONS",
+      "kind": "constant",
+      "span": "L40-L40",
+      "signature": "const MAX_CONNECTIONS: usize = 256;"
+    },
+    {
+      "name": "COMMAND_TIMEOUT",
+      "kind": "constant",
+      "span": "L41-L41",
+      "signature": "const COMMAND_TIMEOUT: Duration = Duration::from_secs(60);"
+    },
+    {
+      "name": "DATA_TIMEOUT",
+      "kind": "constant",
+      "span": "L42-L42",
+      "signature": "const DATA_TIMEOUT: Duration = Duration::from_secs(300);"
+    },
+    {
+      "name": "SESSION_TIMEOUT",
+      "kind": "constant",
+      "span": "L43-L43",
+      "signature": "const SESSION_TIMEOUT: Duration = Duration::from_secs(600);"
+    },
+    {
+      "name": "DNS_TIMEOUT",
+      "kind": "constant",
+      "span": "L44-L44",
+      "signature": "const DNS_TIMEOUT: Duration = Duration::from_secs(5);"
+    },
+    {
+      "name": "SmtpState",
+      "kind": "enum",
+      "span": "L47-L50",
+      "signature": "enum SmtpState"
+    },
+    {
+      "name": "ConnGuard",
+      "kind": "struct",
+      "span": "L52-L55",
+      "signature": "pub struct ConnGuard"
+    },
+    {
+      "name": "drop",
+      "kind": "function",
+      "span": "L58-L68",
+      "signature": "fn drop(&mut self)"
+    },
+    {
+      "name": "check_dnsbl",
+      "kind": "function",
+      "span": "L71-L94",
+      "signature": "pub async fn check_dnsbl(ip: IpAddr, dnsbl_servers: &[String]) -> Option<String>"
+    },
+    {
+      "name": "SmtpServer",
+      "kind": "struct",
+      "span": "L96-L117",
+      "signature": "pub struct SmtpServer"
+    },
+    {
+      "name": "new",
+      "kind": "function",
+      "span": "L120-L135",
+      "signature": "pub fn new("
+    },
+    {
+      "name": "for_test",
+      "kind": "function",
+      "span": "L138-L144",
+      "signature": "pub(crate) fn for_test(threads: Arc<ThreadUseCases>, config: Arc<AppConfig>) -> Self"
+    },
+    {
+      "name": "with_monitoring",
+      "kind": "function",
+      "span": "L146-L149",
+      "signature": "pub fn with_monitoring(mut self, monitoring: Arc<dyn MonitoringService>) -> Self"
+    },
+    {
+      "name": "with_file_storage",
+      "kind": "function",
+      "span": "L153-L156",
+      "signature": "pub fn with_file_storage(mut self, file_storage: Option<Arc<dyn FileStorage>>) -> Self"
+    },
+    {
+      "name": "start_server_loop",
+      "kind": "function",
+      "span": "L158-L219",
+      "signature": "pub async fn start_server_loop("
+    },
+    {
+      "name": "handle_connection",
+      "kind": "function",
+      "span": "L221-L229",
+      "signature": "async fn handle_connection("
+    },
+    {
+      "name": "handle_session",
+      "kind": "function",
+      "span": "L231-L345",
+      "signature": "async fn handle_session("
+    },
+    {
+      "name": "admit_connection",
+      "kind": "function",
+      "span": "L351-L408",
+      "signature": "async fn admit_connection("
+    },
+    {
+      "name": "handle_command",
+      "kind": "function",
+      "span": "L411-L533",
+      "signature": "async fn handle_command<W: tokio::io::AsyncWrite + Unpin>("
+    },
+    {
+      "name": "finish_data_transaction",
+      "kind": "function",
+      "span": "L536-L626",
+      "signature": "async fn finish_data_transaction<W: tokio::io::AsyncWrite + Unpin>("
+    },
+    {
+      "name": "sender_needs_spam_scan",
+      "kind": "function",
+      "span": "L629-L652",
+      "signature": "async fn sender_needs_spam_scan(&self, raw_payload: &RawInboundPayload) -> bool"
+    },
+    {
+      "name": "apply_spam_score",
+      "kind": "function",
+      "span": "L654-L672",
+      "signature": "async fn apply_spam_score(&self, session: &SmtpSession, raw_payload: &mut RawInboundPayload)"
+    },
+    {
+      "name": "record_connection",
+      "kind": "function",
+      "span": "L674-L691",
+      "signature": "fn record_connection("
+    },
+    {
+      "name": "SmtpSession",
+      "kind": "struct",
+      "span": "L696-L701",
+      "signature": "struct SmtpSession"
+    },
+    {
+      "name": "reset_transaction",
+      "kind": "function",
+      "span": "L705-L709",
+      "signature": "fn reset_transaction(&mut self)"
+    },
+    {
+      "name": "push_data_line",
+      "kind": "function",
+      "span": "L711-L723",
+      "signature": "fn push_data_line(&mut self, raw_line: &[u8]) -> bool"
+    },
+    {
+      "name": "LineReadError",
+      "kind": "enum",
+      "span": "L727-L730",
+      "signature": "enum LineReadError"
+    },
+    {
+      "name": "read_limited_line",
+      "kind": "function",
+      "span": "L732-L746",
+      "signature": "async fn read_limited_line<R: AsyncBufRead + Unpin>("
+    },
+    {
+      "name": "declared_message_size",
+      "kind": "function",
+      "span": "L748-L755",
+      "signature": "fn declared_message_size(argument: &str) -> Option<usize>"
+    },
+    {
+      "name": "CommandOutcome",
+      "kind": "enum",
+      "span": "L758-L762",
+      "signature": "enum CommandOutcome"
+    },
+    {
+      "name": "extract_command_address",
+      "kind": "function",
+      "span": "L764-L772",
+      "signature": "fn extract_command_address(re: &regex::Regex, arg: &str) -> Option<String>"
+    },
+    {
+      "name": "SmtpAnswer",
+      "kind": "struct",
+      "span": "L782-L786",
+      "signature": "struct SmtpAnswer"
+    },
+    {
+      "name": "accepted",
+      "kind": "function",
+      "span": "L789-L795",
+      "signature": "fn accepted() -> Self"
+    },
+    {
+      "name": "for_ingest",
+      "kind": "function",
+      "span": "L797-L825",
+      "signature": "fn for_ingest(ingest: &InboundIngestResult) -> Self"
+    },
+    {
+      "name": "for_error",
+      "kind": "function",
+      "span": "L832-L845",
+      "signature": "fn for_error(error: &crate::app_error::AppError) -> Self"
+    },
+    {
+      "name": "is_permanent",
+      "kind": "function",
+      "span": "L847-L849",
+      "signature": "fn is_permanent(&self) -> bool"
+    },
+    {
+      "name": "line",
+      "kind": "function",
+      "span": "L851-L853",
+      "signature": "fn line(&self) -> String"
+    },
+    {
+      "name": "answer_tests",
+      "kind": "module",
+      "span": "L857-L964",
+      "signature": "mod answer_tests"
+    },
+    {
+      "name": "rejected",
+      "kind": "function",
+      "span": "L862-L864",
+      "signature": "fn rejected(rejection: IngestRejection) -> InboundIngestResult"
+    },
+    {
+      "name": "accepted",
+      "kind": "function",
+      "span": "L866-L871",
+      "signature": "fn accepted() -> InboundIngestResult"
+    },
+    {
+      "name": "bounce",
+      "kind": "function",
+      "span": "L873-L888",
+      "signature": "fn bounce() -> BounceInfo"
+    },
+    {
+      "name": "an_accepted_message_is_queued",
+      "kind": "function",
+      "span": "L891-L895",
+      "signature": "fn an_accepted_message_is_queued()"
+    },
+    {
+      "name": "a_message_the_platform_chose_not_to_route_is_accepted_and_dropped",
+      "kind": "function",
+      "span": "L901-L915",
+      "signature": "fn a_message_the_platform_chose_not_to_route_is_accepted_and_dropped()"
+    },
+    {
+      "name": "a_message_refused_on_its_merits_is_a_permanent_rejection",
+      "kind": "function",
+      "span": "L920-L940",
+      "signature": "fn a_message_refused_on_its_merits_is_a_permanent_rejection()"
+    },
+    {
+      "name": "a_failure_of_ours_is_transient_and_a_malformed_message_is_not",
+      "kind": "function",
+      "span": "L945-L963",
+      "signature": "fn a_failure_of_ours_is_transient_and_a_malformed_message_is_not()"
+    },
+    {
+      "name": "tests",
+      "kind": "module",
+      "span": "L967-L1745",
+      "signature": "mod tests"
+    },
+    {
+      "name": "smtp_reuses_the_injected_scanner_across_messages",
+      "kind": "function",
+      "span": "L972-L1014",
+      "signature": "async fn smtp_reuses_the_injected_scanner_across_messages()"
+    },
+    {
+      "name": "StubScanner",
+      "kind": "struct",
+      "span": "L975-L975",
+      "signature": "struct StubScanner(AtomicUsize);"
+    },
+    {
+      "name": "scan",
+      "kind": "function",
+      "span": "L978-L987",
+      "signature": "async fn scan(&self, input: SpamScanInput<'_>) -> SpamScanResult"
+    },
+    {
+      "name": "smtp_line_limits_accept_boundary_and_reject_one_over",
+      "kind": "function",
+      "span": "L1017-L1035",
+      "signature": "async fn smtp_line_limits_accept_boundary_and_reject_one_over()"
+    },
+    {
+      "name": "declared_size_and_streamed_data_share_the_twenty_mib_limit",
+      "kind": "function",
+      "span": "L1038-L1054",
+      "signature": "fn declared_size_and_streamed_data_share_the_twenty_mib_limit()"
+    },
+    {
+      "name": "company_double",
+      "kind": "function",
+      "span": "L1072-L1076",
+      "signature": "fn company_double(companies: Vec<Company>) -> MockCompanyPersistence"
+    },
+    {
+      "name": "MockChannelPersistence",
+      "kind": "struct",
+      "span": "L1078-L1080",
+      "signature": "struct MockChannelPersistence"
+    },
+    {
+      "name": "create",
+      "kind": "function",
+      "span": "L1084-L1086",
+      "signature": "async fn create(&self, _company_id: Uuid, _write: ChannelWrite) -> AppResult<Channel>"
+    },
+    {
+      "name": "get_by_id",
+      "kind": "function",
+      "span": "L1087-L1089",
+      "signature": "async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<Channel>>"
+    },
+    {
+      "name": "get_by_company_slug_and_channel_slug",
+      "kind": "function",
+      "span": "L1090-L1102",
+      "signature": "async fn get_by_company_slug_and_channel_slug("
+    },
+    {
+      "name": "list_by_company_id",
+      "kind": "function",
+      "span": "L1103-L1105",
+      "signature": "async fn list_by_company_id(&self, _company_id: Uuid) -> AppResult<Vec<Channel>>"
+    },
+    {
+      "name": "update",
+      "kind": "function",
+      "span": "L1106-L1111",
+      "signature": "async fn update("
+    },
+    {
+      "name": "delete",
+      "kind": "function",
+      "span": "L1112-L1114",
+      "signature": "async fn delete(&self, _id: Uuid) -> AppResult<()>"
+    },
+    {
+      "name": "test_parse_raw_mime_to_payload",
+      "kind": "function",
+      "span": "L1118-L1151",
+      "signature": "fn test_parse_raw_mime_to_payload()"
+    },
+    {
+      "name": "submitted_authentication_headers_cannot_authorize_smtp_mail",
+      "kind": "function",
+      "span": "L1154-L1319",
+      "signature": "async fn submitted_authentication_headers_cannot_authorize_smtp_mail()"
+    },
+    {
+      "name": "test_dkim_verification_with_gmail_raw_email",
+      "kind": "function",
+      "span": "L1323-L1355",
+      "signature": "async fn test_dkim_verification_with_gmail_raw_email()"
+    },
+    {
+      "name": "test_spf_verification_with_google_ip",
+      "kind": "function",
+      "span": "L1359-L1371",
+      "signature": "async fn test_spf_verification_with_google_ip()"
+    },
+    {
+      "name": "stale_dkim_and_submitted_auth_headers_do_not_authorize_smtp_mail",
+      "kind": "function",
+      "span": "L1374-L1518",
+      "signature": "async fn stale_dkim_and_submitted_auth_headers_do_not_authorize_smtp_mail()"
+    },
+    {
+      "name": "test_smtp_rate_limiting_and_monitoring",
+      "kind": "function",
+      "span": "L1521-L1605",
+      "signature": "async fn test_smtp_rate_limiting_and_monitoring()"
+    },
+    {
+      "name": "TrustLog",
+      "kind": "struct",
+      "span": "L1606-L1606",
+      "signature": "struct TrustLog(Arc<Mutex<Vec<u8>>>);"
+    },
+    {
+      "name": "write",
+      "kind": "function",
+      "span": "L1608-L1611",
+      "signature": "fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize>"
+    },
+    {
+      "name": "flush",
+      "kind": "function",
+      "span": "L1612-L1614",
+      "signature": "fn flush(&mut self) -> std::io::Result<()>"
+    },
+    {
+      "name": "smtp_sender_trust_lookup_failure_is_logged_and_scanned",
+      "kind": "function",
+      "span": "L1618-L1660",
+      "signature": "async fn smtp_sender_trust_lookup_failure_is_logged_and_scanned()"
+    },
+    {
+      "name": "smtp_sender_trust_matches_routing_aliases_and_distinguishes_strangers",
+      "kind": "function",
+      "span": "L1663-L1744",
+      "signature": "async fn smtp_sender_trust_matches_routing_aliases_and_distinguishes_strangers()"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 68523
+  }
+}

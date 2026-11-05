@@ -1,0 +1,49 @@
+{
+  "pattern": "get_channel_threads_after\\(",
+  "filesSearched": 1128,
+  "totalHits": 2,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui.rs#thread_column_stream",
+        "name": "thread_column_stream",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui.rs",
+        "span": "L657-L811"
+      },
+      "path": "src/adapters/http/routes/ui.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 715,
+          "text": ".get_channel_threads_after(channel_id, cursor, STREAM_BATCH_LIMIT)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/mod.rs#get_channel_threads_after",
+        "name": "get_channel_threads_after",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/mod.rs",
+        "span": "L280-L289"
+      },
+      "path": "src/application/use_cases/thread/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 280,
+          "text": "pub async fn get_channel_threads_after("
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 2,
+    "baselineChars": 69119
+  }
+}

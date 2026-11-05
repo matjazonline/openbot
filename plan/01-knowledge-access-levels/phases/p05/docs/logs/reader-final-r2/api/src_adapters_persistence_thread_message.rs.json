@@ -1,0 +1,255 @@
+{
+  "file": "src/adapters/persistence/thread/message.rs",
+  "entries": [
+    {
+      "name": "MessageDb",
+      "kind": "struct",
+      "span": "L54-L77",
+      "signature": "pub(super) struct MessageDb"
+    },
+    {
+      "name": "ParticipantRow",
+      "kind": "struct",
+      "span": "L84-L91",
+      "signature": "struct ParticipantRow"
+    },
+    {
+      "name": "MESSAGE_SELECT",
+      "kind": "constant",
+      "span": "L93-L139",
+      "signature": "pub(super) const MESSAGE_SELECT: &str = r#\""
+    },
+    {
+      "name": "Error",
+      "kind": "type",
+      "span": "L142-L142",
+      "signature": "type Error = AppError;"
+    },
+    {
+      "name": "try_from",
+      "kind": "function",
+      "span": "L144-L186",
+      "signature": "fn try_from(db: MessageDb) -> AppResult<Self>"
+    },
+    {
+      "name": "qualified_identity",
+      "kind": "function",
+      "span": "L190-L205",
+      "signature": "fn qualified_identity("
+    },
+    {
+      "name": "decode_participants",
+      "kind": "function",
+      "span": "L207-L233",
+      "signature": "fn decode_participants(value: Value) -> AppResult<Vec<MessageParticipant>>"
+    },
+    {
+      "name": "decode_response_contract",
+      "kind": "function",
+      "span": "L236-L248",
+      "signature": "pub(super) fn decode_response_contract("
+    },
+    {
+      "name": "decode_attachments",
+      "kind": "function",
+      "span": "L252-L261",
+      "signature": "pub(super) fn decode_attachments("
+    },
+    {
+      "name": "encode_attachments",
+      "kind": "function",
+      "span": "L263-L270",
+      "signature": "pub(super) fn encode_attachments(attachments: &[AttachmentMetadata]) -> AppResult<Option<Value>>"
+    },
+    {
+      "name": "ResolvedAuthor",
+      "kind": "struct",
+      "span": "L273-L277",
+      "signature": "pub(super) struct ResolvedAuthor"
+    },
+    {
+      "name": "ResolvedParticipant",
+      "kind": "struct",
+      "span": "L280-L285",
+      "signature": "pub(super) struct ResolvedParticipant"
+    },
+    {
+      "name": "ThreadScope",
+      "kind": "struct",
+      "span": "L289-L292",
+      "signature": "pub(super) struct ThreadScope"
+    },
+    {
+      "name": "thread_scope",
+      "kind": "function",
+      "span": "L294-L310",
+      "signature": "pub(super) async fn thread_scope("
+    },
+    {
+      "name": "resolve_author",
+      "kind": "function",
+      "span": "L312-L353",
+      "signature": "pub(super) async fn resolve_author("
+    },
+    {
+      "name": "resolve_participants",
+      "kind": "function",
+      "span": "L359-L393",
+      "signature": "pub(super) async fn resolve_participants("
+    },
+    {
+      "name": "canonical_message_hash",
+      "kind": "function",
+      "span": "L402-L452",
+      "signature": "pub(super) fn canonical_message_hash("
+    },
+    {
+      "name": "MessageStampSource",
+      "kind": "enum",
+      "span": "L465-L471",
+      "signature": "pub(crate) enum MessageStampSource"
+    },
+    {
+      "name": "level_on",
+      "kind": "function",
+      "span": "L473-L493",
+      "signature": "async fn level_on("
+    },
+    {
+      "name": "insert_message_on",
+      "kind": "function",
+      "span": "L496-L595",
+      "signature": "pub(crate) async fn insert_message_on("
+    },
+    {
+      "name": "validate_attachment_sources",
+      "kind": "function",
+      "span": "L600-L630",
+      "signature": "async fn validate_attachment_sources("
+    },
+    {
+      "name": "InsertedMessage",
+      "kind": "struct",
+      "span": "L636-L639",
+      "signature": "pub(crate) struct InsertedMessage"
+    },
+    {
+      "name": "associate_message_on",
+      "kind": "function",
+      "span": "L645-L667",
+      "signature": "pub(crate) async fn associate_message_on("
+    },
+    {
+      "name": "StoredPayload",
+      "kind": "struct",
+      "span": "L672-L679",
+      "signature": "pub(super) struct StoredPayload<'a>"
+    },
+    {
+      "name": "store_email_correlated",
+      "kind": "function",
+      "span": "L686-L755",
+      "signature": "async fn store_email_correlated("
+    },
+    {
+      "name": "bounded_message_key",
+      "kind": "function",
+      "span": "L757-L760",
+      "signature": "pub(super) fn bounded_message_key(value: &str) -> AppResult<ExternalMessageKey>"
+    },
+    {
+      "name": "bounded_thread_key",
+      "kind": "function",
+      "span": "L762-L765",
+      "signature": "pub(super) fn bounded_thread_key(value: &str) -> AppResult<ExternalThreadKey>"
+    },
+    {
+      "name": "CanonicalMessageInsert",
+      "kind": "struct",
+      "span": "L767-L773",
+      "signature": "pub(super) struct CanonicalMessageInsert<'a>"
+    },
+    {
+      "name": "insert_canonical_message",
+      "kind": "function",
+      "span": "L774-L820",
+      "signature": "pub(super) async fn insert_canonical_message("
+    },
+    {
+      "name": "insert_participants",
+      "kind": "function",
+      "span": "L826-L866",
+      "signature": "pub(super) async fn insert_participants("
+    },
+    {
+      "name": "AssociationWrite",
+      "kind": "struct",
+      "span": "L873-L877",
+      "signature": "pub(super) struct AssociationWrite"
+    },
+    {
+      "name": "insert_thread_association",
+      "kind": "function",
+      "span": "L879-L935",
+      "signature": "pub(super) async fn insert_thread_association("
+    },
+    {
+      "name": "tests",
+      "kind": "module",
+      "span": "L938-L1084",
+      "signature": "mod tests"
+    },
+    {
+      "name": "slack_identity",
+      "kind": "function",
+      "span": "L942-L948",
+      "signature": "fn slack_identity(namespace: &str, subject: &str) -> QualifiedIdentity"
+    },
+    {
+      "name": "write_with",
+      "kind": "function",
+      "span": "L950-L961",
+      "signature": "fn write_with(correlation: MessageCorrelation) -> MessageWrite"
+    },
+    {
+      "name": "author",
+      "kind": "function",
+      "span": "L963-L969",
+      "signature": "fn author() -> ResolvedAuthor"
+    },
+    {
+      "name": "a_differently_stripped_body_is_the_same_provider_payload",
+      "kind": "function",
+      "span": "L975-L987",
+      "signature": "fn a_differently_stripped_body_is_the_same_provider_payload()"
+    },
+    {
+      "name": "changed_provider_content_changes_the_hash",
+      "kind": "function",
+      "span": "L990-L1010",
+      "signature": "fn changed_provider_content_changes_the_hash()"
+    },
+    {
+      "name": "equal_provider_subjects_in_different_namespaces_hash_differently",
+      "kind": "function",
+      "span": "L1013-L1033",
+      "signature": "fn equal_provider_subjects_in_different_namespaces_hash_differently()"
+    },
+    {
+      "name": "attachments_round_trip_through_their_stored_envelope",
+      "kind": "function",
+      "span": "L1036-L1054",
+      "signature": "fn attachments_round_trip_through_their_stored_envelope()"
+    },
+    {
+      "name": "unreadable_stored_json_is_an_application_error",
+      "kind": "function",
+      "span": "L1059-L1083",
+      "signature": "fn unreadable_stored_json_is_an_application_error()"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 42276
+  }
+}

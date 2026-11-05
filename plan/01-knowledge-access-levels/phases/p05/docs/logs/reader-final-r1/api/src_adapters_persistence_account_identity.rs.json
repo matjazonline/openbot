@@ -1,0 +1,57 @@
+{
+  "file": "src/adapters/persistence/account_identity.rs",
+  "entries": [
+    {
+      "name": "PersonPrincipal",
+      "kind": "struct",
+      "span": "L23-L26",
+      "signature": "struct PersonPrincipal"
+    },
+    {
+      "name": "IdentityHolder",
+      "kind": "struct",
+      "span": "L30-L34",
+      "signature": "struct IdentityHolder"
+    },
+    {
+      "name": "rekey_account_identity_on",
+      "kind": "function",
+      "span": "L52-L100",
+      "signature": "pub(crate) async fn rekey_account_identity_on("
+    },
+    {
+      "name": "identity_holder",
+      "kind": "function",
+      "span": "L102-L124",
+      "signature": "async fn identity_holder("
+    },
+    {
+      "name": "detach_old_address",
+      "kind": "function",
+      "span": "L131-L178",
+      "signature": "async fn detach_old_address("
+    },
+    {
+      "name": "adopt_new_address",
+      "kind": "function",
+      "span": "L181-L205",
+      "signature": "async fn adopt_new_address("
+    },
+    {
+      "name": "adopt_outsider_places",
+      "kind": "function",
+      "span": "L213-L275",
+      "signature": "async fn adopt_outsider_places("
+    },
+    {
+      "name": "tests",
+      "kind": "module",
+      "span": "L279-L279",
+      "signature": "mod tests;"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 10742
+  }
+}

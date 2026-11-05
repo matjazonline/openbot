@@ -1,0 +1,13 @@
+{
+  "port": 55505,
+  "role": "mac02",
+  "datadir": "/Users/mac02/dev/openbot-recovery/.worktrees/pg-knowledge-p05",
+  "socket": "/Users/mac02/dev/openbot-recovery/.worktrees/pg-knowledge-p05-socket",
+  "urls": {
+    "open_bots": "postgres://mac02@127.0.0.1:55505/open_bots",
+    "open_bots_test": "postgres://mac02@127.0.0.1:55505/open_bots_test"
+  },
+  "fresh_migrations": "PASS both",
+  "env_mode": "0o600",
+  "ownership": "p05 only; no siblings changed"
+}

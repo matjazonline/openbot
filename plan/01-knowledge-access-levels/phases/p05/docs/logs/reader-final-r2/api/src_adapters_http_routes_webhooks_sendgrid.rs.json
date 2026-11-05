@@ -1,0 +1,39 @@
+{
+  "file": "src/adapters/http/routes/webhooks/sendgrid.rs",
+  "entries": [
+    {
+      "name": "router",
+      "kind": "function",
+      "span": "L31-L33",
+      "signature": "pub fn router() -> Router<AppState>"
+    },
+    {
+      "name": "sendgrid_inbound_webhook",
+      "kind": "function",
+      "span": "L36-L117",
+      "signature": "async fn sendgrid_inbound_webhook("
+    },
+    {
+      "name": "configured_sendgrid",
+      "kind": "function",
+      "span": "L119-L124",
+      "signature": "fn configured_sendgrid(config: &AppConfig) -> Result<&SendGridInboundConfig, StatusCode>"
+    },
+    {
+      "name": "tests",
+      "kind": "module",
+      "span": "L127-L137",
+      "signature": "mod tests"
+    },
+    {
+      "name": "the_webhook_is_absent_when_sendgrid_is_disabled",
+      "kind": "function",
+      "span": "L131-L136",
+      "signature": "fn the_webhook_is_absent_when_sendgrid_is_disabled()"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 4715
+  }
+}

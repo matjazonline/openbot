@@ -1,0 +1,40 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 3,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_authority_tests.rs#workflow_action_reconciliation_forged_scope_and_subject_never_verify",
+        "name": "workflow_action_reconciliation_forged_scope_and_subject_never_verify",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_authority_tests.rs",
+        "span": "L58-L79"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_authority_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 58,
+          "text": "async fn workflow_action_reconciliation_forged_scope_and_subject_never_verify() {"
+        },
+        {
+          "line": 67,
+          "text": "3 => c.subject.invocation = ActionInvocationId::new(Uuid::new_v4()),"
+        },
+        {
+          "line": 68,
+          "text": "4 => c.subject.argument_digest = serde_json::from_value(json!(\"f\".repeat(64))).unwrap(),"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 16672
+  }
+}

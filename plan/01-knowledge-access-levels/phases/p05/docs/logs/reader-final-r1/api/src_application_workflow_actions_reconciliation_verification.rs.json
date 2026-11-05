@@ -1,0 +1,219 @@
+{
+  "file": "src/application/workflow/actions/reconciliation/verification.rs",
+  "entries": [
+    {
+      "name": "EvidenceVerifierRegistration",
+      "kind": "struct",
+      "span": "L14-L20",
+      "signature": "pub struct EvidenceVerifierRegistration"
+    },
+    {
+      "name": "approve",
+      "kind": "function",
+      "span": "L22-L41",
+      "signature": "pub fn approve("
+    },
+    {
+      "name": "id",
+      "kind": "function",
+      "span": "L43-L45",
+      "signature": "pub fn id(&self) -> &EvidenceVerifierId"
+    },
+    {
+      "name": "version",
+      "kind": "function",
+      "span": "L47-L49",
+      "signature": "pub fn version(&self) -> &EvidenceVerifierVersion"
+    },
+    {
+      "name": "provider",
+      "kind": "function",
+      "span": "L50-L52",
+      "signature": "pub fn provider(&self) -> &EvidenceProviderId"
+    },
+    {
+      "name": "company",
+      "kind": "function",
+      "span": "L53-L55",
+      "signature": "pub fn company(&self) -> CompanyId"
+    },
+    {
+      "name": "operation",
+      "kind": "function",
+      "span": "L56-L58",
+      "signature": "pub fn operation(&self) -> &ArgumentDigest"
+    },
+    {
+      "name": "matches_snapshot",
+      "kind": "function",
+      "span": "L60-L62",
+      "signature": "pub fn matches_snapshot(&self, snapshot: &ReconciliationSnapshot) -> AppResult<bool>"
+    },
+    {
+      "name": "matches",
+      "kind": "function",
+      "span": "L64-L80",
+      "signature": "pub(super) fn matches(&self, snapshot: &ReconciliationSnapshot) -> AppResult<bool>"
+    },
+    {
+      "name": "AppliedEvidenceRequest",
+      "kind": "enum",
+      "span": "L87-L96",
+      "signature": "pub enum AppliedEvidenceRequest"
+    },
+    {
+      "name": "VerifiedDisposition",
+      "kind": "enum",
+      "span": "L98-L105",
+      "signature": "pub enum VerifiedDisposition"
+    },
+    {
+      "name": "EvidenceAttestation",
+      "kind": "struct",
+      "span": "L108-L114",
+      "signature": "pub struct EvidenceAttestation"
+    },
+    {
+      "name": "AttestationDiagnostic",
+      "kind": "struct",
+      "span": "L121-L123",
+      "signature": "pub struct AttestationDiagnostic"
+    },
+    {
+      "name": "VERSION",
+      "kind": "constant",
+      "span": "L126-L126",
+      "signature": "const VERSION: u8 = 1;"
+    },
+    {
+      "name": "new",
+      "kind": "function",
+      "span": "L128-L130",
+      "signature": "pub fn new(ledger: EvidenceProviderId) -> Self"
+    },
+    {
+      "name": "serialize",
+      "kind": "function",
+      "span": "L134-L140",
+      "signature": "fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error>"
+    },
+    {
+      "name": "ActionEvidenceVerifier",
+      "kind": "interface",
+      "span": "L144-L152",
+      "signature": "pub trait ActionEvidenceVerifier: Send + Sync"
+    },
+    {
+      "name": "registration",
+      "kind": "function",
+      "span": "L145-L145",
+      "signature": "fn registration(&self) -> &EvidenceVerifierRegistration;"
+    },
+    {
+      "name": "verify",
+      "kind": "function",
+      "span": "L146-L151",
+      "signature": "async fn verify("
+    },
+    {
+      "name": "EffectiveEvidenceDisposition",
+      "kind": "enum",
+      "span": "L155-L159",
+      "signature": "pub enum EffectiveEvidenceDisposition"
+    },
+    {
+      "name": "VerifiedEvidence",
+      "kind": "struct",
+      "span": "L163-L175",
+      "signature": "pub struct VerifiedEvidence"
+    },
+    {
+      "name": "unknown",
+      "kind": "function",
+      "span": "L177-L197",
+      "signature": "pub(super) fn unknown("
+    },
+    {
+      "name": "issue",
+      "kind": "function",
+      "span": "L199-L287",
+      "signature": "pub(super) fn issue("
+    },
+    {
+      "name": "disposition",
+      "kind": "function",
+      "span": "L289-L291",
+      "signature": "pub fn disposition(&self) -> EffectiveEvidenceDisposition"
+    },
+    {
+      "name": "recovered_result",
+      "kind": "function",
+      "span": "L292-L294",
+      "signature": "pub fn recovered_result(&self) -> Option<&Value>"
+    },
+    {
+      "name": "applied_request",
+      "kind": "function",
+      "span": "L295-L297",
+      "signature": "pub fn applied_request(&self) -> Option<AppliedEvidenceRequest>"
+    },
+    {
+      "name": "request_digest",
+      "kind": "function",
+      "span": "L298-L300",
+      "signature": "pub fn request_digest(&self) -> &ReconciliationRequestDigest"
+    },
+    {
+      "name": "coverage_digest",
+      "kind": "function",
+      "span": "L301-L303",
+      "signature": "pub fn coverage_digest(&self) -> &ActionCoverageDigest"
+    },
+    {
+      "name": "registration",
+      "kind": "function",
+      "span": "L304-L306",
+      "signature": "pub fn registration(&self) -> Option<&EvidenceVerifierRegistration>"
+    },
+    {
+      "name": "authoritative_reference",
+      "kind": "function",
+      "span": "L307-L309",
+      "signature": "pub fn authoritative_reference(&self) -> Option<&EvidenceRecordReference>"
+    },
+    {
+      "name": "observed_at",
+      "kind": "function",
+      "span": "L310-L312",
+      "signature": "pub fn observed_at(&self) -> DateTime<Utc>"
+    },
+    {
+      "name": "verified_at",
+      "kind": "function",
+      "span": "L313-L315",
+      "signature": "pub fn verified_at(&self) -> DateTime<Utc>"
+    },
+    {
+      "name": "valid_until",
+      "kind": "function",
+      "span": "L316-L318",
+      "signature": "pub fn valid_until(&self) -> DateTime<Utc>"
+    },
+    {
+      "name": "diagnostic",
+      "kind": "function",
+      "span": "L319-L321",
+      "signature": "pub fn diagnostic(&self) -> &Value"
+    },
+    {
+      "name": "classify",
+      "kind": "function",
+      "span": "L324-L362",
+      "signature": "fn classify("
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 13149
+  }
+}

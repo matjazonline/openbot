@@ -1,0 +1,111 @@
+{
+  "file": "src/adapters/protocols/email/mail.rs",
+  "entries": [
+    {
+      "name": "MailHeader",
+      "kind": "struct",
+      "span": "L19-L22",
+      "signature": "pub struct MailHeader"
+    },
+    {
+      "name": "MailMessage",
+      "kind": "struct",
+      "span": "L25-L36",
+      "signature": "pub struct MailMessage"
+    },
+    {
+      "name": "MailSendOutcome",
+      "kind": "enum",
+      "span": "L47-L68",
+      "signature": "pub enum MailSendOutcome"
+    },
+    {
+      "name": "into_result",
+      "kind": "function",
+      "span": "L75-L83",
+      "signature": "pub fn into_result(self) -> AppResult<()>"
+    },
+    {
+      "name": "MailTransport",
+      "kind": "interface",
+      "span": "L87-L89",
+      "signature": "pub trait MailTransport: Send + Sync"
+    },
+    {
+      "name": "send",
+      "kind": "function",
+      "span": "L88-L88",
+      "signature": "async fn send(&self, message: MailMessage) -> MailSendOutcome;"
+    },
+    {
+      "name": "CompanyMailTransports",
+      "kind": "interface",
+      "span": "L107-L112",
+      "signature": "pub trait CompanyMailTransports: Send + Sync"
+    },
+    {
+      "name": "transport_for",
+      "kind": "function",
+      "span": "L108-L111",
+      "signature": "async fn transport_for("
+    },
+    {
+      "name": "DeploymentMailTransports",
+      "kind": "struct",
+      "span": "L118-L118",
+      "signature": "pub struct DeploymentMailTransports(Arc<dyn MailTransport>);"
+    },
+    {
+      "name": "only",
+      "kind": "function",
+      "span": "L122-L124",
+      "signature": "pub fn only(transport: Arc<dyn MailTransport>) -> Arc<dyn CompanyMailTransports>"
+    },
+    {
+      "name": "transport_for",
+      "kind": "function",
+      "span": "L129-L134",
+      "signature": "async fn transport_for("
+    },
+    {
+      "name": "DisabledMailTransport",
+      "kind": "struct",
+      "span": "L138-L138",
+      "signature": "pub struct DisabledMailTransport;"
+    },
+    {
+      "name": "send",
+      "kind": "function",
+      "span": "L142-L148",
+      "signature": "async fn send(&self, message: MailMessage) -> MailSendOutcome"
+    },
+    {
+      "name": "SmtpConfirmationSender",
+      "kind": "struct",
+      "span": "L151-L154",
+      "signature": "pub struct SmtpConfirmationSender"
+    },
+    {
+      "name": "new",
+      "kind": "function",
+      "span": "L157-L159",
+      "signature": "pub fn new(config: Arc<AppConfig>, transport: Arc<dyn MailTransport>) -> Self"
+    },
+    {
+      "name": "send_code",
+      "kind": "function",
+      "span": "L164-L188",
+      "signature": "async fn send_code("
+    },
+    {
+      "name": "confirmation_copy",
+      "kind": "function",
+      "span": "L191-L209",
+      "signature": "fn confirmation_copy(purpose: ConfirmationPurpose) -> (&'static str, &'static str, &'static str)"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 8052
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 4,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_claim_boundary_tests.rs#assert_root_links",
+        "name": "assert_root_links",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_claim_boundary_tests.rs",
+        "span": "L343-L365"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_claim_boundary_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 343,
+          "text": "fn assert_root_links(state: &Value, subject: ActivationRequest, scopes: &[ActivationRequest]) {"
+        },
+        {
+          "line": 362,
+          "text": "if scope.run == subject.run { 0 } else { 2 }"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_claim_boundary_tests.rs#workflow_action_reconciliation_claim_boundary_roots_and_companies_same_database",
+        "name": "workflow_action_reconciliation_claim_boundary_roots_and_companies_same_database",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_claim_boundary_tests.rs",
+        "span": "L368-L421"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_claim_boundary_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 407,
+          "text": "\"unrelated debits preserve subject scope\""
+        },
+        {
+          "line": 417,
+          "text": "\"subject claim preserves unrelated root\""
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 15076
+  }
+}

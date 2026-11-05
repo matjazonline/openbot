@@ -1,0 +1,86 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 8,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/decisions.rs#park_on",
+        "name": "park_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/decisions.rs",
+        "span": "L109-L197"
+      },
+      "path": "src/adapters/persistence/workflow/decisions.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 186,
+          "text": "sqlx::query(\"INSERT INTO workflow_decisions(company_id,run_id,execution_id,id,wait_id,subject_kind,proposal_digest) VALUES($1,$2,$3,$4,$5,'business',$6)\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/decisions.rs#submit_on",
+        "name": "submit_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/decisions.rs",
+        "span": "L428-L503"
+      },
+      "path": "src/adapters/persistence/workflow/decisions.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 438,
+          "text": "let row: DecisionRow = sqlx::query_as(\"SELECT subject_kind,choice,revision,proposal_digest,submitted_by,command_key,command_fingerprint FROM workflow_decisions "
+        },
+        {
+          "line": 441,
+          "text": "row.subject_kind.as_str(),"
+        },
+        {
+          "line": 456,
+          "text": "successor: if row.subject_kind == \"token_allowance\""
+        },
+        {
+          "line": 457,
+          "text": "|| (row.subject_kind == \"action_approval\""
+        },
+        {
+          "line": 487,
+          "text": "if row.subject_kind == \"token_allowance\" {"
+        },
+        {
+          "line": 490,
+          "text": "if row.subject_kind == \"action_approval\" {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/decisions.rs#DecisionRow",
+        "name": "DecisionRow",
+        "kind": "struct",
+        "path": "src/adapters/persistence/workflow/decisions.rs",
+        "span": "L331-L339"
+      },
+      "path": "src/adapters/persistence/workflow/decisions.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 332,
+          "text": "subject_kind: String,"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 26250
+  }
+}

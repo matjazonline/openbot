@@ -1,0 +1,32 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 1,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_proof_clock_tests.rs#expiry_diagnostic",
+        "name": "expiry_diagnostic",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_proof_clock_tests.rs",
+        "span": "L88-L103"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_proof_clock_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 99,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 15862
+  }
+}

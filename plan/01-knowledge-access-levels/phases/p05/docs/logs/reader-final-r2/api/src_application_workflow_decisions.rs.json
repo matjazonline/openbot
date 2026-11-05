@@ -1,0 +1,249 @@
+{
+  "file": "src/application/workflow/decisions.rs",
+  "entries": [
+    {
+      "name": "MAX_DECISION_COMMENTS",
+      "kind": "constant",
+      "span": "L28-L28",
+      "signature": "pub const MAX_DECISION_COMMENTS: i64 = 1000;"
+    },
+    {
+      "name": "MAX_COMMENT_CHARS",
+      "kind": "constant",
+      "span": "L30-L30",
+      "signature": "pub const MAX_COMMENT_CHARS: usize = 16_384;"
+    },
+    {
+      "name": "DecisionId",
+      "kind": "struct",
+      "span": "L33-L33",
+      "signature": "pub struct DecisionId(pub Uuid);"
+    },
+    {
+      "name": "DecisionCommandKey",
+      "kind": "struct",
+      "span": "L37-L37",
+      "signature": "pub struct DecisionCommandKey(String);"
+    },
+    {
+      "name": "parse",
+      "kind": "function",
+      "span": "L39-L48",
+      "signature": "pub fn parse(value: impl Into<String>) -> AppResult<Self>"
+    },
+    {
+      "name": "as_str",
+      "kind": "function",
+      "span": "L49-L51",
+      "signature": "pub fn as_str(&self) -> &str"
+    },
+    {
+      "name": "SubmitDecision",
+      "kind": "struct",
+      "span": "L56-L66",
+      "signature": "pub struct SubmitDecision"
+    },
+    {
+      "name": "fingerprint",
+      "kind": "function",
+      "span": "L69-L90",
+      "signature": "pub(crate) fn fingerprint(&self) -> AppResult<String>"
+    },
+    {
+      "name": "AddDecisionComment",
+      "kind": "struct",
+      "span": "L95-L101",
+      "signature": "pub struct AddDecisionComment"
+    },
+    {
+      "name": "validate",
+      "kind": "function",
+      "span": "L103-L109",
+      "signature": "pub(crate) fn validate(&self) -> AppResult<()>"
+    },
+    {
+      "name": "DecisionDisposition",
+      "kind": "enum",
+      "span": "L113-L116",
+      "signature": "pub enum DecisionDisposition"
+    },
+    {
+      "name": "DecisionSubmission",
+      "kind": "struct",
+      "span": "L119-L125",
+      "signature": "pub struct DecisionSubmission"
+    },
+    {
+      "name": "DecisionComment",
+      "kind": "struct",
+      "span": "L128-L131",
+      "signature": "pub struct DecisionComment"
+    },
+    {
+      "name": "DecisionCommentView",
+      "kind": "struct",
+      "span": "L134-L139",
+      "signature": "pub struct DecisionCommentView"
+    },
+    {
+      "name": "DecisionSubmissionView",
+      "kind": "struct",
+      "span": "L142-L148",
+      "signature": "pub struct DecisionSubmissionView"
+    },
+    {
+      "name": "DecisionSubject",
+      "kind": "enum",
+      "span": "L152-L156",
+      "signature": "pub enum DecisionSubject"
+    },
+    {
+      "name": "label",
+      "kind": "function",
+      "span": "L158-L164",
+      "signature": "pub fn label(self) -> &'static str"
+    },
+    {
+      "name": "as_str",
+      "kind": "function",
+      "span": "L165-L171",
+      "signature": "pub fn as_str(self) -> &'static str"
+    },
+    {
+      "name": "DecisionContext",
+      "kind": "struct",
+      "span": "L175-L183",
+      "signature": "pub struct DecisionContext"
+    },
+    {
+      "name": "DecisionHistoryEntry",
+      "kind": "struct",
+      "span": "L187-L199",
+      "signature": "pub struct DecisionHistoryEntry"
+    },
+    {
+      "name": "DecisionView",
+      "kind": "struct",
+      "span": "L203-L228",
+      "signature": "pub struct DecisionView"
+    },
+    {
+      "name": "WorkflowDecisions",
+      "kind": "interface",
+      "span": "L231-L249",
+      "signature": "pub trait WorkflowDecisions: Send + Sync"
+    },
+    {
+      "name": "park_decision",
+      "kind": "function",
+      "span": "L234-L238",
+      "signature": "async fn park_decision("
+    },
+    {
+      "name": "submit_decision",
+      "kind": "function",
+      "span": "L240-L240",
+      "signature": "async fn submit_decision(&self, command: SubmitDecision) -> AppResult<DecisionSubmission>;"
+    },
+    {
+      "name": "add_decision_comment",
+      "kind": "function",
+      "span": "L241-L242",
+      "signature": "async fn add_decision_comment(&self, command: AddDecisionComment)"
+    },
+    {
+      "name": "read_decision",
+      "kind": "function",
+      "span": "L243-L248",
+      "signature": "async fn read_decision("
+    },
+    {
+      "name": "DecisionSpecification",
+      "kind": "struct",
+      "span": "L253-L258",
+      "signature": "pub(crate) struct DecisionSpecification"
+    },
+    {
+      "name": "specification",
+      "kind": "function",
+      "span": "L260-L281",
+      "signature": "pub(crate) fn specification("
+    },
+    {
+      "name": "reviewer_deadline",
+      "kind": "function",
+      "span": "L286-L316",
+      "signature": "pub(crate) fn reviewer_deadline(inputs: &Value) -> AppResult<(Vec<Uuid>, DateTime<Utc>)>"
+    },
+    {
+      "name": "prepare_submission",
+      "kind": "function",
+      "span": "L318-L329",
+      "signature": "pub(crate) fn prepare_submission("
+    },
+    {
+      "name": "hex_digest",
+      "kind": "function",
+      "span": "L332-L335",
+      "signature": "pub(crate) fn hex_digest(value: &Value) -> AppResult<String>"
+    },
+    {
+      "name": "DecisionNotice",
+      "kind": "struct",
+      "span": "L339-L349",
+      "signature": "pub(crate) struct DecisionNotice<'a>"
+    },
+    {
+      "name": "DecisionNotices",
+      "kind": "struct",
+      "span": "L354-L359",
+      "signature": "pub struct DecisionNotices"
+    },
+    {
+      "name": "new",
+      "kind": "function",
+      "span": "L362-L369",
+      "signature": "pub fn new(deliveries: DeliveryComposer, public_base_url: &str, app_domain: &str) -> Self"
+    },
+    {
+      "name": "unrenderable",
+      "kind": "function",
+      "span": "L373-L376",
+      "signature": "pub(crate) fn unrenderable(mut self) -> Self"
+    },
+    {
+      "name": "expected_key_prefix",
+      "kind": "function",
+      "span": "L379-L381",
+      "signature": "pub(crate) fn expected_key_prefix(decision: Uuid, principal: Uuid) -> String"
+    },
+    {
+      "name": "compose",
+      "kind": "function",
+      "span": "L386-L434",
+      "signature": "pub(crate) fn compose(&self, notice: &DecisionNotice<'_>) -> AppResult<NewStandaloneDelivery>"
+    },
+    {
+      "name": "invalid",
+      "kind": "function",
+      "span": "L437-L439",
+      "signature": "fn invalid() -> AppError"
+    },
+    {
+      "name": "project",
+      "kind": "function",
+      "span": "L442-L458",
+      "signature": "pub fn project(&mut self, visibility: crate::application::knowledge::PayloadVisibility)"
+    },
+    {
+      "name": "redact_payload",
+      "kind": "function",
+      "span": "L461-L466",
+      "signature": "pub fn redact_payload(&mut self)"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 16307
+  }
+}

@@ -1,0 +1,291 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 38,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_reconcile_tests.rs#ledger",
+        "name": "ledger",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_reconcile_tests.rs",
+        "span": "L142-L156"
+      },
+      "path": "src/adapters/persistence/workflow/message_reconcile_tests.rs",
+      "inDegree": 10,
+      "hits": [
+        {
+          "line": 151,
+          "text": "let subject = subject(setup, delivery).await;"
+        },
+        {
+          "line": 153,
+          "text": ".bind(&subject.message_id).bind(&subject.recipient_address).bind(&subject.content_digest)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_reconcile_tests.rs#command_as",
+        "name": "command_as",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_reconcile_tests.rs",
+        "span": "L166-L201"
+      },
+      "path": "src/adapters/persistence/workflow/message_reconcile_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 173,
+          "text": "let subject = subject(setup, delivery).await;"
+        },
+        {
+          "line": 183,
+          "text": "subject: ApprovalSubject {"
+        },
+        {
+          "line": 184,
+          "text": "invocation: ActionInvocationId::new(subject.invocation_id),"
+        },
+        {
+          "line": 185,
+          "text": "argument_digest: serde_json::from_value(json!(subject.argument_digest)).unwrap(),"
+        },
+        {
+          "line": 187,
+          "text": "marker: ActionRemoteMarkerId::new(subject.dispatch_id),"
+        },
+        {
+          "line": 189,
+          "text": "ordinal: u8::try_from(subject.ordinal).unwrap(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_reconcile_tests.rs#subject",
+        "name": "subject",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_reconcile_tests.rs",
+        "span": "L126-L139"
+      },
+      "path": "src/adapters/persistence/workflow/message_reconcile_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 126,
+          "text": "async fn subject(setup: &Setup, delivery: Uuid) -> Subject {"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/message_reconcile_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 24,
+          "text": "/// change the subject between snapshot and settlement."
+        },
+        {
+          "line": 264,
+          "text": "/// D3 §G row 15: applied evidence delivers the subject; the consumer derives the receipt and"
+        },
+        {
+          "line": 371,
+          "text": "/// Row 16: final not-applied reopens only the subject; the engine resends it with the same"
+        },
+        {
+          "line": 427,
+          "text": "/// Rows 17 and 18: exhausted attempts dead-letter the subject; a cancelled or expired run"
+        },
+        {
+          "line": 546,
+          "text": "/// Row 19: a subject that changed between snapshot and settlement is refused with no grant."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_reconcile_tests.rs#verify",
+        "name": "verify",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_reconcile_tests.rs",
+        "span": "L38-L79"
+      },
+      "path": "src/adapters/persistence/workflow/message_reconcile_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 44,
+          "text": "let subject = snapshot"
+        },
+        {
+          "line": 47,
+          "text": ".expect(\"a message delivery subject\");"
+        },
+        {
+          "line": 52,
+          "text": ".bind(&subject.message_id)"
+        },
+        {
+          "line": 53,
+          "text": ".bind(&subject.recipient)"
+        },
+        {
+          "line": 54,
+          "text": ".bind(&subject.content_digest)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_reconcile_tests.rs#workflow_message_reconcile_not_applied_reopens_only_the_subject",
+        "name": "workflow_message_reconcile_not_applied_reopens_only_the_subject",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_reconcile_tests.rs",
+        "span": "L374-L425"
+      },
+      "path": "src/adapters/persistence/workflow/message_reconcile_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 374,
+          "text": "async fn workflow_message_reconcile_not_applied_reopens_only_the_subject() {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_reconcile_tests.rs#workflow_message_reconcile_unknown_and_refusals_change_nothing",
+        "name": "workflow_message_reconcile_unknown_and_refusals_change_nothing",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_reconcile_tests.rs",
+        "span": "L494-L544"
+      },
+      "path": "src/adapters/persistence/workflow/message_reconcile_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 535,
+          "text": "// A remote target on a message marker is a missing subject."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_reconcile_tests.rs#workflow_message_reconcile_finality_breach_vetoes_resume_and_reopen",
+        "name": "workflow_message_reconcile_finality_breach_vetoes_resume_and_reopen",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_reconcile_tests.rs",
+        "span": "L639-L749"
+      },
+      "path": "src/adapters/persistence/workflow/message_reconcile_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 643,
+          "text": "let (sibling, subject) = ("
+        },
+        {
+          "line": 648,
+          "text": "send_unknown(&setup, subject).await;"
+        },
+        {
+          "line": 649,
+          "text": "ledger(&setup, subject, \"not_applied\", None, 60.0, None).await;"
+        },
+        {
+          "line": 650,
+          "text": "let first = command(&setup, subject, \"breached-proof\", verified()).await;"
+        },
+        {
+          "line": 658,
+          "text": "send_unknown(&setup, subject).await;"
+        },
+        {
+          "line": 659,
+          "text": "ledger(&setup, subject, \"applied\", Some(accepted_at), 60.0, None).await;"
+        },
+        {
+          "line": 660,
+          "text": "let second = command(&setup, subject, \"breaching-truth\", verified()).await;"
+        },
+        {
+          "line": 664,
+          "text": "delivery_row(setup.pool(), subject).await.status,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_reconcile_tests.rs#workflow_message_reconcile_conflicted_execution_reopens_nothing",
+        "name": "workflow_message_reconcile_conflicted_execution_reopens_nothing",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_reconcile_tests.rs",
+        "span": "L754-L824"
+      },
+      "path": "src/adapters/persistence/workflow/message_reconcile_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 758,
+          "text": "let (sibling, subject) = ("
+        },
+        {
+          "line": 764,
+          "text": "send_unknown(&setup, subject).await;"
+        },
+        {
+          "line": 765,
+          "text": "ledger(&setup, subject, \"not_applied\", None, 60.0, None).await;"
+        },
+        {
+          "line": 766,
+          "text": "let first = command(&setup, subject, \"conflict-proof\", verified()).await;"
+        },
+        {
+          "line": 774,
+          "text": "send_unknown(&setup, subject).await;"
+        },
+        {
+          "line": 775,
+          "text": "ledger(&setup, subject, \"applied\", Some(accepted_at), 60.0, None).await;"
+        },
+        {
+          "line": 776,
+          "text": "let breach = command(&setup, subject, \"conflict-truth\", verified()).await;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_reconcile_tests.rs#workflow_message_sql_evidence_attribution_shape_rejects_forgeries",
+        "name": "workflow_message_sql_evidence_attribution_shape_rejects_forgeries",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_reconcile_tests.rs",
+        "span": "L856-L902"
+      },
+      "path": "src/adapters/persistence/workflow/message_reconcile_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 876,
+          "text": "\"delivery attribution without a subject\","
+        },
+        {
+          "line": 880,
+          "text": "\"remote attribution with a delivery subject\","
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 39388
+  }
+}

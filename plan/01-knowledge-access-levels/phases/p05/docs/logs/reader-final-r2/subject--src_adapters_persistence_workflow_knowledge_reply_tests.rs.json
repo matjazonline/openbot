@@ -1,0 +1,36 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 2,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/knowledge_reply_tests.rs#verified_sender",
+        "name": "verified_sender",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/knowledge_reply_tests.rs",
+        "span": "L7-L30"
+      },
+      "path": "src/adapters/persistence/workflow/knowledge_reply_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 20,
+          "text": "sqlx::query(\"UPDATE principals SET kind='person',user_id=$2 WHERE company_id=$1 AND id IN (SELECT principal_id FROM participant_identities WHERE company_id=$1 A"
+        },
+        {
+          "line": 22,
+          "text": "sqlx::query(\"UPDATE participant_identities SET status='verified',provenance='account',claim_metadata='{\\\"version\\\":1,\\\"kind\\\":\\\"account\\\"}'::jsonb WHERE company"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 6468
+  }
+}

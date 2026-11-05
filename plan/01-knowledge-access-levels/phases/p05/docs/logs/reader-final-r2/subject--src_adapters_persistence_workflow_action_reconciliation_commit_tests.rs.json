@@ -1,0 +1,36 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 2,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_commit_tests.rs#expected_identity",
+        "name": "expected_identity",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_commit_tests.rs",
+        "span": "L127-L134"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_commit_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 130,
+          "text": "\"execution_id\":scope.execution.as_uuid(),\"invocation_id\":command.subject.invocation.as_uuid(),"
+        },
+        {
+          "line": 131,
+          "text": "\"argument_digest\":command.subject.argument_digest.as_str(),\"dispatch_id\":command.marker.as_uuid(),"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 12572
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 2,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_thread_tests.rs#send_to_user",
+        "name": "send_to_user",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_thread_tests.rs",
+        "span": "L629-L635"
+      },
+      "path": "src/adapters/persistence/workflow/message_thread_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 632,
+          "text": "json!({\"content\":{\"literal\":{\"subject\":\"Status\",\"body\":\"The run finished.\"}},"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_thread_tests.rs#workflow_message_thread_send_never_joins_the_customer_thread",
+        "name": "workflow_message_thread_send_never_joins_the_customer_thread",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_thread_tests.rs",
+        "span": "L390-L453"
+      },
+      "path": "src/adapters/persistence/workflow/message_thread_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 395,
+          "text": "json!({\"content\":{\"literal\":{\"subject\":\"Status\",\"body\":\"Sent elsewhere.\"}},"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 34855
+  }
+}

@@ -1,0 +1,103 @@
+{
+  "pattern": "subject",
+  "filesSearched": 3,
+  "totalHits": 9,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/spam_scanner/tests.rs#input",
+        "name": "input",
+        "kind": "function",
+        "path": "src/adapters/spam_scanner/tests.rs",
+        "span": "L22-L30"
+      },
+      "path": "src/adapters/spam_scanner/tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 25,
+          "text": "subject: Some(\"URGENT\"),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/spam_scanner/heuristic.rs#score_subject",
+        "name": "score_subject",
+        "kind": "function",
+        "path": "src/adapters/spam_scanner/heuristic.rs",
+        "span": "L33-L71"
+      },
+      "path": "src/adapters/spam_scanner/heuristic.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 33,
+          "text": "fn score_subject(result: &mut SpamScanResult, subj: &str) {"
+        },
+        {
+          "line": 36,
+          "text": "// High urgency/spam keywords in subject"
+        },
+        {
+          "line": 63,
+          "text": "result.add(1.5, \"Excessive uppercase letters in subject\");"
+        },
+        {
+          "line": 69,
+          "text": "result.add(1.0, \"Excessive punctuation in subject\");"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/spam_scanner/mod.rs#scan",
+        "name": "scan",
+        "kind": "function",
+        "path": "src/adapters/spam_scanner/mod.rs",
+        "span": "L99-L114"
+      },
+      "path": "src/adapters/spam_scanner/mod.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 101,
+          "text": "HeuristicScanner::scan(input.subject, input.from, input.body_text, input.body_html)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/spam_scanner/heuristic.rs#scan",
+        "name": "scan",
+        "kind": "function",
+        "path": "src/adapters/spam_scanner/heuristic.rs",
+        "span": "L6-L31"
+      },
+      "path": "src/adapters/spam_scanner/heuristic.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 7,
+          "text": "subject: Option<&str>,"
+        },
+        {
+          "line": 13,
+          "text": "if let Some(subject) = subject {"
+        },
+        {
+          "line": 14,
+          "text": "score_subject(&mut result, subject);"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 3,
+    "baselineChars": 16314
+  }
+}

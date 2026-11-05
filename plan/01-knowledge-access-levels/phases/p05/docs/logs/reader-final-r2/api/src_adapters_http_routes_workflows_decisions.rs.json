@@ -1,0 +1,105 @@
+{
+  "file": "src/adapters/http/routes/workflows/decisions.rs",
+  "entries": [
+    {
+      "name": "view_json",
+      "kind": "function",
+      "span": "L20-L52",
+      "signature": "fn view_json(view: &DecisionView) -> Value"
+    },
+    {
+      "name": "replayed",
+      "kind": "function",
+      "span": "L54-L56",
+      "signature": "fn replayed(disposition: DecisionDisposition) -> bool"
+    },
+    {
+      "name": "read",
+      "kind": "function",
+      "span": "L58-L68",
+      "signature": "pub async fn read("
+    },
+    {
+      "name": "SubmitBody",
+      "kind": "struct",
+      "span": "L72-L80",
+      "signature": "pub struct SubmitBody"
+    },
+    {
+      "name": "submit_command",
+      "kind": "function",
+      "span": "L82-L108",
+      "signature": "async fn submit_command("
+    },
+    {
+      "name": "submit",
+      "kind": "function",
+      "span": "L110-L118",
+      "signature": "pub async fn submit("
+    },
+    {
+      "name": "CommentBody",
+      "kind": "struct",
+      "span": "L122-L125",
+      "signature": "pub struct CommentBody"
+    },
+    {
+      "name": "comment_command",
+      "kind": "function",
+      "span": "L127-L145",
+      "signature": "async fn comment_command("
+    },
+    {
+      "name": "comment",
+      "kind": "function",
+      "span": "L147-L164",
+      "signature": "pub async fn comment("
+    },
+    {
+      "name": "page_company",
+      "kind": "function",
+      "span": "L168-L175",
+      "signature": "async fn page_company(engine: &WorkflowServices, decision: Uuid) -> AppResult<Uuid>"
+    },
+    {
+      "name": "page",
+      "kind": "function",
+      "span": "L177-L188",
+      "signature": "pub async fn page("
+    },
+    {
+      "name": "CommentForm",
+      "kind": "struct",
+      "span": "L191-L194",
+      "signature": "pub struct CommentForm"
+    },
+    {
+      "name": "section_after",
+      "kind": "function",
+      "span": "L199-L227",
+      "signature": "async fn section_after("
+    },
+    {
+      "name": "ui_submit",
+      "kind": "function",
+      "span": "L229-L263",
+      "signature": "pub async fn ui_submit("
+    },
+    {
+      "name": "submission_body",
+      "kind": "function",
+      "span": "L265-L293",
+      "signature": "fn submission_body(view: &DecisionView, inputs: &DecisionInputs) -> AppResult<SubmitBody>"
+    },
+    {
+      "name": "ui_comment",
+      "kind": "function",
+      "span": "L295-L323",
+      "signature": "pub async fn ui_comment("
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 11059
+  }
+}

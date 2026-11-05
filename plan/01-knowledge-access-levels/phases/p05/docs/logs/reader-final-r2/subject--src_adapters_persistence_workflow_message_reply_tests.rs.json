@@ -1,0 +1,36 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 2,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_reply_tests.rs#asked_via",
+        "name": "asked_via",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_reply_tests.rs",
+        "span": "L77-L215"
+      },
+      "path": "src/adapters/persistence/workflow/message_reply_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 85,
+          "text": "\"content\":{\"literal\":{\"subject\":\"Question\",\"body\":\"Shall we proceed?\"}},"
+        },
+        {
+          "line": 110,
+          "text": "\"content\":{\"literal\":{\"subject\":\"Question\",\"body\":\"Shall we proceed?\"}},"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 31728
+  }
+}

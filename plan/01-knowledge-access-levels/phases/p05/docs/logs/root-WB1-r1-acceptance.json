@@ -1,0 +1,20 @@
+{
+  "phase": "p05",
+  "state": "accepted in phase",
+  "review": "KNOW-P05-WB1-R1",
+  "note": "KNOW-P05-WB1-R1-N1",
+  "findings": [],
+  "installed_digest": "85b5ea486c25f8aa6da8a0032a09c6438edba4edbec3118242a694716a7d7f5c",
+  "tree_sha256": "f48a4d56920291e12f23567b18229ab7d033f5eac052f0cf0f4aa8a9f8de9005",
+  "base": "b7e63b01433ba7a77341ff6c7f158d75d082a8a2",
+  "exclusions": [
+    "plan/01-knowledge-access-levels/phases/p05/docs"
+  ],
+  "files_count": 3256,
+  "authority_revision": 14,
+  "authority_sha256": "e4ab96e9c2704fd3544799497901fecd5da497730dcc2b11499cb8500b0834af",
+  "decision_sha256": "46e5df05700f7f9d6fbbae24a2b914bafc6ee36ea8ae0a11966e2b5c518bcaa3",
+  "required_focused_checks": "PASS; author990+132 native/two browsers/liveSQLx/cache/offline/clippy/fmt/css/schema; independent147native/onebrowser/offline/fmt/whitespace/schema",
+  "full_suite": "not claimed; mandatory06 and Q001 remain",
+  "integration": "pending authorized source+record commits and local main FF"
+}

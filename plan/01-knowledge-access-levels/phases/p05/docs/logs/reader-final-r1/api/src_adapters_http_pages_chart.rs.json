@@ -1,0 +1,381 @@
+{
+  "file": "src/adapters/http/pages/chart.rs",
+  "entries": [
+    {
+      "name": "VIEW_WIDTH",
+      "kind": "constant",
+      "span": "L24-L24",
+      "signature": "const VIEW_WIDTH: f64 = 760.0;"
+    },
+    {
+      "name": "VIEW_HEIGHT",
+      "kind": "constant",
+      "span": "L25-L25",
+      "signature": "const VIEW_HEIGHT: f64 = 210.0;"
+    },
+    {
+      "name": "PAD_LEFT",
+      "kind": "constant",
+      "span": "L28-L28",
+      "signature": "const PAD_LEFT: f64 = 48.0;"
+    },
+    {
+      "name": "PAD_RIGHT",
+      "kind": "constant",
+      "span": "L29-L29",
+      "signature": "const PAD_RIGHT: f64 = 32.0;"
+    },
+    {
+      "name": "PAD_TOP",
+      "kind": "constant",
+      "span": "L30-L30",
+      "signature": "const PAD_TOP: f64 = 14.0;"
+    },
+    {
+      "name": "PAD_BOTTOM",
+      "kind": "constant",
+      "span": "L31-L31",
+      "signature": "const PAD_BOTTOM: f64 = 28.0;"
+    },
+    {
+      "name": "PLOT_WIDTH",
+      "kind": "constant",
+      "span": "L33-L33",
+      "signature": "const PLOT_WIDTH: f64 = VIEW_WIDTH - PAD_LEFT - PAD_RIGHT;"
+    },
+    {
+      "name": "PLOT_HEIGHT",
+      "kind": "constant",
+      "span": "L34-L34",
+      "signature": "const PLOT_HEIGHT: f64 = VIEW_HEIGHT - PAD_TOP - PAD_BOTTOM;"
+    },
+    {
+      "name": "TICKS",
+      "kind": "constant",
+      "span": "L37-L37",
+      "signature": "const TICKS: f64 = 4.0;"
+    },
+    {
+      "name": "GAP",
+      "kind": "constant",
+      "span": "L43-L43",
+      "signature": "const GAP: f64 = 2.0;"
+    },
+    {
+      "name": "MAX_BAR_WIDTH",
+      "kind": "constant",
+      "span": "L46-L46",
+      "signature": "const MAX_BAR_WIDTH: f64 = 24.0;"
+    },
+    {
+      "name": "CAP_RADIUS",
+      "kind": "constant",
+      "span": "L49-L49",
+      "signature": "const CAP_RADIUS: f64 = 4.0;"
+    },
+    {
+      "name": "MIN_BAR_HEIGHT",
+      "kind": "constant",
+      "span": "L52-L52",
+      "signature": "const MIN_BAR_HEIGHT: f64 = 2.0;"
+    },
+    {
+      "name": "MAX_X_LABELS",
+      "kind": "constant",
+      "span": "L55-L55",
+      "signature": "const MAX_X_LABELS: usize = 8;"
+    },
+    {
+      "name": "STYLE",
+      "kind": "constant",
+      "span": "L62-L65",
+      "signature": "pub(crate) const STYLE: &str = r##\"<style>"
+    },
+    {
+      "name": "ChartKind",
+      "kind": "enum",
+      "span": "L69-L76",
+      "signature": "pub(crate) enum ChartKind"
+    },
+    {
+      "name": "YUnit",
+      "kind": "enum",
+      "span": "L80-L84",
+      "signature": "pub(crate) enum YUnit"
+    },
+    {
+      "name": "Series",
+      "kind": "struct",
+      "span": "L94-L99",
+      "signature": "pub(crate) struct Series<'a>"
+    },
+    {
+      "name": "TimeChart",
+      "kind": "struct",
+      "span": "L101-L110",
+      "signature": "pub(crate) struct TimeChart<'a>"
+    },
+    {
+      "name": "peak",
+      "kind": "function",
+      "span": "L117-L128",
+      "signature": "fn peak(&self) -> f64"
+    },
+    {
+      "name": "stack_total",
+      "kind": "function",
+      "span": "L130-L135",
+      "signature": "fn stack_total(&self, index: usize) -> f64"
+    },
+    {
+      "name": "at",
+      "kind": "function",
+      "span": "L139-L141",
+      "signature": "fn at(&self, index: usize) -> Option<f64>"
+    },
+    {
+      "name": "last_measured",
+      "kind": "function",
+      "span": "L144-L150",
+      "signature": "fn last_measured(&self) -> Option<(usize, f64)>"
+    },
+    {
+      "name": "Frame",
+      "kind": "struct",
+      "span": "L154-L159",
+      "signature": "struct Frame"
+    },
+    {
+      "name": "Point",
+      "kind": "struct",
+      "span": "L167-L170",
+      "signature": "struct Point"
+    },
+    {
+      "name": "new",
+      "kind": "function",
+      "span": "L173-L181",
+      "signature": "fn new(chart: &TimeChart<'_>) -> Self"
+    },
+    {
+      "name": "y",
+      "kind": "function",
+      "span": "L183-L185",
+      "signature": "fn y(&self, value: f64) -> f64"
+    },
+    {
+      "name": "baseline",
+      "kind": "function",
+      "span": "L187-L189",
+      "signature": "fn baseline(&self) -> f64"
+    },
+    {
+      "name": "band",
+      "kind": "function",
+      "span": "L192-L194",
+      "signature": "fn band(&self) -> f64"
+    },
+    {
+      "name": "center",
+      "kind": "function",
+      "span": "L196-L198",
+      "signature": "fn center(&self, index: usize) -> f64"
+    },
+    {
+      "name": "point",
+      "kind": "function",
+      "span": "L200-L205",
+      "signature": "fn point(&self, index: usize, value: f64) -> Point"
+    },
+    {
+      "name": "nice_step",
+      "kind": "function",
+      "span": "L213-L230",
+      "signature": "fn nice_step(peak: f64) -> f64"
+    },
+    {
+      "name": "labels_bucket",
+      "kind": "function",
+      "span": "L237-L241",
+      "signature": "fn labels_bucket(index: usize, count: usize) -> bool"
+    },
+    {
+      "name": "format_value",
+      "kind": "function",
+      "span": "L243-L250",
+      "signature": "fn format_value(value: f64, unit: YUnit) -> String"
+    },
+    {
+      "name": "thousands",
+      "kind": "function",
+      "span": "L256-L272",
+      "signature": "pub(crate) fn thousands(value: i64) -> String"
+    },
+    {
+      "name": "time_chart",
+      "kind": "function",
+      "span": "L275-L293",
+      "signature": "pub(crate) fn time_chart(chart: &TimeChart<'_>) -> String"
+    },
+    {
+      "name": "grid",
+      "kind": "function",
+      "span": "L299-L335",
+      "signature": "fn grid(chart: &TimeChart<'_>, frame: &Frame) -> String"
+    },
+    {
+      "name": "marks",
+      "kind": "function",
+      "span": "L337-L343",
+      "signature": "fn marks(chart: &TimeChart<'_>, frame: &Frame) -> String"
+    },
+    {
+      "name": "stacked_columns",
+      "kind": "function",
+      "span": "L346-L389",
+      "signature": "fn stacked_columns(chart: &TimeChart<'_>, frame: &Frame) -> String"
+    },
+    {
+      "name": "segment",
+      "kind": "function",
+      "span": "L392-L415",
+      "signature": "fn segment(origin: Point, width: f64, height: f64, color: &str, capped: bool) -> String"
+    },
+    {
+      "name": "lines",
+      "kind": "function",
+      "span": "L421-L452",
+      "signature": "fn lines(chart: &TimeChart<'_>, frame: &Frame, filled: bool) -> String"
+    },
+    {
+      "name": "measured_runs",
+      "kind": "function",
+      "span": "L458-L475",
+      "signature": "fn measured_runs(chart: &TimeChart<'_>, frame: &Frame, series: &Series<'_>) -> Vec<Vec<Point>>"
+    },
+    {
+      "name": "polyline",
+      "kind": "function",
+      "span": "L477-L487",
+      "signature": "fn polyline(points: &[Point]) -> String"
+    },
+    {
+      "name": "end_marker",
+      "kind": "function",
+      "span": "L493-L517",
+      "signature": "fn end_marker(chart: &TimeChart<'_>, frame: &Frame, series: &Series<'_>) -> String"
+    },
+    {
+      "name": "hover_bands",
+      "kind": "function",
+      "span": "L523-L535",
+      "signature": "fn hover_bands(chart: &TimeChart<'_>, frame: &Frame) -> String"
+    },
+    {
+      "name": "readout",
+      "kind": "function",
+      "span": "L538-L553",
+      "signature": "fn readout(chart: &TimeChart<'_>, index: usize) -> String"
+    },
+    {
+      "name": "legend",
+      "kind": "function",
+      "span": "L559-L582",
+      "signature": "fn legend(chart: &TimeChart<'_>) -> String"
+    },
+    {
+      "name": "tests",
+      "kind": "module",
+      "span": "L585-L793",
+      "signature": "mod tests"
+    },
+    {
+      "name": "buckets",
+      "kind": "function",
+      "span": "L589-L596",
+      "signature": "fn buckets(count: usize) -> Vec<DateTime<Utc>>"
+    },
+    {
+      "name": "chart",
+      "kind": "function",
+      "span": "L598-L610",
+      "signature": "fn chart<'a>("
+    },
+    {
+      "name": "nice_step_rounds_up_to_something_a_reader_can_divide",
+      "kind": "function",
+      "span": "L613-L619",
+      "signature": "fn nice_step_rounds_up_to_something_a_reader_can_divide()"
+    },
+    {
+      "name": "an_idle_window_still_gets_a_scale",
+      "kind": "function",
+      "span": "L622-L636",
+      "signature": "fn an_idle_window_still_gets_a_scale()"
+    },
+    {
+      "name": "a_counted_axis_never_steps_in_fractions",
+      "kind": "function",
+      "span": "L639-L643",
+      "signature": "fn a_counted_axis_never_steps_in_fractions()"
+    },
+    {
+      "name": "a_stack_is_scaled_against_its_total_and_a_line_against_its_largest",
+      "kind": "function",
+      "span": "L646-L666",
+      "signature": "fn a_stack_is_scaled_against_its_total_and_a_line_against_its_largest()"
+    },
+    {
+      "name": "the_newest_bucket_is_always_labelled",
+      "kind": "function",
+      "span": "L669-L678",
+      "signature": "fn the_newest_bucket_is_always_labelled()"
+    },
+    {
+      "name": "an_unmeasured_bucket_breaks_the_line_instead_of_diving_to_zero",
+      "kind": "function",
+      "span": "L681-L694",
+      "signature": "fn an_unmeasured_bucket_breaks_the_line_instead_of_diving_to_zero()"
+    },
+    {
+      "name": "a_line_ends_on_its_last_measured_bucket_not_its_last_bucket",
+      "kind": "function",
+      "span": "L697-L705",
+      "signature": "fn a_line_ends_on_its_last_measured_bucket_not_its_last_bucket()"
+    },
+    {
+      "name": "one_series_gets_no_legend_and_two_get_one",
+      "kind": "function",
+      "span": "L708-L732",
+      "signature": "fn one_series_gets_no_legend_and_two_get_one()"
+    },
+    {
+      "name": "every_bucket_answers_when_pointed_at_including_the_empty_ones",
+      "kind": "function",
+      "span": "L735-L751",
+      "signature": "fn every_bucket_answers_when_pointed_at_including_the_empty_ones()"
+    },
+    {
+      "name": "an_unmeasured_bucket_reads_as_unmeasured_rather_than_as_zero",
+      "kind": "function",
+      "span": "L754-L768",
+      "signature": "fn an_unmeasured_bucket_reads_as_unmeasured_rather_than_as_zero()"
+    },
+    {
+      "name": "milliseconds_become_seconds_once_they_stop_being_readable",
+      "kind": "function",
+      "span": "L771-L776",
+      "signature": "fn milliseconds_become_seconds_once_they_stop_being_readable()"
+    },
+    {
+      "name": "a_value_too_small_to_see_is_still_drawn",
+      "kind": "function",
+      "span": "L779-L792",
+      "signature": "fn a_value_too_small_to_see_is_still_drawn()"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 27594
+  }
+}

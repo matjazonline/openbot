@@ -1,0 +1,197 @@
+{
+  "pattern": "message\\.(body|subject|attachments)|entry\\.subject|content\\.text",
+  "filesSearched": 198,
+  "totalHits": 13,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/deliveries.rs#delivery_detail_pane",
+        "name": "delivery_detail_pane",
+        "kind": "function",
+        "path": "src/adapters/http/pages/deliveries.rs",
+        "span": "L371-L410"
+      },
+      "path": "src/adapters/http/pages/deliveries.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 402,
+          "text": "subject = escape_html_text(&entry.subject),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/mailbox.rs#message_bubble",
+        "name": "message_bubble",
+        "kind": "function",
+        "path": "src/adapters/http/pages/mailbox.rs",
+        "span": "L2479-L2575"
+      },
+      "path": "src/adapters/http/pages/mailbox.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 2506,
+          "text": "escape_html_text(&message.body)"
+        },
+        {
+          "line": 2511,
+          "text": "render_markdown(&message.body)"
+        },
+        {
+          "line": 2516,
+          "text": "escape_html_text(&message.body)"
+        },
+        {
+          "line": 2567,
+          "text": "subject = escape_html_text(&message.subject),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/deliveries.rs#delivery_menu_entry",
+        "name": "delivery_menu_entry",
+        "kind": "function",
+        "path": "src/adapters/http/pages/deliveries.rs",
+        "span": "L268-L303"
+      },
+      "path": "src/adapters/http/pages/deliveries.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 297,
+          "text": "subject = escape_html_text(&entry.subject),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_attachments.rs#find_attachment",
+        "name": "find_attachment",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui_attachments.rs",
+        "span": "L111-L120"
+      },
+      "path": "src/adapters/http/routes/ui_attachments.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 117,
+          "text": ".flat_map(|message| message.attachments.iter())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/mailbox.rs#message_note_controls",
+        "name": "message_note_controls",
+        "kind": "function",
+        "path": "src/adapters/http/pages/mailbox.rs",
+        "span": "L2577-L2619"
+      },
+      "path": "src/adapters/http/pages/mailbox.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 2616,
+          "text": "body = escape_html_text(&message.body),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/mailbox.rs#attachment_chips",
+        "name": "attachment_chips",
+        "kind": "function",
+        "path": "src/adapters/http/pages/mailbox.rs",
+        "span": "L2656-L2670"
+      },
+      "path": "src/adapters/http/pages/mailbox.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 2657,
+          "text": "if message.attachments.is_empty() {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/tests.rs#a_message_renders_for_every_transport_including_none_at_all",
+        "name": "a_message_renders_for_every_transport_including_none_at_all",
+        "kind": "function",
+        "path": "src/adapters/http/pages/tests.rs",
+        "span": "L2516-L2572"
+      },
+      "path": "src/adapters/http/pages/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 2551,
+          "text": "html.contains(&escape_html_text(&message.body)),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/tests.rs#an_attachment_is_offered_as_a_download_scoped_to_its_thread",
+        "name": "an_attachment_is_offered_as_a_download_scoped_to_its_thread",
+        "kind": "function",
+        "path": "src/adapters/http/pages/tests.rs",
+        "span": "L2708-L2762"
+      },
+      "path": "src/adapters/http/pages/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 2713,
+          "text": "message.attachments = vec!["
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/workflow_decision.rs#history",
+        "name": "history",
+        "kind": "function",
+        "path": "src/adapters/http/pages/workflow_decision.rs",
+        "span": "L149-L171"
+      },
+      "path": "src/adapters/http/pages/workflow_decision.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 156,
+          "text": "id=entry.decision.0,subject=entry.subject.label(),step=escape_html_text(entry.step.as_str()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/workflow_runs/mod.rs#WORKFLOW_RUNS_SCRIPT",
+        "name": "WORKFLOW_RUNS_SCRIPT",
+        "kind": "constant",
+        "path": "src/adapters/http/pages/workflow_runs/mod.rs",
+        "span": "L22-L170"
+      },
+      "path": "src/adapters/http/pages/workflow_runs/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 49,
+          "text": "content.textContent = JSON.stringify(values, null, 2);"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 6,
+    "baselineChars": 391420
+  }
+}

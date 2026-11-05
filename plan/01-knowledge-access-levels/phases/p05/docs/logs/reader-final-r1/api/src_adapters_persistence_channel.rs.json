@@ -1,0 +1,177 @@
+{
+  "file": "src/adapters/persistence/channel.rs",
+  "entries": [
+    {
+      "name": "ChannelDb",
+      "kind": "struct",
+      "span": "L38-L53",
+      "signature": "pub struct ChannelDb"
+    },
+    {
+      "name": "Error",
+      "kind": "type",
+      "span": "L56-L56",
+      "signature": "type Error = AppError;"
+    },
+    {
+      "name": "try_from",
+      "kind": "function",
+      "span": "L58-L85",
+      "signature": "fn try_from(db: ChannelDb) -> AppResult<Self>"
+    },
+    {
+      "name": "CHANNEL_SELECT",
+      "kind": "constant",
+      "span": "L88-L135",
+      "signature": "const CHANNEL_SELECT: &str = r#\""
+    },
+    {
+      "name": "load_channel",
+      "kind": "function",
+      "span": "L137-L146",
+      "signature": "async fn load_channel(persistence: &PostgresPersistence, id: Uuid) -> AppResult<Option<Channel>>"
+    },
+    {
+      "name": "insert_channel_slugs",
+      "kind": "function",
+      "span": "L152-L176",
+      "signature": "pub(super) async fn insert_channel_slugs("
+    },
+    {
+      "name": "slug_conflict_error",
+      "kind": "function",
+      "span": "L180-L189",
+      "signature": "fn slug_conflict_error(err: sqlx::Error, slug: &str) -> AppError"
+    },
+    {
+      "name": "channel_access",
+      "kind": "function",
+      "span": "L193-L221",
+      "signature": "pub(super) fn channel_access("
+    },
+    {
+      "name": "insert_email_allowlist_grants",
+      "kind": "function",
+      "span": "L223-L264",
+      "signature": "pub(crate) async fn insert_email_allowlist_grants("
+    },
+    {
+      "name": "write_channel_email_binding",
+      "kind": "function",
+      "span": "L271-L293",
+      "signature": "pub(super) async fn write_channel_email_binding("
+    },
+    {
+      "name": "insert_channel_row_on",
+      "kind": "function",
+      "span": "L298-L330",
+      "signature": "pub(crate) async fn insert_channel_row_on("
+    },
+    {
+      "name": "create",
+      "kind": "function",
+      "span": "L334-L349",
+      "signature": "async fn create(&self, company_id: Uuid, write: ChannelWrite) -> AppResult<Channel>"
+    },
+    {
+      "name": "get_by_id",
+      "kind": "function",
+      "span": "L351-L353",
+      "signature": "async fn get_by_id(&self, id: Uuid) -> AppResult<Option<Channel>>"
+    },
+    {
+      "name": "get_by_company_slug_and_channel_slug",
+      "kind": "function",
+      "span": "L355-L373",
+      "signature": "async fn get_by_company_slug_and_channel_slug("
+    },
+    {
+      "name": "list_by_company_id",
+      "kind": "function",
+      "span": "L375-L386",
+      "signature": "async fn list_by_company_id(&self, company_id: Uuid) -> AppResult<Vec<Channel>>"
+    },
+    {
+      "name": "update",
+      "kind": "function",
+      "span": "L388-L399",
+      "signature": "async fn update(&self, request: ChannelUpdate) -> AppResult<Channel>"
+    },
+    {
+      "name": "delete",
+      "kind": "function",
+      "span": "L401-L443",
+      "signature": "async fn delete(&self, id: Uuid) -> AppResult<()>"
+    },
+    {
+      "name": "write_channel_settings_on",
+      "kind": "function",
+      "span": "L450-L501",
+      "signature": "pub(super) async fn write_channel_settings_on("
+    },
+    {
+      "name": "create_agent_from_library",
+      "kind": "function",
+      "span": "L505-L520",
+      "signature": "async fn create_agent_from_library("
+    },
+    {
+      "name": "prepare_library_agent_on",
+      "kind": "function",
+      "span": "L527-L602",
+      "signature": "pub(crate) async fn prepare_library_agent_on("
+    },
+    {
+      "name": "channels_by_ids",
+      "kind": "function",
+      "span": "L605-L620",
+      "signature": "pub(super) async fn channels_by_ids("
+    },
+    {
+      "name": "tests",
+      "kind": "module",
+      "span": "L623-L1135",
+      "signature": "mod tests"
+    },
+    {
+      "name": "test_update",
+      "kind": "function",
+      "span": "L632-L638",
+      "signature": "fn test_update(company_id: Uuid, channel_id: Uuid, write: ChannelWrite) -> ChannelUpdate"
+    },
+    {
+      "name": "postgres_channel_persistence_works",
+      "kind": "function",
+      "span": "L641-L801",
+      "signature": "async fn postgres_channel_persistence_works()"
+    },
+    {
+      "name": "alias_slugs_are_unique_within_a_company_and_free_across_companies",
+      "kind": "function",
+      "span": "L804-L916",
+      "signature": "async fn alias_slugs_are_unique_within_a_company_and_free_across_companies()"
+    },
+    {
+      "name": "an_enabled_channel_needs_no_agent",
+      "kind": "function",
+      "span": "L919-L987",
+      "signature": "async fn an_enabled_channel_needs_no_agent()"
+    },
+    {
+      "name": "a_channel_form_round_trips_its_email_allowlist_through_principal_grants",
+      "kind": "function",
+      "span": "L993-L1134",
+      "signature": "async fn a_channel_form_round_trips_its_email_allowlist_through_principal_grants()"
+    },
+    {
+      "name": "allowlist_tests",
+      "kind": "module",
+      "span": "L1139-L1139",
+      "signature": "mod allowlist_tests;"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 42624
+  }
+}

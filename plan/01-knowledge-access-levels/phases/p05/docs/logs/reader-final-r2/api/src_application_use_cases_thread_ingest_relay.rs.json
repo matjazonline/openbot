@@ -1,0 +1,39 @@
+{
+  "file": "src/application/use_cases/thread/ingest/relay.rs",
+  "entries": [
+    {
+      "name": "RelaySource",
+      "kind": "struct",
+      "span": "L4-L7",
+      "signature": "struct RelaySource"
+    },
+    {
+      "name": "relay_internal",
+      "kind": "function",
+      "span": "L10-L31",
+      "signature": "async fn relay_internal(&self, mail: &InternalRelayMail<'_>) -> AppResult<RelayDisposition>"
+    },
+    {
+      "name": "resolve_internal_destination",
+      "kind": "function",
+      "span": "L35-L94",
+      "signature": "async fn resolve_internal_destination("
+    },
+    {
+      "name": "internal_inbound_message",
+      "kind": "function",
+      "span": "L100-L182",
+      "signature": "fn internal_inbound_message("
+    },
+    {
+      "name": "authorize_relay",
+      "kind": "function",
+      "span": "L189-L210",
+      "signature": "async fn authorize_relay("
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 8790
+  }
+}

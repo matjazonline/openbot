@@ -1,0 +1,32 @@
+{
+  "pattern": "attachment",
+  "filesSearched": 3,
+  "totalHits": 1,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/sendgrid/inbound.rs#decode_multipart",
+        "name": "decode_multipart",
+        "kind": "function",
+        "path": "src/adapters/sendgrid/inbound.rs",
+        "span": "L131-L169"
+      },
+      "path": "src/adapters/sendgrid/inbound.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 155,
+          "text": "payload.attachments_data.push(RawAttachmentData {"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 10490
+  }
+}

@@ -1,0 +1,225 @@
+{
+  "file": "src/adapters/http/routes/ui.rs",
+  "entries": [
+    {
+      "name": "message",
+      "kind": "module",
+      "span": "L64-L64",
+      "signature": "mod message;"
+    },
+    {
+      "name": "router",
+      "kind": "function",
+      "span": "L66-L78",
+      "signature": "pub fn router() -> Router<AppState>"
+    },
+    {
+      "name": "MailboxQuery",
+      "kind": "struct",
+      "span": "L82-L86",
+      "signature": "pub struct MailboxQuery"
+    },
+    {
+      "name": "ChannelQuery",
+      "kind": "struct",
+      "span": "L89-L92",
+      "signature": "pub struct ChannelQuery"
+    },
+    {
+      "name": "ThreadPageQuery",
+      "kind": "struct",
+      "span": "L95-L100",
+      "signature": "pub struct ThreadPageQuery"
+    },
+    {
+      "name": "ThreadQuery",
+      "kind": "struct",
+      "span": "L103-L107",
+      "signature": "pub struct ThreadQuery"
+    },
+    {
+      "name": "ChannelStreamQuery",
+      "kind": "struct",
+      "span": "L111-L115",
+      "signature": "pub struct ChannelStreamQuery"
+    },
+    {
+      "name": "ThreadStreamQuery",
+      "kind": "struct",
+      "span": "L119-L124",
+      "signature": "pub struct ThreadStreamQuery"
+    },
+    {
+      "name": "ComposeForm",
+      "kind": "struct",
+      "span": "L127-L134",
+      "signature": "pub struct ComposeForm"
+    },
+    {
+      "name": "ReplyForm",
+      "kind": "struct",
+      "span": "L138-L146",
+      "signature": "pub struct ReplyForm"
+    },
+    {
+      "name": "delivery_requested",
+      "kind": "function",
+      "span": "L149-L151",
+      "signature": "fn delivery_requested(deliver: Option<&str>) -> bool"
+    },
+    {
+      "name": "delivery_mode",
+      "kind": "function",
+      "span": "L154-L160",
+      "signature": "fn delivery_mode(deliver: bool) -> ReplyDelivery"
+    },
+    {
+      "name": "load_managed_company",
+      "kind": "function",
+      "span": "L164-L177",
+      "signature": "pub(super) async fn load_managed_company("
+    },
+    {
+      "name": "load_readable_company",
+      "kind": "function",
+      "span": "L184-L197",
+      "signature": "pub(super) async fn load_readable_company("
+    },
+    {
+      "name": "load_viewable_channel",
+      "kind": "function",
+      "span": "L206-L223",
+      "signature": "pub(super) async fn load_viewable_channel("
+    },
+    {
+      "name": "empty_thread_page",
+      "kind": "function",
+      "span": "L225-L231",
+      "signature": "fn empty_thread_page() -> ThreadListResponse"
+    },
+    {
+      "name": "page_activity",
+      "kind": "function",
+      "span": "L237-L249",
+      "signature": "async fn page_activity("
+    },
+    {
+      "name": "first_page_thread_ids",
+      "kind": "function",
+      "span": "L252-L263",
+      "signature": "async fn first_page_thread_ids("
+    },
+    {
+      "name": "render_message_pane",
+      "kind": "function",
+      "span": "L265-L297",
+      "signature": "pub(super) async fn render_message_pane("
+    },
+    {
+      "name": "mailbox_page",
+      "kind": "function",
+      "span": "L305-L398",
+      "signature": "async fn mailbox_page("
+    },
+    {
+      "name": "thread_column_fragment",
+      "kind": "function",
+      "span": "L402-L444",
+      "signature": "async fn thread_column_fragment("
+    },
+    {
+      "name": "thread_page_fragment",
+      "kind": "function",
+      "span": "L448-L485",
+      "signature": "async fn thread_page_fragment("
+    },
+    {
+      "name": "message_pane_fragment",
+      "kind": "function",
+      "span": "L489-L517",
+      "signature": "async fn message_pane_fragment("
+    },
+    {
+      "name": "STREAM_BATCH_LIMIT",
+      "kind": "constant",
+      "span": "L521-L521",
+      "signature": "const STREAM_BATCH_LIMIT: usize = 50;"
+    },
+    {
+      "name": "resume_cursor",
+      "kind": "function",
+      "span": "L530-L536",
+      "signature": "fn resume_cursor<C: FromStr>(headers: &HeaderMap, after: Option<&str>) -> Option<C>"
+    },
+    {
+      "name": "thread_message_stream",
+      "kind": "function",
+      "span": "L544-L663",
+      "signature": "async fn thread_message_stream("
+    },
+    {
+      "name": "thread_column_stream",
+      "kind": "function",
+      "span": "L676-L830",
+      "signature": "async fn thread_column_stream("
+    },
+    {
+      "name": "compose_form",
+      "kind": "function",
+      "span": "L834-L862",
+      "signature": "async fn compose_form("
+    },
+    {
+      "name": "create_thread",
+      "kind": "function",
+      "span": "L876-L954",
+      "signature": "async fn create_thread("
+    },
+    {
+      "name": "reply_form",
+      "kind": "function",
+      "span": "L958-L991",
+      "signature": "async fn reply_form("
+    },
+    {
+      "name": "send_reply",
+      "kind": "function",
+      "span": "L1002-L1090",
+      "signature": "async fn send_reply("
+    },
+    {
+      "name": "sent_message_response",
+      "kind": "function",
+      "span": "L1093-L1141",
+      "signature": "async fn sent_message_response("
+    },
+    {
+      "name": "workspace_user",
+      "kind": "function",
+      "span": "L1153-L1166",
+      "signature": "pub(super) fn workspace_user<'a>("
+    },
+    {
+      "name": "load_account",
+      "kind": "function",
+      "span": "L1168-L1173",
+      "signature": "pub(super) async fn load_account(user_use_cases: &UserUseCases, user_id: Uuid) -> AppResult<User>"
+    },
+    {
+      "name": "sender_email",
+      "kind": "function",
+      "span": "L1176-L1178",
+      "signature": "async fn sender_email(user_use_cases: &UserUseCases, user_id: Uuid) -> AppResult<String>"
+    },
+    {
+      "name": "stream_tests",
+      "kind": "module",
+      "span": "L1182-L1182",
+      "signature": "pub(super) mod stream_tests;"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 45943
+  }
+}

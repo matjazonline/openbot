@@ -1,0 +1,57 @@
+{
+  "file": "src/adapters/persistence/workflow/history_reader.rs",
+  "entries": [
+    {
+      "name": "HistoryRow",
+      "kind": "struct",
+      "span": "L22-L33",
+      "signature": "struct HistoryRow"
+    },
+    {
+      "name": "message",
+      "kind": "function",
+      "span": "L36-L52",
+      "signature": "fn message(self) -> AppResult<HistoryMessage>"
+    },
+    {
+      "name": "frozen_history",
+      "kind": "function",
+      "span": "L57-L78",
+      "signature": "async fn frozen_history(&self, claim: &ClaimedWorkflow) -> AppResult<FrozenHistory>"
+    },
+    {
+      "name": "consume_on",
+      "kind": "function",
+      "span": "L81-L136",
+      "signature": "async fn consume_on("
+    },
+    {
+      "name": "read_rows",
+      "kind": "function",
+      "span": "L138-L168",
+      "signature": "async fn read_rows("
+    },
+    {
+      "name": "live",
+      "kind": "function",
+      "span": "L170-L178",
+      "signature": "async fn live(tx: &mut PgConnection, claim: &ClaimedWorkflow, bound: &WriteBound) -> AppResult<()>"
+    },
+    {
+      "name": "ownership_lost",
+      "kind": "function",
+      "span": "L180-L182",
+      "signature": "fn ownership_lost() -> AppError"
+    },
+    {
+      "name": "record_consumption",
+      "kind": "function",
+      "span": "L184-L201",
+      "signature": "async fn record_consumption("
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 8213
+  }
+}

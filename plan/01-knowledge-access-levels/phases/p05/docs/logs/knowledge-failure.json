@@ -1,0 +1,94 @@
+{
+  "pattern": "KNOWLEDGE_AUDIENCE_BELOW_CONTENT",
+  "filesSearched": 66,
+  "totalHits": 5,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/domain/workflow/outcome.rs#fails_run",
+        "name": "fails_run",
+        "kind": "function",
+        "path": "src/domain/workflow/outcome.rs",
+        "span": "L130-L132"
+      },
+      "path": "src/domain/workflow/outcome.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 131,
+          "text": "self.code.as_str() == KNOWLEDGE_AUDIENCE_BELOW_CONTENT"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/domain/workflow/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 47,
+          "text": "KNOWLEDGE_AUDIENCE_BELOW_CONTENT, OutcomeError, RetryEligibility, StepFailure, StepOutcome,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/workflow/outcome.rs#KNOWLEDGE_AUDIENCE_BELOW_CONTENT",
+        "name": "KNOWLEDGE_AUDIENCE_BELOW_CONTENT",
+        "kind": "constant",
+        "path": "src/domain/workflow/outcome.rs",
+        "span": "L12-L12"
+      },
+      "path": "src/domain/workflow/outcome.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 12,
+          "text": "pub const KNOWLEDGE_AUDIENCE_BELOW_CONTENT: &str = \"knowledge.audience_below_content\";"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/workflow/outcome.rs#knowledge_run_level_refusal_has_no_retry_or_error_route",
+        "name": "knowledge_run_level_refusal_has_no_retry_or_error_route",
+        "kind": "function",
+        "path": "src/domain/workflow/outcome.rs",
+        "span": "L369-L387"
+      },
+      "path": "src/domain/workflow/outcome.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 375,
+          "text": "FailureCode::parse(KNOWLEDGE_AUDIENCE_BELOW_CONTENT).unwrap(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/workflow/recovery_tests.rs#knowledge_run_level_refusal_is_final_but_unknown_effect_still_reconciles",
+        "name": "knowledge_run_level_refusal_is_final_but_unknown_effect_still_reconciles",
+        "kind": "function",
+        "path": "src/domain/workflow/recovery_tests.rs",
+        "span": "L180-L198"
+      },
+      "path": "src/domain/workflow/recovery_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 185,
+          "text": "FailureCode::parse(crate::domain::workflow::KNOWLEDGE_AUDIENCE_BELOW_CONTENT).unwrap(),"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 3,
+    "baselineChars": 29775
+  }
+}

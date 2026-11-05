@@ -1,0 +1,321 @@
+{
+  "file": "src/application/use_cases/user/ports.rs",
+  "entries": [
+    {
+      "name": "MIN_PASSWORD_CHARS",
+      "kind": "constant",
+      "span": "L17-L17",
+      "signature": "pub const MIN_PASSWORD_CHARS: usize = 8;"
+    },
+    {
+      "name": "LoginMethod",
+      "kind": "enum",
+      "span": "L20-L24",
+      "signature": "pub enum LoginMethod"
+    },
+    {
+      "name": "as_str",
+      "kind": "function",
+      "span": "L27-L33",
+      "signature": "pub fn as_str(self) -> &'static str"
+    },
+    {
+      "name": "ExternalIdentity",
+      "kind": "struct",
+      "span": "L37-L44",
+      "signature": "pub struct ExternalIdentity<'a>"
+    },
+    {
+      "name": "LoginMethods",
+      "kind": "struct",
+      "span": "L46-L50",
+      "signature": "pub struct LoginMethods"
+    },
+    {
+      "name": "PendingRegistration",
+      "kind": "struct",
+      "span": "L52-L58",
+      "signature": "pub struct PendingRegistration<'a>"
+    },
+    {
+      "name": "RegistrationPersistence",
+      "kind": "interface",
+      "span": "L61-L69",
+      "signature": "pub trait RegistrationPersistence: Send + Sync"
+    },
+    {
+      "name": "save_pending_registration",
+      "kind": "function",
+      "span": "L62-L62",
+      "signature": "async fn save_pending_registration(&self, pending: PendingRegistration<'_>) -> AppResult<()>;"
+    },
+    {
+      "name": "confirm_pending_registration",
+      "kind": "function",
+      "span": "L63-L68",
+      "signature": "async fn confirm_pending_registration("
+    },
+    {
+      "name": "RegistrationOutcome",
+      "kind": "enum",
+      "span": "L71-L74",
+      "signature": "pub enum RegistrationOutcome"
+    },
+    {
+      "name": "ProfileUpdate",
+      "kind": "struct",
+      "span": "L79-L85",
+      "signature": "pub struct ProfileUpdate<'a>"
+    },
+    {
+      "name": "PasswordChange",
+      "kind": "struct",
+      "span": "L92-L96",
+      "signature": "pub struct PasswordChange<'a>"
+    },
+    {
+      "name": "PasswordSetup",
+      "kind": "struct",
+      "span": "L98-L101",
+      "signature": "pub struct PasswordSetup<'a>"
+    },
+    {
+      "name": "UserPersistence",
+      "kind": "interface",
+      "span": "L104-L196",
+      "signature": "pub trait UserPersistence: Send + Sync"
+    },
+    {
+      "name": "create_user",
+      "kind": "function",
+      "span": "L107-L112",
+      "signature": "async fn create_user("
+    },
+    {
+      "name": "get_by_email",
+      "kind": "function",
+      "span": "L113-L113",
+      "signature": "async fn get_by_email(&self, email: &str) -> AppResult<Option<User>>;"
+    },
+    {
+      "name": "get_by_username",
+      "kind": "function",
+      "span": "L114-L114",
+      "signature": "async fn get_by_username(&self, username: &str) -> AppResult<Option<User>>;"
+    },
+    {
+      "name": "get_by_id",
+      "kind": "function",
+      "span": "L115-L115",
+      "signature": "async fn get_by_id(&self, id: Uuid) -> AppResult<Option<User>>;"
+    },
+    {
+      "name": "canonical_auth_identifier",
+      "kind": "function",
+      "span": "L118-L118",
+      "signature": "async fn canonical_auth_identifier(&self, value: &str) -> AppResult<String>;"
+    },
+    {
+      "name": "reserve_login_attempt",
+      "kind": "function",
+      "span": "L121-L121",
+      "signature": "async fn reserve_login_attempt(&self, key: &AuthAttemptKey) -> AppResult<bool>;"
+    },
+    {
+      "name": "clear_login_attempt",
+      "kind": "function",
+      "span": "L122-L122",
+      "signature": "async fn clear_login_attempt(&self, key: &AuthAttemptKey) -> AppResult<()>;"
+    },
+    {
+      "name": "notification_preferences",
+      "kind": "function",
+      "span": "L124-L124",
+      "signature": "async fn notification_preferences(&self, id: Uuid) -> AppResult<NotificationPreferences>;"
+    },
+    {
+      "name": "set_notification_preferences",
+      "kind": "function",
+      "span": "L126-L130",
+      "signature": "async fn set_notification_preferences("
+    },
+    {
+      "name": "update_avatar_url",
+      "kind": "function",
+      "span": "L134-L138",
+      "signature": "async fn update_avatar_url("
+    },
+    {
+      "name": "update_profile_display",
+      "kind": "function",
+      "span": "L142-L147",
+      "signature": "async fn update_profile_display("
+    },
+    {
+      "name": "update_profile",
+      "kind": "function",
+      "span": "L151-L152",
+      "signature": "async fn update_profile(&self, id: Uuid, profile: ProfileUpdate<'_>)"
+    },
+    {
+      "name": "update_password_hash",
+      "kind": "function",
+      "span": "L156-L156",
+      "signature": "async fn update_password_hash(&self, id: Uuid, password_hash: &str) -> AppResult<Option<User>>;"
+    },
+    {
+      "name": "activate_password",
+      "kind": "function",
+      "span": "L161-L161",
+      "signature": "async fn activate_password(&self, id: Uuid, password_hash: &str) -> AppResult<Option<User>>;"
+    },
+    {
+      "name": "has_login_method",
+      "kind": "function",
+      "span": "L165-L165",
+      "signature": "async fn has_login_method(&self, id: Uuid, method: LoginMethod) -> AppResult<bool>;"
+    },
+    {
+      "name": "create_external_user",
+      "kind": "function",
+      "span": "L167-L171",
+      "signature": "async fn create_external_user(&self, _identity: ExternalIdentity<'_>) -> AppResult<User>"
+    },
+    {
+      "name": "get_by_external_subject",
+      "kind": "function",
+      "span": "L173-L179",
+      "signature": "async fn get_by_external_subject("
+    },
+    {
+      "name": "login_external_identity",
+      "kind": "function",
+      "span": "L182-L185",
+      "signature": "async fn login_external_identity("
+    },
+    {
+      "name": "link_external_identity",
+      "kind": "function",
+      "span": "L187-L195",
+      "signature": "async fn link_external_identity("
+    },
+    {
+      "name": "AccountChangeKind",
+      "kind": "enum",
+      "span": "L204-L207",
+      "signature": "pub enum AccountChangeKind"
+    },
+    {
+      "name": "as_str",
+      "kind": "function",
+      "span": "L210-L215",
+      "signature": "pub fn as_str(self) -> &'static str"
+    },
+    {
+      "name": "parse",
+      "kind": "function",
+      "span": "L219-L225",
+      "signature": "pub fn parse(stored: &str) -> Option<Self>"
+    },
+    {
+      "name": "AccountChange",
+      "kind": "enum",
+      "span": "L231-L235",
+      "signature": "pub enum AccountChange<'a>"
+    },
+    {
+      "name": "kind",
+      "kind": "function",
+      "span": "L238-L243",
+      "signature": "pub fn kind(&self) -> AccountChangeKind"
+    },
+    {
+      "name": "PendingAccountChange",
+      "kind": "struct",
+      "span": "L247-L252",
+      "signature": "pub struct PendingAccountChange<'a>"
+    },
+    {
+      "name": "PendingChange",
+      "kind": "enum",
+      "span": "L260-L268",
+      "signature": "pub enum PendingChange"
+    },
+    {
+      "name": "kind",
+      "kind": "function",
+      "span": "L271-L276",
+      "signature": "pub fn kind(&self) -> AccountChangeKind"
+    },
+    {
+      "name": "ConfirmationCodeSender",
+      "kind": "interface",
+      "span": "L285-L292",
+      "signature": "pub trait ConfirmationCodeSender: Send + Sync"
+    },
+    {
+      "name": "send_code",
+      "kind": "function",
+      "span": "L286-L291",
+      "signature": "async fn send_code("
+    },
+    {
+      "name": "ConfirmationPurpose",
+      "kind": "enum",
+      "span": "L295-L299",
+      "signature": "pub enum ConfirmationPurpose"
+    },
+    {
+      "name": "AccountChangePersistence",
+      "kind": "interface",
+      "span": "L302-L329",
+      "signature": "pub trait AccountChangePersistence: Send + Sync"
+    },
+    {
+      "name": "save_pending_account_change",
+      "kind": "function",
+      "span": "L305-L306",
+      "signature": "async fn save_pending_account_change(&self, pending: PendingAccountChange<'_>)"
+    },
+    {
+      "name": "confirm_pending_account_change",
+      "kind": "function",
+      "span": "L311-L317",
+      "signature": "async fn confirm_pending_account_change("
+    },
+    {
+      "name": "list_pending_account_changes",
+      "kind": "function",
+      "span": "L321-L321",
+      "signature": "async fn list_pending_account_changes(&self, user_id: Uuid) -> AppResult<Vec<PendingChange>>;"
+    },
+    {
+      "name": "discard_pending_account_change",
+      "kind": "function",
+      "span": "L324-L328",
+      "signature": "async fn discard_pending_account_change("
+    },
+    {
+      "name": "UserCredentialsHasher",
+      "kind": "interface",
+      "span": "L331-L334",
+      "signature": "pub trait UserCredentialsHasher: Send + Sync"
+    },
+    {
+      "name": "hash_password",
+      "kind": "function",
+      "span": "L332-L332",
+      "signature": "fn hash_password(&self, password: &str) -> AppResult<String>;"
+    },
+    {
+      "name": "verify_password",
+      "kind": "function",
+      "span": "L333-L333",
+      "signature": "fn verify_password(&self, password: &str, hash: &str) -> AppResult<bool>;"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 11916
+  }
+}

@@ -1,0 +1,75 @@
+{
+  "file": "src/application/workflow/actions/mod.rs",
+  "entries": [
+    {
+      "name": "authorization",
+      "kind": "module",
+      "span": "L3-L3",
+      "signature": "mod authorization;"
+    },
+    {
+      "name": "contracts",
+      "kind": "module",
+      "span": "L4-L4",
+      "signature": "mod contracts;"
+    },
+    {
+      "name": "dispatch",
+      "kind": "module",
+      "span": "L5-L5",
+      "signature": "mod dispatch;"
+    },
+    {
+      "name": "effect",
+      "kind": "module",
+      "span": "L6-L6",
+      "signature": "mod effect;"
+    },
+    {
+      "name": "failure",
+      "kind": "module",
+      "span": "L7-L7",
+      "signature": "mod failure;"
+    },
+    {
+      "name": "freeze",
+      "kind": "module",
+      "span": "L8-L8",
+      "signature": "mod freeze;"
+    },
+    {
+      "name": "reconciliation",
+      "kind": "module",
+      "span": "L9-L9",
+      "signature": "mod reconciliation;"
+    },
+    {
+      "name": "replay",
+      "kind": "module",
+      "span": "L10-L10",
+      "signature": "mod replay;"
+    },
+    {
+      "name": "service",
+      "kind": "module",
+      "span": "L11-L11",
+      "signature": "mod service;"
+    },
+    {
+      "name": "tests",
+      "kind": "module",
+      "span": "L30-L30",
+      "signature": "pub(crate) mod tests;"
+    },
+    {
+      "name": "authorization_tests",
+      "kind": "module",
+      "span": "L33-L33",
+      "signature": "mod authorization_tests;"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 951
+  }
+}

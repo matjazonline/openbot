@@ -1,0 +1,201 @@
+{
+  "file": "src/application/workflow/templates/agent_workflow.rs",
+  "entries": [
+    {
+      "name": "HISTORY_STEP",
+      "kind": "constant",
+      "span": "L17-L17",
+      "signature": "pub const HISTORY_STEP: &str = \"context\";"
+    },
+    {
+      "name": "REPLY_STEP",
+      "kind": "constant",
+      "span": "L18-L18",
+      "signature": "pub const REPLY_STEP: &str = \"reply\";"
+    },
+    {
+      "name": "REVIEW_STEP",
+      "kind": "constant",
+      "span": "L20-L20",
+      "signature": "pub const REVIEW_STEP: &str = \"review\";"
+    },
+    {
+      "name": "NEXT_STEP",
+      "kind": "constant",
+      "span": "L22-L22",
+      "signature": "pub const NEXT_STEP: &str = \"$next\";"
+    },
+    {
+      "name": "END_STEP",
+      "kind": "constant",
+      "span": "L23-L23",
+      "signature": "const END_STEP: &str = \"$end\";"
+    },
+    {
+      "name": "MAX_CUSTOM_STEPS",
+      "kind": "constant",
+      "span": "L25-L25",
+      "signature": "pub const MAX_CUSTOM_STEPS: usize = 6;"
+    },
+    {
+      "name": "StepSlot",
+      "kind": "enum",
+      "span": "L31-L35",
+      "signature": "pub enum StepSlot"
+    },
+    {
+      "name": "CustomStep",
+      "kind": "struct",
+      "span": "L41-L46",
+      "signature": "pub struct CustomStep"
+    },
+    {
+      "name": "AgentWorkflow",
+      "kind": "struct",
+      "span": "L50-L53",
+      "signature": "pub struct AgentWorkflow"
+    },
+    {
+      "name": "base",
+      "kind": "function",
+      "span": "L56-L58",
+      "signature": "pub fn base() -> Self"
+    },
+    {
+      "name": "reviewed",
+      "kind": "function",
+      "span": "L62-L65",
+      "signature": "pub fn reviewed(mut self) -> Self"
+    },
+    {
+      "name": "with_steps",
+      "kind": "function",
+      "span": "L67-L70",
+      "signature": "pub fn with_steps(mut self, steps: Vec<CustomStep>) -> Self"
+    },
+    {
+      "name": "compose",
+      "kind": "function",
+      "span": "L72-L128",
+      "signature": "pub fn compose("
+    },
+    {
+      "name": "check_steps",
+      "kind": "function",
+      "span": "L130-L154",
+      "signature": "fn check_steps(&self) -> Result<(), Diagnostic>"
+    },
+    {
+      "name": "BaseSteps",
+      "kind": "struct",
+      "span": "L158-L158",
+      "signature": "struct BaseSteps(BTreeMap<String, Map<String, Value>>);"
+    },
+    {
+      "name": "read",
+      "kind": "function",
+      "span": "L160-L176",
+      "signature": "fn read(root: &[(String, &LocatedNode)]) -> Result<Self, Diagnostic>"
+    },
+    {
+      "name": "take",
+      "kind": "function",
+      "span": "L178-L182",
+      "signature": "fn take(&mut self, id: &str) -> Result<Map<String, Value>, Diagnostic>"
+    },
+    {
+      "name": "finish",
+      "kind": "function",
+      "span": "L184-L192",
+      "signature": "fn finish(self) -> Result<(), Diagnostic>"
+    },
+    {
+      "name": "Link",
+      "kind": "struct",
+      "span": "L196-L200",
+      "signature": "struct Link"
+    },
+    {
+      "name": "Routes",
+      "kind": "enum",
+      "span": "L201-L208",
+      "signature": "enum Routes"
+    },
+    {
+      "name": "base",
+      "kind": "function",
+      "span": "L210-L216",
+      "signature": "fn base(id: &str, step: Map<String, Value>) -> Self"
+    },
+    {
+      "name": "custom",
+      "kind": "function",
+      "span": "L217-L223",
+      "signature": "fn custom(step: &CustomStep) -> Self"
+    },
+    {
+      "name": "route",
+      "kind": "function",
+      "span": "L228-L255",
+      "signature": "fn route(chain: Vec<Link>) -> Result<Vec<(String, SourceNode)>, Diagnostic>"
+    },
+    {
+      "name": "resolve_next",
+      "kind": "function",
+      "span": "L257-L269",
+      "signature": "fn resolve_next(routes: &mut Value, next: &str, at: &str) -> Result<(), Diagnostic>"
+    },
+    {
+      "name": "ordered",
+      "kind": "function",
+      "span": "L271-L287",
+      "signature": "fn ordered(mut step: Map<String, Value>) -> SourceNode"
+    },
+    {
+      "name": "hand_to_agent",
+      "kind": "function",
+      "span": "L290-L307",
+      "signature": "fn hand_to_agent(draft: &mut Map<String, Value>, step: &str) -> Result<(), Diagnostic>"
+    },
+    {
+      "name": "review_gate",
+      "kind": "function",
+      "span": "L310-L335",
+      "signature": "fn review_gate(draft: &Map<String, Value>, answer: &str) -> Result<Map<String, Value>, Diagnostic>"
+    },
+    {
+      "name": "reply_with",
+      "kind": "function",
+      "span": "L337-L349",
+      "signature": "fn reply_with(reply: &mut Map<String, Value>, answer: &str) -> Result<(), Diagnostic>"
+    },
+    {
+      "name": "with_reviewer",
+      "kind": "function",
+      "span": "L352-L378",
+      "signature": "fn with_reviewer(mut schema: Value) -> Result<Value, Diagnostic>"
+    },
+    {
+      "name": "entries",
+      "kind": "function",
+      "span": "L380-L396",
+      "signature": "fn entries<'a>("
+    },
+    {
+      "name": "invalid",
+      "kind": "function",
+      "span": "L398-L410",
+      "signature": "fn invalid(path: &str, message: &str) -> Diagnostic"
+    },
+    {
+      "name": "tests",
+      "kind": "module",
+      "span": "L414-L414",
+      "signature": "mod tests;"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 14378
+  }
+}

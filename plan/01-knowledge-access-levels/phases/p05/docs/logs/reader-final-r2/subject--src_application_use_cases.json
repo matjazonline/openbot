@@ -1,0 +1,1681 @@
+{
+  "pattern": "subject",
+  "filesSearched": 44,
+  "totalHits": 132,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/tests.rs#new",
+        "name": "new",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/tests.rs",
+        "span": "L126-L140"
+      },
+      "path": "src/application/use_cases/thread/tests.rs",
+      "inDegree": 33,
+      "hits": [
+        {
+          "line": 126,
+          "text": "fn new(source_channel_id: Uuid, from: &str, to: &str, subject: &str, body: &str) -> Self {"
+        },
+        {
+          "line": 131,
+          "text": "subject: subject.to_string(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/test_support.rs#read",
+        "name": "read",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/test_support.rs",
+        "span": "L255-L279"
+      },
+      "path": "src/application/use_cases/thread/test_support.rs",
+      "inDegree": 8,
+      "hits": [
+        {
+          "line": 268,
+          "text": "subject: canonical.subject.clone(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/address_grouping_tests.rs#ingest",
+        "name": "ingest",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/address_grouping_tests.rs",
+        "span": "L35-L55"
+      },
+      "path": "src/application/use_cases/thread/address_grouping_tests.rs",
+      "inDegree": 6,
+      "hits": [
+        {
+          "line": 47,
+          "text": "subject: Some(\"Upgrade and invoice\".into()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/participant/test_support.rs#principal_for_identity",
+        "name": "principal_for_identity",
+        "kind": "function",
+        "path": "src/application/use_cases/participant/test_support.rs",
+        "span": "L48-L61"
+      },
+      "path": "src/application/use_cases/participant/test_support.rs",
+      "inDegree": 5,
+      "hits": [
+        {
+          "line": 56,
+          "text": "digest.update(identity.subject().as_str().as_bytes());"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/ingest/mod.rs#new",
+        "name": "new",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/ingest/mod.rs",
+        "span": "L91-L112"
+      },
+      "path": "src/application/use_cases/thread/ingest/mod.rs",
+      "inDegree": 5,
+      "hits": [
+        {
+          "line": 104,
+          "text": "subject: None,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/tests.rs#message_to_support_cc_outsider",
+        "name": "message_to_support_cc_outsider",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/tests.rs",
+        "span": "L2317-L2327"
+      },
+      "path": "src/application/use_cases/thread/tests.rs",
+      "inDegree": 5,
+      "hits": [
+        {
+          "line": 2323,
+          "text": "subject: Some(\"Client inquiry\".to_string()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/tests.rs#message_to_support",
+        "name": "message_to_support",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/tests.rs",
+        "span": "L2630-L2638"
+      },
+      "path": "src/application/use_cases/thread/tests.rs",
+      "inDegree": 5,
+      "hits": [
+        {
+          "line": 2634,
+          "text": "subject: Some(\"Hello\".to_string()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/user/external_identity.rs#link_external",
+        "name": "link_external",
+        "kind": "function",
+        "path": "src/application/use_cases/user/external_identity.rs",
+        "span": "L32-L76"
+      },
+      "path": "src/application/use_cases/user/external_identity.rs",
+      "inDegree": 5,
+      "hits": [
+        {
+          "line": 48,
+          "text": ".get_by_external_subject(identity.provider, identity.subject)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/reads.rs#project_message",
+        "name": "project_message",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/reads.rs",
+        "span": "L33-L44"
+      },
+      "path": "src/application/use_cases/thread/reads.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 38,
+          "text": "message.subject.clear();"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/tests.rs#relay_hop",
+        "name": "relay_hop",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/tests.rs",
+        "span": "L144-L171"
+      },
+      "path": "src/application/use_cases/thread/tests.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 159,
+          "text": "subject: &hop.subject,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/tests.rs#cc_message",
+        "name": "cc_message",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/tests.rs",
+        "span": "L2344-L2354"
+      },
+      "path": "src/application/use_cases/thread/tests.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 2350,
+          "text": "subject: Some(\"FYI\".to_string()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/tests.rs#outsider_reply",
+        "name": "outsider_reply",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/tests.rs",
+        "span": "L2616-L2628"
+      },
+      "path": "src/application/use_cases/thread/tests.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 2624,
+          "text": "subject: Some(\"Re: Client inquiry\".to_string()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/ingest/canonical.rs#ingest_canonical",
+        "name": "ingest_canonical",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/ingest/canonical.rs",
+        "span": "L19-L85"
+      },
+      "path": "src/application/use_cases/thread/ingest/canonical.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 35,
+          "text": "let subject = canonical_subject(ingress.subject, target.thread.as_ref());"
+        },
+        {
+          "line": 70,
+          "text": "content: CanonicalContent::parse(subject, ingress.text_body)?,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/notices.rs#handle_bounce_dispatch",
+        "name": "handle_bounce_dispatch",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/notices.rs",
+        "span": "L11-L57"
+      },
+      "path": "src/application/use_cases/thread/notices.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 16,
+          "text": "let subject = if bounce"
+        },
+        {
+          "line": 17,
+          "text": ".original_subject"
+        },
+        {
+          "line": 21,
+          "text": "bounce.original_subject.clone()"
+        },
+        {
+          "line": 23,
+          "text": "format!(\"[Undeliverable] {}\", bounce.original_subject)"
+        },
+        {
+          "line": 25,
+          "text": "let content = CanonicalContent::parse(subject, body)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/reads.rs#project_thread_titles",
+        "name": "project_thread_titles",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/reads.rs",
+        "span": "L72-L96"
+      },
+      "path": "src/application/use_cases/thread/reads.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 92,
+          "text": "thread.subject = \"Restricted message\".into();"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/test_support.rs#identity_id_for",
+        "name": "identity_id_for",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/test_support.rs",
+        "span": "L366-L378"
+      },
+      "path": "src/application/use_cases/thread/test_support.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 373,
+          "text": "digest.update(identity.subject().as_str().as_bytes());"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/test_support.rs#message_email_recipients",
+        "name": "message_email_recipients",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/test_support.rs",
+        "span": "L1196-L1208"
+      },
+      "path": "src/application/use_cases/thread/test_support.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 1206,
+          "text": ".map(|participant| EmailAddress::from(participant.identity.subject().as_str()))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/delivery.rs#project_delivery",
+        "name": "project_delivery",
+        "kind": "function",
+        "path": "src/application/use_cases/delivery.rs",
+        "span": "L45-L58"
+      },
+      "path": "src/application/use_cases/delivery.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 52,
+          "text": "entry.subject = \"Restricted message\".into();"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/participant/test_support.rs#membership_for_subject",
+        "name": "membership_for_subject",
+        "kind": "function",
+        "path": "src/application/use_cases/participant/test_support.rs",
+        "span": "L213-L228"
+      },
+      "path": "src/application/use_cases/participant/test_support.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 213,
+          "text": "async fn membership_for_subject("
+        },
+        {
+          "line": 223,
+          "text": "team.membership_for_email(company_id, identity.subject().as_str())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/ingest/mod.rs#with_subject",
+        "name": "with_subject",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/ingest/mod.rs",
+        "span": "L124-L127"
+      },
+      "path": "src/application/use_cases/thread/ingest/mod.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 124,
+          "text": "pub fn with_subject(mut self, subject: impl Into<String>) -> Self {"
+        },
+        {
+          "line": 125,
+          "text": "self.subject = Some(subject.into());"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/ingest/policy.rs#draft",
+        "name": "draft",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/ingest/policy.rs",
+        "span": "L310-L327"
+      },
+      "path": "src/application/use_cases/thread/ingest/policy.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 320,
+          "text": "content: CanonicalContent::parse(\"subject\", \"body\").unwrap(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/ingest/routing.rs#sender_address",
+        "name": "sender_address",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/ingest/routing.rs",
+        "span": "L813-L815"
+      },
+      "path": "src/application/use_cases/thread/ingest/routing.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 814,
+          "text": "EmailAddress::from(draft.author.subject().as_str())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/test_support.rs#create_message",
+        "name": "create_message",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/test_support.rs",
+        "span": "L606-L687"
+      },
+      "path": "src/application/use_cases/thread/test_support.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 618,
+          "text": "subject: write.subject.clone(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/test_support.rs#thread_message_view",
+        "name": "thread_message_view",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/test_support.rs",
+        "span": "L1028-L1061"
+      },
+      "path": "src/application/use_cases/thread/test_support.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 1044,
+          "text": ".map(|identity| identity.subject().as_str().to_string()),"
+        },
+        {
+          "line": 1051,
+          "text": "subject: message.subject.clone(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/test_support.rs#default",
+        "name": "default",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/test_support.rs",
+        "span": "L1126-L1146"
+      },
+      "path": "src/application/use_cases/thread/test_support.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 1136,
+          "text": "subject: \"Subject\".to_string(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/test_support.rs#message_sender_email",
+        "name": "message_sender_email",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/test_support.rs",
+        "span": "L1210-L1222"
+      },
+      "path": "src/application/use_cases/thread/test_support.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 1220,
+          "text": ".map(|identity| EmailAddress::from(identity.subject().as_str()))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/tests.rs#help_message_from",
+        "name": "help_message_from",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/tests.rs",
+        "span": "L3032-L3041"
+      },
+      "path": "src/application/use_cases/thread/tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 3037,
+          "text": "subject: Some(\"What can I send to?\".to_string()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/user/external_identity.rs#register_external",
+        "name": "register_external",
+        "kind": "function",
+        "path": "src/application/use_cases/user/external_identity.rs",
+        "span": "L4-L22"
+      },
+      "path": "src/application/use_cases/user/external_identity.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 13,
+          "text": ".get_by_external_subject(identity.provider, identity.subject)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/participant/test_support.rs#upsert",
+        "name": "upsert",
+        "kind": "function",
+        "path": "src/application/use_cases/participant/test_support.rs",
+        "span": "L230-L257"
+      },
+      "path": "src/application/use_cases/participant/test_support.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 248,
+          "text": "subject: identity.subject().clone(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/participant/test_support.rs#principal_from",
+        "name": "principal_from",
+        "kind": "function",
+        "path": "src/application/use_cases/participant/test_support.rs",
+        "span": "L259-L281"
+      },
+      "path": "src/application/use_cases/participant/test_support.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 277,
+          "text": ".unwrap_or_else(|| identity.subject.as_str().to_string()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/ingest/canonical.rs#canonical_subject",
+        "name": "canonical_subject",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/ingest/canonical.rs",
+        "span": "L167-L174"
+      },
+      "path": "src/application/use_cases/thread/ingest/canonical.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 167,
+          "text": "fn canonical_subject(subject: Option<String>, target: Option<&Thread>) -> String {"
+        },
+        {
+          "line": 168,
+          "text": "match subject {"
+        },
+        {
+          "line": 169,
+          "text": "Some(subject) if !subject.trim().is_empty() => subject,"
+        },
+        {
+          "line": 171,
+          "text": ".map(Thread::reply_subject)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/ingest/commit.rs#build",
+        "name": "build",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/ingest/commit.rs",
+        "span": "L63-L122"
+      },
+      "path": "src/application/use_cases/thread/ingest/commit.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 78,
+          "text": "envelope.content = CanonicalContent::parse(draft.content.subject(), &prepared.body_text)?;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/ingest/policy.rs#into_bounce",
+        "name": "into_bounce",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/ingest/policy.rs",
+        "span": "L263-L282"
+      },
+      "path": "src/application/use_cases/thread/ingest/policy.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 269,
+          "text": "original_subject: String,"
+        },
+        {
+          "line": 280,
+          "text": "original_subject,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/ingest/policy.rs#identity",
+        "name": "identity",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/ingest/policy.rs",
+        "span": "L302-L308"
+      },
+      "path": "src/application/use_cases/thread/ingest/policy.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 302,
+          "text": "fn identity(subject: &str) -> QualifiedIdentity {"
+        },
+        {
+          "line": 306,
+          "text": "IdentitySubject::parse(subject).unwrap(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/ingest/relay.rs#internal_inbound_message",
+        "name": "internal_inbound_message",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/ingest/relay.rs",
+        "span": "L100-L182"
+      },
+      "path": "src/application/use_cases/thread/ingest/relay.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 149,
+          "text": "content: CanonicalContent::parse(mail.subject, quiet_body.unwrap_or(mail.body_text))?,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/ingest/routing.rs#address",
+        "name": "address",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/ingest/routing.rs",
+        "span": "L108-L110"
+      },
+      "path": "src/application/use_cases/thread/ingest/routing.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 109,
+          "text": "self.handle.subject().as_str()"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/ingest/routing.rs#prepare_channel",
+        "name": "prepare_channel",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/ingest/routing.rs",
+        "span": "L486-L549"
+      },
+      "path": "src/application/use_cases/thread/ingest/routing.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 517,
+          "text": "subject: draft.content.subject().to_string(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/ingest/routing.rs#authorize_thread_injection",
+        "name": "authorize_thread_injection",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/ingest/routing.rs",
+        "span": "L554-L589"
+      },
+      "path": "src/application/use_cases/thread/ingest/routing.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 587,
+          "text": "original_subject: draft.content.subject().to_string(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/ingest/routing.rs#channel_was_mentioned",
+        "name": "channel_was_mentioned",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/ingest/routing.rs",
+        "span": "L625-L638"
+      },
+      "path": "src/application/use_cases/thread/ingest/routing.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 629,
+          "text": "body_mentions_email(body, candidate.handle.subject().as_str())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/ingest/routing.rs#undeliverable_rejection",
+        "name": "undeliverable_rejection",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/ingest/routing.rs",
+        "span": "L641-L664"
+      },
+      "path": "src/application/use_cases/thread/ingest/routing.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 660,
+          "text": "draft.content.subject().to_string(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/ingest/routing.rs#send_system_reply",
+        "name": "send_system_reply",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/ingest/routing.rs",
+        "span": "L744-L805"
+      },
+      "path": "src/application/use_cases/thread/ingest/routing.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 758,
+          "text": "let subject = match draft.content.subject().trim() {"
+        },
+        {
+          "line": 769,
+          "text": "let content = CanonicalContent::parse(subject, body)?;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/test_support.rs#delivered_payload",
+        "name": "delivered_payload",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/test_support.rs",
+        "span": "L150-L159"
+      },
+      "path": "src/application/use_cases/thread/test_support.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 158,
+          "text": "(&self.subject, &self.direction, &self.role, &self.email)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/test_support.rs#resolve_author",
+        "name": "resolve_author",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/test_support.rs",
+        "span": "L303-L335"
+      },
+      "path": "src/application/use_cases/thread/test_support.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 311,
+          "text": ".unwrap_or_else(|| observation.identity.subject().as_str().to_string()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/test_support.rs#create_thread",
+        "name": "create_thread",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/test_support.rs",
+        "span": "L401-L426"
+      },
+      "path": "src/application/use_cases/thread/test_support.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 404,
+          "text": "subject: &str,"
+        },
+        {
+          "line": 410,
+          "text": "subject: subject.to_string(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/test_support.rs#stored_email",
+        "name": "stored_email",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/test_support.rs",
+        "span": "L1150-L1194"
+      },
+      "path": "src/application/use_cases/thread/test_support.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 1183,
+          "text": "subject: draft.subject,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/test_support.rs#inbound_message_write",
+        "name": "inbound_message_write",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/test_support.rs",
+        "span": "L1576-L1626"
+      },
+      "path": "src/application/use_cases/thread/test_support.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 1599,
+          "text": "subject: envelope.content.subject().to_string(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/tests.rs#rejection_message",
+        "name": "rejection_message",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/tests.rs",
+        "span": "L2080-L2089"
+      },
+      "path": "src/application/use_cases/thread/tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 2085,
+          "text": "subject: Some(\"Question\".into()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/tests.rs#misspelled_message_from",
+        "name": "misspelled_message_from",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/tests.rs",
+        "span": "L2834-L2843"
+      },
+      "path": "src/application/use_cases/thread/tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 2839,
+          "text": "subject: Some(\"Quick question\".to_string()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/participant/test_support.rs#resolve_or_create_external_identity",
+        "name": "resolve_or_create_external_identity",
+        "kind": "function",
+        "path": "src/application/use_cases/participant/test_support.rs",
+        "span": "L286-L305"
+      },
+      "path": "src/application/use_cases/participant/test_support.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 299,
+          "text": ".membership_for_subject(company_id, &observation.identity)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/participant/test_support.rs#access_context_for_identity",
+        "name": "access_context_for_identity",
+        "kind": "function",
+        "path": "src/application/use_cases/participant/test_support.rs",
+        "span": "L310-L337"
+      },
+      "path": "src/application/use_cases/participant/test_support.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 326,
+          "text": "let membership = self.membership_for_subject(company_id, identity).await?;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/ingest/mod.rs#CanonicalMessageIngress",
+        "name": "CanonicalMessageIngress",
+        "kind": "struct",
+        "path": "src/application/use_cases/thread/ingest/mod.rs",
+        "span": "L65-L88"
+      },
+      "path": "src/application/use_cases/thread/ingest/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 74,
+          "text": "/// Optional conversation/thread subject. If `None` on a reply, inherits from the thread."
+        },
+        {
+          "line": 75,
+          "text": "pub subject: Option<String>,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/use_cases/thread/ingest/routing.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 810,
+          "text": "/// Same single-transport assumption as `dispatch::sender_address`: the subject is an address only"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/notices.rs#BounceInfo",
+        "name": "BounceInfo",
+        "kind": "struct",
+        "path": "src/application/use_cases/thread/notices.rs",
+        "span": "L74-L98"
+      },
+      "path": "src/application/use_cases/thread/notices.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 77,
+          "text": "/// subject."
+        },
+        {
+          "line": 97,
+          "text": "pub original_subject: String,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/test_support.rs#Canonical",
+        "name": "Canonical",
+        "kind": "struct",
+        "path": "src/application/use_cases/thread/test_support.rs",
+        "span": "L131-L143"
+      },
+      "path": "src/application/use_cases/thread/test_support.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 134,
+          "text": "subject: String,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/test_support.rs#list_agent_history",
+        "name": "list_agent_history",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/test_support.rs",
+        "span": "L780-L806"
+      },
+      "path": "src/application/use_cases/thread/test_support.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 802,
+          "text": "subject: message.subject.clone(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/test_support.rs#EmailMessageDraft",
+        "name": "EmailMessageDraft",
+        "kind": "struct",
+        "path": "src/application/use_cases/thread/test_support.rs",
+        "span": "L1105-L1123"
+      },
+      "path": "src/application/use_cases/thread/test_support.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1114,
+          "text": "pub subject: String,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/test_support.rs#commit_inbound",
+        "name": "commit_inbound",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/test_support.rs",
+        "span": "L1467-L1572"
+      },
+      "path": "src/application/use_cases/thread/test_support.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1486,
+          "text": ".map(|intent| EmailAddress::from(intent.identity.subject().as_str()))"
+        },
+        {
+          "line": 1498,
+          "text": ".subjects_for(TransportKind::Email)"
+        },
+        {
+          "line": 1516,
+          "text": "ThreadTarget::Create { subject } => {"
+        },
+        {
+          "line": 1518,
+          "text": ".create_thread(association.channel_id, subject, &emails)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/tests.rs#InternalHop",
+        "name": "InternalHop",
+        "kind": "struct",
+        "path": "src/application/use_cases/thread/tests.rs",
+        "span": "L109-L123"
+      },
+      "path": "src/application/use_cases/thread/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 113,
+          "text": "subject: String,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/tests.rs#test_spf_authentication_failure_rejection",
+        "name": "test_spf_authentication_failure_rejection",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/tests.rs",
+        "span": "L274-L339"
+      },
+      "path": "src/application/use_cases/thread/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 325,
+          "text": "subject: Some(\"Spoofed email\".to_string()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/tests.rs#test_high_spam_score_rejection",
+        "name": "test_high_spam_score_rejection",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/tests.rs",
+        "span": "L342-L405"
+      },
+      "path": "src/application/use_cases/thread/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 393,
+          "text": "subject: Some(\"Buy Cheap Rolex\".to_string()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/tests.rs#access_level_dmarc_failure_rejects_a_known_member_address",
+        "name": "access_level_dmarc_failure_rejects_a_known_member_address",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/tests.rs",
+        "span": "L408-L482"
+      },
+      "path": "src/application/use_cases/thread/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 470,
+          "text": "subject: Some(\"Spoofed email\".to_string()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/tests.rs#test_unauthorized_sender_blocked_before_spam_checks",
+        "name": "test_unauthorized_sender_blocked_before_spam_checks",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/tests.rs",
+        "span": "L485-L549"
+      },
+      "path": "src/application/use_cases/thread/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 536,
+          "text": "subject: Some(\"Hello\".to_string()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/tests.rs#test_participant_sender_bypasses_spam_checks",
+        "name": "test_participant_sender_bypasses_spam_checks",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/tests.rs",
+        "span": "L552-L617"
+      },
+      "path": "src/application/use_cases/thread/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 604,
+          "text": "subject: Some(\"Urgent update\".to_string()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/tests.rs#test_channel_in_cc_resolves_properly",
+        "name": "test_channel_in_cc_resolves_properly",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/tests.rs",
+        "span": "L620-L688"
+      },
+      "path": "src/application/use_cases/thread/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 672,
+          "text": "subject: Some(\"Need help\".to_string()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/tests.rs#test_multi_channel_to_and_cc_execution",
+        "name": "test_multi_channel_to_and_cc_execution",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/tests.rs",
+        "span": "L691-L804"
+      },
+      "path": "src/application/use_cases/thread/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 762,
+          "text": "subject: Some(\"Invoice and account question\".to_string()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/tests.rs#test_pipeline_address_chaining_execution",
+        "name": "test_pipeline_address_chaining_execution",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/tests.rs",
+        "span": "L807-L917"
+      },
+      "path": "src/application/use_cases/thread/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 894,
+          "text": "subject: Some(\"Pipeline Request\".to_string()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/tests.rs#test_misspelled_channel_bounce_and_strict_pipeline_validation",
+        "name": "test_misspelled_channel_bounce_and_strict_pipeline_validation",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/tests.rs",
+        "span": "L920-L1050"
+      },
+      "path": "src/application/use_cases/thread/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 989,
+          "text": "subject: Some(\"Help\".to_string()),"
+        },
+        {
+          "line": 1036,
+          "text": "subject: Some(\"Pipeline Help\".to_string()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/tests.rs#test_quote_stripping_rules_for_first_in_thread_and_forwarded_emails",
+        "name": "test_quote_stripping_rules_for_first_in_thread_and_forwarded_emails",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/tests.rs",
+        "span": "L1053-L1165"
+      },
+      "path": "src/application/use_cases/thread/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1107,
+          "text": "subject: Some(\"New Ticket with Quotes\".to_string()),"
+        },
+        {
+          "line": 1128,
+          "text": "subject: Some(\"Re: New Ticket with Quotes\".to_string()),"
+        },
+        {
+          "line": 1151,
+          "text": "subject: Some(\"Fwd: External Report\".to_string()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/tests.rs#test_participant_modes_company_team_public_and_explicit",
+        "name": "test_participant_modes_company_team_public_and_explicit",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/tests.rs",
+        "span": "L1168-L1320"
+      },
+      "path": "src/application/use_cases/thread/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1260,
+          "text": "subject: Some(\"Team msg\".to_string()),"
+        },
+        {
+          "line": 1273,
+          "text": "subject: Some(\"External msg\".to_string()),"
+        },
+        {
+          "line": 1287,
+          "text": "subject: Some(\"Public msg\".to_string()),"
+        },
+        {
+          "line": 1300,
+          "text": "subject: Some(\"Explicit allowed\".to_string()),"
+        },
+        {
+          "line": 1312,
+          "text": "subject: Some(\"Explicit blocked\".to_string()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/tests.rs#test_sender_verification_refuses_strangers_replying_into_a_thread",
+        "name": "test_sender_verification_refuses_strangers_replying_into_a_thread",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/tests.rs",
+        "span": "L1323-L1426"
+      },
+      "path": "src/application/use_cases/thread/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1377,
+          "text": "subject: Some(\"Need quote\".to_string()),"
+        },
+        {
+          "line": 1395,
+          "text": "subject: Some(\"Re: Need quote\".to_string()),"
+        },
+        {
+          "line": 1419,
+          "text": "subject: Some(\"Re: Need quote\".to_string()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/tests.rs#test_third_party_thread_participants_addition_and_authorization",
+        "name": "test_third_party_thread_participants_addition_and_authorization",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/tests.rs",
+        "span": "L1673-L1849"
+      },
+      "path": "src/application/use_cases/thread/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1731,
+          "text": "subject: Some(\"Client Inquiry\".to_string()),"
+        },
+        {
+          "line": 1743,
+          "text": ".subjects_for(TransportKind::Email)"
+        },
+        {
+          "line": 1756,
+          "text": "subject: Some(\"Re: Client Inquiry\".to_string()),"
+        },
+        {
+          "line": 1771,
+          "text": "subject: Some(\"Unrelated Subject\".to_string()),"
+        },
+        {
+          "line": 1790,
+          "text": "subject: Some(\"Re: Client Inquiry\".to_string()),"
+        },
+        {
+          "line": 1802,
+          "text": ".subjects_for(TransportKind::Email)"
+        },
+        {
+          "line": 1815,
+          "text": "subject: Some(\"Re: Client Inquiry\".to_string()),"
+        },
+        {
+          "line": 1834,
+          "text": "subject: Some(\"Re: Client Inquiry\".to_string()),"
+        },
+        {
+          "line": 1846,
+          "text": ".subjects_for(TransportKind::Email)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/tests.rs#test_context_only_quiet_mode_ingestion",
+        "name": "test_context_only_quiet_mode_ingestion",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/tests.rs",
+        "span": "L1852-L1948"
+      },
+      "path": "src/application/use_cases/thread/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1909,
+          "text": "subject: Some(\"Quiet Note\".to_string()),"
+        },
+        {
+          "line": 1929,
+          "text": "subject: Some(\"Re: Quiet Note\".to_string()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/tests.rs#authenticated_application_message_does_not_require_dmarc",
+        "name": "authenticated_application_message_does_not_require_dmarc",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/tests.rs",
+        "span": "L2270-L2290"
+      },
+      "path": "src/application/use_cases/thread/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 2277,
+          "text": "subject: Some(\"Mailbox message\".to_string()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/tests.rs#authenticated_application_origin_does_not_bypass_participant_authorization",
+        "name": "authenticated_application_origin_does_not_bypass_participant_authorization",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/tests.rs",
+        "span": "L2293-L2314"
+      },
+      "path": "src/application/use_cases/thread/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 2302,
+          "text": "subject: Some(\"Forged mailbox message\".to_string()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/tests.rs#participants_of",
+        "name": "participants_of",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/tests.rs",
+        "span": "L2329-L2339"
+      },
+      "path": "src/application/use_cases/thread/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 2335,
+          "text": ".subjects_for(TransportKind::Email)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/tests.rs#a_mention_only_in_quoted_history_is_not_a_mention",
+        "name": "a_mention_only_in_quoted_history_is_not_a_mention",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/tests.rs",
+        "span": "L2435-L2474"
+      },
+      "path": "src/application/use_cases/thread/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 2443,
+          "text": "subject: Some(\"Mention history\".to_string()),"
+        },
+        {
+          "line": 2462,
+          "text": "subject: Some(\"Re: Mention history\".to_string()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/tests.rs#an_untrusted_sender_cannot_add_outsiders_even_with_the_flag_on",
+        "name": "an_untrusted_sender_cannot_add_outsiders_even_with_the_flag_on",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/tests.rs",
+        "span": "L2537-L2561"
+      },
+      "path": "src/application/use_cases/thread/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 2549,
+          "text": "subject: Some(\"Hello\".to_string()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/tests.rs#the_bounce_body_omits_the_directory_section_when_there_is_nothing_to_list",
+        "name": "the_bounce_body_omits_the_directory_section_when_there_is_nothing_to_list",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/tests.rs",
+        "span": "L3011-L3030"
+      },
+      "path": "src/application/use_cases/thread/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 3024,
+          "text": "original_subject: \"Quick question\".to_string(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/tests.rs#help_cc_d_alongside_a_real_channel_still_reaches_that_channel",
+        "name": "help_cc_d_alongside_a_real_channel_still_reaches_that_channel",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/tests.rs",
+        "span": "L3109-L3138"
+      },
+      "path": "src/application/use_cases/thread/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 3122,
+          "text": "subject: Some(\"Customer question\".to_string()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/tests.rs#an_agent_cannot_use_help_to_enumerate_its_company",
+        "name": "an_agent_cannot_use_help_to_enumerate_its_company",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/tests.rs",
+        "span": "L3173-L3217"
+      },
+      "path": "src/application/use_cases/thread/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 3187,
+          "text": "subject: Some(\"List the channels\".to_string()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/tests.rs#send_reply_in_thread_with_prior_agent_turn_stays_in_same_thread",
+        "name": "send_reply_in_thread_with_prior_agent_turn_stays_in_same_thread",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/tests.rs",
+        "span": "L3220-L3315"
+      },
+      "path": "src/application/use_cases/thread/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 3267,
+          "text": "subject: Some(\"Hello\".to_string()),"
+        },
+        {
+          "line": 3297,
+          "text": "subject: Some(\"Re: Hello\".to_string()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/tests.rs#external_email_cannot_use_mailagents_thread_id_header_to_inject",
+        "name": "external_email_cannot_use_mailagents_thread_id_header_to_inject",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/tests.rs",
+        "span": "L3318-L3393"
+      },
+      "path": "src/application/use_cases/thread/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 3364,
+          "text": "subject: Some(\"Hello\".to_string()),"
+        },
+        {
+          "line": 3377,
+          "text": "subject: Some(\"Spoof\".to_string()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/tests.rs#ingest_canonical_threads_correctly_with_target_thread_and_reply_to",
+        "name": "ingest_canonical_threads_correctly_with_target_thread_and_reply_to",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/tests.rs",
+        "span": "L3396-L3522"
+      },
+      "path": "src/application/use_cases/thread/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 3447,
+          "text": ".with_subject(\"Need help\");"
+        },
+        {
+          "line": 3456,
+          "text": "assert_eq!(thread.subject, \"Need help\");"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/tests.rs#a_passively_copied_channel_records_an_unmentioned_cc_intent",
+        "name": "a_passively_copied_channel_records_an_unmentioned_cc_intent",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/tests.rs",
+        "span": "L3606-L3633"
+      },
+      "path": "src/application/use_cases/thread/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 3620,
+          "text": "subject: Some(\"Re: Client inquiry\".to_string()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/user/ports.rs#ExternalIdentity",
+        "name": "ExternalIdentity",
+        "kind": "struct",
+        "path": "src/application/use_cases/user/ports.rs",
+        "span": "L37-L44"
+      },
+      "path": "src/application/use_cases/user/ports.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 39,
+          "text": "pub subject: &'a str,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/user/ports.rs#get_by_external_subject",
+        "name": "get_by_external_subject",
+        "kind": "function",
+        "path": "src/application/use_cases/user/ports.rs",
+        "span": "L173-L179"
+      },
+      "path": "src/application/use_cases/user/ports.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 173,
+          "text": "async fn get_by_external_subject("
+        },
+        {
+          "line": 176,
+          "text": "_subject: &str,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/user/tests.rs#linking_an_external_provider_requires_the_accounts_email",
+        "name": "linking_an_external_provider_requires_the_accounts_email",
+        "kind": "function",
+        "path": "src/application/use_cases/user/tests.rs",
+        "span": "L1000-L1020"
+      },
+      "path": "src/application/use_cases/user/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1011,
+          "text": "subject: \"apple-subject\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/user/tests.rs#security_email_identity_application_rejects_unverified_oauth_claims",
+        "name": "security_email_identity_application_rejects_unverified_oauth_claims",
+        "kind": "function",
+        "path": "src/application/use_cases/user/tests.rs",
+        "span": "L1023-L1047"
+      },
+      "path": "src/application/use_cases/user/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1030,
+          "text": "subject: \"unverified-subject\","
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 16,
+    "baselineChars": 388755
+  }
+}

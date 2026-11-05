@@ -1,0 +1,2406 @@
+{
+  "pattern": "attachment",
+  "filesSearched": 764,
+  "totalHits": 279,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/ingress.rs#accept",
+        "name": "accept",
+        "kind": "function",
+        "path": "src/adapters/protocols/email/ingress.rs",
+        "span": "L245-L275"
+      },
+      "path": "src/adapters/protocols/email/ingress.rs",
+      "inDegree": 28,
+      "hits": [
+        {
+          "line": 250,
+          "text": "if payload.attachments_data.len() > MAX_ATTACHMENTS {"
+        },
+        {
+          "line": 252,
+          "text": "field: \"attachments\","
+        },
+        {
+          "line": 253,
+          "text": "actual: payload.attachments_data.len(),"
+        },
+        {
+          "line": 258,
+          "text": "let (parsed, attachment_data) = EmailParser::parse(payload, &self.app_domain);"
+        },
+        {
+          "line": 261,
+          "text": "let pending_attachments = PendingEmailAttachments {"
+        },
+        {
+          "line": 262,
+          "text": "data: attachment_data,"
+        },
+        {
+          "line": 263,
+          "text": "metadata: draft.attachments.clone(),"
+        },
+        {
+          "line": 268,
+          "text": "pending_attachments,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/test_support.rs#inbound_email",
+        "name": "inbound_email",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/test_support.rs",
+        "span": "L281-L307"
+      },
+      "path": "src/adapters/persistence/thread/test_support.rs",
+      "inDegree": 17,
+      "hits": [
+        {
+          "line": 293,
+          "text": "attachments: Vec::new(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/tests.rs#mailbox_message_draft",
+        "name": "mailbox_message_draft",
+        "kind": "function",
+        "path": "src/adapters/http/pages/tests.rs",
+        "span": "L1860-L1880"
+      },
+      "path": "src/adapters/http/pages/tests.rs",
+      "inDegree": 6,
+      "hits": [
+        {
+          "line": 1874,
+          "text": "attachments: None,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/webhooks/resend_api_tests.rs#received_event",
+        "name": "received_event",
+        "kind": "function",
+        "path": "src/adapters/http/routes/webhooks/resend_api_tests.rs",
+        "span": "L201-L215"
+      },
+      "path": "src/adapters/http/routes/webhooks/resend_api_tests.rs",
+      "inDegree": 6,
+      "hits": [
+        {
+          "line": 211,
+          "text": "\"attachments\": []"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/jev_assets_tests.rs#image_claim",
+        "name": "image_claim",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/jev_assets_tests.rs",
+        "span": "L58-L67"
+      },
+      "path": "src/adapters/persistence/workflow/jev_assets_tests.rs",
+      "inDegree": 6,
+      "hits": [
+        {
+          "line": 58,
+          "text": "async fn image_claim(f: &Fixture, attachment: &Attachment) -> ClaimedWorkflow {"
+        },
+        {
+          "line": 64,
+          "text": "source[\"steps\"][\"start\"][\"with\"][\"assets\"] = json!({\"literal\":{\"photo\":attachment.reference}});"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/attachments.rs#store_inbound_attachments",
+        "name": "store_inbound_attachments",
+        "kind": "function",
+        "path": "src/adapters/protocols/email/attachments.rs",
+        "span": "L38-L73"
+      },
+      "path": "src/adapters/protocols/email/attachments.rs",
+      "inDegree": 5,
+      "hits": [
+        {
+          "line": 38,
+          "text": "pub async fn store_inbound_attachments("
+        },
+        {
+          "line": 41,
+          "text": "attachments: &mut [RawAttachmentData],"
+        },
+        {
+          "line": 44,
+          "text": "for attachment in attachments {"
+        },
+        {
+          "line": 45,
+          "text": "let key = attachment_key(folder, &attachment.content, &attachment.filename);"
+        },
+        {
+          "line": 46,
+          "text": "let content_type = stored_content_type(attachment);"
+        },
+        {
+          "line": 53,
+          "text": "attachment.content.clone(),"
+        },
+        {
+          "line": 58,
+          "text": "attachment.stored_key = Some(key);"
+        },
+        {
+          "line": 65,
+          "text": "filename = %attachment.filename,"
+        },
+        {
+          "line": 67,
+          "text": "\"Could not store an inbound attachment; the message keeps its metadata only\""
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/message.rs#try_from",
+        "name": "try_from",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/message.rs",
+        "span": "L142-L184"
+      },
+      "path": "src/adapters/persistence/thread/message.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 175,
+          "text": "attachments: decode_attachments(db.attachments)?,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/message.rs#encode_attachments",
+        "name": "encode_attachments",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/message.rs",
+        "span": "L261-L268"
+      },
+      "path": "src/adapters/persistence/thread/message.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 261,
+          "text": "pub(super) fn encode_attachments(attachments: &[AttachmentMetadata]) -> AppResult<Option<Value>> {"
+        },
+        {
+          "line": 262,
+          "text": "if attachments.is_empty() {"
+        },
+        {
+          "line": 265,
+          "text": "serde_json::to_value(MessageAttachments::new(attachments.to_vec()))"
+        },
+        {
+          "line": 267,
+          "text": ".map_err(|error| AppError::Internal(format!(\"Failed to serialize attachments: {error}\")))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/message.rs#insert_message_on",
+        "name": "insert_message_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/message.rs",
+        "span": "L494-L593"
+      },
+      "path": "src/adapters/persistence/thread/message.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 500,
+          "text": "validate_attachment_sources(connection, scope.company_id, write).await?;"
+        },
+        {
+          "line": 503,
+          "text": "let attachments = encode_attachments(&write.attachments)?;"
+        },
+        {
+          "line": 504,
+          "text": "let content_hash = canonical_message_hash(write, &author, &participants, attachments.as_ref());"
+        },
+        {
+          "line": 515,
+          "text": "attachments: attachments.as_ref(),"
+        },
+        {
+          "line": 530,
+          "text": "attachments: attachments.as_ref(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/jev_assets_tests.rs#attachment",
+        "name": "attachment",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/jev_assets_tests.rs",
+        "span": "L25-L57"
+      },
+      "path": "src/adapters/persistence/workflow/jev_assets_tests.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 25,
+          "text": "pub(super) async fn attachment(f: &Fixture, bytes: &[u8]) -> Attachment {"
+        },
+        {
+          "line": 41,
+          "text": "let key = ObjectKey::new(format!(\"attachments/{company}/{}.png\", Uuid::new_v4()));"
+        },
+        {
+          "line": 50,
+          "text": "sqlx::query(\"INSERT INTO messages(id,company_id,author_principal_id,subject,clean_text_body,direction,role,correlation_id,content_hash,attachments,audience) SEL"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/authentication.rs#parse_raw_mime_to_payload",
+        "name": "parse_raw_mime_to_payload",
+        "kind": "function",
+        "path": "src/adapters/protocols/email/authentication.rs",
+        "span": "L118-L218"
+      },
+      "path": "src/adapters/protocols/email/authentication.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 174,
+          "text": "// Extract attachments"
+        },
+        {
+          "line": 175,
+          "text": "let mut attachments_data = Vec::new();"
+        },
+        {
+          "line": 176,
+          "text": "for att in msg.attachments() {"
+        },
+        {
+          "line": 177,
+          "text": "let filename = att.attachment_name().unwrap_or(\"attachment\").to_string();"
+        },
+        {
+          "line": 184,
+          "text": "attachments_data.push(RawAttachmentData {"
+        },
+        {
+          "line": 204,
+          "text": "attachments_data,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/ingress.rs#into_preflight_parts",
+        "name": "into_preflight_parts",
+        "kind": "function",
+        "path": "src/adapters/protocols/email/ingress.rs",
+        "span": "L159-L176"
+      },
+      "path": "src/adapters/protocols/email/ingress.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 167,
+          "text": "pending_attachments,"
+        },
+        {
+          "line": 174,
+          "text": "pending_attachments,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/tests.rs#mailbox_message_view",
+        "name": "mailbox_message_view",
+        "kind": "function",
+        "path": "src/adapters/http/pages/tests.rs",
+        "span": "L1776-L1800"
+      },
+      "path": "src/adapters/http/pages/tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 1792,
+          "text": "attachments: Vec::new(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_attachments.rs#content_disposition",
+        "name": "content_disposition",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui_attachments.rs",
+        "span": "L161-L183"
+      },
+      "path": "src/adapters/http/routes/ui_attachments.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 174,
+          "text": "\"attachment\""
+        },
+        {
+          "line": 180,
+          "text": "\"attachment; filename=\\\"{fallback}\\\"; filename*=UTF-8''{encoded}\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/message.rs#canonical_message_hash",
+        "name": "canonical_message_hash",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/message.rs",
+        "span": "L400-L450"
+      },
+      "path": "src/adapters/persistence/thread/message.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 404,
+          "text": "attachments: Option<&Value>,"
+        },
+        {
+          "line": 435,
+          "text": "\"attachments\": attachments,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/message.rs#insert_canonical_message",
+        "name": "insert_canonical_message",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/message.rs",
+        "span": "L772-L818"
+      },
+      "path": "src/adapters/persistence/thread/message.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 780,
+          "text": "attachments,"
+        },
+        {
+          "line": 795,
+          "text": "clean_text_body, attachments, direction, role, correlation_id, content_hash,"
+        },
+        {
+          "line": 805,
+          "text": ".bind(attachments)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/views.rs#into_view",
+        "name": "into_view",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/views.rs",
+        "span": "L119-L168"
+      },
+      "path": "src/adapters/persistence/thread/views.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 156,
+          "text": "attachments: decode_attachments(self.attachments)?.unwrap_or_default(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/views.rs#thread_message_select",
+        "name": "thread_message_select",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/views.rs",
+        "span": "L244-L275"
+      },
+      "path": "src/adapters/persistence/thread/views.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 254,
+          "text": "message.attachments,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/ingress.rs#persist",
+        "name": "persist",
+        "kind": "function",
+        "path": "src/adapters/protocols/email/ingress.rs",
+        "span": "L196-L218"
+      },
+      "path": "src/adapters/protocols/email/ingress.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 202,
+          "text": "&& gcs.attachments_bucket.is_some()"
+        },
+        {
+          "line": 205,
+          "text": "store_inbound_attachments(storage, &gcs.attachments_folder, &mut self.data).await"
+        },
+        {
+          "line": 210,
+          "text": "for (metadata, attachment) in metadata.iter_mut().zip(&self.data) {"
+        },
+        {
+          "line": 211,
+          "text": "metadata.storage_key = attachment.stored_key.clone();"
+        },
+        {
+          "line": 214,
+          "text": "metadata: BoundedVec::parse(\"attachments\", metadata)?,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/resend_api/inbound.rs#read_mail",
+        "name": "read_mail",
+        "kind": "function",
+        "path": "src/adapters/resend_api/inbound.rs",
+        "span": "L204-L261"
+      },
+      "path": "src/adapters/resend_api/inbound.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 250,
+          "text": "let (mut inbound, attachments) ="
+        },
+        {
+          "line": 260,
+          "text": "Ok((inbound, attachments))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/mailbox.rs#message_bubble",
+        "name": "message_bubble",
+        "kind": "function",
+        "path": "src/adapters/http/pages/mailbox.rs",
+        "span": "L2479-L2575"
+      },
+      "path": "src/adapters/http/pages/mailbox.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 2530,
+          "text": "<div class=\"chat-bubble {bubble_class} max-w-2xl text-sm\">{internal_label}{body}{attachments}</div>"
+        },
+        {
+          "line": 2573,
+          "text": "attachments = attachment_chips(message, scope),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/inbound.rs#message_write",
+        "name": "message_write",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/inbound.rs",
+        "span": "L811-L864"
+      },
+      "path": "src/adapters/persistence/thread/inbound.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 839,
+          "text": "attachments: envelope.attachments.to_vec(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/message.rs#decode_attachments",
+        "name": "decode_attachments",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/message.rs",
+        "span": "L250-L259"
+      },
+      "path": "src/adapters/persistence/thread/message.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 250,
+          "text": "pub(super) fn decode_attachments("
+        },
+        {
+          "line": 257,
+          "text": ".map_err(|error| AppError::Internal(format!(\"Unreadable message attachments: {error}\")))?;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/jev_assets_race_tests.rs#restrict_to_view_grant",
+        "name": "restrict_to_view_grant",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/jev_assets_race_tests.rs",
+        "span": "L62-L93"
+      },
+      "path": "src/adapters/persistence/workflow/jev_assets_race_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 62,
+          "text": "async fn restrict_to_view_grant(f: &Fixture, attachment: &Attachment) -> Uuid {"
+        },
+        {
+          "line": 66,
+          "text": "let channel: Uuid = attachment.reference[\"channel_id\"]"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/jev_assets.rs#locate_on",
+        "name": "locate_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/jev_assets.rs",
+        "span": "L74-L114"
+      },
+      "path": "src/adapters/persistence/workflow/jev_assets.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 94,
+          "text": "\"SELECT attachment.value FROM thread_messages AS membership \\"
+        },
+        {
+          "line": 96,
+          "text": "CROSS JOIN LATERAL jsonb_array_elements(message.attachments->'items') AS attachment(value) \\"
+        },
+        {
+          "line": 98,
+          "text": "AND attachment.value->>'sha256_hash'=$4 LIMIT 1 FOR SHARE OF membership, message\""
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/parser.rs#parse",
+        "name": "parse",
+        "kind": "function",
+        "path": "src/adapters/protocols/email/parser.rs",
+        "span": "L144-L289"
+      },
+      "path": "src/adapters/protocols/email/parser.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 148,
+          "text": "let attachments_data = std::mem::take(&mut payload.attachments_data);"
+        },
+        {
+          "line": 220,
+          "text": "// Process attachments - Filter small inline signature images (< 10KB images)"
+        },
+        {
+          "line": 221,
+          "text": "let mut attachments = Vec::new();"
+        },
+        {
+          "line": 222,
+          "text": "let mut attachment_prompts = Vec::new();"
+        },
+        {
+          "line": 224,
+          "text": "for att in &attachments_data {"
+        },
+        {
+          "line": 242,
+          "text": "attachments.push(meta.clone());"
+        },
+        {
+          "line": 244,
+          "text": "// Only add document/significant attachments to prompt context"
+        },
+        {
+          "line": 246,
+          "text": "attachment_prompts.push(format!("
+        },
+        {
+          "line": 253,
+          "text": "let prompt_text = if attachment_prompts.is_empty() {"
+        },
+        {
+          "line": 256,
+          "text": "format!(\"{}\\n\\n{}\", clean_text_body, attachment_prompts.join(\"\\n\"))"
+        },
+        {
+          "line": 274,
+          "text": "attachments,"
+        },
+        {
+          "line": 288,
+          "text": "(parsed, attachments_data)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/mailbox.rs#attachment_chip",
+        "name": "attachment_chip",
+        "kind": "function",
+        "path": "src/adapters/http/pages/mailbox.rs",
+        "span": "L2672-L2699"
+      },
+      "path": "src/adapters/http/pages/mailbox.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 2672,
+          "text": "fn attachment_chip("
+        },
+        {
+          "line": 2674,
+          "text": "attachment: &AttachmentMetadata,"
+        },
+        {
+          "line": 2680,
+          "text": "filename = escape_html_text(&attachment.filename),"
+        },
+        {
+          "line": 2681,
+          "text": "size = escape_html_text(&file_size(attachment.size_bytes)),"
+        },
+        {
+          "line": 2684,
+          "text": "match attachment.storage_key.is_some() {"
+        },
+        {
+          "line": 2687,
+          "text": "href=\"/ui/threads/{thread_id}/attachments/{sha256}?company_id={company_id}&channel_id={channel_id}\""
+        },
+        {
+          "line": 2689,
+          "text": "sha256 = escape_html_text(&attachment.sha256_hash),"
+        },
+        {
+          "line": 2692,
+          "text": "filename = escape_html_text(&attachment.filename),"
+        },
+        {
+          "line": 2696,
+          "text": "title=\"This attachment was not stored, so there is nothing to download\">📎 {label}</span>\"##"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/mod.rs#router",
+        "name": "router",
+        "kind": "function",
+        "path": "src/adapters/http/routes/mod.rs",
+        "span": "L81-L127"
+      },
+      "path": "src/adapters/http/routes/mod.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 105,
+          "text": ".merge(ui_attachments::router())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_attachments.rs#find_attachment",
+        "name": "find_attachment",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui_attachments.rs",
+        "span": "L111-L120"
+      },
+      "path": "src/adapters/http/routes/ui_attachments.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 111,
+          "text": "fn find_attachment("
+        },
+        {
+          "line": 117,
+          "text": ".flat_map(|message| message.attachments.iter())"
+        },
+        {
+          "line": 118,
+          "text": ".find(|attachment| attachment.sha256_hash.eq_ignore_ascii_case(sha256))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_attachments.rs#attachment_response",
+        "name": "attachment_response",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui_attachments.rs",
+        "span": "L129-L153"
+      },
+      "path": "src/adapters/http/routes/ui_attachments.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 129,
+          "text": "fn attachment_response("
+        },
+        {
+          "line": 130,
+          "text": "attachment: &AttachmentMetadata,"
+        },
+        {
+          "line": 143,
+          "text": "HeaderValue::from_str(&content_disposition(&attachment.filename))"
+        },
+        {
+          "line": 144,
+          "text": ".unwrap_or_else(|_| HeaderValue::from_static(\"attachment\")),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/inbound_tests.rs#envelope",
+        "name": "envelope",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/inbound_tests.rs",
+        "span": "L102-L129"
+      },
+      "path": "src/adapters/persistence/thread/inbound_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 122,
+          "text": "attachments: BoundedVec::empty(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/inbound.rs#recognise_redelivery",
+        "name": "recognise_redelivery",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/inbound.rs",
+        "span": "L201-L247"
+      },
+      "path": "src/adapters/persistence/thread/inbound.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 225,
+          "text": "let attachments = message::encode_attachments(&write.attachments)?;"
+        },
+        {
+          "line": 227,
+          "text": "message::canonical_message_hash(&write, &author, &participants, attachments.as_ref());"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/inbound.rs#store_canonical",
+        "name": "store_canonical",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/inbound.rs",
+        "span": "L606-L643"
+      },
+      "path": "src/adapters/persistence/thread/inbound.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 613,
+          "text": "let attachments = message::encode_attachments(&write.attachments)?;"
+        },
+        {
+          "line": 615,
+          "text": "message::canonical_message_hash(write, &author, &participants, attachments.as_ref());"
+        },
+        {
+          "line": 623,
+          "text": "attachments: attachments.as_ref(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/message.rs#validate_attachment_sources",
+        "name": "validate_attachment_sources",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/message.rs",
+        "span": "L598-L628"
+      },
+      "path": "src/adapters/persistence/thread/message.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 598,
+          "text": "async fn validate_attachment_sources("
+        },
+        {
+          "line": 603,
+          "text": "for attachment in &write.attachments {"
+        },
+        {
+          "line": 604,
+          "text": "let Some(source) = attachment.source.as_ref() else {"
+        },
+        {
+          "line": 622,
+          "text": "\"Private or unclassified attachment material cannot be published externally.\""
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/message.rs#store_email_correlated",
+        "name": "store_email_correlated",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/message.rs",
+        "span": "L684-L753"
+      },
+      "path": "src/adapters/persistence/thread/message.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 707,
+          "text": "attachments: payload.attachments,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/views.rs#list_thread_messages",
+        "name": "list_thread_messages",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/views.rs",
+        "span": "L282-L323"
+      },
+      "path": "src/adapters/persistence/thread/views.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 291,
+          "text": "recent.clean_text_body, recent.attachments, recent.direction, recent.role,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_eligibility_remaining_tests.rs#truth_only",
+        "name": "truth_only",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_eligibility_remaining_tests.rs",
+        "span": "L71-L126"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_eligibility_remaining_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 124,
+          "text": "\"truth attachment changes no other public history\""
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/attachments.rs#attachment_key",
+        "name": "attachment_key",
+        "kind": "function",
+        "path": "src/adapters/protocols/email/attachments.rs",
+        "span": "L76-L91"
+      },
+      "path": "src/adapters/protocols/email/attachments.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 76,
+          "text": "fn attachment_key(folder: &str, content: &[u8], filename: &str) -> ObjectKey {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/attachments.rs#stored_content_type",
+        "name": "stored_content_type",
+        "kind": "function",
+        "path": "src/adapters/protocols/email/attachments.rs",
+        "span": "L112-L117"
+      },
+      "path": "src/adapters/protocols/email/attachments.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 112,
+          "text": "fn stored_content_type(attachment: &RawAttachmentData) -> String {"
+        },
+        {
+          "line": 113,
+          "text": "match ImageFormat::detect(&attachment.content) {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/ingress.rs#draft",
+        "name": "draft",
+        "kind": "function",
+        "path": "src/adapters/protocols/email/ingress.rs",
+        "span": "L350-L408"
+      },
+      "path": "src/adapters/protocols/email/ingress.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 389,
+          "text": "attachments: BoundedVec::parse(\"attachments\", parsed.attachments.clone())?,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/parser.rs#default",
+        "name": "default",
+        "kind": "function",
+        "path": "src/adapters/protocols/email/parser.rs",
+        "span": "L102-L117"
+      },
+      "path": "src/adapters/protocols/email/parser.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 115,
+          "text": "attachments_data: Vec::new(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/resend_api/inbound.rs#decode_event",
+        "name": "decode_event",
+        "kind": "function",
+        "path": "src/adapters/resend_api/inbound.rs",
+        "span": "L136-L195"
+      },
+      "path": "src/adapters/resend_api/inbound.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 159,
+          "text": "let (inbound, attachments) = read_mail(&account, &self.config, event, &email_id).await?;"
+        },
+        {
+          "line": 181,
+          "text": "let persisted = attachments"
+        },
+        {
+          "line": 187,
+          "text": "prepared.replace_attachments("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/sendgrid/inbound.rs#decode_multipart",
+        "name": "decode_multipart",
+        "kind": "function",
+        "path": "src/adapters/sendgrid/inbound.rs",
+        "span": "L130-L168"
+      },
+      "path": "src/adapters/sendgrid/inbound.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 154,
+          "text": "payload.attachments_data.push(RawAttachmentData {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/smtp/server.rs#finish_data_transaction",
+        "name": "finish_data_transaction",
+        "kind": "function",
+        "path": "src/adapters/smtp/server.rs",
+        "span": "L536-L626"
+      },
+      "path": "src/adapters/smtp/server.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 576,
+          "text": "let (inbound, attachments) = accepted"
+        },
+        {
+          "line": 581,
+          "text": "let persisted = attachments"
+        },
+        {
+          "line": 584,
+          "text": "prepared.replace_attachments("
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/http/pages/mailbox.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 2642,
+          "text": "/// An attachment link carries the company and channel because that is what the download route"
+        },
+        {
+          "line": 2653,
+          "text": "/// An attachment that was never stored -- mail that arrived before there was a bucket, or an"
+        },
+        {
+          "line": 2701,
+          "text": "/// An attachment's size, as somebody deciding whether to download it would read it."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/mailbox.rs#attachment_chips",
+        "name": "attachment_chips",
+        "kind": "function",
+        "path": "src/adapters/http/pages/mailbox.rs",
+        "span": "L2656-L2670"
+      },
+      "path": "src/adapters/http/pages/mailbox.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 2656,
+          "text": "fn attachment_chips(message: &ThreadMessageView, scope: MessageScope) -> String {"
+        },
+        {
+          "line": 2657,
+          "text": "if message.attachments.is_empty() {"
+        },
+        {
+          "line": 2662,
+          "text": ".attachments"
+        },
+        {
+          "line": 2664,
+          "text": ".map(|attachment| attachment_chip(message.thread_id, attachment, scope))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/tests.rs#message_pane_puts_the_viewers_messages_on_the_right_and_everyone_else_on_the_left",
+        "name": "message_pane_puts_the_viewers_messages_on_the_right_and_everyone_else_on_the_left",
+        "kind": "function",
+        "path": "src/adapters/http/pages/tests.rs",
+        "span": "L1693-L1767"
+      },
+      "path": "src/adapters/http/pages/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1711,
+          "text": "attachments: None,"
+        },
+        {
+          "line": 1730,
+          "text": "attachments: None,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/tests.rs#an_attachment_is_offered_as_a_download_scoped_to_its_thread",
+        "name": "an_attachment_is_offered_as_a_download_scoped_to_its_thread",
+        "kind": "function",
+        "path": "src/adapters/http/pages/tests.rs",
+        "span": "L2708-L2762"
+      },
+      "path": "src/adapters/http/pages/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 2708,
+          "text": "fn an_attachment_is_offered_as_a_download_scoped_to_its_thread() {"
+        },
+        {
+          "line": 2713,
+          "text": "message.attachments = vec!["
+        },
+        {
+          "line": 2720,
+          "text": "\"attachments/abc123.pdf\","
+        },
+        {
+          "line": 2748,
+          "text": "r##\"href=\"/ui/threads/{}/attachments/abc123?company_id={}&channel_id={}\"\"##,"
+        },
+        {
+          "line": 2752,
+          "text": "assert!(!html.contains(\"attachments/abc123.pdf\"));"
+        },
+        {
+          "line": 2760,
+          "text": "assert!(!html.contains(\"attachments/def456\"));"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/tests.rs#a_streamed_bubble_is_identical_to_one_rendered_with_the_page",
+        "name": "a_streamed_bubble_is_identical_to_one_rendered_with_the_page",
+        "kind": "function",
+        "path": "src/adapters/http/pages/tests.rs",
+        "span": "L2768-L2805"
+      },
+      "path": "src/adapters/http/pages/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 2786,
+          "text": "// than of two different attachment links."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/channel.rs#channel_pages_and_fragments_render_correctly",
+        "name": "channel_pages_and_fragments_render_correctly",
+        "kind": "function",
+        "path": "src/adapters/http/routes/channel.rs",
+        "span": "L837-L1165"
+      },
+      "path": "src/adapters/http/routes/channel.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1017,
+          "text": "attachments: None,"
+        },
+        {
+          "line": 1036,
+          "text": "attachments: None,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/mod.rs#ui_attachments",
+        "name": "ui_attachments",
+        "kind": "module",
+        "path": "src/adapters/http/routes/mod.rs",
+        "span": "L26-L26"
+      },
+      "path": "src/adapters/http/routes/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 26,
+          "text": "pub mod ui_attachments;"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/http/routes/ui_attachments.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 41,
+          "text": "/// Nothing an attachment is served with may be guessed at by the browser, and nothing may be kept."
+        },
+        {
+          "line": 44,
+          "text": "/// A downloaded attachment is one person's copy of one company's mail; no shared cache may hold it."
+        },
+        {
+          "line": 54,
+          "text": "/// Which thread's attachment, scoped the way every mailbox fragment is."
+        },
+        {
+          "line": 61,
+          "text": "/// GET /ui/threads/{thread_id}/attachments/{sha256} - One attachment of one thread (Protected)."
+        },
+        {
+          "line": 110,
+          "text": "/// One attachment of these messages, by the hash of its contents."
+        },
+        {
+          "line": 122,
+          "text": "/// What a caller is told about an attachment that is not theirs, does not exist, or is not on the"
+        },
+        {
+          "line": 157,
+          "text": "/// Always `attachment`: an HTML or SVG file served `inline` would run as a page on this app's own"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_attachments.rs#router",
+        "name": "router",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui_attachments.rs",
+        "span": "L47-L52"
+      },
+      "path": "src/adapters/http/routes/ui_attachments.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 49,
+          "text": "\"/ui/threads/{thread_id}/attachments/{sha256}\","
+        },
+        {
+          "line": 50,
+          "text": "get(download_attachment),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_attachments.rs#download_attachment",
+        "name": "download_attachment",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui_attachments.rs",
+        "span": "L63-L108"
+      },
+      "path": "src/adapters/http/routes/ui_attachments.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 63,
+          "text": "async fn download_attachment("
+        },
+        {
+          "line": 87,
+          "text": "// The attachment has to hang on a message of *this* thread: that, rather than the key, is what"
+        },
+        {
+          "line": 90,
+          "text": "let attachment = find_attachment(&messages, &sha256).ok_or_else(missing)?;"
+        },
+        {
+          "line": 92,
+          "text": "let key = attachment.storage_key.clone().ok_or_else(|| {"
+        },
+        {
+          "line": 94,
+          "text": "\"This attachment was never stored, so there is nothing to download\".into(),"
+        },
+        {
+          "line": 103,
+          "text": "Ok(attachment_response("
+        },
+        {
+          "line": 104,
+          "text": "&attachment,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_attachments.rs#attachment",
+        "name": "attachment",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui_attachments.rs",
+        "span": "L208-L217"
+      },
+      "path": "src/adapters/http/routes/ui_attachments.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 208,
+          "text": "fn attachment(sha: &str, filename: &str, key: Option<&str>) -> AttachmentMetadata {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_attachments.rs#message",
+        "name": "message",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui_attachments.rs",
+        "span": "L219-L239"
+      },
+      "path": "src/adapters/http/routes/ui_attachments.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 219,
+          "text": "fn message(attachments: Vec<AttachmentMetadata>) -> ThreadMessageView {"
+        },
+        {
+          "line": 233,
+          "text": "attachments: Some(attachments),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_attachments.rs#an_attachment_is_found_by_its_hash_only_within_the_thread_it_hangs_on",
+        "name": "an_attachment_is_found_by_its_hash_only_within_the_thread_it_hangs_on",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui_attachments.rs",
+        "span": "L242-L260"
+      },
+      "path": "src/adapters/http/routes/ui_attachments.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 242,
+          "text": "fn an_attachment_is_found_by_its_hash_only_within_the_thread_it_hangs_on() {"
+        },
+        {
+          "line": 244,
+          "text": "message(vec![attachment("
+        },
+        {
+          "line": 247,
+          "text": "Some(\"attachments/aaa.pdf\"),"
+        },
+        {
+          "line": 249,
+          "text": "message(vec![attachment(\"bbb\", \"second.pdf\", None)]),"
+        },
+        {
+          "line": 253,
+          "text": "find_attachment(&messages, \"aaa\").map(|a| a.filename),"
+        },
+        {
+          "line": 257,
+          "text": "assert!(find_attachment(&messages, \"AAA\").is_some());"
+        },
+        {
+          "line": 259,
+          "text": "assert!(find_attachment(&messages, \"ccc\").is_none());"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_attachments.rs#a_name_from_a_stranger_cannot_break_out_of_the_header",
+        "name": "a_name_from_a_stranger_cannot_break_out_of_the_header",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui_attachments.rs",
+        "span": "L263-L278"
+      },
+      "path": "src/adapters/http/routes/ui_attachments.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 267,
+          "text": "assert!(header.starts_with(\"attachment; \"));"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_attachments.rs#a_nameless_attachment_still_downloads",
+        "name": "a_nameless_attachment_still_downloads",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui_attachments.rs",
+        "span": "L289-L292"
+      },
+      "path": "src/adapters/http/routes/ui_attachments.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 289,
+          "text": "fn a_nameless_attachment_still_downloads() {"
+        },
+        {
+          "line": 290,
+          "text": "assert!(content_disposition(\"\").contains(\"filename=\\\"attachment\\\"\"));"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/http/routes/ui_message_diagnostics.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 8,
+          "text": "//! It is authorized exactly like an attachment download, through the same two guards the mailbox"
+        },
+        {
+          "line": 31,
+          "text": "use super::ui_attachments::AttachmentQuery;"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/http/routes/webhooks/resend_api.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 4,
+          "text": "//! Resend's `email.received` payload carries no body, headers or attachments, so reading the mail"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/webhooks/sendgrid.rs#sendgrid_inbound_webhook",
+        "name": "sendgrid_inbound_webhook",
+        "kind": "function",
+        "path": "src/adapters/http/routes/webhooks/sendgrid.rs",
+        "span": "L36-L117"
+      },
+      "path": "src/adapters/http/routes/webhooks/sendgrid.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 60,
+          "text": "let (inbound, attachments) ="
+        },
+        {
+          "line": 71,
+          "text": "let persisted = attachments"
+        },
+        {
+          "line": 75,
+          "text": "warn!(\"Could not prepare inbound SendGrid attachment metadata\");"
+        },
+        {
+          "line": 78,
+          "text": "prepared.replace_attachments("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/message.rs#MessageDb",
+        "name": "MessageDb",
+        "kind": "struct",
+        "path": "src/adapters/persistence/thread/message.rs",
+        "span": "L52-L75"
+      },
+      "path": "src/adapters/persistence/thread/message.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 67,
+          "text": "pub attachments: Option<Value>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/message.rs#MESSAGE_SELECT",
+        "name": "MESSAGE_SELECT",
+        "kind": "constant",
+        "path": "src/adapters/persistence/thread/message.rs",
+        "span": "L91-L137"
+      },
+      "path": "src/adapters/persistence/thread/message.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 105,
+          "text": "message.attachments,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/thread/message.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 248,
+          "text": "/// Read attachment metadata from its versioned envelope. Unexpected stored shapes return"
+        },
+        {
+          "line": 595,
+          "text": "/// A derived attachment cannot carry source material across a wider boundary than its source."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/message.rs#StoredPayload",
+        "name": "StoredPayload",
+        "kind": "struct",
+        "path": "src/adapters/persistence/thread/message.rs",
+        "span": "L670-L677"
+      },
+      "path": "src/adapters/persistence/thread/message.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 674,
+          "text": "pub attachments: Option<&'a Value>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/message.rs#CanonicalMessageInsert",
+        "name": "CanonicalMessageInsert",
+        "kind": "struct",
+        "path": "src/adapters/persistence/thread/message.rs",
+        "span": "L765-L771"
+      },
+      "path": "src/adapters/persistence/thread/message.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 768,
+          "text": "pub attachments: Option<&'a Value>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/message.rs#attachments_round_trip_through_their_stored_envelope",
+        "name": "attachments_round_trip_through_their_stored_envelope",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/message.rs",
+        "span": "L1034-L1052"
+      },
+      "path": "src/adapters/persistence/thread/message.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1034,
+          "text": "fn attachments_round_trip_through_their_stored_envelope() {"
+        },
+        {
+          "line": 1035,
+          "text": "let attachments = vec![AttachmentMetadata {"
+        },
+        {
+          "line": 1040,
+          "text": "storage_key: Some(ObjectKey::from(\"attachments/invoice.pdf\")),"
+        },
+        {
+          "line": 1043,
+          "text": "let encoded = encode_attachments(&attachments).unwrap().unwrap();"
+        },
+        {
+          "line": 1046,
+          "text": "decode_attachments(Some(encoded)).unwrap(),"
+        },
+        {
+          "line": 1047,
+          "text": "Some(attachments)"
+        },
+        {
+          "line": 1049,
+          "text": "assert_eq!(encode_attachments(&[]).unwrap(), None);"
+        },
+        {
+          "line": 1050,
+          "text": "assert_eq!(decode_attachments(None).unwrap(), None);"
+        },
+        {
+          "line": 1051,
+          "text": "assert_eq!(decode_attachments(Some(Value::Null)).unwrap(), None);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/message.rs#unreadable_stored_json_is_an_application_error",
+        "name": "unreadable_stored_json_is_an_application_error",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/message.rs",
+        "span": "L1057-L1081"
+      },
+      "path": "src/adapters/persistence/thread/message.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1060,
+          "text": "decode_attachments(Some(future_version)),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/tests.rs#internal_notes_are_idempotent_immutable_and_auditable",
+        "name": "internal_notes_are_idempotent_immutable_and_auditable",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/tests.rs",
+        "span": "L21-L225"
+      },
+      "path": "src/adapters/persistence/thread/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 122,
+          "text": "assert!(first.attachments.is_empty());"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/tests.rs#derived_attachments_cannot_publish_a_private_source",
+        "name": "derived_attachments_cannot_publish_a_private_source",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/tests.rs",
+        "span": "L348-L390"
+      },
+      "path": "src/adapters/persistence/thread/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 348,
+          "text": "async fn derived_attachments_cannot_publish_a_private_source() {"
+        },
+        {
+          "line": 349,
+          "text": "let Some(fixture) = Fixture::new(\"private_attachment_guard\").await else {"
+        },
+        {
+          "line": 375,
+          "text": ".with_attachments(vec![AttachmentMetadata {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/tests.rs#unreadable_stored_json_surfaces_as_an_application_error",
+        "name": "unreadable_stored_json_surfaces_as_an_application_error",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/tests.rs",
+        "span": "L793-L849"
+      },
+      "path": "src/adapters/persistence/thread/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 804,
+          "text": "\"With an attachment\","
+        },
+        {
+          "line": 806,
+          "text": ".with_attachments(vec![AttachmentMetadata {"
+        },
+        {
+          "line": 817,
+          "text": "assert_eq!(stored.attachments.as_ref().map(Vec::len), Some(1));"
+        },
+        {
+          "line": 820,
+          "text": "let rejected = sqlx::query(\"UPDATE messages SET attachments = $2 WHERE id = $1\")"
+        },
+        {
+          "line": 832,
+          "text": "sqlx::query(\"UPDATE messages SET attachments = $2 WHERE id = $1\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/tests.rs#find_outbound_reply_after_sees_answers_and_ignores_relayed_mail",
+        "name": "find_outbound_reply_after_sees_answers_and_ignores_relayed_mail",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/tests.rs",
+        "span": "L1057-L1156"
+      },
+      "path": "src/adapters/persistence/thread/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1092,
+          "text": "attachments: Vec::new(),"
+        },
+        {
+          "line": 1127,
+          "text": "attachments: Vec::new(),"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/thread/views.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 20,
+          "text": "use super::message::{decode_attachments, decode_response_contract};"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/views.rs#ThreadMessageDb",
+        "name": "ThreadMessageDb",
+        "kind": "struct",
+        "path": "src/adapters/persistence/thread/views.rs",
+        "span": "L93-L116"
+      },
+      "path": "src/adapters/persistence/thread/views.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 104,
+          "text": "attachments: Option<Value>,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/action_reconciliation_claim_sql_witness_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 2,
+          "text": "//! catalog attachment and genuine public scheduling. Not a public stale INSERT."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/jev_assets_race_tests.rs#jev_assets_allowlist_grant_requires_current_verified_email",
+        "name": "jev_assets_allowlist_grant_requires_current_verified_email",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/jev_assets_race_tests.rs",
+        "span": "L112-L157"
+      },
+      "path": "src/adapters/persistence/workflow/jev_assets_race_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 118,
+          "text": "let attachment = attachment(&f, &images::png(280, 280)).await;"
+        },
+        {
+          "line": 119,
+          "text": "let claim = image_claim(&f, &attachment).await;"
+        },
+        {
+          "line": 120,
+          "text": "restrict_to_view_grant(&f, &attachment).await;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/jev_assets_race_tests.rs#jev_assets_final_authorization_holds_view_grant_across_connection_wait",
+        "name": "jev_assets_final_authorization_holds_view_grant_across_connection_wait",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/jev_assets_race_tests.rs",
+        "span": "L160-L242"
+      },
+      "path": "src/adapters/persistence/workflow/jev_assets_race_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 163,
+          "text": "let attachment = attachment(&f, &bytes).await;"
+        },
+        {
+          "line": 164,
+          "text": "let claim = image_claim(&f, &attachment).await;"
+        },
+        {
+          "line": 165,
+          "text": "let channel = restrict_to_view_grant(&f, &attachment).await;"
+        },
+        {
+          "line": 169,
+          "text": ".store_object(BucketKind::Private, &attachment.key, \"image/png\", bytes)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/jev_assets_tests.rs#jev_assets_cross_company_negative_and_forged_claim_are_denied_before_storage",
+        "name": "jev_assets_cross_company_negative_and_forged_claim_are_denied_before_storage",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/jev_assets_tests.rs",
+        "span": "L79-L102"
+      },
+      "path": "src/adapters/persistence/workflow/jev_assets_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 83,
+          "text": "let foreign = attachment(&other, &bytes).await;"
+        },
+        {
+          "line": 95,
+          "text": "let local = attachment(&f, &bytes).await;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/jev_assets_tests.rs#jev_assets_changed_object_retry_never_sends_or_adds_reservation",
+        "name": "jev_assets_changed_object_retry_never_sends_or_adds_reservation",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/jev_assets_tests.rs",
+        "span": "L104-L161"
+      },
+      "path": "src/adapters/persistence/workflow/jev_assets_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 107,
+          "text": "let attachment = attachment(&f, &bytes).await;"
+        },
+        {
+          "line": 108,
+          "text": "let first = image_claim(&f, &attachment).await;"
+        },
+        {
+          "line": 113,
+          "text": "&attachment.key,"
+        },
+        {
+          "line": 138,
+          "text": ".store_object(BucketKind::Private, &attachment.key, \"image/png\", changed)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/jev_assets_tests.rs#jev_assets_mixed_loopback_settlement_replay_and_metadata_only_ledger",
+        "name": "jev_assets_mixed_loopback_settlement_replay_and_metadata_only_ledger",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/jev_assets_tests.rs",
+        "span": "L163-L210"
+      },
+      "path": "src/adapters/persistence/workflow/jev_assets_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 166,
+          "text": "let attachment = attachment(&f, &bytes).await;"
+        },
+        {
+          "line": 167,
+          "text": "let first = image_claim(&f, &attachment).await;"
+        },
+        {
+          "line": 170,
+          "text": ".store_object(BucketKind::Private, &attachment.key, \"image/png\", bytes)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/jev_assets_tests.rs#jev_assets_current_actor_channel_visibility_and_missing_file",
+        "name": "jev_assets_current_actor_channel_visibility_and_missing_file",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/jev_assets_tests.rs",
+        "span": "L213-L248"
+      },
+      "path": "src/adapters/persistence/workflow/jev_assets_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 216,
+          "text": "let attachment = attachment(&f, &bytes).await;"
+        },
+        {
+          "line": 217,
+          "text": "let claim = image_claim(&f, &attachment).await;"
+        },
+        {
+          "line": 234,
+          "text": "attachment.reference[\"channel_id\"]"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/jev_assets.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1,
+          "text": "//! Authorize immutable private attachment references before storage reads."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/jev_end_to_end_tests.rs#jev_end_to_end_box_worker_history_and_invalid_output_rejection",
+        "name": "jev_end_to_end_box_worker_history_and_invalid_output_rejection",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/jev_end_to_end_tests.rs",
+        "span": "L176-L236"
+      },
+      "path": "src/adapters/persistence/workflow/jev_end_to_end_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 186,
+          "text": "let attachment = super::jev_assets_tests::attachment(&f, &bytes).await;"
+        },
+        {
+          "line": 189,
+          "text": ".store_object(BucketKind::Private, &attachment.key, \"image/png\", bytes)"
+        },
+        {
+          "line": 195,
+          "text": "source[\"steps\"][\"start\"][\"with\"][\"assets\"][\"literal\"][\"photo\"] = attachment.reference;"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/protocols/email/attachments.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 10,
+          "text": "//! attachment are therefore one object, and knowing a key grants nothing on its own — a download"
+        },
+        {
+          "line": 30,
+          "text": "/// What an attachment with no recognizable type is stored and served as."
+        },
+        {
+          "line": 33,
+          "text": "/// Put each attachment in the private bucket, recording where it landed."
+        },
+        {
+          "line": 36,
+          "text": "/// must not cost us the message. The mail still arrives, and the attachment shows as one we do not"
+        },
+        {
+          "line": 75,
+          "text": "/// Where an attachment's bytes go: the content hash, under the configured folder."
+        },
+        {
+          "line": 111,
+          "text": "/// keeps a `text/html` \"attachment\" from ever being served as a page."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/attachments.rs#attachment",
+        "name": "attachment",
+        "kind": "function",
+        "path": "src/adapters/protocols/email/attachments.rs",
+        "span": "L124-L131"
+      },
+      "path": "src/adapters/protocols/email/attachments.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 124,
+          "text": "fn attachment(filename: &str, content_type: &str, content: &[u8]) -> RawAttachmentData {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/attachments.rs#an_attachment_goes_to_the_private_bucket_named_by_its_content",
+        "name": "an_attachment_goes_to_the_private_bucket_named_by_its_content",
+        "kind": "function",
+        "path": "src/adapters/protocols/email/attachments.rs",
+        "span": "L136-L154"
+      },
+      "path": "src/adapters/protocols/email/attachments.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 136,
+          "text": "async fn an_attachment_goes_to_the_private_bucket_named_by_its_content() {"
+        },
+        {
+          "line": 138,
+          "text": "let mut attachments = vec![attachment("
+        },
+        {
+          "line": 144,
+          "text": "store_inbound_attachments(&storage, \"attachments\", &mut attachments).await;"
+        },
+        {
+          "line": 149,
+          "text": "assert_eq!(attachments[0].stored_key.as_ref(), Some(&stored.key));"
+        },
+        {
+          "line": 150,
+          "text": "assert!(stored.key.starts_with(\"attachments/\"), \"{}\", stored.key);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/attachments.rs#the_same_file_twice_is_the_same_object",
+        "name": "the_same_file_twice_is_the_same_object",
+        "kind": "function",
+        "path": "src/adapters/protocols/email/attachments.rs",
+        "span": "L157-L167"
+      },
+      "path": "src/adapters/protocols/email/attachments.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 159,
+          "text": "let mut attachments = vec!["
+        },
+        {
+          "line": 160,
+          "text": "attachment(\"a.png\", \"image/png\", PNG),"
+        },
+        {
+          "line": 161,
+          "text": "attachment(\"copy.png\", \"image/png\", PNG),"
+        },
+        {
+          "line": 164,
+          "text": "store_inbound_attachments(&storage, \"attachments\", &mut attachments).await;"
+        },
+        {
+          "line": 166,
+          "text": "assert_eq!(attachments[0].stored_key, attachments[1].stored_key);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/attachments.rs#what_the_sender_calls_it_does_not_decide_how_it_is_stored",
+        "name": "what_the_sender_calls_it_does_not_decide_how_it_is_stored",
+        "kind": "function",
+        "path": "src/adapters/protocols/email/attachments.rs",
+        "span": "L170-L188"
+      },
+      "path": "src/adapters/protocols/email/attachments.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 172,
+          "text": "let mut attachments = vec!["
+        },
+        {
+          "line": 174,
+          "text": "attachment("
+        },
+        {
+          "line": 180,
+          "text": "attachment(\"logo.png\", \"image/png\", PNG),"
+        },
+        {
+          "line": 183,
+          "text": "store_inbound_attachments(&storage, \"attachments\", &mut attachments).await;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/attachments.rs#a_bucket_that_is_down_costs_the_attachment_not_the_message",
+        "name": "a_bucket_that_is_down_costs_the_attachment_not_the_message",
+        "kind": "function",
+        "path": "src/adapters/protocols/email/attachments.rs",
+        "span": "L191-L197"
+      },
+      "path": "src/adapters/protocols/email/attachments.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 191,
+          "text": "async fn a_bucket_that_is_down_costs_the_attachment_not_the_message() {"
+        },
+        {
+          "line": 192,
+          "text": "let mut attachments = vec![attachment(\"a.pdf\", \"application/pdf\", b\"%PDF-1.7\")];"
+        },
+        {
+          "line": 194,
+          "text": "store_inbound_attachments(&FakeStorage::failing(), \"attachments\", &mut attachments).await;"
+        },
+        {
+          "line": 196,
+          "text": "assert_eq!(attachments[0].stored_key, None);"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/protocols/email/ingress.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 14,
+          "text": "//! * **Bounds are enforced before allocation.** Recipients, attachments, subject, body and reply"
+        },
+        {
+          "line": 24,
+          "text": "use crate::adapters::protocols::email::attachments::AttachmentStorageReport;"
+        },
+        {
+          "line": 25,
+          "text": "use crate::adapters::protocols::email::attachments::store_inbound_attachments;"
+        },
+        {
+          "line": 157,
+          "text": "/// Split the policy input from attachment bytes. The bytes stay at the adapter boundary until"
+        },
+        {
+          "line": 195,
+          "text": "/// non-fatal; the returned metadata simply has no object key for that attachment."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/ingress.rs#AcceptedEmail",
+        "name": "AcceptedEmail",
+        "kind": "struct",
+        "path": "src/adapters/protocols/email/ingress.rs",
+        "span": "L130-L139"
+      },
+      "path": "src/adapters/protocols/email/ingress.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 133,
+          "text": "pending_attachments: PendingEmailAttachments,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/mod.rs#attachments",
+        "name": "attachments",
+        "kind": "module",
+        "path": "src/adapters/protocols/email/mod.rs",
+        "span": "L12-L12"
+      },
+      "path": "src/adapters/protocols/email/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 12,
+          "text": "pub mod attachments;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/parser.rs#ParsedEmail",
+        "name": "ParsedEmail",
+        "kind": "struct",
+        "path": "src/adapters/protocols/email/parser.rs",
+        "span": "L32-L68"
+      },
+      "path": "src/adapters/protocols/email/parser.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 55,
+          "text": "pub attachments: Vec<AttachmentMetadata>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/parser.rs#RawInboundPayload",
+        "name": "RawInboundPayload",
+        "kind": "struct",
+        "path": "src/adapters/protocols/email/parser.rs",
+        "span": "L86-L99"
+      },
+      "path": "src/adapters/protocols/email/parser.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 98,
+          "text": "pub attachments_data: Vec<RawAttachmentData>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/parser.rs#RawAttachmentData",
+        "name": "RawAttachmentData",
+        "kind": "struct",
+        "path": "src/adapters/protocols/email/parser.rs",
+        "span": "L132-L139"
+      },
+      "path": "src/adapters/protocols/email/parser.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 137,
+          "text": "/// [`crate::services::attachment_store::store_inbound_attachments`]."
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/resend_api/client.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 86,
+          "text": "/// uses, so the body, the headers and the attachments all come from one representation rather than"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/resend_api/inbound.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 48,
+          "text": "/// Everything else Resend sends -- the subject, the recipient lists, the attachment metadata --"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/smtp/server.rs#SmtpServer",
+        "name": "SmtpServer",
+        "kind": "struct",
+        "path": "src/adapters/smtp/server.rs",
+        "span": "L96-L117"
+      },
+      "path": "src/adapters/smtp/server.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 104,
+          "text": "/// Where inbound attachments are kept; `None` on a deployment with no private bucket."
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/smtp/server.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 151,
+          "text": "/// Where attachments on arriving mail are stored. Without it mail still arrives; its"
+        },
+        {
+          "line": 152,
+          "text": "/// attachments are recorded but their bytes are not kept."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/storage/gcs.rs#GcsFileStorage",
+        "name": "GcsFileStorage",
+        "kind": "struct",
+        "path": "src/adapters/storage/gcs.rs",
+        "span": "L96-L109"
+      },
+      "path": "src/adapters/storage/gcs.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 98,
+          "text": "/// The bucket nothing public may read; `None` when the deployment stores no attachments."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/storage/gcs.rs#from_config",
+        "name": "from_config",
+        "kind": "function",
+        "path": "src/adapters/storage/gcs.rs",
+        "span": "L113-L136"
+      },
+      "path": "src/adapters/storage/gcs.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 128,
+          "text": "private_bucket: config.attachments_bucket.clone(),"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/storage/gcs.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 210,
+          "text": "/// one: storing an attachment where anyone could read it is the one outcome worth refusing."
+        },
+        {
+          "line": 370,
+          "text": "/// `attachments/a.png` is one object, not a folder and a file, and Google answers 404 for the"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/storage/gcs.rs#an_object_name_is_encoded_whole_for_the_read_url",
+        "name": "an_object_name_is_encoded_whole_for_the_read_url",
+        "kind": "function",
+        "path": "src/adapters/storage/gcs.rs",
+        "span": "L506-L514"
+      },
+      "path": "src/adapters/storage/gcs.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 509,
+          "text": "urlencoding(\"attachments/9f2c.png\"),"
+        },
+        {
+          "line": 510,
+          "text": "\"attachments%2F9f2c.png\""
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/storage/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 24,
+          "text": "/// confusing them runs one way: a mail attachment in the public bucket is a leak, while an avatar"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 32,
+    "baselineChars": 894114
+  }
+}

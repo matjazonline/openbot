@@ -1,0 +1,309 @@
+{
+  "file": "src/adapters/http/routes/channel.rs",
+  "entries": [
+    {
+      "name": "simulation",
+      "kind": "module",
+      "span": "L47-L47",
+      "signature": "mod simulation;"
+    },
+    {
+      "name": "router",
+      "kind": "function",
+      "span": "L53-L105",
+      "signature": "pub fn router() -> Router<AppState>"
+    },
+    {
+      "name": "ChannelForm",
+      "kind": "struct",
+      "span": "L108-L117",
+      "signature": "pub struct ChannelForm"
+    },
+    {
+      "name": "enabled",
+      "kind": "function",
+      "span": "L124-L126",
+      "signature": "pub fn enabled(&self) -> bool"
+    },
+    {
+      "name": "add_3rd_party",
+      "kind": "function",
+      "span": "L130-L132",
+      "signature": "pub fn add_3rd_party(&self) -> bool"
+    },
+    {
+      "name": "confirm_spam_disabled",
+      "kind": "function",
+      "span": "L134-L136",
+      "signature": "pub fn confirm_spam_disabled(&self) -> bool"
+    },
+    {
+      "name": "checkbox_ticked",
+      "kind": "function",
+      "span": "L140-L142",
+      "signature": "pub(super) fn checkbox_ticked(value: Option<&str>) -> bool"
+    },
+    {
+      "name": "slugify",
+      "kind": "function",
+      "span": "L144-L166",
+      "signature": "pub fn slugify(input: &str) -> String"
+    },
+    {
+      "name": "parse_agent_ids_form",
+      "kind": "function",
+      "span": "L169-L177",
+      "signature": "pub(super) fn parse_agent_ids_form(input: Option<String>) -> Option<Vec<Uuid>>"
+    },
+    {
+      "name": "ChannelJsonPayload",
+      "kind": "struct",
+      "span": "L180-L192",
+      "signature": "pub struct ChannelJsonPayload"
+    },
+    {
+      "name": "ChannelResponse",
+      "kind": "struct",
+      "span": "L195-L198",
+      "signature": "pub struct ChannelResponse"
+    },
+    {
+      "name": "DEFAULT_THREAD_PAGE_SIZE",
+      "kind": "constant",
+      "span": "L200-L200",
+      "signature": "const DEFAULT_THREAD_PAGE_SIZE: usize = 50;"
+    },
+    {
+      "name": "MAX_THREAD_PAGE_SIZE",
+      "kind": "constant",
+      "span": "L201-L201",
+      "signature": "const MAX_THREAD_PAGE_SIZE: usize = 100;"
+    },
+    {
+      "name": "ThreadListQuery",
+      "kind": "struct",
+      "span": "L207-L210",
+      "signature": "pub struct ThreadListQuery"
+    },
+    {
+      "name": "ThreadListResponse",
+      "kind": "struct",
+      "span": "L213-L217",
+      "signature": "pub struct ThreadListResponse"
+    },
+    {
+      "name": "parse_thread_cursor",
+      "kind": "function",
+      "span": "L219-L223",
+      "signature": "fn parse_thread_cursor(cursor: &str) -> AppResult<ThreadCursor>"
+    },
+    {
+      "name": "load_thread_page",
+      "kind": "function",
+      "span": "L225-L255",
+      "signature": "pub(crate) async fn load_thread_page("
+    },
+    {
+      "name": "parse_emails_form",
+      "kind": "function",
+      "span": "L257-L260",
+      "signature": "pub(super) fn parse_emails_form(input: Option<String>) -> Option<Vec<String>>"
+    },
+    {
+      "name": "parse_text_form",
+      "kind": "function",
+      "span": "L266-L270",
+      "signature": "pub(super) fn parse_text_form(input: Option<String>) -> Option<String>"
+    },
+    {
+      "name": "parse_list_form",
+      "kind": "function",
+      "span": "L273-L282",
+      "signature": "pub(super) fn parse_list_form(input: Option<String>) -> Vec<String>"
+    },
+    {
+      "name": "ChannelsPageQuery",
+      "kind": "struct",
+      "span": "L286-L291",
+      "signature": "pub struct ChannelsPageQuery"
+    },
+    {
+      "name": "list_channels_page",
+      "kind": "function",
+      "span": "L295-L321",
+      "signature": "async fn list_channels_page("
+    },
+    {
+      "name": "create_channel_handler",
+      "kind": "function",
+      "span": "L325-L378",
+      "signature": "async fn create_channel_handler("
+    },
+    {
+      "name": "ChannelListView",
+      "kind": "struct",
+      "span": "L384-L389",
+      "signature": "struct ChannelListView<'a>"
+    },
+    {
+      "name": "render",
+      "kind": "function",
+      "span": "L392-L403",
+      "signature": "async fn render(&self, error: Option<String>) -> AppResult<Html<String>>"
+    },
+    {
+      "name": "managed_channel",
+      "kind": "function",
+      "span": "L408-L424",
+      "signature": "async fn managed_channel("
+    },
+    {
+      "name": "channel_not_found",
+      "kind": "function",
+      "span": "L426-L428",
+      "signature": "fn channel_not_found() -> AppError"
+    },
+    {
+      "name": "edit_channel_form",
+      "kind": "function",
+      "span": "L432-L453",
+      "signature": "async fn edit_channel_form("
+    },
+    {
+      "name": "cancel_channel_edit",
+      "kind": "function",
+      "span": "L457-L477",
+      "signature": "async fn cancel_channel_edit("
+    },
+    {
+      "name": "update_channel_handler",
+      "kind": "function",
+      "span": "L481-L543",
+      "signature": "async fn update_channel_handler("
+    },
+    {
+      "name": "delete_channel_handler",
+      "kind": "function",
+      "span": "L547-L556",
+      "signature": "async fn delete_channel_handler("
+    },
+    {
+      "name": "SimulationForm",
+      "kind": "struct",
+      "span": "L559-L567",
+      "signature": "pub struct SimulationForm"
+    },
+    {
+      "name": "SimulateQuery",
+      "kind": "struct",
+      "span": "L570-L572",
+      "signature": "pub struct SimulateQuery"
+    },
+    {
+      "name": "OpenThreadParams",
+      "kind": "struct",
+      "span": "L575-L577",
+      "signature": "pub struct OpenThreadParams"
+    },
+    {
+      "name": "reply_headers",
+      "kind": "function",
+      "span": "L582-L588",
+      "signature": "pub(crate) fn reply_headers(in_reply_to: Option<&str>) -> Option<String>"
+    },
+    {
+      "name": "reply_headers_for_thread",
+      "kind": "function",
+      "span": "L592-L603",
+      "signature": "pub(crate) fn reply_headers_for_thread("
+    },
+    {
+      "name": "list_channel_threads_page",
+      "kind": "function",
+      "span": "L606-L640",
+      "signature": "async fn list_channel_threads_page("
+    },
+    {
+      "name": "list_channel_threads_fragment",
+      "kind": "function",
+      "span": "L643-L665",
+      "signature": "async fn list_channel_threads_fragment("
+    },
+    {
+      "name": "list_channels_json",
+      "kind": "function",
+      "span": "L668-L677",
+      "signature": "async fn list_channels_json("
+    },
+    {
+      "name": "list_channel_threads_json",
+      "kind": "function",
+      "span": "L680-L695",
+      "signature": "async fn list_channel_threads_json("
+    },
+    {
+      "name": "create_channel_json",
+      "kind": "function",
+      "span": "L698-L735",
+      "signature": "async fn create_channel_json("
+    },
+    {
+      "name": "get_channel_json",
+      "kind": "function",
+      "span": "L738-L749",
+      "signature": "async fn get_channel_json("
+    },
+    {
+      "name": "update_channel_json",
+      "kind": "function",
+      "span": "L752-L795",
+      "signature": "pub(super) async fn update_channel_json("
+    },
+    {
+      "name": "delete_channel_json",
+      "kind": "function",
+      "span": "L798-L808",
+      "signature": "async fn delete_channel_json("
+    },
+    {
+      "name": "tests",
+      "kind": "module",
+      "span": "L811-L1210",
+      "signature": "mod tests"
+    },
+    {
+      "name": "thread_cursor_round_trips",
+      "kind": "function",
+      "span": "L819-L836",
+      "signature": "fn thread_cursor_round_trips()"
+    },
+    {
+      "name": "channel_pages_and_fragments_render_correctly",
+      "kind": "function",
+      "span": "L839-L1168",
+      "signature": "fn channel_pages_and_fragments_render_correctly()"
+    },
+    {
+      "name": "test_slugify",
+      "kind": "function",
+      "span": "L1171-L1179",
+      "signature": "async fn test_slugify()"
+    },
+    {
+      "name": "test_channel_form_deserialization",
+      "kind": "function",
+      "span": "L1182-L1209",
+      "signature": "async fn test_channel_form_deserialization()"
+    },
+    {
+      "name": "authorization_tests",
+      "kind": "module",
+      "span": "L1214-L1214",
+      "signature": "mod authorization_tests;"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 43510
+  }
+}

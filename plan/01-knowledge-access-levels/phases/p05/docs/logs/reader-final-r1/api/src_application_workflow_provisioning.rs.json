@@ -1,0 +1,279 @@
+{
+  "file": "src/application/workflow/provisioning.rs",
+  "entries": [
+    {
+      "name": "LIST_COMPANY_AGENTS",
+      "kind": "constant",
+      "span": "L25-L25",
+      "signature": "pub const LIST_COMPANY_AGENTS: &str = \"list_company_agents\";"
+    },
+    {
+      "name": "CREATE_AGENT_CHANNEL",
+      "kind": "constant",
+      "span": "L26-L26",
+      "signature": "pub const CREATE_AGENT_CHANNEL: &str = \"create_agent_channel\";"
+    },
+    {
+      "name": "PROVISIONING",
+      "kind": "constant",
+      "span": "L28-L28",
+      "signature": "pub const PROVISIONING: &str = \"provisioning\";"
+    },
+    {
+      "name": "PROVISIONING_FORBIDDEN",
+      "kind": "constant",
+      "span": "L30-L30",
+      "signature": "pub const PROVISIONING_FORBIDDEN: &str = \"workflow.provisioning_forbidden\";"
+    },
+    {
+      "name": "PROVISIONING_CONFLICT",
+      "kind": "constant",
+      "span": "L31-L31",
+      "signature": "pub const PROVISIONING_CONFLICT: &str = \"workflow.provisioning_conflict\";"
+    },
+    {
+      "name": "PROVISIONING_INVALID",
+      "kind": "constant",
+      "span": "L32-L32",
+      "signature": "pub const PROVISIONING_INVALID: &str = \"workflow.invalid_input\";"
+    },
+    {
+      "name": "BUILDER_STEP_TYPES",
+      "kind": "constant",
+      "span": "L37-L38",
+      "signature": "pub const BUILDER_STEP_TYPES: [&str; 4] ="
+    },
+    {
+      "name": "MAX_LISTED_AGENTS",
+      "kind": "constant",
+      "span": "L41-L41",
+      "signature": "pub const MAX_LISTED_AGENTS: usize = 200;"
+    },
+    {
+      "name": "MAX_LISTED_MODELS",
+      "kind": "constant",
+      "span": "L43-L43",
+      "signature": "pub const MAX_LISTED_MODELS: usize = 256;"
+    },
+    {
+      "name": "MAX_LISTED_NAME_CHARS",
+      "kind": "constant",
+      "span": "L45-L45",
+      "signature": "pub const MAX_LISTED_NAME_CHARS: usize = 120;"
+    },
+    {
+      "name": "MAX_LISTED_DESCRIPTION_CHARS",
+      "kind": "constant",
+      "span": "L46-L46",
+      "signature": "pub const MAX_LISTED_DESCRIPTION_CHARS: usize = 300;"
+    },
+    {
+      "name": "MAX_LISTING_BYTES",
+      "kind": "constant",
+      "span": "L49-L49",
+      "signature": "pub const MAX_LISTING_BYTES: usize = 48 * 1024;"
+    },
+    {
+      "name": "MAX_REFUSAL_MESSAGE",
+      "kind": "constant",
+      "span": "L50-L50",
+      "signature": "const MAX_REFUSAL_MESSAGE: usize = 2000;"
+    },
+    {
+      "name": "ProvisioningKind",
+      "kind": "enum",
+      "span": "L53-L56",
+      "signature": "pub enum ProvisioningKind"
+    },
+    {
+      "name": "parse",
+      "kind": "function",
+      "span": "L58-L64",
+      "signature": "pub fn parse(name: &str) -> Option<Self>"
+    },
+    {
+      "name": "name",
+      "kind": "function",
+      "span": "L65-L70",
+      "signature": "pub const fn name(self) -> &'static str"
+    },
+    {
+      "name": "effect",
+      "kind": "function",
+      "span": "L71-L76",
+      "signature": "const fn effect(self) -> ActionEffect"
+    },
+    {
+      "name": "is_builtin_provisioning_tool",
+      "kind": "function",
+      "span": "L80-L82",
+      "signature": "pub fn is_builtin_provisioning_tool(name: &str) -> bool"
+    },
+    {
+      "name": "is_reserved_tool_name",
+      "kind": "function",
+      "span": "L86-L89",
+      "signature": "pub fn is_reserved_tool_name(name: &str) -> bool"
+    },
+    {
+      "name": "provisioning_tool_schemas",
+      "kind": "function",
+      "span": "L93-L198",
+      "signature": "pub fn provisioning_tool_schemas(kind: ProvisioningKind) -> (Value, Value)"
+    },
+    {
+      "name": "builtin_provisioning_snapshot",
+      "kind": "function",
+      "span": "L203-L225",
+      "signature": "pub fn builtin_provisioning_snapshot("
+    },
+    {
+      "name": "is_trusted_provisioning_snapshot",
+      "kind": "function",
+      "span": "L228-L238",
+      "signature": "pub fn is_trusted_provisioning_snapshot(snapshot: &ToolSnapshot) -> AppResult<bool>"
+    },
+    {
+      "name": "ReplyMode",
+      "kind": "enum",
+      "span": "L243-L248",
+      "signature": "pub enum ReplyMode"
+    },
+    {
+      "name": "as_str",
+      "kind": "function",
+      "span": "L250-L255",
+      "signature": "pub const fn as_str(self) -> &'static str"
+    },
+    {
+      "name": "agent_workflow",
+      "kind": "function",
+      "span": "L257-L262",
+      "signature": "pub fn agent_workflow(self) -> AgentWorkflow"
+    },
+    {
+      "name": "CreateAgentChannel",
+      "kind": "struct",
+      "span": "L268-L288",
+      "signature": "pub struct CreateAgentChannel"
+    },
+    {
+      "name": "parse",
+      "kind": "function",
+      "span": "L290-L292",
+      "signature": "pub fn parse(arguments: &Value) -> AppResult<Self>"
+    },
+    {
+      "name": "ProvisioningRefusal",
+      "kind": "enum",
+      "span": "L300-L304",
+      "signature": "pub enum ProvisioningRefusal"
+    },
+    {
+      "name": "code",
+      "kind": "function",
+      "span": "L306-L312",
+      "signature": "pub const fn code(&self) -> &'static str"
+    },
+    {
+      "name": "message",
+      "kind": "function",
+      "span": "L313-L321",
+      "signature": "pub fn message(&self) -> String"
+    },
+    {
+      "name": "tool_error",
+      "kind": "function",
+      "span": "L323-L325",
+      "signature": "pub fn tool_error(&self) -> Value"
+    },
+    {
+      "name": "Provisioned",
+      "kind": "type",
+      "span": "L329-L329",
+      "signature": "pub type Provisioned<T> = Result<T, ProvisioningRefusal>;"
+    },
+    {
+      "name": "AssistantChannelRequest",
+      "kind": "struct",
+      "span": "L334-L342",
+      "signature": "pub struct AssistantChannelRequest"
+    },
+    {
+      "name": "MAX_COMMAND_KEY_BYTES",
+      "kind": "constant",
+      "span": "L345-L345",
+      "signature": "pub const MAX_COMMAND_KEY_BYTES: usize = 128;"
+    },
+    {
+      "name": "AssistantChannels",
+      "kind": "interface",
+      "span": "L348-L366",
+      "signature": "pub trait AssistantChannels: Send + Sync"
+    },
+    {
+      "name": "create_assistant_channel",
+      "kind": "function",
+      "span": "L351-L356",
+      "signature": "async fn create_assistant_channel("
+    },
+    {
+      "name": "assistant_channel_result",
+      "kind": "function",
+      "span": "L360-L365",
+      "signature": "async fn assistant_channel_result("
+    },
+    {
+      "name": "ProvisioningToolCall",
+      "kind": "struct",
+      "span": "L370-L374",
+      "signature": "pub struct ProvisioningToolCall"
+    },
+    {
+      "name": "ProvisioningPreparation",
+      "kind": "interface",
+      "span": "L378-L385",
+      "signature": "pub trait ProvisioningPreparation: Send + Sync"
+    },
+    {
+      "name": "provisioning_tool_request",
+      "kind": "function",
+      "span": "L379-L384",
+      "signature": "async fn provisioning_tool_request("
+    },
+    {
+      "name": "ProvisioningActions",
+      "kind": "struct",
+      "span": "L388-L392",
+      "signature": "pub struct ProvisioningActions<P, D>"
+    },
+    {
+      "name": "new",
+      "kind": "function",
+      "span": "L394-L400",
+      "signature": "pub fn new(persistence: P, dispatch: D, lease: LeasePolicy) -> Self"
+    },
+    {
+      "name": "call_tool",
+      "kind": "function",
+      "span": "L405-L456",
+      "signature": "pub async fn call_tool("
+    },
+    {
+      "name": "invalid",
+      "kind": "function",
+      "span": "L459-L461",
+      "signature": "fn invalid() -> AppError"
+    },
+    {
+      "name": "tests",
+      "kind": "module",
+      "span": "L465-L465",
+      "signature": "mod tests;"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 19421
+  }
+}

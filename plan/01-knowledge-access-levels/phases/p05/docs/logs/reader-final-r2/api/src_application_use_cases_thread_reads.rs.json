@@ -1,0 +1,105 @@
+{
+  "file": "src/application/use_cases/thread/reads.rs",
+  "entries": [
+    {
+      "name": "ChannelReadScope",
+      "kind": "struct",
+      "span": "L6-L9",
+      "signature": "pub struct ChannelReadScope"
+    },
+    {
+      "name": "from",
+      "kind": "function",
+      "span": "L11-L16",
+      "signature": "fn from(channel: &Channel) -> Self"
+    },
+    {
+      "name": "ThreadReadScope",
+      "kind": "struct",
+      "span": "L19-L22",
+      "signature": "pub struct ThreadReadScope"
+    },
+    {
+      "name": "new",
+      "kind": "function",
+      "span": "L24-L29",
+      "signature": "pub fn new(channel: &Channel, thread_id: Uuid) -> Self"
+    },
+    {
+      "name": "project_message",
+      "kind": "function",
+      "span": "L33-L44",
+      "signature": "pub(crate) fn project_message(message: &mut ThreadMessageView, viewer: AccessLevel)"
+    },
+    {
+      "name": "viewer_level",
+      "kind": "function",
+      "span": "L47-L54",
+      "signature": "async fn viewer_level(&self, viewer: &Viewer, company_id: Uuid) -> AppResult<AccessLevel>"
+    },
+    {
+      "name": "require_readable_channel",
+      "kind": "function",
+      "span": "L56-L70",
+      "signature": "async fn require_readable_channel("
+    },
+    {
+      "name": "project_thread_titles",
+      "kind": "function",
+      "span": "L72-L96",
+      "signature": "pub(super) async fn project_thread_titles("
+    },
+    {
+      "name": "list_channel_threads",
+      "kind": "function",
+      "span": "L98-L112",
+      "signature": "pub async fn list_channel_threads("
+    },
+    {
+      "name": "get_channel_threads_after",
+      "kind": "function",
+      "span": "L114-L128",
+      "signature": "pub async fn get_channel_threads_after("
+    },
+    {
+      "name": "project_messages",
+      "kind": "function",
+      "span": "L130-L142",
+      "signature": "async fn project_messages("
+    },
+    {
+      "name": "viewer_email_reply_context",
+      "kind": "function",
+      "span": "L145-L171",
+      "signature": "pub async fn viewer_email_reply_context("
+    },
+    {
+      "name": "get_thread_history",
+      "kind": "function",
+      "span": "L173-L192",
+      "signature": "pub async fn get_thread_history("
+    },
+    {
+      "name": "get_thread_messages_after",
+      "kind": "function",
+      "span": "L194-L215",
+      "signature": "pub async fn get_thread_messages_after("
+    },
+    {
+      "name": "get_thread_message_view",
+      "kind": "function",
+      "span": "L217-L243",
+      "signature": "pub async fn get_thread_message_view("
+    },
+    {
+      "name": "get_message_audit",
+      "kind": "function",
+      "span": "L245-L268",
+      "signature": "pub async fn get_message_audit("
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 8814
+  }
+}

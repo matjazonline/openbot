@@ -1,0 +1,152 @@
+{
+  "pattern": "run_view|step_view",
+  "filesSearched": 122,
+  "totalHits": 13,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/ui/runs/mod.rs#visible_run",
+        "name": "visible_run",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/ui/runs/mod.rs",
+        "span": "L214-L228"
+      },
+      "path": "src/adapters/http/routes/workflows/ui/runs/mod.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 219,
+          "text": ".run_views()"
+        },
+        {
+          "line": 220,
+          "text": ".run_view(company_id, RunId::new(run))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/ui/runs/mod.rs#pane_parts",
+        "name": "pane_parts",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/ui/runs/mod.rs",
+        "span": "L259-L279"
+      },
+      "path": "src/adapters/http/routes/workflows/ui/runs/mod.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 263,
+          "text": ".run_views()"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/ui/runs/mod.rs#board_html_at",
+        "name": "board_html_at",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/ui/runs/mod.rs",
+        "span": "L363-L406"
+      },
+      "path": "src/adapters/http/routes/workflows/ui/runs/mod.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 388,
+          "text": ".run_views()"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/ui/runs/mod.rs#run_page",
+        "name": "run_page",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/ui/runs/mod.rs",
+        "span": "L409-L449"
+      },
+      "path": "src/adapters/http/routes/workflows/ui/runs/mod.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 440,
+          "text": ".run_views()"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/http/routes/workflows/ui/runs/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 14,
+          "text": "use crate::application::workflow::run_views::{RunView, StepView};"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/ui/runs/mod.rs#step",
+        "name": "step",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/ui/runs/mod.rs",
+        "span": "L705-L732"
+      },
+      "path": "src/adapters/http/routes/workflows/ui/runs/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 715,
+          "text": ".run_views()"
+        },
+        {
+          "line": 716,
+          "text": ".step_view(company_id, RunId::new(run), execution)"
+        },
+        {
+          "line": 721,
+          "text": ".run_views()"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/ui/runs/pages_tests.rs#reconciliation_is_offered_as_an_annotation_and_a_step_shows_usage_and_receipts",
+        "name": "reconciliation_is_offered_as_an_annotation_and_a_step_shows_usage_and_receipts",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/ui/runs/pages_tests.rs",
+        "span": "L9-L106"
+      },
+      "path": "src/adapters/http/routes/workflows/ui/runs/pages_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 11,
+          "text": "use crate::application::workflow::run_views::{ModelCall, Receipt, StepView};"
+        },
+        {
+          "line": 45,
+          "text": "let step_view = StepView {"
+        },
+        {
+          "line": 73,
+          "text": "attempts: vec![crate::application::workflow::run_views::Attempt {"
+        },
+        {
+          "line": 88,
+          "text": "step: &step_view,"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 2,
+    "baselineChars": 33374
+  }
+}

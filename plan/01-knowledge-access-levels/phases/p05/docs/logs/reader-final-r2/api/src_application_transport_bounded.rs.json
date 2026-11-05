@@ -1,0 +1,147 @@
+{
+  "file": "src/application/transport/bounded.rs",
+  "entries": [
+    {
+      "name": "BoundsError",
+      "kind": "enum",
+      "span": "L17-L35",
+      "signature": "pub enum BoundsError"
+    },
+    {
+      "name": "from",
+      "kind": "function",
+      "span": "L39-L41",
+      "signature": "fn from(error: BoundsError) -> Self"
+    },
+    {
+      "name": "bounded_text",
+      "kind": "function",
+      "span": "L45-L53",
+      "signature": "pub fn bounded_text(field: &'static str, value: &str, max: usize) -> Result<(), BoundsError>"
+    },
+    {
+      "name": "BoundedVec",
+      "kind": "struct",
+      "span": "L61-L61",
+      "signature": "pub struct BoundedVec<T, const MAX: usize>(Vec<T>);"
+    },
+    {
+      "name": "MAX",
+      "kind": "constant",
+      "span": "L64-L64",
+      "signature": "pub const MAX: usize = MAX;"
+    },
+    {
+      "name": "parse",
+      "kind": "function",
+      "span": "L66-L75",
+      "signature": "pub fn parse(field: &'static str, items: Vec<T>) -> Result<Self, BoundsError>"
+    },
+    {
+      "name": "empty",
+      "kind": "function",
+      "span": "L77-L79",
+      "signature": "pub fn empty() -> Self"
+    },
+    {
+      "name": "into_inner",
+      "kind": "function",
+      "span": "L81-L83",
+      "signature": "pub fn into_inner(self) -> Vec<T>"
+    },
+    {
+      "name": "map",
+      "kind": "function",
+      "span": "L88-L90",
+      "signature": "pub fn map<U>(self, transform: impl FnMut(T) -> U) -> BoundedVec<U, MAX>"
+    },
+    {
+      "name": "default",
+      "kind": "function",
+      "span": "L94-L96",
+      "signature": "fn default() -> Self"
+    },
+    {
+      "name": "Target",
+      "kind": "type",
+      "span": "L100-L100",
+      "signature": "type Target = [T];"
+    },
+    {
+      "name": "deref",
+      "kind": "function",
+      "span": "L102-L104",
+      "signature": "fn deref(&self) -> &Self::Target"
+    },
+    {
+      "name": "Item",
+      "kind": "type",
+      "span": "L108-L108",
+      "signature": "type Item = &'a T;"
+    },
+    {
+      "name": "IntoIter",
+      "kind": "type",
+      "span": "L109-L109",
+      "signature": "type IntoIter = std::slice::Iter<'a, T>;"
+    },
+    {
+      "name": "into_iter",
+      "kind": "function",
+      "span": "L111-L113",
+      "signature": "fn into_iter(self) -> Self::IntoIter"
+    },
+    {
+      "name": "Item",
+      "kind": "type",
+      "span": "L117-L117",
+      "signature": "type Item = T;"
+    },
+    {
+      "name": "IntoIter",
+      "kind": "type",
+      "span": "L118-L118",
+      "signature": "type IntoIter = std::vec::IntoIter<T>;"
+    },
+    {
+      "name": "into_iter",
+      "kind": "function",
+      "span": "L120-L122",
+      "signature": "fn into_iter(self) -> Self::IntoIter"
+    },
+    {
+      "name": "deserialize",
+      "kind": "function",
+      "span": "L131-L137",
+      "signature": "fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>"
+    },
+    {
+      "name": "tests",
+      "kind": "module",
+      "span": "L141-L177",
+      "signature": "mod tests"
+    },
+    {
+      "name": "a_list_at_its_limit_is_accepted_and_one_past_it_is_not",
+      "kind": "function",
+      "span": "L145-L155",
+      "signature": "fn a_list_at_its_limit_is_accepted_and_one_past_it_is_not()"
+    },
+    {
+      "name": "an_over_limit_list_is_refused_on_the_way_back_in_without_panicking",
+      "kind": "function",
+      "span": "L160-L169",
+      "signature": "fn an_over_limit_list_is_refused_on_the_way_back_in_without_panicking()"
+    },
+    {
+      "name": "bounded_text_measures_bytes_rather_than_characters",
+      "kind": "function",
+      "span": "L172-L176",
+      "signature": "fn bounded_text_measures_bytes_rather_than_characters()"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 5962
+  }
+}

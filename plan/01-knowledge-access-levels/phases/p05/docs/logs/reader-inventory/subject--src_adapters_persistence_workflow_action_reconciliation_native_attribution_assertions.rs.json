@@ -1,0 +1,32 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 1,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_native_attribution_assertions.rs#assert_owners",
+        "name": "assert_owners",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_native_attribution_assertions.rs",
+        "span": "L6-L75"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_native_attribution_assertions.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 67,
+          "text": "// 04.11-D4 §N: every remote alternative requires no delivery subject; message"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 15925
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "file": "src/application/use_cases/delivery.rs",
+  "entries": [
+    {
+      "name": "DeliveryReader",
+      "kind": "interface",
+      "span": "L19-L37",
+      "signature": "pub trait DeliveryReader: Send + Sync"
+    },
+    {
+      "name": "list_company_deliveries",
+      "kind": "function",
+      "span": "L25-L29",
+      "signature": "async fn list_company_deliveries("
+    },
+    {
+      "name": "get_delivery",
+      "kind": "function",
+      "span": "L32-L36",
+      "signature": "async fn get_delivery("
+    },
+    {
+      "name": "DeliveryReadScope",
+      "kind": "struct",
+      "span": "L40-L43",
+      "signature": "pub struct DeliveryReadScope"
+    },
+    {
+      "name": "project_delivery",
+      "kind": "function",
+      "span": "L45-L58",
+      "signature": "pub(crate) fn project_delivery("
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 1795
+  }
+}

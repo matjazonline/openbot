@@ -1,0 +1,99 @@
+{
+  "file": "src/application/workflow/actions/authorization.rs",
+  "entries": [
+    {
+      "name": "ActionRunAuthority",
+      "kind": "struct",
+      "span": "L14-L19",
+      "signature": "pub struct ActionRunAuthority"
+    },
+    {
+      "name": "ActionAuthorities",
+      "kind": "interface",
+      "span": "L22-L31",
+      "signature": "pub trait ActionAuthorities: Send + Sync"
+    },
+    {
+      "name": "action_authority",
+      "kind": "function",
+      "span": "L26-L30",
+      "signature": "async fn action_authority("
+    },
+    {
+      "name": "CurrentActionPolicy",
+      "kind": "struct",
+      "span": "L33-L36",
+      "signature": "pub struct CurrentActionPolicy"
+    },
+    {
+      "name": "ActionPolicyDirectory",
+      "kind": "interface",
+      "span": "L40-L48",
+      "signature": "pub trait ActionPolicyDirectory: Send + Sync"
+    },
+    {
+      "name": "action_policy",
+      "kind": "function",
+      "span": "L41-L47",
+      "signature": "async fn action_policy("
+    },
+    {
+      "name": "ActionAccessDecision",
+      "kind": "enum",
+      "span": "L52-L55",
+      "signature": "pub enum ActionAccessDecision"
+    },
+    {
+      "name": "authorize",
+      "kind": "function",
+      "span": "L58-L94",
+      "signature": "pub async fn authorize("
+    },
+    {
+      "name": "validate_resource",
+      "kind": "function",
+      "span": "L97-L115",
+      "signature": "pub(crate) fn validate_resource("
+    },
+    {
+      "name": "validate_current_authority",
+      "kind": "function",
+      "span": "L117-L129",
+      "signature": "pub(crate) fn validate_current_authority("
+    },
+    {
+      "name": "validate_run_authority",
+      "kind": "function",
+      "span": "L131-L177",
+      "signature": "pub(crate) fn validate_run_authority("
+    },
+    {
+      "name": "validate_current_policy",
+      "kind": "function",
+      "span": "L179-L191",
+      "signature": "fn validate_current_policy("
+    },
+    {
+      "name": "same_tool",
+      "kind": "function",
+      "span": "L193-L197",
+      "signature": "fn same_tool(left: &ToolSnapshot, right: &ToolSnapshot) -> AppResult<bool>"
+    },
+    {
+      "name": "target",
+      "kind": "function",
+      "span": "L199-L210",
+      "signature": "fn target(target: &ActionTarget) -> (Uuid, &TypeName)"
+    },
+    {
+      "name": "denied",
+      "kind": "function",
+      "span": "L212-L214",
+      "signature": "fn denied() -> AppError"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 7149
+  }
+}

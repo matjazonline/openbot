@@ -1,0 +1,57 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 4,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_other_audit_sql_tests.rs#insert_candidate",
+        "name": "insert_candidate",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_other_audit_sql_tests.rs",
+        "span": "L11-L24"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_other_audit_sql_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 19,
+          "text": ".bind(command.scope.run.as_uuid()).bind(command.scope.execution.as_uuid()).bind(command.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 20,
+          "text": ".bind(command.subject.argument_digest.as_str()).bind(command.marker.as_uuid()).bind(command.actor.user_id())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_other_audit_sql_tests.rs#assert_candidate",
+        "name": "assert_candidate",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_other_audit_sql_tests.rs",
+        "span": "L51-L91"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_other_audit_sql_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 66,
+          "text": "command.subject.invocation.as_uuid().to_string()"
+        },
+        {
+          "line": 70,
+          "text": "command.subject.argument_digest.as_str()"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 6821
+  }
+}

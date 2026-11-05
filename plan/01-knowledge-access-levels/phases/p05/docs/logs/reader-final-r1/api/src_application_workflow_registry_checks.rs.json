@@ -1,0 +1,39 @@
+{
+  "file": "src/application/workflow/registry/checks.rs",
+  "entries": [
+    {
+      "name": "InputCheck",
+      "kind": "enum",
+      "span": "L6-L12",
+      "signature": "pub(crate) enum InputCheck"
+    },
+    {
+      "name": "validate",
+      "kind": "function",
+      "span": "L16-L49",
+      "signature": "pub(crate) fn validate("
+    },
+    {
+      "name": "error",
+      "kind": "function",
+      "span": "L51-L64",
+      "signature": "fn error("
+    },
+    {
+      "name": "check_http",
+      "kind": "function",
+      "span": "L65-L111",
+      "signature": "fn check_http(inputs: &Value, root: &str, span: SourceSpan) -> Result<(), Diagnostic>"
+    },
+    {
+      "name": "check_message",
+      "kind": "function",
+      "span": "L115-L167",
+      "signature": "fn check_message(inputs: &Value, root: &str, span: SourceSpan) -> Result<(), Diagnostic>"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 5606
+  }
+}

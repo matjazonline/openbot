@@ -1,0 +1,61 @@
+172:                JOIN task_attempts AS attempt ON attempt.task_id = NEW.id
+228:                JOIN task_attempts AS attempt ON attempt.task_id=OLD.id AND attempt.attempt_number=OLD.attempt_ordinal
+240:                JOIN task_attempts AS attempt ON attempt.task_id=OLD.id AND attempt.attempt_number=OLD.attempt_ordinal
+257:                JOIN task_attempts AS attempt ON attempt.task_id=OLD.id AND attempt.attempt_number=OLD.attempt_ordinal
+280:DECLARE retirement task_attempts%ROWTYPE;
+283:        SELECT * INTO retirement FROM task_attempts WHERE task_id=OLD.id
+1500:        JOIN public.task_attempts AS attempt ON attempt.task_id=job.id
+1501:            AND attempt.attempt_number=NEW.workflow_attempt
+1507:            AND job.execution_generation=NEW.workflow_generation AND job.attempt_ordinal=NEW.workflow_attempt
+1537:                = ROW(NEW.workflow_generation,NEW.workflow_worker_id,NEW.workflow_attempt)) IS NOT TRUE THEN
+1550:                IS DISTINCT FROM ROW(NEW.workflow_generation,NEW.workflow_worker_id,NEW.workflow_attempt)
+1563:                = ROW(NEW.workflow_generation,NEW.workflow_worker_id,NEW.workflow_attempt)
+1566:            OR (NEW.workflow_generation<>OLD.model_generation AND NEW.workflow_attempt>OLD.model_attempt))) THEN
+2038:                AND NOT EXISTS(SELECT 1 FROM task_attempts AS later WHERE later.task_id=NEW.job_id AND later.attempt_number>NEW.retired_attempt))
+2056:        JOIN task_attempts AS attempt ON attempt.task_id=job.id AND attempt.attempt_number=NEW.retired_attempt
+2069:            AND NOT EXISTS(SELECT 1 FROM task_attempts AS later WHERE later.task_id=NEW.job_id AND later.attempt_number>NEW.retired_attempt))
+2246:    PERFORM id FROM task_attempts WHERE task_id=NEW.job_id AND attempt_number=NEW.attempt_number FOR UPDATE;
+2264:                    JOIN task_attempts AS attempt ON attempt.task_id=job.id AND attempt.attempt_number=NEW.attempt_number
+2287:        JOIN task_attempts AS attempt ON attempt.task_id=job.id
+2463:            JOIN task_attempts AS attempt ON attempt.task_id=entry.job_id AND attempt.attempt_number=entry.attempt_number
+2466:            OR EXISTS(SELECT 1 FROM task_attempts AS attempt WHERE attempt.task_id=marker.job_id
+2500:            AND NOT EXISTS(SELECT 1 FROM task_attempts AS later WHERE later.task_id=job AND later.attempt_number>episode.retired_attempt)
+2628:        JOIN task_attempts AS attempt ON attempt.task_id=task.id AND attempt.attempt_number=task.attempt_ordinal-1
+2663:    PERFORM id FROM task_attempts WHERE task_id=NEW.job_id AND attempt_number=NEW.attempt_number FOR UPDATE;
+2667:        JOIN task_attempts AS attempt ON attempt.task_id=job.id
+2686:            JOIN task_attempts AS attempt ON attempt.task_id=entry.job_id AND attempt.attempt_number=entry.attempt_number
+2828:        JOIN task_attempts AS attempt ON attempt.task_id=task.id AND attempt.attempt_number=task.attempt_ordinal-1
+2999:    JOIN task_attempts AS attempt ON attempt.task_id=marker.job_id AND attempt.attempt_number=marker.attempt_number
+3071:    PERFORM 1 FROM task_attempts WHERE task_id=NEW.job_id AND attempt_number=NEW.attempt_number
+3403:COMMENT ON COLUMN public.background_tasks.workflow_execution_id IS 'Logical workflow execution; attempts and fenced leases remain owned by background_tasks/task_attempts.';
+4187:-- Name: task_attempts; Type: TABLE; Schema: public; Owner: -
+4190:CREATE TABLE public.task_attempts (
+4204:    CONSTRAINT task_attempts_status_check CHECK ((status = ANY (ARRAY['processing'::text, 'completed'::text, 'failed'::text]))),
+4205:    CONSTRAINT task_attempts_finished_check CHECK ((status = 'processing') = (finished_at IS NULL)),
+4206:    CONSTRAINT task_attempts_stop_reason_check CHECK (CASE status
+4211:    CONSTRAINT workflow_attempt_failure_shape CHECK ((((workflow_failure_class IS NULL) AND (workflow_failure_code IS NULL) AND (workflow_retry_safety IS NULL) AND (workflow_retirement IS NULL)) OR ((status = 'failed'::text) AND (finished_at IS NOT NULL) AND (workflow_failure_class IS NOT NULL) AND (workflow_failure_class = ANY (ARRAY['retryable'::text, 'terminal'::text])) AND (workflow_failure_code IS NOT NULL) AND ((octet_length(workflow_failure_code) >= 1) AND (octet_length(workflow_failure_code) <= 128)) AND (workflow_retry_safety IS NOT NULL) AND (workflow_retry_safety = ANY (ARRAY['safe'::text, 'unknown'::text])) AND (workflow_retirement IS NOT NULL) AND (workflow_retirement = ANY (ARRAY['live'::text, 'expired'::text, 'deadline'::text, 'cancel'::text, 'guard'::text])))))
+4216:CREATE UNIQUE INDEX task_attempts_one_processing ON public.task_attempts(task_id) WHERE status = 'processing';
+4232:    workflow_attempt integer NOT NULL,
+4250:        workflow_attempt > 0
+6497:-- Name: task_attempts task_attempts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+6500:ALTER TABLE ONLY public.task_attempts
+6501:    ADD CONSTRAINT task_attempts_pkey PRIMARY KEY (id);
+6505:-- Name: task_attempts task_attempts_task_attempt_key; Type: CONSTRAINT; Schema: public; Owner: -
+6508:ALTER TABLE ONLY public.task_attempts
+6509:    ADD CONSTRAINT task_attempts_task_attempt_key UNIQUE (task_id, attempt_number);
+6673:-- Name: task_attempts workflow_action_attempt_fence_key; Type: CONSTRAINT; Schema: public; Owner: -
+6676:ALTER TABLE ONLY public.task_attempts
+9843:-- Name: task_attempts task_attempts_task_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+9846:ALTER TABLE ONLY public.task_attempts
+9847:    ADD CONSTRAINT task_attempts_task_id_fkey FOREIGN KEY (task_id) REFERENCES public.background_tasks(id) ON DELETE CASCADE;
+9983:    ADD CONSTRAINT workflow_action_claim_episodes_job_id_retired_attempt_fkey FOREIGN KEY (job_id, retired_attempt) REFERENCES public.task_attempts(task_id, attempt_number) ON DELETE CASCADE;
+10035:    ADD CONSTRAINT workflow_action_dispatches_job_id_attempt_number_execution_fkey FOREIGN KEY (job_id, attempt_number, execution_generation, worker_id) REFERENCES public.task_attempts(task_id, attempt_number, execution_generation, worker_id) ON DELETE CASCADE;
+10339:    ADD CONSTRAINT workflow_action_remote_entrie_job_id_attempt_number_execut_fkey FOREIGN KEY (job_id, attempt_number, execution_generation, worker_id) REFERENCES public.task_attempts(task_id, attempt_number, execution_generation, worker_id) ON DELETE CASCADE;
+10363:    ADD CONSTRAINT workflow_action_schedule_witnesses_job_id_retired_attempt_fkey FOREIGN KEY (job_id, retired_attempt) REFERENCES public.task_attempts(task_id, attempt_number) ON DELETE CASCADE;
+11151:        REFERENCES public.task_attempts(task_id,attempt_number) DEFERRABLE INITIALLY DEFERRED;
+11232:    ADD FOREIGN KEY(task_id,workflow_attempt,workflow_generation,workflow_worker_id)
+11233:        REFERENCES public.task_attempts(task_id,attempt_number,execution_generation,worker_id),
+11235:        REFERENCES public.task_attempts(task_id,attempt_number,execution_generation,worker_id);
+11779:        REFERENCES public.task_attempts(task_id,attempt_number,execution_generation,worker_id) ON DELETE CASCADE
+11788:        OR NOT EXISTS (SELECT 1 FROM public.task_attempts WHERE task_id=OLD.job_id AND attempt_number=OLD.attempt_number)
+11803:        JOIN public.task_attempts AS attempt ON attempt.task_id=job.id

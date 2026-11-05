@@ -1,0 +1,101 @@
+{
+  "query": "action_step_failure",
+  "matches": [
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/failure.rs#action_step_failure",
+        "name": "action_step_failure",
+        "kind": "function",
+        "path": "src/application/workflow/actions/failure.rs",
+        "span": "L95-L138"
+      },
+      "hits": [
+        {
+          "id": "src/adapters/persistence/workflow/harness_token_scheduling_tests.rs#knowledge_run_level_refusal_survives_real_token_allowance_and_refusal_retirement",
+          "relation": "calls",
+          "depth": 1,
+          "name": "knowledge_run_level_refusal_survives_real_token_allowance_and_refusal_retirement",
+          "kind": "function",
+          "path": "src/adapters/persistence/workflow/harness_token_scheduling_tests.rs",
+          "span": "L401-L464"
+        },
+        {
+          "id": "src/application/workflow/actions/failure.rs#code",
+          "relation": "calls",
+          "depth": 1,
+          "name": "code",
+          "kind": "function",
+          "path": "src/application/workflow/actions/failure.rs",
+          "span": "L194-L201"
+        },
+        {
+          "id": "src/application/workflow/actions/failure.rs#workflow_guard_error_action_handler_mapping_is_typed_bounded_and_retryable",
+          "relation": "calls",
+          "depth": 1,
+          "name": "workflow_guard_error_action_handler_mapping_is_typed_bounded_and_retryable",
+          "kind": "function",
+          "path": "src/application/workflow/actions/failure.rs",
+          "span": "L166-L192"
+        },
+        {
+          "id": "src/application/workflow/http_runtime.rs#run",
+          "relation": "calls",
+          "depth": 1,
+          "name": "run",
+          "kind": "function",
+          "path": "src/application/workflow/http_runtime.rs",
+          "span": "L130-L162"
+        },
+        {
+          "id": "src/application/workflow/mcp_runtime.rs#fail",
+          "relation": "calls",
+          "depth": 1,
+          "name": "fail",
+          "kind": "function",
+          "path": "src/application/workflow/mcp_runtime.rs",
+          "span": "L350-L352"
+        },
+        {
+          "id": "src/application/workflow/message_runtime.rs#execute",
+          "relation": "calls",
+          "depth": 1,
+          "name": "execute",
+          "kind": "function",
+          "path": "src/application/workflow/message_runtime.rs",
+          "span": "L546-L596"
+        },
+        {
+          "id": "src/application/workflow/http_runtime.rs#execute",
+          "relation": "calls",
+          "depth": 2,
+          "name": "execute",
+          "kind": "function",
+          "path": "src/application/workflow/http_runtime.rs",
+          "span": "L118-L124"
+        },
+        {
+          "id": "src/application/workflow/mcp_runtime.rs#run",
+          "relation": "calls",
+          "depth": 2,
+          "name": "run",
+          "kind": "function",
+          "path": "src/application/workflow/mcp_runtime.rs",
+          "span": "L202-L232"
+        },
+        {
+          "id": "src/application/workflow/mcp_runtime.rs#execute",
+          "relation": "calls",
+          "depth": 3,
+          "name": "execute",
+          "kind": "function",
+          "path": "src/application/workflow/mcp_runtime.rs",
+          "span": "L188-L194"
+        }
+      ]
+    }
+  ],
+  "saved": {
+    "files": 5,
+    "baselineChars": 68046
+  }
+}

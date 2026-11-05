@@ -1,0 +1,621 @@
+{
+  "pattern": "attachment",
+  "filesSearched": 12,
+  "totalHits": 83,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/ingress.rs#accept",
+        "name": "accept",
+        "kind": "function",
+        "path": "src/adapters/protocols/email/ingress.rs",
+        "span": "L247-L277"
+      },
+      "path": "src/adapters/protocols/email/ingress.rs",
+      "inDegree": 28,
+      "hits": [
+        {
+          "line": 252,
+          "text": "if payload.attachments_data.len() > MAX_ATTACHMENTS {"
+        },
+        {
+          "line": 254,
+          "text": "field: \"attachments\","
+        },
+        {
+          "line": 255,
+          "text": "actual: payload.attachments_data.len(),"
+        },
+        {
+          "line": 260,
+          "text": "let (parsed, attachment_data) = EmailParser::parse(payload, &self.app_domain);"
+        },
+        {
+          "line": 263,
+          "text": "let pending_attachments = PendingEmailAttachments {"
+        },
+        {
+          "line": 264,
+          "text": "data: attachment_data,"
+        },
+        {
+          "line": 265,
+          "text": "metadata: draft.attachments.clone(),"
+        },
+        {
+          "line": 270,
+          "text": "pending_attachments,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/attachments.rs#store_inbound_attachments",
+        "name": "store_inbound_attachments",
+        "kind": "function",
+        "path": "src/adapters/protocols/email/attachments.rs",
+        "span": "L40-L75"
+      },
+      "path": "src/adapters/protocols/email/attachments.rs",
+      "inDegree": 5,
+      "hits": [
+        {
+          "line": 40,
+          "text": "pub async fn store_inbound_attachments("
+        },
+        {
+          "line": 43,
+          "text": "attachments: &mut [RawAttachmentData],"
+        },
+        {
+          "line": 46,
+          "text": "for attachment in attachments {"
+        },
+        {
+          "line": 47,
+          "text": "let key = attachment_key(folder, &attachment.content, &attachment.filename);"
+        },
+        {
+          "line": 48,
+          "text": "let content_type = stored_content_type(attachment);"
+        },
+        {
+          "line": 55,
+          "text": "attachment.content.clone(),"
+        },
+        {
+          "line": 60,
+          "text": "attachment.stored_key = Some(key);"
+        },
+        {
+          "line": 67,
+          "text": "filename = %attachment.filename,"
+        },
+        {
+          "line": 69,
+          "text": "\"Could not store an inbound attachment; the message keeps its metadata only\""
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/authentication.rs#parse_raw_mime_to_payload",
+        "name": "parse_raw_mime_to_payload",
+        "kind": "function",
+        "path": "src/adapters/protocols/email/authentication.rs",
+        "span": "L118-L218"
+      },
+      "path": "src/adapters/protocols/email/authentication.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 174,
+          "text": "// Extract attachments"
+        },
+        {
+          "line": 175,
+          "text": "let mut attachments_data = Vec::new();"
+        },
+        {
+          "line": 176,
+          "text": "for att in msg.attachments() {"
+        },
+        {
+          "line": 177,
+          "text": "let filename = att.attachment_name().unwrap_or(\"attachment\").to_string();"
+        },
+        {
+          "line": 184,
+          "text": "attachments_data.push(RawAttachmentData {"
+        },
+        {
+          "line": 204,
+          "text": "attachments_data,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/ingress.rs#into_preflight_parts",
+        "name": "into_preflight_parts",
+        "kind": "function",
+        "path": "src/adapters/protocols/email/ingress.rs",
+        "span": "L161-L178"
+      },
+      "path": "src/adapters/protocols/email/ingress.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 169,
+          "text": "pending_attachments,"
+        },
+        {
+          "line": 176,
+          "text": "pending_attachments,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/ingress.rs#persist",
+        "name": "persist",
+        "kind": "function",
+        "path": "src/adapters/protocols/email/ingress.rs",
+        "span": "L198-L220"
+      },
+      "path": "src/adapters/protocols/email/ingress.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 204,
+          "text": "&& gcs.attachments_bucket.is_some()"
+        },
+        {
+          "line": 207,
+          "text": "store_inbound_attachments(storage, &gcs.attachments_folder, &mut self.data).await"
+        },
+        {
+          "line": 212,
+          "text": "for (metadata, attachment) in metadata.iter_mut().zip(&self.data) {"
+        },
+        {
+          "line": 213,
+          "text": "metadata.storage_key = attachment.stored_key.clone();"
+        },
+        {
+          "line": 216,
+          "text": "metadata: BoundedVec::parse(\"attachments\", metadata)?,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/parser.rs#parse",
+        "name": "parse",
+        "kind": "function",
+        "path": "src/adapters/protocols/email/parser.rs",
+        "span": "L145-L290"
+      },
+      "path": "src/adapters/protocols/email/parser.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 149,
+          "text": "let attachments_data = std::mem::take(&mut payload.attachments_data);"
+        },
+        {
+          "line": 221,
+          "text": "// Process attachments - Filter small inline signature images (< 10KB images)"
+        },
+        {
+          "line": 222,
+          "text": "let mut attachments = Vec::new();"
+        },
+        {
+          "line": 223,
+          "text": "let mut attachment_prompts = Vec::new();"
+        },
+        {
+          "line": 225,
+          "text": "for att in &attachments_data {"
+        },
+        {
+          "line": 243,
+          "text": "attachments.push(meta.clone());"
+        },
+        {
+          "line": 245,
+          "text": "// Only add document/significant attachments to prompt context"
+        },
+        {
+          "line": 247,
+          "text": "attachment_prompts.push(format!("
+        },
+        {
+          "line": 254,
+          "text": "let prompt_text = if attachment_prompts.is_empty() {"
+        },
+        {
+          "line": 257,
+          "text": "format!(\"{}\\n\\n{}\", clean_text_body, attachment_prompts.join(\"\\n\"))"
+        },
+        {
+          "line": 275,
+          "text": "attachments,"
+        },
+        {
+          "line": 289,
+          "text": "(parsed, attachments_data)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/attachments.rs#attachment_key",
+        "name": "attachment_key",
+        "kind": "function",
+        "path": "src/adapters/protocols/email/attachments.rs",
+        "span": "L78-L93"
+      },
+      "path": "src/adapters/protocols/email/attachments.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 78,
+          "text": "fn attachment_key(folder: &str, content: &[u8], filename: &str) -> ObjectKey {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/attachments.rs#stored_content_type",
+        "name": "stored_content_type",
+        "kind": "function",
+        "path": "src/adapters/protocols/email/attachments.rs",
+        "span": "L114-L119"
+      },
+      "path": "src/adapters/protocols/email/attachments.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 114,
+          "text": "fn stored_content_type(attachment: &RawAttachmentData) -> String {"
+        },
+        {
+          "line": 115,
+          "text": "match ImageFormat::detect(&attachment.content) {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/ingress.rs#draft",
+        "name": "draft",
+        "kind": "function",
+        "path": "src/adapters/protocols/email/ingress.rs",
+        "span": "L352-L410"
+      },
+      "path": "src/adapters/protocols/email/ingress.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 391,
+          "text": "attachments: BoundedVec::parse(\"attachments\", parsed.attachments.clone())?,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/parser.rs#default",
+        "name": "default",
+        "kind": "function",
+        "path": "src/adapters/protocols/email/parser.rs",
+        "span": "L103-L118"
+      },
+      "path": "src/adapters/protocols/email/parser.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 116,
+          "text": "attachments_data: Vec::new(),"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/protocols/email/attachments.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1,
+          "text": "//! Ingress attachment extraction stores provider bytes. Viewer downloads separately authorize"
+        },
+        {
+          "line": 12,
+          "text": "//! attachment are therefore one object, and knowing a key grants nothing on its own — a download"
+        },
+        {
+          "line": 32,
+          "text": "/// What an attachment with no recognizable type is stored and served as."
+        },
+        {
+          "line": 35,
+          "text": "/// Put each attachment in the private bucket, recording where it landed."
+        },
+        {
+          "line": 38,
+          "text": "/// must not cost us the message. The mail still arrives, and the attachment shows as one we do not"
+        },
+        {
+          "line": 77,
+          "text": "/// Where an attachment's bytes go: the content hash, under the configured folder."
+        },
+        {
+          "line": 113,
+          "text": "/// keeps a `text/html` \"attachment\" from ever being served as a page."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/attachments.rs#attachment",
+        "name": "attachment",
+        "kind": "function",
+        "path": "src/adapters/protocols/email/attachments.rs",
+        "span": "L126-L133"
+      },
+      "path": "src/adapters/protocols/email/attachments.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 126,
+          "text": "fn attachment(filename: &str, content_type: &str, content: &[u8]) -> RawAttachmentData {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/attachments.rs#an_attachment_goes_to_the_private_bucket_named_by_its_content",
+        "name": "an_attachment_goes_to_the_private_bucket_named_by_its_content",
+        "kind": "function",
+        "path": "src/adapters/protocols/email/attachments.rs",
+        "span": "L138-L156"
+      },
+      "path": "src/adapters/protocols/email/attachments.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 138,
+          "text": "async fn an_attachment_goes_to_the_private_bucket_named_by_its_content() {"
+        },
+        {
+          "line": 140,
+          "text": "let mut attachments = vec![attachment("
+        },
+        {
+          "line": 146,
+          "text": "store_inbound_attachments(&storage, \"attachments\", &mut attachments).await;"
+        },
+        {
+          "line": 151,
+          "text": "assert_eq!(attachments[0].stored_key.as_ref(), Some(&stored.key));"
+        },
+        {
+          "line": 152,
+          "text": "assert!(stored.key.starts_with(\"attachments/\"), \"{}\", stored.key);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/attachments.rs#the_same_file_twice_is_the_same_object",
+        "name": "the_same_file_twice_is_the_same_object",
+        "kind": "function",
+        "path": "src/adapters/protocols/email/attachments.rs",
+        "span": "L159-L169"
+      },
+      "path": "src/adapters/protocols/email/attachments.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 161,
+          "text": "let mut attachments = vec!["
+        },
+        {
+          "line": 162,
+          "text": "attachment(\"a.png\", \"image/png\", PNG),"
+        },
+        {
+          "line": 163,
+          "text": "attachment(\"copy.png\", \"image/png\", PNG),"
+        },
+        {
+          "line": 166,
+          "text": "store_inbound_attachments(&storage, \"attachments\", &mut attachments).await;"
+        },
+        {
+          "line": 168,
+          "text": "assert_eq!(attachments[0].stored_key, attachments[1].stored_key);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/attachments.rs#what_the_sender_calls_it_does_not_decide_how_it_is_stored",
+        "name": "what_the_sender_calls_it_does_not_decide_how_it_is_stored",
+        "kind": "function",
+        "path": "src/adapters/protocols/email/attachments.rs",
+        "span": "L172-L190"
+      },
+      "path": "src/adapters/protocols/email/attachments.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 174,
+          "text": "let mut attachments = vec!["
+        },
+        {
+          "line": 176,
+          "text": "attachment("
+        },
+        {
+          "line": 182,
+          "text": "attachment(\"logo.png\", \"image/png\", PNG),"
+        },
+        {
+          "line": 185,
+          "text": "store_inbound_attachments(&storage, \"attachments\", &mut attachments).await;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/attachments.rs#a_bucket_that_is_down_costs_the_attachment_not_the_message",
+        "name": "a_bucket_that_is_down_costs_the_attachment_not_the_message",
+        "kind": "function",
+        "path": "src/adapters/protocols/email/attachments.rs",
+        "span": "L193-L199"
+      },
+      "path": "src/adapters/protocols/email/attachments.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 193,
+          "text": "async fn a_bucket_that_is_down_costs_the_attachment_not_the_message() {"
+        },
+        {
+          "line": 194,
+          "text": "let mut attachments = vec![attachment(\"a.pdf\", \"application/pdf\", b\"%PDF-1.7\")];"
+        },
+        {
+          "line": 196,
+          "text": "store_inbound_attachments(&FakeStorage::failing(), \"attachments\", &mut attachments).await;"
+        },
+        {
+          "line": 198,
+          "text": "assert_eq!(attachments[0].stored_key, None);"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/protocols/email/ingress.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 16,
+          "text": "//! * **Bounds are enforced before allocation.** Recipients, attachments, subject, body and reply"
+        },
+        {
+          "line": 26,
+          "text": "use crate::adapters::protocols::email::attachments::AttachmentStorageReport;"
+        },
+        {
+          "line": 27,
+          "text": "use crate::adapters::protocols::email::attachments::store_inbound_attachments;"
+        },
+        {
+          "line": 159,
+          "text": "/// Split the policy input from attachment bytes. The bytes stay at the adapter boundary until"
+        },
+        {
+          "line": 197,
+          "text": "/// non-fatal; the returned metadata simply has no object key for that attachment."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/ingress.rs#AcceptedEmail",
+        "name": "AcceptedEmail",
+        "kind": "struct",
+        "path": "src/adapters/protocols/email/ingress.rs",
+        "span": "L132-L141"
+      },
+      "path": "src/adapters/protocols/email/ingress.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 135,
+          "text": "pending_attachments: PendingEmailAttachments,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/mod.rs#attachments",
+        "name": "attachments",
+        "kind": "module",
+        "path": "src/adapters/protocols/email/mod.rs",
+        "span": "L12-L12"
+      },
+      "path": "src/adapters/protocols/email/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 12,
+          "text": "pub mod attachments;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/parser.rs#ParsedEmail",
+        "name": "ParsedEmail",
+        "kind": "struct",
+        "path": "src/adapters/protocols/email/parser.rs",
+        "span": "L33-L69"
+      },
+      "path": "src/adapters/protocols/email/parser.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 56,
+          "text": "pub attachments: Vec<AttachmentMetadata>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/parser.rs#RawInboundPayload",
+        "name": "RawInboundPayload",
+        "kind": "struct",
+        "path": "src/adapters/protocols/email/parser.rs",
+        "span": "L87-L100"
+      },
+      "path": "src/adapters/protocols/email/parser.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 99,
+          "text": "pub attachments_data: Vec<RawAttachmentData>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/parser.rs#RawAttachmentData",
+        "name": "RawAttachmentData",
+        "kind": "struct",
+        "path": "src/adapters/protocols/email/parser.rs",
+        "span": "L133-L140"
+      },
+      "path": "src/adapters/protocols/email/parser.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 138,
+          "text": "/// [`crate::services::attachment_store::store_inbound_attachments`]."
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 5,
+    "baselineChars": 72895
+  }
+}

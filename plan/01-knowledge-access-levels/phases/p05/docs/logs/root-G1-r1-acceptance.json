@@ -1,0 +1,11 @@
+{
+  "stage": "G1",
+  "status": "accepted",
+  "decision_sha256": "46e5df05700f7f9d6fbbae24a2b914bafc6ee36ea8ae0a11966e2b5c518bcaa3",
+  "source_digest": "f0beb409f54adb8d6ca70fd7e308807a0f2ab9c8adcd70df5e940971dd669f53",
+  "authority_sha256": "e4ab96e9c2704fd3544799497901fecd5da497730dcc2b11499cb8500b0834af",
+  "review": "KNOW-P05-G1-R1",
+  "note": "KNOW-P05-G1-R1-N1",
+  "findings": "none",
+  "code_accepted": false
+}

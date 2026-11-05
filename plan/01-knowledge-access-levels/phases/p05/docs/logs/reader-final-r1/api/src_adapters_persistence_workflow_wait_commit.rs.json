@@ -1,0 +1,93 @@
+{
+  "file": "src/adapters/persistence/workflow/wait_commit.rs",
+  "entries": [
+    {
+      "name": "resume_on",
+      "kind": "function",
+      "span": "L5-L116",
+      "signature": "pub(super) async fn resume_on("
+    },
+    {
+      "name": "continue_delivery",
+      "kind": "function",
+      "span": "L121-L136",
+      "signature": "async fn continue_delivery("
+    },
+    {
+      "name": "Wake",
+      "kind": "enum",
+      "span": "L139-L143",
+      "signature": "enum Wake"
+    },
+    {
+      "name": "decision_timed_out",
+      "kind": "function",
+      "span": "L148-L190",
+      "signature": "async fn decision_timed_out("
+    },
+    {
+      "name": "DECISION_TIMED_OUT",
+      "kind": "constant",
+      "span": "L191-L191",
+      "signature": "pub(super) const DECISION_TIMED_OUT: &str = \"decision.timed_out\";"
+    },
+    {
+      "name": "effect_failed",
+      "kind": "function",
+      "span": "L195-L204",
+      "signature": "async fn effect_failed(db: &mut PgConnection, scope: ActivationRequest) -> AppResult<WaitProgress>"
+    },
+    {
+      "name": "advance",
+      "kind": "function",
+      "span": "L206-L246",
+      "signature": "async fn advance("
+    },
+    {
+      "name": "commit_wake",
+      "kind": "function",
+      "span": "L250-L292",
+      "signature": "pub(super) async fn commit_wake("
+    },
+    {
+      "name": "ReceivedEvent",
+      "kind": "struct",
+      "span": "L294-L297",
+      "signature": "struct ReceivedEvent"
+    },
+    {
+      "name": "expire",
+      "kind": "function",
+      "span": "L298-L311",
+      "signature": "async fn expire("
+    },
+    {
+      "name": "SavedResult",
+      "kind": "struct",
+      "span": "L313-L318",
+      "signature": "struct SavedResult"
+    },
+    {
+      "name": "saved",
+      "kind": "function",
+      "span": "L321-L369",
+      "signature": "pub(super) async fn saved("
+    },
+    {
+      "name": "saved_route",
+      "kind": "function",
+      "span": "L372-L383",
+      "signature": "pub(super) fn saved_route(route: &str) -> AppResult<RouteSelection>"
+    },
+    {
+      "name": "fail",
+      "kind": "function",
+      "span": "L385-L411",
+      "signature": "pub(super) async fn fail("
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 19312
+  }
+}

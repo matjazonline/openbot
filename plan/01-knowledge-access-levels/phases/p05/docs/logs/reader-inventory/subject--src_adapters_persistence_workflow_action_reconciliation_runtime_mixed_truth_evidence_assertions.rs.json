@@ -1,0 +1,53 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 3,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_evidence_assertions.rs#actual_receipt",
+        "name": "actual_receipt",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_evidence_assertions.rs",
+        "span": "L4-L40"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_evidence_assertions.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 20,
+          "text": ".filter(|marker| marker[\"invocation_id\"] == json!(request.subject.invocation.as_uuid()))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_evidence_assertions.rs#evidence_fact",
+        "name": "evidence_fact",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_evidence_assertions.rs",
+        "span": "L60-L117"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_evidence_assertions.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 80,
+          "text": "json!(command.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 84,
+          "text": "json!(command.subject.argument_digest.as_str())"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 7704
+  }
+}

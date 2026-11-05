@@ -1,0 +1,44 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 4,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_claim_sql_candidate_tests.rs#second_action",
+        "name": "second_action",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_claim_sql_candidate_tests.rs",
+        "span": "L33-L81"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_claim_sql_candidate_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 47,
+          "text": ".action_authority(first.scope(), &first.subject)"
+        },
+        {
+          "line": 62,
+          "text": "subject: intent.approval_subject(),"
+        },
+        {
+          "line": 68,
+          "text": ".action_authority(request.scope(), &request.subject)"
+        },
+        {
+          "line": 75,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 12566
+  }
+}

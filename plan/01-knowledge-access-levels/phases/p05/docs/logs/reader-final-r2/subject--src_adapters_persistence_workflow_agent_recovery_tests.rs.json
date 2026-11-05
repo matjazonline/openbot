@@ -1,0 +1,32 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 1,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/agent_recovery_tests.rs#workflow_agent_run_settlement_pause_and_second_pause_resume_exact_requests",
+        "name": "workflow_agent_run_settlement_pause_and_second_pause_resume_exact_requests",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/agent_recovery_tests.rs",
+        "span": "L135-L199"
+      },
+      "path": "src/adapters/persistence/workflow/agent_recovery_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 185,
+          "text": "let stages: Vec<(String, Uuid)> = sqlx::query_as(\"SELECT token_stage,token_request_id FROM workflow_decisions WHERE run_id=$1 AND subject_kind='token_allowance'"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 25187
+  }
+}

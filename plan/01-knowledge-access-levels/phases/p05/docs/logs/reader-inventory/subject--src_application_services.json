@@ -1,0 +1,53 @@
+{
+  "pattern": "subject",
+  "filesSearched": 27,
+  "totalHits": 3,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/application/services/notification_worker.rs#compose_email",
+        "name": "compose_email",
+        "kind": "function",
+        "path": "src/application/services/notification_worker.rs",
+        "span": "L167-L211"
+      },
+      "path": "src/application/services/notification_worker.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 177,
+          "text": "let subject = format!(\"Action required: {}\", projection.event.action_kind.label());"
+        },
+        {
+          "line": 189,
+          "text": "let content = CanonicalContent::parse(subject, body)?;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/services/spam_scanner.rs#SpamScanInput",
+        "name": "SpamScanInput",
+        "kind": "struct",
+        "path": "src/application/services/spam_scanner.rs",
+        "span": "L23-L29"
+      },
+      "path": "src/application/services/spam_scanner.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 25,
+          "text": "pub subject: Option<&'a str>,"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 2,
+    "baselineChars": 10450
+  }
+}

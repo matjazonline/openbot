@@ -1,0 +1,120 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 10,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_dispatch_sql_tests.rs#receipt",
+        "name": "receipt",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_dispatch_sql_tests.rs",
+        "span": "L19-L29"
+      },
+      "path": "src/adapters/persistence/workflow/action_dispatch_sql_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 27,
+          "text": ".bind(request.subject.invocation.as_uuid()).bind(request.subject.argument_digest.as_str()).bind(marker).bind(kind).bind(json!({\"written\":true})).execute(&mut **"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_dispatch_sql_tests.rs#apply",
+        "name": "apply",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_dispatch_sql_tests.rs",
+        "span": "L129-L139"
+      },
+      "path": "src/adapters/persistence/workflow/action_dispatch_sql_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 133,
+          "text": "subject: &ApprovalSubject,"
+        },
+        {
+          "line": 135,
+          "text": "let result = Effect(0).apply(tx, action, subject).await?;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_dispatch_sql_tests.rs#wrong_request",
+        "name": "wrong_request",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_dispatch_sql_tests.rs",
+        "span": "L4-L18"
+      },
+      "path": "src/adapters/persistence/workflow/action_dispatch_sql_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 10,
+          "text": "3 => wrong.subject.invocation = ActionInvocationId::new(Uuid::new_v4()),"
+        },
+        {
+          "line": 11,
+          "text": "4 => wrong.subject.argument_digest = serde_json::from_value(json!(\"0\".repeat(64))).unwrap(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_dispatch_sql_tests.rs#workflow_action_dispatch_sql_deferred_run_deadline_rejects_effect_and_receipt",
+        "name": "workflow_action_dispatch_sql_deferred_run_deadline_rejects_effect_and_receipt",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_dispatch_sql_tests.rs",
+        "span": "L80-L121"
+      },
+      "path": "src/adapters/persistence/workflow/action_dispatch_sql_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 97,
+          "text": ".apply(&mut tx, &action, &request.subject)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_dispatch_sql_tests.rs#workflow_action_dispatch_saved_model_tool_and_step_share_effect_wrong_digest_refused",
+        "name": "workflow_action_dispatch_saved_model_tool_and_step_share_effect_wrong_digest_refused",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_dispatch_sql_tests.rs",
+        "span": "L207-L256"
+      },
+      "path": "src/adapters/persistence/workflow/action_dispatch_sql_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 211,
+          "text": ".action_authority(request.scope(), &request.subject)"
+        },
+        {
+          "line": 221,
+          "text": "assert_eq!(intent.approval_subject(), request.subject);"
+        },
+        {
+          "line": 231,
+          "text": "tool.subject = intent.approval_subject();"
+        },
+        {
+          "line": 248,
+          "text": "assert_eq!(fresh.approval_subject(), request.subject);"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 9243
+  }
+}

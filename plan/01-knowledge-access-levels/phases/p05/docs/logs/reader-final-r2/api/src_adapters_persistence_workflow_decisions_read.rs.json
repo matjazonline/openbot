@@ -1,0 +1,87 @@
+{
+  "file": "src/adapters/persistence/workflow/decisions/read.rs",
+  "entries": [
+    {
+      "name": "history",
+      "kind": "module",
+      "span": "L4-L4",
+      "signature": "mod history;"
+    },
+    {
+      "name": "visibility",
+      "kind": "module",
+      "span": "L5-L5",
+      "signature": "mod visibility;"
+    },
+    {
+      "name": "ViewRow",
+      "kind": "struct",
+      "span": "L8-L23",
+      "signature": "struct ViewRow"
+    },
+    {
+      "name": "ContextRow",
+      "kind": "struct",
+      "span": "L26-L35",
+      "signature": "struct ContextRow"
+    },
+    {
+      "name": "read_on",
+      "kind": "function",
+      "span": "L37-L96",
+      "signature": "pub(super) async fn read_on("
+    },
+    {
+      "name": "DecisionReadParts",
+      "kind": "struct",
+      "span": "L98-L108",
+      "signature": "struct DecisionReadParts"
+    },
+    {
+      "name": "assemble",
+      "kind": "function",
+      "span": "L110-L171",
+      "signature": "fn assemble("
+    },
+    {
+      "name": "subject",
+      "kind": "function",
+      "span": "L173-L180",
+      "signature": "fn subject(value: &str) -> AppResult<DecisionSubject>"
+    },
+    {
+      "name": "choices",
+      "kind": "function",
+      "span": "L182-L214",
+      "signature": "async fn choices("
+    },
+    {
+      "name": "proposal",
+      "kind": "function",
+      "span": "L216-L234",
+      "signature": "async fn proposal("
+    },
+    {
+      "name": "comments",
+      "kind": "function",
+      "span": "L236-L259",
+      "signature": "async fn comments("
+    },
+    {
+      "name": "Row",
+      "kind": "struct",
+      "span": "L242-L247",
+      "signature": "struct Row"
+    },
+    {
+      "name": "READ_SQL",
+      "kind": "constant",
+      "span": "L261-L271",
+      "signature": "const READ_SQL: &str = r#\""
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 9224
+  }
+}

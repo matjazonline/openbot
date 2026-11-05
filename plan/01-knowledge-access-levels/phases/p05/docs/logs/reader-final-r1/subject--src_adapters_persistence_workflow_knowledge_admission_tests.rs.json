@@ -1,0 +1,32 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 1,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/knowledge_admission_tests.rs#stamped",
+        "name": "stamped",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/knowledge_admission_tests.rs",
+        "span": "L22-L29"
+      },
+      "path": "src/adapters/persistence/workflow/knowledge_admission_tests.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 24,
+          "text": "sqlx::query(\"INSERT INTO messages(id,company_id,author_principal_id,subject,clean_text_body,direction,role,correlation_id,content_hash,audience,access_level) SE"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 9874
+  }
+}

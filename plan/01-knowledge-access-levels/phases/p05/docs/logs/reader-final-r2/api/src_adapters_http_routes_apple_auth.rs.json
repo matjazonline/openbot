@@ -1,0 +1,189 @@
+{
+  "file": "src/adapters/http/routes/apple_auth.rs",
+  "entries": [
+    {
+      "name": "APPLE_FLOW_COOKIE",
+      "kind": "constant",
+      "span": "L32-L32",
+      "signature": "const APPLE_FLOW_COOKIE: &str = \"apple_oauth_transaction\";"
+    },
+    {
+      "name": "AppleFlow",
+      "kind": "enum",
+      "span": "L35-L39",
+      "signature": "enum AppleFlow"
+    },
+    {
+      "name": "as_str",
+      "kind": "function",
+      "span": "L42-L48",
+      "signature": "fn as_str(self) -> &'static str"
+    },
+    {
+      "name": "parse",
+      "kind": "function",
+      "span": "L50-L57",
+      "signature": "fn parse(value: &str) -> Option<Self>"
+    },
+    {
+      "name": "public_router",
+      "kind": "function",
+      "span": "L60-L65",
+      "signature": "pub fn public_router() -> Router<AppState>"
+    },
+    {
+      "name": "protected_router",
+      "kind": "function",
+      "span": "L67-L69",
+      "signature": "pub fn protected_router() -> Router<AppState>"
+    },
+    {
+      "name": "start_registration",
+      "kind": "function",
+      "span": "L71-L77",
+      "signature": "async fn start_registration("
+    },
+    {
+      "name": "start_login",
+      "kind": "function",
+      "span": "L79-L85",
+      "signature": "async fn start_login("
+    },
+    {
+      "name": "start_connection",
+      "kind": "function",
+      "span": "L87-L94",
+      "signature": "async fn start_connection("
+    },
+    {
+      "name": "start_flow",
+      "kind": "function",
+      "span": "L96-L136",
+      "signature": "fn start_flow("
+    },
+    {
+      "name": "AppleCallbackForm",
+      "kind": "struct",
+      "span": "L139-L144",
+      "signature": "struct AppleCallbackForm"
+    },
+    {
+      "name": "AppleUserPayload",
+      "kind": "struct",
+      "span": "L147-L149",
+      "signature": "struct AppleUserPayload"
+    },
+    {
+      "name": "AppleName",
+      "kind": "struct",
+      "span": "L153-L156",
+      "signature": "struct AppleName"
+    },
+    {
+      "name": "display_name",
+      "kind": "function",
+      "span": "L159-L168",
+      "signature": "fn display_name(&self) -> Option<String>"
+    },
+    {
+      "name": "callback",
+      "kind": "function",
+      "span": "L171-L207",
+      "signature": "async fn callback("
+    },
+    {
+      "name": "complete_flow",
+      "kind": "function",
+      "span": "L209-L268",
+      "signature": "async fn complete_flow("
+    },
+    {
+      "name": "ClientSecretClaims",
+      "kind": "struct",
+      "span": "L271-L277",
+      "signature": "struct ClientSecretClaims<'a>"
+    },
+    {
+      "name": "AppleTokenResponse",
+      "kind": "struct",
+      "span": "L280-L282",
+      "signature": "struct AppleTokenResponse"
+    },
+    {
+      "name": "AppleIdentityClaims",
+      "kind": "struct",
+      "span": "L285-L290",
+      "signature": "struct AppleIdentityClaims"
+    },
+    {
+      "name": "BoolClaim",
+      "kind": "enum",
+      "span": "L294-L297",
+      "signature": "enum BoolClaim"
+    },
+    {
+      "name": "is_true",
+      "kind": "function",
+      "span": "L300-L305",
+      "signature": "fn is_true(&self) -> bool"
+    },
+    {
+      "name": "exchange_and_verify",
+      "kind": "function",
+      "span": "L308-L334",
+      "signature": "async fn exchange_and_verify("
+    },
+    {
+      "name": "apple_client_secret",
+      "kind": "function",
+      "span": "L336-L357",
+      "signature": "fn apple_client_secret(apple: &AppleOAuthConfig) -> AppResult<String>"
+    },
+    {
+      "name": "verify_identity_token",
+      "kind": "function",
+      "span": "L359-L402",
+      "signature": "async fn verify_identity_token("
+    },
+    {
+      "name": "apple_redirect_uri",
+      "kind": "function",
+      "span": "L404-L411",
+      "signature": "fn apple_redirect_uri(config: &AppConfig) -> String"
+    },
+    {
+      "name": "tests",
+      "kind": "module",
+      "span": "L414-L473",
+      "signature": "mod tests"
+    },
+    {
+      "name": "apple_claim_booleans_accept_both_wire_shapes",
+      "kind": "function",
+      "span": "L418-L430",
+      "signature": "fn apple_claim_booleans_accept_both_wire_shapes()"
+    },
+    {
+      "name": "security_email_identity_apple_rejects_missing_false_and_ambiguous_claims",
+      "kind": "function",
+      "span": "L433-L453",
+      "signature": "fn security_email_identity_apple_rejects_missing_false_and_ambiguous_claims()"
+    },
+    {
+      "name": "apple_name_is_optional_and_joined_without_blank_parts",
+      "kind": "function",
+      "span": "L456-L462",
+      "signature": "fn apple_name_is_optional_and_joined_without_blank_parts()"
+    },
+    {
+      "name": "apple_callback_is_always_https",
+      "kind": "function",
+      "span": "L465-L472",
+      "signature": "fn apple_callback_is_always_https()"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 15561
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 3,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_ingress_tests.rs#customer_email",
+        "name": "customer_email",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_ingress_tests.rs",
+        "span": "L325-L342"
+      },
+      "path": "src/adapters/persistence/workflow/message_ingress_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 338,
+          "text": "subject: Some(\"Invoice\".into()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_ingress_tests.rs#asking_source",
+        "name": "asking_source",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_ingress_tests.rs",
+        "span": "L462-L485"
+      },
+      "path": "src/adapters/persistence/workflow/message_ingress_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 473,
+          "text": "\"content\": {\"literal\": {\"subject\": \"Approve the refund?\", \"body\": \"Please answer.\"}},"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_ingress_tests.rs#message_ingress_member_email_reply_resumes_the_question_on_an_allowlist_channel",
+        "name": "message_ingress_member_email_reply_resumes_the_question_on_an_allowlist_channel",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_ingress_tests.rs",
+        "span": "L491-L584"
+      },
+      "path": "src/adapters/persistence/workflow/message_ingress_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 540,
+          "text": "subject: Some(\"Re: Approve the refund?\".into()),"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 22885
+  }
+}

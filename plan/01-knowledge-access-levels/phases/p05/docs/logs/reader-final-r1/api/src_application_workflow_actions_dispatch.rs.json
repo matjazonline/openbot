@@ -1,0 +1,147 @@
+{
+  "file": "src/application/workflow/actions/dispatch.rs",
+  "entries": [
+    {
+      "name": "ActionDispatchRequest",
+      "kind": "struct",
+      "span": "L15-L19",
+      "signature": "pub struct ActionDispatchRequest"
+    },
+    {
+      "name": "scope",
+      "kind": "function",
+      "span": "L21-L27",
+      "signature": "pub fn scope(&self) -> ActionScope"
+    },
+    {
+      "name": "RemoteReservation",
+      "kind": "struct",
+      "span": "L32-L39",
+      "signature": "pub(crate) struct RemoteReservation"
+    },
+    {
+      "name": "RemoteReservationResult",
+      "kind": "enum",
+      "span": "L40-L46",
+      "signature": "pub(crate) enum RemoteReservationResult"
+    },
+    {
+      "name": "LocalDispatchResult",
+      "kind": "enum",
+      "span": "L47-L52",
+      "signature": "pub enum LocalDispatchResult"
+    },
+    {
+      "name": "ActionDispatch",
+      "kind": "interface",
+      "span": "L55-L64",
+      "signature": "pub trait ActionDispatch: Send + Sync"
+    },
+    {
+      "name": "local",
+      "kind": "function",
+      "span": "L56-L56",
+      "signature": "async fn local(&self, request: &ActionDispatchRequest) -> AppResult<LocalDispatchResult>;"
+    },
+    {
+      "name": "remote",
+      "kind": "function",
+      "span": "L58-L63",
+      "signature": "async fn remote("
+    },
+    {
+      "name": "RemoteDispatch",
+      "kind": "interface",
+      "span": "L69-L84",
+      "signature": "pub(crate) trait RemoteDispatch: Send + Sync"
+    },
+    {
+      "name": "reserve_remote",
+      "kind": "function",
+      "span": "L70-L74",
+      "signature": "async fn reserve_remote("
+    },
+    {
+      "name": "enter_remote",
+      "kind": "function",
+      "span": "L75-L75",
+      "signature": "async fn enter_remote(&self, reservation: RemoteReservation) -> AppResult<RemoteEntry>;"
+    },
+    {
+      "name": "finish_remote",
+      "kind": "function",
+      "span": "L78-L82",
+      "signature": "async fn finish_remote("
+    },
+    {
+      "name": "owns_remote",
+      "kind": "function",
+      "span": "L83-L83",
+      "signature": "async fn owns_remote(&self, request: &ActionDispatchRequest) -> AppResult<bool>;"
+    },
+    {
+      "name": "RemoteEntry",
+      "kind": "struct",
+      "span": "L85-L92",
+      "signature": "pub(crate) struct RemoteEntry"
+    },
+    {
+      "name": "RemoteAction",
+      "kind": "interface",
+      "span": "L95-L106",
+      "signature": "pub trait RemoteAction: Send + Sync"
+    },
+    {
+      "name": "replay_contract",
+      "kind": "function",
+      "span": "L98-L98",
+      "signature": "fn replay_contract(&self) -> Option<&ProviderReplayContract>;"
+    },
+    {
+      "name": "invoke",
+      "kind": "function",
+      "span": "L101-L105",
+      "signature": "async fn invoke("
+    },
+    {
+      "name": "RemoteDispatchObservation",
+      "kind": "enum",
+      "span": "L109-L115",
+      "signature": "pub enum RemoteDispatchObservation"
+    },
+    {
+      "name": "dispatch_local",
+      "kind": "function",
+      "span": "L118-L123",
+      "signature": "pub async fn dispatch_local("
+    },
+    {
+      "name": "dispatch_remote",
+      "kind": "function",
+      "span": "L125-L132",
+      "signature": "pub async fn dispatch_remote("
+    },
+    {
+      "name": "supervise_remote",
+      "kind": "function",
+      "span": "L135-L206",
+      "signature": "pub(crate) async fn supervise_remote("
+    },
+    {
+      "name": "validate_action_result",
+      "kind": "function",
+      "span": "L208-L220",
+      "signature": "pub(crate) fn validate_action_result(action: &FrozenAction, result: Value) -> AppResult<Value>"
+    },
+    {
+      "name": "result_schema",
+      "kind": "function",
+      "span": "L224-L233",
+      "signature": "fn result_schema(action: &FrozenAction) -> Value"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 8709
+  }
+}

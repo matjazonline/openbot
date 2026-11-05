@@ -1,0 +1,21 @@
+{
+  "file": "src/adapters/persistence/delivery/evidence.rs",
+  "entries": [
+    {
+      "name": "UnknownSettlement",
+      "kind": "enum",
+      "span": "L19-L31",
+      "signature": "pub(crate) enum UnknownSettlement"
+    },
+    {
+      "name": "settle_unknown_delivery_on",
+      "kind": "function",
+      "span": "L33-L121",
+      "signature": "pub(crate) async fn settle_unknown_delivery_on("
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 5806
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 1,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_cancellation_order_tests.rs#run",
+        "name": "run",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_cancellation_order_tests.rs",
+        "span": "L67-L93"
+      },
+      "path": "src/adapters/persistence/workflow/action_cancellation_order_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 89,
+          "text": ".action_authority(request.scope(), &request.subject)"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 13348
+  }
+}

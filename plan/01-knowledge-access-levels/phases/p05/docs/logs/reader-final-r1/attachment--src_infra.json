@@ -1,0 +1,119 @@
+{
+  "pattern": "attachment",
+  "filesSearched": 16,
+  "totalHits": 13,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/infra/config.rs#default_attachments_folder",
+        "name": "default_attachments_folder",
+        "kind": "function",
+        "path": "src/infra/config.rs",
+        "span": "L364-L366"
+      },
+      "path": "src/infra/config.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 364,
+          "text": "fn default_attachments_folder(app_domain_name: &str) -> String {"
+        },
+        {
+          "line": 365,
+          "text": "format!(\"{app_domain_name}/mail-attachments\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/infra/config.rs#GcsConfig",
+        "name": "GcsConfig",
+        "kind": "struct",
+        "path": "src/infra/config.rs",
+        "span": "L297-L313"
+      },
+      "path": "src/infra/config.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 306,
+          "text": "/// The bucket mail attachments are written to, which must **not** be publicly readable: what"
+        },
+        {
+          "line": 308,
+          "text": "/// rules allow. `None` means attachments are not stored at all."
+        },
+        {
+          "line": 309,
+          "text": "pub attachments_bucket: Option<String>,"
+        },
+        {
+          "line": 310,
+          "text": "/// The folder inside the private bucket attachments are written to. By default it namespaces"
+        },
+        {
+          "line": 312,
+          "text": "pub attachments_folder: String,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/infra/config.rs#from_env~4",
+        "name": "from_env~4",
+        "kind": "function",
+        "path": "src/infra/config.rs",
+        "span": "L321-L351"
+      },
+      "path": "src/infra/config.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 332,
+          "text": "attachments_bucket: non_empty_var(\"GCS_ATTACHMENTS_BUCKET_PRIVATE\"),"
+        },
+        {
+          "line": 333,
+          "text": "attachments_folder: non_empty_var(\"GCS_ATTACHMENTS_FOLDER\")"
+        },
+        {
+          "line": 334,
+          "text": ".unwrap_or_else(|| default_attachments_folder(app_domain_name)),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/infra/config.rs#attachments_are_namespaced_by_application_domain_by_default",
+        "name": "attachments_are_namespaced_by_application_domain_by_default",
+        "kind": "function",
+        "path": "src/infra/config.rs",
+        "span": "L740-L745"
+      },
+      "path": "src/infra/config.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 740,
+          "text": "fn attachments_are_namespaced_by_application_domain_by_default() {"
+        },
+        {
+          "line": 742,
+          "text": "default_attachments_folder(\"mail.example.com\"),"
+        },
+        {
+          "line": 743,
+          "text": "\"mail.example.com/mail-attachments\""
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 31735
+  }
+}

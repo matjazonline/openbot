@@ -1,0 +1,32 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 1,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_approval_review_tests.rs#workflow_action_approval_same_arguments_different_target_or_operation_need_new_approval",
+        "name": "workflow_action_approval_same_arguments_different_target_or_operation_need_new_approval",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_approval_review_tests.rs",
+        "span": "L205-L299"
+      },
+      "path": "src/adapters/persistence/workflow/action_approval_review_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 278,
+          "text": "subject: intent.approval_subject(),"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 13028
+  }
+}

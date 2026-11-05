@@ -1,0 +1,83 @@
+{
+  "pattern": "attachment",
+  "filesSearched": 9,
+  "totalHits": 7,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/resend_api/inbound.rs#read_mail",
+        "name": "read_mail",
+        "kind": "function",
+        "path": "src/adapters/resend_api/inbound.rs",
+        "span": "L205-L262"
+      },
+      "path": "src/adapters/resend_api/inbound.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 251,
+          "text": "let (mut inbound, attachments) ="
+        },
+        {
+          "line": 261,
+          "text": "Ok((inbound, attachments))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/resend_api/inbound.rs#decode_event",
+        "name": "decode_event",
+        "kind": "function",
+        "path": "src/adapters/resend_api/inbound.rs",
+        "span": "L137-L196"
+      },
+      "path": "src/adapters/resend_api/inbound.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 160,
+          "text": "let (inbound, attachments) = read_mail(&account, &self.config, event, &email_id).await?;"
+        },
+        {
+          "line": 182,
+          "text": "let persisted = attachments"
+        },
+        {
+          "line": 188,
+          "text": "prepared.replace_attachments("
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/resend_api/client.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 86,
+          "text": "/// uses, so the body, the headers and the attachments all come from one representation rather than"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/resend_api/inbound.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 49,
+          "text": "/// Everything else Resend sends -- the subject, the recipient lists, the attachment metadata --"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 2,
+    "baselineChars": 31024
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "file": "src/adapters/persistence/workflow/decisions/read/history.rs",
+  "entries": [
+    {
+      "name": "ROUND_LIMIT",
+      "kind": "constant",
+      "span": "L4-L4",
+      "signature": "const ROUND_LIMIT: i64 = 20;"
+    },
+    {
+      "name": "HISTORY_LIMIT",
+      "kind": "constant",
+      "span": "L5-L5",
+      "signature": "const HISTORY_LIMIT: i64 = 40;"
+    },
+    {
+      "name": "History",
+      "kind": "struct",
+      "span": "L7-L10",
+      "signature": "pub(super) struct History"
+    },
+    {
+      "name": "read",
+      "kind": "function",
+      "span": "L14-L66",
+      "signature": "pub(super) async fn read("
+    },
+    {
+      "name": "Row",
+      "kind": "struct",
+      "span": "L69-L79",
+      "signature": "struct Row"
+    },
+    {
+      "name": "HISTORY_SQL",
+      "kind": "constant",
+      "span": "L83-L103",
+      "signature": "const HISTORY_SQL: &str = r#\""
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 4236
+  }
+}

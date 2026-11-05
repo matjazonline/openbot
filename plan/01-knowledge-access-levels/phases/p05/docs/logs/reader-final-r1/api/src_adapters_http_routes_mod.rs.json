@@ -1,0 +1,321 @@
+{
+  "file": "src/adapters/http/routes/mod.rs",
+  "entries": [
+    {
+      "name": "authorization_test_support",
+      "kind": "module",
+      "span": "L2-L2",
+      "signature": "mod authorization_test_support;"
+    },
+    {
+      "name": "agent",
+      "kind": "module",
+      "span": "L4-L4",
+      "signature": "pub mod agent;"
+    },
+    {
+      "name": "agent_library",
+      "kind": "module",
+      "span": "L5-L5",
+      "signature": "pub mod agent_library;"
+    },
+    {
+      "name": "apple_auth",
+      "kind": "module",
+      "span": "L6-L6",
+      "signature": "pub mod apple_auth;"
+    },
+    {
+      "name": "assets",
+      "kind": "module",
+      "span": "L7-L7",
+      "signature": "pub mod assets;"
+    },
+    {
+      "name": "assistant_channels",
+      "kind": "module",
+      "span": "L8-L8",
+      "signature": "pub mod assistant_channels;"
+    },
+    {
+      "name": "attention",
+      "kind": "module",
+      "span": "L9-L9",
+      "signature": "pub mod attention;"
+    },
+    {
+      "name": "channel",
+      "kind": "module",
+      "span": "L10-L10",
+      "signature": "pub mod channel;"
+    },
+    {
+      "name": "company",
+      "kind": "module",
+      "span": "L11-L11",
+      "signature": "pub mod company;"
+    },
+    {
+      "name": "company_invite",
+      "kind": "module",
+      "span": "L12-L12",
+      "signature": "pub mod company_invite;"
+    },
+    {
+      "name": "connection_levels",
+      "kind": "module",
+      "span": "L13-L13",
+      "signature": "mod connection_levels;"
+    },
+    {
+      "name": "health",
+      "kind": "module",
+      "span": "L14-L14",
+      "signature": "pub mod health;"
+    },
+    {
+      "name": "knowledge",
+      "kind": "module",
+      "span": "L15-L15",
+      "signature": "mod knowledge;"
+    },
+    {
+      "name": "live_updates",
+      "kind": "module",
+      "span": "L16-L16",
+      "signature": "mod live_updates;"
+    },
+    {
+      "name": "mcp",
+      "kind": "module",
+      "span": "L17-L17",
+      "signature": "pub mod mcp;"
+    },
+    {
+      "name": "model_usage",
+      "kind": "module",
+      "span": "L18-L18",
+      "signature": "mod model_usage;"
+    },
+    {
+      "name": "monitoring",
+      "kind": "module",
+      "span": "L19-L19",
+      "signature": "pub mod monitoring;"
+    },
+    {
+      "name": "notifications",
+      "kind": "module",
+      "span": "L20-L20",
+      "signature": "pub mod notifications;"
+    },
+    {
+      "name": "onboarding",
+      "kind": "module",
+      "span": "L21-L21",
+      "signature": "pub mod onboarding;"
+    },
+    {
+      "name": "schedule",
+      "kind": "module",
+      "span": "L22-L22",
+      "signature": "pub mod schedule;"
+    },
+    {
+      "name": "skill_library",
+      "kind": "module",
+      "span": "L23-L23",
+      "signature": "pub mod skill_library;"
+    },
+    {
+      "name": "ui",
+      "kind": "module",
+      "span": "L24-L24",
+      "signature": "pub mod ui;"
+    },
+    {
+      "name": "ui_agents",
+      "kind": "module",
+      "span": "L25-L25",
+      "signature": "pub mod ui_agents;"
+    },
+    {
+      "name": "ui_attachments",
+      "kind": "module",
+      "span": "L26-L26",
+      "signature": "pub mod ui_attachments;"
+    },
+    {
+      "name": "ui_channels",
+      "kind": "module",
+      "span": "L27-L27",
+      "signature": "pub mod ui_channels;"
+    },
+    {
+      "name": "ui_companies",
+      "kind": "module",
+      "span": "L28-L28",
+      "signature": "pub mod ui_companies;"
+    },
+    {
+      "name": "ui_dashboard",
+      "kind": "module",
+      "span": "L29-L29",
+      "signature": "pub mod ui_dashboard;"
+    },
+    {
+      "name": "ui_deliveries",
+      "kind": "module",
+      "span": "L30-L30",
+      "signature": "pub mod ui_deliveries;"
+    },
+    {
+      "name": "ui_internal_notes",
+      "kind": "module",
+      "span": "L31-L31",
+      "signature": "mod ui_internal_notes;"
+    },
+    {
+      "name": "ui_invites",
+      "kind": "module",
+      "span": "L32-L32",
+      "signature": "pub mod ui_invites;"
+    },
+    {
+      "name": "ui_mcp",
+      "kind": "module",
+      "span": "L33-L33",
+      "signature": "pub mod ui_mcp;"
+    },
+    {
+      "name": "ui_message_diagnostics",
+      "kind": "module",
+      "span": "L34-L34",
+      "signature": "pub mod ui_message_diagnostics;"
+    },
+    {
+      "name": "ui_profile",
+      "kind": "module",
+      "span": "L35-L35",
+      "signature": "pub mod ui_profile;"
+    },
+    {
+      "name": "ui_run_counts",
+      "kind": "module",
+      "span": "L36-L36",
+      "signature": "mod ui_run_counts;"
+    },
+    {
+      "name": "ui_schedules",
+      "kind": "module",
+      "span": "L37-L37",
+      "signature": "pub mod ui_schedules;"
+    },
+    {
+      "name": "ui_team",
+      "kind": "module",
+      "span": "L38-L38",
+      "signature": "pub mod ui_team;"
+    },
+    {
+      "name": "ui_uploads",
+      "kind": "module",
+      "span": "L39-L39",
+      "signature": "pub mod ui_uploads;"
+    },
+    {
+      "name": "user",
+      "kind": "module",
+      "span": "L40-L40",
+      "signature": "pub mod user;"
+    },
+    {
+      "name": "webhooks",
+      "kind": "module",
+      "span": "L41-L41",
+      "signature": "pub mod webhooks;"
+    },
+    {
+      "name": "workflows",
+      "kind": "module",
+      "span": "L42-L42",
+      "signature": "pub mod workflows;"
+    },
+    {
+      "name": "deserialize_empty_string_as_none",
+      "kind": "function",
+      "span": "L58-L74",
+      "signature": "pub(super) fn deserialize_empty_string_as_none<'de, D, T>("
+    },
+    {
+      "name": "router",
+      "kind": "function",
+      "span": "L81-L127",
+      "signature": "pub fn router(sessions: Arc<SessionAuthority>) -> Router<AppState>"
+    },
+    {
+      "name": "ERROR_BODY_LIMIT",
+      "kind": "constant",
+      "span": "L131-L131",
+      "signature": "const ERROR_BODY_LIMIT: usize = 4 * 1024;"
+    },
+    {
+      "name": "ui_error_feedback",
+      "kind": "function",
+      "span": "L139-L168",
+      "signature": "async fn ui_error_feedback(request: Request<Body>, next: Next) -> Response"
+    },
+    {
+      "name": "accepts_html",
+      "kind": "function",
+      "span": "L170-L175",
+      "signature": "fn accepts_html(headers: &header::HeaderMap) -> bool"
+    },
+    {
+      "name": "is_html",
+      "kind": "function",
+      "span": "L177-L182",
+      "signature": "fn is_html(headers: &header::HeaderMap) -> bool"
+    },
+    {
+      "name": "tests",
+      "kind": "module",
+      "span": "L185-L273",
+      "signature": "mod tests"
+    },
+    {
+      "name": "app",
+      "kind": "function",
+      "span": "L190-L202",
+      "signature": "fn app() -> Router"
+    },
+    {
+      "name": "body_of",
+      "kind": "function",
+      "span": "L204-L209",
+      "signature": "async fn body_of(response: Response) -> String"
+    },
+    {
+      "name": "a_failed_ui_navigation_answers_with_the_reason_on_a_page",
+      "kind": "function",
+      "span": "L212-L227",
+      "signature": "async fn a_failed_ui_navigation_answers_with_the_reason_on_a_page()"
+    },
+    {
+      "name": "an_htmx_failure_is_left_for_the_toast_to_report",
+      "kind": "function",
+      "span": "L231-L245",
+      "signature": "async fn an_htmx_failure_is_left_for_the_toast_to_report()"
+    },
+    {
+      "name": "an_api_failure_and_a_successful_page_are_both_untouched",
+      "kind": "function",
+      "span": "L248-L272",
+      "signature": "async fn an_api_failure_and_a_successful_page_are_both_untouched()"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 8951
+  }
+}

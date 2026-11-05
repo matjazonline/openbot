@@ -1,0 +1,49 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 2,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/binding_association_tests.rs#security_email_identity_workflow_channel_and_thread_need_current_address_proof",
+        "name": "security_email_identity_workflow_channel_and_thread_need_current_address_proof",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/binding_association_tests.rs",
+        "span": "L9-L138"
+      },
+      "path": "src/adapters/persistence/workflow/binding_association_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 57,
+          "text": "\"INSERT INTO threads (id, company_id, channel_id, subject) VALUES ($1, $2, $3, 'Subject')\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/binding_association_tests.rs#workflow_binding_sql_grant_revocation_thread_scope_and_fixed_association",
+        "name": "workflow_binding_sql_grant_revocation_thread_scope_and_fixed_association",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/binding_association_tests.rs",
+        "span": "L242-L348"
+      },
+      "path": "src/adapters/persistence/workflow/binding_association_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 269,
+          "text": "\"INSERT INTO threads (id, company_id, channel_id, subject) VALUES ($1, $2, $3, 'Subject')\","
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 13108
+  }
+}

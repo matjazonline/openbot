@@ -1,0 +1,74 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 5,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_eligibility_history_tests.rs#history_command",
+        "name": "history_command",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_eligibility_history_tests.rs",
+        "span": "L133-L154"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_eligibility_history_tests.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 143,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_eligibility_history_tests.rs#successor_action",
+        "name": "successor_action",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_eligibility_history_tests.rs",
+        "span": "L82-L131"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_eligibility_history_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 107,
+          "text": "subject: intent.approval_subject(),"
+        },
+        {
+          "line": 113,
+          "text": ".action_authority(request.scope(), &request.subject)"
+        },
+        {
+          "line": 120,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_eligibility_history_tests.rs#completed_refusal",
+        "name": "completed_refusal",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_eligibility_history_tests.rs",
+        "span": "L247-L297"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_eligibility_history_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 295,
+          "text": "\"completed subject creates no attempt or debit\""
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 16739
+  }
+}

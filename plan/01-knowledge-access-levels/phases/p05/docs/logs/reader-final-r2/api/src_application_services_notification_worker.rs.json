@@ -1,0 +1,75 @@
+{
+  "file": "src/application/services/notification_worker.rs",
+  "entries": [
+    {
+      "name": "POLL_INTERVAL",
+      "kind": "constant",
+      "span": "L27-L27",
+      "signature": "const POLL_INTERVAL: Duration = Duration::from_millis(500);"
+    },
+    {
+      "name": "ERROR_BACKOFF",
+      "kind": "constant",
+      "span": "L28-L28",
+      "signature": "const ERROR_BACKOFF: Duration = Duration::from_secs(5);"
+    },
+    {
+      "name": "CENSUS_INTERVAL",
+      "kind": "constant",
+      "span": "L29-L29",
+      "signature": "const CENSUS_INTERVAL: Duration = Duration::from_secs(30);"
+    },
+    {
+      "name": "NotificationWorker",
+      "kind": "struct",
+      "span": "L31-L37",
+      "signature": "pub struct NotificationWorker"
+    },
+    {
+      "name": "new",
+      "kind": "function",
+      "span": "L40-L53",
+      "signature": "pub fn new("
+    },
+    {
+      "name": "run",
+      "kind": "function",
+      "span": "L55-L77",
+      "signature": "pub async fn run(self: Arc<Self>, mut shutdown: broadcast::Receiver<()>)"
+    },
+    {
+      "name": "drain_once",
+      "kind": "function",
+      "span": "L79-L101",
+      "signature": "pub(crate) async fn drain_once(&self) -> AppResult<usize>"
+    },
+    {
+      "name": "project",
+      "kind": "function",
+      "span": "L103-L168",
+      "signature": "async fn project(&self, claimed: ClaimedNotificationEvent)"
+    },
+    {
+      "name": "compose_email",
+      "kind": "function",
+      "span": "L170-L214",
+      "signature": "fn compose_email("
+    },
+    {
+      "name": "fail",
+      "kind": "function",
+      "span": "L216-L235",
+      "signature": "async fn fail("
+    },
+    {
+      "name": "record_census",
+      "kind": "function",
+      "span": "L237-L258",
+      "signature": "async fn record_census(&self)"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 9770
+  }
+}

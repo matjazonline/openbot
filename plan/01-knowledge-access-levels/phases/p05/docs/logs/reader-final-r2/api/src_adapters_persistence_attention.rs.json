@@ -1,0 +1,75 @@
+{
+  "file": "src/adapters/persistence/attention.rs",
+  "entries": [
+    {
+      "name": "AttentionRow",
+      "kind": "struct",
+      "span": "L20-L42",
+      "signature": "struct AttentionRow"
+    },
+    {
+      "name": "Error",
+      "kind": "type",
+      "span": "L45-L45",
+      "signature": "type Error = AppError;"
+    },
+    {
+      "name": "try_from",
+      "kind": "function",
+      "span": "L47-L82",
+      "signature": "fn try_from(row: AttentionRow) -> AppResult<Self>"
+    },
+    {
+      "name": "ATTENTION_SQL",
+      "kind": "constant",
+      "span": "L87-L324",
+      "signature": "const ATTENTION_SQL: &str = r#\""
+    },
+    {
+      "name": "bind_attention",
+      "kind": "function",
+      "span": "L331-L359",
+      "signature": "fn bind_attention<'q>("
+    },
+    {
+      "name": "item_href",
+      "kind": "function",
+      "span": "L362-L381",
+      "signature": "fn item_href(item: &AttentionItem) -> Option<String>"
+    },
+    {
+      "name": "attention_page",
+      "kind": "function",
+      "span": "L386-L436",
+      "signature": "async fn attention_page("
+    },
+    {
+      "name": "list_attention",
+      "kind": "function",
+      "span": "L441-L444",
+      "signature": "async fn list_attention(&self, query: AttentionQuery<'_>) -> AppResult<AttentionPage>"
+    },
+    {
+      "name": "operational_summary",
+      "kind": "function",
+      "span": "L446-L530",
+      "signature": "async fn operational_summary("
+    },
+    {
+      "name": "SummaryRow",
+      "kind": "struct",
+      "span": "L452-L460",
+      "signature": "struct SummaryRow"
+    },
+    {
+      "name": "tests",
+      "kind": "module",
+      "span": "L535-L535",
+      "signature": "mod tests;"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 26441
+  }
+}

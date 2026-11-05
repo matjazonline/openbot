@@ -1,0 +1,49 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 2,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_approval_mcp_tests.rs#assert_raw_second_entry_refused",
+        "name": "assert_raw_second_entry_refused",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_approval_mcp_tests.rs",
+        "span": "L153-L178"
+      },
+      "path": "src/adapters/persistence/workflow/action_approval_mcp_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 161,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_approval_mcp_tests.rs#workflow_action_approval_not_applied_proof_never_grants_second_entry",
+        "name": "workflow_action_approval_not_applied_proof_never_grants_second_entry",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_approval_mcp_tests.rs",
+        "span": "L82-L151"
+      },
+      "path": "src/adapters/persistence/workflow/action_approval_mcp_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 115,
+          "text": "subject: intent.approval_subject(),"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 6573
+  }
+}

@@ -1,0 +1,555 @@
+{
+  "file": "src/adapters/http/pages/mailbox.rs",
+  "entries": [
+    {
+      "name": "MailboxUser",
+      "kind": "struct",
+      "span": "L10-L22",
+      "signature": "pub struct MailboxUser<'a>"
+    },
+    {
+      "name": "with_company_membership",
+      "kind": "function",
+      "span": "L25-L28",
+      "signature": "pub fn with_company_membership(mut self, membership: CompanyMembership) -> Self"
+    },
+    {
+      "name": "UiSection",
+      "kind": "enum",
+      "span": "L35-L54",
+      "signature": "pub enum UiSection"
+    },
+    {
+      "name": "LOGOUT_MODAL",
+      "kind": "constant",
+      "span": "L58-L76",
+      "signature": "const LOGOUT_MODAL: &str = r##\""
+    },
+    {
+      "name": "LIVE_UPDATE_STATUS",
+      "kind": "constant",
+      "span": "L80-L85",
+      "signature": "const LIVE_UPDATE_STATUS: &str = r##\""
+    },
+    {
+      "name": "REQUEST_ERROR_TOAST",
+      "kind": "constant",
+      "span": "L91-L100",
+      "signature": "pub(super) const REQUEST_ERROR_TOAST: &str = r##\""
+    },
+    {
+      "name": "UiShell",
+      "kind": "struct",
+      "span": "L104-L113",
+      "signature": "pub struct UiShell<'a>"
+    },
+    {
+      "name": "ui_shell",
+      "kind": "function",
+      "span": "L116-L141",
+      "signature": "pub fn ui_shell(shell: &UiShell<'_>) -> String"
+    },
+    {
+      "name": "ui_error_page",
+      "kind": "function",
+      "span": "L148-L178",
+      "signature": "pub fn ui_error_page(status: u16, reason: &str) -> String"
+    },
+    {
+      "name": "MailboxPage",
+      "kind": "struct",
+      "span": "L181-L196",
+      "signature": "pub struct MailboxPage<'a>"
+    },
+    {
+      "name": "ThreadColumn",
+      "kind": "struct",
+      "span": "L199-L210",
+      "signature": "pub struct ThreadColumn<'a>"
+    },
+    {
+      "name": "MessagePane",
+      "kind": "struct",
+      "span": "L213-L227",
+      "signature": "pub struct MessagePane<'a>"
+    },
+    {
+      "name": "ReplyPane",
+      "kind": "struct",
+      "span": "L230-L240",
+      "signature": "pub struct ReplyPane<'a>"
+    },
+    {
+      "name": "ComposePane",
+      "kind": "struct",
+      "span": "L243-L253",
+      "signature": "pub struct ComposePane<'a>"
+    },
+    {
+      "name": "MAILBOX_SCRIPT",
+      "kind": "constant",
+      "span": "L259-L657",
+      "signature": "pub(crate) const MAILBOX_SCRIPT: &str = r##\"        // The `theme-controller` checkbox already repaints the page by itself -- daisyUI matches"
+    },
+    {
+      "name": "REQUEST_ERROR_SCRIPT",
+      "kind": "constant",
+      "span": "L665-L711",
+      "signature": "pub(crate) const REQUEST_ERROR_SCRIPT: &str = r##\""
+    },
+    {
+      "name": "BUTTON_BUSY_SCRIPT",
+      "kind": "constant",
+      "span": "L719-L783",
+      "signature": "pub(crate) const BUTTON_BUSY_SCRIPT: &str = r##\""
+    },
+    {
+      "name": "THEME_INIT_SCRIPT",
+      "kind": "constant",
+      "span": "L791-L799",
+      "signature": "const THEME_INIT_SCRIPT: &str = r#\""
+    },
+    {
+      "name": "ui_layout",
+      "kind": "function",
+      "span": "L802-L825",
+      "signature": "pub(super) fn ui_layout(title: &str, body: &str) -> String"
+    },
+    {
+      "name": "application_javascript",
+      "kind": "function",
+      "span": "L827-L850",
+      "signature": "pub(crate) fn application_javascript() -> String"
+    },
+    {
+      "name": "EVENT_DELEGATION_SCRIPT",
+      "kind": "constant",
+      "span": "L852-L1030",
+      "signature": "const EVENT_DELEGATION_SCRIPT: &str = r##\""
+    },
+    {
+      "name": "theme_init_javascript",
+      "kind": "function",
+      "span": "L1032-L1034",
+      "signature": "pub(crate) fn theme_init_javascript() -> &'static str"
+    },
+    {
+      "name": "mailbox_page",
+      "kind": "function",
+      "span": "L1036-L1064",
+      "signature": "pub fn mailbox_page(page: &MailboxPage<'_>) -> String"
+    },
+    {
+      "name": "mailbox_no_company_page",
+      "kind": "function",
+      "span": "L1067-L1089",
+      "signature": "pub fn mailbox_no_company_page(user: &MailboxUser<'_>) -> String"
+    },
+    {
+      "name": "brand_logo",
+      "kind": "function",
+      "span": "L1094-L1104",
+      "signature": "pub(super) fn brand_logo() -> String"
+    },
+    {
+      "name": "BRAND_LOGO_STYLES",
+      "kind": "constant",
+      "span": "L1110-L1114",
+      "signature": "pub(super) const BRAND_LOGO_STYLES: &str = r##\""
+    },
+    {
+      "name": "DARK_THEME_BLUES",
+      "kind": "constant",
+      "span": "L1128-L1134",
+      "signature": "const DARK_THEME_BLUES: &str = r##\""
+    },
+    {
+      "name": "FIELD_STYLES",
+      "kind": "constant",
+      "span": "L1155-L1164",
+      "signature": "const FIELD_STYLES: &str = r##\""
+    },
+    {
+      "name": "APP_SHELL_STYLES",
+      "kind": "constant",
+      "span": "L1171-L1265",
+      "signature": "const APP_SHELL_STYLES: &str = r##\""
+    },
+    {
+      "name": "THREAD_ROW_STYLES",
+      "kind": "constant",
+      "span": "L1272-L1274",
+      "signature": "const THREAD_ROW_STYLES: &str = r##\""
+    },
+    {
+      "name": "MAILBOX_LAYOUT_STYLES",
+      "kind": "constant",
+      "span": "L1282-L1307",
+      "signature": "const MAILBOX_LAYOUT_STYLES: &str = r##\""
+    },
+    {
+      "name": "COMPACT_LAYOUT_STYLES",
+      "kind": "constant",
+      "span": "L1322-L1395",
+      "signature": "const COMPACT_LAYOUT_STYLES: &str = r##\""
+    },
+    {
+      "name": "THEME_CONTROLLER",
+      "kind": "constant",
+      "span": "L1403-L1415",
+      "signature": "pub(super) const THEME_CONTROLLER: &str = r##\""
+    },
+    {
+      "name": "top_bar",
+      "kind": "function",
+      "span": "L1428-L1480",
+      "signature": "fn top_bar(user: &MailboxUser<'_>, company: Option<&Company>) -> String"
+    },
+    {
+      "name": "rail_toggle_button",
+      "kind": "function",
+      "span": "L1486-L1493",
+      "signature": "fn rail_toggle_button() -> String"
+    },
+    {
+      "name": "agent_library_entry",
+      "kind": "function",
+      "span": "L1501-L1508",
+      "signature": "fn agent_library_entry(user: &MailboxUser<'_>) -> &'static str"
+    },
+    {
+      "name": "account_chip",
+      "kind": "function",
+      "span": "L1518-L1532",
+      "signature": "pub fn account_chip(user: &MailboxUser<'_>, swap: FragmentSwap) -> String"
+    },
+    {
+      "name": "icon_rail",
+      "kind": "function",
+      "span": "L1538-L1570",
+      "signature": "fn icon_rail(user: &MailboxUser<'_>, company: &Company, section: UiSection) -> String"
+    },
+    {
+      "name": "rail_destinations",
+      "kind": "function",
+      "span": "L1572-L1641",
+      "signature": "fn rail_destinations() -> [RailDestination; 11]"
+    },
+    {
+      "name": "RailDestination",
+      "kind": "struct",
+      "span": "L1644-L1651",
+      "signature": "struct RailDestination"
+    },
+    {
+      "name": "href",
+      "kind": "function",
+      "span": "L1656-L1663",
+      "signature": "fn href(&self, company_id: Uuid) -> String"
+    },
+    {
+      "name": "rail_section_visible",
+      "kind": "function",
+      "span": "L1667-L1684",
+      "signature": "fn rail_section_visible(user: &MailboxUser<'_>, section: UiSection) -> bool"
+    },
+    {
+      "name": "rail_company_badge",
+      "kind": "function",
+      "span": "L1696-L1705",
+      "signature": "pub fn rail_company_badge(company: &Company, swap: FragmentSwap) -> String"
+    },
+    {
+      "name": "topbar_company",
+      "kind": "function",
+      "span": "L1716-L1726",
+      "signature": "pub fn topbar_company(company: &Company, swap: FragmentSwap) -> String"
+    },
+    {
+      "name": "RAIL_ICON",
+      "kind": "constant",
+      "span": "L1729-L1729",
+      "signature": "const RAIL_ICON: &str = \"h-6 w-6\";"
+    },
+    {
+      "name": "sidebar_header",
+      "kind": "function",
+      "span": "L1732-L1734",
+      "signature": "pub(crate) fn sidebar_header(title: &str, subtitle: &str) -> String"
+    },
+    {
+      "name": "sidebar_header_with_action",
+      "kind": "function",
+      "span": "L1739-L1754",
+      "signature": "pub(crate) fn sidebar_header_with_action(title: &str, subtitle: &str, action: &str) -> String"
+    },
+    {
+      "name": "channel_sidebar",
+      "kind": "function",
+      "span": "L1757-L1800",
+      "signature": "fn channel_sidebar(page: &MailboxPage<'_>) -> String"
+    },
+    {
+      "name": "compact_mailbox_header",
+      "kind": "function",
+      "span": "L1812-L1873",
+      "signature": "fn compact_mailbox_header(page: &MailboxPage<'_>) -> String"
+    },
+    {
+      "name": "channel_actions",
+      "kind": "function",
+      "span": "L1881-L1906",
+      "signature": "pub fn channel_actions("
+    },
+    {
+      "name": "channel_filter_options",
+      "kind": "function",
+      "span": "L1914-L1926",
+      "signature": "pub(crate) fn channel_filter_options(channels: &[Channel], selected: Option<Uuid>) -> String"
+    },
+    {
+      "name": "selected_when",
+      "kind": "function",
+      "span": "L1928-L1930",
+      "signature": "pub(crate) fn selected_when(selected: bool) -> &'static str"
+    },
+    {
+      "name": "compose_button",
+      "kind": "function",
+      "span": "L1934-L1943",
+      "signature": "fn compose_button(company_id: Uuid, channel: &Channel) -> String"
+    },
+    {
+      "name": "channel_menu_item",
+      "kind": "function",
+      "span": "L1945-L1975",
+      "signature": "fn channel_menu_item("
+    },
+    {
+      "name": "empty_thread_column",
+      "kind": "function",
+      "span": "L1978-L1991",
+      "signature": "pub fn empty_thread_column() -> String"
+    },
+    {
+      "name": "thread_column",
+      "kind": "function",
+      "span": "L2000-L2040",
+      "signature": "pub fn thread_column(column: &ThreadColumn<'_>) -> String"
+    },
+    {
+      "name": "thread_list_fragment",
+      "kind": "function",
+      "span": "L2043-L2061",
+      "signature": "pub fn thread_list_fragment(column: &ThreadColumn<'_>, swap: FragmentSwap) -> String"
+    },
+    {
+      "name": "thread_row",
+      "kind": "function",
+      "span": "L2063-L2075",
+      "signature": "fn thread_row(column: &ThreadColumn<'_>, thread: &Thread) -> String"
+    },
+    {
+      "name": "opened_by_another_channel",
+      "kind": "function",
+      "span": "L2086-L2092",
+      "signature": "pub fn opened_by_another_channel(thread: &Thread, app_domain_name: &str) -> bool"
+    },
+    {
+      "name": "transport_badge",
+      "kind": "function",
+      "span": "L2106-L2115",
+      "signature": "fn transport_badge(transport: Option<TransportKind>, handle: Option<&str>) -> String"
+    },
+    {
+      "name": "other_channel_glyph",
+      "kind": "function",
+      "span": "L2117-L2126",
+      "signature": "pub fn other_channel_glyph(from_other_channel: bool, title: &str) -> String"
+    },
+    {
+      "name": "ThreadRowMarks",
+      "kind": "struct",
+      "span": "L2134-L2141",
+      "signature": "pub struct ThreadRowMarks"
+    },
+    {
+      "name": "thread_row_fragment",
+      "kind": "function",
+      "span": "L2147-L2204",
+      "signature": "pub fn thread_row_fragment("
+    },
+    {
+      "name": "thread_pagination",
+      "kind": "function",
+      "span": "L2206-L2224",
+      "signature": "fn thread_pagination(column: &ThreadColumn<'_>, swap: FragmentSwap) -> String"
+    },
+    {
+      "name": "empty_detail_pane",
+      "kind": "function",
+      "span": "L2227-L2237",
+      "signature": "pub fn empty_detail_pane(message: &str, swap: FragmentSwap) -> String"
+    },
+    {
+      "name": "simulator_link",
+      "kind": "function",
+      "span": "L2240-L2251",
+      "signature": "fn simulator_link(pane: &MessagePane<'_>) -> String"
+    },
+    {
+      "name": "message_pane",
+      "kind": "function",
+      "span": "L2253-L2350",
+      "signature": "pub fn message_pane(pane: &MessagePane<'_>) -> String"
+    },
+    {
+      "name": "DIAGNOSTICS_DIALOG",
+      "kind": "constant",
+      "span": "L2356-L2367",
+      "signature": "const DIAGNOSTICS_DIALOG: &str = r##\""
+    },
+    {
+      "name": "thread_composer",
+      "kind": "function",
+      "span": "L2374-L2404",
+      "signature": "fn thread_composer(pane: &MessagePane<'_>) -> String"
+    },
+    {
+      "name": "internal_note_composer",
+      "kind": "function",
+      "span": "L2406-L2431",
+      "signature": "fn internal_note_composer(pane: &MessagePane<'_>) -> String"
+    },
+    {
+      "name": "message_bubble_chat",
+      "kind": "function",
+      "span": "L2442-L2455",
+      "signature": "pub fn message_bubble_chat("
+    },
+    {
+      "name": "message_bubble_readonly",
+      "kind": "function",
+      "span": "L2458-L2471",
+      "signature": "pub fn message_bubble_readonly("
+    },
+    {
+      "name": "MessageActions",
+      "kind": "enum",
+      "span": "L2474-L2477",
+      "signature": "enum MessageActions"
+    },
+    {
+      "name": "message_bubble",
+      "kind": "function",
+      "span": "L2479-L2490",
+      "signature": "fn message_bubble("
+    },
+    {
+      "name": "unrestricted_message_bubble",
+      "kind": "function",
+      "span": "L2492-L2588",
+      "signature": "fn unrestricted_message_bubble("
+    },
+    {
+      "name": "message_note_controls",
+      "kind": "function",
+      "span": "L2590-L2632",
+      "signature": "fn message_note_controls("
+    },
+    {
+      "name": "diagnostics_link",
+      "kind": "function",
+      "span": "L2639-L2651",
+      "signature": "fn diagnostics_link(message: &ThreadMessageView, scope: MessageScope) -> String"
+    },
+    {
+      "name": "MessageScope",
+      "kind": "struct",
+      "span": "L2659-L2662",
+      "signature": "pub struct MessageScope"
+    },
+    {
+      "name": "attachment_chips",
+      "kind": "function",
+      "span": "L2669-L2683",
+      "signature": "fn attachment_chips(message: &ThreadMessageView, scope: MessageScope) -> String"
+    },
+    {
+      "name": "attachment_chip",
+      "kind": "function",
+      "span": "L2685-L2712",
+      "signature": "fn attachment_chip("
+    },
+    {
+      "name": "file_size",
+      "kind": "function",
+      "span": "L2715-L2724",
+      "signature": "fn file_size(bytes: usize) -> String"
+    },
+    {
+      "name": "KB",
+      "kind": "constant",
+      "span": "L2716-L2716",
+      "signature": "const KB: usize = 1024;"
+    },
+    {
+      "name": "MB",
+      "kind": "constant",
+      "span": "L2717-L2717",
+      "signature": "const MB: usize = KB * 1024;"
+    },
+    {
+      "name": "form_error_banner",
+      "kind": "function",
+      "span": "L2727-L2735",
+      "signature": "pub(crate) fn form_error_banner(error: Option<&str>) -> String"
+    },
+    {
+      "name": "readonly_field",
+      "kind": "function",
+      "span": "L2738-L2747",
+      "signature": "fn readonly_field(label: &str, value: &str) -> String"
+    },
+    {
+      "name": "send_form_footer",
+      "kind": "function",
+      "span": "L2752-L2768",
+      "signature": "fn send_form_footer(deliver: bool, cancel_attributes: &str) -> String"
+    },
+    {
+      "name": "compose_pane",
+      "kind": "function",
+      "span": "L2770-L2818",
+      "signature": "pub fn compose_pane(pane: &ComposePane<'_>) -> String"
+    },
+    {
+      "name": "reply_pane",
+      "kind": "function",
+      "span": "L2824-L2871",
+      "signature": "pub fn reply_pane(pane: &ReplyPane<'_>) -> String"
+    },
+    {
+      "name": "thread_list_open_tag",
+      "kind": "function",
+      "span": "L2880-L2885",
+      "signature": "fn thread_list_open_tag(swap: FragmentSwap) -> String"
+    },
+    {
+      "name": "thread_list_oob",
+      "kind": "function",
+      "span": "L2888-L2894",
+      "signature": "pub fn thread_list_oob(column: &ThreadColumn<'_>) -> String"
+    },
+    {
+      "name": "message_diagnostics_pane",
+      "kind": "function",
+      "span": "L2904-L2965",
+      "signature": "pub fn message_diagnostics_pane(audit: &MessageAuditView) -> String"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 139676
+  }
+}

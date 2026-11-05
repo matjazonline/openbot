@@ -1,0 +1,66 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 3,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/test_support.rs#delivery_fixture",
+        "name": "delivery_fixture",
+        "kind": "function",
+        "path": "src/adapters/persistence/test_support.rs",
+        "span": "L404-L467"
+      },
+      "path": "src/adapters/persistence/test_support.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 422,
+          "text": "request.subject.to_string(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/test_support.rs#new",
+        "name": "new",
+        "kind": "function",
+        "path": "src/adapters/persistence/test_support.rs",
+        "span": "L383-L396"
+      },
+      "path": "src/adapters/persistence/test_support.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 390,
+          "text": "subject: \"Re: order\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/test_support.rs#DeliveryFixtureRequest",
+        "name": "DeliveryFixtureRequest",
+        "kind": "struct",
+        "path": "src/adapters/persistence/test_support.rs",
+        "span": "L365-L380"
+      },
+      "path": "src/adapters/persistence/test_support.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 373,
+          "text": "pub subject: &'a str,"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 34557
+  }
+}

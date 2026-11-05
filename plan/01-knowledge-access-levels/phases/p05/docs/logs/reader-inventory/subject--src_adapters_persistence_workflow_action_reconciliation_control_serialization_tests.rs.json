@@ -1,0 +1,36 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 2,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_control_serialization_tests.rs#scoped_evidence",
+        "name": "scoped_evidence",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_control_serialization_tests.rs",
+        "span": "L301-L340"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_control_serialization_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 306,
+          "text": "(\"invocation_id\", json!(command.subject.invocation.as_uuid())),"
+        },
+        {
+          "line": 309,
+          "text": "json!(command.subject.argument_digest.as_str()),"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 15570
+  }
+}

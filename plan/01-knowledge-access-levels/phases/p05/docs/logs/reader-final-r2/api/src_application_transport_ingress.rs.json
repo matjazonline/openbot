@@ -1,0 +1,375 @@
+{
+  "file": "src/application/transport/ingress.rs",
+  "entries": [
+    {
+      "name": "MAX_SUBJECT_BYTES",
+      "kind": "constant",
+      "span": "L40-L40",
+      "signature": "pub const MAX_SUBJECT_BYTES: usize = 998;"
+    },
+    {
+      "name": "MAX_BODY_BYTES",
+      "kind": "constant",
+      "span": "L44-L44",
+      "signature": "pub const MAX_BODY_BYTES: usize = 1_000_000;"
+    },
+    {
+      "name": "MAX_ADDRESSED_IDENTITIES",
+      "kind": "constant",
+      "span": "L47-L47",
+      "signature": "pub const MAX_ADDRESSED_IDENTITIES: usize = 100;"
+    },
+    {
+      "name": "MAX_ATTACHMENTS",
+      "kind": "constant",
+      "span": "L50-L50",
+      "signature": "pub const MAX_ATTACHMENTS: usize = 50;"
+    },
+    {
+      "name": "MAX_REPLY_CANDIDATES",
+      "kind": "constant",
+      "span": "L53-L53",
+      "signature": "pub const MAX_REPLY_CANDIDATES: usize = 100;"
+    },
+    {
+      "name": "MAX_THREAD_ASSOCIATIONS",
+      "kind": "constant",
+      "span": "L56-L56",
+      "signature": "pub const MAX_THREAD_ASSOCIATIONS: usize = 20;"
+    },
+    {
+      "name": "MAX_INGRESS_HOPS",
+      "kind": "constant",
+      "span": "L64-L64",
+      "signature": "pub const MAX_INGRESS_HOPS: u32 = 5;"
+    },
+    {
+      "name": "MAX_TRACE_CHANNELS",
+      "kind": "constant",
+      "span": "L67-L67",
+      "signature": "pub const MAX_TRACE_CHANNELS: usize = MAX_INGRESS_HOPS as usize;"
+    },
+    {
+      "name": "MAX_THREAD_PRINCIPALS",
+      "kind": "constant",
+      "span": "L70-L70",
+      "signature": "pub const MAX_THREAD_PRINCIPALS: usize = MAX_ADDRESSED_IDENTITIES + 1;"
+    },
+    {
+      "name": "SMALL_INLINE_IMAGE_BYTES",
+      "kind": "constant",
+      "span": "L77-L77",
+      "signature": "pub const SMALL_INLINE_IMAGE_BYTES: usize = 10_000;"
+    },
+    {
+      "name": "MAX_ADDRESSED_TARGETS",
+      "kind": "constant",
+      "span": "L84-L84",
+      "signature": "pub const MAX_ADDRESSED_TARGETS: usize = MAX_ADDRESSED_IDENTITIES;"
+    },
+    {
+      "name": "AddressedIdentity",
+      "kind": "struct",
+      "span": "L88-L91",
+      "signature": "pub struct AddressedIdentity"
+    },
+    {
+      "name": "new",
+      "kind": "function",
+      "span": "L94-L96",
+      "signature": "pub const fn new(role: RecipientRole, identity: QualifiedIdentity) -> Self"
+    },
+    {
+      "name": "CanonicalContent",
+      "kind": "struct",
+      "span": "L104-L107",
+      "signature": "pub struct CanonicalContent"
+    },
+    {
+      "name": "parse",
+      "kind": "function",
+      "span": "L110-L119",
+      "signature": "pub fn parse("
+    },
+    {
+      "name": "subject",
+      "kind": "function",
+      "span": "L121-L123",
+      "signature": "pub fn subject(&self) -> &str"
+    },
+    {
+      "name": "body_text",
+      "kind": "function",
+      "span": "L125-L127",
+      "signature": "pub fn body_text(&self) -> &str"
+    },
+    {
+      "name": "ReplyDelivery",
+      "kind": "enum",
+      "span": "L137-L142",
+      "signature": "pub enum ReplyDelivery"
+    },
+    {
+      "name": "MessageDisposition",
+      "kind": "enum",
+      "span": "L151-L156",
+      "signature": "pub enum MessageDisposition"
+    },
+    {
+      "name": "answers",
+      "kind": "function",
+      "span": "L159-L161",
+      "signature": "pub const fn answers(self) -> bool"
+    },
+    {
+      "name": "IngressDirectives",
+      "kind": "struct",
+      "span": "L170-L188",
+      "signature": "pub struct IngressDirectives"
+    },
+    {
+      "name": "default",
+      "kind": "function",
+      "span": "L197-L208",
+      "signature": "fn default() -> Self"
+    },
+    {
+      "name": "EmailIngressFacts",
+      "kind": "struct",
+      "span": "L217-L223",
+      "signature": "pub struct EmailIngressFacts"
+    },
+    {
+      "name": "IngressPolicyFacts",
+      "kind": "enum",
+      "span": "L227-L236",
+      "signature": "pub enum IngressPolicyFacts"
+    },
+    {
+      "name": "email",
+      "kind": "function",
+      "span": "L243-L248",
+      "signature": "pub const fn email(&self) -> Option<&EmailIngressFacts>"
+    },
+    {
+      "name": "ReplyCandidates",
+      "kind": "struct",
+      "span": "L256-L259",
+      "signature": "pub struct ReplyCandidates"
+    },
+    {
+      "name": "parse",
+      "kind": "function",
+      "span": "L262-L270",
+      "signature": "pub fn parse("
+    },
+    {
+      "name": "is_empty",
+      "kind": "function",
+      "span": "L272-L274",
+      "signature": "pub fn is_empty(&self) -> bool"
+    },
+    {
+      "name": "InboundDraft",
+      "kind": "struct",
+      "span": "L289-L305",
+      "signature": "pub struct InboundDraft"
+    },
+    {
+      "name": "bind",
+      "kind": "function",
+      "span": "L309-L338",
+      "signature": "pub fn bind(self, binding_id: ChannelBindingId) -> InboundEnvelope"
+    },
+    {
+      "name": "InboundEnvelope",
+      "kind": "struct",
+      "span": "L349-L366",
+      "signature": "pub struct InboundEnvelope"
+    },
+    {
+      "name": "SystemAddress",
+      "kind": "enum",
+      "span": "L378-L381",
+      "signature": "pub enum SystemAddress"
+    },
+    {
+      "name": "ALL",
+      "kind": "constant",
+      "span": "L385-L385",
+      "signature": "pub const ALL: &'static [SystemAddress] = &[SystemAddress::Help];"
+    },
+    {
+      "name": "local_part",
+      "kind": "function",
+      "span": "L387-L391",
+      "signature": "pub const fn local_part(self) -> &'static str"
+    },
+    {
+      "name": "parse",
+      "kind": "function",
+      "span": "L395-L401",
+      "signature": "pub fn parse(local_part: &str) -> Option<Self>"
+    },
+    {
+      "name": "AddressedTarget",
+      "kind": "enum",
+      "span": "L412-L422",
+      "signature": "pub enum AddressedTarget"
+    },
+    {
+      "name": "AddressedRecipient",
+      "kind": "struct",
+      "span": "L429-L436",
+      "signature": "pub struct AddressedRecipient"
+    },
+    {
+      "name": "InboundRouting",
+      "kind": "struct",
+      "span": "L443-L445",
+      "signature": "pub struct InboundRouting"
+    },
+    {
+      "name": "parse",
+      "kind": "function",
+      "span": "L448-L457",
+      "signature": "pub fn parse(recipients: Vec<AddressedRecipient>) -> Result<Self, BoundsError>"
+    },
+    {
+      "name": "channel_pipelines",
+      "kind": "function",
+      "span": "L460-L469",
+      "signature": "pub fn channel_pipelines("
+    },
+    {
+      "name": "system_addresses",
+      "kind": "function",
+      "span": "L472-L479",
+      "signature": "pub fn system_addresses(&self) -> impl Iterator<Item = (&CompanySlug, SystemAddress)>"
+    },
+    {
+      "name": "outsiders",
+      "kind": "function",
+      "span": "L482-L486",
+      "signature": "pub fn outsiders(&self) -> impl Iterator<Item = &QualifiedIdentity>"
+    },
+    {
+      "name": "any_files_only",
+      "kind": "function",
+      "span": "L489-L493",
+      "signature": "pub fn any_files_only(&self) -> bool"
+    },
+    {
+      "name": "ThreadTarget",
+      "kind": "enum",
+      "span": "L498-L501",
+      "signature": "pub enum ThreadTarget"
+    },
+    {
+      "name": "PipelineStep",
+      "kind": "struct",
+      "span": "L508-L511",
+      "signature": "pub struct PipelineStep"
+    },
+    {
+      "name": "only",
+      "kind": "function",
+      "span": "L514-L516",
+      "signature": "pub const fn only() -> Self"
+    },
+    {
+      "name": "ThreadAssociation",
+      "kind": "struct",
+      "span": "L526-L539",
+      "signature": "pub struct ThreadAssociation"
+    },
+    {
+      "name": "ThreadPrincipalIntent",
+      "kind": "struct",
+      "span": "L547-L550",
+      "signature": "pub struct ThreadPrincipalIntent"
+    },
+    {
+      "name": "new",
+      "kind": "function",
+      "span": "L553-L555",
+      "signature": "pub const fn new(identity: QualifiedIdentity, role: ThreadPrincipalRole) -> Self"
+    },
+    {
+      "name": "InboundOrigin",
+      "kind": "enum",
+      "span": "L560-L567",
+      "signature": "pub enum InboundOrigin"
+    },
+    {
+      "name": "as_str",
+      "kind": "function",
+      "span": "L570-L576",
+      "signature": "pub const fn as_str(self) -> &'static str"
+    },
+    {
+      "name": "InboundAdmissionIntent",
+      "kind": "struct",
+      "span": "L587-L597",
+      "signature": "pub struct InboundAdmissionIntent"
+    },
+    {
+      "name": "InboundCommitRequest",
+      "kind": "struct",
+      "span": "L605-L631",
+      "signature": "pub struct InboundCommitRequest"
+    },
+    {
+      "name": "CommitDisposition",
+      "kind": "enum",
+      "span": "L638-L641",
+      "signature": "pub enum CommitDisposition"
+    },
+    {
+      "name": "is_duplicate",
+      "kind": "function",
+      "span": "L644-L646",
+      "signature": "pub const fn is_duplicate(self) -> bool"
+    },
+    {
+      "name": "InboundCommitOutcome",
+      "kind": "struct",
+      "span": "L651-L661",
+      "signature": "pub struct InboundCommitOutcome"
+    },
+    {
+      "name": "tests",
+      "kind": "module",
+      "span": "L664-L721",
+      "signature": "mod tests"
+    },
+    {
+      "name": "canonical_content_strips_invisible_and_prompt_injection_characters",
+      "kind": "function",
+      "span": "L669-L677",
+      "signature": "fn canonical_content_strips_invisible_and_prompt_injection_characters()"
+    },
+    {
+      "name": "content_is_refused_rather_than_truncated_when_it_exceeds_its_bound",
+      "kind": "function",
+      "span": "L680-L685",
+      "signature": "fn content_is_refused_rather_than_truncated_when_it_exceeds_its_bound()"
+    },
+    {
+      "name": "only_email_carries_authentication_verdicts",
+      "kind": "function",
+      "span": "L690-L703",
+      "signature": "fn only_email_carries_authentication_verdicts()"
+    },
+    {
+      "name": "a_protocol_extension_decodes_only_from_a_shape_it_knows",
+      "kind": "function",
+      "span": "L706-L720",
+      "signature": "fn a_protocol_extension_decodes_only_from_a_shape_it_knows()"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 30832
+  }
+}

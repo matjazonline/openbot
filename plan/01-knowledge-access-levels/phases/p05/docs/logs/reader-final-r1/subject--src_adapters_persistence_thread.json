@@ -1,0 +1,1032 @@
+{
+  "pattern": "subject",
+  "filesSearched": 14,
+  "totalHits": 90,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/test_support.rs#inbound_email",
+        "name": "inbound_email",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/test_support.rs",
+        "span": "L281-L307"
+      },
+      "path": "src/adapters/persistence/thread/test_support.rs",
+      "inDegree": 17,
+      "hits": [
+        {
+          "line": 291,
+          "text": "subject: \"Subject\".into(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/inbound_tests.rs#request",
+        "name": "request",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/inbound_tests.rs",
+        "span": "L132-L162"
+      },
+      "path": "src/adapters/persistence/thread/inbound_tests.rs",
+      "inDegree": 13,
+      "hits": [
+        {
+          "line": 144,
+          "text": "subject: \"Quick question\".to_string(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/test_support.rs#extra_thread",
+        "name": "extra_thread",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/test_support.rs",
+        "span": "L102-L111"
+      },
+      "path": "src/adapters/persistence/thread/test_support.rs",
+      "inDegree": 9,
+      "hits": [
+        {
+          "line": 102,
+          "text": "pub(super) async fn extra_thread(&self, channel_id: Uuid, subject: &str) -> Thread {"
+        },
+        {
+          "line": 106,
+          "text": "subject,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/inbound_tests.rs#request_on",
+        "name": "request_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/inbound_tests.rs",
+        "span": "L164-L196"
+      },
+      "path": "src/adapters/persistence/thread/inbound_tests.rs",
+      "inDegree": 5,
+      "hits": [
+        {
+          "line": 182,
+          "text": "subject: \"Quick question\".to_string(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/message.rs#try_from",
+        "name": "try_from",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/message.rs",
+        "span": "L144-L186"
+      },
+      "path": "src/adapters/persistence/thread/message.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 168,
+          "text": "db.author_subject,"
+        },
+        {
+          "line": 171,
+          "text": "subject: db.subject,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/message.rs#canonical_message_hash",
+        "name": "canonical_message_hash",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/message.rs",
+        "span": "L402-L452"
+      },
+      "path": "src/adapters/persistence/thread/message.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 417,
+          "text": "\"subject\": identity.subject().as_str(),"
+        },
+        {
+          "line": 427,
+          "text": "\"subject\": participant.identity.subject().as_str(),"
+        },
+        {
+          "line": 431,
+          "text": "\"subject\": write.subject,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/message.rs#insert_canonical_message",
+        "name": "insert_canonical_message",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/message.rs",
+        "span": "L774-L820"
+      },
+      "path": "src/adapters/persistence/thread/message.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 796,
+          "text": "id, company_id, author_principal_id, authored_identity_id, subject,"
+        },
+        {
+          "line": 805,
+          "text": ".bind(&write.subject)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/views.rs#try_from",
+        "name": "try_from",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/views.rs",
+        "span": "L74-L85"
+      },
+      "path": "src/adapters/persistence/thread/views.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 78,
+          "text": "handle: db.author_subject,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/views.rs#into_view",
+        "name": "into_view",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/views.rs",
+        "span": "L121-L171"
+      },
+      "path": "src/adapters/persistence/thread/views.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 157,
+          "text": "subject: self.subject,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/views.rs#thread_message_select",
+        "name": "thread_message_select",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/views.rs",
+        "span": "L247-L278"
+      },
+      "path": "src/adapters/persistence/thread/views.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 255,
+          "text": "message.subject,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/inbound_multi_task_tests.rs#two_channel_request",
+        "name": "two_channel_request",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/inbound_multi_task_tests.rs",
+        "span": "L20-L40"
+      },
+      "path": "src/adapters/persistence/thread/inbound_multi_task_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 29,
+          "text": "subject: \"Quick question\".into(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/inbound.rs#message_write",
+        "name": "message_write",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/inbound.rs",
+        "span": "L813-L866"
+      },
+      "path": "src/adapters/persistence/thread/inbound.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 839,
+          "text": "subject: envelope.content.subject().to_string(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/message.rs#qualified_identity",
+        "name": "qualified_identity",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/message.rs",
+        "span": "L190-L205"
+      },
+      "path": "src/adapters/persistence/thread/message.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 193,
+          "text": "subject: Option<String>,"
+        },
+        {
+          "line": 195,
+          "text": "let (Some(transport), Some(namespace), Some(subject)) = (transport, namespace, subject) else {"
+        },
+        {
+          "line": 203,
+          "text": "IdentitySubject::parse(subject).map_err(|error| invalid(error.to_string()))?,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/inbound_tests.rs#slack_identity",
+        "name": "slack_identity",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/inbound_tests.rs",
+        "span": "L78-L84"
+      },
+      "path": "src/adapters/persistence/thread/inbound_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 78,
+          "text": "fn slack_identity(namespace: &str, subject: &str) -> QualifiedIdentity {"
+        },
+        {
+          "line": 82,
+          "text": "IdentitySubject::parse(subject).unwrap(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/inbound.rs#resolve_threads",
+        "name": "resolve_threads",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/inbound.rs",
+        "span": "L420-L448"
+      },
+      "path": "src/adapters/persistence/thread/inbound.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 434,
+          "text": "ThreadTarget::Create { subject } => {"
+        },
+        {
+          "line": 435,
+          "text": "open_thread(tx, request.company_id, association.channel_id, &subject).await?"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/inbound.rs#open_thread",
+        "name": "open_thread",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/inbound.rs",
+        "span": "L520-L547"
+      },
+      "path": "src/adapters/persistence/thread/inbound.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 524,
+          "text": "subject: &str,"
+        },
+        {
+          "line": 528,
+          "text": "r#\"INSERT INTO threads (id, company_id, channel_id, subject)"
+        },
+        {
+          "line": 537,
+          "text": ".bind(subject)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/message.rs#decode_participants",
+        "name": "decode_participants",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/message.rs",
+        "span": "L207-L233"
+      },
+      "path": "src/adapters/persistence/thread/message.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 225,
+          "text": "Some(row.subject),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/message.rs#slack_identity",
+        "name": "slack_identity",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/message.rs",
+        "span": "L942-L948"
+      },
+      "path": "src/adapters/persistence/thread/message.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 942,
+          "text": "fn slack_identity(namespace: &str, subject: &str) -> QualifiedIdentity {"
+        },
+        {
+          "line": 946,
+          "text": "IdentitySubject::parse(subject).unwrap(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/mod.rs#try_from",
+        "name": "try_from",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/mod.rs",
+        "span": "L104-L146"
+      },
+      "path": "src/adapters/persistence/thread/mod.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 123,
+          "text": "crate::entities::transport::IdentitySubject::parse(row.subject).map_err("
+        },
+        {
+          "line": 136,
+          "text": "subject: db.subject,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/views.rs#list_thread_messages",
+        "name": "list_thread_messages",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/views.rs",
+        "span": "L285-L326"
+      },
+      "path": "src/adapters/persistence/thread/views.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 293,
+          "text": "recent.author_transport, recent.author_subject, recent.subject,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/inbound_tests.rs#inconsistent_multi_binding_message_mappings_are_a_typed_collision",
+        "name": "inconsistent_multi_binding_message_mappings_are_a_typed_collision",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/inbound_tests.rs",
+        "span": "L767-L844"
+      },
+      "path": "src/adapters/persistence/thread/inbound_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 824,
+          "text": "subject: \"Quick question\".into(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/inbound_tests.rs#slack_participant_intents_persist_with_explicit_roles_and_no_email_projection",
+        "name": "slack_participant_intents_persist_with_explicit_roles_and_no_email_projection",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/inbound_tests.rs",
+        "span": "L848-L928"
+      },
+      "path": "src/adapters/persistence/thread/inbound_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 878,
+          "text": "subject: \"Slack thread\".into(),"
+        },
+        {
+          "line": 903,
+          "text": "AND identity.subject = 'U123'"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/inbound_tests.rs#authored_identity_cannot_belong_to_a_different_author_principal",
+        "name": "authored_identity_cannot_belong_to_a_different_author_principal",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/inbound_tests.rs",
+        "span": "L970-L1025"
+      },
+      "path": "src/adapters/persistence/thread/inbound_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1003,
+          "text": "id, company_id, author_principal_id, authored_identity_id, subject,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/inbound_tests.rs#an_association_through_another_channels_binding_names_the_first_bad_pair",
+        "name": "an_association_through_another_channels_binding_names_the_first_bad_pair",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/inbound_tests.rs",
+        "span": "L1139-L1180"
+      },
+      "path": "src/adapters/persistence/thread/inbound_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1154,
+          "text": "subject: \"Quick question\".to_string(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/inbound_tests.rs#a_message_addressed_to_two_channels_is_stored_once_and_mapped_on_each_binding",
+        "name": "a_message_addressed_to_two_channels_is_stored_once_and_mapped_on_each_binding",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/inbound_tests.rs",
+        "span": "L1184-L1241"
+      },
+      "path": "src/adapters/persistence/thread/inbound_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1198,
+          "text": "subject: \"Quick question\".to_string(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/message.rs#MessageDb",
+        "name": "MessageDb",
+        "kind": "struct",
+        "path": "src/adapters/persistence/thread/message.rs",
+        "span": "L54-L77"
+      },
+      "path": "src/adapters/persistence/thread/message.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 65,
+          "text": "pub author_subject: Option<String>,"
+        },
+        {
+          "line": 66,
+          "text": "pub subject: String,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/message.rs#ParticipantRow",
+        "name": "ParticipantRow",
+        "kind": "struct",
+        "path": "src/adapters/persistence/thread/message.rs",
+        "span": "L84-L91"
+      },
+      "path": "src/adapters/persistence/thread/message.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 90,
+          "text": "subject: String,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/message.rs#MESSAGE_SELECT",
+        "name": "MESSAGE_SELECT",
+        "kind": "constant",
+        "path": "src/adapters/persistence/thread/message.rs",
+        "span": "L93-L139"
+      },
+      "path": "src/adapters/persistence/thread/message.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 103,
+          "text": "author_identity.subject AS author_subject,"
+        },
+        {
+          "line": 104,
+          "text": "message.subject,"
+        },
+        {
+          "line": 121,
+          "text": "'subject', identity.subject)"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/thread/message.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 400,
+          "text": "/// transport and namespace as well as subject, so equal provider subjects in different workspaces"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/message.rs#changed_provider_content_changes_the_hash",
+        "name": "changed_provider_content_changes_the_hash",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/message.rs",
+        "span": "L990-L1010"
+      },
+      "path": "src/adapters/persistence/thread/message.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1002,
+          "text": "let mut resubjected = write_with(MessageCorrelation::Email(EmailMessageMetadata::new("
+        },
+        {
+          "line": 1005,
+          "text": "resubjected.subject = \"Different\".into();"
+        },
+        {
+          "line": 1008,
+          "text": "canonical_message_hash(&resubjected, &author(), &[], None),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/message.rs#equal_provider_subjects_in_different_namespaces_hash_differently",
+        "name": "equal_provider_subjects_in_different_namespaces_hash_differently",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/message.rs",
+        "span": "L1013-L1033"
+      },
+      "path": "src/adapters/persistence/thread/message.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1013,
+          "text": "fn equal_provider_subjects_in_different_namespaces_hash_differently() {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/message.rs#unreadable_stored_json_is_an_application_error",
+        "name": "unreadable_stored_json_is_an_application_error",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/message.rs",
+        "span": "L1059-L1083"
+      },
+      "path": "src/adapters/persistence/thread/message.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1068,
+          "text": "\"transport\": \"email\", \"namespace\": \"deployment\", \"subject\": \"a@example.com\""
+        },
+        {
+          "line": 1077,
+          "text": "\"transport\": \"carrier-pigeon\", \"namespace\": \"deployment\", \"subject\": \"a@example.com\""
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/mod.rs#ThreadDb",
+        "name": "ThreadDb",
+        "kind": "struct",
+        "path": "src/adapters/persistence/thread/mod.rs",
+        "span": "L84-L92"
+      },
+      "path": "src/adapters/persistence/thread/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 87,
+          "text": "pub subject: String,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/mod.rs#ThreadIdentityRow",
+        "name": "ThreadIdentityRow",
+        "kind": "struct",
+        "path": "src/adapters/persistence/thread/mod.rs",
+        "span": "L95-L99"
+      },
+      "path": "src/adapters/persistence/thread/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 98,
+          "text": "subject: String,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/mod.rs#THREAD_SELECT",
+        "name": "THREAD_SELECT",
+        "kind": "constant",
+        "path": "src/adapters/persistence/thread/mod.rs",
+        "span": "L149-L177"
+      },
+      "path": "src/adapters/persistence/thread/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 150,
+          "text": "SELECT thread.id, thread.channel_id, thread.subject,"
+        },
+        {
+          "line": 162,
+          "text": "'subject', identity.subject)"
+        },
+        {
+          "line": 163,
+          "text": "ORDER BY identity.transport, identity.namespace, identity.subject)"
+        },
+        {
+          "line": 165,
+          "text": "SELECT DISTINCT handle.transport, handle.namespace, handle.subject"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/mod.rs#create_thread",
+        "name": "create_thread",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/mod.rs",
+        "span": "L304-L335"
+      },
+      "path": "src/adapters/persistence/thread/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 307,
+          "text": "subject: &str,"
+        },
+        {
+          "line": 313,
+          "text": "r#\"INSERT INTO threads (id, company_id, channel_id, subject)"
+        },
+        {
+          "line": 319,
+          "text": ".bind(subject)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/read_tests.rs#list_threads_updated_after_reads_forward_from_a_cursor",
+        "name": "list_threads_updated_after_reads_forward_from_a_cursor",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/read_tests.rs",
+        "span": "L238-L295"
+      },
+      "path": "src/adapters/persistence/thread/read_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 246,
+          "text": "for subject in [\"second\", \"third\"] {"
+        },
+        {
+          "line": 247,
+          "text": "threads.push(fixture.extra_thread(fixture.channel_id, subject).await);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/read_tests.rs#a_thread_records_its_parties_as_principals_and_projects_their_addresses",
+        "name": "a_thread_records_its_parties_as_principals_and_projects_their_addresses",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/read_tests.rs",
+        "span": "L405-L462"
+      },
+      "path": "src/adapters/persistence/thread/read_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 420,
+          "text": ".subjects_for(TransportKind::Email),"
+        },
+        {
+          "line": 446,
+          "text": ".subjects_for(TransportKind::Email),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/tests.rs#a_message_records_its_author_as_a_principal_and_projects_its_recipients",
+        "name": "a_message_records_its_author_as_a_principal_and_projects_its_recipients",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/tests.rs",
+        "span": "L854-L915"
+      },
+      "path": "src/adapters/persistence/thread/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 874,
+          "text": ".map(|identity| identity.subject().as_str()),"
+        },
+        {
+          "line": 877,
+          "text": "let participant_subjects = |kind| {"
+        },
+        {
+          "line": 882,
+          "text": ".map(|participant| participant.identity.subject().as_str())"
+        },
+        {
+          "line": 886,
+          "text": "participant_subjects(MessageParticipantKind::To),"
+        },
+        {
+          "line": 890,
+          "text": "participant_subjects(MessageParticipantKind::Cc),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/tests.rs#participants_keep_their_order_within_each_role_and_a_repeated_handle_lands_once",
+        "name": "participants_keep_their_order_within_each_role_and_a_repeated_handle_lands_once",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/tests.rs",
+        "span": "L921-L981"
+      },
+      "path": "src/adapters/persistence/thread/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 927,
+          "text": "r#\"SELECT participant.kind || ':' || participant.position || ':' || identity.subject"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/tests.rs#find_outbound_reply_after_sees_answers_and_ignores_relayed_mail",
+        "name": "find_outbound_reply_after_sees_answers_and_ignores_relayed_mail",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/tests.rs",
+        "span": "L1057-L1156"
+      },
+      "path": "src/adapters/persistence/thread/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1090,
+          "text": "subject: \"Relayed\".into(),"
+        },
+        {
+          "line": 1125,
+          "text": "subject: \"Re: Subject\".into(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/view_tests.rs#a_message_no_transport_carried_reads_back_through_every_projection",
+        "name": "a_message_no_transport_carried_reads_back_through_every_projection",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/view_tests.rs",
+        "span": "L41-L111"
+      },
+      "path": "src/adapters/persistence/thread/view_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 95,
+          "text": "assert_eq!(turn.subject, \"Nightly audit\");"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/views.rs#AUTHOR_COLUMNS",
+        "name": "AUTHOR_COLUMNS",
+        "kind": "constant",
+        "path": "src/adapters/persistence/thread/views.rs",
+        "span": "L45-L50"
+      },
+      "path": "src/adapters/persistence/thread/views.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 49,
+          "text": "author_identity.subject AS author_subject"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/views.rs#AuthorDb",
+        "name": "AuthorDb",
+        "kind": "struct",
+        "path": "src/adapters/persistence/thread/views.rs",
+        "span": "L64-L69"
+      },
+      "path": "src/adapters/persistence/thread/views.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 68,
+          "text": "author_subject: Option<String>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/views.rs#ThreadMessageDb",
+        "name": "ThreadMessageDb",
+        "kind": "struct",
+        "path": "src/adapters/persistence/thread/views.rs",
+        "span": "L95-L118"
+      },
+      "path": "src/adapters/persistence/thread/views.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 104,
+          "text": "subject: String,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/views.rs#AgentHistoryDb",
+        "name": "AgentHistoryDb",
+        "kind": "struct",
+        "path": "src/adapters/persistence/thread/views.rs",
+        "span": "L400-L409"
+      },
+      "path": "src/adapters/persistence/thread/views.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 406,
+          "text": "author_subject: Option<String>,"
+        },
+        {
+          "line": 407,
+          "text": "subject: String,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/views.rs#list_agent_history",
+        "name": "list_agent_history",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/views.rs",
+        "span": "L415-L479"
+      },
+      "path": "src/adapters/persistence/thread/views.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 421,
+          "text": "recent.author_label, recent.author_subject, recent.subject, recent.clean_text_body"
+        },
+        {
+          "line": 428,
+          "text": "author_identity.subject AS author_subject,"
+        },
+        {
+          "line": 429,
+          "text": "message.subject,"
+        },
+        {
+          "line": 473,
+          "text": "author_display: display_name(row.author_label, row.author_subject),"
+        },
+        {
+          "line": 474,
+          "text": "subject: row.subject,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/views.rs#EmailReplyContextDb",
+        "name": "EmailReplyContextDb",
+        "kind": "struct",
+        "path": "src/adapters/persistence/thread/views.rs",
+        "span": "L490-L497"
+      },
+      "path": "src/adapters/persistence/thread/views.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 493,
+          "text": "author_subject: Option<String>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/views.rs#latest_email_reply_context",
+        "name": "latest_email_reply_context",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/views.rs",
+        "span": "L504-L544"
+      },
+      "path": "src/adapters/persistence/thread/views.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 511,
+          "text": "author_identity.subject AS author_subject,"
+        },
+        {
+          "line": 515,
+          "text": "SELECT array_agg(identity.subject ORDER BY participant.position)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/views.rs#latest_replyable_email_context",
+        "name": "latest_replyable_email_context",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/views.rs",
+        "span": "L549-L593"
+      },
+      "path": "src/adapters/persistence/thread/views.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 556,
+          "text": "author_identity.subject AS author_subject,"
+        },
+        {
+          "line": 560,
+          "text": "SELECT array_agg(identity.subject ORDER BY participant.position)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/views.rs#email_reply_context",
+        "name": "email_reply_context",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/views.rs",
+        "span": "L595-L613"
+      },
+      "path": "src/adapters/persistence/thread/views.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 597,
+          "text": ".author_subject"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 10,
+    "baselineChars": 277297
+  }
+}

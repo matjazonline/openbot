@@ -1,0 +1,83 @@
+{
+  "pattern": "subject",
+  "filesSearched": 3,
+  "totalHits": 4,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/sendgrid/inbound.rs#apply_field",
+        "name": "apply_field",
+        "kind": "function",
+        "path": "src/adapters/sendgrid/inbound.rs",
+        "span": "L171-L187"
+      },
+      "path": "src/adapters/sendgrid/inbound.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 176,
+          "text": "\"subject\" => payload.subject = Some(value),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/sendgrid/inbound.rs#apply_payload",
+        "name": "apply_payload",
+        "kind": "function",
+        "path": "src/adapters/sendgrid/inbound.rs",
+        "span": "L189-L209"
+      },
+      "path": "src/adapters/sendgrid/inbound.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 190,
+          "text": "payload.subject = provider.subject;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/sendgrid/inbound.rs#SendGridPayload",
+        "name": "SendGridPayload",
+        "kind": "struct",
+        "path": "src/adapters/sendgrid/inbound.rs",
+        "span": "L35-L45"
+      },
+      "path": "src/adapters/sendgrid/inbound.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 39,
+          "text": "subject: Option<String>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/sendgrid/inbound.rs#the_envelope_is_the_routing_source_of_truth",
+        "name": "the_envelope_is_the_routing_source_of_truth",
+        "kind": "function",
+        "path": "src/adapters/sendgrid/inbound.rs",
+        "span": "L231-L255"
+      },
+      "path": "src/adapters/sendgrid/inbound.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 236,
+          "text": "subject: None,"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 10490
+  }
+}

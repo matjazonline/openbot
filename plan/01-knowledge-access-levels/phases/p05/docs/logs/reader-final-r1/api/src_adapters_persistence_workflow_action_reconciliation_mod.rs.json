@@ -1,0 +1,147 @@
+{
+  "file": "src/adapters/persistence/workflow/action_reconciliation/mod.rs",
+  "entries": [
+    {
+      "name": "delivery",
+      "kind": "module",
+      "span": "L3-L3",
+      "signature": "mod delivery;"
+    },
+    {
+      "name": "facts",
+      "kind": "module",
+      "span": "L4-L4",
+      "signature": "mod facts;"
+    },
+    {
+      "name": "resources",
+      "kind": "module",
+      "span": "L5-L5",
+      "signature": "mod resources;"
+    },
+    {
+      "name": "settlement",
+      "kind": "module",
+      "span": "L6-L6",
+      "signature": "mod settlement;"
+    },
+    {
+      "name": "SqlReconciliationResources",
+      "kind": "interface",
+      "span": "L27-L34",
+      "signature": "pub trait SqlReconciliationResources: Send + Sync"
+    },
+    {
+      "name": "lock_resource",
+      "kind": "function",
+      "span": "L28-L33",
+      "signature": "async fn lock_resource("
+    },
+    {
+      "name": "PostgresActionReconciliation",
+      "kind": "struct",
+      "span": "L36-L39",
+      "signature": "pub struct PostgresActionReconciliation<A>"
+    },
+    {
+      "name": "new",
+      "kind": "function",
+      "span": "L41-L46",
+      "signature": "pub fn new(persistence: PostgresPersistence, resources: A) -> Self"
+    },
+    {
+      "name": "association",
+      "kind": "function",
+      "span": "L51-L69",
+      "signature": "async fn association(&self, command: &ReconcileActionCommand) -> AppResult<RelatedAssociation>"
+    },
+    {
+      "name": "snapshot",
+      "kind": "function",
+      "span": "L73-L164",
+      "signature": "async fn snapshot("
+    },
+    {
+      "name": "settle",
+      "kind": "function",
+      "span": "L165-L173",
+      "signature": "async fn settle("
+    },
+    {
+      "name": "head_on",
+      "kind": "function",
+      "span": "L176-L187",
+      "signature": "async fn head_on("
+    },
+    {
+      "name": "FrozenRunRow",
+      "kind": "struct",
+      "span": "L190-L196",
+      "signature": "struct FrozenRunRow"
+    },
+    {
+      "name": "restore_on",
+      "kind": "function",
+      "span": "L198-L237",
+      "signature": "async fn restore_on("
+    },
+    {
+      "name": "marker_on",
+      "kind": "function",
+      "span": "L239-L249",
+      "signature": "async fn marker_on("
+    },
+    {
+      "name": "SavedCommand",
+      "kind": "struct",
+      "span": "L252-L257",
+      "signature": "struct SavedCommand"
+    },
+    {
+      "name": "replay_on",
+      "kind": "function",
+      "span": "L258-L287",
+      "signature": "async fn replay_on("
+    },
+    {
+      "name": "record_refusal_on",
+      "kind": "function",
+      "span": "L288-L302",
+      "signature": "async fn record_refusal_on("
+    },
+    {
+      "name": "overflow_on",
+      "kind": "function",
+      "span": "L303-L309",
+      "signature": "async fn overflow_on("
+    },
+    {
+      "name": "EntryRow",
+      "kind": "struct",
+      "span": "L311-L317",
+      "signature": "struct EntryRow"
+    },
+    {
+      "name": "entries_on",
+      "kind": "function",
+      "span": "L318-L337",
+      "signature": "async fn entries_on("
+    },
+    {
+      "name": "recorded",
+      "kind": "function",
+      "span": "L339-L344",
+      "signature": "fn recorded(action: FrozenAction, result: ReconciliationResult) -> ReconciliationPreparation"
+    },
+    {
+      "name": "refusal_result",
+      "kind": "function",
+      "span": "L345-L352",
+      "signature": "fn refusal_result(outcome: ReconciliationOutcome, revision: RunRevision) -> ReconciliationResult"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 15350
+  }
+}

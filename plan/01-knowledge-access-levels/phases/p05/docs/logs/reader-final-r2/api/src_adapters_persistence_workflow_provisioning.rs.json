@@ -1,0 +1,267 @@
+{
+  "file": "src/adapters/persistence/workflow/provisioning.rs",
+  "entries": [
+    {
+      "name": "ProvisioningActionAuthority",
+      "kind": "struct",
+      "span": "L33-L33",
+      "signature": "pub struct ProvisioningActionAuthority;"
+    },
+    {
+      "name": "lock_current",
+      "kind": "function",
+      "span": "L36-L55",
+      "signature": "async fn lock_current("
+    },
+    {
+      "name": "provisioning_status",
+      "kind": "function",
+      "span": "L58-L70",
+      "signature": "fn provisioning_status(company: CompanyId) -> AppResult<ResourceStatus>"
+    },
+    {
+      "name": "provisioning_target",
+      "kind": "function",
+      "span": "L72-L80",
+      "signature": "fn provisioning_target(target: &ActionTarget) -> AppResult<Uuid>"
+    },
+    {
+      "name": "provisioning_tool_request",
+      "kind": "function",
+      "span": "L85-L119",
+      "signature": "async fn provisioning_tool_request("
+    },
+    {
+      "name": "ProvisioningDeployment",
+      "kind": "struct",
+      "span": "L125-L129",
+      "signature": "pub struct ProvisioningDeployment"
+    },
+    {
+      "name": "new",
+      "kind": "function",
+      "span": "L131-L141",
+      "signature": "pub fn new("
+    },
+    {
+      "name": "catalogue",
+      "kind": "function",
+      "span": "L142-L144",
+      "signature": "pub fn catalogue(&self) -> &TemplateCatalogue"
+    },
+    {
+      "name": "ProvisioningEffects",
+      "kind": "struct",
+      "span": "L149-L151",
+      "signature": "pub struct ProvisioningEffects"
+    },
+    {
+      "name": "new",
+      "kind": "function",
+      "span": "L153-L155",
+      "signature": "pub fn new(templates: ProvisioningDeployment) -> Self"
+    },
+    {
+      "name": "apply",
+      "kind": "function",
+      "span": "L160-L205",
+      "signature": "async fn apply("
+    },
+    {
+      "name": "authorize_requester",
+      "kind": "function",
+      "span": "L210-L220",
+      "signature": "async fn authorize_requester("
+    },
+    {
+      "name": "requester_on",
+      "kind": "function",
+      "span": "L232-L285",
+      "signature": "async fn requester_on("
+    },
+    {
+      "name": "RequesterSource",
+      "kind": "enum",
+      "span": "L289-L296",
+      "signature": "enum RequesterSource"
+    },
+    {
+      "name": "requester_source",
+      "kind": "function",
+      "span": "L297-L313",
+      "signature": "fn requester_source(source_key: &str) -> RequesterSource"
+    },
+    {
+      "name": "ListedAgent",
+      "kind": "type",
+      "span": "L316-L322",
+      "signature": "type ListedAgent = ("
+    },
+    {
+      "name": "list_on",
+      "kind": "function",
+      "span": "L327-L372",
+      "signature": "async fn list_on(tx: &mut Transaction<'_, Postgres>, company: CompanyId) -> AppResult<Value>"
+    },
+    {
+      "name": "ready_models_on",
+      "kind": "function",
+      "span": "L376-L395",
+      "signature": "async fn ready_models_on("
+    },
+    {
+      "name": "AssistantAgent",
+      "kind": "enum",
+      "span": "L398-L403",
+      "signature": "pub(crate) enum AssistantAgent"
+    },
+    {
+      "name": "ProvisioningKey",
+      "kind": "struct",
+      "span": "L407-L407",
+      "signature": "pub(crate) struct ProvisioningKey([u8; 32]);"
+    },
+    {
+      "name": "invocation",
+      "kind": "function",
+      "span": "L409-L414",
+      "signature": "fn invocation(invocation: Uuid) -> Self"
+    },
+    {
+      "name": "command",
+      "kind": "function",
+      "span": "L415-L421",
+      "signature": "fn command(company: CompanyId, command_key: &str) -> Self"
+    },
+    {
+      "name": "id",
+      "kind": "function",
+      "span": "L423-L432",
+      "signature": "fn id(&self, role: &str) -> Uuid"
+    },
+    {
+      "name": "Provisioning",
+      "kind": "struct",
+      "span": "L435-L445",
+      "signature": "pub(crate) struct Provisioning"
+    },
+    {
+      "name": "ProvisionedAssistant",
+      "kind": "struct",
+      "span": "L447-L457",
+      "signature": "pub(crate) struct ProvisionedAssistant"
+    },
+    {
+      "name": "to_json",
+      "kind": "function",
+      "span": "L459-L469",
+      "signature": "pub(crate) fn to_json(&self) -> Value"
+    },
+    {
+      "name": "provision_guarded",
+      "kind": "function",
+      "span": "L476-L499",
+      "signature": "pub(crate) async fn provision_guarded("
+    },
+    {
+      "name": "taken_slug",
+      "kind": "function",
+      "span": "L503-L536",
+      "signature": "async fn taken_slug("
+    },
+    {
+      "name": "provision_on",
+      "kind": "function",
+      "span": "L541-L714",
+      "signature": "async fn provision_on("
+    },
+    {
+      "name": "agent_write",
+      "kind": "function",
+      "span": "L718-L789",
+      "signature": "async fn agent_write("
+    },
+    {
+      "name": "channel_write",
+      "kind": "function",
+      "span": "L793-L812",
+      "signature": "async fn channel_write("
+    },
+    {
+      "name": "compiled",
+      "kind": "function",
+      "span": "L817-L866",
+      "signature": "async fn compiled("
+    },
+    {
+      "name": "malformed",
+      "kind": "function",
+      "span": "L871-L882",
+      "signature": "fn malformed(noun: &str, slug: &str) -> Option<ProvisioningRefusal>"
+    },
+    {
+      "name": "refused",
+      "kind": "function",
+      "span": "L885-L890",
+      "signature": "fn refused(error: AppError) -> ProvisioningRefusal"
+    },
+    {
+      "name": "lifecycle_error",
+      "kind": "function",
+      "span": "L892-L900",
+      "signature": "fn lifecycle_error(error: LifecycleError) -> AppError"
+    },
+    {
+      "name": "AssistantChannelService",
+      "kind": "struct",
+      "span": "L905-L908",
+      "signature": "pub struct AssistantChannelService"
+    },
+    {
+      "name": "new",
+      "kind": "function",
+      "span": "L910-L915",
+      "signature": "pub fn new(persistence: PostgresPersistence, templates: ProvisioningDeployment) -> Self"
+    },
+    {
+      "name": "create_assistant_channel",
+      "kind": "function",
+      "span": "L920-L936",
+      "signature": "async fn create_assistant_channel("
+    },
+    {
+      "name": "assistant_channel_result",
+      "kind": "function",
+      "span": "L938-L957",
+      "signature": "async fn assistant_channel_result("
+    },
+    {
+      "name": "assistant_channel_on",
+      "kind": "function",
+      "span": "L961-L1030",
+      "signature": "pub(crate) async fn assistant_channel_on("
+    },
+    {
+      "name": "tests",
+      "kind": "module",
+      "span": "L1033-L1083",
+      "signature": "mod tests"
+    },
+    {
+      "name": "key",
+      "kind": "function",
+      "span": "L1038-L1042",
+      "signature": "fn key(source: TriggerSource) -> String"
+    },
+    {
+      "name": "requester_source_matches_each_stored_admission_source",
+      "kind": "function",
+      "span": "L1047-L1082",
+      "signature": "fn requester_source_matches_each_stored_admission_source()"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 41124
+  }
+}

@@ -1,0 +1,327 @@
+{
+  "file": "src/adapters/persistence/user.rs",
+  "entries": [
+    {
+      "name": "UserDb",
+      "kind": "struct",
+      "span": "L25-L34",
+      "signature": "pub struct UserDb"
+    },
+    {
+      "name": "NotificationPreferencesDb",
+      "kind": "struct",
+      "span": "L37-L40",
+      "signature": "struct NotificationPreferencesDb"
+    },
+    {
+      "name": "save_pending_registration",
+      "kind": "function",
+      "span": "L44-L66",
+      "signature": "async fn save_pending_registration(&self, pending: PendingRegistration<'_>) -> AppResult<()>"
+    },
+    {
+      "name": "confirm_pending_registration",
+      "kind": "function",
+      "span": "L68-L125",
+      "signature": "async fn confirm_pending_registration("
+    },
+    {
+      "name": "from",
+      "kind": "function",
+      "span": "L129-L140",
+      "signature": "fn from(user_db: UserDb) -> Self"
+    },
+    {
+      "name": "canonical_auth_identifier",
+      "kind": "function",
+      "span": "L145-L151",
+      "signature": "async fn canonical_auth_identifier(&self, value: &str) -> AppResult<String>"
+    },
+    {
+      "name": "reserve_login_attempt",
+      "kind": "function",
+      "span": "L153-L155",
+      "signature": "async fn reserve_login_attempt(&self, key: &AuthAttemptKey) -> AppResult<bool>"
+    },
+    {
+      "name": "clear_login_attempt",
+      "kind": "function",
+      "span": "L157-L159",
+      "signature": "async fn clear_login_attempt(&self, key: &AuthAttemptKey) -> AppResult<()>"
+    },
+    {
+      "name": "create_user",
+      "kind": "function",
+      "span": "L161-L191",
+      "signature": "async fn create_user("
+    },
+    {
+      "name": "notification_preferences",
+      "kind": "function",
+      "span": "L193-L213",
+      "signature": "async fn notification_preferences(&self, id: Uuid) -> AppResult<NotificationPreferences>"
+    },
+    {
+      "name": "set_notification_preferences",
+      "kind": "function",
+      "span": "L215-L250",
+      "signature": "async fn set_notification_preferences("
+    },
+    {
+      "name": "get_by_email",
+      "kind": "function",
+      "span": "L252-L263",
+      "signature": "async fn get_by_email(&self, email: &str) -> AppResult<Option<User>>"
+    },
+    {
+      "name": "get_by_username",
+      "kind": "function",
+      "span": "L265-L276",
+      "signature": "async fn get_by_username(&self, username: &str) -> AppResult<Option<User>>"
+    },
+    {
+      "name": "get_by_id",
+      "kind": "function",
+      "span": "L278-L289",
+      "signature": "async fn get_by_id(&self, id: Uuid) -> AppResult<Option<User>>"
+    },
+    {
+      "name": "update_avatar_url",
+      "kind": "function",
+      "span": "L291-L308",
+      "signature": "async fn update_avatar_url("
+    },
+    {
+      "name": "update_profile",
+      "kind": "function",
+      "span": "L313-L345",
+      "signature": "async fn update_profile("
+    },
+    {
+      "name": "update_profile_display",
+      "kind": "function",
+      "span": "L347-L365",
+      "signature": "async fn update_profile_display("
+    },
+    {
+      "name": "update_password_hash",
+      "kind": "function",
+      "span": "L367-L380",
+      "signature": "async fn update_password_hash(&self, id: Uuid, password_hash: &str) -> AppResult<Option<User>>"
+    },
+    {
+      "name": "activate_password",
+      "kind": "function",
+      "span": "L382-L404",
+      "signature": "async fn activate_password(&self, id: Uuid, password_hash: &str) -> AppResult<Option<User>>"
+    },
+    {
+      "name": "has_login_method",
+      "kind": "function",
+      "span": "L406-L415",
+      "signature": "async fn has_login_method(&self, id: Uuid, method: LoginMethod) -> AppResult<bool>"
+    },
+    {
+      "name": "create_external_user",
+      "kind": "function",
+      "span": "L417-L449",
+      "signature": "async fn create_external_user(&self, identity: ExternalIdentity<'_>) -> AppResult<User>"
+    },
+    {
+      "name": "get_by_external_subject",
+      "kind": "function",
+      "span": "L451-L469",
+      "signature": "async fn get_by_external_subject("
+    },
+    {
+      "name": "login_external_identity",
+      "kind": "function",
+      "span": "L471-L499",
+      "signature": "async fn login_external_identity("
+    },
+    {
+      "name": "link_external_identity",
+      "kind": "function",
+      "span": "L501-L536",
+      "signature": "async fn link_external_identity("
+    },
+    {
+      "name": "external_username",
+      "kind": "function",
+      "span": "L539-L562",
+      "signature": "fn external_username(display_name: Option<&str>, email: &str) -> String"
+    },
+    {
+      "name": "external_identity_conflict",
+      "kind": "function",
+      "span": "L564-L570",
+      "signature": "fn external_identity_conflict(err: sqlx::Error) -> AppError"
+    },
+    {
+      "name": "external_account_conflict",
+      "kind": "function",
+      "span": "L572-L578",
+      "signature": "fn external_account_conflict(err: sqlx::Error) -> AppError"
+    },
+    {
+      "name": "taken_identity_error",
+      "kind": "function",
+      "span": "L585-L604",
+      "signature": "fn taken_identity_error(err: sqlx::Error, profile: &ProfileUpdate<'_>) -> AppError"
+    },
+    {
+      "name": "is_unique_violation",
+      "kind": "function",
+      "span": "L608-L610",
+      "signature": "fn is_unique_violation(err: &sqlx::Error) -> bool"
+    },
+    {
+      "name": "PendingAccountChangeDb",
+      "kind": "struct",
+      "span": "L615-L619",
+      "signature": "struct PendingAccountChangeDb"
+    },
+    {
+      "name": "into_pending",
+      "kind": "function",
+      "span": "L625-L635",
+      "signature": "fn into_pending(self) -> Option<PendingChange>"
+    },
+    {
+      "name": "save_pending_account_change",
+      "kind": "function",
+      "span": "L640-L675",
+      "signature": "async fn save_pending_account_change("
+    },
+    {
+      "name": "confirm_pending_account_change",
+      "kind": "function",
+      "span": "L677-L783",
+      "signature": "async fn confirm_pending_account_change("
+    },
+    {
+      "name": "list_pending_account_changes",
+      "kind": "function",
+      "span": "L785-L802",
+      "signature": "async fn list_pending_account_changes(&self, user_id: Uuid) -> AppResult<Vec<PendingChange>>"
+    },
+    {
+      "name": "discard_pending_account_change",
+      "kind": "function",
+      "span": "L804-L819",
+      "signature": "async fn discard_pending_account_change("
+    },
+    {
+      "name": "locked_account_email",
+      "kind": "function",
+      "span": "L825-L836",
+      "signature": "async fn locked_account_email("
+    },
+    {
+      "name": "taken_address_error",
+      "kind": "function",
+      "span": "L840-L848",
+      "signature": "fn taken_address_error(err: sqlx::Error, address: Option<&str>) -> AppError"
+    },
+    {
+      "name": "tests",
+      "kind": "module",
+      "span": "L851-L1804",
+      "signature": "mod tests"
+    },
+    {
+      "name": "code_key",
+      "kind": "function",
+      "span": "L863-L869",
+      "signature": "fn code_key(id: Uuid, kind: AccountChangeKind) -> AuthAttemptKey"
+    },
+    {
+      "name": "account",
+      "kind": "function",
+      "span": "L871-L877",
+      "signature": "async fn account(persistence: &PostgresPersistence) -> User"
+    },
+    {
+      "name": "in_fifteen_minutes",
+      "kind": "function",
+      "span": "L879-L881",
+      "signature": "fn in_fifteen_minutes() -> DateTime<Utc>"
+    },
+    {
+      "name": "security_email_identity_proof_round_trips_and_stays_with_current_address",
+      "kind": "function",
+      "span": "L884-L994",
+      "signature": "async fn security_email_identity_proof_round_trips_and_stays_with_current_address()"
+    },
+    {
+      "name": "security_email_identity_registration_code_installs_proof_once",
+      "kind": "function",
+      "span": "L997-L1048",
+      "signature": "async fn security_email_identity_registration_code_installs_proof_once()"
+    },
+    {
+      "name": "security_email_identity_link_proof_is_atomic_and_idempotent",
+      "kind": "function",
+      "span": "L1051-L1137",
+      "signature": "async fn security_email_identity_link_proof_is_atomic_and_idempotent()"
+    },
+    {
+      "name": "security_email_identity_competing_claimants_verify_only_the_winner",
+      "kind": "function",
+      "span": "L1140-L1200",
+      "signature": "async fn security_email_identity_competing_claimants_verify_only_the_winner()"
+    },
+    {
+      "name": "security_email_identity_bypassed_address_claim_is_atomic_under_contention",
+      "kind": "function",
+      "span": "L1203-L1259",
+      "signature": "async fn security_email_identity_bypassed_address_claim_is_atomic_under_contention()"
+    },
+    {
+      "name": "security_email_identity_display_save_cannot_restore_address_confirmed_after_read",
+      "kind": "function",
+      "span": "L1262-L1303",
+      "signature": "async fn security_email_identity_display_save_cannot_restore_address_confirmed_after_read()"
+    },
+    {
+      "name": "a_confirmed_code_moves_the_address_and_cannot_be_spent_twice",
+      "kind": "function",
+      "span": "L1306-L1367",
+      "signature": "async fn a_confirmed_code_moves_the_address_and_cannot_be_spent_twice()"
+    },
+    {
+      "name": "a_wrong_or_expired_code_changes_nothing",
+      "kind": "function",
+      "span": "L1370-L1441",
+      "signature": "async fn a_wrong_or_expired_code_changes_nothing()"
+    },
+    {
+      "name": "each_kind_gets_one_request_and_a_second_ask_replaces_it",
+      "kind": "function",
+      "span": "L1444-L1511",
+      "signature": "async fn each_kind_gets_one_request_and_a_second_ask_replaces_it()"
+    },
+    {
+      "name": "an_address_taken_since_the_code_was_mailed_refuses_the_confirmation",
+      "kind": "function",
+      "span": "L1514-L1556",
+      "signature": "async fn an_address_taken_since_the_code_was_mailed_refuses_the_confirmation()"
+    },
+    {
+      "name": "notification_preferences_default_and_round_trip_every_email_family",
+      "kind": "function",
+      "span": "L1559-L1597",
+      "signature": "async fn notification_preferences_default_and_round_trip_every_email_family()"
+    },
+    {
+      "name": "accounts_only_receive_the_login_method_they_registered",
+      "kind": "function",
+      "span": "L1600-L1803",
+      "signature": "async fn accounts_only_receive_the_login_method_they_registered()"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 66199
+  }
+}

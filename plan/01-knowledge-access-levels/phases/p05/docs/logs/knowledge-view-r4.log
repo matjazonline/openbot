@@ -1,0 +1,30 @@
+
+running 16 tests
+test adapters::http::pages::tests::knowledge_views::knowledge_view_visibility_covers_all_levels ... ok
+test adapters::http::pages::tests::knowledge_views::knowledge_view_matching_level_and_owner_keep_full_message ... ok
+test adapters::http::pages::tests::knowledge_views::knowledge_view_simulation_outcomes_remove_run_choices_and_model_metadata ... ok
+test adapters::http::pages::workflow_decision::tests::knowledge_view_decision_redaction_never_echoes_proposal_comments_or_form_input ... ok
+test adapters::http::pages::tests::knowledge_views::knowledge_view_placeholder_contains_only_safe_attribution_and_position ... ok
+test adapters::http::routes::workflows::ui::runs::tests::pages_tests::knowledge_view_run_pane_drops_input_parameter_and_action_payloads ... ok
+test adapters::http::pages::workflow_decision::tests::knowledge_view_history_redaction_keeps_position_and_names_the_restriction ... ok
+test adapters::http::routes::ui::stream_tests::knowledge_views::knowledge_view_public_reader_has_placeholder_and_restricted_thread_title ... ok
+test adapters::http::routes::ui::stream_tests::knowledge_views::knowledge_view_live_stream_rechecks_level_after_demotion ... ok
+test adapters::http::routes::ui::stream_tests::knowledge_views::knowledge_view_attachment_denial_precedes_storage_and_filename_access ... ok
+test adapters::http::routes::ui::stream_tests::knowledge_views::knowledge_view_equal_level_and_owner_get_full_message_and_fresh_demotion_applies ... ok
+
+thread 'adapters::persistence::workflow::tests::message_tests::knowledge_delivery_views::knowledge_view_notification_email_and_in_app_projection_never_quote_classified_message' (30919111) panicked at src/adapters/persistence/workflow/knowledge_view_delivery_tests.rs:187:95:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "42703", message: "column notification.user_id does not exist", detail: None, hint: None, position: Some(Original(109)), where: None, schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("parse_relation.c"), line: Some(3859), routine: Some("errorMissingColumn") })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::persistence::workflow::tests::message_tests::knowledge_delivery_views::knowledge_view_notification_email_and_in_app_projection_never_quote_classified_message ... FAILED
+test adapters::persistence::workflow::tests::message_tests::knowledge_delivery_views::knowledge_view_delivery_subjects_use_current_level_and_foreign_id_is_concealed ... ok
+test adapters::persistence::workflow::tests::message_tests::knowledge_views::knowledge_view_refusal_attention_and_native_constraints_keep_only_historical_levels ... ok
+test adapters::persistence::workflow::tests::message_tests::knowledge_views::knowledge_view_current_run_and_step_stamp_controls_payloads ... ok
+test adapters::persistence::workflow::tests::message_tests::knowledge_views::knowledge_view_competing_readers_demotion_and_content_raise_use_final_facts ... ok
+
+failures:
+
+failures:
+    adapters::persistence::workflow::tests::message_tests::knowledge_delivery_views::knowledge_view_notification_email_and_in_app_projection_never_quote_classified_message
+
+test result: FAILED. 15 passed; 1 failed; 0 ignored; 0 measured; 2820 filtered out; finished in 2.01s
+

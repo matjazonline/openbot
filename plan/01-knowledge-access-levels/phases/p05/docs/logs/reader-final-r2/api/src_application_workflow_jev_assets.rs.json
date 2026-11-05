@@ -1,0 +1,207 @@
+{
+  "file": "src/application/workflow/jev_assets.rs",
+  "entries": [
+    {
+      "name": "MAX_ASSETS",
+      "kind": "constant",
+      "span": "L12-L12",
+      "signature": "pub const MAX_ASSETS: usize = 4;"
+    },
+    {
+      "name": "MAX_IMAGE_BYTES",
+      "kind": "constant",
+      "span": "L13-L13",
+      "signature": "pub const MAX_IMAGE_BYTES: usize = 24 * 1024;"
+    },
+    {
+      "name": "MAX_IMAGE_SIDE",
+      "kind": "constant",
+      "span": "L14-L14",
+      "signature": "pub const MAX_IMAGE_SIDE: u32 = 1024;"
+    },
+    {
+      "name": "MAX_IMAGE_PIXELS",
+      "kind": "constant",
+      "span": "L15-L15",
+      "signature": "pub const MAX_IMAGE_PIXELS: u64 = 1024 * 1024;"
+    },
+    {
+      "name": "AssetName",
+      "kind": "struct",
+      "span": "L19-L19",
+      "signature": "pub struct AssetName(String);"
+    },
+    {
+      "name": "as_str",
+      "kind": "function",
+      "span": "L21-L23",
+      "signature": "pub fn as_str(&self) -> &str"
+    },
+    {
+      "name": "ImageDigest",
+      "kind": "struct",
+      "span": "L27-L27",
+      "signature": "pub struct ImageDigest(String);"
+    },
+    {
+      "name": "of",
+      "kind": "function",
+      "span": "L29-L31",
+      "signature": "pub fn of(bytes: &[u8]) -> Self"
+    },
+    {
+      "name": "as_str",
+      "kind": "function",
+      "span": "L32-L34",
+      "signature": "pub fn as_str(&self) -> &str"
+    },
+    {
+      "name": "JevAssetRef",
+      "kind": "struct",
+      "span": "L38-L44",
+      "signature": "pub struct JevAssetRef"
+    },
+    {
+      "name": "channel_id",
+      "kind": "module",
+      "span": "L45-L58",
+      "signature": "mod channel_id"
+    },
+    {
+      "name": "serialize",
+      "kind": "function",
+      "span": "L47-L52",
+      "signature": "pub fn serialize<S: serde::Serializer>("
+    },
+    {
+      "name": "deserialize",
+      "kind": "function",
+      "span": "L53-L57",
+      "signature": "pub fn deserialize<'de, D: serde::Deserializer<'de>>("
+    },
+    {
+      "name": "thread_id",
+      "kind": "module",
+      "span": "L59-L72",
+      "signature": "mod thread_id"
+    },
+    {
+      "name": "serialize",
+      "kind": "function",
+      "span": "L61-L66",
+      "signature": "pub fn serialize<S: serde::Serializer>("
+    },
+    {
+      "name": "deserialize",
+      "kind": "function",
+      "span": "L67-L71",
+      "signature": "pub fn deserialize<'de, D: serde::Deserializer<'de>>("
+    },
+    {
+      "name": "JevAssetRefs",
+      "kind": "type",
+      "span": "L73-L73",
+      "signature": "pub type JevAssetRefs = BTreeMap<AssetName, JevAssetRef>;"
+    },
+    {
+      "name": "parse_assets",
+      "kind": "function",
+      "span": "L74-L118",
+      "signature": "pub fn parse_assets(value: Option<&Value>) -> Result<JevAssetRefs, &'static str>"
+    },
+    {
+      "name": "JevAssetLocation",
+      "kind": "struct",
+      "span": "L121-L126",
+      "signature": "pub struct JevAssetLocation"
+    },
+    {
+      "name": "JevAssetDirectory",
+      "kind": "interface",
+      "span": "L128-L133",
+      "signature": "pub trait JevAssetDirectory: Send + Sync"
+    },
+    {
+      "name": "locate_jev_assets",
+      "kind": "function",
+      "span": "L129-L132",
+      "signature": "async fn locate_jev_assets("
+    },
+    {
+      "name": "JevAssets",
+      "kind": "interface",
+      "span": "L135-L140",
+      "signature": "pub trait JevAssets: Send + Sync"
+    },
+    {
+      "name": "read",
+      "kind": "function",
+      "span": "L136-L139",
+      "signature": "async fn read("
+    },
+    {
+      "name": "JevImage",
+      "kind": "struct",
+      "span": "L142-L146",
+      "signature": "pub struct JevImage"
+    },
+    {
+      "name": "validate",
+      "kind": "function",
+      "span": "L148-L200",
+      "signature": "pub fn validate("
+    },
+    {
+      "name": "bytes",
+      "kind": "function",
+      "span": "L201-L203",
+      "signature": "pub fn bytes(&self) -> &[u8]"
+    },
+    {
+      "name": "format",
+      "kind": "function",
+      "span": "L204-L206",
+      "signature": "pub fn format(&self) -> &'static str"
+    },
+    {
+      "name": "pixels",
+      "kind": "function",
+      "span": "L207-L209",
+      "signature": "pub fn pixels(&self) -> u64"
+    },
+    {
+      "name": "JevAssetError",
+      "kind": "enum",
+      "span": "L212-L219",
+      "signature": "pub enum JevAssetError"
+    },
+    {
+      "name": "code",
+      "kind": "function",
+      "span": "L221-L230",
+      "signature": "pub fn code(self) -> &'static str"
+    },
+    {
+      "name": "retryable",
+      "kind": "function",
+      "span": "L231-L233",
+      "signature": "pub fn retryable(self) -> bool"
+    },
+    {
+      "name": "image_limits",
+      "kind": "function",
+      "span": "L236-L242",
+      "signature": "fn image_limits() -> image::Limits"
+    },
+    {
+      "name": "tests",
+      "kind": "module",
+      "span": "L245-L245",
+      "signature": "pub(crate) mod tests;"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 8012
+  }
+}

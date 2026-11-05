@@ -1,0 +1,325 @@
+{
+  "pattern": "subject",
+  "filesSearched": 12,
+  "totalHits": 27,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/application/transport/delivery.rs#from",
+        "name": "from",
+        "kind": "function",
+        "path": "src/application/transport/delivery.rs",
+        "span": "L610-L616"
+      },
+      "path": "src/application/transport/delivery.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 613,
+          "text": "subject: content.subject().to_string(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/transport/test_support.rs#email_identity",
+        "name": "email_identity",
+        "kind": "function",
+        "path": "src/application/transport/test_support.rs",
+        "span": "L29-L36"
+      },
+      "path": "src/application/transport/test_support.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 34,
+          "text": ".expect(\"a test address is a valid subject\"),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/transport/test_support.rs#draft_from",
+        "name": "draft_from",
+        "kind": "function",
+        "path": "src/application/transport/test_support.rs",
+        "span": "L39-L63"
+      },
+      "path": "src/application/transport/test_support.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 39,
+          "text": "pub fn draft_from(sender: &str, subject: &str, body: &str) -> InboundDraft {"
+        },
+        {
+          "line": 51,
+          "text": "content: CanonicalContent::parse(subject, body).expect(\"bounded test content\"),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/transport/bounded.rs#bounded_text_measures_bytes_rather_than_characters",
+        "name": "bounded_text_measures_bytes_rather_than_characters",
+        "kind": "function",
+        "path": "src/application/transport/bounded.rs",
+        "span": "L172-L176"
+      },
+      "path": "src/application/transport/bounded.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 173,
+          "text": "assert!(bounded_text(\"subject\", \"ab\", 2).is_ok());"
+        },
+        {
+          "line": 175,
+          "text": "assert!(bounded_text(\"subject\", \"🦀\", 2).is_err());"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/transport/delivery.rs#EmailThreading",
+        "name": "EmailThreading",
+        "kind": "enum",
+        "path": "src/application/transport/delivery.rs",
+        "span": "L451-L469"
+      },
+      "path": "src/application/transport/delivery.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 463,
+          "text": "/// key, so repeated mail about the same subject threads together in a recipient's client"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/transport/delivery.rs#CanonicalContentV1",
+        "name": "CanonicalContentV1",
+        "kind": "struct",
+        "path": "src/application/transport/delivery.rs",
+        "span": "L603-L607"
+      },
+      "path": "src/application/transport/delivery.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 605,
+          "text": "pub subject: String,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/transport/ingress.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 37,
+          "text": "/// The longest subject the canonical message will hold. RFC 5322's unfolded-line limit, which is"
+        },
+        {
+          "line": 100,
+          "text": "/// Constructed only through [`CanonicalContent::parse`], so an oversized subject or body is"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/transport/ingress.rs#CanonicalContent",
+        "name": "CanonicalContent",
+        "kind": "struct",
+        "path": "src/application/transport/ingress.rs",
+        "span": "L103-L106"
+      },
+      "path": "src/application/transport/ingress.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 104,
+          "text": "subject: String,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/transport/ingress.rs#parse",
+        "name": "parse",
+        "kind": "function",
+        "path": "src/application/transport/ingress.rs",
+        "span": "L109-L118"
+      },
+      "path": "src/application/transport/ingress.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 110,
+          "text": "subject: impl Into<String>,"
+        },
+        {
+          "line": 113,
+          "text": "let subject = sanitize_string(subject.into());"
+        },
+        {
+          "line": 115,
+          "text": "bounded_text(\"subject\", &subject, MAX_SUBJECT_BYTES)?;"
+        },
+        {
+          "line": 117,
+          "text": "Ok(Self { subject, body_text })"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/transport/ingress.rs#subject",
+        "name": "subject",
+        "kind": "function",
+        "path": "src/application/transport/ingress.rs",
+        "span": "L120-L122"
+      },
+      "path": "src/application/transport/ingress.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 120,
+          "text": "pub fn subject(&self) -> &str {"
+        },
+        {
+          "line": 121,
+          "text": "&self.subject"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/transport/ingress.rs#InboundEnvelope",
+        "name": "InboundEnvelope",
+        "kind": "struct",
+        "path": "src/application/transport/ingress.rs",
+        "span": "L348-L365"
+      },
+      "path": "src/application/transport/ingress.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 351,
+          "text": "/// Who sent it, qualified by the namespace their subject is unique in."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/transport/ingress.rs#ThreadTarget",
+        "name": "ThreadTarget",
+        "kind": "enum",
+        "path": "src/application/transport/ingress.rs",
+        "span": "L497-L500"
+      },
+      "path": "src/application/transport/ingress.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 499,
+          "text": "Create { subject: String },"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/transport/ingress.rs#canonical_content_strips_invisible_and_prompt_injection_characters",
+        "name": "canonical_content_strips_invisible_and_prompt_injection_characters",
+        "kind": "function",
+        "path": "src/application/transport/ingress.rs",
+        "span": "L668-L676"
+      },
+      "path": "src/application/transport/ingress.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 669,
+          "text": "let hostile_subject = \"Invoice\\u{200B} #1234\\u{E0001}\\u{E0020}\";"
+        },
+        {
+          "line": 673,
+          "text": "CanonicalContent::parse(hostile_subject, hostile_body).expect(\"valid bounded content\");"
+        },
+        {
+          "line": 674,
+          "text": "assert_eq!(content.subject(), \"Invoice #1234\");"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/transport/ingress.rs#content_is_refused_rather_than_truncated_when_it_exceeds_its_bound",
+        "name": "content_is_refused_rather_than_truncated_when_it_exceeds_its_bound",
+        "kind": "function",
+        "path": "src/application/transport/ingress.rs",
+        "span": "L679-L684"
+      },
+      "path": "src/application/transport/ingress.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 680,
+          "text": "assert!(CanonicalContent::parse(\"subject\", \"body\").is_ok());"
+        },
+        {
+          "line": 683,
+          "text": "assert!(CanonicalContent::parse(\"subject\", \"b\".repeat(MAX_BODY_BYTES + 1)).is_err());"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/transport/ports.rs#InternalRelayMail",
+        "name": "InternalRelayMail",
+        "kind": "struct",
+        "path": "src/application/transport/ports.rs",
+        "span": "L184-L202"
+      },
+      "path": "src/application/transport/ports.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 189,
+          "text": "pub subject: &'a str,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/transport/test_support.rs#envelope_from",
+        "name": "envelope_from",
+        "kind": "function",
+        "path": "src/application/transport/test_support.rs",
+        "span": "L66-L68"
+      },
+      "path": "src/application/transport/test_support.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 66,
+          "text": "pub fn envelope_from(sender: &str, subject: &str, body: &str) -> InboundEnvelope {"
+        },
+        {
+          "line": 67,
+          "text": "draft_from(sender, subject, body).bind(ChannelBindingId::random())"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 5,
+    "baselineChars": 86031
+  }
+}

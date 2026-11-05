@@ -1,0 +1,32 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 1,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_tests.rs#workflow_message_wait_cancel_supersedes_unsent_and_records_late_truth",
+        "name": "workflow_message_wait_cancel_supersedes_unsent_and_records_late_truth",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_tests.rs",
+        "span": "L340-L431"
+      },
+      "path": "src/adapters/persistence/workflow/message_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 346,
+          "text": "json!({\"content\":{\"literal\":{\"subject\":\"Status\",\"body\":\"Two recipients.\"}},"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 23503
+  }
+}

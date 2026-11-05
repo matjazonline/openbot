@@ -1,0 +1,99 @@
+{
+  "file": "src/adapters/http/pages/simulation/live.rs",
+  "entries": [
+    {
+      "name": "simulation_active_banner",
+      "kind": "function",
+      "span": "L3-L27",
+      "signature": "pub(crate) fn simulation_active_banner("
+    },
+    {
+      "name": "message_workflow_html",
+      "kind": "function",
+      "span": "L31-L54",
+      "signature": "fn message_workflow_html(msg: &ThreadMessageView, outcomes: &[&MessageBindingOutcome]) -> String"
+    },
+    {
+      "name": "binding_outcome_card",
+      "kind": "function",
+      "span": "L56-L93",
+      "signature": "fn binding_outcome_card(outcome: &MessageBindingOutcome) -> String"
+    },
+    {
+      "name": "admitted_run_detail",
+      "kind": "function",
+      "span": "L95-L165",
+      "signature": "fn admitted_run_detail(run: &AdmittedRun) -> String"
+    },
+    {
+      "name": "run_state_label",
+      "kind": "function",
+      "span": "L167-L186",
+      "signature": "fn run_state_label(state: RunState) -> String"
+    },
+    {
+      "name": "run_state_style",
+      "kind": "function",
+      "span": "L188-L200",
+      "signature": "fn run_state_style(state: RunState) -> &'static str"
+    },
+    {
+      "name": "message_bubble",
+      "kind": "function",
+      "span": "L203-L284",
+      "signature": "pub(crate) fn message_bubble("
+    },
+    {
+      "name": "thread_history_section",
+      "kind": "function",
+      "span": "L287-L337",
+      "signature": "pub(crate) fn thread_history_section("
+    },
+    {
+      "name": "ReplyFormFields",
+      "kind": "struct",
+      "span": "L340-L352",
+      "signature": "pub(crate) struct ReplyFormFields<'a>"
+    },
+    {
+      "name": "simulate_reply_form",
+      "kind": "function",
+      "span": "L354-L455",
+      "signature": "pub(crate) fn simulate_reply_form(fields: &ReplyFormFields<'_>) -> String"
+    },
+    {
+      "name": "simulation_live_view",
+      "kind": "function",
+      "span": "L467-L478",
+      "signature": "pub fn simulation_live_view("
+    },
+    {
+      "name": "SimulationThreadView",
+      "kind": "struct",
+      "span": "L484-L498",
+      "signature": "pub struct SimulationThreadView<'a>"
+    },
+    {
+      "name": "channel_simulation_loaded_thread_fragment",
+      "kind": "function",
+      "span": "L500-L571",
+      "signature": "pub fn channel_simulation_loaded_thread_fragment(view: &SimulationThreadView<'_>) -> String"
+    },
+    {
+      "name": "loaded_thread_overview_card",
+      "kind": "function",
+      "span": "L573-L627",
+      "signature": "pub(crate) fn loaded_thread_overview_card("
+    },
+    {
+      "name": "channel_simulation_thread_error_fragment",
+      "kind": "function",
+      "span": "L629-L675",
+      "signature": "pub fn channel_simulation_thread_error_fragment("
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 30867
+  }
+}

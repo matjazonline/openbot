@@ -1,0 +1,230 @@
+{
+  "pattern": "message_outcomes",
+  "filesSearched": 1136,
+  "totalHits": 16,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/channel/simulation.rs#load_simulation_thread_fragment",
+        "name": "load_simulation_thread_fragment",
+        "kind": "function",
+        "path": "src/adapters/http/routes/channel/simulation.rs",
+        "span": "L94-L144"
+      },
+      "path": "src/adapters/http/routes/channel/simulation.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 125,
+          "text": ".message_outcomes(company.id, thread.id, &message_ids)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/infra/setup.rs#http_state",
+        "name": "http_state",
+        "kind": "function",
+        "path": "src/infra/setup.rs",
+        "span": "L108-L148"
+      },
+      "path": "src/infra/setup.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 117,
+          "text": "message_outcomes: p.clone(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/app_state.rs#AppState",
+        "name": "AppState",
+        "kind": "struct",
+        "path": "src/adapters/http/app_state.rs",
+        "span": "L36-L94"
+      },
+      "path": "src/adapters/http/app_state.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 44,
+          "text": "pub message_outcomes: Arc<dyn crate::application::message_outcomes::MessageOutcomeReader>,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/http/app_state.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 199,
+          "text": "impl FromRef<AppState> for Arc<dyn crate::application::message_outcomes::MessageOutcomeReader> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/app_state.rs#from_ref~18",
+        "name": "from_ref~18",
+        "kind": "function",
+        "path": "src/adapters/http/app_state.rs",
+        "span": "L200-L202"
+      },
+      "path": "src/adapters/http/app_state.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 201,
+          "text": "state.message_outcomes.clone()"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/simulation/live.rs#SimulationThreadView",
+        "name": "SimulationThreadView",
+        "kind": "struct",
+        "path": "src/adapters/http/pages/simulation/live.rs",
+        "span": "L479-L493"
+      },
+      "path": "src/adapters/http/pages/simulation/live.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 490,
+          "text": "/// [`MessageOutcomeReader`]: crate::application::message_outcomes::MessageOutcomeReader"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/http/routes/channel.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 28,
+          "text": "use crate::application::message_outcomes::MessageOutcomeReader;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_intent_tests.rs#message_outcomes_lookup_and_activity_read_every_binding_of_a_message",
+        "name": "message_outcomes_lookup_and_activity_read_every_binding_of_a_message",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_intent_tests.rs",
+        "span": "L1397-L1503"
+      },
+      "path": "src/adapters/persistence/workflow/message_intent_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1397,
+          "text": "async fn message_outcomes_lookup_and_activity_read_every_binding_of_a_message() {"
+        },
+        {
+          "line": 1399,
+          "text": "message_outcomes::MessageOutcomeReader, thread_activity::ThreadActivityReader,"
+        },
+        {
+          "line": 1428,
+          "text": ".message_outcomes(company, s.thread, &[message])"
+        },
+        {
+          "line": 1465,
+          "text": ".message_outcomes(Uuid::new_v4(), s.thread, &[message])"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/message_outcomes.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 8,
+          "text": "application::message_outcomes::MessageOutcomeReader,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_outcomes.rs#message_outcomes",
+        "name": "message_outcomes",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_outcomes.rs",
+        "span": "L97-L145"
+      },
+      "path": "src/adapters/persistence/workflow/message_outcomes.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 97,
+          "text": "async fn message_outcomes("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/mod.rs#message_outcomes",
+        "name": "message_outcomes",
+        "kind": "module",
+        "path": "src/adapters/persistence/workflow/mod.rs",
+        "span": "L131-L131"
+      },
+      "path": "src/adapters/persistence/workflow/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 131,
+          "text": "mod message_outcomes;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/message_outcomes.rs#message_outcomes",
+        "name": "message_outcomes",
+        "kind": "function",
+        "path": "src/application/message_outcomes.rs",
+        "span": "L10-L15"
+      },
+      "path": "src/application/message_outcomes.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 10,
+          "text": "async fn message_outcomes("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/mod.rs#message_outcomes",
+        "name": "message_outcomes",
+        "kind": "module",
+        "path": "src/application/mod.rs",
+        "span": "L4-L4"
+      },
+      "path": "src/application/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 4,
+          "text": "pub mod message_outcomes;"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 10,
+    "baselineChars": 185742
+  }
+}

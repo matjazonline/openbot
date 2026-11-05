@@ -1,0 +1,105 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 16,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_reconcile_veto_tests.rs#workflow_message_reconcile_finality_breach_then_every_destination_final_vetoes_the_receipt",
+        "name": "workflow_message_reconcile_finality_breach_then_every_destination_final_vetoes_the_receipt",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_reconcile_veto_tests.rs",
+        "span": "L45-L160"
+      },
+      "path": "src/adapters/persistence/workflow/message_reconcile_veto_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 51,
+          "text": "let (sibling, subject) = ("
+        },
+        {
+          "line": 57,
+          "text": "send_unknown(&setup, subject).await;"
+        },
+        {
+          "line": 60,
+          "text": "ledger(&setup, subject, \"not_applied\", None, 60.0, None).await;"
+        },
+        {
+          "line": 61,
+          "text": "let proof = command(&setup, subject, \"breached-proof\", verified()).await;"
+        },
+        {
+          "line": 70,
+          "text": "send_unknown(&setup, subject).await;"
+        },
+        {
+          "line": 71,
+          "text": "ledger(&setup, subject, \"applied\", Some(accepted_at), 60.0, None).await;"
+        },
+        {
+          "line": 72,
+          "text": "let truth = command(&setup, subject, \"breaching-truth\", verified()).await;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_reconcile_veto_tests.rs#workflow_message_reconcile_sql_reopen_refuses_expired_non_final_and_foreign_evidence",
+        "name": "workflow_message_reconcile_sql_reopen_refuses_expired_non_final_and_foreign_evidence",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_reconcile_veto_tests.rs",
+        "span": "L193-L271"
+      },
+      "path": "src/adapters/persistence/workflow/message_reconcile_veto_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 197,
+          "text": "let (sibling, subject) = ("
+        },
+        {
+          "line": 202,
+          "text": "send_unknown(&setup, subject).await;"
+        },
+        {
+          "line": 203,
+          "text": "ledger(&setup, subject, \"not_applied\", None, 3.0, None).await;"
+        },
+        {
+          "line": 206,
+          "text": "&command(&setup, subject, \"sql-proof\", verified()).await,"
+        },
+        {
+          "line": 212,
+          "text": "// The resend is ambiguous again: the subject is unknown at its new attempt count."
+        },
+        {
+          "line": 213,
+          "text": "send_unknown(&setup, subject).await;"
+        },
+        {
+          "line": 216,
+          "text": "reopen_from(&setup, proof, subject).await.as_deref(),"
+        },
+        {
+          "line": 257,
+          "text": "reopen_from(&setup, proof, subject).await.as_deref(),"
+        },
+        {
+          "line": 265,
+          "text": "for delivery in [sibling, subject] {"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 17821
+  }
+}

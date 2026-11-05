@@ -1,0 +1,48 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 5,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/attention.rs#ATTENTION_SQL",
+        "name": "ATTENTION_SQL",
+        "kind": "constant",
+        "path": "src/adapters/persistence/attention.rs",
+        "span": "L87-L324"
+      },
+      "path": "src/adapters/persistence/attention.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 105,
+          "text": "CASE decision.subject_kind WHEN 'action_approval' THEN 'Protected-action approval · '"
+        },
+        {
+          "line": 107,
+          "text": "CASE decision.subject_kind"
+        },
+        {
+          "line": 141,
+          "text": "CASE decision.subject_kind WHEN 'action_approval' THEN 'Protected-action approval · '"
+        },
+        {
+          "line": 143,
+          "text": "CASE decision.subject_kind"
+        },
+        {
+          "line": 273,
+          "text": "message.subject,"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 26441
+  }
+}

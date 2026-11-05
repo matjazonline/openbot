@@ -1,0 +1,63 @@
+{
+  "file": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_assertions.rs",
+  "entries": [
+    {
+      "name": "EntryAccounting",
+      "kind": "struct",
+      "span": "L4-L8",
+      "signature": "pub(super) struct EntryAccounting"
+    },
+    {
+      "name": "subject_counts",
+      "kind": "function",
+      "span": "L10-L17",
+      "signature": "pub(super) async fn subject_counts("
+    },
+    {
+      "name": "available",
+      "kind": "function",
+      "span": "L19-L31",
+      "signature": "pub(super) async fn available("
+    },
+    {
+      "name": "assert_subject",
+      "kind": "function",
+      "span": "L33-L104",
+      "signature": "pub(super) async fn assert_subject("
+    },
+    {
+      "name": "reservation_delta",
+      "kind": "function",
+      "span": "L106-L125",
+      "signature": "pub(super) fn reservation_delta(before: &Value, after: &Value)"
+    },
+    {
+      "name": "clean_current",
+      "kind": "function",
+      "span": "L127-L146",
+      "signature": "pub(super) async fn clean_current(source: &HighSource)"
+    },
+    {
+      "name": "retry_delta",
+      "kind": "function",
+      "span": "L148-L204",
+      "signature": "pub(super) fn retry_delta("
+    },
+    {
+      "name": "retry_audit",
+      "kind": "function",
+      "span": "L206-L235",
+      "signature": "fn retry_audit(before: &Value, after: &Value, request: &ActionDispatchRequest, number: i32)"
+    },
+    {
+      "name": "native_catalog",
+      "kind": "function",
+      "span": "L237-L281",
+      "signature": "pub(super) async fn native_catalog(f: &AdmissionFixture) -> Value"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 11933
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 2,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/mcp.rs#effect_state",
+        "name": "effect_state",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/mcp.rs",
+        "span": "L338-L356"
+      },
+      "path": "src/adapters/persistence/workflow/mcp.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 341,
+          "text": "subject: &ApprovalSubject,"
+        },
+        {
+          "line": 345,
+          "text": ".bind(subject.invocation.as_uuid()).bind(subject.argument_digest.as_str()).fetch_optional(self.pool()).await?;"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 15311
+  }
+}

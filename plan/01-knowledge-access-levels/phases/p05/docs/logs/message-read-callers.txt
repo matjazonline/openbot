@@ -1,0 +1,2 @@
+⬆ graft 0.28.0 → 0.28.1 available: run `graft upgrade` (restart your agent after).
+✗ no symbol "src/adapters/persistence/thread/views.rs#list_thread_messages" in the graph — check spelling or run graft build

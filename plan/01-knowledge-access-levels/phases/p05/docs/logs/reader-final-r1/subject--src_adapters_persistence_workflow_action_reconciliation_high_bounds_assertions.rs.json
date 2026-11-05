@@ -1,0 +1,95 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 7,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_assertions.rs#assert_subject",
+        "name": "assert_subject",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_assertions.rs",
+        "span": "L33-L104"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_assertions.rs",
+      "inDegree": 7,
+      "hits": [
+        {
+          "line": 33,
+          "text": "pub(super) async fn assert_subject("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_assertions.rs#clean_current",
+        "name": "clean_current",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_assertions.rs",
+        "span": "L127-L146"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_assertions.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 130,
+          "text": "assert_subject(f, request, 130, \"processing\").await;"
+        },
+        {
+          "line": 132,
+          "text": "subject_counts(f, request).await,"
+        },
+        {
+          "line": 140,
+          "text": ".bind(request.scope().company.as_uuid()).bind(request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_assertions.rs#subject_counts",
+        "name": "subject_counts",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_assertions.rs",
+        "span": "L10-L17"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_assertions.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 10,
+          "text": "pub(super) async fn subject_counts("
+        },
+        {
+          "line": 15,
+          "text": ".bind(request.scope().company.as_uuid()).bind(request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_assertions.rs#available",
+        "name": "available",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_assertions.rs",
+        "span": "L19-L31"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_assertions.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 26,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 11933
+  }
+}

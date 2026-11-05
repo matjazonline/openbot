@@ -1,0 +1,218 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 28,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/user.rs#create_external_user",
+        "name": "create_external_user",
+        "kind": "function",
+        "path": "src/adapters/persistence/user.rs",
+        "span": "L417-L449"
+      },
+      "path": "src/adapters/persistence/user.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 439,
+          "text": "\"INSERT INTO user_login_methods (user_id, provider, provider_subject) VALUES ($1, $2, $3)\","
+        },
+        {
+          "line": 443,
+          "text": ".bind(identity.subject)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/user.rs#login_external_identity",
+        "name": "login_external_identity",
+        "kind": "function",
+        "path": "src/adapters/persistence/user.rs",
+        "span": "L471-L499"
+      },
+      "path": "src/adapters/persistence/user.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 488,
+          "text": "WHERE method.user_id = account.id AND method.provider = $1 AND method.provider_subject = $2"
+        },
+        {
+          "line": 493,
+          "text": ".bind(identity.subject)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/user.rs#link_external_identity",
+        "name": "link_external_identity",
+        "kind": "function",
+        "path": "src/adapters/persistence/user.rs",
+        "span": "L501-L536"
+      },
+      "path": "src/adapters/persistence/user.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 513,
+          "text": "\"INSERT INTO user_login_methods (user_id, provider, provider_subject) VALUES ($1, $2, $3)\","
+        },
+        {
+          "line": 517,
+          "text": ".bind(identity.subject)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/user.rs#get_by_external_subject",
+        "name": "get_by_external_subject",
+        "kind": "function",
+        "path": "src/adapters/persistence/user.rs",
+        "span": "L451-L469"
+      },
+      "path": "src/adapters/persistence/user.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 451,
+          "text": "async fn get_by_external_subject("
+        },
+        {
+          "line": 454,
+          "text": "subject: &str,"
+        },
+        {
+          "line": 461,
+          "text": "WHERE methods.provider = $1 AND methods.provider_subject = $2\"#,"
+        },
+        {
+          "line": 464,
+          "text": ".bind(subject)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/user.rs#security_email_identity_proof_round_trips_and_stays_with_current_address",
+        "name": "security_email_identity_proof_round_trips_and_stays_with_current_address",
+        "kind": "function",
+        "path": "src/adapters/persistence/user.rs",
+        "span": "L884-L994"
+      },
+      "path": "src/adapters/persistence/user.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 906,
+          "text": "let subject = format!(\"subject-{}\", Uuid::new_v4().simple());"
+        },
+        {
+          "line": 909,
+          "text": "subject: &subject,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/user.rs#security_email_identity_link_proof_is_atomic_and_idempotent",
+        "name": "security_email_identity_link_proof_is_atomic_and_idempotent",
+        "kind": "function",
+        "path": "src/adapters/persistence/user.rs",
+        "span": "L1051-L1137"
+      },
+      "path": "src/adapters/persistence/user.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1058,
+          "text": "let subject = format!(\"linked-{}\", Uuid::new_v4().simple());"
+        },
+        {
+          "line": 1061,
+          "text": "subject: &subject,"
+        },
+        {
+          "line": 1112,
+          "text": "let apple_subject = format!(\"apple-{}\", Uuid::new_v4().simple());"
+        },
+        {
+          "line": 1115,
+          "text": "subject: &apple_subject,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/user.rs#accounts_only_receive_the_login_method_they_registered",
+        "name": "accounts_only_receive_the_login_method_they_registered",
+        "kind": "function",
+        "path": "src/adapters/persistence/user.rs",
+        "span": "L1600-L1803"
+      },
+      "path": "src/adapters/persistence/user.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1629,
+          "text": "let google_subject = format!(\"google-subject-{suffix}\");"
+        },
+        {
+          "line": 1633,
+          "text": "subject: &google_subject,"
+        },
+        {
+          "line": 1654,
+          "text": ".get_by_external_subject(LoginMethod::Google, &google_subject)"
+        },
+        {
+          "line": 1663,
+          "text": ".get_by_external_subject(LoginMethod::Google, \"some-other-google-subject\")"
+        },
+        {
+          "line": 1689,
+          "text": "subject: \"some-other-google-subject\","
+        },
+        {
+          "line": 1701,
+          "text": "subject: &google_subject,"
+        },
+        {
+          "line": 1741,
+          "text": "let linked_subject = format!(\"linked-google-{suffix}\");"
+        },
+        {
+          "line": 1748,
+          "text": "subject: &linked_subject,"
+        },
+        {
+          "line": 1760,
+          "text": "subject: &linked_subject,"
+        },
+        {
+          "line": 1772,
+          "text": "let apple_subject = format!(\"apple-subject-{suffix}\");"
+        },
+        {
+          "line": 1776,
+          "text": "subject: &apple_subject,"
+        },
+        {
+          "line": 1793,
+          "text": "subject: &apple_subject,"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 66199
+  }
+}

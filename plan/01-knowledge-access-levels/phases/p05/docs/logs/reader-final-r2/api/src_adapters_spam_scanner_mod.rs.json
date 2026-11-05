@@ -1,0 +1,93 @@
+{
+  "file": "src/adapters/spam_scanner/mod.rs",
+  "entries": [
+    {
+      "name": "heuristic",
+      "kind": "module",
+      "span": "L9-L9",
+      "signature": "mod heuristic;"
+    },
+    {
+      "name": "NETWORK_TIMEOUT",
+      "kind": "constant",
+      "span": "L12-L12",
+      "signature": "const NETWORK_TIMEOUT: Duration = Duration::from_secs(5);"
+    },
+    {
+      "name": "CONNECT_TIMEOUT",
+      "kind": "constant",
+      "span": "L13-L13",
+      "signature": "const CONNECT_TIMEOUT: Duration = Duration::from_secs(2);"
+    },
+    {
+      "name": "MAX_RESPONSE_BYTES",
+      "kind": "constant",
+      "span": "L14-L14",
+      "signature": "const MAX_RESPONSE_BYTES: usize = 65_536;"
+    },
+    {
+      "name": "ExternalScannerSettings",
+      "kind": "enum",
+      "span": "L16-L19",
+      "signature": "pub enum ExternalScannerSettings"
+    },
+    {
+      "name": "SpamScannerSettings",
+      "kind": "struct",
+      "span": "L20-L24",
+      "signature": "pub struct SpamScannerSettings"
+    },
+    {
+      "name": "Backend",
+      "kind": "enum",
+      "span": "L25-L34",
+      "signature": "enum Backend"
+    },
+    {
+      "name": "SpamScannerAdapter",
+      "kind": "struct",
+      "span": "L35-L39",
+      "signature": "pub struct SpamScannerAdapter"
+    },
+    {
+      "name": "new",
+      "kind": "function",
+      "span": "L41-L80",
+      "signature": "pub fn new(settings: SpamScannerSettings) -> anyhow::Result<Self>"
+    },
+    {
+      "name": "external",
+      "kind": "function",
+      "span": "L82-L95",
+      "signature": "async fn external(&self, raw_mime: &[u8]) -> anyhow::Result<SpamScanResult>"
+    },
+    {
+      "name": "scan",
+      "kind": "function",
+      "span": "L99-L114",
+      "signature": "async fn scan(&self, input: SpamScanInput<'_>) -> SpamScanResult"
+    },
+    {
+      "name": "scan_rspamd",
+      "kind": "function",
+      "span": "L116-L151",
+      "signature": "async fn scan_rspamd("
+    },
+    {
+      "name": "scan_spamd",
+      "kind": "function",
+      "span": "L152-L191",
+      "signature": "async fn scan_spamd(endpoint: &str, raw_mime: &[u8]) -> anyhow::Result<SpamScanResult>"
+    },
+    {
+      "name": "tests",
+      "kind": "module",
+      "span": "L193-L193",
+      "signature": "mod tests;"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 7064
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 1,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/checkpoint_updates.rs#approved_settlement",
+        "name": "approved_settlement",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/checkpoint_updates.rs",
+        "span": "L75-L93"
+      },
+      "path": "src/adapters/persistence/workflow/checkpoint_updates.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 83,
+          "text": "AND decision.subject_kind='token_allowance' AND decision.token_stage='settlement'"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 4063
+  }
+}

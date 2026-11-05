@@ -1,0 +1,27 @@
+{
+  "file": "src/adapters/http/pages/workflow_decision/forms.rs",
+  "entries": [
+    {
+      "name": "submission",
+      "kind": "function",
+      "span": "L6-L42",
+      "signature": "pub(super) fn submission(view: &DecisionView, inputs: Option<&DecisionInputs>) -> String"
+    },
+    {
+      "name": "data",
+      "kind": "function",
+      "span": "L44-L88",
+      "signature": "fn data(view: &DecisionView, inputs: Option<&DecisionInputs>) -> String"
+    },
+    {
+      "name": "field_control",
+      "kind": "function",
+      "span": "L90-L149",
+      "signature": "fn field_control(field: &ParameterField, value: &str) -> String"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 7361
+  }
+}

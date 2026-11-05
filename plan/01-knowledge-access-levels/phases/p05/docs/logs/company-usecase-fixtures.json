@@ -1,0 +1,151 @@
+{
+  "pattern": "CompanyUseCases::new",
+  "filesSearched": 122,
+  "totalHits": 8,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/connection_level_tests.rs#new",
+        "name": "new",
+        "kind": "function",
+        "path": "src/adapters/http/routes/connection_level_tests.rs",
+        "span": "L107-L140"
+      },
+      "path": "src/adapters/http/routes/connection_level_tests.rs",
+      "inDegree": 7,
+      "hits": [
+        {
+          "line": 120,
+          "text": "company_use_cases: Arc::new(CompanyUseCases::new(shared.clone())),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/ui/authoring/tests.rs#ui",
+        "name": "ui",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/ui/authoring/tests.rs",
+        "span": "L50-L68"
+      },
+      "path": "src/adapters/http/routes/workflows/ui/authoring/tests.rs",
+      "inDegree": 7,
+      "hits": [
+        {
+          "line": 54,
+          "text": "companies: Arc::new(CompanyUseCases::new(shared.clone())),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_run_counts_tests.rs#workspace",
+        "name": "workspace",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui_run_counts_tests.rs",
+        "span": "L211-L230"
+      },
+      "path": "src/adapters/http/routes/ui_run_counts_tests.rs",
+      "inDegree": 5,
+      "hits": [
+        {
+          "line": 218,
+          "text": "companies: Arc::new(CompanyUseCases::new(f.persistence.clone())),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/authorization_test_support.rs#new",
+        "name": "new",
+        "kind": "function",
+        "path": "src/adapters/http/routes/authorization_test_support.rs",
+        "span": "L66-L138"
+      },
+      "path": "src/adapters/http/routes/authorization_test_support.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 104,
+          "text": "companies: Arc::new(CompanyUseCases::new(p.clone())),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/ui/runs/runs_tests.rs#ui_over",
+        "name": "ui_over",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/ui/runs/runs_tests.rs",
+        "span": "L328-L346"
+      },
+      "path": "src/adapters/http/routes/workflows/ui/runs/runs_tests.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 332,
+          "text": "companies: Arc::new(CompanyUseCases::new(shared.clone())),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/authorization_test_support.rs#failing_companies",
+        "name": "failing_companies",
+        "kind": "function",
+        "path": "src/adapters/http/routes/authorization_test_support.rs",
+        "span": "L181-L185"
+      },
+      "path": "src/adapters/http/routes/authorization_test_support.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 182,
+          "text": "Arc::new(CompanyUseCases::new(Arc::new("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_message_tests.rs#source",
+        "name": "source",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui_message_tests.rs",
+        "span": "L313-L323"
+      },
+      "path": "src/adapters/http/routes/ui_message_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 315,
+          "text": "State(Arc::new(CompanyUseCases::new(h.persistence.clone()))),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/ui/authoring/access_tests.rs#workflow_company_lookup_failures_remain_server_errors_on_pages_and_panes",
+        "name": "workflow_company_lookup_failures_remain_server_errors_on_pages_and_panes",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/ui/authoring/access_tests.rs",
+        "span": "L321-L359"
+      },
+      "path": "src/adapters/http/routes/workflows/ui/authoring/access_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 329,
+          "text": "let companies = Arc::new(CompanyUseCases::new(Arc::new("
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 7,
+    "baselineChars": 119711
+  }
+}

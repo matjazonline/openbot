@@ -1,0 +1,70 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 4,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_consumption_identity_tests.rs#assert_live_source",
+        "name": "assert_live_source",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_consumption_identity_tests.rs",
+        "span": "L99-L106"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_consumption_identity_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 104,
+          "text": ".bind(request.subject.invocation.as_uuid()).fetch_one(f.persistence().pool()).await.unwrap();"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_consumption_identity_tests.rs#reject_identity",
+        "name": "reject_identity",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_consumption_identity_tests.rs",
+        "span": "L237-L298"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_consumption_identity_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 270,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_consumption_identity_tests.rs#historical_entry",
+        "name": "historical_entry",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_consumption_identity_tests.rs",
+        "span": "L154-L184"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_consumption_identity_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 167,
+          "text": ".bind(request.scope().execution.as_uuid()).bind(request.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 168,
+          "text": ".bind(request.subject.argument_digest.as_str()).bind(marker).bind(entry)"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 18339
+  }
+}

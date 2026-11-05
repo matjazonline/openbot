@@ -1,0 +1,93 @@
+{
+  "file": "src/adapters/http/pages/workflow_decision.rs",
+  "entries": [
+    {
+      "name": "forms",
+      "kind": "module",
+      "span": "L6-L6",
+      "signature": "mod forms;"
+    },
+    {
+      "name": "DecisionOutcome",
+      "kind": "enum",
+      "span": "L8-L11",
+      "signature": "pub enum DecisionOutcome<'a>"
+    },
+    {
+      "name": "DecisionInputs",
+      "kind": "struct",
+      "span": "L15-L17",
+      "signature": "pub struct DecisionInputs"
+    },
+    {
+      "name": "DecisionFormInputs",
+      "kind": "enum",
+      "span": "L18-L21",
+      "signature": "pub enum DecisionFormInputs"
+    },
+    {
+      "name": "get",
+      "kind": "function",
+      "span": "L23-L25",
+      "signature": "pub fn get(&self, name: &str) -> Option<&str>"
+    },
+    {
+      "name": "workflow_decision_page",
+      "kind": "function",
+      "span": "L28-L36",
+      "signature": "pub fn workflow_decision_page(view: &DecisionView) -> String"
+    },
+    {
+      "name": "workflow_decision_section",
+      "kind": "function",
+      "span": "L38-L96",
+      "signature": "pub fn workflow_decision_section("
+    },
+    {
+      "name": "pretty",
+      "kind": "function",
+      "span": "L98-L100",
+      "signature": "fn pretty(value: &serde_json::Value) -> String"
+    },
+    {
+      "name": "context",
+      "kind": "function",
+      "span": "L102-L141",
+      "signature": "fn context(view: &DecisionView) -> String"
+    },
+    {
+      "name": "settled",
+      "kind": "function",
+      "span": "L143-L156",
+      "signature": "fn settled(view: &DecisionView, inputs: Option<&DecisionInputs>, open: bool) -> String"
+    },
+    {
+      "name": "history",
+      "kind": "function",
+      "span": "L158-L180",
+      "signature": "fn history(view: &DecisionView) -> String"
+    },
+    {
+      "name": "discussion",
+      "kind": "function",
+      "span": "L182-L217",
+      "signature": "fn discussion(view: &DecisionView, open: bool, inputs: Option<&DecisionInputs>) -> String"
+    },
+    {
+      "name": "workflow_source_message_page",
+      "kind": "function",
+      "span": "L220-L242",
+      "signature": "pub fn workflow_source_message_page("
+    },
+    {
+      "name": "tests",
+      "kind": "module",
+      "span": "L245-L245",
+      "signature": "mod tests;"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 11504
+  }
+}

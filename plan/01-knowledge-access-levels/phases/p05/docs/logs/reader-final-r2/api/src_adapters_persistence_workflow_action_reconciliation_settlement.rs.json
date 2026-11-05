@@ -1,0 +1,45 @@
+{
+  "file": "src/adapters/persistence/workflow/action_reconciliation/settlement.rs",
+  "entries": [
+    {
+      "name": "settle",
+      "kind": "function",
+      "span": "L5-L89",
+      "signature": "pub(super) async fn settle<A: SqlReconciliationResources>("
+    },
+    {
+      "name": "validate_token",
+      "kind": "function",
+      "span": "L91-L123",
+      "signature": "fn validate_token("
+    },
+    {
+      "name": "refusal_on",
+      "kind": "function",
+      "span": "L125-L172",
+      "signature": "async fn refusal_on("
+    },
+    {
+      "name": "continue_on",
+      "kind": "function",
+      "span": "L174-L222",
+      "signature": "async fn continue_on("
+    },
+    {
+      "name": "state_name",
+      "kind": "function",
+      "span": "L224-L233",
+      "signature": "fn state_name(state: RunState) -> &'static str"
+    },
+    {
+      "name": "waiting_reason",
+      "kind": "function",
+      "span": "L235-L247",
+      "signature": "fn waiting_reason(state: RunState) -> Option<&'static str>"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 10801
+  }
+}

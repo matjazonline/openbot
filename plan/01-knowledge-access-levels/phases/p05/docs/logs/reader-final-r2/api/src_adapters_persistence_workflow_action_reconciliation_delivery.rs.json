@@ -1,0 +1,45 @@
+{
+  "file": "src/adapters/persistence/workflow/action_reconciliation/delivery.rs",
+  "entries": [
+    {
+      "name": "Lock",
+      "kind": "enum",
+      "span": "L15-L18",
+      "signature": "pub(super) enum Lock"
+    },
+    {
+      "name": "SubjectRow",
+      "kind": "struct",
+      "span": "L21-L34",
+      "signature": "struct SubjectRow"
+    },
+    {
+      "name": "subject_on",
+      "kind": "function",
+      "span": "L38-L113",
+      "signature": "pub(super) async fn subject_on("
+    },
+    {
+      "name": "current_coverage_on",
+      "kind": "function",
+      "span": "L117-L130",
+      "signature": "pub(super) async fn current_coverage_on("
+    },
+    {
+      "name": "truth_on",
+      "kind": "function",
+      "span": "L133-L240",
+      "signature": "pub(super) async fn truth_on("
+    },
+    {
+      "name": "conflicted_on",
+      "kind": "function",
+      "span": "L242-L253",
+      "signature": "async fn conflicted_on("
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 11523
+  }
+}

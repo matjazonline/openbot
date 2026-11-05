@@ -1,0 +1,51 @@
+# KNOW-P05-G1 — decision revision 1
+
+Original authority: `plan/01-knowledge-access-levels/README.md` and `05-read-paths-ui-and-notifications.md`, all 05A–D. Starting/review base b7e63b01433ba7a77341ff6c7f158d75d082a8a2. No product changes yet. The single WB1 includes all viewer boundaries below, not separate layer reviews.
+
+## Decision 1: one policy and an explicit restricted projection
+
+Add pure domain `visible_to(viewer, stamp)` beside `may_release`. Application projections remove sensitive values before rendering or serialization; templates never receive the hidden subject/body/attachment names as hidden markup or attributes. A restricted message retains stable identity/cursor, author/channel-address attribution and time; it has explicit restricted state and the text “Restricted message”. Drop body, subject, attachments, response-contract details, internal-note content/controls and content diagnostics. Level 5 sees a stamp-5 message, owner 9 sees every valid stamp. Attachment lookup operates only on the projected message list, so denial precedes storage access and filename headers. Diagnostics/source-message links also require the message visibility decision.
+
+Existing channel/company/role guards remain independent and mandatory. No route broadens workflow manager-only access. Raw canonical persistence reads used by ingestion/delivery/workflow are not viewer grants; annotate their purposes in the reader audit.
+
+## Decision 2: fresh, final authorization reads rather than cached levels
+
+The read linearization point is a fresh database authority read AFTER all sensitive data has been loaded and BEFORE its projection is returned. Read failures fail closed. Never accept an AccessLevel from a client or a previously rendered header/session/cache.
+
+For messages the stored stamp is immutable, so the existing fresh joint role/level `ParticipantPersistence.access_context_for_user` after loading the message window is sufficient. A current owner is 9; former/non-members/external readers are 0; malformed authority errors. Company/channel/thread path authorization is repeated at the application viewer entry point (including each SSE batch). Viewer-facing history/exact/cursor reads require viewer plus scope. Existing raw persistence reads retain their internal uses and no direct viewer call remains. App projections are applied on every page, simulation, exact-source, download and SSE read.
+
+Thread cards and header/JSON titles currently use `threads.subject`, with no latest-message body excerpt. Protect that title conservatively by the maximum immutable message stamp in that thread, read in a single scoped batch after loading the thread rows. Then apply the fresh viewer level; replace the title with “Restricted message” below that stamp. Keep pagination/cursor position and existing channel visibility. This conservatively hides a title even if another turn is public, while individual public messages remain readable. The batch query is company scoped and avoids per-thread queries. No schema changes to Thread and no fabricated missing rows.
+
+For runs, do not authorize using an earlier RunView header followed by later step/payload reads. Each run/step projection finishes its own data reads, then performs ONE company/run/user-scoped SQL query joining the current run `content_level` with current account/company/member authority. The application applies `visible_to`. This final query is safe without a long read transaction because content_level is monotone and every payload was fetched before it: a concurrent raise cannot make an earlier payload more classified than the later stamp. A committed demotion before that final query applies immediately; a demotion after it is a subsequent read. Missing current resource/member facts cannot elevate a viewer. No lock is retained across network/HTML/storage work. Add a deterministic competing read/demotion and payload/raise test, not only sequential mocks.
+
+## Decision 3: all run payload surfaces, not only the first pane
+
+RunView and StepView have explicit restricted state/application projection methods. Below CURRENT content level redact run input/params, step frozen inputs/output, choices/routes, receipts/observations/tool payloads and any free-text diagnostics. Keep safe status/timing/step names and IDs required for navigation. Do not serialize hidden payloads in HTML/data attributes. Raw run-board/list/API summaries contain status/IDs/timing, not run input/output; audit and test this claim, and redact any payload-bearing field discovered. Run detail API action evidence/digests/routes also follow the conservative restricted projection.
+
+`run_bundle` is the static admitted workflow configuration, not observed run content. Its graph may still show step names/status; a restricted step must not render frozen agent instructions/tool definitions alongside hidden inputs. Keep existing configuration-management authorization. Child/lineage links carry only status and IDs; their own opened panes use their own current stamp, never the parent's lower stamp.
+
+Decision read models expose run proposals/comments/submissions and historical decisions. Extend the existing authorized decision read boundary to project below the owning run's CURRENT content level, disable forms/`can_submit`, and redact proposal/schema/free-text/choices/history payloads. Every historical entry must use its own run's stamp (batch read); never authorize a higher ancestor against a lower child. The read returned after submit/comment commands uses the same projection. Existing command authorization and idempotency remain; no content is returned by a blind command. Reviewer identity is not an exemption from levels.
+
+Delivery list/detail pages expose a stamped message subject and provider diagnostic detail. Require company/viewer scope on the read boundary; read message stamp and current viewer facts after loading delivery details, then redact subject and all potentially content-bearing free-text diagnostics below the stamp. Keep status, transport and timing. Raw worker delivery reads remain separate and unchanged. Preserve foreign-ID concealment.
+
+## Decision 4: durable safe refusal metadata, generic notifications
+
+Actual NotificationActionKind currently contains only DeliveryFailure. Both in-app entries and notification email composition contain fixed action label, company/channel labels and secure link, no canonical subject/body/excerpt. Preserve this generic output, annotate why there is no excerpt to gate, and verify with classified-message canaries and current recipients. Do not invent an excerpt notification flow.
+
+Attention must explain a knowledge release refusal with the thread/run identifiers and the two HISTORICAL levels. The existing action failure conversion drops those levels. Add a domain typed KnowledgeRefusal value (validated content/destination AccessLevels) carried by the canonical terminal StepFailure, set only when converting AppError::KnowledgeRelease. Preserve failure code, whole-run termination, no retries/error-route recovery, and uncertain-effect precedence. Persist only the safe two levels in nullable `task_attempts` columns, written with the existing lease-fenced retirement update in the same transaction. Add strict range/pair/code constraints to the init schema; no free-text diagnostic parsing, no message content, no generic JSON snapshot. Derive attention's fixed text from the matching terminal execution's refusal attempt, with run/thread IDs and numeric levels. Prevent a stale/foreign/earlier attempt from supplying metadata. Other failure types remain generic; malformed pairs fail closed. No compatibility handling/backfill. Reset only the owned p05 databases before migrations/SQLx prepare. Review the changed shared failure contract together with read paths; publish the accepted addition to later consumers in coordination.
+
+## Invariants / failure modes
+
+- Company/channel membership and access level stay separate; Owner=9; a higher level never grants channel access or managerial UI access.
+- Stable cursor/message identity and placeholder position. No subject/body/excerpt/attachment filename from restricted values in any rendered/serialized output.
+- Fail closed for database/out-of-scope/malformed facts; no level cached across SSE batches.
+- All sensitive data reads precede their final authority/stamp read. No second data fetch after the check without its own check.
+- Run stamp monotonicity is an existing accepted C002 invariant, not newly assumed from a header. Message stamps are immutable.
+- Fenced retirement persists safe metadata with the exact actual failure. Possible-effect evidence still wins and never becomes a new release refusal.
+- No model dependency/API/client or search work in this phase; C003 offline/model lifecycle remains unchanged. Q001 baseline debt is reserved for final p06.
+
+## Focused verification / whole WB1 acceptance
+
+Add nonzero `knowledge_view_` domain/application/native HTTP+DB checks: levels 0/5/9, owner identity rather than role input, full/placeholder/exact/SSE/reconnect/simulation/card JSON, attachment denial before storage/filename, tenant/path confusion, current demotion, race barriers, run/step/API/board/decision historical projection, generic notification content and safe attention levels. Extend actual production HTML-injection browser fixtures for the placeholder (both themes if styling is changed). Preserve existing behavior through affected thread/page/decision/delivery/notification/recovery tests and compile all callers. Re-run the exhaustive clean_text_body/subject/attachment inventory with zero truncated leaves; classify every production reader with either the current-viewer projection or a purpose comment explaining its internal use. Include aliases/body readers as discovered.
+
+Format, strict source whitespace, clippy, fresh own migrations, live SQLx prepare/check, offline all-target compile, focused native DB tests and browser checks are mandatory before WB1. Final whole-current-CI full suite remains phase06, including Q001 closure and image/model assertions. No full-suite claim or x86 inference claim in p05. Architecture G1 and entire WB1 each require independent Astra/high PASS plus root exact artifact recomputation. Only own p05 docs excluded; no deliverable/source exclusion.

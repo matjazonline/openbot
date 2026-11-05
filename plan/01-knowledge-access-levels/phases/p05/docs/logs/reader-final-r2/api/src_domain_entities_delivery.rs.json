@@ -1,0 +1,147 @@
+{
+  "file": "src/domain/entities/delivery.rs",
+  "entries": [
+    {
+      "name": "DeliveryEntry",
+      "kind": "struct",
+      "span": "L31-L62",
+      "signature": "pub struct DeliveryEntry"
+    },
+    {
+      "name": "attempts_remaining",
+      "kind": "function",
+      "span": "L67-L69",
+      "signature": "pub const fn attempts_remaining(&self) -> i32"
+    },
+    {
+      "name": "provider_message_keys",
+      "kind": "function",
+      "span": "L75-L79",
+      "signature": "pub fn provider_message_keys(&self) -> impl Iterator<Item = &str>"
+    },
+    {
+      "name": "part_progress",
+      "kind": "function",
+      "span": "L82-L89",
+      "signature": "pub fn part_progress(&self) -> (usize, usize)"
+    },
+    {
+      "name": "DeliveryPartEntry",
+      "kind": "struct",
+      "span": "L98-L107",
+      "signature": "pub struct DeliveryPartEntry"
+    },
+    {
+      "name": "DeliveryFilter",
+      "kind": "struct",
+      "span": "L111-L121",
+      "signature": "pub struct DeliveryFilter"
+    },
+    {
+      "name": "DeliveryQuery",
+      "kind": "struct",
+      "span": "L129-L137",
+      "signature": "pub struct DeliveryQuery"
+    },
+    {
+      "name": "DEFAULT_PAGE_SIZE",
+      "kind": "constant",
+      "span": "L140-L140",
+      "signature": "pub const DEFAULT_PAGE_SIZE: usize = 50;"
+    },
+    {
+      "name": "MAX_PAGE_SIZE",
+      "kind": "constant",
+      "span": "L141-L141",
+      "signature": "pub const MAX_PAGE_SIZE: usize = 100;"
+    },
+    {
+      "name": "new",
+      "kind": "function",
+      "span": "L143-L156",
+      "signature": "pub fn new(query: DeliveryQuery) -> Self"
+    },
+    {
+      "name": "page",
+      "kind": "function",
+      "span": "L158-L160",
+      "signature": "pub fn page(&self) -> usize"
+    },
+    {
+      "name": "limit",
+      "kind": "function",
+      "span": "L162-L164",
+      "signature": "pub fn limit(&self) -> usize"
+    },
+    {
+      "name": "offset",
+      "kind": "function",
+      "span": "L167-L172",
+      "signature": "pub fn offset(&self) -> i64"
+    },
+    {
+      "name": "probe_limit",
+      "kind": "function",
+      "span": "L176-L178",
+      "signature": "pub fn probe_limit(&self) -> i64"
+    },
+    {
+      "name": "split_probe",
+      "kind": "function",
+      "span": "L181-L185",
+      "signature": "pub fn split_probe(&self, mut entries: Vec<DeliveryEntry>) -> (Vec<DeliveryEntry>, bool)"
+    },
+    {
+      "name": "on_page",
+      "kind": "function",
+      "span": "L187-L192",
+      "signature": "pub fn on_page(self, page: usize) -> Self"
+    },
+    {
+      "name": "tests",
+      "kind": "module",
+      "span": "L196-L309",
+      "signature": "mod tests"
+    },
+    {
+      "name": "entry",
+      "kind": "function",
+      "span": "L199-L223",
+      "signature": "fn entry(parts: Vec<DeliveryPartEntry>) -> DeliveryEntry"
+    },
+    {
+      "name": "part",
+      "kind": "function",
+      "span": "L225-L236",
+      "signature": "fn part(index: u16, status: DeliveryPartStatus, key: Option<&str>) -> DeliveryPartEntry"
+    },
+    {
+      "name": "every_part_contributes_its_own_provider_key",
+      "kind": "function",
+      "span": "L241-L254",
+      "signature": "fn every_part_contributes_its_own_provider_key()"
+    },
+    {
+      "name": "paging_clamps_what_a_request_asks_for",
+      "kind": "function",
+      "span": "L257-L269",
+      "signature": "fn paging_clamps_what_a_request_asks_for()"
+    },
+    {
+      "name": "paging_to_another_page_keeps_what_was_filtered",
+      "kind": "function",
+      "span": "L272-L291",
+      "signature": "fn paging_to_another_page_keeps_what_was_filtered()"
+    },
+    {
+      "name": "probe_row_reports_a_next_page_without_being_shown",
+      "kind": "function",
+      "span": "L294-L308",
+      "signature": "fn probe_row_reports_a_next_page_without_being_shown()"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 11595
+  }
+}

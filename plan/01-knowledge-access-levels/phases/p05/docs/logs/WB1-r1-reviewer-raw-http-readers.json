@@ -1,0 +1,10 @@
+{
+  "pattern": "get_thread_by_id|list_threads_by_channel_id|list_threads_updated_after|list_thread_message_views|latest_email_reply_context|list_agent_history",
+  "filesSearched": 201,
+  "totalHits": 0,
+  "groups": [],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  }
+}

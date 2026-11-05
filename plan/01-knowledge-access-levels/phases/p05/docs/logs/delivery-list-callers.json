@@ -1,0 +1,66 @@
+{
+  "pattern": "list_company_deliveries",
+  "filesSearched": 1133,
+  "totalHits": 3,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_deliveries.rs#page",
+        "name": "page",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui_deliveries.rs",
+        "span": "L277-L285"
+      },
+      "path": "src/adapters/http/routes/ui_deliveries.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 281,
+          "text": ".list_company_deliveries(self.company.id, filter)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/delivery/read.rs#list_company_deliveries",
+        "name": "list_company_deliveries",
+        "kind": "function",
+        "path": "src/adapters/persistence/delivery/read.rs",
+        "span": "L63-L114"
+      },
+      "path": "src/adapters/persistence/delivery/read.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 63,
+          "text": "async fn list_company_deliveries("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/delivery.rs#list_company_deliveries",
+        "name": "list_company_deliveries",
+        "kind": "function",
+        "path": "src/application/use_cases/delivery.rs",
+        "span": "L25-L29"
+      },
+      "path": "src/application/use_cases/delivery.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 25,
+          "text": "async fn list_company_deliveries("
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 3,
+    "baselineChars": 21677
+  }
+}

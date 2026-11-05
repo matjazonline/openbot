@@ -1,0 +1,27 @@
+{
+  "file": "src/adapters/persistence/workflow/jev_assets.rs",
+  "entries": [
+    {
+      "name": "locate_jev_assets",
+      "kind": "function",
+      "span": "L11-L18",
+      "signature": "async fn locate_jev_assets("
+    },
+    {
+      "name": "locate",
+      "kind": "function",
+      "span": "L20-L70",
+      "signature": "async fn locate("
+    },
+    {
+      "name": "locate_on",
+      "kind": "function",
+      "span": "L74-L114",
+      "signature": "pub(super) async fn locate_on("
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 4168
+  }
+}

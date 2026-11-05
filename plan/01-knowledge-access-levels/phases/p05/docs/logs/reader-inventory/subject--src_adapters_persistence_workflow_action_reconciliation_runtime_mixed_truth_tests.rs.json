@@ -1,0 +1,49 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 2,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_tests.rs#recover_same_result",
+        "name": "recover_same_result",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_tests.rs",
+        "span": "L305-L357"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 309,
+          "text": ".bind(request.scope().company.as_uuid()).bind(request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_tests.rs#dispatch_genuine",
+        "name": "dispatch_genuine",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_tests.rs",
+        "span": "L390-L474"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 457,
+          "text": ".bind(h.requests[2].subject.invocation.as_uuid()).bind(good())"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 20386
+  }
+}

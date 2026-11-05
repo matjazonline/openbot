@@ -1,0 +1,81 @@
+{
+  "file": "src/application/workflow/http_runtime.rs",
+  "entries": [
+    {
+      "name": "HttpToolCall",
+      "kind": "struct",
+      "span": "L8-L13",
+      "signature": "pub struct HttpToolCall"
+    },
+    {
+      "name": "HttpActionPreparation",
+      "kind": "interface",
+      "span": "L15-L26",
+      "signature": "pub trait HttpActionPreparation: Send + Sync"
+    },
+    {
+      "name": "http_step_request",
+      "kind": "function",
+      "span": "L16-L20",
+      "signature": "async fn http_step_request("
+    },
+    {
+      "name": "http_tool_request",
+      "kind": "function",
+      "span": "L21-L25",
+      "signature": "async fn http_tool_request("
+    },
+    {
+      "name": "HttpActions",
+      "kind": "struct",
+      "span": "L29-L34",
+      "signature": "pub struct HttpActions<P, D, R>"
+    },
+    {
+      "name": "new",
+      "kind": "function",
+      "span": "L36-L43",
+      "signature": "pub fn new(persistence: P, dispatch: D, provider: R, lease: LeasePolicy) -> Self"
+    },
+    {
+      "name": "call_tool",
+      "kind": "function",
+      "span": "L48-L75",
+      "signature": "pub async fn call_tool("
+    },
+    {
+      "name": "step",
+      "kind": "function",
+      "span": "L78-L105",
+      "signature": "async fn step("
+    },
+    {
+      "name": "StepError",
+      "kind": "enum",
+      "span": "L107-L110",
+      "signature": "enum StepError"
+    },
+    {
+      "name": "supports",
+      "kind": "function",
+      "span": "L115-L117",
+      "signature": "fn supports(&self, kind: &WorkflowStepKind) -> bool"
+    },
+    {
+      "name": "execute",
+      "kind": "function",
+      "span": "L118-L124",
+      "signature": "async fn execute("
+    },
+    {
+      "name": "run",
+      "kind": "function",
+      "span": "L130-L162",
+      "signature": "pub async fn run("
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 5497
+  }
+}

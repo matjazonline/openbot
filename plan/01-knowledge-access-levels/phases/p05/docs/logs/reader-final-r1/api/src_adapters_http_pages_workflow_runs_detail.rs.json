@@ -1,0 +1,129 @@
+{
+  "file": "src/adapters/http/pages/workflow_runs/detail.rs",
+  "entries": [
+    {
+      "name": "MAX_JSON_PREVIEW_BYTES",
+      "kind": "constant",
+      "span": "L10-L10",
+      "signature": "pub const MAX_JSON_PREVIEW_BYTES: usize = 32 * 1024;"
+    },
+    {
+      "name": "json_preview",
+      "kind": "function",
+      "span": "L13-L32",
+      "signature": "pub fn json_preview(value: &serde_json::Value) -> String"
+    },
+    {
+      "name": "RunBanner",
+      "kind": "enum",
+      "span": "L35-L38",
+      "signature": "pub enum RunBanner<'a>"
+    },
+    {
+      "name": "RunPaneView",
+      "kind": "struct",
+      "span": "L40-L53",
+      "signature": "pub struct RunPaneView<'a>"
+    },
+    {
+      "name": "person",
+      "kind": "function",
+      "span": "L55-L60",
+      "signature": "fn person(people: &HashMap<Uuid, String>, user: Uuid) -> String"
+    },
+    {
+      "name": "run_pane_attrs",
+      "kind": "function",
+      "span": "L64-L70",
+      "signature": "pub fn run_pane_attrs(company_id: Uuid, run: Uuid) -> String"
+    },
+    {
+      "name": "run_link",
+      "kind": "function",
+      "span": "L72-L78",
+      "signature": "pub(super) fn run_link(company_id: Uuid, run: Uuid) -> String"
+    },
+    {
+      "name": "control_key",
+      "kind": "function",
+      "span": "L88-L115",
+      "signature": "pub fn control_key("
+    },
+    {
+      "name": "run_ended",
+      "kind": "function",
+      "span": "L118-L120",
+      "signature": "pub fn run_ended(state: &str) -> bool"
+    },
+    {
+      "name": "run_pane",
+      "kind": "function",
+      "span": "L124-L144",
+      "signature": "pub fn run_pane(view: &RunPaneView<'_>) -> String"
+    },
+    {
+      "name": "run_body",
+      "kind": "function",
+      "span": "L156-L216",
+      "signature": "pub fn run_body(view: &RunPaneView<'_>) -> String"
+    },
+    {
+      "name": "facts",
+      "kind": "function",
+      "span": "L218-L316",
+      "signature": "fn facts(view: &RunPaneView<'_>) -> String"
+    },
+    {
+      "name": "controls",
+      "kind": "function",
+      "span": "L318-L416",
+      "signature": "fn controls(view: &RunPaneView<'_>) -> String"
+    },
+    {
+      "name": "Entry",
+      "kind": "struct",
+      "span": "L419-L422",
+      "signature": "struct Entry"
+    },
+    {
+      "name": "timeline",
+      "kind": "function",
+      "span": "L424-L528",
+      "signature": "fn timeline(view: &RunPaneView<'_>) -> String"
+    },
+    {
+      "name": "steps",
+      "kind": "function",
+      "span": "L530-L580",
+      "signature": "fn steps(view: &RunPaneView<'_>) -> String"
+    },
+    {
+      "name": "waits",
+      "kind": "function",
+      "span": "L582-L612",
+      "signature": "fn waits(view: &RunPaneView<'_>) -> String"
+    },
+    {
+      "name": "actions",
+      "kind": "function",
+      "span": "L614-L671",
+      "signature": "fn actions(view: &RunPaneView<'_>) -> String"
+    },
+    {
+      "name": "reconcile_form",
+      "kind": "function",
+      "span": "L675-L725",
+      "signature": "fn reconcile_form("
+    },
+    {
+      "name": "children",
+      "kind": "function",
+      "span": "L727-L764",
+      "signature": "fn children(view: &RunPaneView<'_>) -> String"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 32247
+  }
+}

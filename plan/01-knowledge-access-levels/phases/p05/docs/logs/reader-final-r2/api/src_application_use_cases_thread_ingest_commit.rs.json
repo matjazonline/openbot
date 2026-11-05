@@ -1,0 +1,141 @@
+{
+  "file": "src/application/use_cases/thread/ingest/commit.rs",
+  "entries": [
+    {
+      "name": "PreparedChannel",
+      "kind": "struct",
+      "span": "L25-L35",
+      "signature": "pub(crate) struct PreparedChannel"
+    },
+    {
+      "name": "PreparedChannels",
+      "kind": "struct",
+      "span": "L38-L47",
+      "signature": "pub(crate) struct PreparedChannels"
+    },
+    {
+      "name": "CommitPlan",
+      "kind": "struct",
+      "span": "L50-L60",
+      "signature": "pub(crate) struct CommitPlan"
+    },
+    {
+      "name": "build",
+      "kind": "function",
+      "span": "L63-L122",
+      "signature": "pub(crate) fn build("
+    },
+    {
+      "name": "request",
+      "kind": "function",
+      "span": "L124-L138",
+      "signature": "pub(crate) fn request(&self) -> InboundCommitRequest"
+    },
+    {
+      "name": "replace_attachments",
+      "kind": "function",
+      "span": "L140-L148",
+      "signature": "pub(crate) fn replace_attachments("
+    },
+    {
+      "name": "envelope",
+      "kind": "function",
+      "span": "L150-L152",
+      "signature": "pub(crate) const fn envelope(&self) -> &InboundEnvelope"
+    },
+    {
+      "name": "company_id",
+      "kind": "function",
+      "span": "L154-L156",
+      "signature": "pub(crate) const fn company_id(&self) -> Uuid"
+    },
+    {
+      "name": "disposition",
+      "kind": "function",
+      "span": "L158-L160",
+      "signature": "pub(crate) const fn disposition(&self) -> MessageDisposition"
+    },
+    {
+      "name": "reply_delivery",
+      "kind": "function",
+      "span": "L162-L164",
+      "signature": "pub(crate) const fn reply_delivery(&self) -> ReplyDelivery"
+    },
+    {
+      "name": "channels",
+      "kind": "function",
+      "span": "L166-L168",
+      "signature": "pub(crate) fn channels(&self) -> usize"
+    },
+    {
+      "name": "into_prepared",
+      "kind": "function",
+      "span": "L170-L172",
+      "signature": "pub(crate) fn into_prepared(self) -> PreparedChannels"
+    },
+    {
+      "name": "inbound_origin",
+      "kind": "function",
+      "span": "L175-L181",
+      "signature": "const fn inbound_origin(origin: IngressOrigin) -> InboundOrigin"
+    },
+    {
+      "name": "tests",
+      "kind": "module",
+      "span": "L184-L368",
+      "signature": "mod tests"
+    },
+    {
+      "name": "company",
+      "kind": "function",
+      "span": "L205-L215",
+      "signature": "fn company() -> Company"
+    },
+    {
+      "name": "channel",
+      "kind": "function",
+      "span": "L217-L234",
+      "signature": "fn channel(company_id: Uuid, slug: &str) -> Channel"
+    },
+    {
+      "name": "identity",
+      "kind": "function",
+      "span": "L236-L242",
+      "signature": "fn identity(address: &str) -> QualifiedIdentity"
+    },
+    {
+      "name": "draft",
+      "kind": "function",
+      "span": "L244-L264",
+      "signature": "fn draft(disposition: MessageDisposition) -> InboundDraft"
+    },
+    {
+      "name": "prepared_channel",
+      "kind": "function",
+      "span": "L266-L287",
+      "signature": "fn prepared_channel(company: &Company, slug: &str, role: RecipientRole) -> PreparedChannel"
+    },
+    {
+      "name": "plan_with_disposition",
+      "kind": "function",
+      "span": "L289-L310",
+      "signature": "fn plan_with_disposition("
+    },
+    {
+      "name": "every_association_gets_an_intent_with_its_own_facts",
+      "kind": "function",
+      "span": "L316-L349",
+      "signature": "fn every_association_gets_an_intent_with_its_own_facts()"
+    },
+    {
+      "name": "a_file_only_message_has_intents_that_admit_nothing",
+      "kind": "function",
+      "span": "L354-L367",
+      "signature": "fn a_file_only_message_has_intents_that_admit_nothing()"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 14273
+  }
+}

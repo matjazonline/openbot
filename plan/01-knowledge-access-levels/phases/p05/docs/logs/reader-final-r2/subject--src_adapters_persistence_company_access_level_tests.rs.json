@@ -1,0 +1,32 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 1,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/company_access_level_tests.rs#access_level_joint_readers_external_observed_and_former_members_are_public",
+        "name": "access_level_joint_readers_external_observed_and_former_members_are_public",
+        "kind": "function",
+        "path": "src/adapters/persistence/company_access_level_tests.rs",
+        "span": "L229-L282"
+      },
+      "path": "src/adapters/persistence/company_access_level_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 256,
+          "text": "\"UPDATE participant_identities SET status='observed' WHERE company_id=$1 AND subject=$2\","
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 10967
+  }
+}

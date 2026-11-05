@@ -1,0 +1,117 @@
+{
+  "file": "src/application/workflow/actions/contracts.rs",
+  "entries": [
+    {
+      "name": "ActionScope",
+      "kind": "struct",
+      "span": "L9-L13",
+      "signature": "pub struct ActionScope"
+    },
+    {
+      "name": "ActionTarget",
+      "kind": "enum",
+      "span": "L18-L27",
+      "signature": "pub enum ActionTarget"
+    },
+    {
+      "name": "ActionPolicyContext",
+      "kind": "struct",
+      "span": "L32-L36",
+      "signature": "pub struct ActionPolicyContext"
+    },
+    {
+      "name": "ModelToolCallId",
+      "kind": "struct",
+      "span": "L40-L40",
+      "signature": "pub struct ModelToolCallId(String);"
+    },
+    {
+      "name": "parse",
+      "kind": "function",
+      "span": "L42-L49",
+      "signature": "pub fn parse(value: impl Into<String>) -> AppResult<Self>"
+    },
+    {
+      "name": "as_str",
+      "kind": "function",
+      "span": "L50-L52",
+      "signature": "pub fn as_str(&self) -> &str"
+    },
+    {
+      "name": "deserialize",
+      "kind": "function",
+      "span": "L55-L57",
+      "signature": "fn deserialize<D: serde::Deserializer<'de>>(decoder: D) -> Result<Self, D::Error>"
+    },
+    {
+      "name": "ApprovalSubject",
+      "kind": "struct",
+      "span": "L62-L65",
+      "signature": "pub struct ApprovalSubject"
+    },
+    {
+      "name": "ArgumentDigest",
+      "kind": "struct",
+      "span": "L69-L69",
+      "signature": "pub struct ArgumentDigest(pub(super) String);"
+    },
+    {
+      "name": "as_str",
+      "kind": "function",
+      "span": "L71-L73",
+      "signature": "pub fn as_str(&self) -> &str"
+    },
+    {
+      "name": "deserialize",
+      "kind": "function",
+      "span": "L76-L86",
+      "signature": "fn deserialize<D: serde::Deserializer<'de>>(decoder: D) -> Result<Self, D::Error>"
+    },
+    {
+      "name": "ActionIntent",
+      "kind": "struct",
+      "span": "L91-L97",
+      "signature": "pub struct ActionIntent"
+    },
+    {
+      "name": "approval_subject",
+      "kind": "function",
+      "span": "L99-L104",
+      "signature": "pub fn approval_subject(&self) -> ApprovalSubject"
+    },
+    {
+      "name": "ActionPolicyDecision",
+      "kind": "enum",
+      "span": "L109-L112",
+      "signature": "pub enum ActionPolicyDecision"
+    },
+    {
+      "name": "ActionIdempotencyKey",
+      "kind": "struct",
+      "span": "L115-L115",
+      "signature": "pub struct ActionIdempotencyKey(pub(super) String);"
+    },
+    {
+      "name": "as_str",
+      "kind": "function",
+      "span": "L117-L119",
+      "signature": "pub fn as_str(&self) -> &str"
+    },
+    {
+      "name": "ActionReceipt",
+      "kind": "struct",
+      "span": "L125-L128",
+      "signature": "pub struct ActionReceipt"
+    },
+    {
+      "name": "invalid",
+      "kind": "function",
+      "span": "L130-L132",
+      "signature": "pub(super) fn invalid() -> AppError"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 4027
+  }
+}

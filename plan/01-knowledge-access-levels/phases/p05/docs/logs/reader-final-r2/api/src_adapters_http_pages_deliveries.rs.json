@@ -1,0 +1,147 @@
+{
+  "file": "src/adapters/http/pages/deliveries.rs",
+  "entries": [
+    {
+      "name": "DeliveryList",
+      "kind": "struct",
+      "span": "L18-L25",
+      "signature": "pub struct DeliveryList<'a>"
+    },
+    {
+      "name": "DeliveriesPage",
+      "kind": "struct",
+      "span": "L28-L36",
+      "signature": "pub struct DeliveriesPage<'a>"
+    },
+    {
+      "name": "DeliveryDetailPane",
+      "kind": "struct",
+      "span": "L39-L44",
+      "signature": "pub struct DeliveryDetailPane<'a>"
+    },
+    {
+      "name": "delivery_query",
+      "kind": "function",
+      "span": "L48-L79",
+      "signature": "pub fn delivery_query("
+    },
+    {
+      "name": "delivery_url",
+      "kind": "function",
+      "span": "L81-L90",
+      "signature": "fn delivery_url("
+    },
+    {
+      "name": "delivery_list_url",
+      "kind": "function",
+      "span": "L92-L101",
+      "signature": "fn delivery_list_url("
+    },
+    {
+      "name": "deliveries_page",
+      "kind": "function",
+      "span": "L103-L127",
+      "signature": "pub fn deliveries_page(page: &DeliveriesPage<'_>) -> String"
+    },
+    {
+      "name": "delivery_filter_form",
+      "kind": "function",
+      "span": "L133-L206",
+      "signature": "fn delivery_filter_form(company_id: Uuid, channels: &[Channel], filter: &DeliveryFilter) -> String"
+    },
+    {
+      "name": "delivery_list",
+      "kind": "function",
+      "span": "L210-L243",
+      "signature": "pub fn delivery_list(list: &DeliveryList<'_>, swap: FragmentSwap) -> String"
+    },
+    {
+      "name": "delivery_page_summary",
+      "kind": "function",
+      "span": "L246-L266",
+      "signature": "fn delivery_page_summary(list: &DeliveryList<'_>) -> String"
+    },
+    {
+      "name": "delivery_menu_entry",
+      "kind": "function",
+      "span": "L268-L303",
+      "signature": "fn delivery_menu_entry(list: &DeliveryList<'_>, entry: &DeliveryEntry) -> String"
+    },
+    {
+      "name": "destination_of",
+      "kind": "function",
+      "span": "L306-L311",
+      "signature": "fn destination_of(entry: &DeliveryEntry) -> String"
+    },
+    {
+      "name": "delivery_pager",
+      "kind": "function",
+      "span": "L314-L356",
+      "signature": "fn delivery_pager(list: &DeliveryList<'_>) -> String"
+    },
+    {
+      "name": "delivery_empty_pane",
+      "kind": "function",
+      "span": "L359-L369",
+      "signature": "pub fn delivery_empty_pane(message: &str, swap: FragmentSwap) -> String"
+    },
+    {
+      "name": "delivery_detail_pane",
+      "kind": "function",
+      "span": "L371-L410",
+      "signature": "pub fn delivery_detail_pane(pane: &DeliveryDetailPane<'_>) -> String"
+    },
+    {
+      "name": "delivery_state",
+      "kind": "function",
+      "span": "L416-L470",
+      "signature": "fn delivery_state(entry: &DeliveryEntry) -> String"
+    },
+    {
+      "name": "delivery_facts",
+      "kind": "function",
+      "span": "L473-L517",
+      "signature": "fn delivery_facts(pane: &DeliveryDetailPane<'_>) -> String"
+    },
+    {
+      "name": "delivery_channel_name",
+      "kind": "function",
+      "span": "L520-L525",
+      "signature": "fn delivery_channel_name(pane: &DeliveryDetailPane<'_>) -> String"
+    },
+    {
+      "name": "delivery_parts",
+      "kind": "function",
+      "span": "L532-L564",
+      "signature": "fn delivery_parts(entry: &DeliveryEntry) -> String"
+    },
+    {
+      "name": "delivery_last_error",
+      "kind": "function",
+      "span": "L567-L580",
+      "signature": "fn delivery_last_error(entry: &DeliveryEntry) -> String"
+    },
+    {
+      "name": "delivery_status_style",
+      "kind": "function",
+      "span": "L583-L591",
+      "signature": "fn delivery_status_style(status: DeliveryStatus) -> &'static str"
+    },
+    {
+      "name": "part_status_style",
+      "kind": "function",
+      "span": "L593-L600",
+      "signature": "fn part_status_style(status: DeliveryPartStatus) -> &'static str"
+    },
+    {
+      "name": "part_status_label",
+      "kind": "function",
+      "span": "L602-L611",
+      "signature": "fn part_status_label(status: DeliveryPartStatus) -> &'static str"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 23714
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 1,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_snapshot_tests.rs#command",
+        "name": "command",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_snapshot_tests.rs",
+        "span": "L30-L54"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_snapshot_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 38,
+          "text": "subject: request.subject.clone(),"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 5955
+  }
+}

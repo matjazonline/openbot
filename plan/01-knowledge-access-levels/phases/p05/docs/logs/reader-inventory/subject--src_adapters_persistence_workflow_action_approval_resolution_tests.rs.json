@@ -1,0 +1,32 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 1,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_approval_resolution_tests.rs#workflow_action_approval_race_lost_commit_ack_resolves_exact_park",
+        "name": "workflow_action_approval_race_lost_commit_ack_resolves_exact_park",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_approval_resolution_tests.rs",
+        "span": "L18-L95"
+      },
+      "path": "src/adapters/persistence/workflow/action_approval_resolution_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 33,
+          "text": "subject: intent.approval_subject(),"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 3650
+  }
+}

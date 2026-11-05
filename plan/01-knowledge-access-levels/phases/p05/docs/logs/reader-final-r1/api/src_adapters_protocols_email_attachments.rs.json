@@ -1,0 +1,93 @@
+{
+  "file": "src/adapters/protocols/email/attachments.rs",
+  "entries": [
+    {
+      "name": "AttachmentStorageReport",
+      "kind": "struct",
+      "span": "L27-L30",
+      "signature": "pub struct AttachmentStorageReport"
+    },
+    {
+      "name": "DEFAULT_CONTENT_TYPE",
+      "kind": "constant",
+      "span": "L33-L33",
+      "signature": "const DEFAULT_CONTENT_TYPE: &str = \"application/octet-stream\";"
+    },
+    {
+      "name": "store_inbound_attachments",
+      "kind": "function",
+      "span": "L40-L75",
+      "signature": "pub async fn store_inbound_attachments("
+    },
+    {
+      "name": "attachment_key",
+      "kind": "function",
+      "span": "L78-L93",
+      "signature": "fn attachment_key(folder: &str, content: &[u8], filename: &str) -> ObjectKey"
+    },
+    {
+      "name": "extension_of",
+      "kind": "function",
+      "span": "L99-L107",
+      "signature": "fn extension_of(filename: &str) -> Option<String>"
+    },
+    {
+      "name": "stored_content_type",
+      "kind": "function",
+      "span": "L114-L119",
+      "signature": "fn stored_content_type(attachment: &RawAttachmentData) -> String"
+    },
+    {
+      "name": "tests",
+      "kind": "module",
+      "span": "L122-L214",
+      "signature": "mod tests"
+    },
+    {
+      "name": "attachment",
+      "kind": "function",
+      "span": "L126-L133",
+      "signature": "fn attachment(filename: &str, content_type: &str, content: &[u8]) -> RawAttachmentData"
+    },
+    {
+      "name": "PNG",
+      "kind": "constant",
+      "span": "L135-L135",
+      "signature": "const PNG: &[u8] = b\"\\x89PNG\\r\\n\\x1a\\n....\";"
+    },
+    {
+      "name": "an_attachment_goes_to_the_private_bucket_named_by_its_content",
+      "kind": "function",
+      "span": "L138-L156",
+      "signature": "async fn an_attachment_goes_to_the_private_bucket_named_by_its_content()"
+    },
+    {
+      "name": "the_same_file_twice_is_the_same_object",
+      "kind": "function",
+      "span": "L159-L169",
+      "signature": "async fn the_same_file_twice_is_the_same_object()"
+    },
+    {
+      "name": "what_the_sender_calls_it_does_not_decide_how_it_is_stored",
+      "kind": "function",
+      "span": "L172-L190",
+      "signature": "async fn what_the_sender_calls_it_does_not_decide_how_it_is_stored()"
+    },
+    {
+      "name": "a_bucket_that_is_down_costs_the_attachment_not_the_message",
+      "kind": "function",
+      "span": "L193-L199",
+      "signature": "async fn a_bucket_that_is_down_costs_the_attachment_not_the_message()"
+    },
+    {
+      "name": "only_a_plausible_extension_is_kept",
+      "kind": "function",
+      "span": "L202-L213",
+      "signature": "fn only_a_plausible_extension_is_kept()"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 8173
+  }
+}

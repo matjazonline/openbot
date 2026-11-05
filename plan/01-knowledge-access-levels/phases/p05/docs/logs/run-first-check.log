@@ -1,0 +1,158 @@
+    Checking open_bots v0.1.0 (/Users/mac02/dev/openbot-recovery/.worktrees/knowledge-p05)
+error[E0425]: cannot find type `Uuid` in this scope
+  --> src/adapters/persistence/view_visibility.rs:10:9
+   |
+10 |     id: Uuid,
+   |         ^^^^ not found in this scope
+
+error[E0425]: cannot find type `AppResult` in this scope
+  --> src/adapters/persistence/view_visibility.rs:17:40
+   |
+17 | fn levels(rows: Vec<VisibilityRow>) -> AppResult<HashMap<Uuid, PayloadVisibility>> {
+   |                                        ^^^^^^^^^
+   |
+  --> /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:557:0
+   |
+   = note: similarly named enum `Result` defined here
+help: an enum with a similar name exists
+   |
+17 - fn levels(rows: Vec<VisibilityRow>) -> AppResult<HashMap<Uuid, PayloadVisibility>> {
+17 + fn levels(rows: Vec<VisibilityRow>) -> Result<HashMap<Uuid, PayloadVisibility>> {
+   |
+help: consider importing this type alias
+   |
+ 2 + use crate::app_error::AppResult;
+   |
+
+error[E0425]: cannot find type `Uuid` in this scope
+  --> src/adapters/persistence/view_visibility.rs:17:58
+   |
+17 | fn levels(rows: Vec<VisibilityRow>) -> AppResult<HashMap<Uuid, PayloadVisibility>> {
+   |                                                          ^^^^ not found in this scope
+   |
+help: you might be missing a type parameter
+   |
+17 | fn levels<Uuid>(rows: Vec<VisibilityRow>) -> AppResult<HashMap<Uuid, PayloadVisibility>> {
+   |          ++++++
+
+error[E0425]: cannot find type `Postgres` in this scope
+  --> src/adapters/persistence/view_visibility.rs:37:44
+   |
+37 |     db: impl sqlx::Executor<'e, Database = Postgres>,
+   |                                            ^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `Uuid` in this scope
+  --> src/adapters/persistence/view_visibility.rs:40:13
+   |
+40 |     runs: &[Uuid],
+   |             ^^^^ not found in this scope
+
+error[E0425]: cannot find type `AppResult` in this scope
+  --> src/adapters/persistence/view_visibility.rs:41:6
+   |
+41 | ) -> AppResult<HashMap<Uuid, PayloadVisibility>> {
+   |      ^^^^^^^^^
+   |
+  --> /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:557:0
+   |
+   = note: similarly named enum `Result` defined here
+help: an enum with a similar name exists
+   |
+41 - ) -> AppResult<HashMap<Uuid, PayloadVisibility>> {
+41 + ) -> Result<HashMap<Uuid, PayloadVisibility>> {
+   |
+help: consider importing this type alias
+   |
+ 2 + use crate::app_error::AppResult;
+   |
+
+error[E0425]: cannot find type `Uuid` in this scope
+  --> src/adapters/persistence/view_visibility.rs:41:24
+   |
+41 | ) -> AppResult<HashMap<Uuid, PayloadVisibility>> {
+   |                        ^^^^ not found in this scope
+   |
+help: you might be missing a type parameter
+   |
+36 | pub(super) async fn run_levels_on<'e, Uuid>(
+   |                                     ++++++
+
+error[E0425]: cannot find type `Postgres` in this scope
+  --> src/adapters/persistence/view_visibility.rs:50:44
+   |
+50 |     db: impl sqlx::Executor<'e, Database = Postgres>,
+   |                                            ^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `Uuid` in this scope
+  --> src/adapters/persistence/view_visibility.rs:53:17
+   |
+53 |     messages: &[Uuid],
+   |                 ^^^^ not found in this scope
+
+error[E0425]: cannot find type `AppResult` in this scope
+  --> src/adapters/persistence/view_visibility.rs:54:6
+   |
+54 | ) -> AppResult<HashMap<Uuid, PayloadVisibility>> {
+   |      ^^^^^^^^^
+   |
+  --> /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:557:0
+   |
+   = note: similarly named enum `Result` defined here
+help: an enum with a similar name exists
+   |
+54 - ) -> AppResult<HashMap<Uuid, PayloadVisibility>> {
+54 + ) -> Result<HashMap<Uuid, PayloadVisibility>> {
+   |
+help: consider importing this type alias
+   |
+ 2 + use crate::app_error::AppResult;
+   |
+
+error[E0425]: cannot find type `Uuid` in this scope
+  --> src/adapters/persistence/view_visibility.rs:54:24
+   |
+54 | ) -> AppResult<HashMap<Uuid, PayloadVisibility>> {
+   |                        ^^^^ not found in this scope
+   |
+help: you might be missing a type parameter
+   |
+49 | pub(super) async fn message_levels_on<'e, Uuid>(
+   |                                         ++++++
+
+error[E0061]: this method takes 2 arguments but 3 arguments were supplied
+   --> src/adapters/persistence/workflow/jev_end_to_end_tests.rs:72:10
+    |
+ 72 |         .step_view(f.target.company, run, execution)
+    |          ^^^^^^^^^ ----------------  --- unexpected argument #2 of type `domain::workflow::ids::RunId`
+    |                    |
+    |                    expected `RunReadScope`, found `CompanyId`
+    |
+note: method defined here
+   --> src/application/workflow/run_views.rs:163:14
+    |
+163 |     async fn step_view(&self, scope: RunReadScope, execution: Uuid) -> AppResult<Option<StepView>>;
+    |              ^^^^^^^^^        -----
+help: remove the extra argument
+    |
+ 72 -         .step_view(f.target.company, run, execution)
+ 72 +         .step_view(/* application::workflow::run_views::RunReadScope */, execution)
+    |
+
+error[E0063]: missing field `payload_restricted` in initializer of `application::workflow::run_views::StepView`
+  --> src/adapters/http/routes/workflows/ui/runs/pages_tests.rs:45:21
+   |
+45 |     let step_view = StepView {
+   |                     ^^^^^^^^ missing `payload_restricted`
+
+error[E0063]: missing field `payload_restricted` in initializer of `application::workflow::run_views::RunView`
+   --> src/adapters/http/routes/workflows/ui/runs/pages_tests.rs:118:5
+    |
+118 |     RunView {
+    |     ^^^^^^^ missing `payload_restricted`
+
+For more information about this error, try `rustc --explain E0425`.
+error: could not compile `open_bots` (lib) due to 11 previous errors
+warning: build failed, waiting for other jobs to finish...
+Some errors have detailed explanations: E0061, E0063, E0425.
+For more information about an error, try `rustc --explain E0061`.
+error: could not compile `open_bots` (lib test) due to 14 previous errors

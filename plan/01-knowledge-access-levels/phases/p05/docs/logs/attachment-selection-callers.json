@@ -1,0 +1,38 @@
+{
+  "query": "find_attachment",
+  "matches": [
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_attachments.rs#find_attachment",
+        "name": "find_attachment",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui_attachments.rs",
+        "span": "L116-L126"
+      },
+      "hits": [
+        {
+          "id": "src/adapters/http/routes/ui_attachments.rs#download_attachment",
+          "relation": "calls",
+          "depth": 1,
+          "name": "download_attachment",
+          "kind": "function",
+          "path": "src/adapters/http/routes/ui_attachments.rs",
+          "span": "L63-L113"
+        },
+        {
+          "id": "src/adapters/http/routes/ui_knowledge_view_tests.rs#knowledge_view_attachment_denial_precedes_storage_and_filename_access",
+          "relation": "calls",
+          "depth": 2,
+          "name": "knowledge_view_attachment_denial_precedes_storage_and_filename_access",
+          "kind": "function",
+          "path": "src/adapters/http/routes/ui_knowledge_view_tests.rs",
+          "span": "L165-L191"
+        }
+      ]
+    }
+  ],
+  "saved": {
+    "files": 2,
+    "baselineChars": 19534
+  }
+}

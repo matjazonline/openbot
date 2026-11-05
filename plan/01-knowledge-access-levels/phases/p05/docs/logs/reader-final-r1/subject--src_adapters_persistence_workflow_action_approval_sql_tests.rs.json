@@ -1,0 +1,53 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 3,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_approval_sql_tests.rs#workflow_action_approval_digest_fk_rejects_each_mismatch",
+        "name": "workflow_action_approval_digest_fk_rejects_each_mismatch",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_approval_sql_tests.rs",
+        "span": "L4-L63"
+      },
+      "path": "src/adapters/persistence/workflow/action_approval_sql_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 36,
+          "text": "intent.approval_subject().invocation.as_uuid()"
+        },
+        {
+          "line": 49,
+          "text": "let error=sqlx::query(\"INSERT INTO workflow_decisions(company_id,run_id,execution_id,id,wait_id,subject_kind,proposal_digest,action_invocation_id,argument_diges"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_approval_sql_tests.rs#workflow_action_approval_digest_cannot_authorize_changed_arguments",
+        "name": "workflow_action_approval_digest_cannot_authorize_changed_arguments",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_approval_sql_tests.rs",
+        "span": "L94-L141"
+      },
+      "path": "src/adapters/persistence/workflow/action_approval_sql_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 125,
+          "text": "subject: intent.approval_subject(),"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 10914
+  }
+}

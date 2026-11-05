@@ -1,0 +1,49 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 2,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_receipt_acceptance_tests.rs#workflow_action_receipt_actual_result_precedes_shared_completion_writer",
+        "name": "workflow_action_receipt_actual_result_precedes_shared_completion_writer",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_receipt_acceptance_tests.rs",
+        "span": "L134-L167"
+      },
+      "path": "src/adapters/persistence/workflow/action_receipt_acceptance_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 164,
+          "text": ".bind(request.subject.invocation.as_uuid()).fetch_one(f.persistence().pool()).await.unwrap();"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_receipt_acceptance_tests.rs#workflow_action_receipt_reclaimed_attempt_rechecks_current_registration_and_access",
+        "name": "workflow_action_receipt_reclaimed_attempt_rechecks_current_registration_and_access",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_receipt_acceptance_tests.rs",
+        "span": "L170-L242"
+      },
+      "path": "src/adapters/persistence/workflow/action_receipt_acceptance_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 190,
+          "text": ".action_authority(request.scope(), &request.subject)"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 12616
+  }
+}

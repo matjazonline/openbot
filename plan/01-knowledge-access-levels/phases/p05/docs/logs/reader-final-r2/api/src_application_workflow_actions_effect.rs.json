@@ -1,0 +1,27 @@
+{
+  "file": "src/application/workflow/actions/effect.rs",
+  "entries": [
+    {
+      "name": "ActionEffectState",
+      "kind": "enum",
+      "span": "L9-L19",
+      "signature": "pub enum ActionEffectState"
+    },
+    {
+      "name": "ActionEffectStates",
+      "kind": "interface",
+      "span": "L22-L30",
+      "signature": "pub trait ActionEffectStates: Send + Sync"
+    },
+    {
+      "name": "effect_state",
+      "kind": "function",
+      "span": "L25-L29",
+      "signature": "async fn effect_state("
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 1168
+  }
+}

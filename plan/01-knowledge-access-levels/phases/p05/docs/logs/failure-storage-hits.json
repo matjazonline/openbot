@@ -1,0 +1,740 @@
+{
+  "pattern": "workflow_failure_code",
+  "filesSearched": 487,
+  "totalHits": 48,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/maintenance.rs#retire_jobs",
+        "name": "retire_jobs",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/maintenance.rs",
+        "span": "L60-L82"
+      },
+      "path": "src/adapters/persistence/workflow/maintenance.rs",
+      "inDegree": 5,
+      "hits": [
+        {
+          "line": 72,
+          "text": "let attempts = sqlx::query(\"UPDATE task_attempts AS attempt SET status='failed',finished_at=clock_timestamp(),workflow_failure_class='terminal',workflow_failure"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_cancellation_boundary_tests.rs#retired_once",
+        "name": "retired_once",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_cancellation_boundary_tests.rs",
+        "span": "L70-L130"
+      },
+      "path": "src/adapters/persistence/workflow/action_cancellation_boundary_tests.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 110,
+          "text": "assert_eq!(attempt[\"workflow_failure_code\"], \"workflow.cancelled\");"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_tests.rs#live_recovery",
+        "name": "live_recovery",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_tests.rs",
+        "span": "L196-L243"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_tests.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 230,
+          "text": "assert_eq!(attempt[\"workflow_failure_code\"], \"workflow.lease_expired\");"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_assertions.rs#parked_fence",
+        "name": "parked_fence",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_assertions.rs",
+        "span": "L118-L184"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_assertions.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 143,
+          "text": "assert_eq!(closed[\"workflow_failure_code\"], \"workflow.interrupted\");"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_child_policy_tests.rs#non_lineage_gates",
+        "name": "non_lineage_gates",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_child_policy_tests.rs",
+        "span": "L37-L68"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_child_policy_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 53,
+          "text": "AND attempt.workflow_failure_code NOT IN ('workflow.activation_limit','workflow.invalid_result','workflow.run_deadline','workflow.root_budget_exhausted')"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_completion_race_assertions.rs#attempts",
+        "name": "attempts",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_completion_race_assertions.rs",
+        "span": "L110-L151"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_completion_race_assertions.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 131,
+          "text": "assert_eq!(row[\"workflow_failure_code\"], \"action.evidence_conflict\");"
+        },
+        {
+          "line": 144,
+          "text": "\"workflow_failure_code\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_eligibility_poison_tests.rs#retired",
+        "name": "retired",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_eligibility_poison_tests.rs",
+        "span": "L11-L55"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_eligibility_poison_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 46,
+          "text": "assert_eq!(attempt[\"workflow_failure_code\"], code);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_uncertainty_tests.rs#parked",
+        "name": "parked",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_uncertainty_tests.rs",
+        "span": "L29-L62"
+      },
+      "path": "src/adapters/persistence/workflow/action_uncertainty_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 36,
+          "text": "assert_eq!(saved[\"attempts\"][0][\"workflow_failure_code\"], code);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/dashboard.rs#outstanding",
+        "name": "outstanding",
+        "kind": "function",
+        "path": "src/adapters/persistence/dashboard.rs",
+        "span": "L628-L657"
+      },
+      "path": "src/adapters/persistence/dashboard.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 650,
+          "text": "workflow_failure_code: row"
+        },
+        {
+          "line": 651,
+          "text": ".try_get(\"workflow_failure_code\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_outcome_support.rs#retired",
+        "name": "retired",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_outcome_support.rs",
+        "span": "L67-L85"
+      },
+      "path": "src/adapters/persistence/workflow/action_outcome_support.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 70,
+          "text": "\"SELECT run.state AS run_state, run.waiting_reason, attempt.workflow_failure_code AS code,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_claim_recovery_tests.rs#recover_discarded",
+        "name": "recover_discarded",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_claim_recovery_tests.rs",
+        "span": "L206-L277"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_claim_recovery_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 225,
+          "text": "assert_eq!(attempt[\"workflow_failure_code\"], \"workflow.lease_expired\");"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_claim_sql_deferred_tests.rs#insert_invalid_attempt",
+        "name": "insert_invalid_attempt",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_claim_sql_deferred_tests.rs",
+        "span": "L76-L98"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_claim_sql_deferred_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 91,
+          "text": "let exact_attempt: i64 = sqlx::query_scalar(\"SELECT count(*) FROM task_attempts AS attempt WHERE attempt.id=$1 AND attempt.task_id=$2 AND attempt.attempt_number"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_eligibility_remaining_tests.rs#subject_without_sibling_veto",
+        "name": "subject_without_sibling_veto",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_eligibility_remaining_tests.rs",
+        "span": "L212-L243"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_eligibility_remaining_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 228,
+          "text": "AND attempt.workflow_failure_code NOT IN ('workflow.activation_limit','workflow.invalid_result','workflow.run_deadline','workflow.root_budget_exhausted')"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_eligibility_remaining_tests.rs#owner_exhaustion",
+        "name": "owner_exhaustion",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_eligibility_remaining_tests.rs",
+        "span": "L344-L402"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_eligibility_remaining_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 377,
+          "text": "exhausted[\"task_attempts\"][0][\"workflow_failure_code\"],"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_episode_lifecycle_tests.rs#safely_retire",
+        "name": "safely_retire",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_episode_lifecycle_tests.rs",
+        "span": "L209-L239"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_episode_lifecycle_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 237,
+          "text": "assert_eq!(attempt[\"workflow_failure_code\"], \"provider.rejected\");"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_live_boundary_tests.rs#retired_attempts",
+        "name": "retired_attempts",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_live_boundary_tests.rs",
+        "span": "L256-L285"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_live_boundary_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 269,
+          "text": "assert_eq!(row[\"workflow_failure_code\"], \"workflow.interrupted\");"
+        },
+        {
+          "line": 279,
+          "text": "\"workflow_failure_code\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_assertions.rs#parked_attempt",
+        "name": "parked_attempt",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_assertions.rs",
+        "span": "L186-L215"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_assertions.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 193,
+          "text": "\"workflow_failure_code\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_terminal_revision_tests.rs#retired_attempt",
+        "name": "retired_attempt",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_terminal_revision_tests.rs",
+        "span": "L149-L188"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_terminal_revision_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 176,
+          "text": "assert_eq!(attempt[\"workflow_failure_code\"], \"fixture.terminal\");"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_uncertainty_acceptance_tests.rs#assert_terminal_retirement",
+        "name": "assert_terminal_retirement",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_uncertainty_acceptance_tests.rs",
+        "span": "L215-L241"
+      },
+      "path": "src/adapters/persistence/workflow/action_uncertainty_acceptance_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 227,
+          "text": "assert_eq!(saved[\"attempts\"][0][\"workflow_failure_code\"], code);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/control_revision_tests.rs#forge_cancel",
+        "name": "forge_cancel",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/control_revision_tests.rs",
+        "span": "L109-L149"
+      },
+      "path": "src/adapters/persistence/workflow/control_revision_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 114,
+          "text": "sqlx::query(\"UPDATE task_attempts SET status='failed',finished_at=clock_timestamp(),workflow_failure_class='terminal',workflow_failure_code='workflow.cancelled'"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/knowledge_message_tests.rs#assert_failed_attention",
+        "name": "assert_failed_attention",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/knowledge_message_tests.rs",
+        "span": "L311-L360"
+      },
+      "path": "src/adapters/persistence/workflow/knowledge_message_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 346,
+          "text": "'code',(SELECT workflow_failure_code FROM task_attempts WHERE task_id=$3 AND attempt_number=$4))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/recovery.rs#close_attempt",
+        "name": "close_attempt",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/recovery.rs",
+        "span": "L169-L184"
+      },
+      "path": "src/adapters/persistence/workflow/recovery.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 175,
+          "text": "let closed = sqlx::query(\"UPDATE task_attempts SET status='failed',finished_at=clock_timestamp(),workflow_failure_class=$5,workflow_failure_code=$6,workflow_ret"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/dashboard.rs#OUTSTANDING_SQL",
+        "name": "OUTSTANDING_SQL",
+        "kind": "constant",
+        "path": "src/adapters/persistence/dashboard.rs",
+        "span": "L347-L381"
+      },
+      "path": "src/adapters/persistence/dashboard.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 357,
+          "text": "(SELECT attempt.workflow_failure_code"
+        },
+        {
+          "line": 361,
+          "text": "LIMIT 1) AS workflow_failure_code,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_history_tests.rs#workflow_action_history_direct_sql_forged_safe_retirement_rejected",
+        "name": "workflow_action_history_direct_sql_forged_safe_retirement_rejected",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_history_tests.rs",
+        "span": "L259-L281"
+      },
+      "path": "src/adapters/persistence/workflow/action_history_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 266,
+          "text": "sqlx::query(\"UPDATE task_attempts SET status='failed',finished_at=clock_timestamp(),workflow_failure_class='terminal',workflow_failure_code='provider.rejected',"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_receipt_tests.rs#workflow_action_reconciliation_old_actual_after_new_receipt_keeps_same_and_different_truth",
+        "name": "workflow_action_reconciliation_old_actual_after_new_receipt_keeps_same_and_different_truth",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_receipt_tests.rs",
+        "span": "L421-L559"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_receipt_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 552,
+          "text": "\"SELECT workflow_failure_code FROM task_attempts ORDER BY attempt_number DESC LIMIT 1\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_runtime_conflict_tests.rs#workflow_action_reconciliation_runtime_conflict_after_return_before_completion_retires_exact_attempt",
+        "name": "workflow_action_reconciliation_runtime_conflict_after_return_before_completion_retires_exact_attempt",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_runtime_conflict_tests.rs",
+        "span": "L133-L196"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_runtime_conflict_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 184,
+          "text": "after[\"task_attempts\"][0][\"workflow_failure_code\"],"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/budget_runtime_tests.rs#workflow_budget_runtime_duplicate_conflict_exact_and_exhausted_retry",
+        "name": "workflow_budget_runtime_duplicate_conflict_exact_and_exhausted_retry",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/budget_runtime_tests.rs",
+        "span": "L38-L131"
+      },
+      "path": "src/adapters/persistence/workflow/budget_runtime_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 90,
+          "text": "state[\"attempts\"][0][\"workflow_failure_code\"],"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/completion_tests.rs#workflow_completion_invalid_outputs_and_activation_budget_settle",
+        "name": "workflow_completion_invalid_outputs_and_activation_budget_settle",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/completion_tests.rs",
+        "span": "L374-L421"
+      },
+      "path": "src/adapters/persistence/workflow/completion_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 399,
+          "text": "saved[\"attempts\"][0][\"workflow_failure_code\"],"
+        },
+        {
+          "line": 417,
+          "text": "saved[\"attempts\"][0][\"workflow_failure_code\"],"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/harness_token_refusal_tests.rs#workflow_harness_token_refusal_stops_admitted_descendants_and_inflight_output",
+        "name": "workflow_harness_token_refusal_stops_admitted_descendants_and_inflight_output",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/harness_token_refusal_tests.rs",
+        "span": "L233-L292"
+      },
+      "path": "src/adapters/persistence/workflow/harness_token_refusal_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 269,
+          "text": "\"SELECT workflow_failure_code FROM task_attempts WHERE task_id=$1 AND attempt_number=$2\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/harness_token_scheduling_tests.rs#workflow_harness_token_processing_pause_charges_one_failure_only",
+        "name": "workflow_harness_token_processing_pause_charges_one_failure_only",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/harness_token_scheduling_tests.rs",
+        "span": "L102-L148"
+      },
+      "path": "src/adapters/persistence/workflow/harness_token_scheduling_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 129,
+          "text": "\"SELECT workflow_failure_code FROM task_attempts WHERE task_id=$1 AND attempt_number=$2\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/harness_token_scheduling_tests.rs#workflow_harness_token_pause_cannot_replace_hard_model_budget_failure",
+        "name": "workflow_harness_token_pause_cannot_replace_hard_model_budget_failure",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/harness_token_scheduling_tests.rs",
+        "span": "L365-L398"
+      },
+      "path": "src/adapters/persistence/workflow/harness_token_scheduling_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 391,
+          "text": "let failure: Value = sqlx::query_scalar(\"SELECT jsonb_build_object('code',workflow_failure_code,'class',workflow_failure_class) FROM task_attempts WHERE task_id"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/harness_token_scheduling_tests.rs#knowledge_run_level_refusal_survives_real_token_allowance_and_refusal_retirement",
+        "name": "knowledge_run_level_refusal_survives_real_token_allowance_and_refusal_retirement",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/harness_token_scheduling_tests.rs",
+        "span": "L401-L464"
+      },
+      "path": "src/adapters/persistence/workflow/harness_token_scheduling_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 450,
+          "text": "let saved: Value = sqlx::query_scalar(\"SELECT jsonb_build_object('state',run.state,'code',attempt.workflow_failure_code,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/job_projection_tests.rs#workflow_job_projection_dashboard_outstanding_jobs_name_run_and_latest_failure",
+        "name": "workflow_job_projection_dashboard_outstanding_jobs_name_run_and_latest_failure",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/job_projection_tests.rs",
+        "span": "L115-L163"
+      },
+      "path": "src/adapters/persistence/workflow/job_projection_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 134,
+          "text": "sqlx::query(\"INSERT INTO task_attempts             (id,task_id,attempt_number,status,finished_at,execution_generation,worker_id,workflow_failure_class,workflow_"
+        },
+        {
+          "line": 148,
+          "text": "latest.workflow_failure_code.as_deref(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/maintenance_guard_tests.rs#workflow_maintenance_forged_retirement_is_rejected_and_rolled_back",
+        "name": "workflow_maintenance_forged_retirement_is_rejected_and_rolled_back",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/maintenance_guard_tests.rs",
+        "span": "L59-L115"
+      },
+      "path": "src/adapters/persistence/workflow/maintenance_guard_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 77,
+          "text": "sqlx::query(\"UPDATE task_attempts SET status='failed',finished_at=clock_timestamp(),workflow_failure_class='terminal',workflow_failure_code='workflow.run_deadli"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/provisioning_runtime_tests.rs#builder_stops_a_listing_loop_once_its_result_repeats",
+        "name": "builder_stops_a_listing_loop_once_its_result_repeats",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/provisioning_runtime_tests.rs",
+        "span": "L389-L446"
+      },
+      "path": "src/adapters/persistence/workflow/provisioning_runtime_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 412,
+          "text": "\"SELECT run.state, attempt.workflow_failure_code FROM workflow_runs AS run \\"
+        },
+        {
+          "line": 426,
+          "text": "assert_eq!(failure.workflow_failure_code, \"agent.repeated_tool_call\");"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/provisioning_runtime_tests.rs#ListingLoopFailure",
+        "name": "ListingLoopFailure",
+        "kind": "struct",
+        "path": "src/adapters/persistence/workflow/provisioning_runtime_tests.rs",
+        "span": "L585-L588"
+      },
+      "path": "src/adapters/persistence/workflow/provisioning_runtime_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 587,
+          "text": "workflow_failure_code: String,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/recovery_tests.rs#workflow_failure_retry_debits_once_preserves_input_and_poison_backoff",
+        "name": "workflow_failure_retry_debits_once_preserves_input_and_poison_backoff",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/recovery_tests.rs",
+        "span": "L37-L81"
+      },
+      "path": "src/adapters/persistence/workflow/recovery_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 63,
+          "text": "saved[\"attempts\"][0][\"workflow_failure_code\"],"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/run_views.rs#AttemptRow",
+        "name": "AttemptRow",
+        "kind": "struct",
+        "path": "src/adapters/persistence/workflow/run_views.rs",
+        "span": "L208-L217"
+      },
+      "path": "src/adapters/persistence/workflow/run_views.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 215,
+          "text": "workflow_failure_code: Option<String>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/run_views.rs#from~7",
+        "name": "from~7",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/run_views.rs",
+        "span": "L220-L231"
+      },
+      "path": "src/adapters/persistence/workflow/run_views.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 228,
+          "text": "failure_code: row.workflow_failure_code,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/run_views.rs#ATTEMPTS_SQL",
+        "name": "ATTEMPTS_SQL",
+        "kind": "constant",
+        "path": "src/adapters/persistence/workflow/run_views.rs",
+        "span": "L284-L292"
+      },
+      "path": "src/adapters/persistence/workflow/run_views.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 286,
+          "text": "attempt.workflow_failure_code, attempt.workflow_retry_safety \\"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/workflow_guard_tests.rs#workflow_guard_error_io_completion_never_reexecutes_the_handler",
+        "name": "workflow_guard_error_io_completion_never_reexecutes_the_handler",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/workflow_guard_tests.rs",
+        "span": "L100-L131"
+      },
+      "path": "src/adapters/persistence/workflow/workflow_guard_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 120,
+          "text": "let attempts: Vec<(String,Option<String>,Option<String>)> = sqlx::query_as(\"SELECT status,workflow_retirement,workflow_failure_code FROM task_attempts WHERE tas"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 33,
+    "baselineChars": 494485
+  }
+}

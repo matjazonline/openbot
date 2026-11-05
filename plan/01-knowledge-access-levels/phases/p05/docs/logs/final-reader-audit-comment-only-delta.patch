@@ -1,0 +1,25 @@
+diff --git a/src/application/use_cases/thread/mod.rs b/src/application/use_cases/thread/mod.rs
+index 2ca4731..3b1e418 100644
+--- a/src/application/use_cases/thread/mod.rs
++++ b/src/application/use_cases/thread/mod.rs
+@@ -365,7 +365,7 @@ impl ThreadUseCases {
+         Ok(None)
+     }
+ 
+-    /// One message's operational detail, for an authorized diagnostic pane.
++    /// Internal outbound correlation for runtime processing; not a viewer projection.
+     pub async fn find_outbound_reply_after(
+         &self,
+         thread_id: Uuid,
+diff --git a/src/application/use_cases/thread/reads.rs b/src/application/use_cases/thread/reads.rs
+index f4c9a45..2e2be47 100644
+--- a/src/application/use_cases/thread/reads.rs
++++ b/src/application/use_cases/thread/reads.rs
+@@ -242,6 +242,7 @@ impl ThreadUseCases {
+         Ok(projected.into_iter().next())
+     }
+ 
++    /// Operational identifiers are visible only while the containing message is visible.
+     pub async fn get_message_audit(
+         &self,
+         viewer: &Viewer,

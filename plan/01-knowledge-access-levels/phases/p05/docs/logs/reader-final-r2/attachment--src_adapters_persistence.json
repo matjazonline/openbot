@@ -1,0 +1,938 @@
+{
+  "pattern": "attachment",
+  "filesSearched": 491,
+  "totalHits": 97,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/test_support.rs#inbound_email",
+        "name": "inbound_email",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/test_support.rs",
+        "span": "L281-L307"
+      },
+      "path": "src/adapters/persistence/thread/test_support.rs",
+      "inDegree": 17,
+      "hits": [
+        {
+          "line": 293,
+          "text": "attachments: Vec::new(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/jev_assets_tests.rs#image_claim",
+        "name": "image_claim",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/jev_assets_tests.rs",
+        "span": "L58-L67"
+      },
+      "path": "src/adapters/persistence/workflow/jev_assets_tests.rs",
+      "inDegree": 6,
+      "hits": [
+        {
+          "line": 58,
+          "text": "async fn image_claim(f: &Fixture, attachment: &Attachment) -> ClaimedWorkflow {"
+        },
+        {
+          "line": 64,
+          "text": "source[\"steps\"][\"start\"][\"with\"][\"assets\"] = json!({\"literal\":{\"photo\":attachment.reference}});"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/message.rs#try_from",
+        "name": "try_from",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/message.rs",
+        "span": "L144-L186"
+      },
+      "path": "src/adapters/persistence/thread/message.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 177,
+          "text": "attachments: decode_attachments(db.attachments)?,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/message.rs#encode_attachments",
+        "name": "encode_attachments",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/message.rs",
+        "span": "L263-L270"
+      },
+      "path": "src/adapters/persistence/thread/message.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 263,
+          "text": "pub(super) fn encode_attachments(attachments: &[AttachmentMetadata]) -> AppResult<Option<Value>> {"
+        },
+        {
+          "line": 264,
+          "text": "if attachments.is_empty() {"
+        },
+        {
+          "line": 267,
+          "text": "serde_json::to_value(MessageAttachments::new(attachments.to_vec()))"
+        },
+        {
+          "line": 269,
+          "text": ".map_err(|error| AppError::Internal(format!(\"Failed to serialize attachments: {error}\")))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/message.rs#insert_message_on",
+        "name": "insert_message_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/message.rs",
+        "span": "L496-L595"
+      },
+      "path": "src/adapters/persistence/thread/message.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 502,
+          "text": "validate_attachment_sources(connection, scope.company_id, write).await?;"
+        },
+        {
+          "line": 505,
+          "text": "let attachments = encode_attachments(&write.attachments)?;"
+        },
+        {
+          "line": 506,
+          "text": "let content_hash = canonical_message_hash(write, &author, &participants, attachments.as_ref());"
+        },
+        {
+          "line": 517,
+          "text": "attachments: attachments.as_ref(),"
+        },
+        {
+          "line": 532,
+          "text": "attachments: attachments.as_ref(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/jev_assets_tests.rs#attachment",
+        "name": "attachment",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/jev_assets_tests.rs",
+        "span": "L25-L57"
+      },
+      "path": "src/adapters/persistence/workflow/jev_assets_tests.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 25,
+          "text": "pub(super) async fn attachment(f: &Fixture, bytes: &[u8]) -> Attachment {"
+        },
+        {
+          "line": 41,
+          "text": "let key = ObjectKey::new(format!(\"attachments/{company}/{}.png\", Uuid::new_v4()));"
+        },
+        {
+          "line": 50,
+          "text": "sqlx::query(\"INSERT INTO messages(id,company_id,author_principal_id,subject,clean_text_body,direction,role,correlation_id,content_hash,attachments,audience) SEL"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/message.rs#canonical_message_hash",
+        "name": "canonical_message_hash",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/message.rs",
+        "span": "L402-L452"
+      },
+      "path": "src/adapters/persistence/thread/message.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 406,
+          "text": "attachments: Option<&Value>,"
+        },
+        {
+          "line": 437,
+          "text": "\"attachments\": attachments,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/message.rs#insert_canonical_message",
+        "name": "insert_canonical_message",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/message.rs",
+        "span": "L774-L820"
+      },
+      "path": "src/adapters/persistence/thread/message.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 782,
+          "text": "attachments,"
+        },
+        {
+          "line": 797,
+          "text": "clean_text_body, attachments, direction, role, correlation_id, content_hash,"
+        },
+        {
+          "line": 807,
+          "text": ".bind(attachments)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/views.rs#into_view",
+        "name": "into_view",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/views.rs",
+        "span": "L121-L171"
+      },
+      "path": "src/adapters/persistence/thread/views.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 159,
+          "text": "attachments: decode_attachments(self.attachments)?.unwrap_or_default(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/views.rs#thread_message_select",
+        "name": "thread_message_select",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/views.rs",
+        "span": "L247-L278"
+      },
+      "path": "src/adapters/persistence/thread/views.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 257,
+          "text": "message.attachments,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/inbound.rs#message_write",
+        "name": "message_write",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/inbound.rs",
+        "span": "L813-L866"
+      },
+      "path": "src/adapters/persistence/thread/inbound.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 841,
+          "text": "attachments: envelope.attachments.to_vec(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/message.rs#decode_attachments",
+        "name": "decode_attachments",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/message.rs",
+        "span": "L252-L261"
+      },
+      "path": "src/adapters/persistence/thread/message.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 252,
+          "text": "pub(super) fn decode_attachments("
+        },
+        {
+          "line": 259,
+          "text": ".map_err(|error| AppError::Internal(format!(\"Unreadable message attachments: {error}\")))?;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/jev_assets_race_tests.rs#restrict_to_view_grant",
+        "name": "restrict_to_view_grant",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/jev_assets_race_tests.rs",
+        "span": "L62-L93"
+      },
+      "path": "src/adapters/persistence/workflow/jev_assets_race_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 62,
+          "text": "async fn restrict_to_view_grant(f: &Fixture, attachment: &Attachment) -> Uuid {"
+        },
+        {
+          "line": 66,
+          "text": "let channel: Uuid = attachment.reference[\"channel_id\"]"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/jev_assets.rs#locate_on",
+        "name": "locate_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/jev_assets.rs",
+        "span": "L74-L114"
+      },
+      "path": "src/adapters/persistence/workflow/jev_assets.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 94,
+          "text": "\"SELECT attachment.value FROM thread_messages AS membership \\"
+        },
+        {
+          "line": 96,
+          "text": "CROSS JOIN LATERAL jsonb_array_elements(message.attachments->'items') AS attachment(value) \\"
+        },
+        {
+          "line": 98,
+          "text": "AND attachment.value->>'sha256_hash'=$4 LIMIT 1 FOR SHARE OF membership, message\""
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/inbound_tests.rs#envelope",
+        "name": "envelope",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/inbound_tests.rs",
+        "span": "L102-L129"
+      },
+      "path": "src/adapters/persistence/thread/inbound_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 122,
+          "text": "attachments: BoundedVec::empty(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/inbound.rs#recognise_redelivery",
+        "name": "recognise_redelivery",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/inbound.rs",
+        "span": "L203-L249"
+      },
+      "path": "src/adapters/persistence/thread/inbound.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 227,
+          "text": "let attachments = message::encode_attachments(&write.attachments)?;"
+        },
+        {
+          "line": 229,
+          "text": "message::canonical_message_hash(&write, &author, &participants, attachments.as_ref());"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/inbound.rs#store_canonical",
+        "name": "store_canonical",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/inbound.rs",
+        "span": "L608-L645"
+      },
+      "path": "src/adapters/persistence/thread/inbound.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 615,
+          "text": "let attachments = message::encode_attachments(&write.attachments)?;"
+        },
+        {
+          "line": 617,
+          "text": "message::canonical_message_hash(write, &author, &participants, attachments.as_ref());"
+        },
+        {
+          "line": 625,
+          "text": "attachments: attachments.as_ref(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/message.rs#validate_attachment_sources",
+        "name": "validate_attachment_sources",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/message.rs",
+        "span": "L600-L630"
+      },
+      "path": "src/adapters/persistence/thread/message.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 600,
+          "text": "async fn validate_attachment_sources("
+        },
+        {
+          "line": 605,
+          "text": "for attachment in &write.attachments {"
+        },
+        {
+          "line": 606,
+          "text": "let Some(source) = attachment.source.as_ref() else {"
+        },
+        {
+          "line": 624,
+          "text": "\"Private or unclassified attachment material cannot be published externally.\""
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/message.rs#store_email_correlated",
+        "name": "store_email_correlated",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/message.rs",
+        "span": "L686-L755"
+      },
+      "path": "src/adapters/persistence/thread/message.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 709,
+          "text": "attachments: payload.attachments,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/views.rs#list_thread_messages",
+        "name": "list_thread_messages",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/views.rs",
+        "span": "L285-L326"
+      },
+      "path": "src/adapters/persistence/thread/views.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 294,
+          "text": "recent.clean_text_body, recent.attachments, recent.direction, recent.role,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_eligibility_remaining_tests.rs#truth_only",
+        "name": "truth_only",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_eligibility_remaining_tests.rs",
+        "span": "L71-L126"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_eligibility_remaining_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 124,
+          "text": "\"truth attachment changes no other public history\""
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/message.rs#MessageDb",
+        "name": "MessageDb",
+        "kind": "struct",
+        "path": "src/adapters/persistence/thread/message.rs",
+        "span": "L54-L77"
+      },
+      "path": "src/adapters/persistence/thread/message.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 69,
+          "text": "pub attachments: Option<Value>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/message.rs#MESSAGE_SELECT",
+        "name": "MESSAGE_SELECT",
+        "kind": "constant",
+        "path": "src/adapters/persistence/thread/message.rs",
+        "span": "L93-L139"
+      },
+      "path": "src/adapters/persistence/thread/message.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 107,
+          "text": "message.attachments,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/thread/message.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 250,
+          "text": "/// Read attachment metadata from its versioned envelope. Unexpected stored shapes return"
+        },
+        {
+          "line": 597,
+          "text": "/// A derived attachment cannot carry source material across a wider boundary than its source."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/message.rs#StoredPayload",
+        "name": "StoredPayload",
+        "kind": "struct",
+        "path": "src/adapters/persistence/thread/message.rs",
+        "span": "L672-L679"
+      },
+      "path": "src/adapters/persistence/thread/message.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 676,
+          "text": "pub attachments: Option<&'a Value>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/message.rs#CanonicalMessageInsert",
+        "name": "CanonicalMessageInsert",
+        "kind": "struct",
+        "path": "src/adapters/persistence/thread/message.rs",
+        "span": "L767-L773"
+      },
+      "path": "src/adapters/persistence/thread/message.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 770,
+          "text": "pub attachments: Option<&'a Value>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/message.rs#attachments_round_trip_through_their_stored_envelope",
+        "name": "attachments_round_trip_through_their_stored_envelope",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/message.rs",
+        "span": "L1036-L1054"
+      },
+      "path": "src/adapters/persistence/thread/message.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1036,
+          "text": "fn attachments_round_trip_through_their_stored_envelope() {"
+        },
+        {
+          "line": 1037,
+          "text": "let attachments = vec![AttachmentMetadata {"
+        },
+        {
+          "line": 1042,
+          "text": "storage_key: Some(ObjectKey::from(\"attachments/invoice.pdf\")),"
+        },
+        {
+          "line": 1045,
+          "text": "let encoded = encode_attachments(&attachments).unwrap().unwrap();"
+        },
+        {
+          "line": 1048,
+          "text": "decode_attachments(Some(encoded)).unwrap(),"
+        },
+        {
+          "line": 1049,
+          "text": "Some(attachments)"
+        },
+        {
+          "line": 1051,
+          "text": "assert_eq!(encode_attachments(&[]).unwrap(), None);"
+        },
+        {
+          "line": 1052,
+          "text": "assert_eq!(decode_attachments(None).unwrap(), None);"
+        },
+        {
+          "line": 1053,
+          "text": "assert_eq!(decode_attachments(Some(Value::Null)).unwrap(), None);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/message.rs#unreadable_stored_json_is_an_application_error",
+        "name": "unreadable_stored_json_is_an_application_error",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/message.rs",
+        "span": "L1059-L1083"
+      },
+      "path": "src/adapters/persistence/thread/message.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1062,
+          "text": "decode_attachments(Some(future_version)),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/tests.rs#internal_notes_are_idempotent_immutable_and_auditable",
+        "name": "internal_notes_are_idempotent_immutable_and_auditable",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/tests.rs",
+        "span": "L21-L225"
+      },
+      "path": "src/adapters/persistence/thread/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 122,
+          "text": "assert!(first.attachments.is_empty());"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/tests.rs#derived_attachments_cannot_publish_a_private_source",
+        "name": "derived_attachments_cannot_publish_a_private_source",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/tests.rs",
+        "span": "L348-L390"
+      },
+      "path": "src/adapters/persistence/thread/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 348,
+          "text": "async fn derived_attachments_cannot_publish_a_private_source() {"
+        },
+        {
+          "line": 349,
+          "text": "let Some(fixture) = Fixture::new(\"private_attachment_guard\").await else {"
+        },
+        {
+          "line": 375,
+          "text": ".with_attachments(vec![AttachmentMetadata {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/tests.rs#unreadable_stored_json_surfaces_as_an_application_error",
+        "name": "unreadable_stored_json_surfaces_as_an_application_error",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/tests.rs",
+        "span": "L793-L849"
+      },
+      "path": "src/adapters/persistence/thread/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 804,
+          "text": "\"With an attachment\","
+        },
+        {
+          "line": 806,
+          "text": ".with_attachments(vec![AttachmentMetadata {"
+        },
+        {
+          "line": 817,
+          "text": "assert_eq!(stored.attachments.as_ref().map(Vec::len), Some(1));"
+        },
+        {
+          "line": 820,
+          "text": "let rejected = sqlx::query(\"UPDATE messages SET attachments = $2 WHERE id = $1\")"
+        },
+        {
+          "line": 832,
+          "text": "sqlx::query(\"UPDATE messages SET attachments = $2 WHERE id = $1\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/tests.rs#find_outbound_reply_after_sees_answers_and_ignores_relayed_mail",
+        "name": "find_outbound_reply_after_sees_answers_and_ignores_relayed_mail",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/tests.rs",
+        "span": "L1057-L1156"
+      },
+      "path": "src/adapters/persistence/thread/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1092,
+          "text": "attachments: Vec::new(),"
+        },
+        {
+          "line": 1127,
+          "text": "attachments: Vec::new(),"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/thread/views.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 22,
+          "text": "use super::message::{decode_attachments, decode_response_contract};"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/views.rs#ThreadMessageDb",
+        "name": "ThreadMessageDb",
+        "kind": "struct",
+        "path": "src/adapters/persistence/thread/views.rs",
+        "span": "L95-L118"
+      },
+      "path": "src/adapters/persistence/thread/views.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 106,
+          "text": "attachments: Option<Value>,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/action_reconciliation_claim_sql_witness_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 2,
+          "text": "//! catalog attachment and genuine public scheduling. Not a public stale INSERT."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/jev_assets_race_tests.rs#jev_assets_allowlist_grant_requires_current_verified_email",
+        "name": "jev_assets_allowlist_grant_requires_current_verified_email",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/jev_assets_race_tests.rs",
+        "span": "L112-L157"
+      },
+      "path": "src/adapters/persistence/workflow/jev_assets_race_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 118,
+          "text": "let attachment = attachment(&f, &images::png(280, 280)).await;"
+        },
+        {
+          "line": 119,
+          "text": "let claim = image_claim(&f, &attachment).await;"
+        },
+        {
+          "line": 120,
+          "text": "restrict_to_view_grant(&f, &attachment).await;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/jev_assets_race_tests.rs#jev_assets_final_authorization_holds_view_grant_across_connection_wait",
+        "name": "jev_assets_final_authorization_holds_view_grant_across_connection_wait",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/jev_assets_race_tests.rs",
+        "span": "L160-L242"
+      },
+      "path": "src/adapters/persistence/workflow/jev_assets_race_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 163,
+          "text": "let attachment = attachment(&f, &bytes).await;"
+        },
+        {
+          "line": 164,
+          "text": "let claim = image_claim(&f, &attachment).await;"
+        },
+        {
+          "line": 165,
+          "text": "let channel = restrict_to_view_grant(&f, &attachment).await;"
+        },
+        {
+          "line": 169,
+          "text": ".store_object(BucketKind::Private, &attachment.key, \"image/png\", bytes)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/jev_assets_tests.rs#jev_assets_cross_company_negative_and_forged_claim_are_denied_before_storage",
+        "name": "jev_assets_cross_company_negative_and_forged_claim_are_denied_before_storage",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/jev_assets_tests.rs",
+        "span": "L79-L102"
+      },
+      "path": "src/adapters/persistence/workflow/jev_assets_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 83,
+          "text": "let foreign = attachment(&other, &bytes).await;"
+        },
+        {
+          "line": 95,
+          "text": "let local = attachment(&f, &bytes).await;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/jev_assets_tests.rs#jev_assets_changed_object_retry_never_sends_or_adds_reservation",
+        "name": "jev_assets_changed_object_retry_never_sends_or_adds_reservation",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/jev_assets_tests.rs",
+        "span": "L104-L161"
+      },
+      "path": "src/adapters/persistence/workflow/jev_assets_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 107,
+          "text": "let attachment = attachment(&f, &bytes).await;"
+        },
+        {
+          "line": 108,
+          "text": "let first = image_claim(&f, &attachment).await;"
+        },
+        {
+          "line": 113,
+          "text": "&attachment.key,"
+        },
+        {
+          "line": 138,
+          "text": ".store_object(BucketKind::Private, &attachment.key, \"image/png\", changed)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/jev_assets_tests.rs#jev_assets_mixed_loopback_settlement_replay_and_metadata_only_ledger",
+        "name": "jev_assets_mixed_loopback_settlement_replay_and_metadata_only_ledger",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/jev_assets_tests.rs",
+        "span": "L163-L210"
+      },
+      "path": "src/adapters/persistence/workflow/jev_assets_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 166,
+          "text": "let attachment = attachment(&f, &bytes).await;"
+        },
+        {
+          "line": 167,
+          "text": "let first = image_claim(&f, &attachment).await;"
+        },
+        {
+          "line": 170,
+          "text": ".store_object(BucketKind::Private, &attachment.key, \"image/png\", bytes)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/jev_assets_tests.rs#jev_assets_current_actor_channel_visibility_and_missing_file",
+        "name": "jev_assets_current_actor_channel_visibility_and_missing_file",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/jev_assets_tests.rs",
+        "span": "L213-L248"
+      },
+      "path": "src/adapters/persistence/workflow/jev_assets_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 216,
+          "text": "let attachment = attachment(&f, &bytes).await;"
+        },
+        {
+          "line": 217,
+          "text": "let claim = image_claim(&f, &attachment).await;"
+        },
+        {
+          "line": 234,
+          "text": "attachment.reference[\"channel_id\"]"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/jev_assets.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1,
+          "text": "//! Authorize immutable private attachment references before storage reads."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/jev_end_to_end_tests.rs#jev_end_to_end_box_worker_history_and_invalid_output_rejection",
+        "name": "jev_end_to_end_box_worker_history_and_invalid_output_rejection",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/jev_end_to_end_tests.rs",
+        "span": "L183-L243"
+      },
+      "path": "src/adapters/persistence/workflow/jev_end_to_end_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 193,
+          "text": "let attachment = super::jev_assets_tests::attachment(&f, &bytes).await;"
+        },
+        {
+          "line": 196,
+          "text": ".store_object(BucketKind::Private, &attachment.key, \"image/png\", bytes)"
+        },
+        {
+          "line": 202,
+          "text": "source[\"steps\"][\"start\"][\"with\"][\"assets\"][\"literal\"][\"photo\"] = attachment.reference;"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 12,
+    "baselineChars": 277671
+  }
+}

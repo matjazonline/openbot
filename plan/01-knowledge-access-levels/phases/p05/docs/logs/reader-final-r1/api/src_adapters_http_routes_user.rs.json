@@ -1,0 +1,225 @@
+{
+  "file": "src/adapters/http/routes/user.rs",
+  "entries": [
+    {
+      "name": "SIGNED_IN_LANDING",
+      "kind": "constant",
+      "span": "L39-L39",
+      "signature": "pub(super) const SIGNED_IN_LANDING: &str = \"/\";"
+    },
+    {
+      "name": "AUTH_BUSY_MESSAGE",
+      "kind": "constant",
+      "span": "L40-L40",
+      "signature": "const AUTH_BUSY_MESSAGE: &str = \"Authentication is busy. Try again shortly.\";"
+    },
+    {
+      "name": "GOOGLE_FLOW_COOKIE",
+      "kind": "constant",
+      "span": "L41-L41",
+      "signature": "const GOOGLE_FLOW_COOKIE: &str = \"google_oauth_flow\";"
+    },
+    {
+      "name": "public_router",
+      "kind": "function",
+      "span": "L43-L62",
+      "signature": "pub fn public_router() -> Router<AppState>"
+    },
+    {
+      "name": "protected_router",
+      "kind": "function",
+      "span": "L64-L69",
+      "signature": "pub fn protected_router() -> Router<AppState>"
+    },
+    {
+      "name": "index",
+      "kind": "function",
+      "span": "L71-L93",
+      "signature": "async fn index("
+    },
+    {
+      "name": "logout",
+      "kind": "function",
+      "span": "L95-L107",
+      "signature": "async fn logout("
+    },
+    {
+      "name": "login_page",
+      "kind": "function",
+      "span": "L109-L114",
+      "signature": "async fn login_page() -> impl IntoResponse"
+    },
+    {
+      "name": "register_page",
+      "kind": "function",
+      "span": "L116-L121",
+      "signature": "async fn register_page() -> impl IntoResponse"
+    },
+    {
+      "name": "GoogleFlow",
+      "kind": "enum",
+      "span": "L124-L128",
+      "signature": "enum GoogleFlow"
+    },
+    {
+      "name": "as_str",
+      "kind": "function",
+      "span": "L131-L137",
+      "signature": "fn as_str(self) -> &'static str"
+    },
+    {
+      "name": "parse",
+      "kind": "function",
+      "span": "L139-L146",
+      "signature": "fn parse(value: &str) -> Option<Self>"
+    },
+    {
+      "name": "start_google_registration",
+      "kind": "function",
+      "span": "L149-L155",
+      "signature": "async fn start_google_registration("
+    },
+    {
+      "name": "start_google_login",
+      "kind": "function",
+      "span": "L157-L163",
+      "signature": "async fn start_google_login("
+    },
+    {
+      "name": "start_google_connection",
+      "kind": "function",
+      "span": "L165-L172",
+      "signature": "async fn start_google_connection("
+    },
+    {
+      "name": "start_google_flow",
+      "kind": "function",
+      "span": "L174-L219",
+      "signature": "fn start_google_flow("
+    },
+    {
+      "name": "GoogleCallbackQuery",
+      "kind": "struct",
+      "span": "L222-L226",
+      "signature": "struct GoogleCallbackQuery"
+    },
+    {
+      "name": "GoogleTokenResponse",
+      "kind": "struct",
+      "span": "L229-L231",
+      "signature": "struct GoogleTokenResponse"
+    },
+    {
+      "name": "GoogleProfile",
+      "kind": "struct",
+      "span": "L234-L240",
+      "signature": "struct GoogleProfile"
+    },
+    {
+      "name": "google_callback",
+      "kind": "function",
+      "span": "L242-L294",
+      "signature": "async fn google_callback("
+    },
+    {
+      "name": "complete_google_flow",
+      "kind": "function",
+      "span": "L296-L364",
+      "signature": "async fn complete_google_flow("
+    },
+    {
+      "name": "fetch_google_profile",
+      "kind": "function",
+      "span": "L366-L401",
+      "signature": "async fn fetch_google_profile("
+    },
+    {
+      "name": "google_redirect_uri",
+      "kind": "function",
+      "span": "L403-L415",
+      "signature": "fn google_redirect_uri(config: &AppConfig) -> String"
+    },
+    {
+      "name": "RegisterForm",
+      "kind": "struct",
+      "span": "L418-L423",
+      "signature": "pub struct RegisterForm"
+    },
+    {
+      "name": "LoginForm",
+      "kind": "struct",
+      "span": "L426-L429",
+      "signature": "pub struct LoginForm"
+    },
+    {
+      "name": "RegisterPayload",
+      "kind": "struct",
+      "span": "L432-L436",
+      "signature": "pub struct RegisterPayload"
+    },
+    {
+      "name": "RegisterResponse",
+      "kind": "struct",
+      "span": "L439-L442",
+      "signature": "pub struct RegisterResponse"
+    },
+    {
+      "name": "ConfirmRegistration",
+      "kind": "struct",
+      "span": "L445-L448",
+      "signature": "pub struct ConfirmRegistration"
+    },
+    {
+      "name": "LoginResponse",
+      "kind": "struct",
+      "span": "L451-L455",
+      "signature": "pub struct LoginResponse"
+    },
+    {
+      "name": "register_form",
+      "kind": "function",
+      "span": "L463-L524",
+      "signature": "async fn register_form("
+    },
+    {
+      "name": "confirm_registration_form",
+      "kind": "function",
+      "span": "L526-L554",
+      "signature": "async fn confirm_registration_form("
+    },
+    {
+      "name": "login_form",
+      "kind": "function",
+      "span": "L558-L616",
+      "signature": "async fn login_form("
+    },
+    {
+      "name": "register_json",
+      "kind": "function",
+      "span": "L623-L663",
+      "signature": "async fn register_json("
+    },
+    {
+      "name": "confirm_registration_json",
+      "kind": "function",
+      "span": "L665-L684",
+      "signature": "async fn confirm_registration_json("
+    },
+    {
+      "name": "login_json",
+      "kind": "function",
+      "span": "L688-L719",
+      "signature": "async fn login_json("
+    },
+    {
+      "name": "tests",
+      "kind": "module",
+      "span": "L723-L723",
+      "signature": "mod tests;"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 22946
+  }
+}

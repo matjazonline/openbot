@@ -1,0 +1,29 @@
+{
+  "query": "close_attempt",
+  "matches": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/recovery.rs#close_attempt",
+        "name": "close_attempt",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/recovery.rs",
+        "span": "L169-L184"
+      },
+      "hits": [
+        {
+          "id": "src/adapters/persistence/workflow/recovery.rs#retire_on",
+          "relation": "calls",
+          "depth": 1,
+          "name": "retire_on",
+          "kind": "function",
+          "path": "src/adapters/persistence/workflow/recovery.rs",
+          "span": "L21-L100"
+        }
+      ]
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 15739
+  }
+}

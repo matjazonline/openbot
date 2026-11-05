@@ -1,0 +1,213 @@
+{
+  "file": "src/adapters/protocols/email/ingress.rs",
+  "entries": [
+    {
+      "name": "VerifiedEmailAuth",
+      "kind": "struct",
+      "span": "L69-L75",
+      "signature": "pub struct VerifiedEmailAuth"
+    },
+    {
+      "name": "EmailIngressTrust",
+      "kind": "enum",
+      "span": "L82-L88",
+      "signature": "pub enum EmailIngressTrust"
+    },
+    {
+      "name": "policy",
+      "kind": "function",
+      "span": "L91-L101",
+      "signature": "fn policy(self) -> IngressPolicyFacts"
+    },
+    {
+      "name": "EmailIngressError",
+      "kind": "enum",
+      "span": "L110-L121",
+      "signature": "pub enum EmailIngressError"
+    },
+    {
+      "name": "from",
+      "kind": "function",
+      "span": "L125-L127",
+      "signature": "fn from(error: EmailIngressError) -> Self"
+    },
+    {
+      "name": "AcceptedEmail",
+      "kind": "struct",
+      "span": "L132-L141",
+      "signature": "pub struct AcceptedEmail"
+    },
+    {
+      "name": "into_inbound",
+      "kind": "function",
+      "span": "L149-L157",
+      "signature": "pub fn into_inbound("
+    },
+    {
+      "name": "into_preflight_parts",
+      "kind": "function",
+      "span": "L161-L178",
+      "signature": "pub fn into_preflight_parts("
+    },
+    {
+      "name": "PendingEmailAttachments",
+      "kind": "struct",
+      "span": "L183-L186",
+      "signature": "pub struct PendingEmailAttachments"
+    },
+    {
+      "name": "PersistedEmailAttachments",
+      "kind": "struct",
+      "span": "L189-L193",
+      "signature": "pub struct PersistedEmailAttachments"
+    },
+    {
+      "name": "persist",
+      "kind": "function",
+      "span": "L198-L220",
+      "signature": "pub async fn persist("
+    },
+    {
+      "name": "EmailIngressAdapter",
+      "kind": "struct",
+      "span": "L229-L232",
+      "signature": "pub struct EmailIngressAdapter"
+    },
+    {
+      "name": "new",
+      "kind": "function",
+      "span": "L235-L240",
+      "signature": "pub fn new(app_domain: impl AsRef<str>) -> Self"
+    },
+    {
+      "name": "for_config",
+      "kind": "function",
+      "span": "L242-L244",
+      "signature": "pub fn for_config(config: &AppConfig) -> Self"
+    },
+    {
+      "name": "accept",
+      "kind": "function",
+      "span": "L247-L277",
+      "signature": "pub fn accept("
+    },
+    {
+      "name": "route",
+      "kind": "function",
+      "span": "L284-L307",
+      "signature": "fn route(&self, parsed: &ParsedEmail) -> Result<InboundRouting, EmailIngressError>"
+    },
+    {
+      "name": "classify",
+      "kind": "function",
+      "span": "L311-L329",
+      "signature": "fn classify(&self, address: &str) -> AddressedTarget"
+    },
+    {
+      "name": "disposition_of",
+      "kind": "function",
+      "span": "L331-L338",
+      "signature": "fn disposition_of(&self, address: &str) -> MessageDisposition"
+    },
+    {
+      "name": "identity",
+      "kind": "function",
+      "span": "L340-L348",
+      "signature": "fn identity("
+    },
+    {
+      "name": "draft",
+      "kind": "function",
+      "span": "L352-L410",
+      "signature": "fn draft("
+    },
+    {
+      "name": "email_metadata",
+      "kind": "function",
+      "span": "L414-L427",
+      "signature": "fn email_metadata(parsed: &ParsedEmail) -> EmailMessageMetadata"
+    },
+    {
+      "name": "message_key",
+      "kind": "function",
+      "span": "L429-L431",
+      "signature": "fn message_key(id: &MessageId) -> Result<ExternalMessageKey, EmailIngressError>"
+    },
+    {
+      "name": "thread_key",
+      "kind": "function",
+      "span": "L433-L435",
+      "signature": "fn thread_key(id: &MessageId) -> Result<ExternalThreadKey, EmailIngressError>"
+    },
+    {
+      "name": "reply_message_keys",
+      "kind": "function",
+      "span": "L442-L453",
+      "signature": "fn reply_message_keys("
+    },
+    {
+      "name": "tests",
+      "kind": "module",
+      "span": "L456-L689",
+      "signature": "mod tests"
+    },
+    {
+      "name": "adapter",
+      "kind": "function",
+      "span": "L460-L462",
+      "signature": "fn adapter() -> EmailIngressAdapter"
+    },
+    {
+      "name": "verified",
+      "kind": "function",
+      "span": "L464-L471",
+      "signature": "fn verified() -> EmailIngressTrust"
+    },
+    {
+      "name": "mail",
+      "kind": "function",
+      "span": "L473-L482",
+      "signature": "fn mail(to: &str) -> RawInboundPayload"
+    },
+    {
+      "name": "every_recipient_is_classified_before_the_application_sees_it",
+      "kind": "function",
+      "span": "L487-L544",
+      "signature": "fn every_recipient_is_classified_before_the_application_sees_it()"
+    },
+    {
+      "name": "authentication_comes_from_the_caller_and_never_from_the_message",
+      "kind": "function",
+      "span": "L549-L571",
+      "signature": "fn authentication_comes_from_the_caller_and_never_from_the_message()"
+    },
+    {
+      "name": "the_message_and_its_conversation_are_keyed_by_their_rfc_ids",
+      "kind": "function",
+      "span": "L575-L615",
+      "signature": "fn the_message_and_its_conversation_are_keyed_by_their_rfc_ids()"
+    },
+    {
+      "name": "oversized_input_is_refused_at_the_boundary",
+      "kind": "function",
+      "span": "L619-L650",
+      "signature": "fn oversized_input_is_refused_at_the_boundary()"
+    },
+    {
+      "name": "an_unusable_address_is_a_permanent_rejection_naming_which_field_it_was",
+      "kind": "function",
+      "span": "L654-L672",
+      "signature": "fn an_unusable_address_is_a_permanent_rejection_naming_which_field_it_was()"
+    },
+    {
+      "name": "identities_are_normalized_where_the_address_syntax_lives",
+      "kind": "function",
+      "span": "L676-L688",
+      "signature": "fn identities_are_normalized_where_the_address_syntax_lives()"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 27398
+  }
+}

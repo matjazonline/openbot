@@ -1,0 +1,200 @@
+{
+  "pattern": "recovery::retire_on|get_thread_messages_after",
+  "filesSearched": 1128,
+  "totalHits": 12,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_tests.rs#live_recovery",
+        "name": "live_recovery",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_tests.rs",
+        "span": "L196-L243"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_tests.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 215,
+          "text": "Box::pin(recovery::retire_on("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui.rs#thread_message_stream",
+        "name": "thread_message_stream",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui.rs",
+        "span": "L525-L644"
+      },
+      "path": "src/adapters/http/routes/ui.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 580,
+          "text": ".get_thread_messages_after(thread_id, cursor, STREAM_BATCH_LIMIT)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_runtime_tests.rs#rust_sql_equivalence",
+        "name": "rust_sql_equivalence",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_runtime_tests.rs",
+        "span": "L76-L100"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_runtime_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 86,
+          "text": "recovery::retire_on(&mut tx, request.fence, lease::Retirement::Expired)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/completion.rs#complete_on",
+        "name": "complete_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/completion.rs",
+        "span": "L72-L147"
+      },
+      "path": "src/adapters/persistence/workflow/completion.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 126,
+          "text": "recovery::retire_on(db, result.fence, lease::Retirement::Interrupted(cause))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_sibling_boundary_tests.rs#check_rust_safe_rollback",
+        "name": "check_rust_safe_rollback",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_sibling_boundary_tests.rs",
+        "span": "L128-L151"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_sibling_boundary_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 133,
+          "text": "recovery::retire_on(&mut tx, request.fence, lease::Retirement::Expired)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/budget.rs#reserve_fenced",
+        "name": "reserve_fenced",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/budget.rs",
+        "span": "L83-L109"
+      },
+      "path": "src/adapters/persistence/workflow/budget.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 100,
+          "text": "Box::pin(recovery::retire_on("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/completion.rs#progression_allowed",
+        "name": "progression_allowed",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/completion.rs",
+        "span": "L149-L193"
+      },
+      "path": "src/adapters/persistence/workflow/completion.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 152,
+          "text": "Box::pin(recovery::retire_on("
+        },
+        {
+          "line": 182,
+          "text": "recovery::retire_on("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/lease.rs#retire",
+        "name": "retire",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/lease.rs",
+        "span": "L338-L347"
+      },
+      "path": "src/adapters/persistence/workflow/lease.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 346,
+          "text": "Box::pin(super::recovery::retire_on(db, fence, reason)).await"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_history_tests.rs#workflow_action_history_matrix_shared_predicate_and_actual_rust_retirement",
+        "name": "workflow_action_history_matrix_shared_predicate_and_actual_rust_retirement",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_history_tests.rs",
+        "span": "L102-L146"
+      },
+      "path": "src/adapters/persistence/workflow/action_history_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 138,
+          "text": "recovery::retire_on(&mut tx, request.fence, lease::Retirement::Expired)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/mod.rs#get_thread_messages_after",
+        "name": "get_thread_messages_after",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/mod.rs",
+        "span": "L420-L429"
+      },
+      "path": "src/application/use_cases/thread/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 420,
+          "text": "pub async fn get_thread_messages_after("
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/infra/events.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 14,
+          "text": "//! [`crate::use_cases::thread::ThreadUseCases::get_thread_messages_after`]."
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 10,
+    "baselineChars": 199388
+  }
+}

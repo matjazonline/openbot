@@ -1,0 +1,27 @@
+{
+  "file": "src/application/workflow/registry/examples.rs",
+  "entries": [
+    {
+      "name": "AuthoringExample",
+      "kind": "struct",
+      "span": "L6-L10",
+      "signature": "pub struct AuthoringExample"
+    },
+    {
+      "name": "example",
+      "kind": "function",
+      "span": "L11-L80",
+      "signature": "pub fn example(name: &str) -> Option<AuthoringExample>"
+    },
+    {
+      "name": "values",
+      "kind": "function",
+      "span": "L81-L129",
+      "signature": "fn values(name: &str) -> Value"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 6369
+  }
+}

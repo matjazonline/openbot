@@ -1,0 +1,177 @@
+{
+  "file": "src/adapters/resend_api/client.rs",
+  "entries": [
+    {
+      "name": "MAX_RESEND_API_JSON_RESPONSE_BYTES",
+      "kind": "constant",
+      "span": "L22-L22",
+      "signature": "pub const MAX_RESEND_API_JSON_RESPONSE_BYTES: usize = 4 * 1024 * 1024;"
+    },
+    {
+      "name": "CONNECT_TIMEOUT",
+      "kind": "constant",
+      "span": "L25-L25",
+      "signature": "const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);"
+    },
+    {
+      "name": "ResendApiError",
+      "kind": "enum",
+      "span": "L29-L46",
+      "signature": "pub enum ResendApiError"
+    },
+    {
+      "name": "is_transient",
+      "kind": "function",
+      "span": "L51-L53",
+      "signature": "pub fn is_transient(&self) -> bool"
+    },
+    {
+      "name": "ResendApiSendRequest",
+      "kind": "struct",
+      "span": "L62-L75",
+      "signature": "pub struct ResendApiSendRequest"
+    },
+    {
+      "name": "ResendApiSendResponse",
+      "kind": "struct",
+      "span": "L78-L80",
+      "signature": "pub struct ResendApiSendResponse"
+    },
+    {
+      "name": "ReceivedEmail",
+      "kind": "struct",
+      "span": "L89-L97",
+      "signature": "pub struct ReceivedEmail"
+    },
+    {
+      "name": "RawReference",
+      "kind": "struct",
+      "span": "L100-L103",
+      "signature": "pub struct RawReference"
+    },
+    {
+      "name": "ResendApi",
+      "kind": "interface",
+      "span": "L111-L121",
+      "signature": "pub trait ResendApi: Send + Sync"
+    },
+    {
+      "name": "send_email",
+      "kind": "function",
+      "span": "L112-L115",
+      "signature": "async fn send_email("
+    },
+    {
+      "name": "retrieve_received",
+      "kind": "function",
+      "span": "L117-L117",
+      "signature": "async fn retrieve_received(&self, email_id: &str) -> Result<ReceivedEmail, ResendApiError>;"
+    },
+    {
+      "name": "download_raw",
+      "kind": "function",
+      "span": "L120-L120",
+      "signature": "async fn download_raw(&self, url: &str) -> Result<Vec<u8>, ResendApiError>;"
+    },
+    {
+      "name": "ReqwestResendApiClient",
+      "kind": "struct",
+      "span": "L130-L134",
+      "signature": "pub struct ReqwestResendApiClient"
+    },
+    {
+      "name": "shared_http",
+      "kind": "function",
+      "span": "L138-L146",
+      "signature": "pub fn shared_http(config: &ResendApiConfig) -> Result<Client, ResendApiError>"
+    },
+    {
+      "name": "new",
+      "kind": "function",
+      "span": "L150-L156",
+      "signature": "pub fn new(http: &Client, config: &ResendApiConfig, api_key: SecretString) -> Self"
+    },
+    {
+      "name": "request",
+      "kind": "function",
+      "span": "L158-L162",
+      "signature": "fn request(&self, method: Method, path: &str) -> reqwest::RequestBuilder"
+    },
+    {
+      "name": "send_email",
+      "kind": "function",
+      "span": "L167-L180",
+      "signature": "async fn send_email("
+    },
+    {
+      "name": "retrieve_received",
+      "kind": "function",
+      "span": "L182-L200",
+      "signature": "async fn retrieve_received(&self, email_id: &str) -> Result<ReceivedEmail, ResendApiError>"
+    },
+    {
+      "name": "download_raw",
+      "kind": "function",
+      "span": "L202-L222",
+      "signature": "async fn download_raw(&self, url: &str) -> Result<Vec<u8>, ResendApiError>"
+    },
+    {
+      "name": "bounded_body",
+      "kind": "function",
+      "span": "L227-L264",
+      "signature": "async fn bounded_body("
+    },
+    {
+      "name": "retry_after_of",
+      "kind": "function",
+      "span": "L266-L278",
+      "signature": "fn retry_after_of(response: &reqwest::Response) -> Option<Duration>"
+    },
+    {
+      "name": "classify_status",
+      "kind": "function",
+      "span": "L285-L302",
+      "signature": "pub fn classify_status("
+    },
+    {
+      "name": "classify_transport",
+      "kind": "function",
+      "span": "L304-L315",
+      "signature": "pub fn classify_transport(error: reqwest::Error) -> ResendApiError"
+    },
+    {
+      "name": "is_path_segment",
+      "kind": "function",
+      "span": "L317-L323",
+      "signature": "fn is_path_segment(value: &str) -> bool"
+    },
+    {
+      "name": "tests",
+      "kind": "module",
+      "span": "L326-L371",
+      "signature": "mod tests"
+    },
+    {
+      "name": "a_rate_limit_is_transient_and_a_refusal_is_not",
+      "kind": "function",
+      "span": "L330-L341",
+      "signature": "fn a_rate_limit_is_transient_and_a_refusal_is_not()"
+    },
+    {
+      "name": "an_email_id_that_is_not_a_path_segment_is_refused_without_a_request",
+      "kind": "function",
+      "span": "L344-L350",
+      "signature": "fn an_email_id_that_is_not_a_path_segment_is_refused_without_a_request()"
+    },
+    {
+      "name": "a_send_request_serializes_without_its_idempotency_key_or_empty_fields",
+      "kind": "function",
+      "span": "L353-L370",
+      "signature": "fn a_send_request_serializes_without_its_idempotency_key_or_empty_fields()"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 15046
+  }
+}

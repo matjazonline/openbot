@@ -1,0 +1,57 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 4,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_refusal_sql_tests.rs#assert_refusal_row",
+        "name": "assert_refusal_row",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_refusal_sql_tests.rs",
+        "span": "L30-L65"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_refusal_sql_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 39,
+          "text": "(\"invocation_id\", json!(c.subject.invocation.as_uuid())),"
+        },
+        {
+          "line": 40,
+          "text": "(\"argument_digest\", json!(c.subject.argument_digest.as_str())),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_refusal_sql_tests.rs#insert_refusal",
+        "name": "insert_refusal",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_refusal_sql_tests.rs",
+        "span": "L11-L28"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_refusal_sql_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 23,
+          "text": ".bind(c.scope.run.as_uuid()).bind(c.scope.execution.as_uuid()).bind(c.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 24,
+          "text": ".bind(c.subject.argument_digest.as_str()).bind(c.marker.as_uuid()).bind(c.actor.user_id())"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 9572
+  }
+}

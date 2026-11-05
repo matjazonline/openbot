@@ -1,0 +1,59 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 6,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_attribution_tests.rs#marker_only",
+        "name": "marker_only",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_attribution_tests.rs",
+        "span": "L91-L141"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_attribution_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 117,
+          "text": "subject_scope(added[0], request);"
+        },
+        {
+          "line": 120,
+          "text": "let stored_subject: Vec<u8> ="
+        },
+        {
+          "line": 121,
+          "text": "sqlx::query_scalar(\"SELECT replay_subject FROM workflow_action_dispatches WHERE id=$1\")"
+        },
+        {
+          "line": 127,
+          "text": "stored_subject,"
+        },
+        {
+          "line": 128,
+          "text": "crate::application::workflow::actions::replay_subject("
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/action_reconciliation_attribution_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 7,
+          "text": "use assertions::{append, committed_conflict, native_catalog, positive_links, rows, subject_scope};"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 14178
+  }
+}

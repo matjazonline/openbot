@@ -1,0 +1,123 @@
+{
+  "file": "src/adapters/resend_api/inbound.rs",
+  "entries": [
+    {
+      "name": "RECEIVED_EVENT_TYPE",
+      "kind": "constant",
+      "span": "L45-L45",
+      "signature": "const RECEIVED_EVENT_TYPE: &str = \"email.received\";"
+    },
+    {
+      "name": "ReceivedEvent",
+      "kind": "struct",
+      "span": "L53-L57",
+      "signature": "struct ReceivedEvent"
+    },
+    {
+      "name": "ReceivedEventData",
+      "kind": "struct",
+      "span": "L60-L62",
+      "signature": "struct ReceivedEventData"
+    },
+    {
+      "name": "ResendApiInboundDecoder",
+      "kind": "struct",
+      "span": "L64-L73",
+      "signature": "pub struct ResendApiInboundDecoder"
+    },
+    {
+      "name": "new",
+      "kind": "function",
+      "span": "L76-L88",
+      "signature": "pub fn new("
+    },
+    {
+      "name": "fetch_raw_mime",
+      "kind": "function",
+      "span": "L96-L116",
+      "signature": "async fn fetch_raw_mime("
+    },
+    {
+      "name": "transport",
+      "kind": "function",
+      "span": "L120-L122",
+      "signature": "fn transport(&self) -> TransportKind"
+    },
+    {
+      "name": "decode",
+      "kind": "function",
+      "span": "L124-L129",
+      "signature": "async fn decode(&self, event: &InboundEventRecord) -> InboundEventDecodeOutcome"
+    },
+    {
+      "name": "decode_event",
+      "kind": "function",
+      "span": "L137-L196",
+      "signature": "async fn decode_event("
+    },
+    {
+      "name": "read_mail",
+      "kind": "function",
+      "span": "L205-L262",
+      "signature": "async fn read_mail("
+    },
+    {
+      "name": "event_email_id",
+      "kind": "function",
+      "span": "L268-L275",
+      "signature": "fn event_email_id(event: &InboundEventRecord) -> Result<Option<String>, Failure>"
+    },
+    {
+      "name": "ignore_reason",
+      "kind": "function",
+      "span": "L282-L295",
+      "signature": "fn ignore_reason("
+    },
+    {
+      "name": "Failure",
+      "kind": "struct",
+      "span": "L299-L303",
+      "signature": "struct Failure"
+    },
+    {
+      "name": "terminal",
+      "kind": "function",
+      "span": "L306-L312",
+      "signature": "fn terminal(class: InboundEventErrorClass, detail: String) -> Self"
+    },
+    {
+      "name": "from_provider",
+      "kind": "function",
+      "span": "L319-L358",
+      "signature": "fn from_provider("
+    },
+    {
+      "name": "from_app",
+      "kind": "function",
+      "span": "L361-L367",
+      "signature": "fn from_app(error: crate::app_error::AppError) -> Self"
+    },
+    {
+      "name": "into_outcome",
+      "kind": "function",
+      "span": "L369-L382",
+      "signature": "fn into_outcome(self) -> InboundEventDecodeOutcome"
+    },
+    {
+      "name": "bounded_detail",
+      "kind": "function",
+      "span": "L387-L397",
+      "signature": "fn bounded_detail(message: &str) -> crate::transport::InboundFailureDetail"
+    },
+    {
+      "name": "tests",
+      "kind": "module",
+      "span": "L401-L401",
+      "signature": "mod tests;"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 15978
+  }
+}

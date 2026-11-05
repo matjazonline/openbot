@@ -1,0 +1,38 @@
+[
+  {
+    "path": "src/adapters/http/pages/knowledge_view_tests.rs",
+    "lines": 129
+  },
+  {
+    "path": "src/adapters/http/pages/message_visibility.rs",
+    "lines": 20
+  },
+  {
+    "path": "src/adapters/http/routes/ui_knowledge_view_tests.rs",
+    "lines": 348
+  },
+  {
+    "path": "src/adapters/persistence/view_visibility.rs",
+    "lines": 92
+  },
+  {
+    "path": "src/adapters/persistence/workflow/decisions/read/visibility.rs",
+    "lines": 38
+  },
+  {
+    "path": "src/adapters/persistence/workflow/knowledge_view_delivery_tests.rs",
+    "lines": 208
+  },
+  {
+    "path": "src/adapters/persistence/workflow/knowledge_view_tests.rs",
+    "lines": 264
+  },
+  {
+    "path": "src/application/knowledge/visibility.rs",
+    "lines": 13
+  },
+  {
+    "path": "src/application/use_cases/thread/reads.rs",
+    "lines": 270
+  }
+]

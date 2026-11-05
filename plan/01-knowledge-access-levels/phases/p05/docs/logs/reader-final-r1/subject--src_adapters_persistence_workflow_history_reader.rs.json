@@ -1,0 +1,78 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 6,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/history_reader.rs#read_rows",
+        "name": "read_rows",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/history_reader.rs",
+        "span": "L138-L168"
+      },
+      "path": "src/adapters/persistence/workflow/history_reader.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 146,
+          "text": "author_identity.subject AS author_subject, \\"
+        },
+        {
+          "line": 147,
+          "text": "left(message.subject, $3) AS subject, left(message.clean_text_body, $3) AS body \\"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/history_reader.rs#HistoryRow",
+        "name": "HistoryRow",
+        "kind": "struct",
+        "path": "src/adapters/persistence/workflow/history_reader.rs",
+        "span": "L22-L33"
+      },
+      "path": "src/adapters/persistence/workflow/history_reader.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 30,
+          "text": "author_subject: Option<String>,"
+        },
+        {
+          "line": 31,
+          "text": "subject: String,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/history_reader.rs#message",
+        "name": "message",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/history_reader.rs",
+        "span": "L36-L52"
+      },
+      "path": "src/adapters/persistence/workflow/history_reader.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 46,
+          "text": "\"\" => self.author_subject.unwrap_or_else(|| \"Unknown\".into()),"
+        },
+        {
+          "line": 49,
+          "text": "subject: self.subject,"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 8213
+  }
+}

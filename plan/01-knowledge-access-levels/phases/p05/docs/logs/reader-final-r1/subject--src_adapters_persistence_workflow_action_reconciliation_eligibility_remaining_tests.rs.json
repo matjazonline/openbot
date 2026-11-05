@@ -1,0 +1,74 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 5,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_eligibility_remaining_tests.rs#blocked",
+        "name": "blocked",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_eligibility_remaining_tests.rs",
+        "span": "L128-L167"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_eligibility_remaining_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 165,
+          "text": "\"ineligible subject cannot claim or debit\""
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_eligibility_remaining_tests.rs#subject_without_sibling_veto",
+        "name": "subject_without_sibling_veto",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_eligibility_remaining_tests.rs",
+        "span": "L212-L243"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_eligibility_remaining_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 212,
+          "text": "async fn subject_without_sibling_veto(pending: &PendingAction) {"
+        },
+        {
+          "line": 214,
+          "text": "// Assert every subject gate, omitting only the final runnable-sibling veto."
+        },
+        {
+          "line": 233,
+          "text": "assert!(eligible, \"the subject passes every other reopen gate\");"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_eligibility_remaining_tests.rs#workflow_action_reconciliation_eligibility_extra_pending_sibling_records_truth_only",
+        "name": "workflow_action_reconciliation_eligibility_extra_pending_sibling_records_truth_only",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_eligibility_remaining_tests.rs",
+        "span": "L246-L268"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_eligibility_remaining_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 266,
+          "text": "subject_without_sibling_veto(&pending).await;"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 19560
+  }
+}

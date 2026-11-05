@@ -1,0 +1,4 @@
+{'pattern': 'clean_text_body', 'hits': 74, 'leaves': 1, 'calls': 1, 'truncated': 0}
+{'pattern': 'subject', 'hits': 1301, 'leaves': 492, 'calls': 497, 'truncated': 0}
+{'pattern': 'attachment', 'hits': 375, 'leaves': 7, 'calls': 8, 'truncated': 0}
+{'api_files': 145}

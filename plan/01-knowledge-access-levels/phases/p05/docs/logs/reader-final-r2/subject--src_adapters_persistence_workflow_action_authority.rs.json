@@ -1,0 +1,65 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 6,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_authority.rs#load_on",
+        "name": "load_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_authority.rs",
+        "span": "L54-L120"
+      },
+      "path": "src/adapters/persistence/workflow/action_authority.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 57,
+          "text": "subject: &ApprovalSubject,"
+        },
+        {
+          "line": 81,
+          "text": ".bind(subject.invocation.as_uuid())"
+        },
+        {
+          "line": 82,
+          "text": ".bind(subject.argument_digest.as_str())"
+        },
+        {
+          "line": 92,
+          "text": "|| action.argument_digest() != &subject.argument_digest"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_authority.rs#action_authority",
+        "name": "action_authority",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_authority.rs",
+        "span": "L18-L29"
+      },
+      "path": "src/adapters/persistence/workflow/action_authority.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 21,
+          "text": "subject: &ApprovalSubject,"
+        },
+        {
+          "line": 26,
+          "text": "let authority = load_on(&mut tx, scope, subject, actor).await?;"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 4361
+  }
+}

@@ -1,0 +1,128 @@
+{
+  "pattern": "subject",
+  "filesSearched": 9,
+  "totalHits": 7,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/resend_api/transport_tests.rs#mail",
+        "name": "mail",
+        "kind": "function",
+        "path": "src/adapters/resend_api/transport_tests.rs",
+        "span": "L12-L37"
+      },
+      "path": "src/adapters/resend_api/transport_tests.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 18,
+          "text": "subject: \"Re: an order\".to_string(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/resend_api/transport.rs#build_request",
+        "name": "build_request",
+        "kind": "function",
+        "path": "src/adapters/resend_api/transport.rs",
+        "span": "L121-L175"
+      },
+      "path": "src/adapters/resend_api/transport.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 164,
+          "text": "subject: mail.subject,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/resend_api/client.rs#ResendApiSendRequest",
+        "name": "ResendApiSendRequest",
+        "kind": "struct",
+        "path": "src/adapters/resend_api/client.rs",
+        "span": "L62-L75"
+      },
+      "path": "src/adapters/resend_api/client.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 67,
+          "text": "pub subject: String,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/resend_api/client.rs#a_send_request_serializes_without_its_idempotency_key_or_empty_fields",
+        "name": "a_send_request_serializes_without_its_idempotency_key_or_empty_fields",
+        "kind": "function",
+        "path": "src/adapters/resend_api/client.rs",
+        "span": "L353-L370"
+      },
+      "path": "src/adapters/resend_api/client.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 358,
+          "text": "subject: \"Re: hello\".to_string(),"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/resend_api/inbound.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 48,
+          "text": "/// Everything else Resend sends -- the subject, the recipient lists, the attachment metadata --"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/resend_api/transport_tests.rs#a_send_carries_the_frozen_threading_and_loop_headers",
+        "name": "a_send_carries_the_frozen_threading_and_loop_headers",
+        "kind": "function",
+        "path": "src/adapters/resend_api/transport_tests.rs",
+        "span": "L46-L81"
+      },
+      "path": "src/adapters/resend_api/transport_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 54,
+          "text": "assert_eq!(request.subject, \"Re: an order\");"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/resend_api/transport.rs#RESERVED_HEADERS",
+        "name": "RESERVED_HEADERS",
+        "kind": "constant",
+        "path": "src/adapters/resend_api/transport.rs",
+        "span": "L34-L34"
+      },
+      "path": "src/adapters/resend_api/transport.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 34,
+          "text": "const RESERVED_HEADERS: [&str; 4] = [\"message-id\", \"in-reply-to\", \"references\", \"subject\"];"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 4,
+    "baselineChars": 46429
+  }
+}

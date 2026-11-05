@@ -1,0 +1,173 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 15,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/decision_approvals.rs#fail",
+        "name": "fail",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/decision_approvals.rs",
+        "span": "L183-L210"
+      },
+      "path": "src/adapters/persistence/workflow/decision_approvals.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 189,
+          "text": "let operation: Value = sqlx::query_scalar(\"SELECT intent.operation FROM workflow_decisions AS decision JOIN workflow_action_intents AS intent ON intent.company_"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/decision_approvals.rs#confirm",
+        "name": "confirm",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/decision_approvals.rs",
+        "span": "L214-L221"
+      },
+      "path": "src/adapters/persistence/workflow/decision_approvals.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 219,
+          "text": "Ok(sqlx::query_scalar(\"SELECT EXISTS(SELECT 1 FROM workflow_decisions AS decision JOIN task_attempts AS attempt ON attempt.task_id=decision.job_id AND attempt.a"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/decision_approvals.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1,
+          "text": "//! Protected-action subjects use the decision ledger, but never complete a business step."
+        },
+        {
+          "line": 234,
+          "text": "// Shared choice commit; subject-specific approval and refusal remain with their owner."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/decision_approvals.rs#approved",
+        "name": "approved",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/decision_approvals.rs",
+        "span": "L8-L16"
+      },
+      "path": "src/adapters/persistence/workflow/decision_approvals.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 11,
+          "text": "subject: &ApprovalSubject,"
+        },
+        {
+          "line": 14,
+          "text": "Ok(sqlx::query_scalar(\"SELECT decision.id FROM workflow_decisions AS decision JOIN workflow_waits AS wait ON wait.company_id=decision.company_id AND wait.id=dec"
+        },
+        {
+          "line": 15,
+          "text": ".bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(subject.invocation.as_uuid()).bind(subject.argument_digest.as_str("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/decision_approvals.rs#approved_request",
+        "name": "approved_request",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/decision_approvals.rs",
+        "span": "L18-L25"
+      },
+      "path": "src/adapters/persistence/workflow/decision_approvals.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 23,
+          "text": "Ok(sqlx::query_scalar(\"SELECT EXISTS(SELECT 1 FROM workflow_decisions AS decision JOIN workflow_waits AS wait ON wait.company_id=decision.company_id AND wait.id"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/decision_approvals.rs#consumed",
+        "name": "consumed",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/decision_approvals.rs",
+        "span": "L36-L44"
+      },
+      "path": "src/adapters/persistence/workflow/decision_approvals.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 42,
+          "text": ".bind(request.scope().execution.as_uuid()).bind(request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/decision_approvals.rs#park",
+        "name": "park",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/decision_approvals.rs",
+        "span": "L46-L95"
+      },
+      "path": "src/adapters/persistence/workflow/decision_approvals.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 70,
+          "text": ".bind(scope.company.as_uuid()).bind(scope.execution.as_uuid()).bind(request.subject.invocation.as_uuid()).fetch_one(&mut **tx).await?;"
+        },
+        {
+          "line": 86,
+          "text": "let digest = hex_digest(&proposal(request.subject.invocation.as_uuid(), action))?;"
+        },
+        {
+          "line": 89,
+          "text": "sqlx::query(\"INSERT INTO workflow_decisions(company_id,run_id,execution_id,id,wait_id,subject_kind,proposal_digest,action_invocation_id,argument_digest,operatio"
+        },
+        {
+          "line": 90,
+          "text": ".bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(decision).bind(wait).bind(digest).bind(request.subject.invocation."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/decision_approvals.rs#parked",
+        "name": "parked",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/decision_approvals.rs",
+        "span": "L140-L148"
+      },
+      "path": "src/adapters/persistence/workflow/decision_approvals.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 145,
+          "text": "let wait: Option<Uuid> = sqlx::query_scalar(\"SELECT decision.wait_id FROM workflow_decisions AS decision JOIN task_attempts AS attempt ON attempt.task_id=decisi"
+        },
+        {
+          "line": 146,
+          "text": ".bind(fence.scope.company.as_uuid()).bind(fence.scope.run.as_uuid()).bind(fence.scope.execution.as_uuid()).bind(fence.scope.job.0).bind(fence.attempt.0).bind(fe"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 18043
+  }
+}

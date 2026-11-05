@@ -1,0 +1,51 @@
+{
+  "file": "src/adapters/persistence/workflow/checkpoint_models.rs",
+  "entries": [
+    {
+      "name": "Admission",
+      "kind": "type",
+      "span": "L9-L9",
+      "signature": "type Admission = WorkflowModelAdmission;"
+    },
+    {
+      "name": "reserve_on",
+      "kind": "function",
+      "span": "L11-L83",
+      "signature": "pub(super) async fn reserve_on("
+    },
+    {
+      "name": "charge",
+      "kind": "function",
+      "span": "L85-L102",
+      "signature": "async fn charge("
+    },
+    {
+      "name": "admission_replay",
+      "kind": "function",
+      "span": "L104-L142",
+      "signature": "fn admission_replay("
+    },
+    {
+      "name": "settle_on",
+      "kind": "function",
+      "span": "L144-L201",
+      "signature": "pub(super) async fn settle_on("
+    },
+    {
+      "name": "replay_policy",
+      "kind": "function",
+      "span": "L203-L225",
+      "signature": "async fn replay_policy("
+    },
+    {
+      "name": "settlement_replay",
+      "kind": "function",
+      "span": "L227-L257",
+      "signature": "fn settlement_replay("
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 9571
+  }
+}

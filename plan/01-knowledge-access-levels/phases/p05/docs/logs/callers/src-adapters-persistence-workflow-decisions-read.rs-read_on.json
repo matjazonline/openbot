@@ -1,0 +1,29 @@
+{
+  "query": "read_on",
+  "matches": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/decisions/read.rs#read_on",
+        "name": "read_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/decisions/read.rs",
+        "span": "L36-L93"
+      },
+      "hits": [
+        {
+          "id": "src/adapters/persistence/workflow/decisions.rs#read_decision",
+          "relation": "calls",
+          "depth": 1,
+          "name": "read_decision",
+          "kind": "function",
+          "path": "src/adapters/persistence/workflow/decisions.rs",
+          "span": "L55-L69"
+        }
+      ]
+    }
+  ],
+  "saved": {
+    "files": 2,
+    "baselineChars": 35327
+  }
+}

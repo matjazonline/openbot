@@ -1,0 +1,213 @@
+{
+  "file": "src/domain/entities/message.rs",
+  "entries": [
+    {
+      "name": "ExternalMessageCollision",
+      "kind": "struct",
+      "span": "L35-L39",
+      "signature": "pub struct ExternalMessageCollision"
+    },
+    {
+      "name": "MessageRole",
+      "kind": "enum",
+      "span": "L43-L47",
+      "signature": "pub enum MessageRole"
+    },
+    {
+      "name": "MessageAudience",
+      "kind": "enum",
+      "span": "L55-L58",
+      "signature": "pub enum MessageAudience"
+    },
+    {
+      "name": "as_str",
+      "kind": "function",
+      "span": "L61-L66",
+      "signature": "pub const fn as_str(self) -> &'static str"
+    },
+    {
+      "name": "is_externally_deliverable",
+      "kind": "function",
+      "span": "L68-L70",
+      "signature": "pub const fn is_externally_deliverable(self) -> bool"
+    },
+    {
+      "name": "Err",
+      "kind": "type",
+      "span": "L74-L74",
+      "signature": "type Err = String;"
+    },
+    {
+      "name": "from_str",
+      "kind": "function",
+      "span": "L76-L82",
+      "signature": "fn from_str(value: &str) -> Result<Self, Self::Err>"
+    },
+    {
+      "name": "ThreadEntryKind",
+      "kind": "enum",
+      "span": "L91-L96",
+      "signature": "pub enum ThreadEntryKind"
+    },
+    {
+      "name": "as_str",
+      "kind": "function",
+      "span": "L99-L106",
+      "signature": "pub const fn as_str(self) -> &'static str"
+    },
+    {
+      "name": "Err",
+      "kind": "type",
+      "span": "L110-L110",
+      "signature": "type Err = String;"
+    },
+    {
+      "name": "from_str",
+      "kind": "function",
+      "span": "L112-L120",
+      "signature": "fn from_str(value: &str) -> Result<Self, Self::Err>"
+    },
+    {
+      "name": "as_str",
+      "kind": "function",
+      "span": "L124-L130",
+      "signature": "pub fn as_str(&self) -> &'static str"
+    },
+    {
+      "name": "Err",
+      "kind": "type",
+      "span": "L134-L134",
+      "signature": "type Err = String;"
+    },
+    {
+      "name": "from_str",
+      "kind": "function",
+      "span": "L136-L143",
+      "signature": "fn from_str(s: &str) -> Result<Self, Self::Err>"
+    },
+    {
+      "name": "MessageDirection",
+      "kind": "enum",
+      "span": "L148-L151",
+      "signature": "pub enum MessageDirection"
+    },
+    {
+      "name": "as_str",
+      "kind": "function",
+      "span": "L154-L159",
+      "signature": "pub fn as_str(&self) -> &'static str"
+    },
+    {
+      "name": "Err",
+      "kind": "type",
+      "span": "L163-L163",
+      "signature": "type Err = String;"
+    },
+    {
+      "name": "from_str",
+      "kind": "function",
+      "span": "L165-L171",
+      "signature": "fn from_str(s: &str) -> Result<Self, Self::Err>"
+    },
+    {
+      "name": "MessageParticipantKind",
+      "kind": "enum",
+      "span": "L180-L184",
+      "signature": "pub enum MessageParticipantKind"
+    },
+    {
+      "name": "as_str",
+      "kind": "function",
+      "span": "L187-L193",
+      "signature": "pub const fn as_str(self) -> &'static str"
+    },
+    {
+      "name": "Err",
+      "kind": "type",
+      "span": "L197-L197",
+      "signature": "type Err = String;"
+    },
+    {
+      "name": "from_str",
+      "kind": "function",
+      "span": "L199-L206",
+      "signature": "fn from_str(value: &str) -> Result<Self, Self::Err>"
+    },
+    {
+      "name": "MessageParticipant",
+      "kind": "struct",
+      "span": "L214-L220",
+      "signature": "pub struct MessageParticipant"
+    },
+    {
+      "name": "AttachmentMetadata",
+      "kind": "struct",
+      "span": "L223-L240",
+      "signature": "pub struct AttachmentMetadata"
+    },
+    {
+      "name": "AttachmentSource",
+      "kind": "struct",
+      "span": "L243-L246",
+      "signature": "pub struct AttachmentSource"
+    },
+    {
+      "name": "MessageAttachments",
+      "kind": "enum",
+      "span": "L256-L259",
+      "signature": "pub enum MessageAttachments"
+    },
+    {
+      "name": "new",
+      "kind": "function",
+      "span": "L262-L264",
+      "signature": "pub fn new(items: Vec<AttachmentMetadata>) -> Self"
+    },
+    {
+      "name": "into_items",
+      "kind": "function",
+      "span": "L266-L270",
+      "signature": "pub fn into_items(self) -> Vec<AttachmentMetadata>"
+    },
+    {
+      "name": "MessageAuthor",
+      "kind": "struct",
+      "span": "L278-L285",
+      "signature": "pub struct MessageAuthor"
+    },
+    {
+      "name": "display",
+      "kind": "function",
+      "span": "L289-L294",
+      "signature": "pub fn display(&self) -> &str"
+    },
+    {
+      "name": "Message",
+      "kind": "struct",
+      "span": "L302-L329",
+      "signature": "pub struct Message"
+    },
+    {
+      "name": "cursor",
+      "kind": "function",
+      "span": "L333-L338",
+      "signature": "pub fn cursor(&self) -> MessageCursor"
+    },
+    {
+      "name": "tests",
+      "kind": "module",
+      "span": "L342-L365",
+      "signature": "mod tests"
+    },
+    {
+      "name": "attachments_decode_only_from_their_own_version",
+      "kind": "function",
+      "span": "L346-L364",
+      "signature": "fn attachments_decode_only_from_their_own_version()"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 12594
+  }
+}

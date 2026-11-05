@@ -1,0 +1,32 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 1,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/auth_key_rotation_tests.rs#schema_constraint_oauth_account_stores_null_and_rejects_passwords",
+        "name": "schema_constraint_oauth_account_stores_null_and_rejects_passwords",
+        "kind": "function",
+        "path": "src/adapters/persistence/auth_key_rotation_tests.rs",
+        "span": "L205-L240"
+      },
+      "path": "src/adapters/persistence/auth_key_rotation_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 216,
+          "text": "subject: &suffix,"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 9623
+  }
+}

@@ -1,0 +1,70 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 4,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_cancellation_receipt_tests.rs#accepted",
+        "name": "accepted",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_cancellation_receipt_tests.rs",
+        "span": "L26-L67"
+      },
+      "path": "src/adapters/persistence/workflow/action_cancellation_receipt_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 54,
+          "text": ".action_authority(request.scope(), &request.subject)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_cancellation_receipt_tests.rs#settled_truth",
+        "name": "settled_truth",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_cancellation_receipt_tests.rs",
+        "span": "L107-L162"
+      },
+      "path": "src/adapters/persistence/workflow/action_cancellation_receipt_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 128,
+          "text": "json!(request.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 132,
+          "text": "json!(request.subject.argument_digest.as_str())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_cancellation_receipt_tests.rs#workflow_action_cancellation_observed_result_token_settles_then_interrupts",
+        "name": "workflow_action_cancellation_observed_result_token_settles_then_interrupts",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_cancellation_receipt_tests.rs",
+        "span": "L550-L597"
+      },
+      "path": "src/adapters/persistence/workflow/action_cancellation_receipt_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 583,
+          "text": "json!(request.subject.argument_digest.as_str())"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 23434
+  }
+}

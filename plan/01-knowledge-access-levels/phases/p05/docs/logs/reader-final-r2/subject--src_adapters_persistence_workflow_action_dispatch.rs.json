@@ -1,0 +1,245 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 25,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_dispatch.rs#insert_subject",
+        "name": "insert_subject",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_dispatch.rs",
+        "span": "L191-L207"
+      },
+      "path": "src/adapters/persistence/workflow/action_dispatch.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 191,
+          "text": "pub(super) async fn insert_subject("
+        },
+        {
+          "line": 197,
+          "text": "subject: Option<Vec<u8>>,"
+        },
+        {
+          "line": 199,
+          "text": "sqlx::query(\"INSERT INTO workflow_action_dispatches (company_id,run_id,execution_id,invocation_id,argument_digest,id,job_id,attempt_number,execution_generation,"
+        },
+        {
+          "line": 201,
+          "text": ".bind(request.scope().execution.as_uuid()).bind(request.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 202,
+          "text": ".bind(request.subject.argument_digest.as_str()).bind(marker)"
+        },
+        {
+          "line": 205,
+          "text": ".bind(kind).bind(policy).bind(subject).execute(&mut **tx).await?;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_dispatch.rs#authorize_prelocked_on",
+        "name": "authorize_prelocked_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_dispatch.rs",
+        "span": "L96-L169"
+      },
+      "path": "src/adapters/persistence/workflow/action_dispatch.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 127,
+          "text": "&request.subject,"
+        },
+        {
+          "line": 131,
+          "text": "validate_run_authority(request.scope(), &request.subject, &authority)?;"
+        },
+        {
+          "line": 144,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 145,
+          "text": ".bind(request.subject.argument_digest.as_str())"
+        },
+        {
+          "line": 155,
+          "text": "&request.subject,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_dispatch.rs#existing",
+        "name": "existing",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_dispatch.rs",
+        "span": "L171-L179"
+      },
+      "path": "src/adapters/persistence/workflow/action_dispatch.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 177,
+          "text": ").bind(request.scope().company.as_uuid()).bind(request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_dispatch.rs#apply",
+        "name": "apply",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_dispatch.rs",
+        "span": "L39-L44"
+      },
+      "path": "src/adapters/persistence/workflow/action_dispatch.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 43,
+          "text": "subject: &ApprovalSubject,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_dispatch.rs#insert",
+        "name": "insert",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_dispatch.rs",
+        "span": "L181-L189"
+      },
+      "path": "src/adapters/persistence/workflow/action_dispatch.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 188,
+          "text": "Self::insert_subject(tx, request, marker, kind, policy, None).await"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_dispatch.rs#is",
+        "name": "is",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_dispatch.rs",
+        "span": "L307-L315"
+      },
+      "path": "src/adapters/persistence/workflow/action_dispatch.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 310,
+          "text": "&& self.invocation_id == request.subject.invocation.as_uuid()"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_dispatch.rs#saved_receipt",
+        "name": "saved_receipt",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_dispatch.rs",
+        "span": "L659-L666"
+      },
+      "path": "src/adapters/persistence/workflow/action_dispatch.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 664,
+          "text": ".bind(request.scope().company.as_uuid()).bind(request.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 665,
+          "text": ".bind(request.subject.argument_digest.as_str()).fetch_optional(&mut **tx).await?)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_dispatch.rs#SqlLocalAction",
+        "name": "SqlLocalAction",
+        "kind": "interface",
+        "path": "src/adapters/persistence/workflow/action_dispatch.rs",
+        "span": "L36-L45"
+      },
+      "path": "src/adapters/persistence/workflow/action_dispatch.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 38,
+          "text": "/// `subject` names the invocation, for effects that derive their identities from it."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_dispatch.rs#local",
+        "name": "local",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_dispatch.rs",
+        "span": "L212-L283"
+      },
+      "path": "src/adapters/persistence/workflow/action_dispatch.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 231,
+          "text": "Some(result) => LocalDispatchResult::Committed(ActionReceipt { subject: request.subject.clone(), result: validate_action_result(&action, result)? }),"
+        },
+        {
+          "line": 239,
+          "text": "let result = validate_action_result(&action, Box::pin(self.local.apply(&mut tx, &action, &request.subject)).await?)?;"
+        },
+        {
+          "line": 242,
+          "text": ".bind(request.scope().execution.as_uuid()).bind(request.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 243,
+          "text": ".bind(request.subject.argument_digest.as_str()).bind(marker).bind(&result).execute(&mut *tx).await?;"
+        },
+        {
+          "line": 245,
+          "text": "Ok(End::Commit(LocalDispatchResult::Committed(ActionReceipt { subject: request.subject.clone(), result })))"
+        },
+        {
+          "line": 270,
+          "text": "subject: request.subject.clone(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_dispatch.rs#enter_remote",
+        "name": "enter_remote",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_dispatch.rs",
+        "span": "L577-L627"
+      },
+      "path": "src/adapters/persistence/workflow/action_dispatch.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 604,
+          "text": ".bind(request.subject.invocation.as_uuid()).bind(reservation.entry).fetch_one(&mut *tx).await?;"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 29716
+  }
+}

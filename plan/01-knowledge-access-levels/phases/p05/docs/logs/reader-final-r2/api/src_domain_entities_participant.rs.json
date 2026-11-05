@@ -1,0 +1,249 @@
+{
+  "file": "src/domain/entities/participant.rs",
+  "entries": [
+    {
+      "name": "PrincipalKind",
+      "kind": "enum",
+      "span": "L17-L22",
+      "signature": "pub enum PrincipalKind"
+    },
+    {
+      "name": "as_str",
+      "kind": "function",
+      "span": "L25-L32",
+      "signature": "pub const fn as_str(self) -> &'static str"
+    },
+    {
+      "name": "Err",
+      "kind": "type",
+      "span": "L36-L36",
+      "signature": "type Err = InvalidParticipantValue;"
+    },
+    {
+      "name": "from_str",
+      "kind": "function",
+      "span": "L38-L46",
+      "signature": "fn from_str(value: &str) -> Result<Self, Self::Err>"
+    },
+    {
+      "name": "Principal",
+      "kind": "struct",
+      "span": "L50-L59",
+      "signature": "pub struct Principal"
+    },
+    {
+      "name": "IdentityStatus",
+      "kind": "enum",
+      "span": "L63-L66",
+      "signature": "pub enum IdentityStatus"
+    },
+    {
+      "name": "as_str",
+      "kind": "function",
+      "span": "L69-L74",
+      "signature": "pub const fn as_str(self) -> &'static str"
+    },
+    {
+      "name": "Err",
+      "kind": "type",
+      "span": "L78-L78",
+      "signature": "type Err = InvalidParticipantValue;"
+    },
+    {
+      "name": "from_str",
+      "kind": "function",
+      "span": "L80-L86",
+      "signature": "fn from_str(value: &str) -> Result<Self, Self::Err>"
+    },
+    {
+      "name": "IdentityProvenance",
+      "kind": "enum",
+      "span": "L92-L99",
+      "signature": "pub enum IdentityProvenance"
+    },
+    {
+      "name": "as_str",
+      "kind": "function",
+      "span": "L102-L111",
+      "signature": "pub const fn as_str(self) -> &'static str"
+    },
+    {
+      "name": "Err",
+      "kind": "type",
+      "span": "L115-L115",
+      "signature": "type Err = InvalidParticipantValue;"
+    },
+    {
+      "name": "from_str",
+      "kind": "function",
+      "span": "L117-L127",
+      "signature": "fn from_str(value: &str) -> Result<Self, Self::Err>"
+    },
+    {
+      "name": "IdentityClaimMetadata",
+      "kind": "enum",
+      "span": "L134-L145",
+      "signature": "pub enum IdentityClaimMetadata"
+    },
+    {
+      "name": "observation",
+      "kind": "function",
+      "span": "L148-L150",
+      "signature": "pub const fn observation() -> Self"
+    },
+    {
+      "name": "account",
+      "kind": "function",
+      "span": "L152-L154",
+      "signature": "pub const fn account() -> Self"
+    },
+    {
+      "name": "provider_profile",
+      "kind": "function",
+      "span": "L157-L162",
+      "signature": "pub const fn provider_profile(claimed_identity: Option<QualifiedIdentity>) -> Self"
+    },
+    {
+      "name": "version",
+      "kind": "function",
+      "span": "L164-L170",
+      "signature": "pub const fn version(&self) -> u8"
+    },
+    {
+      "name": "PrincipalIdentity",
+      "kind": "struct",
+      "span": "L174-L187",
+      "signature": "pub struct PrincipalIdentity"
+    },
+    {
+      "name": "PrincipalCapability",
+      "kind": "enum",
+      "span": "L191-L194",
+      "signature": "pub enum PrincipalCapability"
+    },
+    {
+      "name": "as_str",
+      "kind": "function",
+      "span": "L197-L202",
+      "signature": "pub const fn as_str(self) -> &'static str"
+    },
+    {
+      "name": "Err",
+      "kind": "type",
+      "span": "L206-L206",
+      "signature": "type Err = InvalidParticipantValue;"
+    },
+    {
+      "name": "from_str",
+      "kind": "function",
+      "span": "L208-L214",
+      "signature": "fn from_str(value: &str) -> Result<Self, Self::Err>"
+    },
+    {
+      "name": "GrantProvenance",
+      "kind": "enum",
+      "span": "L219-L224",
+      "signature": "pub enum GrantProvenance"
+    },
+    {
+      "name": "as_str",
+      "kind": "function",
+      "span": "L227-L234",
+      "signature": "pub const fn as_str(self) -> &'static str"
+    },
+    {
+      "name": "Err",
+      "kind": "type",
+      "span": "L238-L238",
+      "signature": "type Err = InvalidParticipantValue;"
+    },
+    {
+      "name": "from_str",
+      "kind": "function",
+      "span": "L240-L248",
+      "signature": "fn from_str(value: &str) -> Result<Self, Self::Err>"
+    },
+    {
+      "name": "ChannelPrincipalGrant",
+      "kind": "struct",
+      "span": "L252-L257",
+      "signature": "pub struct ChannelPrincipalGrant"
+    },
+    {
+      "name": "PrincipalAccessContext",
+      "kind": "struct",
+      "span": "L261-L268",
+      "signature": "pub struct PrincipalAccessContext"
+    },
+    {
+      "name": "PrincipalGrantAuthority",
+      "kind": "enum",
+      "span": "L271-L274",
+      "signature": "pub enum PrincipalGrantAuthority"
+    },
+    {
+      "name": "external",
+      "kind": "function",
+      "span": "L277-L284",
+      "signature": "pub const fn external(principal_id: PrincipalId) -> Self"
+    },
+    {
+      "name": "ThreadPrincipalRole",
+      "kind": "enum",
+      "span": "L289-L292",
+      "signature": "pub enum ThreadPrincipalRole"
+    },
+    {
+      "name": "as_str",
+      "kind": "function",
+      "span": "L295-L300",
+      "signature": "pub const fn as_str(self) -> &'static str"
+    },
+    {
+      "name": "Err",
+      "kind": "type",
+      "span": "L304-L304",
+      "signature": "type Err = InvalidParticipantValue;"
+    },
+    {
+      "name": "from_str",
+      "kind": "function",
+      "span": "L306-L312",
+      "signature": "fn from_str(value: &str) -> Result<Self, Self::Err>"
+    },
+    {
+      "name": "InvalidParticipantValue",
+      "kind": "struct",
+      "span": "L317-L320",
+      "signature": "pub struct InvalidParticipantValue"
+    },
+    {
+      "name": "new",
+      "kind": "function",
+      "span": "L323-L328",
+      "signature": "fn new(field: &'static str, value: impl Into<String>) -> Self"
+    },
+    {
+      "name": "fmt",
+      "kind": "function",
+      "span": "L332-L334",
+      "signature": "fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result"
+    },
+    {
+      "name": "tests",
+      "kind": "module",
+      "span": "L338-L347",
+      "signature": "mod tests"
+    },
+    {
+      "name": "claim_payloads_require_the_current_version",
+      "kind": "function",
+      "span": "L342-L346",
+      "signature": "fn claim_payloads_require_the_current_version()"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 9810
+  }
+}

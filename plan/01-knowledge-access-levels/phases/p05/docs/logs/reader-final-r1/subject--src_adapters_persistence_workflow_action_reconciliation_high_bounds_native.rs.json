@@ -1,0 +1,129 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 9,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_native.rs#insert_entry",
+        "name": "insert_entry",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_native.rs",
+        "span": "L24-L39"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_native.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 33,
+          "text": ".bind(request.scope().execution.as_uuid()).bind(request.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 34,
+          "text": ".bind(request.subject.argument_digest.as_str()).bind(marker).bind(entry)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_native.rs#invalid_exclusions",
+        "name": "invalid_exclusions",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_native.rs",
+        "span": "L125-L148"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_native.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 141,
+          "text": ".bind(source.request.scope().company.as_uuid()).bind(source.request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_native.rs#candidate_predicates",
+        "name": "candidate_predicates",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_native.rs",
+        "span": "L156-L187"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_native.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 172,
+          "text": ".bind(request.scope().company.as_uuid()).bind(request.subject.invocation.as_uuid()).bind(entry)"
+        },
+        {
+          "line": 178,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_native.rs#historical_entry",
+        "name": "historical_entry",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_native.rs",
+        "span": "L41-L67"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_native.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 45,
+          "text": "assert_subject(f, request, 129, \"processing\").await;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_native.rs#reject_historical",
+        "name": "reject_historical",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_native.rs",
+        "span": "L201-L229"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_native.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 219,
+          "text": ".bind(source.request.scope().company.as_uuid()).bind(source.request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_native.rs#supported_positive",
+        "name": "supported_positive",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_native.rs",
+        "span": "L252-L310"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_native.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 290,
+          "text": ".bind(request.scope().execution.as_uuid()).bind(request.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 298,
+          "text": "subject_counts(f, &source.request).await,"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 16121
+  }
+}

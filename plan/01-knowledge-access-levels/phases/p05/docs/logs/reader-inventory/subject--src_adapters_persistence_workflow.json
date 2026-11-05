@@ -1,0 +1,3283 @@
+{
+  "pattern": "subject",
+  "filesSearched": 392,
+  "totalHits": 300,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_provider_tests.rs#barrier",
+        "name": "barrier",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_provider_tests.rs",
+        "span": "L105-L117"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_provider_tests.rs",
+      "inDegree": 50,
+      "hits": [
+        {
+          "line": 108,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 115,
+          "text": ".bind(request.subject.invocation.as_uuid()).execute(&mut *tx).await.unwrap();"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_receipt_tests.rs#receipt_fixture",
+        "name": "receipt_fixture",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_receipt_tests.rs",
+        "span": "L52-L88"
+      },
+      "path": "src/adapters/persistence/workflow/action_receipt_tests.rs",
+      "inDegree": 35,
+      "hits": [
+        {
+          "line": 67,
+          "text": ".action_authority(request.scope(), &request.subject)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_sibling_tests.rs#scoped_marker",
+        "name": "scoped_marker",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_sibling_tests.rs",
+        "span": "L74-L80"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_sibling_tests.rs",
+      "inDegree": 23,
+      "hits": [
+        {
+          "line": 76,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_provider_tests.rs#invocation_rows",
+        "name": "invocation_rows",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_provider_tests.rs",
+        "span": "L161-L167"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_provider_tests.rs",
+      "inDegree": 10,
+      "hits": [
+        {
+          "line": 163,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_receipt_tests.rs#register_ledger",
+        "name": "register_ledger",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_receipt_tests.rs",
+        "span": "L117-L146"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_receipt_tests.rs",
+      "inDegree": 9,
+      "hits": [
+        {
+          "line": 123,
+          "text": ".action_authority(request.scope(), &request.subject)"
+        },
+        {
+          "line": 130,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_history_tests.rs#historical",
+        "name": "historical",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_history_tests.rs",
+        "span": "L9-L33"
+      },
+      "path": "src/adapters/persistence/workflow/action_history_tests.rs",
+      "inDegree": 7,
+      "hits": [
+        {
+          "line": 12,
+          "text": ".action_authority(request.scope(), &request.subject)"
+        },
+        {
+          "line": 29,
+          "text": "subject: Some("
+        },
+        {
+          "line": 30,
+          "text": "replay_subject(&action.request().contract, &action.request().target).unwrap(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_history_tests.rs#insert_history",
+        "name": "insert_history",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_history_tests.rs",
+        "span": "L34-L51"
+      },
+      "path": "src/adapters/persistence/workflow/action_history_tests.rs",
+      "inDegree": 7,
+      "hits": [
+        {
+          "line": 40,
+          "text": "Dispatch::insert_subject("
+        },
+        {
+          "line": 46,
+          "text": "evidence.subject,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_assertions.rs#assert_subject",
+        "name": "assert_subject",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_assertions.rs",
+        "span": "L33-L104"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_assertions.rs",
+      "inDegree": 7,
+      "hits": [
+        {
+          "line": 33,
+          "text": "pub(super) async fn assert_subject("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_receipt_company_tests.rs#applied_history",
+        "name": "applied_history",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_receipt_company_tests.rs",
+        "span": "L60-L130"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_receipt_company_tests.rs",
+      "inDegree": 6,
+      "hits": [
+        {
+          "line": 93,
+          "text": ".bind(request.scope().company.as_uuid()).bind(request.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 99,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_attribution_assertions.rs#scope",
+        "name": "scope",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_attribution_assertions.rs",
+        "span": "L222-L225"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_attribution_assertions.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 223,
+          "text": "subject_scope(row, request);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_eligibility_history_tests.rs#history_command",
+        "name": "history_command",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_eligibility_history_tests.rs",
+        "span": "L133-L154"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_eligibility_history_tests.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 143,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_assertions.rs#clean_current",
+        "name": "clean_current",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_assertions.rs",
+        "span": "L127-L146"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_assertions.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 130,
+          "text": "assert_subject(f, request, 130, \"processing\").await;"
+        },
+        {
+          "line": 132,
+          "text": "subject_counts(f, request).await,"
+        },
+        {
+          "line": 140,
+          "text": ".bind(request.scope().company.as_uuid()).bind(request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_receipt_sql_tests.rs#history",
+        "name": "history",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_receipt_sql_tests.rs",
+        "span": "L16-L83"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_receipt_sql_tests.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 52,
+          "text": ".bind(request.scope().company.as_uuid()).bind(request.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 59,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_runtime_tests.rs#new",
+        "name": "new",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_runtime_tests.rs",
+        "span": "L16-L37"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_runtime_tests.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 23,
+          "text": ".action_authority(request.scope(), &request.subject)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_cancellation_completion_tests.rs#receipt_kept",
+        "name": "receipt_kept",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_cancellation_completion_tests.rs",
+        "span": "L63-L77"
+      },
+      "path": "src/adapters/persistence/workflow/action_cancellation_completion_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 73,
+          "text": "json!(request.subject.invocation.as_uuid()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_cancellation_receipt_tests.rs#accepted",
+        "name": "accepted",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_cancellation_receipt_tests.rs",
+        "span": "L26-L67"
+      },
+      "path": "src/adapters/persistence/workflow/action_cancellation_receipt_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 54,
+          "text": ".action_authority(request.scope(), &request.subject)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_dispatch_tests.rs#initialize_action_on_claim",
+        "name": "initialize_action_on_claim",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_dispatch_tests.rs",
+        "span": "L111-L173"
+      },
+      "path": "src/adapters/persistence/workflow/action_dispatch_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 132,
+          "text": ".action_authority(action.scope, &intent.approval_subject())"
+        },
+        {
+          "line": 168,
+          "text": "subject: intent.approval_subject(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_dispatch.rs#insert_subject",
+        "name": "insert_subject",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_dispatch.rs",
+        "span": "L191-L207"
+      },
+      "path": "src/adapters/persistence/workflow/action_dispatch.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 191,
+          "text": "pub(super) async fn insert_subject("
+        },
+        {
+          "line": 197,
+          "text": "subject: Option<Vec<u8>>,"
+        },
+        {
+          "line": 199,
+          "text": "sqlx::query(\"INSERT INTO workflow_action_dispatches (company_id,run_id,execution_id,invocation_id,argument_digest,id,job_id,attempt_number,execution_generation,"
+        },
+        {
+          "line": 201,
+          "text": ".bind(request.scope().execution.as_uuid()).bind(request.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 202,
+          "text": ".bind(request.subject.argument_digest.as_str()).bind(marker)"
+        },
+        {
+          "line": 205,
+          "text": ".bind(kind).bind(policy).bind(subject).execute(&mut **tx).await?;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_history_tests.rs#corrupt",
+        "name": "corrupt",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_history_tests.rs",
+        "span": "L64-L99"
+      },
+      "path": "src/adapters/persistence/workflow/action_history_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 83,
+          "text": "\"null_subject\" => evidence.subject = None,"
+        },
+        {
+          "line": 84,
+          "text": "\"utf8\" => evidence.subject = Some(vec![255]),"
+        },
+        {
+          "line": 85,
+          "text": "\"shape\" => evidence.subject = Some(b\"[]\".to_vec()),"
+        },
+        {
+          "line": 87,
+          "text": "let mut subject: Value ="
+        },
+        {
+          "line": 88,
+          "text": "serde_json::from_slice(evidence.subject.as_ref().unwrap()).unwrap();"
+        },
+        {
+          "line": 89,
+          "text": "subject[\"tool\"][\"contract\"][\"output_schema\"] = json!(false);"
+        },
+        {
+          "line": 90,
+          "text": "let bytes = serde_json::to_vec(&subject).unwrap();"
+        },
+        {
+          "line": 92,
+          "text": "evidence.subject = Some(bytes);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_receipts.rs#receipt_on",
+        "name": "receipt_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_receipts.rs",
+        "span": "L10-L35"
+      },
+      "path": "src/adapters/persistence/workflow/action_receipts.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 23,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 24,
+          "text": ".bind(request.subject.argument_digest.as_str())"
+        },
+        {
+          "line": 30,
+          "text": "subject: request.subject.clone(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_audit_sql_tests.rs#assert_owner_audit",
+        "name": "assert_owner_audit",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_audit_sql_tests.rs",
+        "span": "L50-L109"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_audit_sql_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 103,
+          "text": "json!(c.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 107,
+          "text": "json!(c.subject.argument_digest.as_str())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_command_probe_tests.rs#expected",
+        "name": "expected",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_command_probe_tests.rs",
+        "span": "L118-L132"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_command_probe_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 121,
+          "text": "\"execution_id\":scope.execution.as_uuid(), \"invocation_id\":command.subject.invocation.as_uuid(),"
+        },
+        {
+          "line": 122,
+          "text": "\"argument_digest\":command.subject.argument_digest.as_str(), \"dispatch_id\":command.marker.as_uuid(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_receipt_tests.rs#ledger_row",
+        "name": "ledger_row",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_receipt_tests.rs",
+        "span": "L152-L166"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_receipt_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 160,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_retained_truth_assertions.rs#command_scope",
+        "name": "command_scope",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_retained_truth_assertions.rs",
+        "span": "L11-L26"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_retained_truth_assertions.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 20,
+          "text": "json!(command.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 24,
+          "text": "json!(command.subject.argument_digest.as_str())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_tests.rs#mixed_requests",
+        "name": "mixed_requests",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_tests.rs",
+        "span": "L30-L99"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 36,
+          "text": ".action_authority(first.scope(), &first.subject)"
+        },
+        {
+          "line": 81,
+          "text": "subject: intent.approval_subject(),"
+        },
+        {
+          "line": 86,
+          "text": ".action_authority(third.scope(), &third.subject)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_approval_message_tests.rs#protected",
+        "name": "protected",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_approval_message_tests.rs",
+        "span": "L55-L67"
+      },
+      "path": "src/adapters/persistence/workflow/action_approval_message_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 60,
+          "text": "\"content\":{\"literal\":{\"subject\":\"Approved message\",\"body\":\"Send after approval\"}},"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_cancellation_receipt_tests.rs#settled_truth",
+        "name": "settled_truth",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_cancellation_receipt_tests.rs",
+        "span": "L107-L162"
+      },
+      "path": "src/adapters/persistence/workflow/action_cancellation_receipt_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 128,
+          "text": "json!(request.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 132,
+          "text": "json!(request.subject.argument_digest.as_str())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_dispatch_sql_tests.rs#receipt",
+        "name": "receipt",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_dispatch_sql_tests.rs",
+        "span": "L19-L29"
+      },
+      "path": "src/adapters/persistence/workflow/action_dispatch_sql_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 27,
+          "text": ".bind(request.subject.invocation.as_uuid()).bind(request.subject.argument_digest.as_str()).bind(marker).bind(kind).bind(json!({\"written\":true})).execute(&mut **"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_dispatch_sql_tests.rs#apply",
+        "name": "apply",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_dispatch_sql_tests.rs",
+        "span": "L129-L139"
+      },
+      "path": "src/adapters/persistence/workflow/action_dispatch_sql_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 133,
+          "text": "subject: &ApprovalSubject,"
+        },
+        {
+          "line": 135,
+          "text": "let result = Effect(0).apply(tx, action, subject).await?;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_dispatch.rs#authorize_prelocked_on",
+        "name": "authorize_prelocked_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_dispatch.rs",
+        "span": "L96-L169"
+      },
+      "path": "src/adapters/persistence/workflow/action_dispatch.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 127,
+          "text": "&request.subject,"
+        },
+        {
+          "line": 131,
+          "text": "validate_run_authority(request.scope(), &request.subject, &authority)?;"
+        },
+        {
+          "line": 144,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 145,
+          "text": ".bind(request.subject.argument_digest.as_str())"
+        },
+        {
+          "line": 155,
+          "text": "&request.subject,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_dispatch.rs#existing",
+        "name": "existing",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_dispatch.rs",
+        "span": "L171-L179"
+      },
+      "path": "src/adapters/persistence/workflow/action_dispatch.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 177,
+          "text": ").bind(request.scope().company.as_uuid()).bind(request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_history_tests.rs#cloned_intent",
+        "name": "cloned_intent",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_history_tests.rs",
+        "span": "L148-L163"
+      },
+      "path": "src/adapters/persistence/workflow/action_history_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 154,
+          "text": "cloned.subject.invocation = ActionInvocationId::new(Uuid::new_v4());"
+        },
+        {
+          "line": 157,
+          "text": "Sha256::digest(cloned.subject.invocation.as_uuid().as_bytes())"
+        },
+        {
+          "line": 160,
+          "text": ".bind(request.subject.invocation.as_uuid()).bind(cloned.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_receipts.rs#reserve_entry_on",
+        "name": "reserve_entry_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_receipts.rs",
+        "span": "L107-L136"
+      },
+      "path": "src/adapters/persistence/workflow/action_receipts.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 116,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 124,
+          "text": ".bind(request.scope().execution.as_uuid()).bind(request.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 125,
+          "text": ".bind(request.subject.argument_digest.as_str()).bind(marker).bind(entry)"
+        },
+        {
+          "line": 132,
+          "text": ".bind(request.subject.invocation.as_uuid()).bind(request.subject.argument_digest.as_str()).bind(marker).bind(proof).bind(entry)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_receipts.rs#verify_entry_on",
+        "name": "verify_entry_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_receipts.rs",
+        "span": "L138-L166"
+      },
+      "path": "src/adapters/persistence/workflow/action_receipts.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 154,
+          "text": "AND marker.replay_subject=$13 AND intent.operation=$14)\","
+        },
+        {
+          "line": 156,
+          "text": ".bind(request.scope().execution.as_uuid()).bind(request.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 157,
+          "text": ".bind(request.subject.argument_digest.as_str()).bind(marker).bind(entry)"
+        },
+        {
+          "line": 160,
+          "text": ".bind(replay_subject(&action.request().contract,&action.request().target)?)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_attribution_assertions.rs#subject_scope",
+        "name": "subject_scope",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_attribution_assertions.rs",
+        "span": "L226-L241"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_attribution_assertions.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 226,
+          "text": "pub(super) fn subject_scope(row: &Value, request: &ActionDispatchRequest) {"
+        },
+        {
+          "line": 235,
+          "text": "json!(request.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 239,
+          "text": "json!(request.subject.argument_digest.as_str())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_audit_execution_tests.rs#owner",
+        "name": "owner",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_audit_execution_tests.rs",
+        "span": "L55-L121"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_audit_execution_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 107,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_claim_recovery_tests.rs#subject_attempt",
+        "name": "subject_attempt",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_claim_recovery_tests.rs",
+        "span": "L49-L61"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_claim_recovery_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 49,
+          "text": "fn subject_attempt(state: &Value, s: &Scheduled, ordinal: i32) -> Value {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_claim_recovery_tests.rs#finish_accepted",
+        "name": "finish_accepted",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_claim_recovery_tests.rs",
+        "span": "L107-L156"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_claim_recovery_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 151,
+          "text": "subject_attempt(&after, s, s.request.fence.attempt.0)[\"status\"],"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_command_probe_tests.rs#assert_distinct",
+        "name": "assert_distinct",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_command_probe_tests.rs",
+        "span": "L205-L224"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_command_probe_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 215,
+          "text": "request.subject.invocation,"
+        },
+        {
+          "line": 216,
+          "text": "foreign.request.subject.invocation"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_commit_tests.rs#expected_identity",
+        "name": "expected_identity",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_commit_tests.rs",
+        "span": "L127-L134"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_commit_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 130,
+          "text": "\"execution_id\":scope.execution.as_uuid(),\"invocation_id\":command.subject.invocation.as_uuid(),"
+        },
+        {
+          "line": 131,
+          "text": "\"argument_digest\":command.subject.argument_digest.as_str(),\"dispatch_id\":command.marker.as_uuid(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_consumption_identity_tests.rs#assert_live_source",
+        "name": "assert_live_source",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_consumption_identity_tests.rs",
+        "span": "L99-L106"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_consumption_identity_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 104,
+          "text": ".bind(request.subject.invocation.as_uuid()).fetch_one(f.persistence().pool()).await.unwrap();"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_consumption_identity_tests.rs#reject_identity",
+        "name": "reject_identity",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_consumption_identity_tests.rs",
+        "span": "L237-L298"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_consumption_identity_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 270,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_eligibility_history_tests.rs#successor_action",
+        "name": "successor_action",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_eligibility_history_tests.rs",
+        "span": "L82-L131"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_eligibility_history_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 107,
+          "text": "subject: intent.approval_subject(),"
+        },
+        {
+          "line": 113,
+          "text": ".action_authority(request.scope(), &request.subject)"
+        },
+        {
+          "line": 120,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_eligibility_remaining_tests.rs#blocked",
+        "name": "blocked",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_eligibility_remaining_tests.rs",
+        "span": "L128-L167"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_eligibility_remaining_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 165,
+          "text": "\"ineligible subject cannot claim or debit\""
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_native.rs#insert_entry",
+        "name": "insert_entry",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_native.rs",
+        "span": "L24-L39"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_native.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 33,
+          "text": ".bind(request.scope().execution.as_uuid()).bind(request.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 34,
+          "text": ".bind(request.subject.argument_digest.as_str()).bind(marker).bind(entry)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_source.rs#retire_retry",
+        "name": "retire_retry",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_source.rs",
+        "span": "L137-L182"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_source.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 142,
+          "text": "assert_subject(f, request, number, \"processing\").await;"
+        },
+        {
+          "line": 160,
+          "text": "assert_subject(f, request, number, \"failed\").await;"
+        },
+        {
+          "line": 181,
+          "text": "assert_subject(f, request, number, \"pending\").await;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_prior_bounds_support.rs#no_result",
+        "name": "no_result",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_prior_bounds_support.rs",
+        "span": "L12-L23"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_prior_bounds_support.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 17,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_prior_bounds_tests.rs#only_refusal",
+        "name": "only_refusal",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_prior_bounds_tests.rs",
+        "span": "L220-L282"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_prior_bounds_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 259,
+          "text": "(\"invocation_id\", json!(command.subject.invocation.as_uuid())),"
+        },
+        {
+          "line": 262,
+          "text": "json!(command.subject.argument_digest.as_str()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_refusal_sql_tests.rs#assert_refusal_row",
+        "name": "assert_refusal_row",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_refusal_sql_tests.rs",
+        "span": "L30-L65"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_refusal_sql_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 39,
+          "text": "(\"invocation_id\", json!(c.subject.invocation.as_uuid())),"
+        },
+        {
+          "line": 40,
+          "text": "(\"argument_digest\", json!(c.subject.argument_digest.as_str())),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_reopen_tests.rs#final_expected",
+        "name": "final_expected",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_reopen_tests.rs",
+        "span": "L150-L161"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_reopen_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 153,
+          "text": "\"invocation_id\":command.subject.invocation.as_uuid(),\"argument_digest\":command.subject.argument_digest.as_str(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_assertions.rs#retrieval_boundary",
+        "name": "retrieval_boundary",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_assertions.rs",
+        "span": "L279-L301"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_assertions.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 283,
+          "text": ".filter(|row| row[\"invocation_id\"] == json!(request.subject.invocation.as_uuid()))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_snapshot_tests.rs#command",
+        "name": "command",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_snapshot_tests.rs",
+        "span": "L30-L54"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_snapshot_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 38,
+          "text": "subject: request.subject.clone(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_validation_tests.rs#insert_outcome_on",
+        "name": "insert_outcome_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_validation_tests.rs",
+        "span": "L63-L88"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_validation_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 79,
+          "text": ".bind(command.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 80,
+          "text": ".bind(command.subject.argument_digest.as_str())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation/delivery.rs#subject_on",
+        "name": "subject_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation/delivery.rs",
+        "span": "L38-L113"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation/delivery.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 38,
+          "text": "pub(super) async fn subject_on("
+        },
+        {
+          "line": 53,
+          "text": ".bind(command.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 54,
+          "text": ".bind(command.subject.argument_digest.as_str())"
+        },
+        {
+          "line": 79,
+          "text": ".bind(command.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 87,
+          "text": "// Email renders exactly one part; anything else is not a subject this path can attest."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_approval_mcp_tests.rs#assert_raw_second_entry_refused",
+        "name": "assert_raw_second_entry_refused",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_approval_mcp_tests.rs",
+        "span": "L153-L178"
+      },
+      "path": "src/adapters/persistence/workflow/action_approval_mcp_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 161,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_authority.rs#load_on",
+        "name": "load_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_authority.rs",
+        "span": "L54-L120"
+      },
+      "path": "src/adapters/persistence/workflow/action_authority.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 57,
+          "text": "subject: &ApprovalSubject,"
+        },
+        {
+          "line": 81,
+          "text": ".bind(subject.invocation.as_uuid())"
+        },
+        {
+          "line": 82,
+          "text": ".bind(subject.argument_digest.as_str())"
+        },
+        {
+          "line": 92,
+          "text": "|| action.argument_digest() != &subject.argument_digest"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_cancellation_order_tests.rs#run",
+        "name": "run",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_cancellation_order_tests.rs",
+        "span": "L67-L93"
+      },
+      "path": "src/adapters/persistence/workflow/action_cancellation_order_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 89,
+          "text": ".action_authority(request.scope(), &request.subject)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_dispatch_sql_tests.rs#wrong_request",
+        "name": "wrong_request",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_dispatch_sql_tests.rs",
+        "span": "L4-L18"
+      },
+      "path": "src/adapters/persistence/workflow/action_dispatch_sql_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 10,
+          "text": "3 => wrong.subject.invocation = ActionInvocationId::new(Uuid::new_v4()),"
+        },
+        {
+          "line": 11,
+          "text": "4 => wrong.subject.argument_digest = serde_json::from_value(json!(\"0\".repeat(64))).unwrap(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_dispatch.rs#apply",
+        "name": "apply",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_dispatch.rs",
+        "span": "L39-L44"
+      },
+      "path": "src/adapters/persistence/workflow/action_dispatch.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 43,
+          "text": "subject: &ApprovalSubject,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_dispatch.rs#insert",
+        "name": "insert",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_dispatch.rs",
+        "span": "L181-L189"
+      },
+      "path": "src/adapters/persistence/workflow/action_dispatch.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 188,
+          "text": "Self::insert_subject(tx, request, marker, kind, policy, None).await"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_dispatch.rs#is",
+        "name": "is",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_dispatch.rs",
+        "span": "L307-L315"
+      },
+      "path": "src/adapters/persistence/workflow/action_dispatch.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 310,
+          "text": "&& self.invocation_id == request.subject.invocation.as_uuid()"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_dispatch.rs#saved_receipt",
+        "name": "saved_receipt",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_dispatch.rs",
+        "span": "L659-L666"
+      },
+      "path": "src/adapters/persistence/workflow/action_dispatch.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 664,
+          "text": ".bind(request.scope().company.as_uuid()).bind(request.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 665,
+          "text": ".bind(request.subject.argument_digest.as_str()).fetch_optional(&mut **tx).await?)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_history_tests.rs#wrong_entry_request",
+        "name": "wrong_entry_request",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_history_tests.rs",
+        "span": "L411-L425"
+      },
+      "path": "src/adapters/persistence/workflow/action_history_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 417,
+          "text": "3 => wrong.subject.invocation = ActionInvocationId::new(Uuid::new_v4()),"
+        },
+        {
+          "line": 418,
+          "text": "4 => wrong.subject.argument_digest = serde_json::from_value(json!(\"0\".repeat(64))).unwrap(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_receipts.rs#insert_receipt_on",
+        "name": "insert_receipt_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_receipts.rs",
+        "span": "L256-L279"
+      },
+      "path": "src/adapters/persistence/workflow/action_receipts.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 268,
+          "text": ".bind(request.scope().execution.as_uuid()).bind(request.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 269,
+          "text": ".bind(request.subject.argument_digest.as_str()).bind(entry.marker).bind(entry.entry).bind(&result)"
+        },
+        {
+          "line": 275,
+          "text": ".bind(request.scope().execution.as_uuid()).bind(request.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 276,
+          "text": ".bind(request.subject.argument_digest.as_str()).bind(entry.marker).bind(entry.entry).bind(result)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_association_tests.rs#foreign_associations",
+        "name": "foreign_associations",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_association_tests.rs",
+        "span": "L118-L168"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_association_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 142,
+          "text": "sqlx::query(\"INSERT INTO threads(id,company_id,channel_id,subject) VALUES($1,$2,$3,'Foreign')\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_attribution_tests.rs#marker_only",
+        "name": "marker_only",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_attribution_tests.rs",
+        "span": "L91-L141"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_attribution_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 117,
+          "text": "subject_scope(added[0], request);"
+        },
+        {
+          "line": 120,
+          "text": "let stored_subject: Vec<u8> ="
+        },
+        {
+          "line": 121,
+          "text": "sqlx::query_scalar(\"SELECT replay_subject FROM workflow_action_dispatches WHERE id=$1\")"
+        },
+        {
+          "line": 127,
+          "text": "stored_subject,"
+        },
+        {
+          "line": 128,
+          "text": "crate::application::workflow::actions::replay_subject("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_claim_boundary_tests.rs#assert_root_links",
+        "name": "assert_root_links",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_claim_boundary_tests.rs",
+        "span": "L343-L365"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_claim_boundary_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 343,
+          "text": "fn assert_root_links(state: &Value, subject: ActivationRequest, scopes: &[ActivationRequest]) {"
+        },
+        {
+          "line": 362,
+          "text": "if scope.run == subject.run { 0 } else { 2 }"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_claim_recovery_tests.rs#recover_discarded",
+        "name": "recover_discarded",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_claim_recovery_tests.rs",
+        "span": "L206-L277"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_claim_recovery_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 223,
+          "text": "let attempt = subject_attempt(&retired, s, 2);"
+        },
+        {
+          "line": 229,
+          "text": "subject_attempt(&charged, s, 1),"
+        },
+        {
+          "line": 230,
+          "text": "subject_attempt(&retired, s, 1)"
+        },
+        {
+          "line": 254,
+          "text": "subject_attempt(&retired, s, 2),"
+        },
+        {
+          "line": 255,
+          "text": "subject_attempt(&recovered, s, 2)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_claim_sql_candidate_support.rs#assert_distinct_histories",
+        "name": "assert_distinct_histories",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_claim_sql_candidate_support.rs",
+        "span": "L162-L195"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_claim_sql_candidate_support.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 170,
+          "text": "assert_ne!(first.subject.invocation, second.subject.invocation);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_claim_sql_candidate_support.rs#verifier_for",
+        "name": "verifier_for",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_claim_sql_candidate_support.rs",
+        "span": "L245-L266"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_claim_sql_candidate_support.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 251,
+          "text": ".action_authority(request.scope(), &request.subject)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_claim_sql_candidate_tests.rs#second_action",
+        "name": "second_action",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_claim_sql_candidate_tests.rs",
+        "span": "L33-L81"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_claim_sql_candidate_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 47,
+          "text": ".action_authority(first.scope(), &first.subject)"
+        },
+        {
+          "line": 62,
+          "text": "subject: intent.approval_subject(),"
+        },
+        {
+          "line": 68,
+          "text": ".action_authority(request.scope(), &request.subject)"
+        },
+        {
+          "line": 75,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_command_probe_negative_tests.rs#owner",
+        "name": "owner",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_command_probe_negative_tests.rs",
+        "span": "L342-L379"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_command_probe_negative_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 361,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_command_probe_tests.rs#positive",
+        "name": "positive",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_command_probe_tests.rs",
+        "span": "L265-L337"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_command_probe_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 284,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_commit_final_tests.rs#assert_source",
+        "name": "assert_source",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_commit_final_tests.rs",
+        "span": "L132-L190"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_commit_final_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 146,
+          "text": "let invocation = json!(request.subject.invocation.as_uuid());"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_commit_final_tests.rs#assert_saved_receipt",
+        "name": "assert_saved_receipt",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_commit_final_tests.rs",
+        "span": "L191-L230"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_commit_final_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 209,
+          "text": "json!(request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_consumption_identity_tests.rs#historical_entry",
+        "name": "historical_entry",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_consumption_identity_tests.rs",
+        "span": "L154-L184"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_consumption_identity_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 167,
+          "text": ".bind(request.scope().execution.as_uuid()).bind(request.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 168,
+          "text": ".bind(request.subject.argument_digest.as_str()).bind(marker).bind(entry)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_control_serialization_tests.rs#scoped_evidence",
+        "name": "scoped_evidence",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_control_serialization_tests.rs",
+        "span": "L301-L340"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_control_serialization_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 306,
+          "text": "(\"invocation_id\", json!(command.subject.invocation.as_uuid())),"
+        },
+        {
+          "line": 309,
+          "text": "json!(command.subject.argument_digest.as_str()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_eligibility_history_tests.rs#completed_refusal",
+        "name": "completed_refusal",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_eligibility_history_tests.rs",
+        "span": "L247-L297"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_eligibility_history_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 295,
+          "text": "\"completed subject creates no attempt or debit\""
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_eligibility_remaining_tests.rs#subject_without_sibling_veto",
+        "name": "subject_without_sibling_veto",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_eligibility_remaining_tests.rs",
+        "span": "L212-L243"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_eligibility_remaining_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 212,
+          "text": "async fn subject_without_sibling_veto(pending: &PendingAction) {"
+        },
+        {
+          "line": 214,
+          "text": "// Assert every subject gate, omitting only the final runnable-sibling veto."
+        },
+        {
+          "line": 233,
+          "text": "assert!(eligible, \"the subject passes every other reopen gate\");"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_native.rs#invalid_exclusions",
+        "name": "invalid_exclusions",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_native.rs",
+        "span": "L125-L148"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_native.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 141,
+          "text": ".bind(source.request.scope().company.as_uuid()).bind(source.request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_native.rs#candidate_predicates",
+        "name": "candidate_predicates",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_native.rs",
+        "span": "L156-L187"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_native.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 172,
+          "text": ".bind(request.scope().company.as_uuid()).bind(request.subject.invocation.as_uuid()).bind(entry)"
+        },
+        {
+          "line": 178,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_source.rs#assert_lapsed_backstop",
+        "name": "assert_lapsed_backstop",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_source.rs",
+        "span": "L86-L104"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_source.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 99,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_source.rs#real_history",
+        "name": "real_history",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_source.rs",
+        "span": "L184-L225"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_source.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 191,
+          "text": "assert_subject(f, request, number, \"processing\").await;"
+        },
+        {
+          "line": 211,
+          "text": "subject_counts(f, request).await,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_source.rs#final_proof",
+        "name": "final_proof",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_source.rs",
+        "span": "L227-L251"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_source.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 248,
+          "text": "assert_subject(f, request, 128, \"pending\").await;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_source.rs#foreign_entry",
+        "name": "foreign_entry",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_source.rs",
+        "span": "L253-L323"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_source.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 317,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_source.rs#try_high_source",
+        "name": "try_high_source",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_source.rs",
+        "span": "L340-L416"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_source.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 352,
+          "text": "// Bootstrap the other tenant before starting the short subject fence."
+        },
+        {
+          "line": 362,
+          "text": "subject_counts(&f, &request).await,"
+        },
+        {
+          "line": 394,
+          "text": ".bind(sibling.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 398,
+          "text": "assert_ne!(sibling.subject.invocation, request.subject.invocation);"
+        },
+        {
+          "line": 402,
+          "text": "assert_subject(&f, &request, 130, \"processing\").await;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_tests.rs#unchanged",
+        "name": "unchanged",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_tests.rs",
+        "span": "L91-L102"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 101,
+          "text": "assert_subject(&source.fixture, &source.request, 130, \"processing\").await;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_native_attribution_assertions.rs#assert_owners",
+        "name": "assert_owners",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_native_attribution_assertions.rs",
+        "span": "L6-L75"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_native_attribution_assertions.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 67,
+          "text": "// 04.11-D4 §N: every remote alternative requires no delivery subject; message"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_native_bounds_tests.rs#result_source",
+        "name": "result_source",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_native_bounds_tests.rs",
+        "span": "L168-L212"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_native_bounds_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 194,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_native_evidence_tests.rs#assert_source",
+        "name": "assert_source",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_native_evidence_tests.rs",
+        "span": "L94-L141"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_native_evidence_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 109,
+          "text": "json!(request.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 113,
+          "text": "request.subject.argument_digest.as_str()"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_native_fk_assertions.rs#owner_view",
+        "name": "owner_view",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_native_fk_assertions.rs",
+        "span": "L4-L14"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_native_fk_assertions.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 9,
+          "text": "&& row[\"invocation_id\"] != json!(foreign.request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_native_fk_assertions.rs#assert_sources",
+        "name": "assert_sources",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_native_fk_assertions.rs",
+        "span": "L202-L224"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_native_fk_assertions.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 211,
+          "text": "foreign.request.subject.invocation.as_uuid(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_other_audit_sql_tests.rs#insert_candidate",
+        "name": "insert_candidate",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_other_audit_sql_tests.rs",
+        "span": "L11-L24"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_other_audit_sql_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 19,
+          "text": ".bind(command.scope.run.as_uuid()).bind(command.scope.execution.as_uuid()).bind(command.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 20,
+          "text": ".bind(command.subject.argument_digest.as_str()).bind(command.marker.as_uuid()).bind(command.actor.user_id())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_other_audit_sql_tests.rs#assert_candidate",
+        "name": "assert_candidate",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_other_audit_sql_tests.rs",
+        "span": "L51-L91"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_other_audit_sql_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 66,
+          "text": "command.subject.invocation.as_uuid().to_string()"
+        },
+        {
+          "line": 70,
+          "text": "command.subject.argument_digest.as_str()"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_other_audit_tests.rs#unknown_owner",
+        "name": "unknown_owner",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_other_audit_tests.rs",
+        "span": "L33-L101"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_other_audit_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 76,
+          "text": "\"invocation_id\":candidate.subject.invocation.as_uuid(),\"argument_digest\":candidate.subject.argument_digest.as_str(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_prior_bounds_tests.rs#scheduled_128",
+        "name": "scheduled_128",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_prior_bounds_tests.rs",
+        "span": "L144-L158"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_prior_bounds_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 152,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_proof_clock_tests.rs#expiry_diagnostic",
+        "name": "expiry_diagnostic",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_proof_clock_tests.rs",
+        "span": "L88-L103"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_proof_clock_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 99,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_receipt_company_tests.rs#company_positive",
+        "name": "company_positive",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_receipt_company_tests.rs",
+        "span": "L132-L174"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_receipt_company_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 159,
+          "text": ".bind(history.request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_receipt_tests.rs#sql_observation",
+        "name": "sql_observation",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_receipt_tests.rs",
+        "span": "L594-L604"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_receipt_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 602,
+          "text": ".bind(request.subject.invocation.as_uuid()).bind(request.subject.argument_digest.as_str()).bind(entry.marker).bind(entry.entry).bind(result)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_refusal_sql_tests.rs#insert_refusal",
+        "name": "insert_refusal",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_refusal_sql_tests.rs",
+        "span": "L11-L28"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_refusal_sql_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 23,
+          "text": ".bind(c.scope.run.as_uuid()).bind(c.scope.execution.as_uuid()).bind(c.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 24,
+          "text": ".bind(c.subject.argument_digest.as_str()).bind(c.marker.as_uuid()).bind(c.actor.user_id())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_retained_truth_tests.rs#verified_conflict",
+        "name": "verified_conflict",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_retained_truth_tests.rs",
+        "span": "L135-L212"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_retained_truth_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 189,
+          "text": ".bind(h.requests[1].subject.invocation.as_uuid()).execute(h.fixture.persistence().pool()).await.unwrap();"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_revision_overflow_tests.rs#recovered_links",
+        "name": "recovered_links",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_revision_overflow_tests.rs",
+        "span": "L172-L245"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_revision_overflow_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 201,
+          "text": "json!(command.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 205,
+          "text": "json!(command.subject.argument_digest.as_str())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_revision_tests.rs#scoped_truth",
+        "name": "scoped_truth",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_revision_tests.rs",
+        "span": "L137-L193"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_revision_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 148,
+          "text": "(\"invocation_id\", json!(command.subject.invocation.as_uuid())),"
+        },
+        {
+          "line": 151,
+          "text": "json!(command.subject.argument_digest.as_str()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_assertions.rs#scope",
+        "name": "scope",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_assertions.rs",
+        "span": "L37-L52"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_assertions.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 46,
+          "text": "json!(request.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 50,
+          "text": "json!(request.subject.argument_digest.as_str())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_evidence_assertions.rs#actual_receipt",
+        "name": "actual_receipt",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_evidence_assertions.rs",
+        "span": "L4-L40"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_evidence_assertions.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 20,
+          "text": ".filter(|marker| marker[\"invocation_id\"] == json!(request.subject.invocation.as_uuid()))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_evidence_assertions.rs#evidence_fact",
+        "name": "evidence_fact",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_evidence_assertions.rs",
+        "span": "L60-L117"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_evidence_assertions.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 80,
+          "text": "json!(command.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 84,
+          "text": "json!(command.subject.argument_digest.as_str())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_tests.rs#recover_same_result",
+        "name": "recover_same_result",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_tests.rs",
+        "span": "L305-L357"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 309,
+          "text": ".bind(request.scope().company.as_uuid()).bind(request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_tests.rs#dispatch_genuine",
+        "name": "dispatch_genuine",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_tests.rs",
+        "span": "L390-L474"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 457,
+          "text": ".bind(h.requests[2].subject.invocation.as_uuid()).bind(good())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_sibling_tests.rs#sibling",
+        "name": "sibling",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_sibling_tests.rs",
+        "span": "L37-L72"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_sibling_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 44,
+          "text": ".action_authority(original.scope(), &original.subject)"
+        },
+        {
+          "line": 56,
+          "text": ".action_authority(original.scope(), &intent.approval_subject())"
+        },
+        {
+          "line": 69,
+          "text": "subject: intent.approval_subject(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_validation_tests.rs#different_target_registration",
+        "name": "different_target_registration",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_validation_tests.rs",
+        "span": "L144-L171"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_validation_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 159,
+          "text": ".action_authority(original.scope(), &intent.approval_subject())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_validation_tests.rs#entry_times",
+        "name": "entry_times",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_validation_tests.rs",
+        "span": "L277-L290"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_validation_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 286,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation/delivery.rs#current_coverage_on",
+        "name": "current_coverage_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation/delivery.rs",
+        "span": "L117-L130"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation/delivery.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 122,
+          "text": "let Some((subject, status)) = subject_on(tx, command, Lock::Settle).await? else {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_approval_mcp_tests.rs#workflow_action_approval_not_applied_proof_never_grants_second_entry",
+        "name": "workflow_action_approval_not_applied_proof_never_grants_second_entry",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_approval_mcp_tests.rs",
+        "span": "L82-L151"
+      },
+      "path": "src/adapters/persistence/workflow/action_approval_mcp_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 115,
+          "text": "subject: intent.approval_subject(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_approval_resolution_tests.rs#workflow_action_approval_race_lost_commit_ack_resolves_exact_park",
+        "name": "workflow_action_approval_race_lost_commit_ack_resolves_exact_park",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_approval_resolution_tests.rs",
+        "span": "L18-L95"
+      },
+      "path": "src/adapters/persistence/workflow/action_approval_resolution_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 33,
+          "text": "subject: intent.approval_subject(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_approval_review_tests.rs#workflow_action_approval_same_arguments_different_target_or_operation_need_new_approval",
+        "name": "workflow_action_approval_same_arguments_different_target_or_operation_need_new_approval",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_approval_review_tests.rs",
+        "span": "L205-L299"
+      },
+      "path": "src/adapters/persistence/workflow/action_approval_review_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 278,
+          "text": "subject: intent.approval_subject(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_approval_sql_tests.rs#workflow_action_approval_digest_fk_rejects_each_mismatch",
+        "name": "workflow_action_approval_digest_fk_rejects_each_mismatch",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_approval_sql_tests.rs",
+        "span": "L4-L63"
+      },
+      "path": "src/adapters/persistence/workflow/action_approval_sql_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 36,
+          "text": "intent.approval_subject().invocation.as_uuid()"
+        },
+        {
+          "line": 49,
+          "text": "let error=sqlx::query(\"INSERT INTO workflow_decisions(company_id,run_id,execution_id,id,wait_id,subject_kind,proposal_digest,action_invocation_id,argument_diges"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_approval_sql_tests.rs#workflow_action_approval_digest_cannot_authorize_changed_arguments",
+        "name": "workflow_action_approval_digest_cannot_authorize_changed_arguments",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_approval_sql_tests.rs",
+        "span": "L94-L141"
+      },
+      "path": "src/adapters/persistence/workflow/action_approval_sql_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 125,
+          "text": "subject: intent.approval_subject(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_authority.rs#action_authority",
+        "name": "action_authority",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_authority.rs",
+        "span": "L18-L29"
+      },
+      "path": "src/adapters/persistence/workflow/action_authority.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 21,
+          "text": "subject: &ApprovalSubject,"
+        },
+        {
+          "line": 26,
+          "text": "let authority = load_on(&mut tx, scope, subject, actor).await?;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_cancellation_receipt_tests.rs#workflow_action_cancellation_observed_result_token_settles_then_interrupts",
+        "name": "workflow_action_cancellation_observed_result_token_settles_then_interrupts",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_cancellation_receipt_tests.rs",
+        "span": "L550-L597"
+      },
+      "path": "src/adapters/persistence/workflow/action_cancellation_receipt_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 583,
+          "text": "json!(request.subject.argument_digest.as_str())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_dispatch_sql_tests.rs#workflow_action_dispatch_sql_deferred_run_deadline_rejects_effect_and_receipt",
+        "name": "workflow_action_dispatch_sql_deferred_run_deadline_rejects_effect_and_receipt",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_dispatch_sql_tests.rs",
+        "span": "L80-L121"
+      },
+      "path": "src/adapters/persistence/workflow/action_dispatch_sql_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 97,
+          "text": ".apply(&mut tx, &action, &request.subject)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_dispatch_sql_tests.rs#workflow_action_dispatch_saved_model_tool_and_step_share_effect_wrong_digest_refused",
+        "name": "workflow_action_dispatch_saved_model_tool_and_step_share_effect_wrong_digest_refused",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_dispatch_sql_tests.rs",
+        "span": "L207-L256"
+      },
+      "path": "src/adapters/persistence/workflow/action_dispatch_sql_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 211,
+          "text": ".action_authority(request.scope(), &request.subject)"
+        },
+        {
+          "line": 221,
+          "text": "assert_eq!(intent.approval_subject(), request.subject);"
+        },
+        {
+          "line": 231,
+          "text": "tool.subject = intent.approval_subject();"
+        },
+        {
+          "line": 248,
+          "text": "assert_eq!(fresh.approval_subject(), request.subject);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_dispatch_tests.rs#workflow_action_dispatch_stale_fences_scopes_protection_and_errors",
+        "name": "workflow_action_dispatch_stale_fences_scopes_protection_and_errors",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_dispatch_tests.rs",
+        "span": "L243-L280"
+      },
+      "path": "src/adapters/persistence/workflow/action_dispatch_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 256,
+          "text": "_ => wrong.subject.invocation = ActionInvocationId::new(Uuid::new_v4()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_dispatch_tests.rs#workflow_action_dispatch_sql_commit_expiry_and_append_only_facts",
+        "name": "workflow_action_dispatch_sql_commit_expiry_and_append_only_facts",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_dispatch_tests.rs",
+        "span": "L439-L487"
+      },
+      "path": "src/adapters/persistence/workflow/action_dispatch_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 457,
+          "text": ".apply(&mut tx, &action, &request.subject)"
+        },
+        {
+          "line": 462,
+          "text": ".bind(request.subject.invocation.as_uuid()).bind(request.subject.argument_digest.as_str()).bind(marker).bind(output).execute(&mut *tx).await.unwrap();"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_dispatch.rs#SqlLocalAction",
+        "name": "SqlLocalAction",
+        "kind": "interface",
+        "path": "src/adapters/persistence/workflow/action_dispatch.rs",
+        "span": "L36-L45"
+      },
+      "path": "src/adapters/persistence/workflow/action_dispatch.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 38,
+          "text": "/// `subject` names the invocation, for effects that derive their identities from it."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_dispatch.rs#local",
+        "name": "local",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_dispatch.rs",
+        "span": "L212-L283"
+      },
+      "path": "src/adapters/persistence/workflow/action_dispatch.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 231,
+          "text": "Some(result) => LocalDispatchResult::Committed(ActionReceipt { subject: request.subject.clone(), result: validate_action_result(&action, result)? }),"
+        },
+        {
+          "line": 239,
+          "text": "let result = validate_action_result(&action, Box::pin(self.local.apply(&mut tx, &action, &request.subject)).await?)?;"
+        },
+        {
+          "line": 242,
+          "text": ".bind(request.scope().execution.as_uuid()).bind(request.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 243,
+          "text": ".bind(request.subject.argument_digest.as_str()).bind(marker).bind(&result).execute(&mut *tx).await?;"
+        },
+        {
+          "line": 245,
+          "text": "Ok(End::Commit(LocalDispatchResult::Committed(ActionReceipt { subject: request.subject.clone(), result })))"
+        },
+        {
+          "line": 270,
+          "text": "subject: request.subject.clone(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_dispatch.rs#enter_remote",
+        "name": "enter_remote",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_dispatch.rs",
+        "span": "L577-L627"
+      },
+      "path": "src/adapters/persistence/workflow/action_dispatch.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 604,
+          "text": ".bind(request.subject.invocation.as_uuid()).bind(reservation.entry).fetch_one(&mut *tx).await?;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_evidence_binding_tests.rs#workflow_action_evidence_remote_entry_transaction_identity_cannot_be_spoofed",
+        "name": "workflow_action_evidence_remote_entry_transaction_identity_cannot_be_spoofed",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_evidence_binding_tests.rs",
+        "span": "L49-L84"
+      },
+      "path": "src/adapters/persistence/workflow/action_evidence_binding_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 65,
+          "text": ".bind(request.scope().execution.as_uuid()).bind(request.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 66,
+          "text": ".bind(request.subject.argument_digest.as_str()).bind(marker).bind(Uuid::new_v4())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_history_tests.rs#HistoricalEvidence",
+        "name": "HistoricalEvidence",
+        "kind": "struct",
+        "path": "src/adapters/persistence/workflow/action_history_tests.rs",
+        "span": "L5-L8"
+      },
+      "path": "src/adapters/persistence/workflow/action_history_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 7,
+          "text": "subject: Option<Vec<u8>>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_history_tests.rs#workflow_action_history_matrix_shared_predicate_and_actual_rust_retirement",
+        "name": "workflow_action_history_matrix_shared_predicate_and_actual_rust_retirement",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_history_tests.rs",
+        "span": "L102-L146"
+      },
+      "path": "src/adapters/persistence/workflow/action_history_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 122,
+          "text": "\"null_subject\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_history_tests.rs#workflow_action_history_numeric_subject_and_u64_revision_domain",
+        "name": "workflow_action_history_numeric_subject_and_u64_revision_domain",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_history_tests.rs",
+        "span": "L166-L223"
+      },
+      "path": "src/adapters/persistence/workflow/action_history_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 166,
+          "text": "async fn workflow_action_history_numeric_subject_and_u64_revision_domain() {"
+        },
+        {
+          "line": 170,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 192,
+          "text": "let subject = json!({\"tool\":operation[\"contract\"],\"target\":operation[\"target\"]});"
+        },
+        {
+          "line": 198,
+          "text": "replay_subject("
+        },
+        {
+          "line": 204,
+          "text": "serde_json::to_vec(&subject).unwrap()"
+        },
+        {
+          "line": 209,
+          "text": "evidence.subject = Some(bytes);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_history_tests.rs#workflow_action_history_unsafe_sibling_and_129_fact_overflow",
+        "name": "workflow_action_history_unsafe_sibling_and_129_fact_overflow",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_history_tests.rs",
+        "span": "L226-L256"
+      },
+      "path": "src/adapters/persistence/workflow/action_history_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 230,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_history_tests.rs#workflow_action_history_remote_entry_append_only_and_receipt_requires_entry",
+        "name": "workflow_action_history_remote_entry_append_only_and_receipt_requires_entry",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_history_tests.rs",
+        "span": "L474-L518"
+      },
+      "path": "src/adapters/persistence/workflow/action_history_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 505,
+          "text": ".bind(request.scope().execution.as_uuid()).bind(request.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 506,
+          "text": ".bind(request.subject.argument_digest.as_str()).bind(marker).bind(remote_entry).bind(json!({\"written\":true}))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_receipt_acceptance_tests.rs#workflow_action_receipt_actual_result_precedes_shared_completion_writer",
+        "name": "workflow_action_receipt_actual_result_precedes_shared_completion_writer",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_receipt_acceptance_tests.rs",
+        "span": "L134-L167"
+      },
+      "path": "src/adapters/persistence/workflow/action_receipt_acceptance_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 164,
+          "text": ".bind(request.subject.invocation.as_uuid()).fetch_one(f.persistence().pool()).await.unwrap();"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_receipt_acceptance_tests.rs#workflow_action_receipt_reclaimed_attempt_rechecks_current_registration_and_access",
+        "name": "workflow_action_receipt_reclaimed_attempt_rechecks_current_registration_and_access",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_receipt_acceptance_tests.rs",
+        "span": "L170-L242"
+      },
+      "path": "src/adapters/persistence/workflow/action_receipt_acceptance_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 190,
+          "text": ".action_authority(request.scope(), &request.subject)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_receipt_tests.rs#workflow_action_receipt_restart_model_link_no_registration_and_current_access",
+        "name": "workflow_action_receipt_restart_model_link_no_registration_and_current_access",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_receipt_tests.rs",
+        "span": "L228-L274"
+      },
+      "path": "src/adapters/persistence/workflow/action_receipt_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 238,
+          "text": ".action_authority(request.scope(), &request.subject)"
+        },
+        {
+          "line": 252,
+          "text": "assert_eq!(intent.approval_subject(), request.subject);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_receipts.rs#marker_on",
+        "name": "marker_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_receipts.rs",
+        "span": "L61-L105"
+      },
+      "path": "src/adapters/persistence/workflow/action_receipts.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 74,
+          "text": "AND effect_kind='remote' AND replay_subject=$4\","
+        },
+        {
+          "line": 77,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 79,
+          "text": ".bind(replay_subject("
+        },
+        {
+          "line": 92,
+          "text": "Self::insert_subject("
+        },
+        {
+          "line": 98,
+          "text": "Some(replay_subject("
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/action_reconciliation_attribution_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 7,
+          "text": "use assertions::{append, committed_conflict, native_catalog, positive_links, rows, subject_scope};"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_authority_tests.rs#workflow_action_reconciliation_forged_scope_and_subject_never_verify",
+        "name": "workflow_action_reconciliation_forged_scope_and_subject_never_verify",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_authority_tests.rs",
+        "span": "L58-L79"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_authority_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 58,
+          "text": "async fn workflow_action_reconciliation_forged_scope_and_subject_never_verify() {"
+        },
+        {
+          "line": 67,
+          "text": "3 => c.subject.invocation = ActionInvocationId::new(Uuid::new_v4()),"
+        },
+        {
+          "line": 68,
+          "text": "4 => c.subject.argument_digest = serde_json::from_value(json!(\"f\".repeat(64))).unwrap(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_bounds_tests.rs#workflow_action_reconciliation_bounds_paused_128_to_129_settlement_refuses",
+        "name": "workflow_action_reconciliation_bounds_paused_128_to_129_settlement_refuses",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_bounds_tests.rs",
+        "span": "L45-L104"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_bounds_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 49,
+          "text": ".action_authority(request.scope(), &request.subject)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_bounds_tests.rs#workflow_action_reconciliation_bounds_exclusion_requires_exact_consumption",
+        "name": "workflow_action_reconciliation_bounds_exclusion_requires_exact_consumption",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_bounds_tests.rs",
+        "span": "L208-L278"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_bounds_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 211,
+          "text": "let invocation = request.subject.invocation.as_uuid();"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_claim_boundary_tests.rs#workflow_action_reconciliation_claim_boundary_roots_and_companies_same_database",
+        "name": "workflow_action_reconciliation_claim_boundary_roots_and_companies_same_database",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_claim_boundary_tests.rs",
+        "span": "L368-L421"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_claim_boundary_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 407,
+          "text": "\"unrelated debits preserve subject scope\""
+        },
+        {
+          "line": 417,
+          "text": "\"subject claim preserves unrelated root\""
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_claim_recovery_tests.rs#workflow_action_reconciliation_claim_recovery_lost_response_automatic_saved_retry",
+        "name": "workflow_action_reconciliation_claim_recovery_lost_response_automatic_saved_retry",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_claim_recovery_tests.rs",
+        "span": "L159-L204"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_claim_recovery_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 182,
+          "text": "let lost = subject_attempt(&installed, &s, 2);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_eligibility_remaining_tests.rs#workflow_action_reconciliation_eligibility_extra_pending_sibling_records_truth_only",
+        "name": "workflow_action_reconciliation_eligibility_extra_pending_sibling_records_truth_only",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_eligibility_remaining_tests.rs",
+        "span": "L246-L268"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_eligibility_remaining_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 266,
+          "text": "subject_without_sibling_veto(&pending).await;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_assertions.rs#subject_counts",
+        "name": "subject_counts",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_assertions.rs",
+        "span": "L10-L17"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_assertions.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 10,
+          "text": "pub(super) async fn subject_counts("
+        },
+        {
+          "line": 15,
+          "text": ".bind(request.scope().company.as_uuid()).bind(request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_assertions.rs#available",
+        "name": "available",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_assertions.rs",
+        "span": "L19-L31"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_assertions.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 26,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_native.rs#historical_entry",
+        "name": "historical_entry",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_native.rs",
+        "span": "L41-L67"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_native.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 45,
+          "text": "assert_subject(f, request, 129, \"processing\").await;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_native.rs#reject_historical",
+        "name": "reject_historical",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_native.rs",
+        "span": "L201-L229"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_native.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 219,
+          "text": ".bind(source.request.scope().company.as_uuid()).bind(source.request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_native.rs#supported_positive",
+        "name": "supported_positive",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_native.rs",
+        "span": "L252-L310"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_native.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 290,
+          "text": ".bind(request.scope().execution.as_uuid()).bind(request.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 298,
+          "text": "subject_counts(f, &source.request).await,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_prior_bounds_tests.rs#available",
+        "name": "available",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_prior_bounds_tests.rs",
+        "span": "L114-L126"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_prior_bounds_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 121,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_proof_tests.rs#apply_old_entry",
+        "name": "apply_old_entry",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_proof_tests.rs",
+        "span": "L290-L306"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_proof_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 299,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_provider_tests.rs#delayed_apply",
+        "name": "delayed_apply",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_provider_tests.rs",
+        "span": "L86-L104"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_provider_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 95,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 100,
+          "text": ".bind(request.subject.invocation.as_uuid()).fetch_one(&mut *tx).await.unwrap();"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_receipt_company_tests.rs#workflow_action_reconciliation_receipt_sql_authentic_foreign_company_guard",
+        "name": "workflow_action_reconciliation_receipt_sql_authentic_foreign_company_guard",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_receipt_company_tests.rs",
+        "span": "L177-L233"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_receipt_company_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 186,
+          "text": "assert_ne!(a.request.subject.invocation, b.request.subject.invocation);"
+        },
+        {
+          "line": 208,
+          "text": "for (subject, source) in [(&a, &b), (&b, &a)] {"
+        },
+        {
+          "line": 215,
+          "text": "subject.marker,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_receipt_sql_tests.rs#workflow_action_reconciliation_receipt_sql_authentic_foreign_bindings",
+        "name": "workflow_action_reconciliation_receipt_sql_authentic_foreign_bindings",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_receipt_sql_tests.rs",
+        "span": "L224-L260"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_receipt_sql_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 227,
+          "text": "h.requests[0].subject.invocation,"
+        },
+        {
+          "line": 228,
+          "text": "h.requests[1].subject.invocation"
+        },
+        {
+          "line": 231,
+          "text": "h.requests[0].subject.argument_digest,"
+        },
+        {
+          "line": 232,
+          "text": "h.requests[1].subject.argument_digest"
+        },
+        {
+          "line": 249,
+          "text": "json!({\"argument_digest\":h.requests[1].subject.argument_digest.as_str(),\"reconciliation_evidence_id\":h.evidence[0]}),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_receipt_tests.rs#verify",
+        "name": "verify",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_receipt_tests.rs",
+        "span": "L46-L95"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_receipt_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 57,
+          "text": ".bind(snapshot.subject.invocation.as_uuid()).fetch_one(&mut *tx).await?;"
+        },
+        {
+          "line": 62,
+          "text": ".bind(snapshot.action.scope().company.as_uuid()).bind(snapshot.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_receipt_tests.rs#workflow_action_reconciliation_sql_actual_receipt_conflict_and_audit_guards",
+        "name": "workflow_action_reconciliation_sql_actual_receipt_conflict_and_audit_guards",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_receipt_tests.rs",
+        "span": "L606-L659"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_receipt_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 634,
+          "text": ".bind(request.subject.invocation.as_uuid()).bind(request.subject.argument_digest.as_str()).bind(entry.marker).bind(entry.entry)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_retained_truth_tests.rs#scoped_projection",
+        "name": "scoped_projection",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_retained_truth_tests.rs",
+        "span": "L55-L60"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_retained_truth_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 58,
+          "text": ".bind(h.requests[index].subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_retained_truth_tests.rs#available_proof",
+        "name": "available_proof",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_retained_truth_tests.rs",
+        "span": "L297-L304"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_retained_truth_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 300,
+          "text": ".bind(h.requests[0].subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_sibling_tests.rs#workflow_action_reconciliation_siblings_later_valid_result_resolves_positive_truth",
+        "name": "workflow_action_reconciliation_siblings_later_valid_result_resolves_positive_truth",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_sibling_tests.rs",
+        "span": "L329-L363"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_sibling_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 341,
+          "text": ".bind(requests[1].subject.invocation.as_uuid()).execute(f.persistence().pool()).await.unwrap();"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_validation_tests.rs#workflow_action_reconciliation_validation_installed_source_mismatches",
+        "name": "workflow_action_reconciliation_validation_installed_source_mismatches",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_validation_tests.rs",
+        "span": "L199-L269"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_validation_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 211,
+          "text": ".action_authority(request.scope(), &request.subject)"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/action_reconciliation/delivery.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1,
+          "text": "//! Message delivery subjects through the 04.7 service (04.11-D3 §H, D4 §N-§R)."
+        },
+        {
+          "line": 3,
+          "text": "//! A subject is one destination delivery of the invocation that is `outcome_unknown`. Locks,"
+        },
+        {
+          "line": 5,
+          "text": "//! the subject parent (`FOR SHARE` to snapshot, `FOR UPDATE` to settle). Settlement never"
+        },
+        {
+          "line": 36,
+          "text": "/// The subject delivery with its current status, or `None` when the invocation has no such"
+        },
+        {
+          "line": 115,
+          "text": "/// Settlement's re-read under the parent `FOR UPDATE`: the current coverage of a subject that"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 244
+  },
+  "saved": {
+    "files": 69,
+    "baselineChars": 950388
+  }
+}

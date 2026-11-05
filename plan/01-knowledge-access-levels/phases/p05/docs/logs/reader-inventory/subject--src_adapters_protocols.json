@@ -1,0 +1,519 @@
+{
+  "pattern": "subject",
+  "filesSearched": 12,
+  "totalHits": 46,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/ingress.rs#mail",
+        "name": "mail",
+        "kind": "function",
+        "path": "src/adapters/protocols/email/ingress.rs",
+        "span": "L471-L480"
+      },
+      "path": "src/adapters/protocols/email/ingress.rs",
+      "inDegree": 6,
+      "hits": [
+        {
+          "line": 475,
+          "text": "subject: Some(\"Quick question\".to_string()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/authentication.rs#parse_raw_mime_to_payload",
+        "name": "parse_raw_mime_to_payload",
+        "kind": "function",
+        "path": "src/adapters/protocols/email/authentication.rs",
+        "span": "L118-L218"
+      },
+      "path": "src/adapters/protocols/email/authentication.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 145,
+          "text": "// Extract subject"
+        },
+        {
+          "line": 146,
+          "text": "let subject = msg.subject().map(|s| s.to_string());"
+        },
+        {
+          "line": 196,
+          "text": "subject,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/egress.rs#as_relay_mail",
+        "name": "as_relay_mail",
+        "kind": "function",
+        "path": "src/adapters/protocols/email/egress.rs",
+        "span": "L156-L172"
+      },
+      "path": "src/adapters/protocols/email/egress.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 162,
+          "text": "subject: &self.subject,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/egress.rs#render_email",
+        "name": "render_email",
+        "kind": "function",
+        "path": "src/adapters/protocols/email/egress.rs",
+        "span": "L353-L402"
+      },
+      "path": "src/adapters/protocols/email/egress.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 370,
+          "text": "subject: if prefix_as_reply {"
+        },
+        {
+          "line": 371,
+          "text": "reply_subject(&content.subject)"
+        },
+        {
+          "line": 373,
+          "text": "content.subject.clone()"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/parser.rs#parse",
+        "name": "parse",
+        "kind": "function",
+        "path": "src/adapters/protocols/email/parser.rs",
+        "span": "L144-L289"
+      },
+      "path": "src/adapters/protocols/email/parser.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 187,
+          "text": "let subject = sanitize_string(payload.subject.unwrap_or_else(|| \"No Subject\".to_string()));"
+        },
+        {
+          "line": 188,
+          "text": "let is_auto_reply_from_subject = Self::is_auto_reply_subject(&subject);"
+        },
+        {
+          "line": 189,
+          "text": "let is_auto_reply = is_auto_reply_from_headers || is_auto_reply_from_subject;"
+        },
+        {
+          "line": 196,
+          "text": "Self::is_forwarded_email(&subject, raw_text.as_deref().unwrap_or_default());"
+        },
+        {
+          "line": 270,
+          "text": "subject,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/egress.rs#into_mail_message",
+        "name": "into_mail_message",
+        "kind": "function",
+        "path": "src/adapters/protocols/email/egress.rs",
+        "span": "L94-L108"
+      },
+      "path": "src/adapters/protocols/email/egress.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 101,
+          "text": "subject: self.subject,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/egress.rs#reply_subject",
+        "name": "reply_subject",
+        "kind": "function",
+        "path": "src/adapters/protocols/email/egress.rs",
+        "span": "L448-L457"
+      },
+      "path": "src/adapters/protocols/email/egress.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 448,
+          "text": "fn reply_subject(subject: &str) -> String {"
+        },
+        {
+          "line": 449,
+          "text": "let trimmed = subject.trim();"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/ingress.rs#draft",
+        "name": "draft",
+        "kind": "function",
+        "path": "src/adapters/protocols/email/ingress.rs",
+        "span": "L350-L408"
+      },
+      "path": "src/adapters/protocols/email/ingress.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 388,
+          "text": "content: CanonicalContent::parse(&parsed.subject, &parsed.clean_text_body)?,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/parser.rs#default",
+        "name": "default",
+        "kind": "function",
+        "path": "src/adapters/protocols/email/parser.rs",
+        "span": "L102-L117"
+      },
+      "path": "src/adapters/protocols/email/parser.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 107,
+          "text": "subject: None,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/parser.rs#is_auto_reply_subject",
+        "name": "is_auto_reply_subject",
+        "kind": "function",
+        "path": "src/adapters/protocols/email/parser.rs",
+        "span": "L414-L422"
+      },
+      "path": "src/adapters/protocols/email/parser.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 414,
+          "text": "pub fn is_auto_reply_subject(subject: &str) -> bool {"
+        },
+        {
+          "line": 415,
+          "text": "let lower = subject.trim().to_lowercase();"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/parser.rs#is_forwarded_email",
+        "name": "is_forwarded_email",
+        "kind": "function",
+        "path": "src/adapters/protocols/email/parser.rs",
+        "span": "L424-L436"
+      },
+      "path": "src/adapters/protocols/email/parser.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 424,
+          "text": "pub fn is_forwarded_email(subject: &str, body: &str) -> bool {"
+        },
+        {
+          "line": 425,
+          "text": "let lower_subj = subject.trim().to_lowercase();"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/protocols/email/egress_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 128,
+          "text": "/// `Re:` exactly once, however the subject arrived, and the parent appended to `References:` when"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/egress_tests.rs#the_reply_subject_and_reference_chain_are_normalized",
+        "name": "the_reply_subject_and_reference_chain_are_normalized",
+        "kind": "function",
+        "path": "src/adapters/protocols/email/egress_tests.rs",
+        "span": "L131-L150"
+      },
+      "path": "src/adapters/protocols/email/egress_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 131,
+          "text": "fn the_reply_subject_and_reference_chain_are_normalized() {"
+        },
+        {
+          "line": 137,
+          "text": "assert_eq!(rendered.subject, \"Re: Order 91\");"
+        },
+        {
+          "line": 147,
+          "text": "assert_eq!(reply_subject(\"Re: Order 91\"), \"Re: Order 91\");"
+        },
+        {
+          "line": 148,
+          "text": "assert_eq!(reply_subject(\"RE: Order 91\"), \"RE: Order 91\");"
+        },
+        {
+          "line": 149,
+          "text": "assert_eq!(reply_subject(\"   \"), \"Re:\");"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/egress.rs#OutboundEmailV1",
+        "name": "OutboundEmailV1",
+        "kind": "struct",
+        "path": "src/adapters/protocols/email/egress.rs",
+        "span": "L64-L81"
+      },
+      "path": "src/adapters/protocols/email/egress.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 69,
+          "text": "pub subject: String,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/protocols/email/egress.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 447,
+          "text": "/// `Re:` exactly once, however the subject arrived."
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/protocols/email/ingress.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 14,
+          "text": "//! * **Bounds are enforced before allocation.** Recipients, attachments, subject, body and reply"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/ingress.rs#every_recipient_is_classified_before_the_application_sees_it",
+        "name": "every_recipient_is_classified_before_the_application_sees_it",
+        "kind": "function",
+        "path": "src/adapters/protocols/email/ingress.rs",
+        "span": "L485-L542"
+      },
+      "path": "src/adapters/protocols/email/ingress.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 535,
+          "text": ".map(|handle| handle.subject().as_str().to_string())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/ingress.rs#oversized_input_is_refused_at_the_boundary",
+        "name": "oversized_input_is_refused_at_the_boundary",
+        "kind": "function",
+        "path": "src/adapters/protocols/email/ingress.rs",
+        "span": "L617-L648"
+      },
+      "path": "src/adapters/protocols/email/ingress.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 618,
+          "text": "let long_subject = adapter().accept("
+        },
+        {
+          "line": 620,
+          "text": "subject: Some(\"s\".repeat(MAX_SUBJECT_BYTES + 1)),"
+        },
+        {
+          "line": 625,
+          "text": "assert!(matches!(long_subject, Err(EmailIngressError::Bounds(_))));"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/ingress.rs#identities_are_normalized_where_the_address_syntax_lives",
+        "name": "identities_are_normalized_where_the_address_syntax_lives",
+        "kind": "function",
+        "path": "src/adapters/protocols/email/ingress.rs",
+        "span": "L674-L686"
+      },
+      "path": "src/adapters/protocols/email/ingress.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 679,
+          "text": "accepted.draft.author.subject().as_str(),"
+        },
+        {
+          "line": 683,
+          "text": "accepted.draft.addressed[0].identity.subject().as_str(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/mail.rs#MailMessage",
+        "name": "MailMessage",
+        "kind": "struct",
+        "path": "src/adapters/protocols/email/mail.rs",
+        "span": "L25-L36"
+      },
+      "path": "src/adapters/protocols/email/mail.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 30,
+          "text": "pub subject: String,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/mail.rs#send_code",
+        "name": "send_code",
+        "kind": "function",
+        "path": "src/adapters/protocols/email/mail.rs",
+        "span": "L164-L188"
+      },
+      "path": "src/adapters/protocols/email/mail.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 170,
+          "text": "let (subject, lead, footer) = confirmation_copy(purpose);"
+        },
+        {
+          "line": 177,
+          "text": "subject: subject.to_string(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/parser.rs#ParsedEmail",
+        "name": "ParsedEmail",
+        "kind": "struct",
+        "path": "src/adapters/protocols/email/parser.rs",
+        "span": "L32-L68"
+      },
+      "path": "src/adapters/protocols/email/parser.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 51,
+          "text": "pub subject: String,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/parser.rs#RawInboundPayload",
+        "name": "RawInboundPayload",
+        "kind": "struct",
+        "path": "src/adapters/protocols/email/parser.rs",
+        "span": "L86-L99"
+      },
+      "path": "src/adapters/protocols/email/parser.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 90,
+          "text": "pub subject: Option<String>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/parser.rs#parse_inbound_email_sanitizes_invisible_unicode_injection_characters",
+        "name": "parse_inbound_email_sanitizes_invisible_unicode_injection_characters",
+        "kind": "function",
+        "path": "src/adapters/protocols/email/parser.rs",
+        "span": "L560-L574"
+      },
+      "path": "src/adapters/protocols/email/parser.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 564,
+          "text": "subject: Some(\"Invoice\\u{200B} #999\\u{E0001}\\u{E0020}\".to_string()),"
+        },
+        {
+          "line": 571,
+          "text": "assert_eq!(parsed.subject, \"Invoice #999\");"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/types.rs#subject",
+        "name": "subject",
+        "kind": "function",
+        "path": "src/adapters/protocols/email/types.rs",
+        "span": "L98-L100"
+      },
+      "path": "src/adapters/protocols/email/types.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 98,
+          "text": "pub fn subject(&self) -> &IdentitySubject {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/types.rs#email_identity_normalization_is_case_insensitive",
+        "name": "email_identity_normalization_is_case_insensitive",
+        "kind": "function",
+        "path": "src/adapters/protocols/email/types.rs",
+        "span": "L150-L155"
+      },
+      "path": "src/adapters/protocols/email/types.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 154,
+          "text": "assert_eq!(first.subject().as_str(), \"person@example.com\");"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 7,
+    "baselineChars": 134115
+  }
+}

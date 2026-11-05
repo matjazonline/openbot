@@ -1,0 +1,74 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 5,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_provider_tests.rs#barrier",
+        "name": "barrier",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_provider_tests.rs",
+        "span": "L105-L117"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_provider_tests.rs",
+      "inDegree": 50,
+      "hits": [
+        {
+          "line": 108,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 115,
+          "text": ".bind(request.subject.invocation.as_uuid()).execute(&mut *tx).await.unwrap();"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_provider_tests.rs#invocation_rows",
+        "name": "invocation_rows",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_provider_tests.rs",
+        "span": "L161-L167"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_provider_tests.rs",
+      "inDegree": 10,
+      "hits": [
+        {
+          "line": 163,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_provider_tests.rs#delayed_apply",
+        "name": "delayed_apply",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_provider_tests.rs",
+        "span": "L86-L104"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_provider_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 95,
+          "text": ".bind(request.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 100,
+          "text": ".bind(request.subject.invocation.as_uuid()).fetch_one(&mut *tx).await.unwrap();"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 19503
+  }
+}

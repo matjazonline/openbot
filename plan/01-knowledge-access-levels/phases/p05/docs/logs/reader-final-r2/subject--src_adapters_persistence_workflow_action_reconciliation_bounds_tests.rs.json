@@ -1,0 +1,49 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 2,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_bounds_tests.rs#workflow_action_reconciliation_bounds_paused_128_to_129_settlement_refuses",
+        "name": "workflow_action_reconciliation_bounds_paused_128_to_129_settlement_refuses",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_bounds_tests.rs",
+        "span": "L45-L104"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_bounds_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 49,
+          "text": ".action_authority(request.scope(), &request.subject)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_bounds_tests.rs#workflow_action_reconciliation_bounds_exclusion_requires_exact_consumption",
+        "name": "workflow_action_reconciliation_bounds_exclusion_requires_exact_consumption",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_bounds_tests.rs",
+        "span": "L208-L278"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_bounds_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 211,
+          "text": "let invocation = request.subject.invocation.as_uuid();"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 9558
+  }
+}

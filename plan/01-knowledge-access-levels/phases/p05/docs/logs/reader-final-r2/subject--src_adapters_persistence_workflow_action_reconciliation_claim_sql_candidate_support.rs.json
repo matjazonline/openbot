@@ -1,0 +1,49 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 2,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_claim_sql_candidate_support.rs#assert_distinct_histories",
+        "name": "assert_distinct_histories",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_claim_sql_candidate_support.rs",
+        "span": "L162-L195"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_claim_sql_candidate_support.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 170,
+          "text": "assert_ne!(first.subject.invocation, second.subject.invocation);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_claim_sql_candidate_support.rs#verifier_for",
+        "name": "verifier_for",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_claim_sql_candidate_support.rs",
+        "span": "L245-L266"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_claim_sql_candidate_support.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 251,
+          "text": ".action_authority(request.scope(), &request.subject)"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 11662
+  }
+}

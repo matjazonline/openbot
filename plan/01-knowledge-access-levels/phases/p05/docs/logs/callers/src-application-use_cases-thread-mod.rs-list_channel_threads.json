@@ -1,0 +1,164 @@
+{
+  "query": "list_channel_threads",
+  "matches": [
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/mod.rs#list_channel_threads",
+        "name": "list_channel_threads",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/mod.rs",
+        "span": "L253-L262"
+      },
+      "hits": [
+        {
+          "id": "src/adapters/http/routes/channel.rs#load_thread_page",
+          "relation": "calls",
+          "depth": 1,
+          "name": "load_thread_page",
+          "kind": "function",
+          "path": "src/adapters/http/routes/channel.rs",
+          "span": "L225-L254"
+        },
+        {
+          "id": "src/adapters/http/routes/ui.rs#first_page_thread_ids",
+          "relation": "calls",
+          "depth": 1,
+          "name": "first_page_thread_ids",
+          "kind": "function",
+          "path": "src/adapters/http/routes/ui.rs",
+          "span": "L252-L262"
+        },
+        {
+          "id": "src/adapters/http/routes/channel.rs#list_channel_threads_fragment",
+          "relation": "calls",
+          "depth": 2,
+          "name": "list_channel_threads_fragment",
+          "kind": "function",
+          "path": "src/adapters/http/routes/channel.rs",
+          "span": "L641-L663"
+        },
+        {
+          "id": "src/adapters/http/routes/channel.rs#list_channel_threads_json",
+          "relation": "calls",
+          "depth": 2,
+          "name": "list_channel_threads_json",
+          "kind": "function",
+          "path": "src/adapters/http/routes/channel.rs",
+          "span": "L678-L693"
+        },
+        {
+          "id": "src/adapters/http/routes/channel.rs#list_channel_threads_page",
+          "relation": "calls",
+          "depth": 2,
+          "name": "list_channel_threads_page",
+          "kind": "function",
+          "path": "src/adapters/http/routes/channel.rs",
+          "span": "L605-L638"
+        },
+        {
+          "id": "src/adapters/http/routes/ui.rs#mailbox_page",
+          "relation": "calls",
+          "depth": 2,
+          "name": "mailbox_page",
+          "kind": "function",
+          "path": "src/adapters/http/routes/ui.rs",
+          "span": "L299-L386"
+        },
+        {
+          "id": "src/adapters/http/routes/ui.rs#sent_message_response",
+          "relation": "calls",
+          "depth": 2,
+          "name": "sent_message_response",
+          "kind": "function",
+          "path": "src/adapters/http/routes/ui.rs",
+          "span": "L1074-L1116"
+        },
+        {
+          "id": "src/adapters/http/routes/ui.rs#thread_column_fragment",
+          "relation": "calls",
+          "depth": 2,
+          "name": "thread_column_fragment",
+          "kind": "function",
+          "path": "src/adapters/http/routes/ui.rs",
+          "span": "L390-L426"
+        },
+        {
+          "id": "src/adapters/http/routes/ui.rs#thread_page_fragment",
+          "relation": "calls",
+          "depth": 2,
+          "name": "thread_page_fragment",
+          "kind": "function",
+          "path": "src/adapters/http/routes/ui.rs",
+          "span": "L430-L466"
+        },
+        {
+          "id": "src/adapters/http/routes/ui.rs#thread_column_stream",
+          "relation": "calls",
+          "depth": 2,
+          "name": "thread_column_stream",
+          "kind": "function",
+          "path": "src/adapters/http/routes/ui.rs",
+          "span": "L657-L811"
+        },
+        {
+          "id": "src/adapters/http/routes/ui.rs#create_thread",
+          "relation": "calls",
+          "depth": 3,
+          "name": "create_thread",
+          "kind": "function",
+          "path": "src/adapters/http/routes/ui.rs",
+          "span": "L857-L935"
+        },
+        {
+          "id": "src/adapters/http/routes/ui.rs#send_reply",
+          "relation": "calls",
+          "depth": 3,
+          "name": "send_reply",
+          "kind": "function",
+          "path": "src/adapters/http/routes/ui.rs",
+          "span": "L983-L1071"
+        },
+        {
+          "id": "src/adapters/http/routes/ui_stream_tests.rs#column_stream",
+          "relation": "calls",
+          "depth": 3,
+          "name": "column_stream",
+          "kind": "function",
+          "path": "src/adapters/http/routes/ui_stream_tests.rs",
+          "span": "L363-L383"
+        },
+        {
+          "id": "src/adapters/http/routes/ui_stream_tests.rs#a_resync_re_sends_the_columns_badges",
+          "relation": "calls",
+          "depth": 4,
+          "name": "a_resync_re_sends_the_columns_badges",
+          "kind": "function",
+          "path": "src/adapters/http/routes/ui_stream_tests.rs",
+          "span": "L484-L503"
+        },
+        {
+          "id": "src/adapters/http/routes/ui_stream_tests.rs#a_run_change_redraws_its_threads_badge",
+          "relation": "calls",
+          "depth": 4,
+          "name": "a_run_change_redraws_its_threads_badge",
+          "kind": "function",
+          "path": "src/adapters/http/routes/ui_stream_tests.rs",
+          "span": "L461-L480"
+        },
+        {
+          "id": "src/adapters/http/routes/ui_stream_tests.rs#the_column_stream_badges_each_thread_by_its_newest_run",
+          "relation": "calls",
+          "depth": 4,
+          "name": "the_column_stream_badges_each_thread_by_its_newest_run",
+          "kind": "function",
+          "path": "src/adapters/http/routes/ui_stream_tests.rs",
+          "span": "L411-L457"
+        }
+      ]
+    }
+  ],
+  "saved": {
+    "files": 4,
+    "baselineChars": 131811
+  }
+}

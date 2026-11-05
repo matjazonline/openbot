@@ -1,0 +1,201 @@
+{
+  "file": "src/adapters/protocols/email/egress.rs",
+  "entries": [
+    {
+      "name": "OUTBOUND_EMAIL_VERSION",
+      "kind": "constant",
+      "span": "L46-L46",
+      "signature": "pub const OUTBOUND_EMAIL_VERSION: u16 = 1;"
+    },
+    {
+      "name": "EMAIL_PART_INDEX",
+      "kind": "constant",
+      "span": "L53-L53",
+      "signature": "const EMAIL_PART_INDEX: PartIndex = PartIndex::new(0);"
+    },
+    {
+      "name": "OutboundEmailV1",
+      "kind": "struct",
+      "span": "L66-L83",
+      "signature": "pub struct OutboundEmailV1"
+    },
+    {
+      "name": "OutboundRelayV1",
+      "kind": "struct",
+      "span": "L87-L93",
+      "signature": "pub struct OutboundRelayV1"
+    },
+    {
+      "name": "into_mail_message",
+      "kind": "function",
+      "span": "L96-L110",
+      "signature": "fn into_mail_message(self) -> MailMessage"
+    },
+    {
+      "name": "wire_headers",
+      "kind": "function",
+      "span": "L119-L150",
+      "signature": "fn wire_headers(&self) -> Vec<MailHeader>"
+    },
+    {
+      "name": "as_relay_mail",
+      "kind": "function",
+      "span": "L158-L174",
+      "signature": "fn as_relay_mail(&self) -> Option<InternalRelayMail<'_>>"
+    },
+    {
+      "name": "wire_relay",
+      "kind": "function",
+      "span": "L181-L188",
+      "signature": "fn wire_relay(&self) -> Option<(u32, Vec<Uuid>)>"
+    },
+    {
+      "name": "EmailRenderer",
+      "kind": "struct",
+      "span": "L195-L197",
+      "signature": "pub struct EmailRenderer"
+    },
+    {
+      "name": "new",
+      "kind": "function",
+      "span": "L200-L204",
+      "signature": "pub fn new(app_domain_name: impl AsRef<str>) -> Self"
+    },
+    {
+      "name": "message_id_for",
+      "kind": "function",
+      "span": "L214-L222",
+      "signature": "pub fn message_id_for(&self, part_key: &PartKey) -> MessageId"
+    },
+    {
+      "name": "anchor_message_id",
+      "kind": "function",
+      "span": "L233-L241",
+      "signature": "fn anchor_message_id(&self, anchor: &ConversationAnchor) -> MessageId"
+    },
+    {
+      "name": "thread_headers",
+      "kind": "function",
+      "span": "L247-L268",
+      "signature": "fn thread_headers(&self, threading: &EmailThreading) -> MailThreadHeaders"
+    },
+    {
+      "name": "part_key",
+      "kind": "function",
+      "span": "L274-L277",
+      "signature": "pub fn part_key(idempotency_key: &str) -> AppResult<PartKey>"
+    },
+    {
+      "name": "transport",
+      "kind": "function",
+      "span": "L281-L283",
+      "signature": "fn transport(&self) -> TransportKind"
+    },
+    {
+      "name": "render",
+      "kind": "function",
+      "span": "L285-L300",
+      "signature": "fn render(&self, envelope: &DeliveryEnvelope) -> AppResult<Vec<RenderedPart>>"
+    },
+    {
+      "name": "render_standalone",
+      "kind": "function",
+      "span": "L302-L319",
+      "signature": "fn render_standalone("
+    },
+    {
+      "name": "rendered_correlation",
+      "kind": "function",
+      "span": "L321-L342",
+      "signature": "fn rendered_correlation("
+    },
+    {
+      "name": "application_message_key",
+      "kind": "function",
+      "span": "L344-L351",
+      "signature": "fn application_message_key("
+    },
+    {
+      "name": "render_email",
+      "kind": "function",
+      "span": "L355-L404",
+      "signature": "fn render_email("
+    },
+    {
+      "name": "copied_addresses",
+      "kind": "function",
+      "span": "L411-L427",
+      "signature": "fn copied_addresses(&self, context: &EmailDeliveryContext) -> Vec<EmailAddress>"
+    },
+    {
+      "name": "internal_target",
+      "kind": "function",
+      "span": "L430-L438",
+      "signature": "fn internal_target("
+    },
+    {
+      "name": "MailThreadHeaders",
+      "kind": "struct",
+      "span": "L444-L447",
+      "signature": "struct MailThreadHeaders"
+    },
+    {
+      "name": "reply_subject",
+      "kind": "function",
+      "span": "L450-L459",
+      "signature": "fn reply_subject(subject: &str) -> String"
+    },
+    {
+      "name": "EmailSender",
+      "kind": "struct",
+      "span": "L468-L471",
+      "signature": "pub struct EmailSender"
+    },
+    {
+      "name": "new",
+      "kind": "function",
+      "span": "L474-L482",
+      "signature": "pub fn new("
+    },
+    {
+      "name": "relay_internally",
+      "kind": "function",
+      "span": "L488-L512",
+      "signature": "async fn relay_internally("
+    },
+    {
+      "name": "transport",
+      "kind": "function",
+      "span": "L517-L519",
+      "signature": "fn transport(&self) -> TransportKind"
+    },
+    {
+      "name": "send",
+      "kind": "function",
+      "span": "L521-L626",
+      "signature": "async fn send(&self, delivery: &DeliveryRecord, part: &RenderedPart) -> ProviderSendOutcome"
+    },
+    {
+      "name": "provider_key",
+      "kind": "function",
+      "span": "L633-L645",
+      "signature": "fn provider_key(message_id: &MessageId, delivery: &DeliveryRecord) -> Option<ExternalMessageKey>"
+    },
+    {
+      "name": "detail",
+      "kind": "function",
+      "span": "L649-L658",
+      "signature": "fn detail(message: &str) -> FailureDetail"
+    },
+    {
+      "name": "tests",
+      "kind": "module",
+      "span": "L662-L662",
+      "signature": "mod tests;"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 28880
+  }
+}

@@ -1,0 +1,111 @@
+{
+  "file": "src/adapters/persistence/workflow/decision_approvals.rs",
+  "entries": [
+    {
+      "name": "approved",
+      "kind": "function",
+      "span": "L8-L16",
+      "signature": "pub(in crate::adapters::persistence::workflow) async fn approved("
+    },
+    {
+      "name": "approved_request",
+      "kind": "function",
+      "span": "L18-L25",
+      "signature": "pub(in crate::adapters::persistence::workflow) async fn approved_request("
+    },
+    {
+      "name": "ParkHead",
+      "kind": "struct",
+      "span": "L28-L33",
+      "signature": "struct ParkHead"
+    },
+    {
+      "name": "consumed",
+      "kind": "function",
+      "span": "L36-L44",
+      "signature": "pub(in crate::adapters::persistence::workflow) async fn consumed("
+    },
+    {
+      "name": "park",
+      "kind": "function",
+      "span": "L46-L95",
+      "signature": "pub(in crate::adapters::persistence::workflow) async fn park("
+    },
+    {
+      "name": "approvers",
+      "kind": "function",
+      "span": "L97-L115",
+      "signature": "pub(super) async fn approvers("
+    },
+    {
+      "name": "proposal",
+      "kind": "function",
+      "span": "L117-L120",
+      "signature": "fn proposal(invocation: Uuid, action: &FrozenAction) -> Value"
+    },
+    {
+      "name": "close_attempt",
+      "kind": "function",
+      "span": "L122-L134",
+      "signature": "pub(super) async fn close_attempt(db: &mut PgConnection, fence: WorkflowFence) -> AppResult<()>"
+    },
+    {
+      "name": "closed_error",
+      "kind": "function",
+      "span": "L135-L137",
+      "signature": "fn closed_error() -> AppError"
+    },
+    {
+      "name": "parked",
+      "kind": "function",
+      "span": "L140-L148",
+      "signature": "pub(in crate::adapters::persistence::workflow) async fn parked("
+    },
+    {
+      "name": "view_proposal",
+      "kind": "function",
+      "span": "L150-L158",
+      "signature": "pub(super) async fn view_proposal("
+    },
+    {
+      "name": "submit",
+      "kind": "function",
+      "span": "L160-L181",
+      "signature": "pub(super) async fn submit("
+    },
+    {
+      "name": "fail",
+      "kind": "function",
+      "span": "L183-L210",
+      "signature": "pub(in crate::adapters::persistence::workflow) async fn fail("
+    },
+    {
+      "name": "confirm",
+      "kind": "function",
+      "span": "L214-L221",
+      "signature": "pub(in crate::adapters::persistence::workflow) async fn confirm("
+    },
+    {
+      "name": "audit",
+      "kind": "function",
+      "span": "L223-L232",
+      "signature": "pub(super) async fn audit("
+    },
+    {
+      "name": "record_choice",
+      "kind": "function",
+      "span": "L235-L255",
+      "signature": "pub(super) async fn record_choice("
+    },
+    {
+      "name": "reopen_job",
+      "kind": "function",
+      "span": "L257-L267",
+      "signature": "pub(in crate::adapters::persistence::workflow) async fn reopen_job("
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 18043
+  }
+}

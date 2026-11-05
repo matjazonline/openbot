@@ -1,0 +1,249 @@
+{
+  "file": "src/application/transport/ports.rs",
+  "entries": [
+    {
+      "name": "InboundMessageCommitter",
+      "kind": "interface",
+      "span": "L42-L47",
+      "signature": "pub trait InboundMessageCommitter: Send + Sync"
+    },
+    {
+      "name": "commit_inbound",
+      "kind": "function",
+      "span": "L43-L46",
+      "signature": "async fn commit_inbound("
+    },
+    {
+      "name": "ExternalCorrelationStore",
+      "kind": "interface",
+      "span": "L56-L82",
+      "signature": "pub trait ExternalCorrelationStore: Send + Sync"
+    },
+    {
+      "name": "thread_for_thread_keys",
+      "kind": "function",
+      "span": "L61-L65",
+      "signature": "async fn thread_for_thread_keys("
+    },
+    {
+      "name": "thread_for_message_keys",
+      "kind": "function",
+      "span": "L69-L73",
+      "signature": "async fn thread_for_message_keys("
+    },
+    {
+      "name": "message_for_external_key",
+      "kind": "function",
+      "span": "L77-L81",
+      "signature": "async fn message_for_external_key("
+    },
+    {
+      "name": "DeliveryPlanner",
+      "kind": "interface",
+      "span": "L89-L91",
+      "signature": "pub trait DeliveryPlanner: Send + Sync"
+    },
+    {
+      "name": "plan",
+      "kind": "function",
+      "span": "L90-L90",
+      "signature": "fn plan(&self, request: &DeliveryPlanRequest<'_>) -> Vec<DeliveryIntent>;"
+    },
+    {
+      "name": "PolicyDeliveryPlanner",
+      "kind": "struct",
+      "span": "L95-L95",
+      "signature": "pub struct PolicyDeliveryPlanner;"
+    },
+    {
+      "name": "plan",
+      "kind": "function",
+      "span": "L98-L100",
+      "signature": "fn plan(&self, request: &DeliveryPlanRequest<'_>) -> Vec<DeliveryIntent>"
+    },
+    {
+      "name": "RenderedCorrelation",
+      "kind": "struct",
+      "span": "L105-L108",
+      "signature": "pub struct RenderedCorrelation"
+    },
+    {
+      "name": "TransportRenderer",
+      "kind": "interface",
+      "span": "L116-L142",
+      "signature": "pub trait TransportRenderer: Send + Sync"
+    },
+    {
+      "name": "transport",
+      "kind": "function",
+      "span": "L117-L117",
+      "signature": "fn transport(&self) -> TransportKind;"
+    },
+    {
+      "name": "render",
+      "kind": "function",
+      "span": "L119-L119",
+      "signature": "fn render(&self, envelope: &DeliveryEnvelope) -> AppResult<Vec<RenderedPart>>;"
+    },
+    {
+      "name": "render_standalone",
+      "kind": "function",
+      "span": "L126-L129",
+      "signature": "fn render_standalone("
+    },
+    {
+      "name": "rendered_correlation",
+      "kind": "function",
+      "span": "L133-L133",
+      "signature": "fn rendered_correlation(&self, part: &RenderedPart) -> AppResult<RenderedCorrelation>;"
+    },
+    {
+      "name": "application_message_key",
+      "kind": "function",
+      "span": "L137-L141",
+      "signature": "fn application_message_key("
+    },
+    {
+      "name": "TransportSender",
+      "kind": "interface",
+      "span": "L154-L158",
+      "signature": "pub trait TransportSender: Send + Sync"
+    },
+    {
+      "name": "transport",
+      "kind": "function",
+      "span": "L155-L155",
+      "signature": "fn transport(&self) -> TransportKind;"
+    },
+    {
+      "name": "send",
+      "kind": "function",
+      "span": "L157-L157",
+      "signature": "async fn send(&self, delivery: &DeliveryRecord, part: &RenderedPart) -> ProviderSendOutcome;"
+    },
+    {
+      "name": "InternalMailRelay",
+      "kind": "interface",
+      "span": "L170-L177",
+      "signature": "pub trait InternalMailRelay: Send + Sync"
+    },
+    {
+      "name": "relay_internal",
+      "kind": "function",
+      "span": "L176-L176",
+      "signature": "async fn relay_internal(&self, mail: &InternalRelayMail<'_>) -> AppResult<RelayDisposition>;"
+    },
+    {
+      "name": "InternalRelayMail",
+      "kind": "struct",
+      "span": "L184-L202",
+      "signature": "pub struct InternalRelayMail<'a>"
+    },
+    {
+      "name": "RelayDisposition",
+      "kind": "enum",
+      "span": "L206-L215",
+      "signature": "pub enum RelayDisposition"
+    },
+    {
+      "name": "RegisteredTransport",
+      "kind": "struct",
+      "span": "L219-L222",
+      "signature": "pub struct RegisteredTransport"
+    },
+    {
+      "name": "renderer",
+      "kind": "function",
+      "span": "L225-L227",
+      "signature": "pub fn renderer(&self) -> &Arc<dyn TransportRenderer>"
+    },
+    {
+      "name": "sender",
+      "kind": "function",
+      "span": "L229-L231",
+      "signature": "pub fn sender(&self) -> &Arc<dyn TransportSender>"
+    },
+    {
+      "name": "TransportRegistrationError",
+      "kind": "enum",
+      "span": "L235-L243",
+      "signature": "pub enum TransportRegistrationError"
+    },
+    {
+      "name": "TransportRenderers",
+      "kind": "struct",
+      "span": "L254-L256",
+      "signature": "pub struct TransportRenderers"
+    },
+    {
+      "name": "new",
+      "kind": "function",
+      "span": "L259-L261",
+      "signature": "pub fn new() -> Self"
+    },
+    {
+      "name": "register",
+      "kind": "function",
+      "span": "L265-L275",
+      "signature": "pub fn register("
+    },
+    {
+      "name": "get",
+      "kind": "function",
+      "span": "L277-L279",
+      "signature": "pub fn get(&self, transport: TransportKind) -> Option<&Arc<dyn TransportRenderer>>"
+    },
+    {
+      "name": "require",
+      "kind": "function",
+      "span": "L285-L291",
+      "signature": "pub fn require("
+    },
+    {
+      "name": "registered",
+      "kind": "function",
+      "span": "L293-L295",
+      "signature": "pub fn registered(&self) -> impl Iterator<Item = TransportKind> + '_"
+    },
+    {
+      "name": "TransportRegistry",
+      "kind": "struct",
+      "span": "L305-L307",
+      "signature": "pub struct TransportRegistry"
+    },
+    {
+      "name": "new",
+      "kind": "function",
+      "span": "L310-L312",
+      "signature": "pub fn new() -> Self"
+    },
+    {
+      "name": "register",
+      "kind": "function",
+      "span": "L320-L338",
+      "signature": "pub fn register("
+    },
+    {
+      "name": "get",
+      "kind": "function",
+      "span": "L340-L342",
+      "signature": "pub fn get(&self, transport: TransportKind) -> Option<&RegisteredTransport>"
+    },
+    {
+      "name": "require",
+      "kind": "function",
+      "span": "L348-L354",
+      "signature": "pub fn require("
+    },
+    {
+      "name": "registered",
+      "kind": "function",
+      "span": "L356-L358",
+      "signature": "pub fn registered(&self) -> impl Iterator<Item = TransportKind> + '_"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 15333
+  }
+}

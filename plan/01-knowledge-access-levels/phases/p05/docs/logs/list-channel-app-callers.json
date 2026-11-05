@@ -1,0 +1,66 @@
+{
+  "pattern": "list_channel_threads\\(",
+  "filesSearched": 1128,
+  "totalHits": 3,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/channel.rs#load_thread_page",
+        "name": "load_thread_page",
+        "kind": "function",
+        "path": "src/adapters/http/routes/channel.rs",
+        "span": "L225-L254"
+      },
+      "path": "src/adapters/http/routes/channel.rs",
+      "inDegree": 7,
+      "hits": [
+        {
+          "line": 243,
+          "text": ".list_channel_threads(channel_id, before, limit + 1)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/mod.rs#list_channel_threads",
+        "name": "list_channel_threads",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/mod.rs",
+        "span": "L255-L264"
+      },
+      "path": "src/application/use_cases/thread/mod.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 255,
+          "text": "pub async fn list_channel_threads("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui.rs#first_page_thread_ids",
+        "name": "first_page_thread_ids",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui.rs",
+        "span": "L252-L262"
+      },
+      "path": "src/adapters/http/routes/ui.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 257,
+          "text": ".list_channel_threads(channel_id, None, STREAM_BATCH_LIMIT)"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 3,
+    "baselineChars": 112405
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "file": "src/application/use_cases/thread/notices.rs",
+  "entries": [
+    {
+      "name": "handle_bounce_dispatch",
+      "kind": "function",
+      "span": "L11-L57",
+      "signature": "pub async fn handle_bounce_dispatch(&self, ingest: &InboundIngestResult) -> AppResult<()>"
+    },
+    {
+      "name": "BounceSuggestion",
+      "kind": "struct",
+      "span": "L60-L63",
+      "signature": "pub struct BounceSuggestion"
+    },
+    {
+      "name": "ChannelDirectoryEntry",
+      "kind": "struct",
+      "span": "L67-L71",
+      "signature": "pub struct ChannelDirectoryEntry"
+    },
+    {
+      "name": "BounceInfo",
+      "kind": "struct",
+      "span": "L74-L98",
+      "signature": "pub struct BounceInfo"
+    },
+    {
+      "name": "format_bounce_email_body",
+      "kind": "function",
+      "span": "L100-L140",
+      "signature": "pub fn format_bounce_email_body(bounce: &BounceInfo, app_domain: &str) -> String"
+    },
+    {
+      "name": "push_channel_directory",
+      "kind": "function",
+      "span": "L147-L162",
+      "signature": "fn push_channel_directory(body: &mut String, entries: &[ChannelDirectoryEntry])"
+    },
+    {
+      "name": "format_help_email_body",
+      "kind": "function",
+      "span": "L173-L218",
+      "signature": "pub fn format_help_email_body("
+    },
+    {
+      "name": "bounce_cause",
+      "kind": "function",
+      "span": "L221-L233",
+      "signature": "pub fn bounce_cause(bounce: &BounceInfo) -> &'static str"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 9415
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "file": "src/adapters/http/pages/simulation.rs",
+  "entries": [
+    {
+      "name": "EmailSimulationResult",
+      "kind": "struct",
+      "span": "L10-L21",
+      "signature": "pub struct EmailSimulationResult"
+    },
+    {
+      "name": "compose",
+      "kind": "module",
+      "span": "L23-L23",
+      "signature": "mod compose;"
+    },
+    {
+      "name": "live",
+      "kind": "module",
+      "span": "L24-L24",
+      "signature": "mod live;"
+    },
+    {
+      "name": "outcomes",
+      "kind": "module",
+      "span": "L25-L25",
+      "signature": "mod outcomes;"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 1109
+  }
+}

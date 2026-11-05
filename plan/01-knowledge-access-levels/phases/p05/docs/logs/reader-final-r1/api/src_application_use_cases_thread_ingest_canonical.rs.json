@@ -1,0 +1,51 @@
+{
+  "file": "src/application/use_cases/thread/ingest/canonical.rs",
+  "entries": [
+    {
+      "name": "Target",
+      "kind": "struct",
+      "span": "L5-L9",
+      "signature": "struct Target"
+    },
+    {
+      "name": "EmailHeaders",
+      "kind": "struct",
+      "span": "L10-L16",
+      "signature": "struct EmailHeaders"
+    },
+    {
+      "name": "ingest_canonical",
+      "kind": "function",
+      "span": "L19-L85",
+      "signature": "pub async fn ingest_canonical("
+    },
+    {
+      "name": "canonical_target",
+      "kind": "function",
+      "span": "L86-L127",
+      "signature": "async fn canonical_target("
+    },
+    {
+      "name": "canonical_email_headers",
+      "kind": "function",
+      "span": "L128-L165",
+      "signature": "fn canonical_email_headers("
+    },
+    {
+      "name": "canonical_subject",
+      "kind": "function",
+      "span": "L167-L174",
+      "signature": "fn canonical_subject(subject: Option<String>, target: Option<&Thread>) -> String"
+    },
+    {
+      "name": "canonical_directives",
+      "kind": "function",
+      "span": "L175-L189",
+      "signature": "fn canonical_directives("
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 6844
+  }
+}

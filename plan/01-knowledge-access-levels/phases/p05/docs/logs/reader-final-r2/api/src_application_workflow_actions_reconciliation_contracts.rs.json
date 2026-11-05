@@ -1,0 +1,135 @@
+{
+  "file": "src/application/workflow/actions/reconciliation/contracts.rs",
+  "entries": [
+    {
+      "name": "MAX_EVIDENCE_NOTE_BYTES",
+      "kind": "constant",
+      "span": "L11-L11",
+      "signature": "pub const MAX_EVIDENCE_NOTE_BYTES: usize = 4096;"
+    },
+    {
+      "name": "MAX_EVIDENCE_ENVELOPE_BYTES",
+      "kind": "constant",
+      "span": "L12-L12",
+      "signature": "pub const MAX_EVIDENCE_ENVELOPE_BYTES: usize = 16_384;"
+    },
+    {
+      "name": "MAX_RECONCILIATION_COVERAGE",
+      "kind": "constant",
+      "span": "L13-L13",
+      "signature": "pub const MAX_RECONCILIATION_COVERAGE: usize = 128;"
+    },
+    {
+      "name": "ClaimedDisposition",
+      "kind": "enum",
+      "span": "L18-L22",
+      "signature": "pub enum ClaimedDisposition"
+    },
+    {
+      "name": "EvidenceInput",
+      "kind": "enum",
+      "span": "L27-L36",
+      "signature": "pub enum EvidenceInput"
+    },
+    {
+      "name": "validate",
+      "kind": "function",
+      "span": "L38-L45",
+      "signature": "pub fn validate(&self) -> AppResult<()>"
+    },
+    {
+      "name": "ReconciliationTarget",
+      "kind": "enum",
+      "span": "L53-L56",
+      "signature": "pub enum ReconciliationTarget"
+    },
+    {
+      "name": "effect_kind",
+      "kind": "function",
+      "span": "L59-L64",
+      "signature": "pub const fn effect_kind(self) -> &'static str"
+    },
+    {
+      "name": "ReconcileActionCommand",
+      "kind": "struct",
+      "span": "L68-L77",
+      "signature": "pub struct ReconcileActionCommand"
+    },
+    {
+      "name": "request_digest",
+      "kind": "function",
+      "span": "L79-L102",
+      "signature": "pub fn request_digest(&self) -> AppResult<ReconciliationRequestDigest>"
+    },
+    {
+      "name": "ReconciliationEntry",
+      "kind": "struct",
+      "span": "L107-L113",
+      "signature": "pub struct ReconciliationEntry"
+    },
+    {
+      "name": "DeliverySubject",
+      "kind": "struct",
+      "span": "L118-L134",
+      "signature": "pub struct DeliverySubject"
+    },
+    {
+      "name": "ReconciliationSnapshot",
+      "kind": "struct",
+      "span": "L139-L149",
+      "signature": "pub struct ReconciliationSnapshot"
+    },
+    {
+      "name": "coverage",
+      "kind": "function",
+      "span": "L151-L189",
+      "signature": "pub fn coverage("
+    },
+    {
+      "name": "delivery_coverage",
+      "kind": "function",
+      "span": "L193-L219",
+      "signature": "pub fn delivery_coverage("
+    },
+    {
+      "name": "validate",
+      "kind": "function",
+      "span": "L221-L260",
+      "signature": "pub fn validate(&self, command: &ReconcileActionCommand) -> AppResult<()>"
+    },
+    {
+      "name": "ReconciliationBlockedReason",
+      "kind": "enum",
+      "span": "L265-L275",
+      "signature": "pub enum ReconciliationBlockedReason"
+    },
+    {
+      "name": "ReconciliationOutcome",
+      "kind": "enum",
+      "span": "L279-L297",
+      "signature": "pub enum ReconciliationOutcome"
+    },
+    {
+      "name": "ReconciliationResult",
+      "kind": "struct",
+      "span": "L300-L305",
+      "signature": "pub struct ReconciliationResult"
+    },
+    {
+      "name": "invalid",
+      "kind": "function",
+      "span": "L307-L309",
+      "signature": "pub(crate) fn invalid() -> AppError"
+    },
+    {
+      "name": "hash",
+      "kind": "function",
+      "span": "L310-L313",
+      "signature": "pub(crate) fn hash(value: &Value) -> AppResult<String>"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 11907
+  }
+}

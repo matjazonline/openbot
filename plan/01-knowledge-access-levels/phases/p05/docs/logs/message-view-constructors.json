@@ -1,0 +1,212 @@
+{
+  "pattern": "ThreadMessageView \\{",
+  "filesSearched": 1128,
+  "totalHits": 15,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/test_support.rs#stored_email_view",
+        "name": "stored_email_view",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/test_support.rs",
+        "span": "L1208-L1210"
+      },
+      "path": "src/application/use_cases/thread/test_support.rs",
+      "inDegree": 9,
+      "hits": [
+        {
+          "line": 1208,
+          "text": "pub fn stored_email_view(draft: EmailMessageDraft) -> ThreadMessageView {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/tests.rs#mailbox_message",
+        "name": "mailbox_message",
+        "kind": "function",
+        "path": "src/adapters/http/pages/tests.rs",
+        "span": "L1770-L1772"
+      },
+      "path": "src/adapters/http/pages/tests.rs",
+      "inDegree": 7,
+      "hits": [
+        {
+          "line": 1770,
+          "text": "fn mailbox_message(thread_id: Uuid, body: &str) -> ThreadMessageView {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/tests.rs#mailbox_message_view",
+        "name": "mailbox_message_view",
+        "kind": "function",
+        "path": "src/adapters/http/pages/tests.rs",
+        "span": "L1776-L1800"
+      },
+      "path": "src/adapters/http/pages/tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 1776,
+          "text": "fn mailbox_message_view(thread_id: Uuid, body: &str) -> ThreadMessageView {"
+        },
+        {
+          "line": 1777,
+          "text": "ThreadMessageView {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/thread/views.rs#into_view",
+        "name": "into_view",
+        "kind": "function",
+        "path": "src/adapters/persistence/thread/views.rs",
+        "span": "L119-L168"
+      },
+      "path": "src/adapters/persistence/thread/views.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 142,
+          "text": "Ok(ThreadMessageView {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/thread/test_support.rs#thread_message_view",
+        "name": "thread_message_view",
+        "kind": "function",
+        "path": "src/application/use_cases/thread/test_support.rs",
+        "span": "L1009-L1041"
+      },
+      "path": "src/application/use_cases/thread/test_support.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 1009,
+          "text": "fn thread_message_view(message: &Message) -> ThreadMessageView {"
+        },
+        {
+          "line": 1010,
+          "text": "ThreadMessageView {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/tests.rs#agent_reply_view",
+        "name": "agent_reply_view",
+        "kind": "function",
+        "path": "src/adapters/http/pages/tests.rs",
+        "span": "L1844-L1857"
+      },
+      "path": "src/adapters/http/pages/tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 1844,
+          "text": "fn agent_reply_view(thread_id: Uuid, body: &str) -> ThreadMessageView {"
+        },
+        {
+          "line": 1845,
+          "text": "ThreadMessageView {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/tests.rs#a_message_from_another_channel_is_marked_and_keeps_its_own_sender",
+        "name": "a_message_from_another_channel_is_marked_and_keeps_its_own_sender",
+        "kind": "function",
+        "path": "src/adapters/http/pages/tests.rs",
+        "span": "L2339-L2380"
+      },
+      "path": "src/adapters/http/pages/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 2365,
+          "text": "let own_reply = ThreadMessageView {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/tests.rs#a_message_renders_for_every_transport_including_none_at_all",
+        "name": "a_message_renders_for_every_transport_including_none_at_all",
+        "kind": "function",
+        "path": "src/adapters/http/pages/tests.rs",
+        "span": "L2516-L2572"
+      },
+      "path": "src/adapters/http/pages/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 2526,
+          "text": "let slack = ThreadMessageView {"
+        },
+        {
+          "line": 2536,
+          "text": "let schedule = ThreadMessageView {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_attachments.rs#message",
+        "name": "message",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui_attachments.rs",
+        "span": "L219-L239"
+      },
+      "path": "src/adapters/http/routes/ui_attachments.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 219,
+          "text": "fn message(attachments: Vec<AttachmentMetadata>) -> ThreadMessageView {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/message_view.rs#ThreadMessageView",
+        "name": "ThreadMessageView",
+        "kind": "struct",
+        "path": "src/domain/entities/message_view.rs",
+        "span": "L83-L106"
+      },
+      "path": "src/domain/entities/message_view.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 83,
+          "text": "pub struct ThreadMessageView {"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/domain/entities/message_view.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 108,
+          "text": "impl ThreadMessageView {"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 5,
+    "baselineChars": 294019
+  }
+}

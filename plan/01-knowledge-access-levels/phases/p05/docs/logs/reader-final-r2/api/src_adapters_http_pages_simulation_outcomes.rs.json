@@ -1,0 +1,63 @@
+{
+  "file": "src/adapters/http/pages/simulation/outcomes.rs",
+  "entries": [
+    {
+      "name": "LlmInfo",
+      "kind": "struct",
+      "span": "L6-L10",
+      "signature": "pub struct LlmInfo"
+    },
+    {
+      "name": "resolve_llm_info",
+      "kind": "function",
+      "span": "L16-L31",
+      "signature": "pub fn resolve_llm_info(_channel: Option<&Channel>, company: Option<&Company>) -> LlmInfo"
+    },
+    {
+      "name": "ChannelSimulationFailure",
+      "kind": "struct",
+      "span": "L33-L42",
+      "signature": "pub struct ChannelSimulationFailure<'a>"
+    },
+    {
+      "name": "channel_simulation_failure_fragment",
+      "kind": "function",
+      "span": "L44-L153",
+      "signature": "pub fn channel_simulation_failure_fragment(failure: &ChannelSimulationFailure<'_>) -> String"
+    },
+    {
+      "name": "simulation_completed_banner",
+      "kind": "function",
+      "span": "L156-L176",
+      "signature": "fn simulation_completed_banner(company_id: Uuid, channel_id: Uuid) -> String"
+    },
+    {
+      "name": "SimulationRoutingReport",
+      "kind": "struct",
+      "span": "L180-L192",
+      "signature": "struct SimulationRoutingReport<'a>"
+    },
+    {
+      "name": "simulation_routing_report",
+      "kind": "function",
+      "span": "L194-L275",
+      "signature": "fn simulation_routing_report(report: &SimulationRoutingReport<'_>) -> String"
+    },
+    {
+      "name": "status_banner",
+      "kind": "function",
+      "span": "L282-L290",
+      "signature": "fn status_banner(glyph: Icon, tint: &str, sentence: &str) -> String"
+    },
+    {
+      "name": "channel_simulation_result_fragment",
+      "kind": "function",
+      "span": "L294-L369",
+      "signature": "pub fn channel_simulation_result_fragment("
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 16539
+  }
+}

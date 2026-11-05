@@ -1,0 +1,1590 @@
+{
+  "pattern": "subject",
+  "filesSearched": 172,
+  "totalHits": 144,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/application/workflow/registry/examples.rs#values",
+        "name": "values",
+        "kind": "function",
+        "path": "src/application/workflow/registry/examples.rs",
+        "span": "L81-L129"
+      },
+      "path": "src/application/workflow/registry/examples.rs",
+      "inDegree": 44,
+      "hits": [
+        {
+          "line": 117,
+          "text": "json!({\"content\":{\"subject\":\"Hello\",\"body\":\"hello\"},\"destinations\":[{\"kind\":\"channel\",\"id\":\"00000000-0000-0000-0000-000000000004\"}]})"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/contracts.rs#approval_subject",
+        "name": "approval_subject",
+        "kind": "function",
+        "path": "src/application/workflow/actions/contracts.rs",
+        "span": "L99-L104"
+      },
+      "path": "src/application/workflow/actions/contracts.rs",
+      "inDegree": 26,
+      "hits": [
+        {
+          "line": 99,
+          "text": "pub fn approval_subject(&self) -> ApprovalSubject {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/reconciliation/contracts.rs#coverage",
+        "name": "coverage",
+        "kind": "function",
+        "path": "src/application/workflow/actions/reconciliation/contracts.rs",
+        "span": "L151-L189"
+      },
+      "path": "src/application/workflow/actions/reconciliation/contracts.rs",
+      "inDegree": 7,
+      "hits": [
+        {
+          "line": 153,
+          "text": "subject: &ApprovalSubject,"
+        },
+        {
+          "line": 160,
+          "text": "|| subject.invocation.as_uuid().is_nil()"
+        },
+        {
+          "line": 161,
+          "text": "|| action.argument_digest() != &subject.argument_digest"
+        },
+        {
+          "line": 183,
+          "text": "&json!({\"version\":1,\"scope\":action.scope(),\"subject\":subject,\"marker\":marker,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/reconciliation/tests.rs#fixture",
+        "name": "fixture",
+        "kind": "function",
+        "path": "src/application/workflow/actions/reconciliation/tests.rs",
+        "span": "L12-L67"
+      },
+      "path": "src/application/workflow/actions/reconciliation/tests.rs",
+      "inDegree": 6,
+      "hits": [
+        {
+          "line": 25,
+          "text": "let subject = ApprovalSubject {"
+        },
+        {
+          "line": 40,
+          "text": "subject: subject.clone(),"
+        },
+        {
+          "line": 53,
+          "text": "ReconciliationSnapshot::coverage(&action, &subject, command.marker, marker_created_at, &[])"
+        },
+        {
+          "line": 57,
+          "text": "subject,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/replay.rs#replay_subject",
+        "name": "replay_subject",
+        "kind": "function",
+        "path": "src/application/workflow/actions/replay.rs",
+        "span": "L111-L117"
+      },
+      "path": "src/application/workflow/actions/replay.rs",
+      "inDegree": 5,
+      "hits": [
+        {
+          "line": 111,
+          "text": "pub(crate) fn replay_subject(tool: &ToolSnapshot, target: &ActionTarget) -> AppResult<Vec<u8>> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/authorization_tests.rs#subject",
+        "name": "subject",
+        "kind": "function",
+        "path": "src/application/workflow/actions/authorization_tests.rs",
+        "span": "L55-L63"
+      },
+      "path": "src/application/workflow/actions/authorization_tests.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 55,
+          "text": "fn subject(request: &ActionRequest) -> ApprovalSubject {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/authorization.rs#validate_run_authority",
+        "name": "validate_run_authority",
+        "kind": "function",
+        "path": "src/application/workflow/actions/authorization.rs",
+        "span": "L131-L177"
+      },
+      "path": "src/application/workflow/actions/authorization.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 133,
+          "text": "subject: &ApprovalSubject,"
+        },
+        {
+          "line": 138,
+          "text": "|| subject.invocation.as_uuid().is_nil()"
+        },
+        {
+          "line": 139,
+          "text": "|| authority.action.argument_digest() != &subject.argument_digest"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/reconciliation/contracts.rs#delivery_coverage",
+        "name": "delivery_coverage",
+        "kind": "function",
+        "path": "src/application/workflow/actions/reconciliation/contracts.rs",
+        "span": "L193-L219"
+      },
+      "path": "src/application/workflow/actions/reconciliation/contracts.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 195,
+          "text": "subject: &ApprovalSubject,"
+        },
+        {
+          "line": 200,
+          "text": "|| subject.invocation.as_uuid().is_nil()"
+        },
+        {
+          "line": 201,
+          "text": "|| action.argument_digest() != &subject.argument_digest"
+        },
+        {
+          "line": 211,
+          "text": "\"subject\":subject,\"marker\":marker,\"operation\":action.operation_digest(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/binding/mod.rs#check_message_trigger",
+        "name": "check_message_trigger",
+        "kind": "function",
+        "path": "src/application/workflow/binding/mod.rs",
+        "span": "L90-L117"
+      },
+      "path": "src/application/workflow/binding/mod.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 114,
+          "text": "(source_message, message, subject, sender)\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/reconciliation/verification.rs#matches",
+        "name": "matches",
+        "kind": "function",
+        "path": "src/application/workflow/actions/reconciliation/verification.rs",
+        "span": "L64-L80"
+      },
+      "path": "src/application/workflow/actions/reconciliation/verification.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 73,
+          "text": "// A delivery subject is attested only by the registration for its own transport."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/replay.rs#signature",
+        "name": "signature",
+        "kind": "function",
+        "path": "src/application/workflow/actions/replay.rs",
+        "span": "L101-L107"
+      },
+      "path": "src/application/workflow/actions/replay.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 105,
+          "text": "Sha256::digest(replay_subject(tool, target)?)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/history_tests.rs#message",
+        "name": "message",
+        "kind": "function",
+        "path": "src/application/workflow/history_tests.rs",
+        "span": "L3-L14"
+      },
+      "path": "src/application/workflow/history_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 11,
+          "text": "subject: \"Order\".into(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/mcp_runtime.rs#dispatch_prepared",
+        "name": "dispatch_prepared",
+        "kind": "function",
+        "path": "src/application/workflow/mcp_runtime.rs",
+        "span": "L137-L176"
+      },
+      "path": "src/application/workflow/mcp_runtime.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 144,
+          "text": "let subject = intent.approval_subject();"
+        },
+        {
+          "line": 147,
+          "text": ".effect_state(request.scope, &subject)"
+        },
+        {
+          "line": 166,
+          "text": "subject,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/message_runtime.rs#dispatch_request",
+        "name": "dispatch_request",
+        "kind": "function",
+        "path": "src/application/workflow/message_runtime.rs",
+        "span": "L92-L102"
+      },
+      "path": "src/application/workflow/message_runtime.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 98,
+          "text": "subject: intent.approval_subject(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/message_runtime.rs#of",
+        "name": "of",
+        "kind": "function",
+        "path": "src/application/workflow/message_runtime.rs",
+        "span": "L333-L409"
+      },
+      "path": "src/application/workflow/message_runtime.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 359,
+          "text": "subject: content.subject().to_string(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/triggers.rs#new",
+        "name": "new",
+        "kind": "function",
+        "path": "src/application/workflow/triggers.rs",
+        "span": "L27-L39"
+      },
+      "path": "src/application/workflow/triggers.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 30,
+          "text": "subject: &str,"
+        },
+        {
+          "line": 36,
+          "text": "subject: truncate(subject, MAX_SUBJECT_BYTES).to_string(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/authorization.rs#action_authority",
+        "name": "action_authority",
+        "kind": "function",
+        "path": "src/application/workflow/actions/authorization.rs",
+        "span": "L26-L30"
+      },
+      "path": "src/application/workflow/actions/authorization.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 29,
+          "text": "subject: &ApprovalSubject,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/reconciliation/boundary_tests.rs#cover_entry",
+        "name": "cover_entry",
+        "kind": "function",
+        "path": "src/application/workflow/actions/reconciliation/boundary_tests.rs",
+        "span": "L34-L53"
+      },
+      "path": "src/application/workflow/actions/reconciliation/boundary_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 45,
+          "text": "&self.snapshot.subject,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/reconciliation/service.rs#reconcile_on",
+        "name": "reconcile_on",
+        "kind": "function",
+        "path": "src/application/workflow/actions/reconciliation/service.rs",
+        "span": "L95-L184"
+      },
+      "path": "src/application/workflow/actions/reconciliation/service.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 126,
+          "text": "|| action.argument_digest() != &command.subject.argument_digest"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/reconciliation/verification.rs#approve",
+        "name": "approve",
+        "kind": "function",
+        "path": "src/application/workflow/actions/reconciliation/verification.rs",
+        "span": "L22-L41"
+      },
+      "path": "src/application/workflow/actions/reconciliation/verification.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 32,
+          "text": "let subject = super::super::replay_subject(tool, target)?;"
+        },
+        {
+          "line": 39,
+          "text": "operation: ArgumentDigest(format!(\"{:x}\", Sha256::digest(subject))),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/decisions.rs#new",
+        "name": "new",
+        "kind": "function",
+        "path": "src/application/workflow/decisions.rs",
+        "span": "L362-L369"
+      },
+      "path": "src/application/workflow/decisions.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 367,
+          "text": "subject_prefix: \"Review requested\".into(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/history.rs#item",
+        "name": "item",
+        "kind": "function",
+        "path": "src/application/workflow/history.rs",
+        "span": "L58-L71"
+      },
+      "path": "src/application/workflow/history.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 67,
+          "text": "\"subject\": cut(&message.subject).0,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/http_runtime.rs#step",
+        "name": "step",
+        "kind": "function",
+        "path": "src/application/workflow/http_runtime.rs",
+        "span": "L78-L105"
+      },
+      "path": "src/application/workflow/http_runtime.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 96,
+          "text": "subject: intent.approval_subject(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/message_runtime.rs#plan",
+        "name": "plan",
+        "kind": "function",
+        "path": "src/application/workflow/message_runtime.rs",
+        "span": "L158-L211"
+      },
+      "path": "src/application/workflow/message_runtime.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 166,
+          "text": "let source_key = format!(\"invocation:{}\", dispatch.subject.invocation.as_uuid());"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/message_runtime.rs#message_write",
+        "name": "message_write",
+        "kind": "function",
+        "path": "src/application/workflow/message_runtime.rs",
+        "span": "L282-L331"
+      },
+      "path": "src/application/workflow/message_runtime.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 312,
+          "text": "content.subject().to_string(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/message_runtime.rs#plan_channel",
+        "name": "plan_channel",
+        "kind": "function",
+        "path": "src/application/workflow/message_runtime.rs",
+        "span": "L412-L447"
+      },
+      "path": "src/application/workflow/message_runtime.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 423,
+          "text": "content.subject().to_string(),"
+        },
+        {
+          "line": 437,
+          "text": "subject: content.subject().to_string(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/message_runtime.rs#plan_in_app",
+        "name": "plan_in_app",
+        "kind": "function",
+        "path": "src/application/workflow/message_runtime.rs",
+        "span": "L452-L482"
+      },
+      "path": "src/application/workflow/message_runtime.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 463,
+          "text": "content.subject().to_string(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/message_runtime.rs#plan_internal_reply",
+        "name": "plan_internal_reply",
+        "kind": "function",
+        "path": "src/application/workflow/message_runtime.rs",
+        "span": "L484-L518"
+      },
+      "path": "src/application/workflow/message_runtime.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 495,
+          "text": "content.subject().to_string(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/message.rs#parse_content",
+        "name": "parse_content",
+        "kind": "function",
+        "path": "src/application/workflow/message.rs",
+        "span": "L165-L184"
+      },
+      "path": "src/application/workflow/message.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 169,
+          "text": "let subject = match content.get(\"subject\") {"
+        },
+        {
+          "line": 177,
+          "text": "let parsed = CanonicalContent::parse(subject, body).map_err(bounds)?;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/registry/checks.rs#check_message",
+        "name": "check_message",
+        "kind": "function",
+        "path": "src/application/workflow/registry/checks.rs",
+        "span": "L115-L167"
+      },
+      "path": "src/application/workflow/registry/checks.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 119,
+          "text": ".get(\"subject\")"
+        },
+        {
+          "line": 121,
+          "text": ".is_some_and(|subject| subject.len() > MAX_SUBJECT_BYTES)"
+        },
+        {
+          "line": 124,
+          "text": "\"registry.message_subject\","
+        },
+        {
+          "line": 125,
+          "text": "\"A message subject is at most 998 UTF-8 bytes\","
+        },
+        {
+          "line": 127,
+          "text": "\"subject\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/registry/help.rs#notes",
+        "name": "notes",
+        "kind": "function",
+        "path": "src/application/workflow/registry/help.rs",
+        "span": "L54-L103"
+      },
+      "path": "src/application/workflow/registry/help.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 63,
+          "text": "\"TypeSafe System One: literal typesafe connection slot, exact versioned model, and 1–32 independent typed questions; state is a string, object or array. Noul is"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/registry/mod.rs#message_reply_wait",
+        "name": "message_reply_wait",
+        "kind": "function",
+        "path": "src/application/workflow/registry/mod.rs",
+        "span": "L224-L261"
+      },
+      "path": "src/application/workflow/registry/mod.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 237,
+          "text": "(source_message, message, subject, sender)\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/triggers.rs#schema",
+        "name": "schema",
+        "kind": "function",
+        "path": "src/application/workflow/triggers.rs",
+        "span": "L62-L77"
+      },
+      "path": "src/application/workflow/triggers.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 71,
+          "text": "\"subject\": {\"type\": \"string\", \"maxLength\": MAX_SUBJECT_BYTES},"
+        },
+        {
+          "line": 74,
+          "text": "\"required\": [\"source_message\", \"message\", \"subject\", \"sender\"],"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/authorization_tests.rs#workflow_action_authorization_current_revocation_errors_policy_and_approval",
+        "name": "workflow_action_authorization_current_revocation_errors_policy_and_approval",
+        "kind": "function",
+        "path": "src/application/workflow/actions/authorization_tests.rs",
+        "span": "L166-L233"
+      },
+      "path": "src/application/workflow/actions/authorization_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 169,
+          "text": "let subject = subject(&request);"
+        },
+        {
+          "line": 184,
+          "text": ".authorize(request.scope, &subject, &resources, &policies)"
+        },
+        {
+          "line": 203,
+          "text": ".authorize(request.scope, &subject, &good, &policies)"
+        },
+        {
+          "line": 222,
+          "text": "&subject,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/authorization_tests.rs#workflow_action_authorization_frozen_provenance_ceiling_and_binding",
+        "name": "workflow_action_authorization_frozen_provenance_ceiling_and_binding",
+        "kind": "function",
+        "path": "src/application/workflow/actions/authorization_tests.rs",
+        "span": "L236-L268"
+      },
+      "path": "src/application/workflow/actions/authorization_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 238,
+          "text": "let subject = subject(&request);"
+        },
+        {
+          "line": 265,
+          "text": "let result = authorization::validate_run_authority(request.scope, &subject, &authority);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/authorization_tests.rs#workflow_action_authorization_exact_frozen_connection_slot",
+        "name": "workflow_action_authorization_exact_frozen_connection_slot",
+        "kind": "function",
+        "path": "src/application/workflow/actions/authorization_tests.rs",
+        "span": "L271-L289"
+      },
+      "path": "src/application/workflow/actions/authorization_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 280,
+          "text": "let subject = subject(&request);"
+        },
+        {
+          "line": 282,
+          "text": "assert!(authorization::validate_run_authority(request.scope, &subject, &authority).is_ok());"
+        },
+        {
+          "line": 286,
+          "text": "assert!(authorization::validate_run_authority(request.scope, &subject, &authority).is_err());"
+        },
+        {
+          "line": 288,
+          "text": "assert!(authorization::validate_run_authority(request.scope, &subject, &authority).is_err());"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/authorization_tests.rs#workflow_action_authorization_lookup_timeouts_fail_closed",
+        "name": "workflow_action_authorization_lookup_timeouts_fail_closed",
+        "kind": "function",
+        "path": "src/application/workflow/actions/authorization_tests.rs",
+        "span": "L292-L318"
+      },
+      "path": "src/application/workflow/actions/authorization_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 295,
+          "text": "let subject = subject(&request);"
+        },
+        {
+          "line": 313,
+          "text": "service.authorize(request.scope, &subject, &resources, &good_policy),"
+        },
+        {
+          "line": 314,
+          "text": "service.authorize(request.scope, &subject, &good_resources, &policy),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/authorization.rs#ActionAuthorities",
+        "name": "ActionAuthorities",
+        "kind": "interface",
+        "path": "src/application/workflow/actions/authorization.rs",
+        "span": "L22-L31"
+      },
+      "path": "src/application/workflow/actions/authorization.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 23,
+          "text": "/// Load the scoped immutable subject and run snapshot, rechecking current company access."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/authorization.rs#authorize",
+        "name": "authorize",
+        "kind": "function",
+        "path": "src/application/workflow/actions/authorization.rs",
+        "span": "L58-L94"
+      },
+      "path": "src/application/workflow/actions/authorization.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 61,
+          "text": "subject: &ApprovalSubject,"
+        },
+        {
+          "line": 65,
+          "text": "let authority = self.persistence.action_authority(scope, subject).await?;"
+        },
+        {
+          "line": 66,
+          "text": "validate_run_authority(scope, subject, &authority)?;"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/actions/contracts.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 29,
+          "text": "/// Supplied by the trusted execution boundary; frozen content remains subject to current access."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/contracts.rs#ActionReceipt",
+        "name": "ActionReceipt",
+        "kind": "struct",
+        "path": "src/application/workflow/actions/contracts.rs",
+        "span": "L125-L128"
+      },
+      "path": "src/application/workflow/actions/contracts.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 126,
+          "text": "pub subject: ApprovalSubject,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/dispatch.rs#ActionDispatchRequest",
+        "name": "ActionDispatchRequest",
+        "kind": "struct",
+        "path": "src/application/workflow/actions/dispatch.rs",
+        "span": "L15-L19"
+      },
+      "path": "src/application/workflow/actions/dispatch.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 16,
+          "text": "pub subject: ApprovalSubject,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/effect.rs#effect_state",
+        "name": "effect_state",
+        "kind": "function",
+        "path": "src/application/workflow/actions/effect.rs",
+        "span": "L25-L29"
+      },
+      "path": "src/application/workflow/actions/effect.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 28,
+          "text": "subject: &ApprovalSubject,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/actions/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 26,
+          "text": "pub(crate) use replay::{prepare_provider, replay_subject};"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/reconciliation/contracts.rs#ReconcileActionCommand",
+        "name": "ReconcileActionCommand",
+        "kind": "struct",
+        "path": "src/application/workflow/actions/reconciliation/contracts.rs",
+        "span": "L68-L77"
+      },
+      "path": "src/application/workflow/actions/reconciliation/contracts.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 71,
+          "text": "pub subject: ApprovalSubject,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/reconciliation/contracts.rs#request_digest",
+        "name": "request_digest",
+        "kind": "function",
+        "path": "src/application/workflow/actions/reconciliation/contracts.rs",
+        "span": "L79-L102"
+      },
+      "path": "src/application/workflow/actions/reconciliation/contracts.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 84,
+          "text": "|| self.subject.invocation.as_uuid().is_nil()"
+        },
+        {
+          "line": 96,
+          "text": "\"subject\":self.subject,\"marker\":self.marker,\"target\":self.target,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/actions/reconciliation/contracts.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 137,
+          "text": "/// `entries` covers a remote marker; `delivery` is the subject of a message target, whose"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/reconciliation/contracts.rs#ReconciliationSnapshot",
+        "name": "ReconciliationSnapshot",
+        "kind": "struct",
+        "path": "src/application/workflow/actions/reconciliation/contracts.rs",
+        "span": "L139-L149"
+      },
+      "path": "src/application/workflow/actions/reconciliation/contracts.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 141,
+          "text": "pub subject: ApprovalSubject,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/reconciliation/contracts.rs#validate~2",
+        "name": "validate~2",
+        "kind": "function",
+        "path": "src/application/workflow/actions/reconciliation/contracts.rs",
+        "span": "L221-L260"
+      },
+      "path": "src/application/workflow/actions/reconciliation/contracts.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 225,
+          "text": "&self.subject,"
+        },
+        {
+          "line": 241,
+          "text": "Self::delivery_coverage(&self.action, &self.subject, self.marker, delivery)?"
+        },
+        {
+          "line": 246,
+          "text": "|| self.subject != command.subject"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/reconciliation/service.rs#ActionReconciliation",
+        "name": "ActionReconciliation",
+        "kind": "interface",
+        "path": "src/application/workflow/actions/reconciliation/service.rs",
+        "span": "L23-L46"
+      },
+      "path": "src/application/workflow/actions/reconciliation/service.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 29,
+          "text": "/// Restore frozen bundle/resource/subject/marker independently of dispatch loader;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/reconciliation/tests.rs#workflow_action_reconciliation_request_identity_binds_every_command_component",
+        "name": "workflow_action_reconciliation_request_identity_binds_every_command_component",
+        "kind": "function",
+        "path": "src/application/workflow/actions/reconciliation/tests.rs",
+        "span": "L109-L147"
+      },
+      "path": "src/application/workflow/actions/reconciliation/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 120,
+          "text": "4 => changed.subject.invocation = ActionInvocationId::new(Uuid::new_v4()),"
+        },
+        {
+          "line": 122,
+          "text": "changed.subject.argument_digest ="
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/reconciliation/tests.rs#workflow_action_reconciliation_coverage_binds_marker_and_all_request_provenance",
+        "name": "workflow_action_reconciliation_coverage_binds_marker_and_all_request_provenance",
+        "kind": "function",
+        "path": "src/application/workflow/actions/reconciliation/tests.rs",
+        "span": "L169-L220"
+      },
+      "path": "src/application/workflow/actions/reconciliation/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 183,
+          "text": "&snapshot.subject,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/reconciliation/tests.rs#workflow_action_reconciliation_applied_request_must_belong_to_exact_snapshot",
+        "name": "workflow_action_reconciliation_applied_request_must_belong_to_exact_snapshot",
+        "kind": "function",
+        "path": "src/application/workflow/actions/reconciliation/tests.rs",
+        "span": "L327-L399"
+      },
+      "path": "src/application/workflow/actions/reconciliation/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 338,
+          "text": "&snapshot.subject,"
+        },
+        {
+          "line": 375,
+          "text": "&snapshot.subject,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/reconciliation/verification.rs#AppliedEvidenceRequest",
+        "name": "AppliedEvidenceRequest",
+        "kind": "enum",
+        "path": "src/application/workflow/actions/reconciliation/verification.rs",
+        "span": "L87-L96"
+      },
+      "path": "src/application/workflow/actions/reconciliation/verification.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 91,
+          "text": "/// The provider accepted the subject delivery's message at `accepted_at`; there is no"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/decisions.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 150,
+          "text": "/// The subject whose immutable artifact a reviewer is settling."
+        },
+        {
+          "line": 371,
+          "text": "/// A composer whose subject cannot render, for the deterministic-failure path."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/decisions.rs#DecisionHistoryEntry",
+        "name": "DecisionHistoryEntry",
+        "kind": "struct",
+        "path": "src/application/workflow/decisions.rs",
+        "span": "L187-L199"
+      },
+      "path": "src/application/workflow/decisions.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 194,
+          "text": "pub subject: DecisionSubject,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/decisions.rs#DecisionView",
+        "name": "DecisionView",
+        "kind": "struct",
+        "path": "src/application/workflow/decisions.rs",
+        "span": "L203-L228"
+      },
+      "path": "src/application/workflow/decisions.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 205,
+          "text": "pub subject: DecisionSubject,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/decisions.rs#DecisionNotices",
+        "name": "DecisionNotices",
+        "kind": "struct",
+        "path": "src/application/workflow/decisions.rs",
+        "span": "L354-L359"
+      },
+      "path": "src/application/workflow/decisions.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 358,
+          "text": "subject_prefix: String,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/decisions.rs#unrenderable",
+        "name": "unrenderable",
+        "kind": "function",
+        "path": "src/application/workflow/decisions.rs",
+        "span": "L373-L376"
+      },
+      "path": "src/application/workflow/decisions.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 374,
+          "text": "self.subject_prefix = \"x\".repeat(4096);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/decisions.rs#compose",
+        "name": "compose",
+        "kind": "function",
+        "path": "src/application/workflow/decisions.rs",
+        "span": "L386-L434"
+      },
+      "path": "src/application/workflow/decisions.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 387,
+          "text": "let subject = format!("
+        },
+        {
+          "line": 389,
+          "text": "self.subject_prefix, notice.workflow_title, notice.step"
+        },
+        {
+          "line": 399,
+          "text": "let content = CanonicalContent::parse(subject, body)"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/fixtures/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 153,
+          "text": "/// Both shipped reply templates give the agent the message's subject beside its body, so a"
+        },
+        {
+          "line": 154,
+          "text": "/// question asked only in the subject still reaches it; a message without one gives \"\"."
+        },
+        {
+          "line": 155,
+          "text": "/// Both reply templates hand the agent the thread so far beside the message and its subject, so"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/fixtures/tests.rs#workflow_fixtures_reply_templates_pass_the_subject_and_history_to_the_agent",
+        "name": "workflow_fixtures_reply_templates_pass_the_subject_and_history_to_the_agent",
+        "kind": "function",
+        "path": "src/application/workflow/fixtures/tests.rs",
+        "span": "L158-L201"
+      },
+      "path": "src/application/workflow/fixtures/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 158,
+          "text": "fn workflow_fixtures_reply_templates_pass_the_subject_and_history_to_the_agent() {"
+        },
+        {
+          "line": 168,
+          "text": "for (input, subject) in ["
+        },
+        {
+          "line": 170,
+          "text": "json!({\"message\":\"we are in CET\",\"subject\":\"date today\",\"source_message\":source_message}),"
+        },
+        {
+          "line": 182,
+          "text": "\"author\": \"Agent Builder\", \"subject\": \"date today\","
+        },
+        {
+          "line": 190,
+          "text": "inputs.value()[\"context\"][\"untrusted_subject\"],"
+        },
+        {
+          "line": 191,
+          "text": "subject,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/history.rs#HistoryMessage",
+        "name": "HistoryMessage",
+        "kind": "struct",
+        "path": "src/application/workflow/history.rs",
+        "span": "L24-L33"
+      },
+      "path": "src/application/workflow/history.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 31,
+          "text": "pub subject: String,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/http_runtime.rs#call_tool",
+        "name": "call_tool",
+        "kind": "function",
+        "path": "src/application/workflow/http_runtime.rs",
+        "span": "L48-L75"
+      },
+      "path": "src/application/workflow/http_runtime.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 67,
+          "text": "subject: intent.approval_subject(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/message_unit_tests.rs#message_registry_runtime_arguments_refuse_out_of_bound_inputs",
+        "name": "message_registry_runtime_arguments_refuse_out_of_bound_inputs",
+        "kind": "function",
+        "path": "src/application/workflow/message_unit_tests.rs",
+        "span": "L20-L61"
+      },
+      "path": "src/application/workflow/message_unit_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 21,
+          "text": "let body = json!({\"subject\":\"Status\",\"body\":\"hello\"});"
+        },
+        {
+          "line": 44,
+          "text": "send(json!({\"subject\":exact,\"body\":\"hello\"}), users(1)).unwrap();"
+        },
+        {
+          "line": 47,
+          "text": "json!({\"subject\":format!(\"{exact}a\"),\"body\":\"hello\"}),"
+        },
+        {
+          "line": 52,
+          "text": "assert!(send(json!({\"subject\":\"€\".repeat(998),\"body\":\"hello\"}), users(1)).is_err());"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/message.rs#NewThread",
+        "name": "NewThread",
+        "kind": "struct",
+        "path": "src/application/workflow/message.rs",
+        "span": "L306-L310"
+      },
+      "path": "src/application/workflow/message.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 309,
+          "text": "pub subject: String,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/provisioning.rs#call_tool",
+        "name": "call_tool",
+        "kind": "function",
+        "path": "src/application/workflow/provisioning.rs",
+        "span": "L405-L456"
+      },
+      "path": "src/application/workflow/provisioning.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 439,
+          "text": "subject: intent.approval_subject(),"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/reads.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 185,
+          "text": "/// A hint, not a grant: the command's own subject conditions (an `outcome_unknown`"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/registry/message_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1,
+          "text": "//! 04.11-D2 §1.1 (F003) bounds: byte-exact subjects, destination counts, duplicates, groups."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/registry/message_tests.rs#subject",
+        "name": "subject",
+        "kind": "function",
+        "path": "src/application/workflow/registry/message_tests.rs",
+        "span": "L10-L12"
+      },
+      "path": "src/application/workflow/registry/message_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 10,
+          "text": "fn subject(subject: &str) -> Result<CompiledWorkflow, Diagnostic> {"
+        },
+        {
+          "line": 11,
+          "text": "send_with(|with| with[\"content\"] = json!({\"literal\":{\"subject\":subject,\"body\":\"hello\"}}))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/registry/message_tests.rs#message_registry_subject_is_bounded_in_utf8_bytes_at_publication",
+        "name": "message_registry_subject_is_bounded_in_utf8_bytes_at_publication",
+        "kind": "function",
+        "path": "src/application/workflow/registry/message_tests.rs",
+        "span": "L18-L37"
+      },
+      "path": "src/application/workflow/registry/message_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 18,
+          "text": "fn message_registry_subject_is_bounded_in_utf8_bytes_at_publication() {"
+        },
+        {
+          "line": 22,
+          "text": "assert!(subject(&exact).is_ok());"
+        },
+        {
+          "line": 24,
+          "text": "subject(&format!(\"{exact}a\")).err().unwrap().code,"
+        },
+        {
+          "line": 25,
+          "text": "\"registry.message_subject\""
+        },
+        {
+          "line": 30,
+          "text": "assert!(subject(&ending).is_ok());"
+        },
+        {
+          "line": 34,
+          "text": "subject(&crossing).err().unwrap().code,"
+        },
+        {
+          "line": 35,
+          "text": "\"registry.message_subject\""
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/registry/message_tests.rs#message_registry_runtime_check_refuses_what_the_schema_admits",
+        "name": "message_registry_runtime_check_refuses_what_the_schema_admits",
+        "kind": "function",
+        "path": "src/application/workflow/registry/message_tests.rs",
+        "span": "L40-L67"
+      },
+      "path": "src/application/workflow/registry/message_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 43,
+          "text": "v[\"input_schema\"] = json!({\"type\":\"object\",\"properties\":{\"subject\":{\"type\":\"string\"}},\"required\":[\"subject\"]});"
+        },
+        {
+          "line": 61,
+          "text": "prepare(json!({\"subject\":wide,\"body\":\"hello\"}))"
+        },
+        {
+          "line": 64,
+          "text": "\"registry.message_subject\""
+        },
+        {
+          "line": 66,
+          "text": "prepare(json!({\"subject\":\"€\".repeat(332),\"body\":\"hello\"})).unwrap();"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/registry/schemas.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 39,
+          "text": "/// enforce the canonical 998-byte subject at compilation (literals) and at resolution."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/registry/schemas.rs#content",
+        "name": "content",
+        "kind": "function",
+        "path": "src/application/workflow/registry/schemas.rs",
+        "span": "L40-L43"
+      },
+      "path": "src/application/workflow/registry/schemas.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 41,
+          "text": "let subject = json!({\"type\":\"string\",\"maxLength\":crate::application::transport::ingress::MAX_SUBJECT_BYTES});"
+        },
+        {
+          "line": 42,
+          "text": "object(json!({\"subject\":subject,\"body\":text(MAX_TEXT)}), &[\"body\"])"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/registry/schemas.rs#history_item",
+        "name": "history_item",
+        "kind": "function",
+        "path": "src/application/workflow/registry/schemas.rs",
+        "span": "L49-L69"
+      },
+      "path": "src/application/workflow/registry/schemas.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 55,
+          "text": "\"author\":{\"type\":\"string\",\"maxLength\":MAX_TEXT},\"subject\":{\"type\":\"string\",\"maxLength\":MAX_TEXT},"
+        },
+        {
+          "line": 64,
+          "text": "\"subject\","
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/templates/agent_workflow.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 289,
+          "text": "/// The draft's context gains a step's output, beside the message, subject and history."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/tests/authorization_cases/mod.rs#thread",
+        "name": "thread",
+        "kind": "function",
+        "path": "src/application/workflow/tests/authorization_cases/mod.rs",
+        "span": "L30-L40"
+      },
+      "path": "src/application/workflow/tests/authorization_cases/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 34,
+          "text": "subject: \"Related\".into(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/triggers.rs#MessageTriggerInput",
+        "name": "MessageTriggerInput",
+        "kind": "struct",
+        "path": "src/application/workflow/triggers.rs",
+        "span": "L18-L23"
+      },
+      "path": "src/application/workflow/triggers.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 21,
+          "text": "pub subject: String,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/triggers.rs#to_value",
+        "name": "to_value",
+        "kind": "function",
+        "path": "src/application/workflow/triggers.rs",
+        "span": "L41-L48"
+      },
+      "path": "src/application/workflow/triggers.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 45,
+          "text": "\"subject\": self.subject,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/triggers.rs#representative",
+        "name": "representative",
+        "kind": "function",
+        "path": "src/application/workflow/triggers.rs",
+        "span": "L51-L59"
+      },
+      "path": "src/application/workflow/triggers.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 55,
+          "text": "\"A representative subject\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/triggers.rs#message_trigger_input_is_bounded_at_char_boundaries_and_matches_its_schema",
+        "name": "message_trigger_input_is_bounded_at_char_boundaries_and_matches_its_schema",
+        "kind": "function",
+        "path": "src/application/workflow/triggers.rs",
+        "span": "L115-L131"
+      },
+      "path": "src/application/workflow/triggers.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 120,
+          "text": "\"subject\","
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 33,
+    "baselineChars": 317006
+  }
+}

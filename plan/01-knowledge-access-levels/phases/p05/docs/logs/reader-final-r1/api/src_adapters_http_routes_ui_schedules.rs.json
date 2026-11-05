@@ -1,0 +1,267 @@
+{
+  "file": "src/adapters/http/routes/ui_schedules.rs",
+  "entries": [
+    {
+      "name": "SCHEDULE_UI_PATHS",
+      "kind": "constant",
+      "span": "L49-L58",
+      "signature": "pub(crate) const SCHEDULE_UI_PATHS: &[&str] = &["
+    },
+    {
+      "name": "router",
+      "kind": "function",
+      "span": "L60-L78",
+      "signature": "pub fn router() -> Router<AppState>"
+    },
+    {
+      "name": "SchedulesQuery",
+      "kind": "struct",
+      "span": "L81-L86",
+      "signature": "pub struct SchedulesQuery"
+    },
+    {
+      "name": "CompanyScopedQuery",
+      "kind": "struct",
+      "span": "L89-L93",
+      "signature": "pub struct CompanyScopedQuery"
+    },
+    {
+      "name": "SchedulesWorkspace",
+      "kind": "struct",
+      "span": "L95-L102",
+      "signature": "struct SchedulesWorkspace"
+    },
+    {
+      "name": "RunsColumnRender",
+      "kind": "enum",
+      "span": "L105-L108",
+      "signature": "enum RunsColumnRender"
+    },
+    {
+      "name": "Rejection",
+      "kind": "type",
+      "span": "L111-L111",
+      "signature": "type Rejection = AuthError;"
+    },
+    {
+      "name": "from_request_parts",
+      "kind": "function",
+      "span": "L113-L127",
+      "signature": "async fn from_request_parts("
+    },
+    {
+      "name": "scoped_company",
+      "kind": "function",
+      "span": "L131-L136",
+      "signature": "async fn scoped_company("
+    },
+    {
+      "name": "bindings",
+      "kind": "function",
+      "span": "L139-L143",
+      "signature": "async fn bindings(&self, company_id: Uuid) -> AppResult<Vec<ScheduleBindingChoice>>"
+    },
+    {
+      "name": "runs_page",
+      "kind": "function",
+      "span": "L147-L164",
+      "signature": "async fn runs_page("
+    },
+    {
+      "name": "runs_column",
+      "kind": "function",
+      "span": "L168-L176",
+      "signature": "async fn runs_column("
+    },
+    {
+      "name": "runs_column_fragment",
+      "kind": "function",
+      "span": "L178-L191",
+      "signature": "async fn runs_column_fragment("
+    },
+    {
+      "name": "render_runs_column",
+      "kind": "function",
+      "span": "L193-L230",
+      "signature": "async fn render_runs_column("
+    },
+    {
+      "name": "PAGE_SIZE",
+      "kind": "constant",
+      "span": "L233-L233",
+      "signature": "const PAGE_SIZE: i64 = 15;"
+    },
+    {
+      "name": "schedules_page",
+      "kind": "function",
+      "span": "L236-L348",
+      "signature": "async fn schedules_page("
+    },
+    {
+      "name": "schedule_runs_fragment",
+      "kind": "function",
+      "span": "L351-L363",
+      "signature": "async fn schedule_runs_fragment("
+    },
+    {
+      "name": "create_pane",
+      "kind": "function",
+      "span": "L366-L396",
+      "signature": "async fn create_pane("
+    },
+    {
+      "name": "edit_schedule_pane",
+      "kind": "function",
+      "span": "L399-L436",
+      "signature": "async fn edit_schedule_pane("
+    },
+    {
+      "name": "ScheduleActionForm",
+      "kind": "struct",
+      "span": "L441-L446",
+      "signature": "pub struct ScheduleActionForm"
+    },
+    {
+      "name": "wants_enabled",
+      "kind": "function",
+      "span": "L449-L452",
+      "signature": "fn wants_enabled(&self) -> bool"
+    },
+    {
+      "name": "run_schedule_now",
+      "kind": "function",
+      "span": "L456-L472",
+      "signature": "async fn run_schedule_now("
+    },
+    {
+      "name": "toggle_schedule",
+      "kind": "function",
+      "span": "L475-L503",
+      "signature": "async fn toggle_schedule("
+    },
+    {
+      "name": "close_pane",
+      "kind": "function",
+      "span": "L506-L514",
+      "signature": "async fn close_pane("
+    },
+    {
+      "name": "CreateScheduleForm",
+      "kind": "struct",
+      "span": "L519-L523",
+      "signature": "pub struct CreateScheduleForm"
+    },
+    {
+      "name": "create_schedule",
+      "kind": "function",
+      "span": "L526-L550",
+      "signature": "async fn create_schedule("
+    },
+    {
+      "name": "update_schedule",
+      "kind": "function",
+      "span": "L553-L579",
+      "signature": "async fn update_schedule("
+    },
+    {
+      "name": "delete_schedule",
+      "kind": "function",
+      "span": "L582-L602",
+      "signature": "async fn delete_schedule("
+    },
+    {
+      "name": "schedule_page_redirect",
+      "kind": "function",
+      "span": "L605-L619",
+      "signature": "async fn schedule_page_redirect("
+    },
+    {
+      "name": "tests",
+      "kind": "module",
+      "span": "L622-L1012",
+      "signature": "mod tests"
+    },
+    {
+      "name": "test_company",
+      "kind": "function",
+      "span": "L637-L647",
+      "signature": "fn test_company() -> Company"
+    },
+    {
+      "name": "test_schedule",
+      "kind": "function",
+      "span": "L649-L666",
+      "signature": "fn test_schedule(company_id: Uuid, channel_id: Uuid) -> ChannelSchedule"
+    },
+    {
+      "name": "binding_of",
+      "kind": "function",
+      "span": "L668-L675",
+      "signature": "fn binding_of(schedule: &ChannelSchedule) -> ScheduleBindingChoice"
+    },
+    {
+      "name": "occurrence",
+      "kind": "function",
+      "span": "L677-L690",
+      "signature": "fn occurrence(status: OccurrenceStatus) -> ScheduleRun"
+    },
+    {
+      "name": "admin",
+      "kind": "function",
+      "span": "L692-L701",
+      "signature": "fn admin(email: &EmailAddress) -> MailboxUser<'_>"
+    },
+    {
+      "name": "schedule_pages_only_target_routed_paths",
+      "kind": "function",
+      "span": "L707-L777",
+      "signature": "fn schedule_pages_only_target_routed_paths()"
+    },
+    {
+      "name": "matches",
+      "kind": "function",
+      "span": "L709-L717",
+      "signature": "fn matches(pattern: &str, path: &str) -> bool"
+    },
+    {
+      "name": "schedules_page_renders_3_columns_and_sidebar_items",
+      "kind": "function",
+      "span": "L780-L810",
+      "signature": "fn schedules_page_renders_3_columns_and_sidebar_items()"
+    },
+    {
+      "name": "schedule_runs_column_renders_occurrences_with_their_runs",
+      "kind": "function",
+      "span": "L813-L866",
+      "signature": "fn schedule_runs_column_renders_occurrences_with_their_runs()"
+    },
+    {
+      "name": "create_schedule_form_deserializes_browser_submission",
+      "kind": "function",
+      "span": "L873-L911",
+      "signature": "async fn create_schedule_form_deserializes_browser_submission()"
+    },
+    {
+      "name": "create_schedule_form_deserializes_one_off_submission",
+      "kind": "function",
+      "span": "L916-L954",
+      "signature": "async fn create_schedule_form_deserializes_one_off_submission()"
+    },
+    {
+      "name": "schedule_editor_keeps_channel_fixed_and_creation_keeps_selector",
+      "kind": "function",
+      "span": "L957-L978",
+      "signature": "fn schedule_editor_keeps_channel_fixed_and_creation_keeps_selector()"
+    },
+    {
+      "name": "the_schedule_form_picks_a_binding_and_nothing_it_replaced",
+      "kind": "function",
+      "span": "L982-L1011",
+      "signature": "fn the_schedule_form_picks_a_binding_and_nothing_it_replaced()"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 33349
+  }
+}

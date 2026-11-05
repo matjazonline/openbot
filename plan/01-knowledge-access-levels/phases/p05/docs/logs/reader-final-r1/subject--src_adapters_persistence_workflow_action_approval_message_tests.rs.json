@@ -1,0 +1,32 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 1,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_approval_message_tests.rs#protected",
+        "name": "protected",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_approval_message_tests.rs",
+        "span": "L55-L67"
+      },
+      "path": "src/adapters/persistence/workflow/action_approval_message_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 60,
+          "text": "\"content\":{\"literal\":{\"subject\":\"Approved message\",\"body\":\"Send after approval\"}},"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 7025
+  }
+}

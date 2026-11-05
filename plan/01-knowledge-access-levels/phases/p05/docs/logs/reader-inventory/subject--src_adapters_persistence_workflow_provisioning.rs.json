@@ -1,0 +1,36 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 2,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/provisioning.rs#apply",
+        "name": "apply",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/provisioning.rs",
+        "span": "L160-L205"
+      },
+      "path": "src/adapters/persistence/workflow/provisioning.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 164,
+          "text": "subject: &ApprovalSubject,"
+        },
+        {
+          "line": 195,
+          "text": "key: ProvisioningKey::invocation(subject.invocation.as_uuid()),"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 41124
+  }
+}

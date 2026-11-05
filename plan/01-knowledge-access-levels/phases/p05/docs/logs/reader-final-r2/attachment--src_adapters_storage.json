@@ -1,0 +1,96 @@
+{
+  "pattern": "attachment",
+  "filesSearched": 3,
+  "totalHits": 7,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/storage/gcs.rs#GcsFileStorage",
+        "name": "GcsFileStorage",
+        "kind": "struct",
+        "path": "src/adapters/storage/gcs.rs",
+        "span": "L96-L109"
+      },
+      "path": "src/adapters/storage/gcs.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 98,
+          "text": "/// The bucket nothing public may read; `None` when the deployment stores no attachments."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/storage/gcs.rs#from_config",
+        "name": "from_config",
+        "kind": "function",
+        "path": "src/adapters/storage/gcs.rs",
+        "span": "L113-L136"
+      },
+      "path": "src/adapters/storage/gcs.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 128,
+          "text": "private_bucket: config.attachments_bucket.clone(),"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/storage/gcs.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 210,
+          "text": "/// one: storing an attachment where anyone could read it is the one outcome worth refusing."
+        },
+        {
+          "line": 370,
+          "text": "/// `attachments/a.png` is one object, not a folder and a file, and Google answers 404 for the"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/storage/gcs.rs#an_object_name_is_encoded_whole_for_the_read_url",
+        "name": "an_object_name_is_encoded_whole_for_the_read_url",
+        "kind": "function",
+        "path": "src/adapters/storage/gcs.rs",
+        "span": "L506-L514"
+      },
+      "path": "src/adapters/storage/gcs.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 509,
+          "text": "urlencoding(\"attachments/9f2c.png\"),"
+        },
+        {
+          "line": 510,
+          "text": "\"attachments%2F9f2c.png\""
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/storage/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 24,
+          "text": "/// confusing them runs one way: a mail attachment in the public bucket is a leak, while an avatar"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 2,
+    "baselineChars": 20748
+  }
+}

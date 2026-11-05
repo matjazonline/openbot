@@ -1,0 +1,32 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 1,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs#call",
+        "name": "call",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs",
+        "span": "L111-L150"
+      },
+      "path": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs",
+      "inDegree": 8,
+      "hits": [
+        {
+          "line": 146,
+          "text": "subject: intent.approval_subject(),"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 31366
+  }
+}

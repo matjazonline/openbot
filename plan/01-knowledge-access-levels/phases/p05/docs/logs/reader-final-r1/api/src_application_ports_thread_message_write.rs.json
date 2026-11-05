@@ -1,0 +1,99 @@
+{
+  "file": "src/application/ports/thread/message_write.rs",
+  "entries": [
+    {
+      "name": "MessageAuthorWrite",
+      "kind": "enum",
+      "span": "L31-L47",
+      "signature": "pub enum MessageAuthorWrite"
+    },
+    {
+      "name": "AgentAuthor",
+      "kind": "struct",
+      "span": "L54-L57",
+      "signature": "pub struct AgentAuthor"
+    },
+    {
+      "name": "MessageParticipantWrite",
+      "kind": "struct",
+      "span": "L62-L65",
+      "signature": "pub struct MessageParticipantWrite"
+    },
+    {
+      "name": "new",
+      "kind": "function",
+      "span": "L68-L70",
+      "signature": "pub fn new(kind: MessageParticipantKind, identity: QualifiedIdentity) -> Self"
+    },
+    {
+      "name": "MessageCorrelation",
+      "kind": "enum",
+      "span": "L79-L86",
+      "signature": "pub enum MessageCorrelation"
+    },
+    {
+      "name": "MessageWrite",
+      "kind": "struct",
+      "span": "L90-L116",
+      "signature": "pub struct MessageWrite"
+    },
+    {
+      "name": "internal",
+      "kind": "function",
+      "span": "L121-L150",
+      "signature": "pub fn internal("
+    },
+    {
+      "name": "with_participants",
+      "kind": "function",
+      "span": "L152-L155",
+      "signature": "pub fn with_participants(mut self, participants: Vec<MessageParticipantWrite>) -> Self"
+    },
+    {
+      "name": "with_attachments",
+      "kind": "function",
+      "span": "L157-L160",
+      "signature": "pub fn with_attachments(mut self, attachments: Vec<AttachmentMetadata>) -> Self"
+    },
+    {
+      "name": "with_correlation",
+      "kind": "function",
+      "span": "L162-L165",
+      "signature": "pub fn with_correlation(mut self, correlation: MessageCorrelation) -> Self"
+    },
+    {
+      "name": "external_conversation",
+      "kind": "function",
+      "span": "L171-L175",
+      "signature": "pub fn external_conversation(mut self) -> Self"
+    },
+    {
+      "name": "with_entry_kind",
+      "kind": "function",
+      "span": "L177-L180",
+      "signature": "pub fn with_entry_kind(mut self, entry_kind: ThreadEntryKind) -> Self"
+    },
+    {
+      "name": "created_at",
+      "kind": "function",
+      "span": "L182-L185",
+      "signature": "pub fn created_at(mut self, created_at: DateTime<Utc>) -> Self"
+    },
+    {
+      "name": "email_metadata",
+      "kind": "function",
+      "span": "L188-L193",
+      "signature": "pub fn email_metadata(&self) -> Option<&EmailMessageMetadata>"
+    },
+    {
+      "name": "participant_observation",
+      "kind": "function",
+      "span": "L201-L211",
+      "signature": "pub fn participant_observation(&self, identity: QualifiedIdentity) -> IdentityObservation"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 9008
+  }
+}

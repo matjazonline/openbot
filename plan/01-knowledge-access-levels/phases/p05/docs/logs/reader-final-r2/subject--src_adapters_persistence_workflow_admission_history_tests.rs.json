@@ -1,0 +1,66 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 3,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/admission_history_tests.rs#new",
+        "name": "new",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/admission_history_tests.rs",
+        "span": "L18-L42"
+      },
+      "path": "src/adapters/persistence/workflow/admission_history_tests.rs",
+      "inDegree": 7,
+      "hits": [
+        {
+          "line": 37,
+          "text": "sqlx::query(\"INSERT INTO threads (id, company_id, channel_id, subject) VALUES ($1,$2,$3,'Admission')\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/admission_history_tests.rs#insert_message",
+        "name": "insert_message",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/admission_history_tests.rs",
+        "span": "L47-L52"
+      },
+      "path": "src/adapters/persistence/workflow/admission_history_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 49,
+          "text": "sqlx::query(\"INSERT INTO messages (id, company_id, author_principal_id, subject, clean_text_body, direction, role, correlation_id, content_hash, audience) SELEC"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/admission_history_tests.rs#workflow_admit_sql_long_history_retains_only_newest_256",
+        "name": "workflow_admit_sql_long_history_retains_only_newest_256",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/admission_history_tests.rs",
+        "span": "L213-L254"
+      },
+      "path": "src/adapters/persistence/workflow/admission_history_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 218,
+          "text": "sqlx::query(\"WITH inserted AS (INSERT INTO messages (id,company_id,author_principal_id,subject,clean_text_body,direction,role,correlation_id,content_hash,audien"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 15264
+  }
+}

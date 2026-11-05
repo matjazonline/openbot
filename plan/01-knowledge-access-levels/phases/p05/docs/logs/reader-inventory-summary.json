@@ -1,0 +1,17 @@
+{
+  "clean_text_body": {
+    "complete_hits": 73,
+    "leaf_scopes": 1,
+    "records": "/Users/mac02/dev/openbot-recovery/.worktrees/knowledge-p05/plan/01-knowledge-access-levels/phases/p05/docs/logs/reader-inventory/clean_text_body-complete.json"
+  },
+  "subject": {
+    "complete_hits": 1279,
+    "leaf_scopes": 489,
+    "records": "/Users/mac02/dev/openbot-recovery/.worktrees/knowledge-p05/plan/01-knowledge-access-levels/phases/p05/docs/logs/reader-inventory/subject-complete.json"
+  },
+  "attachment": {
+    "complete_hits": 356,
+    "leaf_scopes": 7,
+    "records": "/Users/mac02/dev/openbot-recovery/.worktrees/knowledge-p05/plan/01-knowledge-access-levels/phases/p05/docs/logs/reader-inventory/attachment-complete.json"
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 3,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_receipt_tests.rs#receipt_fixture",
+        "name": "receipt_fixture",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_receipt_tests.rs",
+        "span": "L52-L88"
+      },
+      "path": "src/adapters/persistence/workflow/action_receipt_tests.rs",
+      "inDegree": 35,
+      "hits": [
+        {
+          "line": 67,
+          "text": ".action_authority(request.scope(), &request.subject)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_receipt_tests.rs#workflow_action_receipt_restart_model_link_no_registration_and_current_access",
+        "name": "workflow_action_receipt_restart_model_link_no_registration_and_current_access",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_receipt_tests.rs",
+        "span": "L228-L274"
+      },
+      "path": "src/adapters/persistence/workflow/action_receipt_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 238,
+          "text": ".action_authority(request.scope(), &request.subject)"
+        },
+        {
+          "line": 252,
+          "text": "assert_eq!(intent.approval_subject(), request.subject);"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 16129
+  }
+}

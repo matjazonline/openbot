@@ -1,0 +1,165 @@
+{
+  "file": "src/adapters/persistence/thread/views.rs",
+  "entries": [
+    {
+      "name": "AUTHOR_COLUMNS",
+      "kind": "constant",
+      "span": "L45-L50",
+      "signature": "const AUTHOR_COLUMNS: &str = r#\""
+    },
+    {
+      "name": "AUTHOR_JOINS",
+      "kind": "constant",
+      "span": "L52-L60",
+      "signature": "const AUTHOR_JOINS: &str = r#\""
+    },
+    {
+      "name": "AuthorDb",
+      "kind": "struct",
+      "span": "L64-L69",
+      "signature": "struct AuthorDb"
+    },
+    {
+      "name": "Error",
+      "kind": "type",
+      "span": "L72-L72",
+      "signature": "type Error = AppError;"
+    },
+    {
+      "name": "try_from",
+      "kind": "function",
+      "span": "L74-L85",
+      "signature": "fn try_from(db: AuthorDb) -> AppResult<Self>"
+    },
+    {
+      "name": "transport_kind",
+      "kind": "function",
+      "span": "L89-L92",
+      "signature": "fn transport_kind(value: &str) -> AppResult<TransportKind>"
+    },
+    {
+      "name": "ThreadMessageDb",
+      "kind": "struct",
+      "span": "L95-L118",
+      "signature": "struct ThreadMessageDb"
+    },
+    {
+      "name": "into_view",
+      "kind": "function",
+      "span": "L121-L171",
+      "signature": "fn into_view(self, run_ids: Vec<Uuid>) -> AppResult<ThreadMessageView>"
+    },
+    {
+      "name": "ThreadRunLookupDb",
+      "kind": "struct",
+      "span": "L175-L178",
+      "signature": "struct ThreadRunLookupDb"
+    },
+    {
+      "name": "THREAD_RUN_LOOKUP_SQL",
+      "kind": "constant",
+      "span": "L185-L208",
+      "signature": "pub(in crate::adapters::persistence) const THREAD_RUN_LOOKUP_SQL: &str = r#\""
+    },
+    {
+      "name": "fetch_thread_runs",
+      "kind": "function",
+      "span": "L211-L245",
+      "signature": "async fn fetch_thread_runs("
+    },
+    {
+      "name": "thread_message_select",
+      "kind": "function",
+      "span": "L247-L278",
+      "signature": "fn thread_message_select() -> String"
+    },
+    {
+      "name": "list_thread_messages",
+      "kind": "function",
+      "span": "L285-L326",
+      "signature": "pub(super) async fn list_thread_messages("
+    },
+    {
+      "name": "list_thread_messages_after",
+      "kind": "function",
+      "span": "L333-L371",
+      "signature": "pub(super) async fn list_thread_messages_after("
+    },
+    {
+      "name": "get_thread_message",
+      "kind": "function",
+      "span": "L374-L397",
+      "signature": "pub(super) async fn get_thread_message("
+    },
+    {
+      "name": "AgentHistoryDb",
+      "kind": "struct",
+      "span": "L400-L409",
+      "signature": "struct AgentHistoryDb"
+    },
+    {
+      "name": "list_agent_history",
+      "kind": "function",
+      "span": "L415-L479",
+      "signature": "pub(super) async fn list_agent_history("
+    },
+    {
+      "name": "display_name",
+      "kind": "function",
+      "span": "L482-L487",
+      "signature": "fn display_name(label: String, handle: Option<String>) -> String"
+    },
+    {
+      "name": "EmailReplyContextDb",
+      "kind": "struct",
+      "span": "L490-L497",
+      "signature": "struct EmailReplyContextDb"
+    },
+    {
+      "name": "latest_email_reply_context",
+      "kind": "function",
+      "span": "L504-L544",
+      "signature": "pub(super) async fn latest_email_reply_context("
+    },
+    {
+      "name": "latest_replyable_email_context",
+      "kind": "function",
+      "span": "L549-L593",
+      "signature": "pub(super) async fn latest_replyable_email_context("
+    },
+    {
+      "name": "email_reply_context",
+      "kind": "function",
+      "span": "L595-L613",
+      "signature": "fn email_reply_context(row: EmailReplyContextDb) -> EmailReplyContext"
+    },
+    {
+      "name": "latest_thread_rfc_message_id",
+      "kind": "function",
+      "span": "L616-L637",
+      "signature": "pub(super) async fn latest_thread_rfc_message_id("
+    },
+    {
+      "name": "MessageAuditDb",
+      "kind": "struct",
+      "span": "L640-L656",
+      "signature": "struct MessageAuditDb"
+    },
+    {
+      "name": "ExternalKeyRow",
+      "kind": "struct",
+      "span": "L659-L663",
+      "signature": "struct ExternalKeyRow"
+    },
+    {
+      "name": "get_message_audit",
+      "kind": "function",
+      "span": "L670-L753",
+      "signature": "pub(super) async fn get_message_audit("
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 30550
+  }
+}

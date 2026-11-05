@@ -1,0 +1,99 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 8,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_uncertainty_acceptance_tests.rs#observation",
+        "name": "observation",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_uncertainty_acceptance_tests.rs",
+        "span": "L3-L13"
+      },
+      "path": "src/adapters/persistence/workflow/action_uncertainty_acceptance_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 10,
+          "text": ".bind(request.scope().execution.as_uuid()).bind(request.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 11,
+          "text": ".bind(request.subject.argument_digest.as_str()).bind(marker).execute(db).await?;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_uncertainty_acceptance_tests.rs#terminal_audit",
+        "name": "terminal_audit",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_uncertainty_acceptance_tests.rs",
+        "span": "L243-L301"
+      },
+      "path": "src/adapters/persistence/workflow/action_uncertainty_acceptance_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 279,
+          "text": ".find(|row| row[\"invocation_id\"] == current.subject.invocation.as_uuid().to_string())"
+        },
+        {
+          "line": 284,
+          "text": "current.subject.argument_digest.as_str()"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_uncertainty_acceptance_tests.rs#sibling",
+        "name": "sibling",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_uncertainty_acceptance_tests.rs",
+        "span": "L170-L192"
+      },
+      "path": "src/adapters/persistence/workflow/action_uncertainty_acceptance_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 177,
+          "text": ".action_authority(request.scope(), &request.subject)"
+        },
+        {
+          "line": 189,
+          "text": "subject: intent.approval_subject(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_uncertainty_acceptance_tests.rs#workflow_action_uncertainty_sql_provenance_isolated_from_other_guards",
+        "name": "workflow_action_uncertainty_sql_provenance_isolated_from_other_guards",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_uncertainty_acceptance_tests.rs",
+        "span": "L24-L77"
+      },
+      "path": "src/adapters/persistence/workflow/action_uncertainty_acceptance_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 50,
+          "text": "3 => wrong.subject.invocation = ActionInvocationId::new(Uuid::new_v4()),"
+        },
+        {
+          "line": 52,
+          "text": "wrong.subject.argument_digest ="
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 11475
+  }
+}

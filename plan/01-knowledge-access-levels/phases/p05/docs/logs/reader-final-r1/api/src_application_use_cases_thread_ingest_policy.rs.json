@@ -1,0 +1,183 @@
+{
+  "file": "src/application/use_cases/thread/ingest/policy.rs",
+  "entries": [
+    {
+      "name": "IngestRejection",
+      "kind": "enum",
+      "span": "L26-L55",
+      "signature": "pub enum IngestRejection"
+    },
+    {
+      "name": "UndeliverableReason",
+      "kind": "struct",
+      "span": "L59-L62",
+      "signature": "pub struct UndeliverableReason"
+    },
+    {
+      "name": "UndeliverableKind",
+      "kind": "enum",
+      "span": "L65-L68",
+      "signature": "pub enum UndeliverableKind"
+    },
+    {
+      "name": "as_str",
+      "kind": "function",
+      "span": "L72-L94",
+      "signature": "pub fn as_str(&self) -> &'static str"
+    },
+    {
+      "name": "bounce",
+      "kind": "function",
+      "span": "L97-L103",
+      "signature": "pub fn bounce(&self) -> Option<&BounceInfo>"
+    },
+    {
+      "name": "fmt",
+      "kind": "function",
+      "span": "L107-L109",
+      "signature": "fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result"
+    },
+    {
+      "name": "IngressOrigin",
+      "kind": "enum",
+      "span": "L117-L127",
+      "signature": "pub enum IngressOrigin"
+    },
+    {
+      "name": "is_internal",
+      "kind": "function",
+      "span": "L130-L132",
+      "signature": "pub const fn is_internal(self) -> bool"
+    },
+    {
+      "name": "internal_channel",
+      "kind": "function",
+      "span": "L134-L139",
+      "signature": "pub const fn internal_channel(self) -> Option<uuid::Uuid>"
+    },
+    {
+      "name": "internal_company",
+      "kind": "function",
+      "span": "L141-L146",
+      "signature": "pub const fn internal_company(self) -> Option<uuid::Uuid>"
+    },
+    {
+      "name": "guard_ingress",
+      "kind": "function",
+      "span": "L153-L176",
+      "signature": "pub fn guard_ingress(draft: &InboundDraft, origin: IngressOrigin) -> Result<(), IngestRejection>"
+    },
+    {
+      "name": "exceeds_spam_threshold",
+      "kind": "function",
+      "span": "L179-L189",
+      "signature": "pub fn exceeds_spam_threshold("
+    },
+    {
+      "name": "exceeds_turn_limit",
+      "kind": "function",
+      "span": "L192-L194",
+      "signature": "pub const fn exceeds_turn_limit(recent_messages: usize) -> bool"
+    },
+    {
+      "name": "thread_participants",
+      "kind": "function",
+      "span": "L201-L224",
+      "signature": "pub fn thread_participants<T: Clone + Eq>("
+    },
+    {
+      "name": "UndeliverableSlugs",
+      "kind": "struct",
+      "span": "L231-L235",
+      "signature": "pub struct UndeliverableSlugs"
+    },
+    {
+      "name": "unknown",
+      "kind": "function",
+      "span": "L238-L245",
+      "signature": "pub fn unknown(&mut self, slug: ChannelSlug, suggestions: Vec<ChannelSlug>)"
+    },
+    {
+      "name": "disabled",
+      "kind": "function",
+      "span": "L247-L249",
+      "signature": "pub fn disabled(&mut self, slug: ChannelSlug)"
+    },
+    {
+      "name": "kind",
+      "kind": "function",
+      "span": "L253-L261",
+      "signature": "pub fn kind(&self) -> Option<UndeliverableKind>"
+    },
+    {
+      "name": "into_bounce",
+      "kind": "function",
+      "span": "L263-L282",
+      "signature": "pub fn into_bounce("
+    },
+    {
+      "name": "tests",
+      "kind": "module",
+      "span": "L286-L519",
+      "signature": "mod tests"
+    },
+    {
+      "name": "identity",
+      "kind": "function",
+      "span": "L302-L308",
+      "signature": "fn identity(subject: &str) -> QualifiedIdentity"
+    },
+    {
+      "name": "draft",
+      "kind": "function",
+      "span": "L310-L327",
+      "signature": "fn draft(policy: IngressPolicyFacts, directives: IngressDirectives) -> InboundDraft"
+    },
+    {
+      "name": "email_facts",
+      "kind": "function",
+      "span": "L329-L336",
+      "signature": "fn email_facts(dmarc: AuthVerdict, spam_score: Option<f64>) -> IngressPolicyFacts"
+    },
+    {
+      "name": "only_a_dmarc_pass_authorizes_a_message_from_a_remote_mail_server",
+      "kind": "function",
+      "span": "L339-L368",
+      "signature": "fn only_a_dmarc_pass_authorizes_a_message_from_a_remote_mail_server()"
+    },
+    {
+      "name": "a_signed_in_composer_is_not_asked_for_a_dmarc_verdict",
+      "kind": "function",
+      "span": "L373-L384",
+      "signature": "fn a_signed_in_composer_is_not_asked_for_a_dmarc_verdict()"
+    },
+    {
+      "name": "an_internal_message_must_prove_which_channel_relayed_it",
+      "kind": "function",
+      "span": "L387-L415",
+      "signature": "fn an_internal_message_must_prove_which_channel_relayed_it()"
+    },
+    {
+      "name": "the_hop_limit_applies_to_relayed_traffic_and_the_auto_reply_guard_to_outside_traffic",
+      "kind": "function",
+      "span": "L418-L453",
+      "signature": "fn the_hop_limit_applies_to_relayed_traffic_and_the_auto_reply_guard_to_outside_traffic()"
+    },
+    {
+      "name": "a_trusted_sender_is_never_scored_and_an_absent_score_is_not_a_zero",
+      "kind": "function",
+      "span": "L456-L487",
+      "signature": "fn a_trusted_sender_is_never_scored_and_an_absent_score_is_not_a_zero()"
+    },
+    {
+      "name": "participants_join_once_and_only_when_the_rule_allows",
+      "kind": "function",
+      "span": "L490-L518",
+      "signature": "fn participants_join_once_and_only_when_the_rule_allows()"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 18887
+  }
+}

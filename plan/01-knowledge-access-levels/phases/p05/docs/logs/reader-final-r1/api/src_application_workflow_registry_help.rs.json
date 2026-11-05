@@ -1,0 +1,27 @@
+{
+  "file": "src/application/workflow/registry/help.rs",
+  "entries": [
+    {
+      "name": "AuthoringHelp",
+      "kind": "struct",
+      "span": "L5-L15",
+      "signature": "pub struct AuthoringHelp"
+    },
+    {
+      "name": "authoring_help",
+      "kind": "function",
+      "span": "L18-L53",
+      "signature": "pub fn authoring_help("
+    },
+    {
+      "name": "notes",
+      "kind": "function",
+      "span": "L54-L103",
+      "signature": "fn notes(name: &str) -> &'static str"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 7593
+  }
+}

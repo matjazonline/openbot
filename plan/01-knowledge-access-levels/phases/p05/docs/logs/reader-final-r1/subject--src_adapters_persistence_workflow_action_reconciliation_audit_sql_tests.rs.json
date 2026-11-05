@@ -1,0 +1,36 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 2,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_audit_sql_tests.rs#assert_owner_audit",
+        "name": "assert_owner_audit",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_audit_sql_tests.rs",
+        "span": "L50-L109"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_audit_sql_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 103,
+          "text": "json!(c.subject.invocation.as_uuid())"
+        },
+        {
+          "line": 107,
+          "text": "json!(c.subject.argument_digest.as_str())"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 15291
+  }
+}

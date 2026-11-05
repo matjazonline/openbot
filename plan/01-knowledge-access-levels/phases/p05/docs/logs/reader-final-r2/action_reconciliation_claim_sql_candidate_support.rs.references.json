@@ -1,0 +1,26 @@
+{
+  "pattern": "action_reconciliation_claim_sql_candidate_support.rs",
+  "filesSearched": 1137,
+  "totalHits": 1,
+  "groups": [
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/action_reconciliation_claim_sql_candidate_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 5,
+          "text": "#[path = \"action_reconciliation_claim_sql_candidate_support.rs\"]"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 12566
+  }
+}

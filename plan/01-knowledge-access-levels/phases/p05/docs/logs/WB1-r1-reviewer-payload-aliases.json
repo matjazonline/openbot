@@ -1,0 +1,412 @@
+{
+  "pattern": "frozen_inputs|committed_output|argument_digest|proposal|receipt|clean_text_body",
+  "filesSearched": 123,
+  "totalHits": 34,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_knowledge_view_tests.rs#classified",
+        "name": "classified",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui_knowledge_view_tests.rs",
+        "span": "L50-L76"
+      },
+      "path": "src/adapters/http/routes/ui_knowledge_view_tests.rs",
+      "inDegree": 5,
+      "hits": [
+        {
+          "line": 61,
+          "text": "sqlx::query(\"INSERT INTO messages(id,company_id,author_principal_id,subject,clean_text_body,attachments,direction,role,correlation_id,content_hash,audience,acce"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/ui/authoring/sample_tests.rs#counts",
+        "name": "counts",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/ui/authoring/sample_tests.rs",
+        "span": "L11-L31"
+      },
+      "path": "src/adapters/http/routes/workflows/ui/authoring/sample_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 18,
+          "text": "\"workflow_action_receipts\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/reconciliation_tests.rs#request",
+        "name": "request",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/reconciliation_tests.rs",
+        "span": "L64-L70"
+      },
+      "path": "src/adapters/http/routes/workflows/reconciliation_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 67,
+          "text": "\"argument_digest\": a.argument_digest, \"marker_id\": a.marker,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/reconciliations.rs#reconcile_command",
+        "name": "reconcile_command",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/reconciliations.rs",
+        "span": "L83-L124"
+      },
+      "path": "src/adapters/http/routes/workflows/reconciliations.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 99,
+          "text": "argument_digest: body.argument_digest,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_message_tests.rs#seed",
+        "name": "seed",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui_message_tests.rs",
+        "span": "L325-L341"
+      },
+      "path": "src/adapters/http/routes/ui_message_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 334,
+          "text": "\"INSERT INTO messages(id,company_id,author_principal_id,subject,clean_text_body,direction,role,correlation_id,content_hash,created_at,audience) \\"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/bindings.rs#run_detail_json",
+        "name": "run_detail_json",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/bindings.rs",
+        "span": "L574-L634"
+      },
+      "path": "src/adapters/http/routes/workflows/bindings.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 598,
+          "text": "\"argument_digest\": action.argument_digest,"
+        },
+        {
+          "line": 602,
+          "text": "\"has_receipt\": action.has_receipt,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/decision_review_tests.rs#child_source",
+        "name": "child_source",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/decision_review_tests.rs",
+        "span": "L4-L17"
+      },
+      "path": "src/adapters/http/routes/workflows/decision_review_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 8,
+          "text": "source[\"steps\"][\"start\"][\"with\"][\"proposal\"] = json!({\"object\":{\"body\":{\"ref\":\"/input/body\"}}});"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/decisions.rs#view_json",
+        "name": "view_json",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/decisions.rs",
+        "span": "L20-L52"
+      },
+      "path": "src/adapters/http/routes/workflows/decisions.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 33,
+          "text": "\"proposal\": view.proposal,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/ui/runs/mod.rs#frozen_agent",
+        "name": "frozen_agent",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/ui/runs/mod.rs",
+        "span": "L690-L706"
+      },
+      "path": "src/adapters/http/routes/workflows/ui/runs/mod.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 694,
+          "text": "let handle = step.frozen_inputs.as_ref()?.get(\"agent\")?.as_str()?;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/channel.rs#channel_pages_and_fragments_render_correctly",
+        "name": "channel_pages_and_fragments_render_correctly",
+        "kind": "function",
+        "path": "src/adapters/http/routes/channel.rs",
+        "span": "L839-L1168"
+      },
+      "path": "src/adapters/http/routes/channel.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1016,
+          "text": "clean_text_body: \"Body text\".to_string(),"
+        },
+        {
+          "line": 1035,
+          "text": "clean_text_body: \"### Thread Result\\n\\n- **First** item\\n- Second item\".to_string(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_attachments.rs#message",
+        "name": "message",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui_attachments.rs",
+        "span": "L252-L272"
+      },
+      "path": "src/adapters/http/routes/ui_attachments.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 263,
+          "text": "clean_text_body: \"See attached.\".to_string(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/decision_review_tests.rs#reviewer_comments_revises_reads_next_draft_and_accepts_exact_artifact",
+        "name": "reviewer_comments_revises_reads_next_draft_and_accepts_exact_artifact",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/decision_review_tests.rs",
+        "span": "L80-L142"
+      },
+      "path": "src/adapters/http/routes/workflows/decision_review_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 87,
+          "text": "assert_eq!(first_view[\"proposal\"], json!({\"body\":\"Draft one\"}));"
+        },
+        {
+          "line": 105,
+          "text": "assert_eq!(second_view[\"proposal\"], json!({\"body\":\"Draft two\"}));"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/reconciliation_tests.rs#reconciliation_annotates_both_http_forms",
+        "name": "reconciliation_annotates_both_http_forms",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/reconciliation_tests.rs",
+        "span": "L134-L173"
+      },
+      "path": "src/adapters/http/routes/workflows/reconciliation_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 145,
+          "text": "action[\"has_receipt\"].clone(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/reconciliations.rs#ReconcileBody",
+        "name": "ReconcileBody",
+        "kind": "struct",
+        "path": "src/adapters/http/routes/workflows/reconciliations.rs",
+        "span": "L37-L47"
+      },
+      "path": "src/adapters/http/routes/workflows/reconciliations.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 40,
+          "text": "pub argument_digest: ArgumentDigest,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/ui/runs/authorization_tests.rs#reconciliation_and_step_refuse_foreign_and_hidden_channel_identities",
+        "name": "reconciliation_and_step_refuse_foreign_and_hidden_channel_identities",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/ui/runs/authorization_tests.rs",
+        "span": "L7-L89"
+      },
+      "path": "src/adapters/http/routes/workflows/ui/runs/authorization_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 30,
+          "text": "\"argument_digest\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/ui/runs/controls_tests.rs#an_uncertain_action_is_annotated_from_the_pane_and_its_step_shows_the_attempt",
+        "name": "an_uncertain_action_is_annotated_from_the_pane_and_its_step_shows_the_attempt",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/ui/runs/controls_tests.rs",
+        "span": "L109-L289"
+      },
+      "path": "src/adapters/http/routes/workflows/ui/runs/controls_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 179,
+          "text": "field_value(&shown, \"argument_digest\"),"
+        },
+        {
+          "line": 180,
+          "text": "action.argument_digest"
+        },
+        {
+          "line": 194,
+          "text": "\"argument_digest\","
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/http/routes/workflows/ui/runs/controls_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 399,
+          "text": "/// An HTTP action the server accepted: the step lists its receipt, and the run's cancel says"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/ui/runs/controls_tests.rs#an_accepted_action_shows_its_receipt_and_cancel_names_it",
+        "name": "an_accepted_action_shows_its_receipt_and_cancel_names_it",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/ui/runs/controls_tests.rs",
+        "span": "L402-L439"
+      },
+      "path": "src/adapters/http/routes/workflows/ui/runs/controls_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 402,
+          "text": "async fn an_accepted_action_shows_its_receipt_and_cancel_names_it() {"
+        },
+        {
+          "line": 432,
+          "text": "body.contains(\"Action receipts\") && body.contains(\"remote action accepted\"),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/ui/runs/controls.rs#reconcile",
+        "name": "reconcile",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/ui/runs/controls.rs",
+        "span": "L170-L256"
+      },
+      "path": "src/adapters/http/routes/workflows/ui/runs/controls.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 189,
+          "text": "\"argument_digest\": form.text(\"argument_digest\"),"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/http/routes/workflows/ui/runs/pages_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 2,
+          "text": "//! receipts, attempts, the annotation offer, and how an ended run shows a step it never finished."
+        },
+        {
+          "line": 7,
+          "text": "/// step lists its model usage and receipts, escaped."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/ui/runs/pages_tests.rs#reconciliation_is_offered_as_an_annotation_and_a_step_shows_usage_and_receipts",
+        "name": "reconciliation_is_offered_as_an_annotation_and_a_step_shows_usage_and_receipts",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/ui/runs/pages_tests.rs",
+        "span": "L9-L107"
+      },
+      "path": "src/adapters/http/routes/workflows/ui/runs/pages_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 9,
+          "text": "fn reconciliation_is_offered_as_an_annotation_and_a_step_shows_usage_and_receipts() {"
+        },
+        {
+          "line": 17,
+          "text": "argument_digest: \"a\".repeat(64),"
+        },
+        {
+          "line": 21,
+          "text": "has_receipt: false,"
+        },
+        {
+          "line": 53,
+          "text": "frozen_inputs: Some(json!({\"q\": hostile})),"
+        },
+        {
+          "line": 54,
+          "text": "committed_output: Some(json!({\"answer\": hostile})),"
+        },
+        {
+          "line": 67,
+          "text": "receipts: vec![Receipt {"
+        },
+        {
+          "line": 101,
+          "text": "assert!(body.contains(\"Action receipts\") && body.contains(\"accepted\"));"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 15,
+    "baselineChars": 218378
+  }
+}

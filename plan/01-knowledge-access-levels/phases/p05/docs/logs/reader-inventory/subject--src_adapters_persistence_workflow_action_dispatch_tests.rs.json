@@ -1,0 +1,74 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 5,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_dispatch_tests.rs#initialize_action_on_claim",
+        "name": "initialize_action_on_claim",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_dispatch_tests.rs",
+        "span": "L111-L173"
+      },
+      "path": "src/adapters/persistence/workflow/action_dispatch_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 132,
+          "text": ".action_authority(action.scope, &intent.approval_subject())"
+        },
+        {
+          "line": 168,
+          "text": "subject: intent.approval_subject(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_dispatch_tests.rs#workflow_action_dispatch_stale_fences_scopes_protection_and_errors",
+        "name": "workflow_action_dispatch_stale_fences_scopes_protection_and_errors",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_dispatch_tests.rs",
+        "span": "L243-L280"
+      },
+      "path": "src/adapters/persistence/workflow/action_dispatch_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 256,
+          "text": "_ => wrong.subject.invocation = ActionInvocationId::new(Uuid::new_v4()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_dispatch_tests.rs#workflow_action_dispatch_sql_commit_expiry_and_append_only_facts",
+        "name": "workflow_action_dispatch_sql_commit_expiry_and_append_only_facts",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_dispatch_tests.rs",
+        "span": "L439-L487"
+      },
+      "path": "src/adapters/persistence/workflow/action_dispatch_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 457,
+          "text": ".apply(&mut tx, &action, &request.subject)"
+        },
+        {
+          "line": 462,
+          "text": ".bind(request.subject.invocation.as_uuid()).bind(request.subject.argument_digest.as_str()).bind(marker).bind(output).execute(&mut *tx).await.unwrap();"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 19518
+  }
+}

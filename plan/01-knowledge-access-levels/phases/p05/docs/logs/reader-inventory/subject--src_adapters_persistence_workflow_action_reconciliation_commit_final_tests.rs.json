@@ -1,0 +1,49 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 2,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_commit_final_tests.rs#assert_source",
+        "name": "assert_source",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_commit_final_tests.rs",
+        "span": "L132-L190"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_commit_final_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 146,
+          "text": "let invocation = json!(request.subject.invocation.as_uuid());"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_commit_final_tests.rs#assert_saved_receipt",
+        "name": "assert_saved_receipt",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_commit_final_tests.rs",
+        "span": "L191-L230"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_commit_final_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 209,
+          "text": "json!(request.subject.invocation.as_uuid())"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 15768
+  }
+}

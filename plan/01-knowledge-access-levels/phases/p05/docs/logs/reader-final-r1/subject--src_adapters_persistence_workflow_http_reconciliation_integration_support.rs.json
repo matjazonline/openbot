@@ -1,0 +1,32 @@
+{
+  "pattern": "subject",
+  "filesSearched": 1,
+  "totalHits": 1,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/http_reconciliation_integration_support.rs#command",
+        "name": "command",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/http_reconciliation_integration_support.rs",
+        "span": "L163-L200"
+      },
+      "path": "src/adapters/persistence/workflow/http_reconciliation_integration_support.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 176,
+          "text": "subject: intent.approval_subject(),"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 9215
+  }
+}

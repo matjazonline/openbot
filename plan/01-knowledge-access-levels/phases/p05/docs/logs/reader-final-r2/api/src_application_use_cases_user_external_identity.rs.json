@@ -1,0 +1,39 @@
+{
+  "file": "src/application/use_cases/user/external_identity.rs",
+  "entries": [
+    {
+      "name": "register_external",
+      "kind": "function",
+      "span": "L4-L22",
+      "signature": "pub async fn register_external(&self, identity: ExternalIdentity<'_>) -> AppResult<User>"
+    },
+    {
+      "name": "login_external",
+      "kind": "function",
+      "span": "L24-L30",
+      "signature": "pub async fn login_external(&self, identity: ExternalIdentity<'_>) -> AppResult<User>"
+    },
+    {
+      "name": "link_external",
+      "kind": "function",
+      "span": "L32-L76",
+      "signature": "pub async fn link_external("
+    },
+    {
+      "name": "login_methods",
+      "kind": "function",
+      "span": "L78-L94",
+      "signature": "pub async fn login_methods(&self, id: Uuid) -> AppResult<LoginMethods>"
+    },
+    {
+      "name": "require_verified_external_identity",
+      "kind": "function",
+      "span": "L96-L103",
+      "signature": "fn require_verified_external_identity(identity: &ExternalIdentity<'_>) -> AppResult<()>"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 3584
+  }
+}

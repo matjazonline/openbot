@@ -1,0 +1,183 @@
+{
+  "file": "src/adapters/persistence/workflow/decisions.rs",
+  "entries": [
+    {
+      "name": "park_decision",
+      "kind": "function",
+      "span": "L17-L30",
+      "signature": "async fn park_decision("
+    },
+    {
+      "name": "submit_decision",
+      "kind": "function",
+      "span": "L31-L40",
+      "signature": "async fn submit_decision(&self, command: SubmitDecision) -> AppResult<DecisionSubmission>"
+    },
+    {
+      "name": "add_decision_comment",
+      "kind": "function",
+      "span": "L41-L54",
+      "signature": "async fn add_decision_comment("
+    },
+    {
+      "name": "read_decision",
+      "kind": "function",
+      "span": "L55-L69",
+      "signature": "async fn read_decision("
+    },
+    {
+      "name": "closed_at_commit",
+      "kind": "function",
+      "span": "L73-L82",
+      "signature": "fn closed_at_commit(error: sqlx::Error) -> AppError"
+    },
+    {
+      "name": "closed",
+      "kind": "function",
+      "span": "L83-L85",
+      "signature": "fn closed() -> AppError"
+    },
+    {
+      "name": "stale",
+      "kind": "function",
+      "span": "L86-L88",
+      "signature": "fn stale() -> AppError"
+    },
+    {
+      "name": "Reviewer",
+      "kind": "struct",
+      "span": "L91-L95",
+      "signature": "struct Reviewer"
+    },
+    {
+      "name": "ReviewerRow",
+      "kind": "struct",
+      "span": "L97-L100",
+      "signature": "struct ReviewerRow"
+    },
+    {
+      "name": "NoticeContext",
+      "kind": "struct",
+      "span": "L102-L107",
+      "signature": "struct NoticeContext"
+    },
+    {
+      "name": "park_on",
+      "kind": "function",
+      "span": "L109-L197",
+      "signature": "async fn park_on("
+    },
+    {
+      "name": "insert_reviewers",
+      "kind": "function",
+      "span": "L199-L228",
+      "signature": "async fn insert_reviewers("
+    },
+    {
+      "name": "compose_notices",
+      "kind": "function",
+      "span": "L232-L261",
+      "signature": "fn compose_notices("
+    },
+    {
+      "name": "unavailable",
+      "kind": "function",
+      "span": "L264-L275",
+      "signature": "async fn unavailable("
+    },
+    {
+      "name": "eligible_reviewer",
+      "kind": "function",
+      "span": "L284-L299",
+      "signature": "async fn eligible_reviewer("
+    },
+    {
+      "name": "eligible_reviewer_row",
+      "kind": "function",
+      "span": "L301-L323",
+      "signature": "async fn eligible_reviewer_row("
+    },
+    {
+      "name": "DecisionHead",
+      "kind": "struct",
+      "span": "L326-L329",
+      "signature": "struct DecisionHead"
+    },
+    {
+      "name": "DecisionRow",
+      "kind": "struct",
+      "span": "L331-L339",
+      "signature": "struct DecisionRow"
+    },
+    {
+      "name": "RunAssociation",
+      "kind": "struct",
+      "span": "L341-L344",
+      "signature": "struct RunAssociation"
+    },
+    {
+      "name": "Locked",
+      "kind": "struct",
+      "span": "L348-L352",
+      "signature": "struct Locked"
+    },
+    {
+      "name": "lock_decision",
+      "kind": "function",
+      "span": "L353-L426",
+      "signature": "async fn lock_decision("
+    },
+    {
+      "name": "submit_on",
+      "kind": "function",
+      "span": "L428-L503",
+      "signature": "async fn submit_on("
+    },
+    {
+      "name": "submit_business_on",
+      "kind": "function",
+      "span": "L505-L560",
+      "signature": "async fn submit_business_on("
+    },
+    {
+      "name": "successor_of",
+      "kind": "function",
+      "span": "L562-L583",
+      "signature": "async fn successor_of("
+    },
+    {
+      "name": "comment_on",
+      "kind": "function",
+      "span": "L585-L623",
+      "signature": "async fn comment_on("
+    },
+    {
+      "name": "read",
+      "kind": "module",
+      "span": "L625-L625",
+      "signature": "mod read;"
+    },
+    {
+      "name": "approvals",
+      "kind": "module",
+      "span": "L629-L629",
+      "signature": "pub(super) mod approvals;"
+    },
+    {
+      "name": "decision_wait",
+      "kind": "function",
+      "span": "L631-L638",
+      "signature": "async fn decision_wait("
+    },
+    {
+      "name": "tokens",
+      "kind": "module",
+      "span": "L641-L641",
+      "signature": "pub(super) mod tokens;"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 26250
+  }
+}

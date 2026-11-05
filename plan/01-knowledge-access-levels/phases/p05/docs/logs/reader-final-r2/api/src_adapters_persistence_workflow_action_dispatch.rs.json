@@ -1,0 +1,207 @@
+{
+  "file": "src/adapters/persistence/workflow/action_dispatch.rs",
+  "entries": [
+    {
+      "name": "AuthorizedAction",
+      "kind": "struct",
+      "span": "L13-L17",
+      "signature": "pub(super) struct AuthorizedAction"
+    },
+    {
+      "name": "LockedActionAuthority",
+      "kind": "struct",
+      "span": "L19-L22",
+      "signature": "pub struct LockedActionAuthority"
+    },
+    {
+      "name": "SqlActionAuthority",
+      "kind": "interface",
+      "span": "L25-L33",
+      "signature": "pub trait SqlActionAuthority: Send + Sync"
+    },
+    {
+      "name": "lock_current",
+      "kind": "function",
+      "span": "L28-L32",
+      "signature": "async fn lock_current("
+    },
+    {
+      "name": "SqlLocalAction",
+      "kind": "interface",
+      "span": "L36-L45",
+      "signature": "pub trait SqlLocalAction: Send + Sync"
+    },
+    {
+      "name": "apply",
+      "kind": "function",
+      "span": "L39-L44",
+      "signature": "async fn apply("
+    },
+    {
+      "name": "UnavailableActionAuthority",
+      "kind": "struct",
+      "span": "L48-L48",
+      "signature": "pub struct UnavailableActionAuthority;"
+    },
+    {
+      "name": "lock_current",
+      "kind": "function",
+      "span": "L51-L57",
+      "signature": "async fn lock_current("
+    },
+    {
+      "name": "PostgresActionDispatch",
+      "kind": "struct",
+      "span": "L60-L65",
+      "signature": "pub struct PostgresActionDispatch<A, L>"
+    },
+    {
+      "name": "new",
+      "kind": "function",
+      "span": "L67-L74",
+      "signature": "pub fn new(persistence: PostgresPersistence, authority: A, local: L) -> Self"
+    },
+    {
+      "name": "with_decision_notices",
+      "kind": "function",
+      "span": "L75-L81",
+      "signature": "pub fn with_decision_notices("
+    },
+    {
+      "name": "authorize_on",
+      "kind": "function",
+      "span": "L85-L94",
+      "signature": "pub(super) async fn authorize_on("
+    },
+    {
+      "name": "authorize_prelocked_on",
+      "kind": "function",
+      "span": "L96-L169",
+      "signature": "pub(super) async fn authorize_prelocked_on("
+    },
+    {
+      "name": "existing",
+      "kind": "function",
+      "span": "L171-L179",
+      "signature": "pub(super) async fn existing("
+    },
+    {
+      "name": "insert",
+      "kind": "function",
+      "span": "L181-L189",
+      "signature": "pub(super) async fn insert("
+    },
+    {
+      "name": "insert_subject",
+      "kind": "function",
+      "span": "L191-L207",
+      "signature": "pub(super) async fn insert_subject("
+    },
+    {
+      "name": "local",
+      "kind": "function",
+      "span": "L212-L283",
+      "signature": "async fn local(&self, request: &ActionDispatchRequest) -> AppResult<LocalDispatchResult>"
+    },
+    {
+      "name": "remote",
+      "kind": "function",
+      "span": "L285-L292",
+      "signature": "async fn remote("
+    },
+    {
+      "name": "EntryOwner",
+      "kind": "struct",
+      "span": "L297-L304",
+      "signature": "struct EntryOwner"
+    },
+    {
+      "name": "is",
+      "kind": "function",
+      "span": "L307-L315",
+      "signature": "fn is(&self, request: &ActionDispatchRequest, marker: Option<Uuid>) -> bool"
+    },
+    {
+      "name": "PendingReservation",
+      "kind": "type",
+      "span": "L320-L320",
+      "signature": "type PendingReservation = Mutex<Option<RemoteReservation>>;"
+    },
+    {
+      "name": "take",
+      "kind": "function",
+      "span": "L322-L324",
+      "signature": "fn take(pending: &PendingReservation) -> Option<RemoteReservation>"
+    },
+    {
+      "name": "adopt",
+      "kind": "function",
+      "span": "L328-L337",
+      "signature": "fn adopt((mut reservation, fresh): (RemoteReservation, LeaseWindow)) -> Option<RemoteReservation>"
+    },
+    {
+      "name": "resolve_reservation",
+      "kind": "function",
+      "span": "L345-L367",
+      "signature": "async fn resolve_reservation("
+    },
+    {
+      "name": "reserved_on",
+      "kind": "function",
+      "span": "L373-L407",
+      "signature": "async fn reserved_on("
+    },
+    {
+      "name": "ReservationEvidence",
+      "kind": "enum",
+      "span": "L411-L414",
+      "signature": "enum ReservationEvidence"
+    },
+    {
+      "name": "Reserving",
+      "kind": "enum",
+      "span": "L416-L424",
+      "signature": "enum Reserving"
+    },
+    {
+      "name": "reserve_action",
+      "kind": "function",
+      "span": "L427-L524",
+      "signature": "async fn reserve_action("
+    },
+    {
+      "name": "reserve_remote",
+      "kind": "function",
+      "span": "L529-L575",
+      "signature": "async fn reserve_remote("
+    },
+    {
+      "name": "enter_remote",
+      "kind": "function",
+      "span": "L577-L627",
+      "signature": "async fn enter_remote(&self, reservation: RemoteReservation) -> AppResult<RemoteEntry>"
+    },
+    {
+      "name": "finish_remote",
+      "kind": "function",
+      "span": "L629-L635",
+      "signature": "async fn finish_remote("
+    },
+    {
+      "name": "owns_remote",
+      "kind": "function",
+      "span": "L637-L656",
+      "signature": "async fn owns_remote(&self, request: &ActionDispatchRequest) -> AppResult<bool>"
+    },
+    {
+      "name": "saved_receipt",
+      "kind": "function",
+      "span": "L659-L666",
+      "signature": "async fn saved_receipt("
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 29716
+  }
+}

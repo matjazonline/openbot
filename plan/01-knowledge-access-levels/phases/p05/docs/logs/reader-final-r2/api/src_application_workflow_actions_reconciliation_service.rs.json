@@ -1,0 +1,63 @@
+{
+  "file": "src/application/workflow/actions/reconciliation/service.rs",
+  "entries": [
+    {
+      "name": "ReconciliationPreparation",
+      "kind": "enum",
+      "span": "L14-L20",
+      "signature": "pub enum ReconciliationPreparation"
+    },
+    {
+      "name": "ActionReconciliation",
+      "kind": "interface",
+      "span": "L23-L46",
+      "signature": "pub trait ActionReconciliation: Send + Sync"
+    },
+    {
+      "name": "association",
+      "kind": "function",
+      "span": "L26-L26",
+      "signature": "async fn association(&self, command: &ReconcileActionCommand) -> AppResult<RelatedAssociation>;"
+    },
+    {
+      "name": "snapshot",
+      "kind": "function",
+      "span": "L31-L34",
+      "signature": "async fn snapshot("
+    },
+    {
+      "name": "settle",
+      "kind": "function",
+      "span": "L40-L45",
+      "signature": "async fn settle("
+    },
+    {
+      "name": "ActionReconciliationService",
+      "kind": "struct",
+      "span": "L48-L53",
+      "signature": "pub struct ActionReconciliationService<P, A, R>"
+    },
+    {
+      "name": "new",
+      "kind": "function",
+      "span": "L57-L69",
+      "signature": "pub fn new("
+    },
+    {
+      "name": "reconcile",
+      "kind": "function",
+      "span": "L74-L93",
+      "signature": "pub async fn reconcile("
+    },
+    {
+      "name": "reconcile_on",
+      "kind": "function",
+      "span": "L95-L184",
+      "signature": "async fn reconcile_on("
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 7613
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "file": "src/adapters/persistence/workflow/action_authority.rs",
+  "entries": [
+    {
+      "name": "RunAuthorityRow",
+      "kind": "struct",
+      "span": "L8-L14",
+      "signature": "struct RunAuthorityRow"
+    },
+    {
+      "name": "action_authority",
+      "kind": "function",
+      "span": "L18-L29",
+      "signature": "async fn action_authority("
+    },
+    {
+      "name": "prelock_on",
+      "kind": "function",
+      "span": "L35-L52",
+      "signature": "pub(super) async fn prelock_on("
+    },
+    {
+      "name": "load_on",
+      "kind": "function",
+      "span": "L54-L120",
+      "signature": "pub(super) async fn load_on("
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 4361
+  }
+}
