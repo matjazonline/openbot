@@ -1,0 +1,11 @@
+{
+  "main_head": "9156228ccb46c00066a03f75448e896e078a02de",
+  "accepted_source_commit": "6298ce36844569114bacffa10024c9055627cce3",
+  "method": "local fast-forward, no remote push",
+  "preserved_coordination_sha256": {
+    "plan/fix-app/COORDINATION.md": "573f77d2e362b036080b5c522a9c7515892c6e7dbf31c1c054156697020ea72f",
+    "plan/01-knowledge-access-levels/COORDINATION.md": "b5e05aaaf511b19a1703104bb3806c5491c04244597a43f6023b343e6f72b1e5"
+  },
+  "origin_main": "73799dc6ac685008d5c97f154e861d11ae15bfa0",
+  "whole_knowledge_plan_complete": false
+}
