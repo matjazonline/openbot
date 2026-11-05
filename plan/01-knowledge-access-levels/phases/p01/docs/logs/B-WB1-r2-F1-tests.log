@@ -1,0 +1,9 @@
+
+running 4 tests
+test adapters::http::routes::company_invite::levels::route_tests::access_level_legacy_html_member_route_enforces_actor_scope_and_caps ... ok
+test adapters::http::routes::company_invite::levels::route_tests::access_level_json_member_route_enforces_actor_scope_and_caps ... ok
+test adapters::http::routes::company_invite::levels::route_tests::access_level_legacy_html_invite_route_enforces_actor_scope_and_caps ... ok
+test adapters::http::routes::company_invite::levels::route_tests::access_level_json_invite_route_enforces_actor_scope_and_caps ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 2731 filtered out; finished in 0.29s
+

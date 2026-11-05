@@ -1,0 +1,25 @@
+
+running 20 tests
+test adapters::http::routes::company_invite::levels::tests::access_level_json_is_numeric_bounded_and_rejects_role_injection ... ok
+test adapters::http::pages::team_level_tests::access_level_ui_admin_caps_and_owner_fixed_controls_match_the_domain ... ok
+test adapters::http::pages::team_level_tests::access_level_both_team_pages_give_admins_only_level_controls ... ok
+test adapters::http::routes::company_invite::levels::tests::access_level_browser_form_accepts_integer_strings_and_rejects_extra_fields ... ok
+test domain::entities::access_level::tests::access_level_assignment_admin_matrix_checks_both_current_and_requested ... ok
+test domain::entities::access_level::tests::access_level_assignment_owner_fixed_and_nonadministrators_refused ... ok
+test domain::entities::access_level::tests::access_level_lowest_is_public_for_no_readers_and_orders_every_level ... ok
+test domain::entities::access_level::tests::access_level_numeric_range_and_serde_are_exact ... ok
+test domain::entities::company_invite::tests::access_level_invite_payload_requires_current_fields ... ok
+test application::use_cases::thread::tests::access_level_dmarc_failure_rejects_a_known_member_address ... ok
+test adapters::persistence::company_invite::access_level_tests::access_level_sql_domain_owner_and_defaults_are_enforced ... ok
+test adapters::persistence::company_invite::access_level_tests::access_level_native_writers_apply_caps_scope_and_owner_only_role_powers ... ok
+test adapters::persistence::company_invite::access_level_tests::access_level_joint_readers_external_observed_and_former_members_are_public ... ok
+test adapters::persistence::company_invite::access_level_tests::access_level_invite_copies_new_grants_and_never_restores_existing_grants ... ok
+test adapters::http::routes::ui_team::authorization_tests::access_level_browser_self_demotion_refreshes_caps_and_foreign_targets_are_hidden ... ok
+test adapters::persistence::company_invite::access_level_tests::races::access_level_assignment_committed_first_finishes_before_later_demotion ... ok
+test adapters::persistence::company_invite::access_level_tests::races::access_level_owner_loss_is_rechecked_after_a_waiting_invite_write ... ok
+test adapters::persistence::company_invite::access_level_tests::races::access_level_acceptance_and_own_invite_assignment_do_not_deadlock_or_restore_levels ... ok
+test adapters::persistence::company_invite::access_level_tests::races::access_level_demotion_committed_first_refuses_a_waiting_assignment ... ok
+test adapters::persistence::company_invite::access_level_tests::races::access_level_busy_authority_returns_a_bounded_conflict_without_a_write ... ok
+
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 2711 filtered out; finished in 2.42s
+

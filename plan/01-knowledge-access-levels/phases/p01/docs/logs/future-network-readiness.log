@@ -1,0 +1,1 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
