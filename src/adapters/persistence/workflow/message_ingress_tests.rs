@@ -36,6 +36,9 @@ mod reviewed_delivery_tests;
 #[path = "message_ingress_composition.rs"]
 mod composition;
 
+#[path = "knowledge_e2e_tests.rs"]
+mod knowledge_e2e;
+
 const CUSTOMER: &str = "customer@partner.test";
 
 /// The production engine and ingest over one company: a `support` channel the customer may
@@ -45,7 +48,11 @@ struct Deployment {
     channel: Uuid,
     threads: ThreadUseCases,
     engine: WorkflowEngine,
+    knowledge: Arc<crate::application::knowledge::KnowledgeLibrary>,
     llm: ScriptedLlm,
+    mcp_selections: Vec<crate::adapters::persistence::workflow::mcp::McpPublicationSelection>,
+    resources:
+        BTreeMap<crate::domain::workflow::ResourceName, crate::domain::workflow::RuntimeResourceId>,
 }
 
 impl Deployment {
@@ -111,31 +118,18 @@ impl Deployment {
                 .register(Arc::new(EmailRenderer::new(APP_DOMAIN)))
                 .unwrap(),
         );
-        let engine = composition::engine(&p, &config, renderers.clone());
-        let shared = Arc::new(p.clone());
-        let threads = ThreadUseCases::new(
-            ThreadStores {
-                threads: shared.clone(),
-                channels: shared.clone(),
-                companies: shared.clone(),
-                participants: shared.clone(),
-            },
-            InboundIngestPorts {
-                committer: shared.clone(),
-                correlation: shared.clone(),
-                bindings: shared.clone(),
-                standalone_deliveries: shared,
-            },
-            renderers,
-            (config).thread_settings(),
-        )
-        .with_intent_wakeups(engine.intent_wakeups.clone());
+        let composition::Composition { engine, knowledge } =
+            composition::engine(&p, &config, renderers.clone());
+        let threads = composition::threads(&p, &config, renderers, engine.intent_wakeups.clone());
         Self {
             fixture,
             channel,
             threads,
             engine,
+            knowledge,
             llm,
+            mcp_selections: Vec::new(),
+            resources: BTreeMap::new(),
         }
     }
 
@@ -151,7 +145,10 @@ impl Deployment {
     async fn bind(&self, mut source: Value, trigger: Option<MessageTrigger>) -> BindingTarget {
         let workflow = WorkflowId::new(Uuid::new_v4());
         source["workflow_id"] = json!(workflow.to_string());
-        let definitions = self.engine.services().definitions(Vec::new(), Vec::new());
+        let definitions = self
+            .engine
+            .services()
+            .definitions(Vec::new(), self.mcp_selections.clone());
         let definition = DefinitionTarget {
             workflow,
             ..self.fixture.target
@@ -181,7 +178,7 @@ impl Deployment {
                 association: RelatedAssociation::Channel(RelatedChannelId::new(self.channel)),
                 version,
                 params: json!({}),
-                resources: BTreeMap::new(),
+                resources: self.resources.clone(),
                 run_as: None,
                 message_trigger: trigger,
             })

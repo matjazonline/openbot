@@ -126,3 +126,48 @@ async fn knowledge_search_sql_simple_exact_terms_and_digit_fallback_work_in_non_
         assert!(passages[0]["text"].as_str().unwrap().contains("AX-4410"));
     }
 }
+
+#[tokio::test]
+async fn knowledge_e2e_quality_fixture_exact_hit_oracle_matches_real_postgres_search() {
+    let Some(database) = own_database().await else {
+        return;
+    };
+    let f = Fixture::new(database.pool.clone()).await;
+    let fixture: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../../assets/knowledge/retrieval-fixture.json"
+    ))
+    .unwrap();
+    for document in fixture["documents"].as_array().unwrap() {
+        let name = format!("0_{}", document["name"].as_str().unwrap());
+        let body = format!(
+            "# {}\n{}",
+            document["heading"].as_str().unwrap(),
+            document["text"].as_str().unwrap()
+        );
+        f.replace(f.owner, &name, &body).await;
+    }
+    let questions = fixture["questions"].as_array().unwrap();
+    assert!((10..=20).contains(&questions.len()));
+    for question in questions {
+        let input = json!({"query":question["query"],"exact_terms":question["exact_terms"]});
+        let rows = f
+            .store
+            .visible(request(f.owner.company, AccessLevel::L9, input))
+            .await
+            .unwrap();
+        let mut actual: Vec<_> = rows
+            .into_iter()
+            .filter(|chunk| chunk.keyword_rank.is_some())
+            .map(|chunk| chunk.document_name.to_string())
+            .collect();
+        let mut expected: Vec<_> = question["exact_hits"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap().to_owned())
+            .collect();
+        actual.sort();
+        expected.sort();
+        assert_eq!(actual, expected, "{}", question["query"]);
+    }
+}

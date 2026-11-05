@@ -27,7 +27,7 @@ use std::{collections::BTreeMap, time::Duration};
 use tokio_util::sync::CancellationToken;
 
 #[path = "mcp_test_support.rs"]
-mod support;
+pub(in crate::adapters::persistence::workflow) mod support;
 use support::*;
 
 #[path = "mcp_reconciliation_tests.rs"]

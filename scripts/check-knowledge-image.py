@@ -69,6 +69,13 @@ def check(image):
         raise RuntimeError(f'Model peak RSS exceeds the early {PEAK_RSS_BUDGET_MIB} MiB budget: {probe["peak_rss_bytes"]}')
     if probe["translation_score"] < probe["unrelated_score"] + 0.02:
         raise RuntimeError("Image failed multilingual relevance")
+    retrieval = probe["retrieval"]
+    if not 10 <= retrieval["questions"] <= 20 or retrieval["matched"] != retrieval["questions"]:
+        raise RuntimeError("Image failed the retrieval calibration fixture: " + json.dumps(retrieval))
+    if retrieval["exact_first_checks"] < 3 or retrieval["exact_first_passed"] != retrieval["exact_first_checks"]:
+        raise RuntimeError("Image failed exact product/code precedence: " + json.dumps(retrieval))
+    if retrieval["bounded_corpus_chunks"] != 8192:
+        raise RuntimeError("Image did not exercise the bounded company corpus")
     fixture_root=ROOT / "target"
     fixture_root.mkdir(exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="knowledge-image-",dir=fixture_root) as temporary:

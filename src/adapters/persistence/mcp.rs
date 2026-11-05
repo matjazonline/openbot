@@ -146,7 +146,7 @@ async fn replace_grants(
 impl McpPersistence for PostgresPersistence {
     async fn set_mcp_level(
         &self,
-        command: crate::use_cases::connection_level::ConnectionLevelCommand,
+        command: crate::application::workflow::connection_level::ConnectionLevelCommand,
     ) -> AppResult<CompanyMcpConnection> {
         use crate::entities::access_level::{LevelTarget, may_assign_level};
         let mut tx = super::workflow::http::begin_http(self).await?;

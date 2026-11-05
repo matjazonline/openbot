@@ -120,7 +120,7 @@ pub trait HttpConnections: Send + Sync {
     ) -> AppResult<Vec<HttpConnection>>;
     async fn set_http_level(
         &self,
-        command: crate::use_cases::connection_level::ConnectionLevelCommand,
+        command: crate::application::workflow::connection_level::ConnectionLevelCommand,
     ) -> AppResult<HttpConnection>;
     async fn create_http(
         &self,

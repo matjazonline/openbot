@@ -149,7 +149,7 @@ impl HttpConnections for PostgresPersistence {
     }
     async fn set_http_level(
         &self,
-        command: crate::use_cases::connection_level::ConnectionLevelCommand,
+        command: crate::application::workflow::connection_level::ConnectionLevelCommand,
     ) -> AppResult<HttpConnection> {
         use crate::entities::access_level::{LevelTarget, may_assign_level};
         let mut tx = begin_http(self).await?;

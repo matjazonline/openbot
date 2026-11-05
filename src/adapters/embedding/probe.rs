@@ -2,6 +2,8 @@
 use super::*;
 use serde::Serialize;
 use std::time::Instant;
+#[path = "retrieval_probe.rs"]
+mod retrieval;
 #[derive(Serialize)]
 pub struct ModelCheck {
     model_id: EmbeddingModelId,
@@ -17,6 +19,7 @@ pub struct ModelCheck {
     chunk_count: usize,
     largest_chunk_tokens: usize,
     oversized_query_and_batch_refused: bool,
+    retrieval: retrieval::RetrievalCheck,
 }
 pub fn model_check(directory: &Path) -> anyhow::Result<ModelCheck> {
     let started = Instant::now();
@@ -40,6 +43,7 @@ pub fn model_check(directory: &Path) -> anyhow::Result<ModelCheck> {
     }
     let vectors = model.embed_passages(&[&long, &long, &long, &long])?;
     let chunk_check = check_chunks_and_bounds(&model)?;
+    let retrieval = retrieval::check(&model)?;
     let norm = dot(&vectors[0], &vectors[0]);
     if (norm - 1.0).abs() > 0.001 {
         bail!("Knowledge model failed its batch norm check");
@@ -58,6 +62,7 @@ pub fn model_check(directory: &Path) -> anyhow::Result<ModelCheck> {
         chunk_count: chunk_check.count,
         largest_chunk_tokens: chunk_check.largest_tokens,
         oversized_query_and_batch_refused: chunk_check.bounds_refused,
+        retrieval,
     })
 }
 struct ChunkCheck {

@@ -76,6 +76,21 @@ rejected as a whole. Search and uploads share the same model and processing slot
 out searches return retryable errors. A search question must also fit the local model's 512-token
 input limit, including its prefix and special tokens.
 
+This schema requires a fresh database: access levels, knowledge layers, content stamps and
+consumption records are part of the init migration. Owner memberships are fixed at level 9;
+other memberships default to level 0. Assign member levels before uploading restricted files.
+Files need a single level prefix, such as `0_sales.md` or `5_sales.md`; replies cite `sales.md`.
+Agents receive `search_knowledge` only when it is explicitly granted and published.
+
+The operational `knowledge model-check` includes 16 public sales questions and the production
+chunker and hybrid ranker. The exact-hit fixture is checked separately against PostgreSQL.
+On Linux/aarch64 with two CPUs, all 16 questions and all three exact-code/name checks passed at
+similarity threshold 0.75 (lowest expected similarity 0.803, highest unrelated similarity 0.743).
+The same offline image probe allocates the full 8192-chunk scan, including repeated headings and
+raw vector buffers. The measured Docker-reported image size was about 334 MiB and `/app` about
+551 MiB. These measurements describe this fixture and platform; the required image gate records
+fresh timing, size and memory measurements for each build.
+
 The Linux/aarch64 image probe with two CPUs measured about **1452 MiB cold peak RSS**, including
 four 512-token passages. `fly.toml` therefore provisions **2 GiB**. CI requires
 `scripts/check-knowledge-image.py --image <built-image>` to pass under a **hard 2048 MiB container

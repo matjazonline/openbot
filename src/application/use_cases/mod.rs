@@ -17,5 +17,3 @@ pub mod thread;
 pub mod user;
 
 pub mod mcp;
-
-pub mod connection_level;

@@ -99,7 +99,7 @@ pub trait McpCredentialPersistence: Send + Sync {
 pub trait McpPersistence: Send + Sync {
     async fn set_mcp_level(
         &self,
-        command: super::connection_level::ConnectionLevelCommand,
+        command: crate::application::workflow::connection_level::ConnectionLevelCommand,
     ) -> AppResult<CompanyMcpConnection>;
     async fn list_mcp_connections(&self, company_id: Uuid) -> AppResult<Vec<CompanyMcpConnection>>;
     async fn create_mcp_connection(
@@ -192,7 +192,7 @@ impl McpUseCases {
     }
     pub async fn set_level(
         &self,
-        command: super::connection_level::ConnectionLevelCommand,
+        command: crate::application::workflow::connection_level::ConnectionLevelCommand,
     ) -> AppResult<CompanyMcpConnection> {
         super::company::managed_company(
             self.companies.as_ref(),

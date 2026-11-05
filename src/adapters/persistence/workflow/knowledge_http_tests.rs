@@ -1,7 +1,7 @@
 use super::*;
 use crate::adapters::persistence::workflow::knowledge;
+use crate::application::workflow::connection_level::ConnectionLevelCommand;
 use crate::entities::access_level::AccessLevel;
-use crate::use_cases::connection_level::ConnectionLevelCommand;
 
 #[tokio::test]
 async fn knowledge_run_level_http_step_and_direct_tool_refuse_before_network() {

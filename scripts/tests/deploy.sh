@@ -92,4 +92,25 @@ export FLY_APP_EXISTS=1
 "$ROOT_DIR/scripts/deploy.sh" app >"$TEST_DIR/normal.out" 2>&1
 grep -q '^deploy$' "$FLY_TEST_LOG"
 
+# Keep the production model/security gate mandatory alongside the deployment preflight. Runtime
+# missing/tampered-model refusal is exercised by that gate against the built image, before DB I/O.
+python3 - "$ROOT_DIR" <<'PY_MODEL_BUILD'
+import json, re, sys
+from pathlib import Path
+root = Path(sys.argv[1])
+dockerfile = (root / "Dockerfile").read_text()
+runtime = re.split(r"^FROM .*\n", dockerfile, flags=re.MULTILINE)[-1]
+users = re.findall(r"^USER\s+(\S+)", runtime, flags=re.MULTILINE)
+assert users and users[-1] not in {"root", "0", "0:0"}, "runtime must run as non-root"
+assert re.search(r"^COPY --from=model /knowledge-model /app/models/multilingual-e5-small$", runtime, re.MULTILINE), "runtime must include the verified model stage"
+assert "python3 scripts/prepare-knowledge-model.py --destination /knowledge-model" in dockerfile, "model must be verified during image build"
+manifest = json.loads((root / "assets/knowledge/model-manifest.json").read_text())
+assert manifest["model_id"], "model identity must be pinned"
+ci = (root / ".github/workflows/ci.yml").read_text()
+assert "python3 scripts/check-knowledge-image.py --image openbot-knowledge-ci" in ci, "missing-model/non-root/runtime RSS checks must remain required in CI"
+checker = (root / "scripts/check-knowledge-image.py").read_text()
+assert "failed_startup(image, empty, MODEL)" in checker, "image gate must exercise missing-model startup refusal"
+print("deployment model-stage/non-root/missing-model gate assertions passed")
+PY_MODEL_BUILD
+
 echo "deploy script tests passed"

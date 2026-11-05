@@ -2,10 +2,10 @@
 use crate::{
     adapters::http::{app_state::AppState, auth::AuthenticatedUser, pages},
     app_error::{AppError, AppResult},
+    application::workflow::connection_level::ConnectionLevelCommand,
     application::workflow::{WorkflowActor, http::HttpConnection},
     domain::workflow::CompanyId,
     entities::access_level::{AccessLevel, LevelActor},
-    use_cases::connection_level::ConnectionLevelCommand,
 };
 use axum::{
     Json, Router,

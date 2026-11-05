@@ -18,6 +18,7 @@ pub mod checkpoints;
 pub mod children;
 pub mod compiler;
 pub mod completion;
+pub mod connection_level;
 mod contracts;
 pub mod decisions;
 pub mod fixtures;

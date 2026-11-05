@@ -9,7 +9,7 @@ async fn jsonb_row_context_thread_contract_is_optional_per_message() {
     for suffix in ["broken", "valid"] {
         let message = inbound_email(
             fixture.thread.id,
-            email_metadata(&format!("<{suffix}-{}@test.invalid>", fixture.suffix)),
+            email_metadata(&format!("<{suffix}-{}@fixture.test>", fixture.suffix)),
             "{}",
         );
         fixture.persistence.create_message(&message).await.unwrap();

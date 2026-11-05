@@ -1,0 +1,172 @@
+{
+  "documents": [
+    {
+      "name": "returns.md",
+      "heading": "Rückgaberecht",
+      "text": "Kunden können Produkte innerhalb von dreißig Tagen zurückgeben und erhalten eine vollständige Rückerstattung."
+    },
+    {
+      "name": "warranty.md",
+      "heading": "Garanzia",
+      "text": "Tutti i prodotti hanno una garanzia di ventiquattro mesi dalla consegna. Ripariamo gratuitamente i difetti di fabbricazione."
+    },
+    {
+      "name": "shipping.md",
+      "heading": "Envíos nacionales",
+      "text": "Los pedidos nacionales llegan en tres a cinco días laborables. El seguimiento del envío se manda por correo electrónico."
+    },
+    {
+      "name": "payments.md",
+      "heading": "Payment terms",
+      "text": "Business invoices are payable within thirty days of the invoice date. We accept bank transfers and credit cards."
+    },
+    {
+      "name": "bulk.md",
+      "heading": "Minimum order",
+      "text": "The minimum wholesale order is twelve units. Sample orders can contain a single unit."
+    },
+    {
+      "name": "support.md",
+      "heading": "Assistance",
+      "text": "Notre assistance est disponible du lundi au vendredi, de neuf heures à dix-sept heures UTC."
+    },
+    {
+      "name": "pricing.md",
+      "heading": "Volume discounts",
+      "text": "Orders of at least one hundred units receive a ten percent volume discount. Smaller orders use the published list price."
+    },
+    {
+      "name": "ax4401.md",
+      "heading": "AX-4401 specifications",
+      "text": "The AX-4401 portable scanner has eight hours of battery life and weighs two hundred grams."
+    },
+    {
+      "name": "ax4410.md",
+      "heading": "AX-4410 specifications",
+      "text": "The AX-4410 portable scanner has forty-eight hours of battery life and weighs three hundred grams."
+    },
+    {
+      "name": "delta-basic.md",
+      "heading": "Delta Basic specifications",
+      "text": "The Delta Basic mixer has a five hundred watt motor and a two litre bowl."
+    },
+    {
+      "name": "delta-pro.md",
+      "heading": "Delta Pro specifications",
+      "text": "The Delta Pro mixer has a seven hundred and fifty watt motor and a five litre bowl."
+    },
+    {
+      "name": "international.md",
+      "heading": "Spedizioni internazionali",
+      "text": "Per gli ordini internazionali si applica Incoterms DAP. Il cliente paga eventuali dazi doganali e tasse di importazione."
+    }
+  ],
+  "questions": [
+    {
+      "query": "How long can I return a product for a refund?",
+      "exact_terms": [],
+      "expected_file": "returns.md",
+      "exact_hits": []
+    },
+    {
+      "query": "¿Cuánto tiempo tengo para devolver un producto y recuperar el dinero?",
+      "exact_terms": [],
+      "expected_file": "returns.md",
+      "exact_hits": []
+    },
+    {
+      "query": "Quanto dura la garanzia dei prodotti?",
+      "exact_terms": [],
+      "expected_file": "warranty.md",
+      "exact_hits": []
+    },
+    {
+      "query": "How long does the product warranty last?",
+      "exact_terms": [],
+      "expected_file": "warranty.md",
+      "exact_hits": []
+    },
+    {
+      "query": "¿Cuánto tarda en llegar un pedido nacional?",
+      "exact_terms": [],
+      "expected_file": "shipping.md",
+      "exact_hits": []
+    },
+    {
+      "query": "Quels sont les horaires de l’assistance ?",
+      "exact_terms": [],
+      "expected_file": "support.md",
+      "exact_hits": []
+    },
+    {
+      "query": "When must a business invoice be paid?",
+      "exact_terms": [],
+      "expected_file": "payments.md",
+      "exact_hits": []
+    },
+    {
+      "query": "What is the minimum quantity for a wholesale order?",
+      "exact_terms": [],
+      "expected_file": "bulk.md",
+      "exact_hits": []
+    },
+    {
+      "query": "Quale sconto si applica a un ordine di cento unità?",
+      "exact_terms": [],
+      "expected_file": "pricing.md",
+      "exact_hits": []
+    },
+    {
+      "query": "What is the battery life of the AX-4410 scanner?",
+      "exact_terms": [
+        "AX-4410"
+      ],
+      "expected_file": "ax4410.md",
+      "exact_hits": [
+        "ax4410.md"
+      ]
+    },
+    {
+      "query": "¿Cuánto dura la batería del AX-4401?",
+      "exact_terms": [],
+      "expected_file": "ax4401.md",
+      "exact_hits": [
+        "ax4401.md"
+      ]
+    },
+    {
+      "query": "What motor power does Delta Pro have?",
+      "exact_terms": [
+        "Delta Pro"
+      ],
+      "expected_file": "delta-pro.md",
+      "exact_hits": [
+        "delta-pro.md"
+      ]
+    },
+    {
+      "query": "Quale Incoterms usate per gli ordini internazionali?",
+      "exact_terms": [],
+      "expected_file": "international.md",
+      "exact_hits": []
+    },
+    {
+      "query": "Innerhalb welcher Frist kann ich Waren zurückgeben?",
+      "exact_terms": [],
+      "expected_file": "returns.md",
+      "exact_hits": []
+    },
+    {
+      "query": "How many moons orbit Neptune?",
+      "exact_terms": [],
+      "expected_file": null,
+      "exact_hits": []
+    },
+    {
+      "query": "Qual è la capitale dell’Islanda?",
+      "exact_terms": [],
+      "expected_file": null,
+      "exact_hits": []
+    }
+  ]
+}

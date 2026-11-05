@@ -15,8 +15,8 @@ use std::sync::{
 };
 use tokio::sync::Notify;
 
-pub(super) const TOKEN: &str = "fixture-mcp-secret";
-pub(super) const TOOL: &str = "lookup_customer";
+pub(in crate::adapters::persistence::workflow) const TOKEN: &str = "fixture-mcp-secret";
+pub(in crate::adapters::persistence::workflow) const TOOL: &str = "lookup_customer";
 
 pub(super) fn input_schema() -> Value {
     json!({"type":"object","properties":{"customer_id":{"type":"string","maxLength":64}},"required":["customer_id"],"additionalProperties":false})
@@ -29,7 +29,7 @@ pub(super) fn listed_tools() -> Value {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) enum Call {
+pub(in crate::adapters::persistence::workflow) enum Call {
     Json,
     Sse,
     ToolError,
@@ -54,8 +54,8 @@ pub(super) struct ServerState {
     pub(super) arrived: Notify,
     pub(super) release: Notify,
 }
-pub(super) struct McpServer {
-    pub(super) url: String,
+pub(in crate::adapters::persistence::workflow) struct McpServer {
+    pub(in crate::adapters::persistence::workflow) url: String,
     pub(super) state: Arc<ServerState>,
     task: tokio::task::JoinHandle<()>,
 }
@@ -71,7 +71,7 @@ impl McpServer {
     pub(super) fn count(&self, entry: &str) -> usize {
         self.log().iter().filter(|line| *line == entry).count()
     }
-    pub(super) fn calls(&self) -> usize {
+    pub(in crate::adapters::persistence::workflow) fn calls(&self) -> usize {
         self.count("POST tools/call")
     }
     pub(super) fn arguments(&self) -> Vec<Value> {
@@ -104,7 +104,7 @@ impl McpServer {
     }
 }
 
-pub(super) async fn mcp_server(call: Call) -> McpServer {
+pub(in crate::adapters::persistence::workflow) async fn mcp_server(call: Call) -> McpServer {
     let state = Arc::new(ServerState {
         base: Mutex::new(String::new()),
         log: Mutex::default(),
@@ -314,7 +314,7 @@ pub(super) async fn connection_on(
         .find(|connection| connection.id == id)
         .expect("the connection is live")
 }
-pub(super) fn guarded_client(url: &str) -> Arc<HttpMcpClient> {
+pub(in crate::adapters::persistence::workflow) fn guarded_client(url: &str) -> Arc<HttpMcpClient> {
     Arc::new(HttpMcpClient::new(
         EndpointPolicy::new([url.to_owned()]).unwrap(),
     ))
@@ -342,7 +342,10 @@ pub(super) async fn mcp_setup(call: Call) -> McpSetup {
     }
 }
 
-pub(super) async fn configured(fixture: &Fixture, url: &str) -> (CompanyMcpConnection, Uuid) {
+pub(in crate::adapters::persistence::workflow) async fn configured(
+    fixture: &Fixture,
+    url: &str,
+) -> (CompanyMcpConnection, Uuid) {
     let p = &fixture.persistence;
     let company = fixture.target.company;
     let connection = p

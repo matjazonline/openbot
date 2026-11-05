@@ -45,13 +45,15 @@ async fn knowledge_run_level_mcp_level_change_preserves_operation_and_credential
     let claim = claimed(&setup).await;
     let scope = claim.fence.scope;
     let current = setup.current().await;
-    p.set_mcp_level(crate::use_cases::connection_level::ConnectionLevelCommand {
-        company: scope.company,
-        actor: setup.actor(),
-        connection: current.id,
-        expected_revision: current.revision,
-        access_level: AccessLevel::L5,
-    })
+    p.set_mcp_level(
+        crate::application::workflow::connection_level::ConnectionLevelCommand {
+            company: scope.company,
+            actor: setup.actor(),
+            connection: current.id,
+            expected_revision: current.revision,
+            access_level: AccessLevel::L5,
+        },
+    )
     .await
     .unwrap();
     let mut tx = p.pool().begin().await.unwrap();
