@@ -84,3 +84,7 @@ Actual B PASS and note KNOW-P01-WB1-R2-N1 saved, sole finding F1 closed, all4 ne
 
 ## Accepted source committed
 Phase code commit 4bc57b3688777260d2d55280faa21b4b0473aa5f; root post-commit full manifest/diff proof exactly matches B-accepted source (logs/phase-code-commit-preservation.json). Raw .log evidence is ignored by repository defaults, so root explicitly force-staged 39 required author/B check logs for durable retention; no implementation changes. A metadata/evidence commit follows before local main fast-forward. No remote knowledge push.
+
+
+## Local integration complete
+Accepted source4bc57b3 and its evidence commit 16ea8cefc1093a39c8caa47374ce754c9a59f719 fast-forward integrated into primary main with no additional implementation differences. logs/local-main-integration.json proves exact source preservation and the two deliberately machine-local coordination changes retained in primary. Authorityr4 publishes KNOW-C001/r1 accepted p01 contracts for dependent phases; I001–I005/r1 unchanged. P01 accepted/integrated locally; fullknowledge/push and final06 not done. This final phase status/evidence update is metadata only; its commit will be fast-forwarded without changing accepted source.
