@@ -789,3 +789,6 @@ pub(super) async fn retry_scope(f: &AdmissionFixture, scope: ActivationRequest) 
         RetryResult::Applied { .. }
     ));
 }
+
+#[path = "schema_constraint_tests.rs"]
+mod schema_constraint_tests;

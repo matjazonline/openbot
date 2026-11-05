@@ -3689,7 +3689,7 @@ fn queued_delivery(company_id: Uuid, channel_id: Uuid) -> DeliveryEntry {
         message_id: CanonicalMessageId::random(),
         correlation_id: CorrelationId::new(),
         transport: TransportKind::Email,
-        purpose: DeliveryPurpose::Reply,
+        purpose: DeliveryPurpose::WorkflowReply,
         status: DeliveryStatus::Pending,
         idempotency_key: "reply:task:reply:email:customer@example.com".to_string(),
         destination_label: "support@acme".to_string(),
@@ -3740,7 +3740,7 @@ fn deliveries_page_lists_queued_work_and_escapes_its_subject() {
     assert!(!html.contains("order <script>"));
     assert!(html.contains("customer@example.com"));
     // The transport and the purpose are columns of their own now, not payload archaeology.
-    assert!(html.contains("Email · Reply · customer@example.com"));
+    assert!(html.contains("Email · Workflow reply · customer@example.com"));
     // A queued delivery is an undelivered one, and the summary says so before anything is clicked.
     assert!(html.contains("1 delivery · 1 undelivered · page 1"));
     assert!(html.contains("menu-active"));
@@ -3873,7 +3873,7 @@ fn delivery_query_carries_only_what_was_chosen() {
         channel_id: Some(channel_id),
         status: Some(DeliveryStatus::DeadLetter),
         transport: Some(TransportKind::Slack),
-        purpose: Some(DeliveryPurpose::Outreach),
+        purpose: Some(DeliveryPurpose::WorkflowSend),
         sort_asc: true,
         page: Some(3),
         limit: Some(10),
@@ -3883,7 +3883,7 @@ fn delivery_query_carries_only_what_was_chosen() {
         full,
         format!(
             "company_id={company_id}&channel_id={channel_id}&status=dead_letter&transport=slack\
-             &purpose=outreach&sort=asc&limit=10&page=3&entry_id={entry_id}"
+             &purpose=workflow_send&sort=asc&limit=10&page=3&entry_id={entry_id}"
         )
     );
 }
@@ -4126,7 +4126,7 @@ fn profile_account() -> User {
         username: "dana".to_string(),
         email: "dana@example.com".to_string(),
         email_verified_at: None,
-        password_hash: "irrelevant".to_string(),
+        password_hash: Some("irrelevant".to_string()),
         avatar_url: Some(AvatarUrl::from("https://cdn.example.com/dana.png")),
         created_at: Utc::now(),
     }

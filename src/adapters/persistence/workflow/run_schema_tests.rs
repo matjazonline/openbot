@@ -278,7 +278,7 @@ impl HistoryFixture {
         sqlx::query("INSERT INTO threads (id, company_id, channel_id, subject) VALUES ($1, $2, $3, 'History')")
             .bind(history.thread).bind(company).bind(history.channel).execute(pool).await.unwrap();
         for message in history.messages {
-            sqlx::query("INSERT INTO messages (id, company_id, author_principal_id, subject, clean_text_body, direction, role, correlation_id, content_hash) SELECT $1, $2, id, 'History', 'body', 'inbound', 'human', $3, $4 FROM principals WHERE company_id = $2 AND user_id = $5")
+            sqlx::query("INSERT INTO messages (id, company_id, author_principal_id, subject, clean_text_body, direction, role, correlation_id, content_hash, audience) SELECT $1, $2, id, 'History', 'body', 'inbound', 'human', $3, $4, 'external_conversation' FROM principals WHERE company_id = $2 AND user_id = $5")
                 .bind(message).bind(company).bind(Uuid::new_v4()).bind(vec![0_u8; 32]).bind(f.target.actor.user_id()).execute(pool).await.unwrap();
             sqlx::query("INSERT INTO thread_messages (id, company_id, channel_id, thread_id, message_id, entry_kind) VALUES ($1, $2, $3, $4, $5, 'conversation')")
                 .bind(Uuid::new_v4()).bind(company).bind(history.channel).bind(history.thread).bind(message).execute(pool).await.unwrap();

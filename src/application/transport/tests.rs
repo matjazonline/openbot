@@ -113,7 +113,7 @@ fn fan_out_includes_exactly_what_policy_allows() {
     let cases = vec![
         FanOutCase {
             name: "the source binding never receives its own message",
-            purpose: DeliveryPurpose::Mirror,
+            purpose: DeliveryPurpose::WorkflowReply,
             candidates: vec![
                 DeliveryCandidate::deployment(source),
                 DeliveryCandidate::deployment(peer),
@@ -124,7 +124,7 @@ fn fan_out_includes_exactly_what_policy_allows() {
         },
         FanOutCase {
             name: "a binding that is not active is excluded",
-            purpose: DeliveryPurpose::Mirror,
+            purpose: DeliveryPurpose::WorkflowReply,
             candidates: vec![
                 DeliveryCandidate::deployment(disabled),
                 DeliveryCandidate::deployment(paused),
@@ -136,7 +136,7 @@ fn fan_out_includes_exactly_what_policy_allows() {
         },
         FanOutCase {
             name: "a binding whose installation is unusable is excluded",
-            purpose: DeliveryPurpose::Mirror,
+            purpose: DeliveryPurpose::WorkflowReply,
             candidates: vec![
                 DeliveryCandidate {
                     binding: uninstalled,
@@ -150,7 +150,7 @@ fn fan_out_includes_exactly_what_policy_allows() {
         },
         FanOutCase {
             name: "a reply-only binding takes replies but not outreach",
-            purpose: DeliveryPurpose::Outreach,
+            purpose: DeliveryPurpose::WorkflowSend,
             candidates: vec![
                 DeliveryCandidate::deployment(reply_only),
                 DeliveryCandidate::deployment(peer),
@@ -161,7 +161,7 @@ fn fan_out_includes_exactly_what_policy_allows() {
         },
         FanOutCase {
             name: "a reply reaches the same reply-only binding",
-            purpose: DeliveryPurpose::Reply,
+            purpose: DeliveryPurpose::WorkflowReply,
             candidates: vec![DeliveryCandidate::deployment(reply_only)],
             explicit: Vec::new(),
             expected_bindings: vec![reply_only.id],
@@ -169,7 +169,7 @@ fn fan_out_includes_exactly_what_policy_allows() {
         },
         FanOutCase {
             name: "an explicitly named destination is retained",
-            purpose: DeliveryPurpose::Outreach,
+            purpose: DeliveryPurpose::WorkflowSend,
             candidates: vec![DeliveryCandidate::deployment(source)],
             explicit: vec![ExternalDestination::Email(EmailAddress::from(
                 "person@example.com",
@@ -179,7 +179,7 @@ fn fan_out_includes_exactly_what_policy_allows() {
         },
         FanOutCase {
             name: "several different eligible bindings are all delivered to",
-            purpose: DeliveryPurpose::Mirror,
+            purpose: DeliveryPurpose::WorkflowReply,
             candidates: vec![
                 DeliveryCandidate::deployment(source),
                 DeliveryCandidate::deployment(peer),
@@ -239,15 +239,15 @@ fn the_same_logical_delivery_replans_to_the_same_key() {
     let message_id = CanonicalMessageId::random();
     let destination = DeliveryDestination::Binding(ChannelBindingId::random());
     assert_eq!(
-        DeliveryIntent::stable_key(DeliveryPurpose::Reply, message_id, &destination),
-        DeliveryIntent::stable_key(DeliveryPurpose::Reply, message_id, &destination)
+        DeliveryIntent::stable_key(DeliveryPurpose::WorkflowReply, message_id, &destination),
+        DeliveryIntent::stable_key(DeliveryPurpose::WorkflowReply, message_id, &destination)
     );
     assert_ne!(
-        DeliveryIntent::stable_key(DeliveryPurpose::Reply, message_id, &destination),
-        DeliveryIntent::stable_key(DeliveryPurpose::Mirror, message_id, &destination)
+        DeliveryIntent::stable_key(DeliveryPurpose::WorkflowReply, message_id, &destination),
+        DeliveryIntent::stable_key(DeliveryPurpose::WorkflowSend, message_id, &destination)
     );
 
-    // Two outreach recipients on one message: no binding column separates these rows, so the keys
+    // Two initiating recipients on one message: no binding column separates these rows, so the keys
     // have to.
     let first = DeliveryDestination::External(ExternalDestination::Email(EmailAddress::from(
         "first@example.com",
@@ -256,16 +256,16 @@ fn the_same_logical_delivery_replans_to_the_same_key() {
         "second@example.com",
     )));
     assert_ne!(
-        DeliveryIntent::stable_key(DeliveryPurpose::Outreach, message_id, &first),
-        DeliveryIntent::stable_key(DeliveryPurpose::Outreach, message_id, &second)
+        DeliveryIntent::stable_key(DeliveryPurpose::WorkflowSend, message_id, &first),
+        DeliveryIntent::stable_key(DeliveryPurpose::WorkflowSend, message_id, &second)
     );
     // And one recipient written two ways is one delivery.
     let shouting = DeliveryDestination::External(ExternalDestination::Email(EmailAddress::from(
         "First@Example.COM",
     )));
     assert_eq!(
-        DeliveryIntent::stable_key(DeliveryPurpose::Outreach, message_id, &first),
-        DeliveryIntent::stable_key(DeliveryPurpose::Outreach, message_id, &shouting)
+        DeliveryIntent::stable_key(DeliveryPurpose::WorkflowSend, message_id, &first),
+        DeliveryIntent::stable_key(DeliveryPurpose::WorkflowSend, message_id, &shouting)
     );
 }
 
@@ -310,9 +310,9 @@ fn record(transport: TransportKind) -> DeliveryRecord {
         external_destination: None,
         correlation_id: CorrelationId::new(),
         transport,
-        purpose: DeliveryPurpose::Reply,
+        purpose: DeliveryPurpose::WorkflowReply,
         idempotency_key: DeliveryIntent::stable_key(
-            DeliveryPurpose::Reply,
+            DeliveryPurpose::WorkflowReply,
             message_id,
             &destination,
         ),

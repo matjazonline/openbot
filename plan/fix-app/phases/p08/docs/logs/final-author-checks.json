@@ -1,0 +1,51 @@
+{
+  "clippy": {
+    "command": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "--offline",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 0
+  },
+  "main": {
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--bin",
+      "open_bots"
+    ],
+    "exit_code": 0
+  },
+  "fmt": {
+    "command": [
+      "cargo",
+      "fmt",
+      "--",
+      "--check"
+    ],
+    "exit_code": 0
+  },
+  "whitespace": {
+    "command": [
+      "git",
+      "diff",
+      "--check",
+      "77edd70862a88e2189587fda50fb2b0b913082b6"
+    ],
+    "exit_code": 2
+  },
+  "resources": {
+    "command": [
+      "python3",
+      "plan/fix-app/phases/p08/docs/logs/verify-step6-resources.py"
+    ],
+    "exit_code": 0
+  }
+}

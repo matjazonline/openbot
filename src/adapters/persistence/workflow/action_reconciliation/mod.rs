@@ -210,7 +210,7 @@ async fn restore_on(
     .fetch_optional(&mut **tx)
     .await?
     .ok_or_else(missing)?;
-    sqlx::query_scalar::<_, Uuid>("SELECT id FROM background_tasks WHERE company_id=$1 AND workflow_execution_id=$2 AND queue_kind='workflow' FOR UPDATE")
+    sqlx::query_scalar::<_, Uuid>("SELECT id FROM background_tasks WHERE company_id=$1 AND workflow_execution_id=$2  FOR UPDATE")
         .bind(command.scope.company.as_uuid()).bind(command.scope.execution.as_uuid()).fetch_optional(&mut **tx).await?.ok_or_else(missing)?;
     let operation: Value = sqlx::query_scalar("SELECT operation FROM workflow_action_intents WHERE company_id=$1 AND run_id=$2 AND execution_id=$3 AND id=$4 AND argument_digest=$5 FOR SHARE")
         .bind(command.scope.company.as_uuid()).bind(command.scope.run.as_uuid()).bind(command.scope.execution.as_uuid())

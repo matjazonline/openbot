@@ -39,21 +39,24 @@ impl TryFrom<ConnectionRow> for CompanyMcpConnection {
             "bearer" => McpAuth::Bearer,
             _ => return Err(invalid("Stored MCP auth is invalid")),
         };
-        let write = McpConnectionWrite {
+        let mut write = McpConnectionWrite {
             slug: row.slug.into(),
             endpoint: row.endpoint_url.try_into().map_err(AppError::BadRequest)?,
             enabled: row.enabled,
             auth: auth.clone(),
-            discovered_tools: serde_json::from_value(row.discovery_json)
-                .map_err(|_| invalid("Stored MCP discovery is invalid"))?,
-            tool_grants: row
-                .tool_grants
-                .into_iter()
-                .map(McpToolName::try_from)
-                .collect::<Result<_, _>>()
-                .map_err(AppError::BadRequest)?,
+            discovered_tools: Vec::new(),
+            tool_grants: Vec::new(),
         };
+        // Validate ordinary settings strictly before the optional catalog is considered.
         write.validate()?;
+        match read_catalog(row.discovery_json, row.tool_grants) {
+            Ok(catalog) => {
+                write.discovered_tools = catalog.tools;
+                write.tool_grants = catalog.grants;
+            }
+            Err(error) => tracing::warn!(connection_id = %row.id, error,
+                "Stored MCP discovery was quarantined"),
+        }
         Ok(Self {
             company_id: row.company_id,
             id: row.id,
@@ -69,6 +72,26 @@ impl TryFrom<ConnectionRow> for CompanyMcpConnection {
         })
     }
 }
+struct ReadCatalog {
+    tools: Vec<McpDiscoveredTool>,
+    grants: Vec<McpToolName>,
+}
+
+fn read_catalog(
+    value: serde_json::Value,
+    grants: Vec<String>,
+) -> Result<ReadCatalog, &'static str> {
+    let tools: Vec<McpDiscoveredTool> =
+        serde_json::from_value(value).map_err(|_| "Malformed stored MCP discovery")?;
+    let grants = grants
+        .into_iter()
+        .map(McpToolName::try_from)
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|_| "Malformed stored MCP grants")?;
+    validate_catalog(&tools, &grants).map_err(|_| "Invalid stored MCP discovery catalog")?;
+    Ok(ReadCatalog { tools, grants })
+}
+
 fn invalid(message: &str) -> AppError {
     AppError::BadRequest(message.into())
 }

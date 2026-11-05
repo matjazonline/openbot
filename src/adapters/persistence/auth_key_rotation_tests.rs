@@ -200,3 +200,111 @@ async fn auth_key_rotation_pending_codes_survive_jwt_rotation_with_the_independe
         "one code is spent once"
     );
 }
+
+#[tokio::test]
+async fn schema_constraint_oauth_account_stores_null_and_rejects_passwords() {
+    use crate::use_cases::user::{ExternalIdentity, LoginMethod, UserPersistence};
+    let database = own_database().await.expect("native password nullability");
+    let p = Arc::new(PostgresPersistence::new(database.pool.clone()));
+    let config = AppConfig::for_test();
+    let users = cases(&config, &p, &Arc::new(Codes::default()));
+    let suffix = uuid::Uuid::new_v4().simple().to_string();
+    let email = EmailAddress::from(format!("oauth-{suffix}@example.test"));
+    let oauth = p
+        .create_external_user(ExternalIdentity {
+            provider: LoginMethod::Google,
+            subject: &suffix,
+            email: &email,
+            email_verified: true,
+            display_name: Some("Passwordless account"),
+        })
+        .await
+        .unwrap();
+    assert!(oauth.password_hash.is_none());
+    assert!(
+        p.get_by_id(oauth.id)
+            .await
+            .unwrap()
+            .unwrap()
+            .password_hash
+            .is_none()
+    );
+    for candidate in ["a-native-password", "other-password"] {
+        assert!(matches!(
+            users
+                .login(&oauth.email, &candidate.into(), None, None)
+                .await,
+            Err(crate::app_error::AppError::InvalidCredentials)
+        ));
+    }
+}
+
+#[tokio::test]
+async fn schema_constraint_password_login_requires_hash_and_registered_method() {
+    use crate::use_cases::user::{LoginMethod, UserCredentialsHasher, UserPersistence};
+    let database = own_database()
+        .await
+        .expect("native password method/hash facts");
+    let p = Arc::new(PostgresPersistence::new(database.pool.clone()));
+    let config = AppConfig::for_test();
+    let users = cases(&config, &p, &Arc::new(Codes::default()));
+    let suffix = uuid::Uuid::new_v4().simple().to_string();
+    let hash = crate::infra::argon2_password_hasher()
+        .hash_password("a-native-password")
+        .unwrap();
+    let password = p
+        .create_user(
+            &format!("password-{suffix}"),
+            &format!("password-{suffix}@example.test"),
+            &hash,
+        )
+        .await
+        .unwrap();
+    assert!(
+        users
+            .login(&password.email, &"a-native-password".into(), None, None)
+            .await
+            .is_ok()
+    );
+    sqlx::query("UPDATE users SET password_hash=NULL WHERE id=$1")
+        .bind(password.id)
+        .execute(p.pool())
+        .await
+        .unwrap();
+    assert!(
+        p.get_by_id(password.id)
+            .await
+            .unwrap()
+            .unwrap()
+            .auth_revision
+            > password.auth_revision
+    );
+    assert!(
+        p.has_login_method(password.id, LoginMethod::Password)
+            .await
+            .unwrap()
+    );
+    assert!(matches!(
+        users
+            .login(&password.email, &"a-native-password".into(), None, None)
+            .await,
+        Err(crate::app_error::AppError::InvalidCredentials)
+    ));
+    sqlx::query("UPDATE users SET password_hash=$2 WHERE id=$1")
+        .bind(password.id)
+        .bind(hash)
+        .execute(p.pool())
+        .await
+        .unwrap();
+    sqlx::query("DELETE FROM user_login_methods WHERE user_id=$1 AND provider='password'")
+        .bind(password.id)
+        .execute(p.pool())
+        .await
+        .unwrap();
+    assert!(matches!(
+        users
+            .login(&password.email, &"a-native-password".into(), None, None)
+            .await,
+        Err(crate::app_error::AppError::InvalidCredentials)
+    ));
+}

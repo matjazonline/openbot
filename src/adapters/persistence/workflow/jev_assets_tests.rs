@@ -47,7 +47,7 @@ pub(super) async fn attachment(f: &Fixture, bytes: &[u8]) -> Attachment {
         .await
         .unwrap();
     let metadata = json!({"version":"1","items":[{"filename":"fixture.png","content_type":"image/png","sha256_hash":ImageDigest::of(bytes),"size_bytes":bytes.len(),"storage_key":key.as_str()}]});
-    sqlx::query("INSERT INTO messages(id,company_id,author_principal_id,subject,clean_text_body,direction,role,correlation_id,content_hash,attachments) SELECT $1,$2,principal.id,'Images','body','inbound','human',$3,$4,$5 FROM principals AS principal WHERE principal.company_id=$2 AND principal.user_id=$6")
+    sqlx::query("INSERT INTO messages(id,company_id,author_principal_id,subject,clean_text_body,direction,role,correlation_id,content_hash,attachments,audience) SELECT $1,$2,principal.id,'Images','body','inbound','human',$3,$4,$5,'external_conversation' FROM principals AS principal WHERE principal.company_id=$2 AND principal.user_id=$6")
         .bind(message).bind(company).bind(Uuid::new_v4()).bind(vec![0u8;32]).bind(metadata).bind(f.target.actor.user_id()).execute(p.pool()).await.unwrap();
     sqlx::query("INSERT INTO thread_messages(id,company_id,channel_id,thread_id,message_id,entry_kind) VALUES($1,$2,$3,$4,$5,'conversation')").bind(Uuid::new_v4()).bind(company).bind(channel.id).bind(thread).bind(message).execute(p.pool()).await.unwrap();
     Attachment {

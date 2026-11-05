@@ -182,13 +182,7 @@ async fn schedule_control(pending: PendingAction) {
     let after = all_tables(f).await;
     retained_accounting(&before, &after);
     assert_eq!(after["background_tasks"].as_array().unwrap().len(), 1);
-    for field in [
-        "id",
-        "payload",
-        "workflow_execution_id",
-        "retry_count",
-        "max_retries",
-    ] {
+    for field in ["id", "workflow_execution_id", "retry_count", "max_retries"] {
         assert_eq!(
             before["background_tasks"][0][field],
             after["background_tasks"][0][field]
@@ -208,8 +202,8 @@ async fn extra_pending(pending: &PendingAction) -> Uuid {
     // An adversarial queue candidate at an unused ordinal, with no invented owner history.
     sqlx::query("INSERT INTO workflow_executions (company_id,run_id,id,step_id,activation) VALUES ($1,$2,$3,'start',2)")
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(execution).execute(&mut *tx).await.unwrap();
-    sqlx::query("INSERT INTO background_tasks (id,company_id,channel_id,thread_id,correlation_id,task_type,payload,queue_kind,workflow_execution_id)
-        SELECT $2,company_id,channel_id,thread_id,correlation_id,'workflow_execution',jsonb_build_object('version',1,'execution_id',$3::uuid),'workflow',$3 FROM background_tasks WHERE id=$1")
+    sqlx::query("INSERT INTO background_tasks (id, company_id, channel_id, thread_id, correlation_id, workflow_execution_id)
+        SELECT $2, company_id, channel_id, thread_id, correlation_id, $3 FROM background_tasks WHERE id=$1")
         .bind(scope.job.0).bind(job).bind(execution).execute(&mut *tx).await.unwrap();
     tx.commit().await.unwrap();
     job
@@ -223,7 +217,7 @@ async fn subject_without_sibling_veto(pending: &PendingAction) {
         JOIN background_tasks AS task ON task.company_id=execution.company_id AND task.workflow_execution_id=execution.id
         JOIN task_attempts AS attempt ON attempt.task_id=task.id AND attempt.attempt_number=task.retry_count
         JOIN workflow_admissions AS admission ON admission.company_id=owner.company_id AND admission.run_id=owner.id
-        WHERE owner.company_id=$1 AND owner.id=$2 AND task.id=$3 AND task.queue_kind='workflow'
+        WHERE owner.company_id=$1 AND owner.id=$2 AND task.id=$3
           AND owner.state='waiting' AND owner.waiting_reason='reconciliation' AND task.status='failed'
           AND owner.deadline>clock_timestamp() AND execution.activation<=owner.max_steps
           AND execution.activated_at IS NOT NULL AND execution.completed_at IS NULL

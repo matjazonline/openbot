@@ -366,8 +366,14 @@ async fn lock_decision(
     .await?
     .ok_or_else(missing)?;
     let reviewer = authority::authorize_reviewer_on(tx, company, actor).await?;
-    let job: Uuid = sqlx::query_scalar("SELECT id FROM background_tasks WHERE company_id=$1 AND workflow_execution_id=$2 AND queue_kind='workflow'")
-        .bind(company.as_uuid()).bind(head.execution_id).fetch_optional(&mut **tx).await?.ok_or_else(missing)?;
+    let job: Uuid = sqlx::query_scalar(
+        "SELECT id FROM background_tasks WHERE company_id=$1 AND workflow_execution_id=$2 ",
+    )
+    .bind(company.as_uuid())
+    .bind(head.execution_id)
+    .fetch_optional(&mut **tx)
+    .await?
+    .ok_or_else(missing)?;
     let scope = ActivationRequest {
         company,
         run: RunId::new(head.run_id),
@@ -562,8 +568,13 @@ async fn successor_of(
     let Some(Some(next)) = next else {
         return Ok(None);
     };
-    let job: Uuid = sqlx::query_scalar("SELECT id FROM background_tasks WHERE company_id=$1 AND workflow_execution_id=$2 AND queue_kind='workflow'")
-        .bind(scope.company.as_uuid()).bind(next).fetch_one(db).await?;
+    let job: Uuid = sqlx::query_scalar(
+        "SELECT id FROM background_tasks WHERE company_id=$1 AND workflow_execution_id=$2 ",
+    )
+    .bind(scope.company.as_uuid())
+    .bind(next)
+    .fetch_one(db)
+    .await?;
     Ok(Some(ActivationRequest {
         execution: ExecutionId::new(next),
         job: WorkflowJobId(job),

@@ -125,7 +125,7 @@ BEGIN
         'execution_scope',execution.company_id=owner.company_id AND execution.run_id=owner.id AND execution.id=config.execution_id,
         'job_scope',task.company_id=execution.company_id AND task.workflow_execution_id=execution.id AND task.id=config.job_id,
         'admission_scope',admission.company_id=owner.company_id AND admission.run_id=owner.id,
-        'workflow_queue',task.queue_kind='workflow','future_deadline',owner.deadline>clock_timestamp(),'activation_bound',execution.activation<=owner.max_steps,
+        'future_deadline',owner.deadline>clock_timestamp(),'activation_bound',execution.activation<=owner.max_steps,
         'activated',execution.activated_at IS NOT NULL,'uncompleted',execution.completed_at IS NULL,'no_output',execution.committed_output IS NULL,
         'no_route',execution.committed_route IS NULL,'no_successor',execution.successor_execution_id IS NULL,'positive_attempt',task.retry_count>0,
         'remaining_attempts',task.retry_count<task.max_retries,'no_worker',task.worker_id IS NULL,'no_generation',task.execution_generation IS NULL,'no_lease',task.lock_expires_at IS NULL,
@@ -139,7 +139,7 @@ BEGIN
         'no_exhausted_receipt',NOT EXISTS(SELECT 1 FROM workflow_budget_receipts WHERE company_id=config.company_id AND run_id=config.run_id AND disposition='exhausted'),
         'no_refusal',NOT EXISTS(SELECT 1 FROM workflow_action_claim_budget_refusals WHERE company_id=config.company_id AND run_id=config.run_id AND execution_id=config.execution_id AND job_id=config.job_id),
         'non_child',(substring(admission.source_key FROM 4)::jsonb->>0)<>'child',
-        'no_runnable_sibling',NOT EXISTS(SELECT 1 FROM workflow_executions AS sibling JOIN background_tasks AS other ON other.company_id=sibling.company_id AND other.workflow_execution_id=sibling.id WHERE sibling.company_id=config.company_id AND sibling.run_id=config.run_id AND other.queue_kind='workflow' AND other.id<>config.job_id AND other.status IN ('pending','processing')),
+        'no_runnable_sibling',NOT EXISTS(SELECT 1 FROM workflow_executions AS sibling JOIN background_tasks AS other ON other.company_id=sibling.company_id AND other.workflow_execution_id=sibling.id WHERE sibling.company_id=config.company_id AND sibling.run_id=config.run_id AND other.id<>config.job_id AND other.status IN ('pending','processing')),
         'latest_attempt',NOT EXISTS(SELECT 1 FROM task_attempts AS later WHERE later.task_id=task.id AND later.attempt_number>task.attempt_ordinal-1),
         'running',owner.state='running','no_terminal_pointer',owner.terminal_execution_id IS NULL,
         'pending',task.status='pending','reopen_safe',workflow_action_reconciliation_reopen_safe(config.company_id,config.run_id,config.job_id)) INTO predicates

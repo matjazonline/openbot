@@ -3,7 +3,6 @@ use super::{CompanyId, publication::PublishedBundle};
 use crate::application::app_error::{AppError, AppResult};
 use crate::domain::workflow::{Binding, ChoiceName, Context, ExecutionId, RunId, StepId};
 use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeSet;
 use uuid::Uuid;
@@ -28,29 +27,6 @@ pub struct ActivatedExecution {
     pub ordinal: u64,
     pub inputs: Value,
     pub choice: Option<ChoiceName>,
-}
-
-#[derive(Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct JobWire {
-    version: u8,
-    execution_id: Uuid,
-}
-
-pub fn job_payload(execution: ExecutionId) -> Value {
-    serde_json::json!({"version": 1, "execution_id": execution.as_uuid()})
-}
-
-pub fn decode_job_payload(value: Value) -> AppResult<ExecutionId> {
-    let wire: JobWire = serde_json::from_value(value).map_err(|_| invalid_job())?;
-    if wire.version != 1 {
-        return Err(invalid_job());
-    }
-    Ok(ExecutionId::new(wire.execution_id))
-}
-
-fn invalid_job() -> AppError {
-    AppError::Database("Invalid stored workflow job payload".into())
 }
 
 /// Include optional/defaulted references too; missing committed values retain
@@ -157,22 +133,4 @@ pub trait WorkflowActivation: Send + Sync {
     /// before execution. IDs must agree with the stored ID-only job. No I/O,
     /// claim, attempt creation, or permission to perform effects is implied.
     async fn activate(&self, request: ActivationRequest) -> AppResult<ActivatedExecution>;
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn workflow_activation_payload_is_strict_and_id_only() {
-        let id = ExecutionId::new(Uuid::new_v4());
-        assert_eq!(decode_job_payload(job_payload(id)).unwrap(), id);
-        for value in [
-            serde_json::json!({"version":2,"execution_id":id.as_uuid()}),
-            serde_json::json!({"version":1,"execution_id":id.as_uuid(),"context":{}}),
-            serde_json::json!({"execution_id":id.as_uuid()}),
-            serde_json::json!({"version":1,"execution_id":"bad"}),
-        ] {
-            assert!(decode_job_payload(value).is_err());
-        }
-    }
 }

@@ -78,7 +78,7 @@ pub(super) const VALID_HINT: &str = r#"
         ON run.company_id=execution.company_id AND run.id=execution.run_id
       WHERE job.company_id=demand.company_id AND job.id=demand.job_id
         AND execution.id=demand.execution_id AND run.id=demand.run_id
-        AND job.queue_kind='workflow' AND job.status='pending'
+         AND job.status='pending'
         AND job.run_at<=clock_timestamp() AND job.retry_count<job.max_retries
         AND execution.completed_at IS NULL AND run.state IN ('queued','running')
         AND run.deadline>clock_timestamp()

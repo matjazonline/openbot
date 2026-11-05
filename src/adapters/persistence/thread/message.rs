@@ -62,8 +62,7 @@ pub(super) struct MessageDb {
     pub author_subject: Option<String>,
     pub subject: String,
     pub clean_text_body: String,
-    pub response_contract:
-        Option<sqlx::types::Json<crate::entities::response_contract::ResponseContract>>,
+    pub response_contract: Option<Value>,
     pub attachments: Option<Value>,
     pub direction: String,
     pub role: String,
@@ -165,7 +164,10 @@ impl TryFrom<MessageDb> for Message {
             },
             subject: db.subject,
             clean_text_body: db.clean_text_body,
-            response_contract: db.response_contract.map(|contract| contract.0),
+            response_contract: decode_response_contract(
+                CanonicalMessageId::new(db.canonical_id),
+                db.response_contract,
+            ),
             attachments: decode_attachments(db.attachments)?,
             direction,
             role,
@@ -224,10 +226,23 @@ fn decode_participants(value: Value) -> AppResult<Vec<MessageParticipant>> {
         .collect()
 }
 
-/// Read attachment metadata back out of its versioned envelope.
-///
-/// Fallible on purpose: this is untrusted, long-lived JSON, and a shape a rolling deploy has not
-/// learned yet must surface as an application error rather than as a panic in a request handler.
+/// A malformed optional form cannot make neighboring messages unreadable.
+pub(super) fn decode_response_contract(
+    message_id: CanonicalMessageId,
+    value: Option<Value>,
+) -> Option<crate::entities::response_contract::ResponseContract> {
+    match serde_json::from_value(value?) {
+        Ok(contract) => Some(contract),
+        Err(error) => {
+            tracing::warn!(message_id = %message_id.as_uuid(), error = %error,
+                "Stored message response contract is invalid");
+            None
+        }
+    }
+}
+
+/// Read attachment metadata from its versioned envelope. Unexpected stored shapes return
+/// application errors instead of panicking in a request handler.
 pub(super) fn decode_attachments(
     value: Option<Value>,
 ) -> AppResult<Option<Vec<AttachmentMetadata>>> {

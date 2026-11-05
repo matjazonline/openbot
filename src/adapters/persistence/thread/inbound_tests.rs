@@ -1001,8 +1001,8 @@ async fn authored_identity_cannot_belong_to_a_different_author_principal() {
     let error = sqlx::query(
         r#"INSERT INTO messages (
                 id, company_id, author_principal_id, authored_identity_id, subject,
-                clean_text_body, direction, role, correlation_id, content_hash
-           ) VALUES ($1, $2, $3, $4, '', '', 'inbound', 'human', $5, $6)"#,
+                clean_text_body, direction, role, correlation_id, content_hash, audience
+           ) VALUES ($1, $2, $3, $4, '', '', 'inbound', 'human', $5, $6, 'external_conversation')"#,
     )
     .bind(Uuid::new_v4())
     .bind(fixture.company_id)

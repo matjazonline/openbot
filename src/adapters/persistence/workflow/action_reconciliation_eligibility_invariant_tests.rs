@@ -337,13 +337,7 @@ async fn exhausted_retirement(f: &AdmissionFixture, scope: ActivationRequest) {
     ] {
         assert_eq!(before[table], after[table]);
     }
-    for field in [
-        "id",
-        "payload",
-        "workflow_execution_id",
-        "retry_count",
-        "max_retries",
-    ] {
+    for field in ["id", "workflow_execution_id", "retry_count", "max_retries"] {
         assert_eq!(
             before["background_tasks"][0][field],
             after["background_tasks"][0][field]

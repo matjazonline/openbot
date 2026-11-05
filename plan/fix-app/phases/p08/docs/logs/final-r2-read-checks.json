@@ -1,0 +1,20 @@
+{
+  "fmt": {
+    "command": [
+      "cargo",
+      "fmt",
+      "--",
+      "--check"
+    ],
+    "exit_code": 0
+  },
+  "whitespace": {
+    "command": [
+      "git",
+      "diff",
+      "--check",
+      "77edd70862a88e2189587fda50fb2b0b913082b6"
+    ],
+    "exit_code": 0
+  }
+}

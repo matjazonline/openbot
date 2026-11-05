@@ -1,0 +1,21 @@
+{
+  "expected_init_sha384": "2717e3ab45ec5df36d562faf57ca3daa4249a22e323d7f94f845d7d43f399ac0a8fa654559b9c28b15a6ef545bd0bd39",
+  "databases": [
+    [
+      "open_bots",
+      "mac02",
+      "55408",
+      "/Users/mac02/dev/openbot-recovery/.worktrees/pg-p08",
+      "2717e3ab45ec5df36d562faf57ca3daa4249a22e323d7f94f845d7d43f399ac0a8fa654559b9c28b15a6ef545bd0bd39",
+      "t"
+    ],
+    [
+      "open_bots_test",
+      "mac02",
+      "55408",
+      "/Users/mac02/dev/openbot-recovery/.worktrees/pg-p08",
+      "2717e3ab45ec5df36d562faf57ca3daa4249a22e323d7f94f845d7d43f399ac0a8fa654559b9c28b15a6ef545bd0bd39",
+      "t"
+    ]
+  ]
+}

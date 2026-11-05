@@ -1,0 +1,36 @@
+[
+  {
+    "check": "step4-reset",
+    "command": [
+      "bash",
+      "scripts/reset-db.sh",
+      "--all",
+      "--yes"
+    ],
+    "exit_code": 0
+  },
+  {
+    "check": "step4-test-migrate",
+    "command": [
+      "cargo",
+      "sqlx",
+      "migrate",
+      "run",
+      "--database-url",
+      "postgres://mac02@127.0.0.1:55408/open_bots_test"
+    ],
+    "exit_code": 0
+  },
+  {
+    "check": "step4-live-typecheck",
+    "command": [
+      "cargo",
+      "check",
+      "--locked",
+      "--offline",
+      "--all-targets",
+      "--message-format=json"
+    ],
+    "exit_code": 101
+  }
+]

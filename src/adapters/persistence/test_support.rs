@@ -389,7 +389,7 @@ impl<'a> DeliveryFixtureRequest<'a> {
             recipient: "customer@example.com",
             subject: "Re: order",
             body: "On its way.",
-            purpose: DeliveryPurpose::Reply,
+            purpose: DeliveryPurpose::WorkflowReply,
             parts: 1,
             depends_on: None,
         }

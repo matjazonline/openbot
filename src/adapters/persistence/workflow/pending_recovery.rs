@@ -103,7 +103,7 @@ pub(super) async fn settle(
         sqlx::query("UPDATE workflow_runs SET state=$4,waiting_reason=$5,terminal_execution_id=CASE WHEN $4='failed' THEN $3 ELSE NULL END WHERE company_id=$1 AND id=$2 AND state IN ('queued','running')")
             .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(if reconcile {"waiting"} else {"failed"}).bind(if reconcile {Some("reconciliation")} else {None}).execute(&mut *db).await?;
     }
-    let changed = sqlx::query("UPDATE background_tasks SET status='failed',updated_at=clock_timestamp() WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 AND queue_kind='workflow' AND status='pending' AND worker_id IS NULL AND execution_generation IS NULL AND lock_expires_at IS NULL")
+    let changed = sqlx::query("UPDATE background_tasks SET status='failed',updated_at=clock_timestamp() WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3  AND status='pending' AND worker_id IS NULL AND execution_generation IS NULL AND lock_expires_at IS NULL")
         .bind(scope.company.as_uuid()).bind(scope.job.0).bind(scope.execution.as_uuid()).execute(&mut *db).await?;
     if changed.rows_affected() != 1 {
         return Err(invalid());

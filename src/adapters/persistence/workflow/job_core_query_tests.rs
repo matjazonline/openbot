@@ -23,7 +23,7 @@ async fn scoped_fixture() -> (JobFixture, Uuid) {
         .await
         .unwrap();
     }
-    let workflow = f.insert(&mut db, f.payload()).await.unwrap();
+    let workflow = f.insert(&mut db).await.unwrap();
     let agent = Uuid::new_v4();
     sqlx::query("INSERT INTO agents (id, company_id, name, slug, created_by) VALUES ($1, $2, 'Worker', 'worker', $3)")
         .bind(agent).bind(f.binding.target.company.as_uuid())

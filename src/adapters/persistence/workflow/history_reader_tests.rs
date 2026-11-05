@@ -137,7 +137,7 @@ async fn workflow_context_history_returns_the_admission_snapshot_with_boundaries
         &f,
         &conversation,
         2,
-        ("system", "legacy_unclassified", "system_event"),
+        ("system", "internal_only", "system_event"),
         "status changed",
     )
     .await;
@@ -182,7 +182,7 @@ async fn workflow_context_history_returns_the_admission_snapshot_with_boundaries
         facts(2),
         (
             json!("system"),
-            json!("legacy_unclassified"),
+            json!("internal_only"),
             json!("system_event")
         )
     );

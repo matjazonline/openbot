@@ -11,13 +11,12 @@ async fn workflow_job_projection_dashboard_counts_every_workflow_job() {
     let (f, workflow) = scoped_fixture().await;
     let p = &f.binding.fixture.persistence;
     let company = f.binding.target.company.as_uuid();
-    let mut jobs: Vec<Uuid> = sqlx::query_scalar(
-        "SELECT id FROM background_tasks WHERE company_id = $1 AND queue_kind = 'workflow'",
-    )
-    .bind(company)
-    .fetch_all(p.pool())
-    .await
-    .unwrap();
+    let mut jobs: Vec<Uuid> =
+        sqlx::query_scalar("SELECT id FROM background_tasks WHERE company_id = $1 ")
+            .bind(company)
+            .fetch_all(p.pool())
+            .await
+            .unwrap();
     jobs.sort();
     assert_eq!(
         jobs.len(),
@@ -27,7 +26,7 @@ async fn workflow_job_projection_dashboard_counts_every_workflow_job() {
     sqlx::query("UPDATE background_tasks SET created_at = CURRENT_TIMESTAMP - interval '10 minutes' WHERE company_id = $1")
         .bind(company).execute(p.pool()).await.unwrap();
     // A second attempt, 90 seconds long: one attempt and one retry in the window.
-    sqlx::query("INSERT INTO task_attempts (id,task_id,attempt_number,execution_generation,status,worker_id,machine_id,started_at,finished_at) VALUES (gen_random_uuid(),$1,2,gen_random_uuid(),'completed',gen_random_uuid(),'projection',CURRENT_TIMESTAMP - make_interval(secs => 90),CURRENT_TIMESTAMP)")
+    sqlx::query("INSERT INTO task_attempts (id,task_id,attempt_number,execution_generation,status,stop_reason,worker_id,started_at,finished_at) VALUES (gen_random_uuid(),$1,2,gen_random_uuid(),'completed','completed',gen_random_uuid(),CURRENT_TIMESTAMP - make_interval(secs => 90),CURRENT_TIMESTAMP)")
         .bind(workflow).execute(p.pool()).await.unwrap();
     sqlx::query("INSERT INTO model_usage_calls (company_id, request_id, task_id, agent_id, workflow_id, version_id, run_id, execution_id, root_run_id, provider, model, reserved_input, reserved_output, input_tokens, output_tokens, usage_source, settled_at) \
         SELECT $1, gen_random_uuid(), job.id, agent.id, run.workflow_id, run.version_id, run.id, execution.id, run.id, 'openai', 'gpt-4o', 64, 64, 40, 2, 'reported', clock_timestamp() \
@@ -113,7 +112,7 @@ async fn workflow_job_projection_dashboard_counts_every_workflow_job() {
 /// Plan new-board-view 04: each outstanding job names the run it is a step of, through its
 /// execution, so the Dashboard can link a job outside a conversation to its run.
 #[tokio::test]
-async fn workflow_job_projection_dashboard_outstanding_jobs_name_their_run() {
+async fn workflow_job_projection_dashboard_outstanding_jobs_name_run_and_latest_failure() {
     let (f, _) = scoped_fixture().await;
     let p = &f.binding.fixture.persistence;
     let company = f.binding.target.company.as_uuid();
@@ -121,7 +120,7 @@ async fn workflow_job_projection_dashboard_outstanding_jobs_name_their_run() {
         "SELECT job.id, execution.run_id FROM background_tasks AS job \
            JOIN workflow_executions AS execution \
              ON execution.company_id = job.company_id AND execution.id = job.workflow_execution_id \
-          WHERE job.company_id = $1 AND job.queue_kind = 'workflow'",
+          WHERE job.company_id = $1 ",
     )
     .bind(company)
     .fetch_all(p.pool())
@@ -130,11 +129,25 @@ async fn workflow_job_projection_dashboard_outstanding_jobs_name_their_run() {
     .into_iter()
     .collect();
     assert_eq!(expected.len(), 3, "the fixture's three jobs");
+    let failed_job = *expected.keys().next().unwrap();
+    for (attempt, code) in [(1_i32, "agent.older_failure"), (2, "agent.latest_failure")] {
+        sqlx::query("INSERT INTO task_attempts             (id,task_id,attempt_number,status,finished_at,execution_generation,worker_id,workflow_failure_class,workflow_failure_code,workflow_retry_safety,workflow_retirement)             VALUES(gen_random_uuid(),$1,$2,'failed',clock_timestamp(),gen_random_uuid(),gen_random_uuid(),'retryable',$3,'safe','live')")
+            .bind(failed_job).bind(attempt).bind(code).execute(p.pool()).await.unwrap();
+    }
     for scope in [None, Some(company)] {
         let snapshot = p
             .dashboard_snapshot(scope, DashboardWindow::last_hour())
             .await
             .unwrap();
+        let latest = snapshot
+            .outstanding
+            .iter()
+            .find(|job| job.id == failed_job)
+            .unwrap();
+        assert_eq!(
+            latest.workflow_failure_code.as_deref(),
+            Some("agent.latest_failure")
+        );
         let named: std::collections::HashMap<Uuid, Uuid> = snapshot
             .outstanding
             .iter()

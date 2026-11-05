@@ -1,0 +1,15 @@
+{
+  "review": "FIXAPP-P08-G1-R1 PASS architecture only",
+  "decision_sha256": "44fe77bbfeb8e41629288d3fe17d930b79748b231ded28c62e30fb6beef3e91a",
+  "source": {
+    "base": "77edd70862a88e2189587fda50fb2b0b913082b6",
+    "head": "77edd70862a88e2189587fda50fb2b0b913082b6",
+    "exclusions": [
+      "plan/fix-app/phases/p08/docs/"
+    ],
+    "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "tree_sha256": "51bf98e2f2a628c916cd46ce32575b40114c3278f2a41c949fc96c507cc1b6d2",
+    "files_count": 2254
+  },
+  "authority_sha256": "d498e2128e27d9b4c189a736041143e264f3ef8694dd454c80b333141c51c795"
+}

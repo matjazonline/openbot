@@ -29,20 +29,26 @@ pub async fn insert_delivery_on(
 ) -> AppResult<DeliveryCreation> {
     if !delivery.message_audience.is_externally_deliverable() {
         return Err(AppError::BadRequest(
-            "Internal-only and unclassified messages cannot be delivered externally.".into(),
+            "Internal-only messages cannot be delivered externally.".into(),
         ));
     }
-    let structured: Option<
-        sqlx::types::Json<crate::services::response_contract::StructuredResponse>,
-    > = sqlx::query_scalar(
+    let structured: Option<serde_json::Value> = sqlx::query_scalar(
         "SELECT structured_response FROM messages WHERE company_id = $1 AND id = $2",
     )
     .bind(delivery.company_id)
     .bind(delivery.message_id.as_uuid())
     .fetch_one(&mut **tx)
     .await?;
-    if let Some(response) = structured {
-        crate::adapters::response_schema::validate_delivery(&response.0, delivery)?;
+    if let Some(value) = structured {
+        let response =
+            serde_json::from_value::<crate::services::response_contract::StructuredResponse>(value)
+                .map_err(|error| {
+                    AppError::Internal(format!(
+                        "Invalid structured response for delivery {}: {error}",
+                        delivery.id.as_uuid()
+                    ))
+                })?;
+        crate::adapters::response_schema::validate_delivery(&response, delivery)?;
     }
     let inserted: Option<(Uuid,)> = sqlx::query_as(
         r#"INSERT INTO message_deliveries (

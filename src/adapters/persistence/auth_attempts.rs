@@ -326,7 +326,7 @@ mod tests {
                 .unwrap()
                 .unwrap()
                 .password_hash,
-            "old-hash"
+            Some("old-hash".to_owned())
         );
     }
 
@@ -367,7 +367,7 @@ mod tests {
                 .unwrap()
                 .unwrap()
                 .password_hash,
-            "new-hash"
+            Some("new-hash".to_owned())
         );
     }
 

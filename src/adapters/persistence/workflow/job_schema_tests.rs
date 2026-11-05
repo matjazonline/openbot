@@ -59,20 +59,12 @@ impl JobFixture {
         }
     }
 
-    async fn insert(
-        &self,
-        db: &mut PgConnection,
-        payload: serde_json::Value,
-    ) -> Result<Uuid, sqlx::Error> {
+    async fn insert(&self, db: &mut PgConnection) -> Result<Uuid, sqlx::Error> {
         let id = Uuid::new_v4();
-        sqlx::query("INSERT INTO background_tasks (id, company_id, channel_id, correlation_id, task_type, queue_kind, workflow_execution_id, payload, thread_id) VALUES ($1, $2, $3, $4, 'workflow_execution', 'workflow', $5, $6, $7)")
+        sqlx::query("INSERT INTO background_tasks (id, company_id, channel_id, correlation_id, workflow_execution_id, thread_id) VALUES ($1, $2, $3, $4, $5, $6)")
             .bind(id).bind(self.binding.target.company.as_uuid()).bind(self.channel)
-            .bind(Uuid::new_v4()).bind(self.execution).bind(payload).bind(self.thread).execute(db).await?;
+            .bind(Uuid::new_v4()).bind(self.execution).bind(self.thread).execute(db).await?;
         Ok(id)
-    }
-
-    fn payload(&self) -> serde_json::Value {
-        json!({"version": 1, "execution_id": self.execution})
     }
 
     async fn hypothetical(&self) -> sqlx::Transaction<'_, sqlx::Postgres> {
@@ -105,7 +97,7 @@ async fn workflow_job_schema_keeps_the_channel_nullable_for_company_associations
         .acquire()
         .await
         .unwrap();
-    f.insert(&mut db, f.payload()).await.unwrap();
+    f.insert(&mut db).await.unwrap();
     let required: bool = sqlx::query_scalar("SELECT attnotnull FROM pg_attribute WHERE attrelid = 'background_tasks'::regclass AND attname = 'channel_id'")
         .fetch_one(&mut *db).await.unwrap();
     assert!(
@@ -117,39 +109,25 @@ async fn workflow_job_schema_keeps_the_channel_nullable_for_company_associations
 #[tokio::test]
 async fn workflow_job_schema_enforces_exact_ids_and_scoped_execution() {
     let mut f = JobFixture::new().await;
-    for payload in [
-        json!({}),
-        json!({"version": null, "execution_id": f.execution}),
-        json!({"version": 1, "execution_id": f.execution, "context": {}}),
-        json!({"version": 1, "execution_id": Uuid::new_v4()}),
-    ] {
-        let mut tx = f.hypothetical().await;
-        constraint(
-            f.insert(&mut tx, payload).await.unwrap_err(),
-            "background_tasks_workflow_shape_check",
-        );
-        tx.rollback().await.unwrap();
-    }
     let original = f.execution;
     f.execution = Uuid::new_v4();
     let mut tx = f.hypothetical().await;
     constraint(
-        f.insert(&mut tx, f.payload()).await.unwrap_err(),
+        f.insert(&mut tx).await.unwrap_err(),
         "background_tasks_workflow_execution_fk",
     );
     tx.rollback().await.unwrap();
     f.execution = original;
     let mut tx = f.hypothetical().await;
-    let id = f.insert(&mut tx, f.payload()).await.unwrap();
-    let saved: (String, Uuid, serde_json::Value) = sqlx::query_as(
-        "SELECT queue_kind, workflow_execution_id, payload FROM background_tasks WHERE id = $1",
-    )
-    .bind(id)
-    .fetch_one(&mut *tx)
-    .await
-    .unwrap();
-    assert_eq!(saved, ("workflow".into(), f.execution, f.payload()));
-    let error = sqlx::query("UPDATE background_tasks SET workflow_execution_id = $2 WHERE id = $1")
+    let id = f.insert(&mut tx).await.unwrap();
+    let saved: Uuid =
+        sqlx::query_scalar("SELECT workflow_execution_id FROM background_tasks WHERE id=$1")
+            .bind(id)
+            .fetch_one(&mut *tx)
+            .await
+            .unwrap();
+    assert_eq!(saved, f.execution);
+    let error = sqlx::query("UPDATE background_tasks SET workflow_execution_id=$2 WHERE id=$1")
         .bind(id)
         .bind(Uuid::new_v4())
         .execute(&mut *tx)
@@ -164,7 +142,7 @@ async fn workflow_job_schema_enforces_exact_ids_and_scoped_execution() {
 }
 
 #[tokio::test]
-async fn workflow_job_schema_rejects_foreign_execution_and_a_non_workflow_job() {
+async fn workflow_job_schema_rejects_foreign_execution_and_missing_owner() {
     let f = JobFixture::new().await;
     let p = &f.binding.fixture.persistence;
     let company = CompanyPersistence::create(
@@ -190,22 +168,24 @@ async fn workflow_job_schema_rejects_foreign_execution_and_a_non_workflow_job() 
     .await
     .unwrap();
     let mut tx = f.hypothetical().await;
-    let error = sqlx::query("INSERT INTO background_tasks (id, company_id, channel_id, correlation_id, task_type, queue_kind, workflow_execution_id, payload) VALUES ($1, $2, $3, $4, 'workflow_execution', 'workflow', $5, $6)")
+    let error = sqlx::query("INSERT INTO background_tasks (id,company_id,channel_id,correlation_id,workflow_execution_id) VALUES ($1,$2,$3,$4,$5)")
         .bind(Uuid::new_v4()).bind(company.id).bind(channel.id).bind(Uuid::new_v4())
-        .bind(f.execution).bind(f.payload()).execute(&mut *tx).await.unwrap_err();
+        .bind(f.execution).execute(&mut *tx).await.unwrap_err();
     constraint(error, "background_tasks_workflow_execution_fk");
     tx.rollback().await.unwrap();
+    let required: bool = sqlx::query_scalar("SELECT attnotnull FROM pg_attribute WHERE attrelid='background_tasks'::regclass AND attname='workflow_execution_id'")
+        .fetch_one(p.pool()).await.unwrap();
+    assert!(required);
+    let retired: i64 = sqlx::query_scalar("SELECT count(*) FROM pg_attribute WHERE NOT attisdropped AND ((attrelid='background_tasks'::regclass AND attname IN ('task_type','payload','queue_kind')) OR (attrelid='task_harness_runs'::regclass AND attname='owner_kind'))")
+        .fetch_one(p.pool()).await.unwrap();
+    assert_eq!(retired, 0);
     let mut tx = f.hypothetical().await;
-    // Scoped exactly like the execution, so only the job's own kind is wrong.
-    let error = sqlx::query("INSERT INTO background_tasks (id, company_id, channel_id, thread_id, correlation_id, task_type, workflow_execution_id, payload) VALUES ($1, $2, $3, $4, $5, 'inbound_email', $6, $7)")
-        .bind(Uuid::new_v4()).bind(f.binding.target.company.as_uuid()).bind(f.channel).bind(f.thread)
-        .bind(Uuid::new_v4()).bind(f.execution).bind(f.payload()).execute(&mut *tx).await.unwrap_err();
-    constraint(error, "background_tasks_workflow_shape_check");
-    tx.rollback().await.unwrap();
-    let mut tx = f.hypothetical().await;
-    let id = f.insert(&mut tx, f.payload()).await.unwrap();
-    let error = sqlx::query("UPDATE background_tasks SET queue_kind = 'other', workflow_execution_id = NULL WHERE id = $1")
-        .bind(id).execute(&mut *tx).await.unwrap_err();
+    let id = f.insert(&mut tx).await.unwrap();
+    let error = sqlx::query("UPDATE background_tasks SET workflow_execution_id=NULL WHERE id=$1")
+        .bind(id)
+        .execute(&mut *tx)
+        .await
+        .unwrap_err();
     assert!(error.to_string().contains("queue identity is immutable"));
     tx.rollback().await.unwrap();
 }

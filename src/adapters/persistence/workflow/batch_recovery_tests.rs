@@ -57,8 +57,8 @@ async fn workflow_batch_rule_replay_ignores_new_available_predecessor() {
     };
     sqlx::query("INSERT INTO workflow_executions (company_id,run_id,id,step_id,activation) VALUES ($1,$2,$3,'rule',4)")
         .bind(request.company.as_uuid()).bind(request.run.as_uuid()).bind(later.execution.as_uuid()).execute(f.persistence().pool()).await.unwrap();
-    sqlx::query("INSERT INTO background_tasks (id,company_id,channel_id,thread_id,correlation_id,task_type,payload,queue_kind,workflow_execution_id) SELECT $1,run.company_id,run.channel_id,run.thread_id,run.correlation_id,'workflow_execution',$3,'workflow',$4 FROM workflow_runs AS run WHERE run.company_id = $2 AND run.id = $5")
-        .bind(later.job.0).bind(request.company.as_uuid()).bind(job_payload(later.execution)).bind(later.execution.as_uuid()).bind(request.run.as_uuid()).execute(f.persistence().pool()).await.unwrap();
+    sqlx::query("INSERT INTO background_tasks (id, company_id, channel_id, thread_id, correlation_id, workflow_execution_id) SELECT $1, run.company_id, run.channel_id, run.thread_id, run.correlation_id, $3 FROM workflow_runs AS run WHERE run.company_id = $2 AND run.id = $4")
+        .bind(later.job.0).bind(request.company.as_uuid()).bind(later.execution.as_uuid()).bind(request.run.as_uuid()).execute(f.persistence().pool()).await.unwrap();
     let frozen = f.persistence().activate(later).await.unwrap();
     assert_eq!(frozen.choice.as_ref().unwrap().as_str(), "no");
     sqlx::query("INSERT INTO workflow_executions (company_id,run_id,id,step_id,activation,activated_at,frozen_inputs,completed_at,committed_output) VALUES ($1,$2,gen_random_uuid(),'start',3,clock_timestamp(),'{}',clock_timestamp(),'2')")

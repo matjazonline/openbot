@@ -205,8 +205,13 @@ impl UserUseCases {
             return Err(AppError::InvalidCredentials);
         }
 
+        let Some(hash) = user.password_hash.as_deref() else {
+            self.verify_password(password.expose_secret(), DUMMY_PASSWORD_HASH, work_lifetime)
+                .await?;
+            return Err(AppError::InvalidCredentials);
+        };
         let is_valid = self
-            .verify_password(password.expose_secret(), &user.password_hash, work_lifetime)
+            .verify_password(password.expose_secret(), hash, work_lifetime)
             .await?;
 
         if !is_valid {

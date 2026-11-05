@@ -63,7 +63,6 @@ pub struct Principal {
 pub enum IdentityStatus {
     Observed,
     Verified,
-    Disabled,
 }
 
 impl IdentityStatus {
@@ -71,7 +70,6 @@ impl IdentityStatus {
         match self {
             Self::Observed => "observed",
             Self::Verified => "verified",
-            Self::Disabled => "disabled",
         }
     }
 }
@@ -83,7 +81,6 @@ impl FromStr for IdentityStatus {
         match value {
             "observed" => Ok(Self::Observed),
             "verified" => Ok(Self::Verified),
-            "disabled" => Ok(Self::Disabled),
             _ => Err(InvalidParticipantValue::new("identity status", value)),
         }
     }

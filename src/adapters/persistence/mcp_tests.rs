@@ -224,3 +224,105 @@ async fn mcp_connection_capacity_is_atomic_for_competing_creators() {
 
 #[path = "mcp_read_tests.rs"]
 mod reads;
+
+#[tokio::test]
+async fn schema_constraint_deleted_mcp_slug_is_reusable_and_live_creators_compete() {
+    let pool = test_pool().await.expect("native MCP constraints");
+    let p = PostgresPersistence::new(pool);
+    let company = company(&p).await;
+    let first = p
+        .create_mcp_connection(company, write("reusable"))
+        .await
+        .unwrap();
+    p.delete_mcp_connection(company, first.id, first.revision)
+        .await
+        .unwrap();
+    let error = sqlx::query(
+        "UPDATE company_mcp_connections SET enabled=true WHERE company_id=$1 AND id=$2",
+    )
+    .bind(company)
+    .bind(first.id)
+    .execute(p.pool())
+    .await
+    .unwrap_err();
+    assert_eq!(
+        error
+            .as_database_error()
+            .and_then(|error| error.constraint()),
+        Some("company_mcp_connections_deleted_check")
+    );
+    let (a, b) = tokio::join!(
+        p.create_mcp_connection(company, write("reusable")),
+        p.create_mcp_connection(company, write("reusable")),
+    );
+    assert_eq!(
+        [a.is_ok(), b.is_ok()].into_iter().filter(|ok| *ok).count(),
+        1
+    );
+    let listed = p.list_mcp_connections(company).await.unwrap();
+    assert_eq!(listed.len(), 1);
+    assert_ne!(listed[0].id, first.id);
+    assert_eq!(listed[0].slug.as_str(), "reusable");
+}
+
+#[tokio::test]
+async fn jsonb_row_context_mcp_quarantines_discovery_and_effective_grants() {
+    use super::jsonb_test_support::LogCapture;
+    use tracing::instrument::WithSubscriber;
+    let database = super::test_support::own_database().await.unwrap();
+    let pool = database.pool.clone();
+    let p = PostgresPersistence::with_credential_cipher(pool.clone(), CredentialCipher::for_test());
+    let company = company(&p).await;
+    let broken = p
+        .create_mcp_connection(company, write("broken"))
+        .await
+        .unwrap();
+    let good = p
+        .create_mcp_connection(company, write("good"))
+        .await
+        .unwrap();
+    for discovery in [
+        serde_json::json!([42]),
+        serde_json::json!([{
+            "name":"search", "description":"bad schema", "input_schema":42, "output_schema":null
+        }]),
+    ] {
+        sqlx::query(
+            "UPDATE company_mcp_connections SET discovery_json=$1 WHERE company_id=$2 AND id=$3",
+        )
+        .bind(discovery)
+        .bind(company)
+        .bind(broken.id)
+        .execute(&pool)
+        .await
+        .unwrap();
+        let logs = LogCapture::default();
+        let connections = p
+            .list_mcp_connections(company)
+            .with_subscriber(logs.dispatch())
+            .await
+            .unwrap();
+        assert_eq!(connections.len(), 2);
+        let quarantined = connections.iter().find(|row| row.id == broken.id).unwrap();
+        assert!(quarantined.discovered_tools.is_empty());
+        assert!(quarantined.tool_grants.is_empty());
+        let neighbor = connections.iter().find(|row| row.id == good.id).unwrap();
+        assert_eq!(neighbor.discovered_tools.len(), 1);
+        assert_eq!(neighbor.tool_grants.len(), 1);
+        let stored: i64 = sqlx::query_scalar(
+            "SELECT count(*) FROM company_mcp_tool_grants WHERE company_id=$1 AND connection_id=$2",
+        )
+        .bind(company)
+        .bind(broken.id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(stored, 1);
+        assert!(logs.text().contains(&broken.id.to_string()));
+    }
+    sqlx::query("DELETE FROM companies WHERE id=$1")
+        .bind(company)
+        .execute(&pool)
+        .await
+        .unwrap();
+}

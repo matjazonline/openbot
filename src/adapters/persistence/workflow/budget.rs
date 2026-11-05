@@ -75,7 +75,7 @@ pub(super) async fn reserve_on(
 
 async fn lock_run(db: &mut PgConnection, request: &BudgetReservation) -> AppResult<Option<Uuid>> {
     let scope = request.fence.scope;
-    let scoped: Option<Uuid> = sqlx::query_scalar("SELECT run.id FROM workflow_runs AS run WHERE run.company_id=$1 AND run.id=$2 AND EXISTS (SELECT 1 FROM workflow_executions AS execution JOIN background_tasks AS job ON job.company_id=execution.company_id AND job.workflow_execution_id=execution.id WHERE execution.company_id=run.company_id AND execution.run_id=run.id AND execution.id=$3 AND job.id=$4 AND job.queue_kind='workflow') FOR UPDATE")
+    let scoped: Option<Uuid> = sqlx::query_scalar("SELECT run.id FROM workflow_runs AS run WHERE run.company_id=$1 AND run.id=$2 AND EXISTS (SELECT 1 FROM workflow_executions AS execution JOIN background_tasks AS job ON job.company_id=execution.company_id AND job.workflow_execution_id=execution.id WHERE execution.company_id=run.company_id AND execution.run_id=run.id AND execution.id=$3 AND job.id=$4 ) FOR UPDATE")
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(scope.job.0).fetch_optional(&mut *db).await?;
     Ok(scoped)
 }
@@ -169,7 +169,7 @@ pub(super) async fn activate(
     db: &mut PgConnection,
     scope: crate::application::workflow::activation::ActivationRequest,
 ) -> AppResult<bool> {
-    let pending: bool = sqlx::query_scalar("SELECT status='pending' AND worker_id IS NULL AND execution_generation IS NULL AND lock_expires_at IS NULL FROM background_tasks WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 AND queue_kind='workflow'")
+    let pending: bool = sqlx::query_scalar("SELECT status='pending' AND worker_id IS NULL AND execution_generation IS NULL AND lock_expires_at IS NULL FROM background_tasks WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 ")
         .bind(scope.company.as_uuid()).bind(scope.job.0).bind(scope.execution.as_uuid()).fetch_one(&mut *db).await?;
     if !pending {
         return Err(AppError::Conflict(

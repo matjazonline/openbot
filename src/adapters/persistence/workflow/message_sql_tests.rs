@@ -417,11 +417,11 @@ async fn workflow_message_sql_delivery_provenance_rejects_unproven_exits() {
         ),
         (
             unknown,
-            "UPDATE message_deliveries SET status='retryable' WHERE id=$1",
+            "UPDATE message_deliveries SET status='retryable',last_error_class='invalid_payload' WHERE id=$1",
         ),
         (
             unknown,
-            "UPDATE message_deliveries SET status='dead_letter' WHERE id=$1",
+            "UPDATE message_deliveries SET status='dead_letter',last_error_class='invalid_payload' WHERE id=$1",
         ),
         (
             unknown,
@@ -429,7 +429,7 @@ async fn workflow_message_sql_delivery_provenance_rejects_unproven_exits() {
         ),
         (
             delivered,
-            "UPDATE message_deliveries SET status='retryable', delivered_at=NULL WHERE id=$1",
+            "UPDATE message_deliveries SET status='retryable', delivered_at=NULL,last_error_class='invalid_payload' WHERE id=$1",
         ),
         (
             delivered,

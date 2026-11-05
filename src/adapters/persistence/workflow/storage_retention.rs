@@ -59,7 +59,7 @@ pub(super) async fn retire_on(
     let removed_jobs = sqlx::query(
         "DELETE FROM background_tasks AS job USING pg_temp.workflow_retention_jobs AS saved
         WHERE job.company_id=saved.company_id AND job.id=saved.job_id
-        AND job.workflow_execution_id=saved.execution_id AND job.queue_kind='workflow'",
+        AND job.workflow_execution_id=saved.execution_id ",
     )
     .execute(db)
     .await?

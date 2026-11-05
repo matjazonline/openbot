@@ -50,7 +50,7 @@ pub(super) fn history_item() -> Value {
     object(
         json!({"message_id":identifier(),"at":{"type":"string","format":"date-time","maxLength":MAX_DEADLINE},
             "role":{"enum":["human","agent","system"]},
-            "audience":{"enum":["external_conversation","internal_only","legacy_unclassified"]},
+            "audience":{"enum":["external_conversation","internal_only"]},
             "entry_kind":{"enum":["conversation","note","delegation","system_event"]},
             "author":{"type":"string","maxLength":MAX_TEXT},"subject":{"type":"string","maxLength":MAX_TEXT},
             "body":{"type":"string","maxLength":MAX_TEXT},"truncated":{"type":"boolean"}}),

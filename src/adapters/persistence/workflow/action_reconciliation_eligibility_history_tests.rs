@@ -360,7 +360,6 @@ fn scheduled_history(
     assert_eq!(new["status"], "pending");
     for field in [
         "id",
-        "payload",
         "workflow_execution_id",
         "retry_count",
         "max_retries",

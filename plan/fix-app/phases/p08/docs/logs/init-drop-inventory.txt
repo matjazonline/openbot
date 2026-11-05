@@ -1,0 +1,38 @@
+57:        IF NEW.queue_kind<>'workflow' THEN RETURN NULL; END IF;
+126:    IF OLD.queue_kind='workflow' AND OLD.status='failed' AND NEW.status='pending' THEN
+167:    IF OLD.queue_kind = 'workflow' AND OLD.status = 'processing' AND NEW.status = 'completed' THEN
+210:    IF OLD.queue_kind='workflow' AND OLD.status='completed' AND NEW.status='pending' THEN
+283:    IF OLD.queue_kind='workflow' AND OLD.status='processing' AND NEW.status IN ('pending','failed') THEN
+1095:    IF (NEW.queue_kind, NEW.workflow_execution_id) IS DISTINCT FROM
+1096:       (OLD.queue_kind, OLD.workflow_execution_id) THEN
+1472:        ROW(NEW.id,NEW.company_id,NEW.task_id,NEW.agent_id,NEW.owner_kind,NEW.workflow_run_id,
+1475:        ROW(OLD.id,OLD.company_id,OLD.task_id,OLD.agent_id,OLD.owner_kind,OLD.workflow_run_id,
+1479:    IF NEW.owner_kind <> 'workflow' THEN
+1520:    IF NEW.owner_kind<>'workflow' THEN RETURN NEW; END IF;
+1979:    IF OLD.queue_kind='workflow' AND OLD.status='failed' AND NEW.status='pending' THEN
+2176:    IF OLD.queue_kind='workflow' AND OLD.status='pending' AND NEW.status='failed'
+3664:    delivery_part_id uuid,
+3933:    audience text DEFAULT 'legacy_unclassified'::text NOT NULL,
+3936:    CONSTRAINT messages_audience_check CHECK ((audience = ANY (ARRAY['external_conversation'::text, 'internal_only'::text, 'legacy_unclassified'::text]))),
+4095:    machine_id text NOT NULL,
+4096:    machine_region text,
+4196:    machine_id text NOT NULL,
+4197:    machine_region text,
+4202:    CONSTRAINT task_attempts_machine_id_check CHECK ((length(TRIM(BOTH FROM machine_id)) > 0)),
+4218:    owner_kind text NOT NULL DEFAULT 'workflow',
+4236:    final_output_consumed_at timestamp with time zone,
+4237:    CONSTRAINT task_harness_runs_token_owner CHECK (model_blocked_decision IS NULL OR owner_kind='workflow'),
+4240:        OR (owner_kind='workflow'
+4244:        owner_kind = 'workflow'
+4247:            AND workflow_attempt > 0 AND final_output_consumed_at IS NULL
+5106:    registered_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL
+6437:    ADD CONSTRAINT runtime_metric_samples_pkey PRIMARY KEY (machine_id, sampled_at);
+6444:COMMENT ON CONSTRAINT runtime_metric_samples_pkey ON public.runtime_metric_samples IS 'Supports runtime history reads on (machine_id, sampled_at)';
+7790:-- Name: external_messages_delivery_part_idx; Type: INDEX; Schema: public; Owner: -
+7793:CREATE INDEX external_messages_delivery_part_idx ON public.external_messages USING btree (delivery_part_id) WHERE (delivery_part_id IS NOT NULL);
+9441:    ADD CONSTRAINT external_messages_delivery_part_fk FOREIGN KEY (company_id, delivery_part_id) REFERENCES public.message_delivery_parts(company_id, id) ON DELETE SET NULL (delivery_part_id);
+11177:        OLD.queue_kind='workflow' AND NEW.queue_kind='workflow'
+11234:    ON public.task_harness_runs(company_id,workflow_execution_id) WHERE owner_kind='workflow';
+11372:    IF NEW.owner_kind<>'workflow' THEN RETURN NEW; END IF;
+11466:    FOR EACH ROW WHEN (NEW.owner_kind='workflow' AND OLD.model_request_id IS NULL AND NEW.model_request_id IS NOT NULL)
+11492:    FOR EACH ROW WHEN (NEW.owner_kind='workflow')

@@ -232,15 +232,12 @@ async fn lock_job(
     row: &CompletionExecution,
 ) -> AppResult<bool> {
     let scope = fence.scope;
-    let payload: Option<Value> = sqlx::query_scalar("SELECT payload FROM background_tasks WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 AND queue_kind='workflow' AND status=$4 FOR UPDATE")
+    let execution: Option<Uuid> = sqlx::query_scalar("SELECT workflow_execution_id FROM background_tasks WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3  AND status=$4 FOR UPDATE")
         .bind(scope.company.as_uuid()).bind(scope.job.0).bind(scope.execution.as_uuid())
         .bind(if row.completed_at.is_some() { "completed" } else { "processing" }).fetch_optional(&mut *db).await?;
-    let Some(payload) = payload else {
+    let Some(_) = execution else {
         return Ok(false);
     };
-    if decode_job_payload(payload)? != scope.execution {
-        return Ok(false);
-    }
     let attempt: Option<Uuid> = sqlx::query_scalar("SELECT id FROM task_attempts WHERE task_id=$1 AND attempt_number=$2 AND worker_id=$3 AND execution_generation=$4 AND status=$5 FOR UPDATE")
         .bind(scope.job.0).bind(fence.attempt.0).bind(fence.worker.0).bind(fence.generation.0)
         .bind(if row.completed_at.is_some() { "completed" } else { "processing" }).fetch_optional(db).await?;
@@ -269,7 +266,7 @@ async fn replay(
     };
     let scope = result.fence.scope;
     let successor = if let Some(execution) = row.successor_execution_id {
-        let job = sqlx::query_scalar("SELECT job.id FROM background_tasks AS job JOIN workflow_executions AS execution ON execution.company_id=job.company_id AND execution.id=job.workflow_execution_id WHERE job.company_id=$1 AND execution.run_id=$2 AND execution.id=$3 AND job.queue_kind='workflow'")
+        let job = sqlx::query_scalar("SELECT job.id FROM background_tasks AS job JOIN workflow_executions AS execution ON execution.company_id=job.company_id AND execution.id=job.workflow_execution_id WHERE job.company_id=$1 AND execution.run_id=$2 AND execution.id=$3 ")
             .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(execution).fetch_one(db).await?;
         Some(ActivationRequest {
             execution: ExecutionId::new(execution),

@@ -1,0 +1,104 @@
+[
+  {
+    "file": "src/adapters/http/pages/tests.rs",
+    "line": 4129,
+    "old": "\"irrelevant\".to_string()",
+    "new": "Some(\"irrelevant\".to_string())"
+  },
+  {
+    "file": "src/adapters/http/routes/monitoring.rs",
+    "line": 41,
+    "old": "String::new()",
+    "new": "Some(String::new())"
+  },
+  {
+    "file": "src/adapters/http/routes/user_tests.rs",
+    "line": 263,
+    "old": "password_hash.to_string()",
+    "new": "Some(password_hash.to_string())"
+  },
+  {
+    "file": "src/adapters/persistence/auth_attempts.rs",
+    "line": 329,
+    "old": "\"old-hash\"",
+    "new": "Some(\"old-hash\".to_owned())"
+  },
+  {
+    "file": "src/adapters/persistence/auth_attempts.rs",
+    "line": 370,
+    "old": "\"new-hash\"",
+    "new": "Some(\"new-hash\".to_owned())"
+  },
+  {
+    "file": "src/adapters/persistence/user.rs",
+    "line": 1438,
+    "old": "\"hash\"",
+    "new": "Some(\"hash\".to_owned())"
+  },
+  {
+    "file": "src/application/use_cases/company_invite_tests.rs",
+    "line": 412,
+    "old": "\"hash\".to_string()",
+    "new": "Some(\"hash\".to_string())"
+  },
+  {
+    "file": "src/application/use_cases/user/tests.rs",
+    "line": 287,
+    "old": "\"secret_hash\".to_string()",
+    "new": "Some(\"secret_hash\".to_string())"
+  },
+  {
+    "file": "src/application/use_cases/user/tests.rs",
+    "line": 332,
+    "old": "password_hash.to_string()",
+    "new": "Some(password_hash.to_string())"
+  },
+  {
+    "file": "src/application/use_cases/user/tests.rs",
+    "line": 346,
+    "old": "\"secret_hash\".to_string()",
+    "new": "Some(\"secret_hash\".to_string())"
+  },
+  {
+    "file": "src/application/use_cases/user/tests.rs",
+    "line": 363,
+    "old": "\"secret_hash\".to_string()",
+    "new": "Some(\"secret_hash\".to_string())"
+  },
+  {
+    "file": "src/application/use_cases/user/tests.rs",
+    "line": 437,
+    "old": "password_hash.to_string()",
+    "new": "Some(password_hash.to_string())"
+  },
+  {
+    "file": "src/application/use_cases/user/tests.rs",
+    "line": 770,
+    "old": "\"secret_hash\"",
+    "new": "Some(\"secret_hash\".to_owned())"
+  },
+  {
+    "file": "src/application/use_cases/user/tests.rs",
+    "line": 784,
+    "old": "\"a-longer-secret_hash\"",
+    "new": "Some(\"a-longer-secret_hash\".to_owned())"
+  },
+  {
+    "file": "src/application/use_cases/user/tests.rs",
+    "line": 968,
+    "old": "\"a-longer-secret_hash\"",
+    "new": "Some(\"a-longer-secret_hash\".to_owned())"
+  },
+  {
+    "file": "src/application/use_cases/user/tests.rs",
+    "line": 999,
+    "old": "\"secret_hash\"",
+    "new": "Some(\"secret_hash\".to_owned())"
+  },
+  {
+    "file": "src/application/use_cases/user/tests.rs",
+    "line": 1199,
+    "old": "\"a-new-password_hash\"",
+    "new": "Some(\"a-new-password_hash\".to_owned())"
+  }
+]

@@ -187,7 +187,7 @@ async fn continue_on(
     if head.state != RunState::Waiting(WaitingReason::Reconciliation) {
         return Ok((outcome, None));
     }
-    let job: Option<Uuid> = sqlx::query_scalar("SELECT id FROM background_tasks WHERE company_id=$1 AND workflow_execution_id=$2 AND queue_kind='workflow' AND status='failed'")
+    let job: Option<Uuid> = sqlx::query_scalar("SELECT id FROM background_tasks WHERE company_id=$1 AND workflow_execution_id=$2  AND status='failed'")
         .bind(command.scope.company.as_uuid()).bind(command.scope.execution.as_uuid()).fetch_optional(&mut **tx).await?;
     let Some(job) = job else {
         return Ok((

@@ -81,7 +81,7 @@ pub(crate) fn account(id: Uuid) -> User {
         username: "unit-user".into(),
         email: "unit@example.test".into(),
         email_verified_at: None,
-        password_hash: "unit-hash".into(),
+        password_hash: Some("unit-hash".into()),
         avatar_url: None,
         created_at: Utc::now(),
     }

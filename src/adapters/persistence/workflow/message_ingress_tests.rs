@@ -267,7 +267,7 @@ impl Deployment {
                  'waiting', waiting_reason)) FROM workflow_runs WHERE company_id = $1), \
                'jobs', (SELECT jsonb_agg(jsonb_build_object('id', id, 'status', status, \
                  'lock_expires_at', lock_expires_at, 'run_at', run_at)) \
-                 FROM background_tasks WHERE company_id = $1 AND queue_kind = 'workflow'), \
+                 FROM background_tasks WHERE company_id = $1 ), \
                'waits', (SELECT jsonb_agg(jsonb_build_object('run', run_id, 'reason', reason, \
                  'state', state, 'deadline', deadline, 'settled_at', settled_at, \
                  'consumed', consumed_event_id)) FROM workflow_waits WHERE company_id = $1), \

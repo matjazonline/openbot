@@ -193,14 +193,14 @@ pub(super) async fn pending_gate(
         JOIN workflow_decisions AS decision ON decision.company_id=checkpoint.company_id AND decision.id=checkpoint.model_blocked_decision
         JOIN workflow_waits AS wait ON wait.company_id=decision.company_id AND wait.id=decision.wait_id
         WHERE checkpoint.company_id=$1 AND checkpoint.workflow_run_id=$2 AND checkpoint.workflow_execution_id=$3 AND checkpoint.task_id=$4
-        AND checkpoint.owner_kind='workflow' AND checkpoint.state='active' AND checkpoint.model_request_id IS NULL
+         AND checkpoint.state='active' AND checkpoint.model_request_id IS NULL
         AND decision.token_stage='reservation' AND decision.choice='approve' AND wait.state='completed')")
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(scope.job.0).fetch_one(&mut *db).await?;
     if native {
         return Ok(Progression::Open);
     }
     let changed=sqlx::query("UPDATE background_tasks AS job SET run_at=LEAST(clock_timestamp()+interval '5 seconds',run.deadline),updated_at=clock_timestamp()
-        FROM workflow_runs AS run WHERE job.company_id=$1 AND job.id=$2 AND job.workflow_execution_id=$3 AND job.queue_kind='workflow'
+        FROM workflow_runs AS run WHERE job.company_id=$1 AND job.id=$2 AND job.workflow_execution_id=$3
         AND job.status='pending' AND job.worker_id IS NULL AND job.execution_generation IS NULL
         AND run.company_id=job.company_id AND run.id=$4 AND run.deadline>clock_timestamp()")
         .bind(scope.company.as_uuid()).bind(scope.job.0).bind(scope.execution.as_uuid()).bind(scope.run.as_uuid()).execute(db).await?.rows_affected();

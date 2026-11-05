@@ -62,7 +62,7 @@ async fn native_for(f: AdmissionFixture, scope: ActivationRequest) -> NativeFixt
         .await
         .unwrap();
     let row = json!({"id":run.run_id.0,"company_id":scope.company.as_uuid(),
-        "task_id":scope.job.0,"agent_id":agent.id,"owner_kind":"workflow",
+        "task_id":scope.job.0,"agent_id":agent.id,
         "workflow_run_id":scope.run.as_uuid(),"workflow_execution_id":scope.execution.as_uuid(),
         "workflow_generation":fence.generation.0,"workflow_worker_id":fence.worker.0,
         "workflow_attempt":fence.attempt.0,"workflow_prepared":prepared(agent.id),
@@ -119,10 +119,8 @@ async fn workflow_harness_owner_exact_scope_and_workflow_owner_only() {
     }
     // A workflow is the only owner a checkpoint can have (p08 D4.8).
     for (field, value) in [
-        ("owner_kind", json!("legacy")),
         ("workflow_attempt", json!(2)),
         ("workflow_prepared", Value::Null),
-        ("final_output_consumed_at", json!(chrono::Utc::now())),
     ] {
         let mut wrong = row.clone();
         wrong[field] = value;
@@ -162,7 +160,6 @@ async fn workflow_harness_owner_mutation_and_expired_fence_refuse() {
         "workflow_worker_id=gen_random_uuid()",
         "workflow_generation=gen_random_uuid()",
         "workflow_attempt=workflow_attempt+1",
-        "owner_kind='legacy'",
     ] {
         let sql = format!(
             "UPDATE task_harness_runs SET revision=revision+1, checkpoint=jsonb_set(checkpoint,'{revision}',to_jsonb(revision+1)), {assignment} WHERE id=$1",

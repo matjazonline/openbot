@@ -58,7 +58,7 @@ impl ForeignSource {
         .await
         .unwrap();
         let message = Uuid::new_v4();
-        sqlx::query("INSERT INTO messages (id,company_id,author_principal_id,subject,clean_text_body,direction,role,correlation_id,content_hash) SELECT $1,$2,id,'Foreign','Body','inbound','human',$3,$4 FROM principals WHERE company_id=$2 AND user_id=$5")
+        sqlx::query("INSERT INTO messages (id,company_id,author_principal_id,subject,clean_text_body,direction,role,correlation_id,content_hash,audience) SELECT $1,$2,id,'Foreign','Body','inbound','human',$3,$4,'external_conversation' FROM principals WHERE company_id=$2 AND user_id=$5")
             .bind(message).bind(company.id).bind(Uuid::new_v4()).bind(vec![0_u8;32]).bind(f.binding.target.actor.user_id()).execute(p.pool()).await.unwrap();
         Self {
             company: CompanyId::new(company.id),

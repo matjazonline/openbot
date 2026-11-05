@@ -1,0 +1,6 @@
+#!/usr/bin/env python3
+"""Supply snapshot.sh's GNU realpath arguments on this macOS host."""
+import os,sys
+args=sys.argv[1:]
+assert len(args)==4 and args[0]=='-m' and args[1].startswith('--relative-to=') and args[2]=='--',args
+print(os.path.relpath(os.path.realpath(args[3]),args[1].split('=',1)[1]))

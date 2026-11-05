@@ -1,0 +1,19 @@
+{
+  "filters": {
+    "schema_constraint_messages_require_declared_audience": 1,
+    "dashboard": 51,
+    "application::transport::": 25,
+    "adapters::protocols::email::egress::": 21,
+    "adapters::persistence::delivery::": 36,
+    "application::services::delivery_worker": 10,
+    "every_vocabulary_round_trips_through_its_stored_string": 1,
+    "a_reply_only_interface_carries_every_purpose_but_new_conversations": 1,
+    "workflow_fairness_": 15,
+    "workflow_activation_": 11,
+    "workflow_job_association_": 4,
+    "workflow_job_projection_": 2,
+    "workflow_decision_notice_rejects_non_notification_independently": 1,
+    "workflow_action_reconciliation_claim_sql_deferred_greater_attempt_refusal": 1
+  },
+  "selected_unique": 178
+}

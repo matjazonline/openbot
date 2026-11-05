@@ -46,7 +46,7 @@ impl Conversation {
     }
     async fn insert_message(&self, db: &mut PgConnection, f: &AdmissionFixture, message: Uuid) {
         let company = f.binding.target.company.as_uuid();
-        sqlx::query("INSERT INTO messages (id, company_id, author_principal_id, subject, clean_text_body, direction, role, correlation_id, content_hash) SELECT $1,$2,id,'History','body','inbound','human',$3,$4 FROM principals WHERE company_id=$2 AND user_id=$5")
+        sqlx::query("INSERT INTO messages (id, company_id, author_principal_id, subject, clean_text_body, direction, role, correlation_id, content_hash, audience) SELECT $1,$2,id,'History','body','inbound','human',$3,$4,'external_conversation' FROM principals WHERE company_id=$2 AND user_id=$5")
             .bind(message).bind(company).bind(Uuid::new_v4()).bind(vec![0_u8;32])
             .bind(f.binding.target.actor.user_id()).execute(&mut *db).await.unwrap();
     }
@@ -215,7 +215,7 @@ async fn workflow_admit_sql_long_history_retains_only_newest_256() {
     let c = Conversation::new(&f).await;
     let p = f.persistence();
     // A thread beyond the old limit still admits and keeps a bounded snapshot.
-    sqlx::query("WITH inserted AS (INSERT INTO messages (id,company_id,author_principal_id,subject,clean_text_body,direction,role,correlation_id,content_hash) SELECT gen_random_uuid(),$1,principal.id,'History','body','inbound','human',gen_random_uuid(),$5 FROM principals AS principal CROSS JOIN generate_series(1,$4::integer) WHERE principal.company_id=$1 AND principal.user_id=$6 RETURNING id) INSERT INTO thread_messages (id,company_id,channel_id,thread_id,message_id,entry_kind) SELECT gen_random_uuid(),$1,$2,$3,id,'conversation' FROM inserted")
+    sqlx::query("WITH inserted AS (INSERT INTO messages (id,company_id,author_principal_id,subject,clean_text_body,direction,role,correlation_id,content_hash,audience) SELECT gen_random_uuid(),$1,principal.id,'History','body','inbound','human',gen_random_uuid(),$5,'external_conversation' FROM principals AS principal CROSS JOIN generate_series(1,$4::integer) WHERE principal.company_id=$1 AND principal.user_id=$6 RETURNING id) INSERT INTO thread_messages (id,company_id,channel_id,thread_id,message_id,entry_kind) SELECT gen_random_uuid(),$1,$2,$3,id,'conversation' FROM inserted")
         .bind(f.binding.target.company.as_uuid()).bind(c.channel).bind(c.thread)
         .bind(10_000_i32).bind(vec![0_u8;32])
         .bind(f.binding.target.actor.user_id()).execute(p.pool()).await.unwrap();

@@ -1,0 +1,12 @@
+{
+  "filters": {
+    "jsonb_row_context_": 4,
+    "adapters::persistence::thread::": 64,
+    "adapters::persistence::mcp": 6,
+    "workflow_harness_": 39,
+    "adapters::persistence::delivery::tests::": 38,
+    "response_schema::": 4,
+    "application::use_cases::mcp::": 0
+  },
+  "selected_unique": 152
+}

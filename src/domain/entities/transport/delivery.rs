@@ -23,12 +23,6 @@ stored_enum! {
     /// entry rather than inferred from direction or role -- the heuristic route is how a system
     /// starts mirroring a category nobody decided to mirror.
     DeliveryPurpose as "delivery purpose" {
-        /// The answer to something that arrived on this interface.
-        Reply => "reply",
-        /// The same message exposed through another eligible interface.
-        Mirror => "mirror",
-        /// The agent opening a conversation with a third party.
-        Outreach => "outreach",
         /// A platform notice: a bounce, an approval request, a stop notice, a schedule digest.
         Notification => "notification",
         /// A workflow `message.send` opening a conversation with a company member.
@@ -45,8 +39,8 @@ impl DeliveryPurpose {
     /// and refuses the starting kind; that is the entire meaning of the policy, stated once.
     pub const fn initiates_conversation(self) -> bool {
         match self {
-            Self::Outreach | Self::WorkflowSend => true,
-            Self::Reply | Self::Mirror | Self::Notification | Self::WorkflowReply => false,
+            Self::WorkflowSend => true,
+            Self::Notification | Self::WorkflowReply => false,
         }
     }
 
@@ -60,9 +54,6 @@ impl DeliveryPurpose {
     /// What a reader calls this, so one delivery reads the same in a filter, a list and a pane.
     pub const fn label(self) -> &'static str {
         match self {
-            Self::Reply => "Reply",
-            Self::Mirror => "Mirror",
-            Self::Outreach => "Outreach",
             Self::Notification => "Notification",
             Self::WorkflowSend => "Workflow message",
             Self::WorkflowReply => "Workflow reply",
@@ -411,14 +402,11 @@ mod tests {
 
     #[test]
     fn a_reply_only_interface_carries_every_purpose_but_new_conversations() {
-        // Outreach and a workflow send each open a conversation; a workflow reply answers one.
+        // A workflow send opens a conversation; a workflow reply answers one.
         for purpose in DeliveryPurpose::ALL {
             assert!(purpose.permitted_by(BindingDeliveryPolicy::ReplyAndInitiate));
             assert_eq!(
-                !matches!(
-                    purpose,
-                    DeliveryPurpose::Outreach | DeliveryPurpose::WorkflowSend
-                ),
+                !matches!(purpose, DeliveryPurpose::WorkflowSend),
                 purpose.permitted_by(BindingDeliveryPolicy::ReplyOnly)
             );
         }

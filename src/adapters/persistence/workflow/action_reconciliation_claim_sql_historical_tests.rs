@@ -84,7 +84,7 @@ BEGIN
     THEN RAISE EXCEPTION 'historical audit probe retirement is unconfirmed, linked, expired or wrong ordinal'; END IF;
     IF NOT EXISTS(SELECT 1 FROM background_tasks AS job
         WHERE job.company_id=episode.company_id AND job.id=episode.job_id
-            AND job.workflow_execution_id=episode.execution_id AND job.queue_kind='workflow'
+            AND job.workflow_execution_id=episode.execution_id
             AND job.status='failed' AND job.retry_count=episode.retired_attempt
             AND job.worker_id IS NULL AND job.execution_generation IS NULL AND job.lock_expires_at IS NULL)
         OR EXISTS(SELECT 1 FROM task_attempts AS later WHERE later.task_id=episode.job_id AND later.attempt_number>episode.retired_attempt)

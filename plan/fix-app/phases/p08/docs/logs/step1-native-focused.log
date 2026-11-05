@@ -1,0 +1,211 @@
+
+running 178 tests
+test adapters::http::pages::dashboard::tests::a_lapsed_lease_outranks_the_stored_status ... ok
+test adapters::http::pages::dashboard::tests::a_queued_job_is_not_treated_as_trouble ... ok
+test adapters::http::pages::dashboard::tests::counts_come_from_the_matching_status ... ok
+test adapters::http::pages::dashboard::tests::a_healthy_system_raises_no_alerts ... ok
+test adapters::http::pages::dashboard::tests::a_lapsed_lease_is_called_out ... ok
+test adapters::http::pages::dashboard::tests::an_expired_delivery_lease_is_called_out ... ok
+test adapters::http::pages::dashboard::tests::an_empty_window_says_so_instead_of_drawing_an_empty_chart ... ok
+test adapters::http::pages::dashboard::tests::elapsed_reads_in_the_coarsest_useful_unit ... ok
+test adapters::http::pages::dashboard::tests::latencies_render_as_a_dash_before_anything_finishes ... ok
+test adapters::http::pages::dashboard::tests::an_empty_outstanding_list_says_so ... ok
+test adapters::http::pages::dashboard::tests::an_outstanding_task_links_to_its_thread ... ok
+test adapters::http::pages::dashboard::tests::one_stalled_task_reads_singular ... ok
+test adapters::http::pages::dashboard::tests::job_figures_are_plain_and_delivery_figures_link_for_a_company ... ok
+test adapters::http::pages::dashboard::tests::a_row_in_a_company_the_caller_cannot_open_is_not_a_link ... ok
+test adapters::http::pages::dashboard::tests::thousands_groups_digits ... ok
+test adapters::http::pages::dashboard::tests::a_job_with_no_thread_links_to_its_run ... ok
+test adapters::http::pages::dashboard_query_health::tests::hidden_unavailable_and_available_are_distinct_states ... ok
+test adapters::http::pages::dashboard::tests::the_job_panel_counts_step_jobs_and_links_the_board ... ok
+test adapters::http::pages::dashboard::tests::truncation_marks_what_it_cut_and_leaves_short_text_alone ... ok
+test adapters::http::pages::dashboard::tests::infrastructure_panels_are_operator_only_and_missing_samples_render_safely ... ok
+test adapters::http::pages::dashboard_runtime::tests::worker_capacity_outputs_the_configured_and_safe_observed_maximum ... ok
+test adapters::http::routes::ui_dashboard::tests::only_an_operator_may_resolve_the_global_dashboard_scope ... ok
+test adapters::http::pages::dashboard_query_health::tests::deallocation_and_unsafe_logging_configuration_warn ... ok
+test adapters::http::pages::dashboard_query_health::tests::normalized_sql_is_escaped_and_truncation_is_visible ... ok
+test adapters::http::routes::ui_dashboard::tests::dashboard_responses_are_private_and_not_stored ... ok
+test adapters::http::pages::dashboard::tests::attempt_summary_and_chart_report_actual_retries ... ok
+test adapters::http::routes::ui_dashboard::tests::infrastructure_is_not_queried_until_operator_authorization_succeeds ... ok
+test adapters::http::routes::ui_dashboard::tests::query_health_is_read_only_for_an_operator_in_system_scope ... ok
+test adapters::http::routes::ui_dashboard::tests::dashboard_connection_gauge_increments_and_cleans_up_on_drop ... ok
+test adapters::http::pages::dashboard::tests::the_global_view_streams_unscoped_and_can_switch_back_to_the_company ... ok
+test adapters::http::pages::dashboard::tests::the_page_subscribes_to_the_event_the_stream_sends ... ok
+test adapters::http::pages::tests::the_dashboard_shows_a_placeholder_with_one_initial_writer ... ok
+test adapters::persistence::delivery::cancellation::tests::every_reason_has_a_detail_the_sql_case_can_carry ... ok
+test adapters::persistence::dashboard::tests::no_statement_tests_a_parameter_for_null ... ok
+test adapters::persistence::dashboard::tests::the_company_is_the_last_parameter_and_only_the_company_form_binds_it ... ok
+test adapters::http::pages::dashboard::tests::dashboard_outstanding_renders_the_latest_attempt_failure_code ... FAILED
+test adapters::persistence::dashboard::tests::the_global_snapshot_runs ... ok
+test adapters::persistence::dashboard::tests::a_company_scoped_snapshot_runs_and_stays_inside_its_company ... ok
+test adapters::persistence::delivery::tests::a_stored_destination_is_read_through_its_own_transport ... ok
+test adapters::persistence::delivery::tests::a_stored_part_payload_is_decoded_fallibly ... ok
+test adapters::http::routes::ui_dashboard::authorization_tests::dashboard_resolves_operator_company_before_managed_selection_and_refuses_member_or_stranger ... ok
+test adapters::persistence::dashboard::tests::every_company_form_reads_only_its_own_company ... ok
+test adapters::persistence::dashboard::tests::every_global_form_reads_both_companies ... ok
+test adapters::persistence::dashboard::tests::the_snapshot_cache_never_serves_one_view_to_another ... ok
+test adapters::persistence::delivery::tests::cancellation::the_cancellation_reasons_match_their_database_constraint ... ok
+test adapters::persistence::delivery::tests::a_multi_part_delivery_aggregates_from_its_parts ... ok
+test adapters::persistence::delivery::tests::a_reaped_lease_retries_only_what_never_reached_the_provider ... ok
+test adapters::persistence::delivery::tests::a_poison_delivery_goes_terminal_without_spinning ... ok
+test adapters::persistence::delivery::tests::a_retryable_failure_backs_off_and_the_last_attempt_dead_letters ... ok
+test adapters::persistence::delivery::tests::a_dependent_delivery_waits_and_is_orphaned_when_its_root_dies ... ok
+test adapters::persistence::delivery::tests::a_stale_execution_cannot_write_over_the_one_that_replaced_it ... ok
+test adapters::persistence::delivery::tests::cancellation::a_held_delivery_starts_no_further_part_once_cancelled ... ok
+test adapters::persistence::delivery::tests::one_key_per_destination_absorbs_a_repeat_and_keeps_two_recipients_apart ... ok
+test adapters::persistence::delivery::tests::cancellation::a_begin_part_that_loses_the_parent_lock_starts_no_request ... ok
+test adapters::persistence::delivery::tests::tenant_tests::channel_path_fk_delivery_cannot_cross_channels ... ok
+test adapters::persistence::delivery::tests::cancellation::a_queued_delivery_is_superseded_and_keeps_its_partial_send ... ok
+test adapters::persistence::delivery::tests::tenant_tests::notification_delivery_tenant_member_removal_cancels_pending_notices ... ok
+test adapters::persistence::delivery::tests::tenant_tests::notification_delivery_tenant_part_company_must_match_its_delivery ... ok
+test adapters::persistence::delivery::tests::cancellation::a_request_already_made_keeps_its_real_outcome ... ok
+test adapters::persistence::delivery::tests::cancellation::release_failure_and_the_lease_sweep_settle_rather_than_requeue ... ok
+test adapters::persistence::delivery::tests::tenant_tests::tenant_fk_small_company_deletion_leaves_no_demand_or_poll_rows ... ok
+test adapters::persistence::delivery::tests::tenant_tests::tenant_fk_small_notification_event_and_recipient_are_tenant_proven ... ok
+test adapters::persistence::delivery::tests::the_claimable_statuses_match_the_index_the_claim_relies_on ... ok
+test adapters::persistence::delivery::tests::the_delivery_vocabularies_match_their_database_constraints ... ok
+test adapters::persistence::delivery::tests::competing_standalone_notification_enqueues_create_one_claimable_delivery ... ok
+test adapters::persistence::delivery::tests::late_completion::delivery_late_completion_after_the_lease_expired_records_the_outcome ... ok
+test adapters::persistence::runtime_metrics::tests::runtime_samples_round_trip_and_fill_dashboard_buckets ... ok
+test adapters::persistence::thread::tests::schema_constraint_messages_require_declared_audience ... ok
+test adapters::persistence::delivery::tests::late_completion::delivery_late_completion_races_the_reaper_and_exactly_one_wins ... ok
+test adapters::persistence::delivery::tests::late_completion::delivery_late_completion_after_the_reaper_took_the_row_is_lease_lost ... ok
+test adapters::persistence::delivery::tests::late_completion::delivery_late_completion_renewal_locks_in_id_order ... ok
+test adapters::persistence::delivery::tests::late_completion::delivery_late_completion_renewal_races_the_reaper_and_exactly_one_wins ... ok
+test adapters::persistence::delivery::tests::releasing_a_claim_costs_no_attempt_and_makes_it_immediately_claimable ... ok
+test adapters::persistence::delivery::tests::tenant_tests::notification_delivery_tenant_company_deletion_removes_notices_and_parts ... ok
+test adapters::persistence::delivery::tests::tenant_tests::notification_delivery_tenant_removal_first_producer_finds_no_member ... ok
+test adapters::persistence::delivery::tests::tenant_tests::notification_delivery_tenant_removal_waits_for_a_producer_and_cancels_its_notice ... ok
+test adapters::persistence::delivery::tests::the_stuck_delivery_census_counts_each_stall_and_not_a_due_delivery ... ok
+test adapters::persistence::delivery::tests::two_claimants_never_own_the_same_delivery ... ok
+test adapters::persistence::workflow::tests::admission_tests::activation_tests::workflow_activation_abort_and_lost_ack_reuse_snapshot_across_attempts ... ok
+test adapters::persistence::workflow::tests::admission_tests::activation_tests::workflow_activation_competing_connections_freeze_once ... ok
+test adapters::persistence::workflow::tests::admission_tests::activation_tests::workflow_activation_deadline_ordinal_and_output_bounds ... ok
+test adapters::persistence::workflow::tests::admission_tests::activation_tests::workflow_activation_final_statement_failure_rolls_back_snapshot ... ok
+test adapters::persistence::workflow::tests::admission_tests::activation_tests::workflow_activation_ignores_unreferenced_historical_outputs ... ok
+test adapters::persistence::workflow::tests::admission_tests::activation_tests::workflow_activation_parent_metadata_comes_from_run_lineage ... ok
+test adapters::persistence::workflow::tests::admission_tests::activation_tests::workflow_activation_predecessor_order_repeats_and_saved_replay ... ok
+test adapters::persistence::workflow::tests::admission_tests::activation_tests::workflow_activation_scopes_job_run_and_rejects_invalid_inputs ... ok
+test adapters::persistence::delivery::tests::late_completion::delivery_late_completion_worker_renews_so_a_slow_batch_completes ... ok
+test adapters::persistence::workflow::tests::admission_tests::activation_tests::workflow_activation_sql_immutable_and_bounded_facts ... ok
+test adapters::persistence::workflow::tests::admission_tests::decision_tests::provenance_tests::workflow_decision_notice_rejects_non_notification_independently ... ok
+test adapters::persistence::workflow::tests::admission_tests::activation_tests::workflow_activation_waiting_on_run_lock_cannot_cross_deadline ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::deferred_tests::workflow_action_reconciliation_claim_sql_deferred_greater_attempt_refusal ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::capacity_tests::fairness_tests::acceptance_tests::workflow_fairness_claim_waiting_for_run_does_not_hold_capacity ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::capacity_tests::fairness_tests::acceptance_tests::workflow_fairness_cleanup_skips_explicitly_locked_stale_parents ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::capacity_tests::fairness_tests::acceptance_tests::workflow_fairness_deleted_company_hints_are_inert_and_cursors_retire ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::capacity_tests::fairness_tests::acceptance_tests::workflow_fairness_discovery_never_waits_for_run_or_capacity_locks ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::capacity_tests::fairness_tests::acceptance_tests::workflow_fairness_faults_roll_back_cursor_demand_and_activation ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::capacity_tests::fairness_tests::acceptance_tests::workflow_fairness_schema_enforces_cursor_owner_and_single_offer ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::capacity_tests::fairness_tests::worker_tests::workflow_fairness_complementary_workers_reach_actual_supported_dispatch ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::capacity_tests::fairness_tests::workflow_fairness_abandoned_offer_and_stale_withdrawal_are_bounded ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::capacity_tests::fairness_tests::worker_tests::mixed_tests::workflow_fairness_real_loop_mixes_full_unsupported_poison_wait_hung_and_refill ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::capacity_tests::fairness_tests::worker_tests::workflow_fairness_worker_stops_full_page_at_first_denied_demand ... ok
+test adapters::protocols::email::egress::tests::a_delivered_mail_reports_the_message_id_it_went_out_under ... ok
+test adapters::protocols::email::egress::tests::a_delivery_key_separates_purpose_source_and_destination ... FAILED
+test adapters::protocols::email::egress::tests::a_failed_submission_is_ambiguous_rather_than_retried ... ok
+test adapters::protocols::email::egress::tests::a_mail_addressed_outside_this_deployment_carries_no_internal_target ... ok
+test adapters::protocols::email::egress::tests::a_recipient_of_our_own_is_relayed_rather_than_posted ... ok
+test adapters::protocols::email::egress::tests::a_renderer_refuses_a_context_for_another_transport ... ok
+test adapters::protocols::email::egress::tests::a_standalone_notice_carries_no_threading_headers ... ok
+test adapters::protocols::email::egress::tests::an_anchored_conversation_is_given_its_message_id_by_the_renderer ... ok
+test adapters::protocols::email::egress::tests::an_internal_refusal_is_terminal ... ok
+test adapters::protocols::email::egress::tests::an_unreadable_payload_is_terminal ... ok
+test adapters::protocols::email::egress::tests::application_message_keys_are_owned_by_email_egress_and_qualified_by_company ... ok
+test adapters::protocols::email::egress::tests::copied_addresses_drop_duplicates_and_this_deployment_s_own_mailboxes ... ok
+test adapters::protocols::email::egress::tests::frozen_correlation_reads_the_payload_even_with_a_different_renderer_domain ... ok
+test adapters::protocols::email::egress::tests::notification_delivery_tenant_notice_uses_the_deployment_relay ... ok
+test adapters::protocols::email::egress::tests::one_delivery_freezes_exactly_one_mail ... ok
+test adapters::protocols::email::egress::tests::only_a_relayed_message_carries_the_loop_control_headers ... ok
+test adapters::protocols::email::egress::tests::only_one_unambiguous_channel_is_relayed_directly ... ok
+test adapters::protocols::email::egress::tests::received_mail_without_an_rfc_id_threads_onto_nothing ... ok
+test adapters::protocols::email::egress::tests::the_internal_relay_and_the_wire_agree_on_the_hop_budget ... ok
+test adapters::protocols::email::egress::tests::the_message_id_is_a_pure_function_of_the_delivery_key ... ok
+test adapters::protocols::email::egress::tests::the_reply_subject_and_reference_chain_are_normalized ... ok
+test application::services::dashboard_snapshot::tests::a_lone_tab_gets_a_fresh_reading_on_every_tick ... ok
+test application::services::dashboard_snapshot::tests::a_reading_is_shared_for_one_tick_and_refreshed_after_it ... ok
+test application::services::dashboard_snapshot::tests::an_idle_view_is_dropped_when_another_is_first_read ... ok
+test application::services::dashboard_snapshot::tests::callers_queued_behind_a_slow_reading_reuse_it ... ok
+test application::services::dashboard_snapshot::tests::concurrent_misses_on_one_view_share_one_read ... ok
+test application::services::dashboard_snapshot::tests::every_view_is_answered_from_its_own_reading ... ok
+test application::services::dashboard_snapshot::tests::failures_are_cached_for_one_tick_too ... ok
+test application::services::delivery_worker::tests::a_batch_is_interleaved_so_one_tenant_cannot_monopolise_it ... ok
+test application::services::delivery_worker::tests::a_creation_says_whether_it_queued_anything ... ok
+test application::services::delivery_worker::tests::a_delivery_for_an_unregistered_transport_is_dead_lettered ... ok
+test application::services::delivery_worker::tests::a_resumed_delivery_starts_at_its_first_unfinished_part ... ok
+test application::services::delivery_worker::tests::a_single_tenant_batch_keeps_the_claim_s_order ... ok
+test application::services::delivery_worker::tests::a_sweep_publishes_every_stuck_delivery_gauge ... ok
+test application::services::delivery_worker::tests::delivery_late_completion_a_lost_renewal_stops_the_send ... ok
+test application::services::delivery_worker::tests::delivery_late_completion_a_renewal_error_still_sends ... ok
+test application::services::delivery_worker::tests::losing_the_lease_stops_the_worker_mid_send ... ok
+test application::services::delivery_worker::tests::shutdown_before_a_send_releases_the_claim_rather_than_stranding_it ... ok
+test application::transport::bounded::tests::a_list_at_its_limit_is_accepted_and_one_past_it_is_not ... ok
+test application::transport::bounded::tests::an_over_limit_list_is_refused_on_the_way_back_in_without_panicking ... ok
+test application::transport::bounded::tests::bounded_text_measures_bytes_rather_than_characters ... ok
+test application::transport::dependency_tests::scanner_tests::a_cfg_test_attribute_on_an_item_does_not_truncate_the_file ... ok
+test application::transport::dependency_tests::scanner_tests::the_inline_test_module_is_not_scanned ... ok
+test application::transport::dependency_tests::the_application_layer_imports_no_adapter_framework_or_provider_type ... ok
+test application::transport::dependency_tests::the_application_layer_names_no_agent_runtime ... ok
+test application::transport::dependency_tests::workflow_and_transport_depend_on_shared_ports_without_reverse_usecase_imports ... ok
+test application::transport::inbox::tests::payload_and_safe_facts_are_bounded ... ok
+test application::transport::inbox::tests::payload_debug_never_contains_its_bytes ... ok
+test application::transport::ingress::tests::a_protocol_extension_decodes_only_from_a_shape_it_knows ... ok
+test application::transport::ingress::tests::canonical_content_strips_invisible_and_prompt_injection_characters ... ok
+test application::transport::ingress::tests::content_is_refused_rather_than_truncated_when_it_exceeds_its_bound ... ok
+test application::transport::ingress::tests::only_email_carries_authentication_verdicts ... ok
+test application::transport::lease::tests::a_lapsed_claim_reports_itself_as_lapsed ... ok
+test application::transport::lease::tests::two_claims_on_the_same_row_are_distinguished_by_their_execution ... ok
+test application::transport::queue::tests::a_claimed_delivery_resumes_at_its_first_unfinished_part ... ok
+test application::transport::queue::tests::a_delivery_that_renders_nothing_is_refused_rather_than_queued ... ok
+test application::transport::queue::tests::backoff_doubles_then_stops_at_its_ceiling ... ok
+test application::transport::tests::a_payload_is_read_back_only_by_the_transport_and_version_that_wrote_it ... ok
+test application::transport::tests::a_registry_refuses_a_mismatched_or_repeated_transport ... ok
+test application::transport::tests::a_sender_reports_rate_limits_and_ambiguity_as_distinct_outcomes ... ok
+test application::transport::tests::an_over_limit_rendered_payload_is_refused_rather_than_stored ... ok
+test application::transport::tests::fan_out_includes_exactly_what_policy_allows ... ok
+test application::transport::tests::the_same_logical_delivery_replans_to_the_same_key ... FAILED
+test application::workflow::activation::tests::workflow_activation_payload_is_strict_and_id_only ... ok
+test domain::entities::transport::delivery::tests::a_reply_only_interface_carries_every_purpose_but_new_conversations ... ok
+test domain::entities::transport::delivery::tests::every_vocabulary_round_trips_through_its_stored_string ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::capacity_tests::fairness_tests::workflow_fairness_full_wait_preserves_age_then_protects_quiet_retry ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::capacity_tests::fairness_tests::worker_tests::workflow_fairness_sustained_refill_dispatches_quiet_handlers_in_bounded_turns ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::capacity_tests::fairness_tests::workflow_fairness_invalid_offer_is_cleaned_before_older_invalid_history ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::capacity_tests::fairness_tests::workflow_fairness_worker_traversals_and_finite_horizons_are_independent ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::capacity_tests::fairness_tests::workflow_fairness_open_offer_survives_older_company_becoming_uncapped ... ok
+test adapters::persistence::workflow::tests::run_schema_tests::job_schema_tests::job_association_tests::workflow_job_association_insert_serializes_parent_update ... ok
+test adapters::persistence::workflow::tests::run_schema_tests::job_schema_tests::job_association_tests::workflow_job_association_nullable_scope_matrix_and_shared_attempts ... ok
+test adapters::persistence::workflow::tests::run_schema_tests::job_schema_tests::job_association_tests::workflow_job_association_parents_and_scope_reject_mutation ... ok
+test adapters::persistence::workflow::tests::run_schema_tests::job_schema_tests::job_association_tests::workflow_job_association_prior_parent_update_serializes_insert ... ok
+test adapters::persistence::workflow::tests::run_schema_tests::job_schema_tests::job_core_query_tests::job_projection_tests::workflow_job_projection_dashboard_counts_every_workflow_job ... ok
+test adapters::persistence::workflow::tests::run_schema_tests::job_schema_tests::job_core_query_tests::job_projection_tests::workflow_job_projection_dashboard_outstanding_jobs_name_run_and_latest_failure ... ok
+
+failures:
+
+---- adapters::http::pages::dashboard::tests::dashboard_outstanding_renders_the_latest_attempt_failure_code stdout ----
+
+thread 'adapters::http::pages::dashboard::tests::dashboard_outstanding_renders_the_latest_attempt_failure_code' (29948452) panicked at src/adapters/http/pages/dashboard.rs:1466:9:
+assertion failed: html.contains("agent.provider_timeout")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::protocols::email::egress::tests::a_delivery_key_separates_purpose_source_and_destination stdout ----
+
+thread 'adapters::protocols::email::egress::tests::a_delivery_key_separates_purpose_source_and_destination' (29949101) panicked at src/adapters/protocols/email/egress_tests.rs:593:5:
+assertion `left == right` failed
+  left: "workflow_reply:task:1:email:a@example.com"
+ right: "reply:task:1:email:a@example.com"
+
+---- application::transport::tests::the_same_logical_delivery_replans_to_the_same_key stdout ----
+
+thread 'application::transport::tests::the_same_logical_delivery_replans_to_the_same_key' (29949170) panicked at src/application/transport/tests.rs:245:5:
+assertion `left != right` failed
+  left: DeliveryKey("workflow_reply:message:f8c4d1af-7dfe-40f4-a09c-c7f0cbd69cb2:binding:2a35d377-7add-467f-b435-66b3e8742ac9")
+ right: DeliveryKey("workflow_reply:message:f8c4d1af-7dfe-40f4-a09c-c7f0cbd69cb2:binding:2a35d377-7add-467f-b435-66b3e8742ac9")
+
+
+failures:
+    adapters::http::pages::dashboard::tests::dashboard_outstanding_renders_the_latest_attempt_failure_code
+    adapters::protocols::email::egress::tests::a_delivery_key_separates_purpose_source_and_destination
+    application::transport::tests::the_same_logical_delivery_replans_to_the_same_key
+
+test result: FAILED. 175 passed; 3 failed; 0 ignored; 0 measured; 2519 filtered out; finished in 14.84s
+

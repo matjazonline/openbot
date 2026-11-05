@@ -36,7 +36,7 @@ impl TryFrom<PriceRow> for ModelPrice {
 struct CallRow {
     provider: String,
     model: String,
-    workflow_id: Option<Uuid>,
+    workflow_id: Uuid,
     agent_id: Option<Uuid>,
     input_tokens: i64,
     output_tokens: i64,

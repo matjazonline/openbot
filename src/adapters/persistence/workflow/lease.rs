@@ -2,7 +2,6 @@ use super::persistence_bound::{Attempt, End, Evidence, WriteBound, set_server_ti
 use super::*;
 use crate::application::workflow::{activation::*, lease::*};
 use chrono::{DateTime, Utc};
-use serde_json::Value;
 use sqlx::PgPool;
 use tokio::time::Instant;
 
@@ -20,7 +19,6 @@ pub(super) struct LeaseJob {
     pub worker_id: Option<Uuid>,
     pub execution_generation: Option<Uuid>,
     pub lock_expires_at: Option<DateTime<Utc>>,
-    pub payload: Value,
     pub step_id: String,
 }
 
@@ -292,14 +290,11 @@ pub(super) async fn lock_scope(
     let Some(step_id) = step else {
         return Ok(None);
     };
-    let job = sqlx::query_as::<_, LeaseJob>("SELECT status,retry_count,attempt_ordinal,max_retries,worker_id,execution_generation,lock_expires_at,payload,$4::text AS step_id FROM background_tasks WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 AND queue_kind='workflow' FOR UPDATE")
+    let job = sqlx::query_as::<_, LeaseJob>("SELECT status,retry_count,attempt_ordinal,max_retries,worker_id,execution_generation,lock_expires_at,$4::text AS step_id FROM background_tasks WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3  FOR UPDATE")
         .bind(scope.company.as_uuid()).bind(scope.job.0).bind(scope.execution.as_uuid()).bind(step_id).fetch_optional(&mut *db).await?;
     let Some(job) = job else {
         return Ok(None);
     };
-    if decode_job_payload(job.payload.clone())? != scope.execution {
-        return Ok(None);
-    }
     super::persistence_bound::locks_held();
     let active: bool = sqlx::query_scalar("SELECT state IN ('queued','running') AND deadline > clock_timestamp() FROM workflow_runs WHERE company_id=$1 AND id=$2")
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).fetch_one(&mut *db).await?;
@@ -330,7 +325,7 @@ pub(super) async fn live_window(
     fence: WorkflowFence,
     started: Instant,
 ) -> AppResult<Option<LeaseWindow>> {
-    let row = sqlx::query_as::<_, Remaining>("SELECT extract(epoch FROM (job.lock_expires_at-clock_timestamp()))::float8 AS lease_seconds, extract(epoch FROM (run.deadline-clock_timestamp()))::float8 AS run_seconds FROM background_tasks AS job JOIN workflow_executions AS execution ON execution.company_id=job.company_id AND execution.id=job.workflow_execution_id JOIN workflow_runs AS run ON run.company_id=execution.company_id AND run.id=execution.run_id JOIN task_attempts AS attempt ON attempt.task_id=job.id AND attempt.attempt_number=$7 AND attempt.execution_generation=$6 AND attempt.worker_id=$5 AND attempt.status='processing' WHERE job.company_id=$1 AND run.id=$2 AND execution.id=$3 AND job.id=$4 AND job.queue_kind='workflow' AND job.status='processing' AND job.worker_id=$5 AND job.execution_generation=$6 AND job.attempt_ordinal=$7 AND job.lock_expires_at > clock_timestamp() AND execution.completed_at IS NULL AND run.state IN ('queued','running') AND run.deadline > clock_timestamp()")
+    let row = sqlx::query_as::<_, Remaining>("SELECT extract(epoch FROM (job.lock_expires_at-clock_timestamp()))::float8 AS lease_seconds, extract(epoch FROM (run.deadline-clock_timestamp()))::float8 AS run_seconds FROM background_tasks AS job JOIN workflow_executions AS execution ON execution.company_id=job.company_id AND execution.id=job.workflow_execution_id JOIN workflow_runs AS run ON run.company_id=execution.company_id AND run.id=execution.run_id JOIN task_attempts AS attempt ON attempt.task_id=job.id AND attempt.attempt_number=$7 AND attempt.execution_generation=$6 AND attempt.worker_id=$5 AND attempt.status='processing' WHERE job.company_id=$1 AND run.id=$2 AND execution.id=$3 AND job.id=$4  AND job.status='processing' AND job.worker_id=$5 AND job.execution_generation=$6 AND job.attempt_ordinal=$7 AND job.lock_expires_at > clock_timestamp() AND execution.completed_at IS NULL AND run.state IN ('queued','running') AND run.deadline > clock_timestamp()")
         .bind(fence.scope.company.as_uuid()).bind(fence.scope.run.as_uuid()).bind(fence.scope.execution.as_uuid()).bind(fence.scope.job.0).bind(fence.worker.0).bind(fence.generation.0).bind(fence.attempt.0).fetch_optional(db).await?;
     Ok(row
         .filter(|row| row.lease_seconds > 0.0 && row.run_seconds > 0.0)
@@ -468,7 +463,7 @@ pub(super) async fn renew_owned(
     fence: WorkflowFence,
     policy: LeasePolicy,
 ) -> AppResult<bool> {
-    let changed = sqlx::query("UPDATE background_tasks SET lock_expires_at = LEAST(clock_timestamp() + make_interval(secs => $2), (SELECT deadline FROM workflow_runs WHERE company_id=$3 AND id=$4)) WHERE id=$1 AND company_id=$3 AND workflow_execution_id=$5 AND queue_kind='workflow' AND status='processing' AND execution_generation=$6 AND worker_id=$7 AND attempt_ordinal=$8 AND lock_expires_at > clock_timestamp() AND EXISTS (SELECT 1 FROM workflow_runs AS run WHERE run.company_id=$3 AND run.id=$4 AND run.deadline > clock_timestamp())")
+    let changed = sqlx::query("UPDATE background_tasks SET lock_expires_at = LEAST(clock_timestamp() + make_interval(secs => $2), (SELECT deadline FROM workflow_runs WHERE company_id=$3 AND id=$4)) WHERE id=$1 AND company_id=$3 AND workflow_execution_id=$5  AND status='processing' AND execution_generation=$6 AND worker_id=$7 AND attempt_ordinal=$8 AND lock_expires_at > clock_timestamp() AND EXISTS (SELECT 1 FROM workflow_runs AS run WHERE run.company_id=$3 AND run.id=$4 AND run.deadline > clock_timestamp())")
         .bind(fence.scope.job.0).bind(policy.duration().as_secs_f64())
         .bind(fence.scope.company.as_uuid()).bind(fence.scope.run.as_uuid())
         .bind(fence.scope.execution.as_uuid()).bind(fence.generation.0).bind(fence.worker.0)

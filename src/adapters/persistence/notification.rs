@@ -543,6 +543,8 @@ async fn release_stale_projection(
                                 THEN 'dead_letter' ELSE 'pending' END,
                   available_at = CURRENT_TIMESTAMP
                       + (2 * POWER(2, LEAST(attempt_count, 8))) * INTERVAL '1 second',
+                  last_error_class = 'stale_projection',
+                  last_error_detail = 'Notification projection changed before commit',
                   execution_id = NULL, owner_worker_id = NULL,
                   locked_at = NULL, lock_expires_at = NULL
             WHERE id = $1 AND status = 'processing'

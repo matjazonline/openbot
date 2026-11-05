@@ -310,7 +310,7 @@ const HISTORICAL_RETIREMENT: &str = r#"SELECT witness.transaction_id<>pg_current
             AND workflow_action_retry_safe(witness.company_id,witness.execution_id) IS DISTINCT FROM false)
             OR (owner.state='waiting' AND owner.waiting_reason='reconciliation' AND owner.terminal_execution_id IS NULL
                 AND workflow_action_retry_safe(witness.company_id,witness.execution_id) IS FALSE))
-        AND job.status='failed' AND job.queue_kind='workflow' AND job.workflow_execution_id=witness.execution_id
+        AND job.status='failed'  AND job.workflow_execution_id=witness.execution_id
         AND job.retry_count=witness.retired_attempt AND job.worker_id IS NULL AND job.execution_generation IS NULL
         AND job.lock_expires_at IS NULL AND execution.activated_at IS NOT NULL AND execution.completed_at IS NULL
         AND audit.execution_id=witness.execution_id AND audit.event_kind='workflow.root_budget_exhausted'

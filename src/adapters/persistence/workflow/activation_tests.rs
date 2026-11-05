@@ -103,7 +103,7 @@ async fn workflow_activation_abort_and_lost_ack_reuse_snapshot_across_attempts()
     );
     tx.commit().await.unwrap(); // Simulate losing the response after commit.
     for attempt in [1, 2] {
-        sqlx::query("INSERT INTO task_attempts (id, task_id, attempt_number, status, execution_generation, worker_id, machine_id) VALUES (gen_random_uuid(), $1, $2, 'failed', gen_random_uuid(), gen_random_uuid(), 'activation-test')")
+        sqlx::query("INSERT INTO task_attempts (id, task_id, attempt_number, status, execution_generation, worker_id, finished_at) VALUES (gen_random_uuid(), $1, $2, 'failed', gen_random_uuid(), gen_random_uuid(), clock_timestamp())")
             .bind(request.job.0).bind(attempt).execute(f.persistence().pool()).await.unwrap();
     }
     // Reconnect independently and corrupt the original resolution source. Replay
@@ -139,8 +139,8 @@ async fn successor(
     sqlx::query("INSERT INTO workflow_executions (company_id, run_id, id, step_id, activation) VALUES ($1,$2,$3,$4,$5)")
         .bind(next.company.as_uuid()).bind(next.run.as_uuid()).bind(next.execution.as_uuid())
         .bind(step).bind(ordinal).execute(f.persistence().pool()).await.unwrap();
-    sqlx::query("INSERT INTO background_tasks (id,company_id,correlation_id,task_type,payload,queue_kind,workflow_execution_id) VALUES ($1,$2,gen_random_uuid(),'workflow_execution',$3,'workflow',$4)")
-        .bind(next.job.0).bind(next.company.as_uuid()).bind(job_payload(next.execution))
+    sqlx::query("INSERT INTO background_tasks (id, company_id, correlation_id, workflow_execution_id) VALUES ($1, $2, gen_random_uuid(), $3)")
+        .bind(next.job.0).bind(next.company.as_uuid())
         .bind(next.execution.as_uuid()).execute(f.persistence().pool()).await.unwrap();
     next
 }

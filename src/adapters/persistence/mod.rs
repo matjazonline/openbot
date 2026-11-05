@@ -461,3 +461,6 @@ mod harness_checkpoint;
 
 #[cfg(test)]
 mod auth_key_rotation_tests;
+
+#[cfg(test)]
+mod jsonb_test_support;

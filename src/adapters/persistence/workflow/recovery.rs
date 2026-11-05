@@ -26,7 +26,7 @@ pub(super) async fn retire_on(
     let scope = fence.scope;
     let run = sqlx::query_as::<_, Snapshot>("SELECT binding_id,max_steps,deadline,clock_timestamp() AS now FROM workflow_runs WHERE company_id=$1 AND id=$2")
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).fetch_one(&mut *db).await?;
-    let job = sqlx::query_as::<_, LeaseJob>("SELECT status,retry_count,attempt_ordinal,max_retries,worker_id,execution_generation,lock_expires_at,payload,execution.step_id FROM background_tasks AS job JOIN workflow_executions AS execution ON execution.company_id=job.company_id AND execution.id=job.workflow_execution_id WHERE job.company_id=$1 AND job.id=$2")
+    let job = sqlx::query_as::<_, LeaseJob>("SELECT status,retry_count,attempt_ordinal,max_retries,worker_id,execution_generation,lock_expires_at,execution.step_id FROM background_tasks AS job JOIN workflow_executions AS execution ON execution.company_id=job.company_id AND execution.id=job.workflow_execution_id WHERE job.company_id=$1 AND job.id=$2")
         .bind(scope.company.as_uuid()).bind(scope.job.0).fetch_one(&mut *db).await?;
     let binding = admission_binding::read_saved_binding(
         db,
@@ -210,7 +210,7 @@ async fn finish_job(
         RecoveryDecision::RetryAt(at) => Some(at),
         _ => None,
     };
-    let changed = sqlx::query("UPDATE background_tasks SET status=$8,retry_count=retry_count+1,run_at=COALESCE($9,run_at),worker_id=NULL,execution_generation=NULL,locked_at=NULL,lock_expires_at=NULL,updated_at=clock_timestamp() WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 AND queue_kind='workflow' AND status='processing' AND execution_generation=$4 AND worker_id=$5 AND attempt_ordinal=$6 AND ($7 OR lock_expires_at>clock_timestamp())")
+    let changed = sqlx::query("UPDATE background_tasks SET status=$8,retry_count=retry_count+1,run_at=COALESCE($9,run_at),worker_id=NULL,execution_generation=NULL,locked_at=NULL,lock_expires_at=NULL,updated_at=clock_timestamp() WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3  AND status='processing' AND execution_generation=$4 AND worker_id=$5 AND attempt_ordinal=$6 AND ($7 OR lock_expires_at>clock_timestamp())")
         .bind(fence.scope.company.as_uuid()).bind(fence.scope.job.0).bind(fence.scope.execution.as_uuid()).bind(fence.generation.0).bind(fence.worker.0).bind(fence.attempt.0)
         .bind(matches!(reason,Retirement::Expired)).bind(if retry_at.is_some(){"pending"}else{"failed"}).bind(retry_at).execute(db).await?;
     if changed.rows_affected() != 1 {
@@ -355,7 +355,7 @@ pub(super) async fn route_parked_failure(
         sqlx::query("UPDATE workflow_runs SET state='failed',waiting_reason=NULL,terminal_execution_id=$3 WHERE company_id=$1 AND id=$2")
             .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).execute(&mut *db).await?;
     }
-    let closed = sqlx::query("UPDATE background_tasks SET status='failed',updated_at=clock_timestamp() WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 AND queue_kind='workflow' AND status='completed'")
+    let closed = sqlx::query("UPDATE background_tasks SET status='failed',updated_at=clock_timestamp() WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3  AND status='completed'")
         .bind(scope.company.as_uuid()).bind(scope.job.0).bind(scope.execution.as_uuid()).execute(&mut *db).await?;
     if closed.rows_affected() != 1 {
         return Err(invalid());

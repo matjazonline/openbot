@@ -21,46 +21,54 @@ pub struct McpConnectionWrite {
 impl McpConnectionWrite {
     pub fn validate(&self) -> AppResult<()> {
         super::channel::validate_slug(&self.slug, super::channel::SlugKind::AgentSlug)?;
-        if self.discovered_tools.len() > MAX_MCP_DISCOVERED_TOOLS
-            || self.tool_grants.len() > MAX_EFFECTIVE_MCP_TOOLS
-        {
-            return Err(invalid("MCP tool count exceeds the server limit"));
+        validate_catalog(&self.discovered_tools, &self.tool_grants)
+    }
+}
+/// Validate the reviewed discovery and grants together; callers cannot widen a bad catalog.
+pub(crate) fn validate_catalog(
+    discovered_tools: &[McpDiscoveredTool],
+    tool_grants: &[McpToolName],
+) -> AppResult<()> {
+    if discovered_tools.len() > MAX_MCP_DISCOVERED_TOOLS
+        || tool_grants.len() > MAX_EFFECTIVE_MCP_TOOLS
+    {
+        return Err(invalid("MCP tool count exceeds the server limit"));
+    }
+    let encoded =
+        serde_json::to_vec(discovered_tools).map_err(|_| invalid("Invalid MCP discovery"))?;
+    if encoded.len() > MAX_MCP_DISCOVERY_BYTES {
+        return Err(invalid("MCP discovery exceeds 1 MiB"));
+    }
+    let mut names = std::collections::HashSet::new();
+    for tool in discovered_tools {
+        if !names.insert(&tool.name) {
+            return Err(invalid("Duplicate discovered MCP tool name"));
         }
-        let encoded = serde_json::to_vec(&self.discovered_tools)
-            .map_err(|_| invalid("Invalid MCP discovery"))?;
-        if encoded.len() > MAX_MCP_DISCOVERY_BYTES {
-            return Err(invalid("MCP discovery exceeds 1 MiB"));
-        }
-        let mut names = std::collections::HashSet::new();
-        for tool in &self.discovered_tools {
-            if !names.insert(&tool.name) {
-                return Err(invalid("Duplicate discovered MCP tool name"));
-            }
-            for schema in std::iter::once(&tool.input_schema).chain(&tool.output_schema) {
-                crate::services::tool_schema::compile(schema)?;
-                if !schema.is_object()
-                    || serde_json::to_vec(schema)
-                        .map_err(|_| invalid("Invalid MCP schema"))?
-                        .len()
-                        > MAX_MCP_SCHEMA_BYTES
-                {
-                    return Err(invalid(
-                        "MCP tool schema must be an object of at most 64 KiB",
-                    ));
-                }
-            }
-        }
-        let mut grants = std::collections::HashSet::new();
-        for grant in &self.tool_grants {
-            if !names.contains(grant) || !grants.insert(grant) {
+        for schema in std::iter::once(&tool.input_schema).chain(&tool.output_schema) {
+            crate::services::tool_schema::compile(schema)?;
+            if !schema.is_object()
+                || serde_json::to_vec(schema)
+                    .map_err(|_| invalid("Invalid MCP schema"))?
+                    .len()
+                    > MAX_MCP_SCHEMA_BYTES
+            {
                 return Err(invalid(
-                    "MCP grants must uniquely name reviewed discovered tools",
+                    "MCP tool schema must be an object of at most 64 KiB",
                 ));
             }
         }
-        Ok(())
     }
+    let mut grants = std::collections::HashSet::new();
+    for grant in tool_grants {
+        if !names.contains(grant) || !grants.insert(grant) {
+            return Err(invalid(
+                "MCP grants must uniquely name reviewed discovered tools",
+            ));
+        }
+    }
+    Ok(())
 }
+
 fn invalid(message: &str) -> AppError {
     AppError::BadRequest(message.into())
 }

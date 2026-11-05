@@ -1,0 +1,35 @@
+[
+  {
+    "check": "step1-reset",
+    "command": [
+      "bash",
+      "scripts/reset-db.sh",
+      "--all",
+      "--yes"
+    ],
+    "exit_code": 0
+  },
+  {
+    "check": "step1-test-migrate",
+    "command": [
+      "cargo",
+      "sqlx",
+      "migrate",
+      "run",
+      "--database-url",
+      "postgres://mac02@127.0.0.1:55408/open_bots_test"
+    ],
+    "exit_code": 0
+  },
+  {
+    "check": "step1-live-sqlx",
+    "command": [
+      "cargo",
+      "sqlx",
+      "prepare",
+      "--",
+      "--all-targets"
+    ],
+    "exit_code": 0
+  }
+]

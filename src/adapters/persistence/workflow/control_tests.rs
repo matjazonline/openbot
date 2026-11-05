@@ -137,13 +137,7 @@ async fn workflow_control_competing_retry_preserves_identity_facts_and_remaining
     let after = snapshot(&f).await;
     assert_eq!(after["executions"], before["executions"]);
     assert_eq!(after["attempts"], before["attempts"]);
-    for key in [
-        "id",
-        "workflow_execution_id",
-        "retry_count",
-        "max_retries",
-        "payload",
-    ] {
+    for key in ["id", "workflow_execution_id", "retry_count", "max_retries"] {
         assert_eq!(after["jobs"][0][key], before["jobs"][0][key], "{key}");
     }
     for key in [

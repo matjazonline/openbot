@@ -1,0 +1,10 @@
+
+running 5 tests
+test adapters::persistence::notification::tests::notification_stale_last_attempt_is_dead_lettered ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::workflow_io_real_competing_claims_lost_ack_crash_backoff_and_frozen_retry ... ok
+test adapters::persistence::notification::tests::notification_stale_below_the_limit_returns_to_pending_with_backoff ... ok
+test adapters::persistence::notification::tests::notification_stale_poison_batch_is_not_reclaimed_by_the_next_iteration ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::maintenance_tests::workflow_maintenance_live_expired_and_spent_attempts_debit_once ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 2691 filtered out; finished in 2.62s
+

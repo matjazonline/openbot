@@ -17,6 +17,7 @@ type Outcome = WriteOutcome<RunCheckpoint>;
 
 #[derive(sqlx::FromRow)]
 struct Saved {
+    id: Uuid,
     checkpoint: Value,
     workflow_prepared: Value,
     model_blocked_decision: Option<Uuid>,
@@ -113,7 +114,7 @@ impl WorkflowCheckpointStore for PostgresPersistence {
                         return Ok(WriteOutcome::OwnershipLost);
                     }
                     let run = load_on(&mut tx, fence).await?.ok_or_else(missing)?;
-                    let run = decode(run.checkpoint)?;
+                    let run = decode(run.id, run.checkpoint)?;
                     live(&mut tx, fence, &bound).await?;
                     Ok(WriteOutcome::AlreadyApplied(run))
                 }
@@ -225,7 +226,7 @@ impl WorkflowCheckpointStore for PostgresPersistence {
                         "SELECT decision.token_proposal->'request'->'reservation' FROM task_harness_runs AS checkpoint
                          JOIN workflow_decisions AS decision ON decision.company_id=checkpoint.company_id
                           AND decision.id=checkpoint.model_blocked_decision AND decision.token_stage='reservation'
-                         WHERE checkpoint.owner_kind='workflow' AND checkpoint.company_id=$1 AND checkpoint.workflow_run_id=$2
+                         WHERE checkpoint.company_id=$1 AND checkpoint.workflow_run_id=$2
                            AND checkpoint.workflow_execution_id=$3 AND checkpoint.task_id=$4",
                     )
                     .bind(fence.scope.company.as_uuid())
@@ -308,7 +309,7 @@ async fn live(tx: &mut PgConnection, fence: WorkflowFence, bound: &WriteBound) -
 /// authority class before any local workflow lock. Missing preparation fails closed.
 async fn authorize_on(tx: &mut PgConnection, fence: WorkflowFence) -> AppResult<()> {
     let prepared: Value = sqlx::query_scalar(
-        "SELECT workflow_prepared FROM task_harness_runs WHERE owner_kind='workflow' AND company_id=$1
+        "SELECT workflow_prepared FROM task_harness_runs WHERE company_id=$1
           AND workflow_run_id=$2 AND workflow_execution_id=$3 AND task_id=$4",
     )
     .bind(fence.scope.company.as_uuid())
@@ -323,8 +324,8 @@ async fn authorize_on(tx: &mut PgConnection, fence: WorkflowFence) -> AppResult<
 
 async fn load_on(tx: &mut PgConnection, fence: WorkflowFence) -> AppResult<Option<Saved>> {
     sqlx::query_as(
-        "SELECT checkpoint,workflow_prepared,model_blocked_decision,model_request_id,model_generation,model_worker_id,model_attempt FROM task_harness_runs
-        WHERE owner_kind='workflow' AND company_id=$1 AND workflow_run_id=$2
+        "SELECT id,checkpoint,workflow_prepared,model_blocked_decision,model_request_id,model_generation,model_worker_id,model_attempt FROM task_harness_runs
+        WHERE company_id=$1 AND workflow_run_id=$2
           AND workflow_execution_id=$3 AND task_id=$4 FOR UPDATE",
     )
     .bind(fence.scope.company.as_uuid())
@@ -337,7 +338,7 @@ async fn load_on(tx: &mut PgConnection, fence: WorkflowFence) -> AppResult<Optio
 }
 
 fn matching(saved: Saved, spec: &WorkflowCheckpointSpec) -> AppResult<RunCheckpoint> {
-    let run = decode(saved.checkpoint)?;
+    let run = decode(saved.id, saved.checkpoint)?;
     if run.identity != spec.identity
         || run.policy != spec.policy
         || saved.workflow_prepared != spec.prepared
@@ -380,9 +381,8 @@ async fn open_on(
         return Ok(End::Rollback(WriteOutcome::AlreadyApplied(run)));
     }
     sqlx::query("INSERT INTO task_harness_runs
-        (id,company_id,task_id,agent_id,owner_kind,workflow_run_id,workflow_execution_id,
-         workflow_generation,workflow_worker_id,workflow_attempt,workflow_prepared,schema_version,revision,state,checkpoint)
-        VALUES ($1,$2,$3,$4,'workflow',$5,$6,$7,$8,$9,$10,1,0,'active',$11)")
+        (id, company_id, task_id, agent_id, workflow_run_id, workflow_execution_id, workflow_generation, workflow_worker_id, workflow_attempt, workflow_prepared, schema_version, revision, state, checkpoint)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 1, 0, 'active', $11)")
         .bind(proposed.run_id.0).bind(fence.scope.company.as_uuid()).bind(fence.scope.job.0).bind(spec.identity.agent_id)
         .bind(fence.scope.run.as_uuid()).bind(fence.scope.execution.as_uuid()).bind(fence.generation.0)
         .bind(fence.worker.0).bind(fence.attempt.0).bind(&spec.prepared).bind(serde_json::to_value(proposed).map_err(|_| invalid())?)
@@ -401,7 +401,7 @@ async fn execution_on(
         return Ok(End::Rollback(WriteOutcome::OwnershipLost));
     }
     let saved = load_on(tx, write.fence).await?.ok_or_else(missing)?;
-    let current = decode(saved.checkpoint)?;
+    let current = decode(saved.id, saved.checkpoint)?;
     live(tx, write.fence, bound).await?;
     if current.run_id != write.checkpoint {
         return Ok(End::Rollback(WriteOutcome::OwnershipLost));
@@ -473,7 +473,7 @@ pub(super) async fn persist_on(
         model_attempt=CASE WHEN $11='execution' AND model_generation=$8 THEN model_attempt WHEN $12::uuid IS NOT NULL THEN $10 ELSE NULL END,
         model_generation=CASE WHEN $11='execution' AND model_generation=$8 THEN model_generation WHEN $12::uuid IS NOT NULL THEN $8 ELSE NULL END,
         model_blocked_decision=CASE WHEN $11='execution' THEN model_blocked_decision ELSE $13 END
-        WHERE owner_kind='workflow' AND company_id=$1 AND workflow_run_id=$2 AND workflow_execution_id=$3 AND id=$4")
+        WHERE company_id=$1 AND workflow_run_id=$2 AND workflow_execution_id=$3 AND id=$4")
         .bind(fence.scope.company.as_uuid()).bind(fence.scope.run.as_uuid()).bind(fence.scope.execution.as_uuid())
         .bind(run.run_id.0).bind(revision(run.revision.0)?).bind(state_name(&run.state))
         .bind(serde_json::to_value(run).map_err(|_| invalid())?).bind(fence.generation.0).bind(fence.worker.0).bind(fence.attempt.0)
@@ -496,7 +496,7 @@ async fn execution_evidence(
     let saved = load_on(tx, write.fence)
         .await?
         .ok_or_else(|| bound.unresolved())?;
-    let run = decode(saved.checkpoint)?;
+    let run = decode(saved.id, saved.checkpoint)?;
     if run.run_id != write.checkpoint {
         return Err(bound.unresolved());
     }

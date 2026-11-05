@@ -153,8 +153,6 @@ async fn workflow_fairness_sustained_refill_dispatches_quiet_handlers_in_bounded
             for (scope,w) in qs.iter().zip(qworkers) {
                 assert_eq!(runner(p,&handler,w).process(candidate(*scope),&cancel).await.unwrap(),WorkDisposition::Deferred);
             }
-            sqlx::query("UPDATE workflow_dispatch_demand SET registered_at=clock_timestamp()-interval '2 minutes'")
-                .execute(p.pool()).await.unwrap();
             for i in 0..9 {
                 let noisy=[&f,&c,&d][i%3];
                 denied(p,admit(noisy,&format!("full-refill-{i}")).await,worker()).await;

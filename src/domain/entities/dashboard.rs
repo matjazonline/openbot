@@ -281,13 +281,12 @@ pub struct OutstandingTask {
     /// The run the job is a step of (`background_tasks.workflow_execution_id` → its execution's
     /// run); `None` only if the execution is gone.
     pub run_id: Option<Uuid>,
-    pub task_type: String,
     pub status: TaskStatus,
     /// Claimed, but its lease has lapsed. Derived rather than stored — there is no `stalled`
     /// status, because from the queue's point of view the row is still `processing`.
     pub stalled: bool,
     pub retry_count: i32,
-    pub last_error: Option<String>,
+    pub workflow_failure_code: Option<String>,
     /// When the task last changed state, which is what "stuck for 20 minutes" is measured from.
     pub since: DateTime<Utc>,
 }

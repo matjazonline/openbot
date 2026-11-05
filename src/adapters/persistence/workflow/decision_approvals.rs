@@ -123,7 +123,7 @@ pub(super) async fn close_attempt(db: &mut PgConnection, fence: WorkflowFence) -
     let scope = fence.scope;
     let closed = sqlx::query("UPDATE task_attempts SET status='completed',stop_reason='approval_parked',finished_at=clock_timestamp() WHERE task_id=$1 AND attempt_number=$2 AND worker_id=$3 AND execution_generation=$4 AND status='processing'")
         .bind(scope.job.0).bind(fence.attempt.0).bind(fence.worker.0).bind(fence.generation.0).execute(&mut *db).await?;
-    let job = sqlx::query("UPDATE background_tasks SET status='completed',updated_at=clock_timestamp(),worker_id=NULL,execution_generation=NULL,locked_at=NULL,lock_expires_at=NULL WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 AND queue_kind='workflow' AND status='processing' AND worker_id=$4 AND execution_generation=$5 AND attempt_ordinal=$6 AND continuation_count<workflow_job_continuation_limit() AND lock_expires_at>clock_timestamp()")
+    let job = sqlx::query("UPDATE background_tasks SET status='completed',updated_at=clock_timestamp(),worker_id=NULL,execution_generation=NULL,locked_at=NULL,lock_expires_at=NULL WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3  AND status='processing' AND worker_id=$4 AND execution_generation=$5 AND attempt_ordinal=$6 AND continuation_count<workflow_job_continuation_limit() AND lock_expires_at>clock_timestamp()")
         .bind(scope.company.as_uuid()).bind(scope.job.0).bind(scope.execution.as_uuid()).bind(fence.worker.0).bind(fence.generation.0).bind(fence.attempt.0).execute(&mut *db).await?;
     if closed.rows_affected() != 1 || job.rows_affected() != 1 {
         return Err(closed_error());

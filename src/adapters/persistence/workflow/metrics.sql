@@ -13,7 +13,7 @@ WITH bounds AS (
                FILTER (WHERE status = 'pending' AND run_at <= bounds.now), 0) AS age,
            count(*) FILTER (WHERE status = 'processing' AND lock_expires_at <= bounds.now) AS expired
     FROM background_tasks CROSS JOIN bounds
-    WHERE queue_kind = 'workflow' AND status IN ('pending','processing')
+    WHERE status IN ('pending','processing')
 ), steps AS (
     SELECT count(*) AS completed,
            COALESCE(percentile_cont(0.95) WITHIN GROUP
@@ -23,7 +23,7 @@ WITH bounds AS (
     SELECT count(*) AS count FROM task_attempts AS attempt
     JOIN background_tasks AS job ON job.id = attempt.task_id
     CROSS JOIN bounds
-    WHERE job.queue_kind = 'workflow' AND attempt.attempt_number > 1 AND attempt.started_at >= bounds.since
+    WHERE attempt.attempt_number > 1 AND attempt.started_at >= bounds.since
 ), decisions AS (
     SELECT count(*) AS open,
            COALESCE(max(EXTRACT(EPOCH FROM bounds.now - decision.created_at)), 0) AS age

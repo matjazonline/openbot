@@ -344,8 +344,13 @@ pub(super) async fn saved(
         TransitionTarget::Step(StepId::parse(saved.route_target).map_err(|_| invalid())?)
     };
     let successor = if let Some(id) = saved.successor_execution_id {
-        let job=sqlx::query_scalar("SELECT id FROM background_tasks WHERE company_id=$1 AND workflow_execution_id=$2 AND queue_kind='workflow'")
-            .bind(scope.company.as_uuid()).bind(id).fetch_one(db).await?;
+        let job = sqlx::query_scalar(
+            "SELECT id FROM background_tasks WHERE company_id=$1 AND workflow_execution_id=$2 ",
+        )
+        .bind(scope.company.as_uuid())
+        .bind(id)
+        .fetch_one(db)
+        .await?;
         Some(ActivationRequest {
             execution: ExecutionId::new(id),
             job: WorkflowJobId(job),

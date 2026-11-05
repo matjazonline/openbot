@@ -63,7 +63,7 @@ async fn all_other_gates(f: &AdmissionFixture, request: &ActionDispatchRequest) 
          JOIN background_tasks AS task ON task.company_id=execution.company_id AND task.workflow_execution_id=execution.id
          JOIN task_attempts AS attempt ON attempt.task_id=task.id AND attempt.attempt_number=task.retry_count
          JOIN workflow_admissions AS admission ON admission.company_id=owner.company_id AND admission.run_id=owner.id
-         WHERE owner.company_id=$1 AND owner.id=$2 AND task.id=$3 AND task.queue_kind='workflow'
+         WHERE owner.company_id=$1 AND owner.id=$2 AND task.id=$3
            AND owner.state='waiting' AND owner.waiting_reason='reconciliation' AND task.status='failed'
            AND owner.deadline>clock_timestamp() AND execution.activation<=owner.max_steps
            AND execution.activated_at IS NOT NULL AND execution.completed_at IS NULL
@@ -79,7 +79,7 @@ async fn all_other_gates(f: &AdmissionFixture, request: &ActionDispatchRequest) 
            AND (substring(admission.source_key FROM 4)::jsonb->>0)<>'child'
            AND NOT EXISTS(SELECT 1 FROM workflow_executions AS sibling
              JOIN background_tasks AS other ON other.company_id=sibling.company_id AND other.workflow_execution_id=sibling.id
-             WHERE sibling.company_id=$1 AND sibling.run_id=$2 AND other.queue_kind='workflow'
+             WHERE sibling.company_id=$1 AND sibling.run_id=$2
                AND other.id<>$3 AND other.status IN ('pending','processing')))"
     )
     .bind(request.scope().company.as_uuid())

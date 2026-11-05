@@ -1,0 +1,13 @@
+{
+  "worktree": "/Users/mac02/dev/openbot-recovery/.worktrees/fix-app-p08",
+  "branch": "fix-app/p08",
+  "base": "77edd70862a88e2189587fda50fb2b0b913082b6",
+  "port": 55408,
+  "role": "mac02",
+  "cluster": "/Users/mac02/dev/openbot-recovery/.worktrees/pg-p08",
+  "databases": [
+    "open_bots",
+    "open_bots_test"
+  ],
+  "target": "/Users/mac02/dev/openbot-recovery/.worktrees/fix-app-p08/target"
+}

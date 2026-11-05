@@ -114,12 +114,12 @@ impl UserUseCases {
             ));
         }
 
+        let hash = user
+            .password_hash
+            .as_deref()
+            .ok_or(AppError::InvalidCredentials)?;
         if !self
-            .verify_password(
-                change.current.expose_secret(),
-                &user.password_hash,
-                work_lifetime.clone(),
-            )
+            .verify_password(change.current.expose_secret(), hash, work_lifetime.clone())
             .await?
         {
             return Err(AppError::InvalidCredentials);

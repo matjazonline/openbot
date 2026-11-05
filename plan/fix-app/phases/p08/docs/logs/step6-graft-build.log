@@ -1,0 +1,4 @@
+✓ wiring: 17774 nodes (11994 function, 1819 struct, 1234 module, 1130 file, 849 constant, 474 enum, 141 interface, 112 type, 20 method, 1 class), 27977 edges, 1130 cards [javascript, python, rust]
+  parsed: 68 of 1130 files (1062 replayed from cache)
+  → /Users/mac02/dev/openbot-recovery/.worktrees/fix-app-p08/graft
+  graft/ is git-ignored (added automatically), a local cache; teammates run `graft build` to get their own.

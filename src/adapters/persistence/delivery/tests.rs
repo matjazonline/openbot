@@ -333,7 +333,7 @@ async fn one_key_per_destination_absorbs_a_repeat_and_keeps_two_recipients_apart
         &scope,
         DeliveryFixtureRequest {
             recipient: "one@example.com",
-            purpose: DeliveryPurpose::Outreach,
+            purpose: DeliveryPurpose::WorkflowSend,
             ..DeliveryFixtureRequest::new(
                 scope.company.id,
                 scope.channel.id,
@@ -351,7 +351,7 @@ async fn one_key_per_destination_absorbs_a_repeat_and_keeps_two_recipients_apart
         &scope,
         DeliveryFixtureRequest {
             recipient: "two@example.com",
-            purpose: DeliveryPurpose::Outreach,
+            purpose: DeliveryPurpose::WorkflowSend,
             ..DeliveryFixtureRequest::new(
                 scope.company.id,
                 scope.channel.id,
@@ -941,7 +941,7 @@ async fn a_dependent_delivery_waits_and_is_orphaned_when_its_root_dies() {
 
     // The root dies, and the sweep says so on the dependant rather than leaving it waiting for ever.
     sqlx::query(
-        "UPDATE message_deliveries SET status = 'dead_letter', attempt_count = max_attempts
+        "UPDATE message_deliveries SET status = 'dead_letter', attempt_count = max_attempts, last_error_class = 'invalid_payload'
           WHERE id = $1",
     )
     .bind(root.delivery.id.as_uuid())
@@ -1212,7 +1212,8 @@ async fn the_stuck_delivery_census_counts_each_stall_and_not_a_due_delivery() {
             sqlx::query(
                 "UPDATE message_deliveries
                     SET status = $2, available_at = CURRENT_TIMESTAMP - $3::interval,
-                        delivered_at = CASE WHEN $2 = 'delivered' THEN CURRENT_TIMESTAMP END
+                        delivered_at = CASE WHEN $2 = 'delivered' THEN CURRENT_TIMESTAMP END,
+                        last_error_class = CASE WHEN $2 IN ('retryable','dead_letter') THEN 'invalid_payload' END
                   WHERE id = $1",
             )
             .bind(id)
@@ -1250,3 +1251,186 @@ mod cancellation;
 
 #[path = "late_completion_tests.rs"]
 mod late_completion;
+
+#[tokio::test]
+async fn schema_constraint_delivery_failure_requires_class_and_bounded_detail() {
+    let database = own_database().await.expect("native delivery constraints");
+    let p = PostgresPersistence::new(database.pool.clone());
+    let scope = scope(&p).await;
+    let queued = queue(
+        &p,
+        &scope,
+        DeliveryFixtureRequest::new(
+            scope.company.id,
+            scope.channel.id,
+            scope.thread_id,
+            "error-constraints",
+        ),
+    )
+    .await;
+    struct FailureRow {
+        status: &'static str,
+        class: Option<&'static str>,
+        detail: Option<String>,
+    }
+    for row in [
+        FailureRow {
+            status: "retryable",
+            class: None,
+            detail: None,
+        },
+        FailureRow {
+            status: "dead_letter",
+            class: None,
+            detail: None,
+        },
+        FailureRow {
+            status: "pending",
+            class: None,
+            detail: Some("detail without class".into()),
+        },
+        FailureRow {
+            status: "pending",
+            class: Some("network"),
+            detail: Some("é".repeat(257)),
+        },
+    ] {
+        let error = sqlx::query("UPDATE message_deliveries SET status=$2,last_error_class=$3,last_error_detail=$4 WHERE id=$1")
+            .bind(queued.delivery.id.as_uuid()).bind(row.status).bind(row.class).bind(row.detail)
+            .execute(p.pool()).await.unwrap_err();
+        let error = error.as_database_error().unwrap();
+        assert_eq!(error.code().as_deref(), Some("23514"));
+        assert_eq!(error.constraint(), Some("message_deliveries_error_check"));
+    }
+    // Pending retries may retain a class, so parity is an implication rather than iff.
+    sqlx::query(
+        "UPDATE message_deliveries SET last_error_class='network',last_error_detail=$2 WHERE id=$1",
+    )
+    .bind(queued.delivery.id.as_uuid())
+    .bind("é".repeat(256))
+    .execute(p.pool())
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn schema_constraint_retired_delivery_purposes_and_identity_status_are_refused() {
+    let database = own_database().await.expect("native vocabulary constraints");
+    let p = PostgresPersistence::new(database.pool.clone());
+    let scope = scope(&p).await;
+    let queued = queue(
+        &p,
+        &scope,
+        DeliveryFixtureRequest::new(
+            scope.company.id,
+            scope.channel.id,
+            scope.thread_id,
+            "vocabulary-constraints",
+        ),
+    )
+    .await;
+    for purpose in ["reply", "mirror", "outreach"] {
+        assert!(
+            purpose
+                .parse::<crate::entities::transport::DeliveryPurpose>()
+                .is_err()
+        );
+        let error = sqlx::query("UPDATE message_deliveries SET purpose=$2 WHERE id=$1")
+            .bind(queued.delivery.id.as_uuid())
+            .bind(purpose)
+            .execute(p.pool())
+            .await
+            .unwrap_err();
+        assert_eq!(
+            error
+                .as_database_error()
+                .and_then(|error| error.constraint()),
+            Some("message_deliveries_purpose_check")
+        );
+    }
+    assert!(
+        "disabled"
+            .parse::<crate::entities::participant::IdentityStatus>()
+            .is_err()
+    );
+    let identity: Uuid =
+        sqlx::query_scalar("SELECT id FROM participant_identities WHERE company_id=$1 LIMIT 1")
+            .bind(scope.company.id)
+            .fetch_one(p.pool())
+            .await
+            .unwrap();
+    let error = sqlx::query(
+        "UPDATE participant_identities SET status='disabled' WHERE company_id=$1 AND id=$2",
+    )
+    .bind(scope.company.id)
+    .bind(identity)
+    .execute(p.pool())
+    .await
+    .unwrap_err();
+    assert_eq!(
+        error
+            .as_database_error()
+            .and_then(|error| error.constraint()),
+        Some("participant_identities_status_check")
+    );
+}
+
+#[tokio::test]
+async fn jsonb_row_context_delivery_reports_id_before_creating_queue_rows() {
+    let database = own_database().await.unwrap();
+    let p = PostgresPersistence::new(database.pool.clone());
+    let scope = scope(&p).await;
+    let fixture = delivery_fixture(
+        &p,
+        DeliveryFixtureRequest::new(
+            scope.company.id,
+            scope.channel.id,
+            scope.thread_id,
+            "json-broken",
+        ),
+    )
+    .await;
+    sqlx::query("UPDATE messages SET structured_response=jsonb_build_object('body',clean_text_body,'fingerprint',repeat('a',64),'contract',jsonb_build_object('version',1,'format','unsupported','schema','{}'::jsonb)) WHERE id=$1")
+        .bind(fixture.delivery.message_id.as_uuid()).execute(p.pool()).await.unwrap();
+    let mut tx = p.pool().begin().await.unwrap();
+    let error = enqueue::insert_delivery_on(&mut tx, &fixture.delivery)
+        .await
+        .unwrap_err();
+    assert!(matches!(error, crate::app_error::AppError::Internal(_)));
+    assert!(
+        error
+            .to_string()
+            .contains(&fixture.delivery.id.as_uuid().to_string())
+    );
+    assert!(
+        error
+            .to_string()
+            .contains("Unsupported or oversized response_contract")
+    );
+    tx.rollback().await.unwrap();
+    let count: i64 = sqlx::query_scalar("SELECT count(*) FROM message_deliveries")
+        .fetch_one(p.pool())
+        .await
+        .unwrap();
+    assert_eq!(count, 0);
+    let count: i64 = sqlx::query_scalar("SELECT count(*) FROM message_delivery_parts")
+        .fetch_one(p.pool())
+        .await
+        .unwrap();
+    assert_eq!(count, 0);
+    let good = queue(
+        &p,
+        &scope,
+        DeliveryFixtureRequest::new(
+            scope.company.id,
+            scope.channel.id,
+            scope.thread_id,
+            "json-good",
+        ),
+    )
+    .await;
+    assert_eq!(
+        status_of(&p, good.delivery.id).await,
+        DeliveryStatus::Pending
+    );
+}

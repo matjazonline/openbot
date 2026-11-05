@@ -165,12 +165,12 @@ async fn install(
     policy: LeasePolicy,
 ) -> AppResult<()> {
     let scope = fence.scope;
-    let changed = sqlx::query("UPDATE background_tasks SET status='processing', worker_id=$4, execution_generation=$5, locked_at=clock_timestamp(), lock_expires_at=LEAST(clock_timestamp()+make_interval(secs => $6), (SELECT deadline FROM workflow_runs WHERE company_id=$1 AND id=$7)) WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 AND queue_kind='workflow' AND status='pending' AND retry_count < max_retries AND run_at <= clock_timestamp() AND EXISTS (SELECT 1 FROM workflow_runs AS run WHERE run.company_id=$1 AND run.id=$7 AND run.state IN ('queued','running') AND run.deadline > clock_timestamp())")
+    let changed = sqlx::query("UPDATE background_tasks SET status='processing', worker_id=$4, execution_generation=$5, locked_at=clock_timestamp(), lock_expires_at=LEAST(clock_timestamp()+make_interval(secs => $6), (SELECT deadline FROM workflow_runs WHERE company_id=$1 AND id=$7)) WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3  AND status='pending' AND retry_count < max_retries AND run_at <= clock_timestamp() AND EXISTS (SELECT 1 FROM workflow_runs AS run WHERE run.company_id=$1 AND run.id=$7 AND run.state IN ('queued','running') AND run.deadline > clock_timestamp())")
         .bind(scope.company.as_uuid()).bind(scope.job.0).bind(scope.execution.as_uuid()).bind(fence.worker.0).bind(fence.generation.0).bind(policy.duration().as_secs_f64()).bind(scope.run.as_uuid()).execute(&mut *db).await?;
     if changed.rows_affected() != 1 {
         return Err(refused("lease claim"));
     }
-    sqlx::query("INSERT INTO task_attempts (id,task_id,attempt_number,execution_generation,status,worker_id,machine_id,started_at) VALUES (gen_random_uuid(),$1,$2,$3,'processing',$4,'workflow',clock_timestamp())")
+    sqlx::query("INSERT INTO task_attempts (id,task_id,attempt_number,execution_generation,status,worker_id,started_at) VALUES (gen_random_uuid(),$1,$2,$3,'processing',$4,clock_timestamp())")
         .bind(scope.job.0).bind(fence.attempt.0).bind(fence.generation.0).bind(fence.worker.0).execute(&mut *db).await?;
     sqlx::query(
         "UPDATE workflow_runs SET state='running' WHERE company_id=$1 AND id=$2 AND state='queued'",

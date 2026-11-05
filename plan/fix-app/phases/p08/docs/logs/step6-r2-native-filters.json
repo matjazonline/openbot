@@ -1,0 +1,22 @@
+{
+  "filters": {
+    "adapters::persistence::workflow::": 1090,
+    "schema_constraint_": 13,
+    "jsonb_row_context_": 4,
+    "adapters::persistence::dashboard::": 7,
+    "adapters::http::pages::dashboard::": 23,
+    "adapters::http::pages::tests::": 120,
+    "adapters::persistence::thread::": 64,
+    "adapters::persistence::mcp": 6,
+    "adapters::persistence::delivery::": 39,
+    "adapters::persistence::notification": 6,
+    "application::use_cases::user::": 23,
+    "adapters::persistence::user::": 12,
+    "adapters::persistence::auth_": 13,
+    "model_usage": 12,
+    "application::transport::tests::": 6,
+    "adapters::protocols::email::egress::tests::": 21,
+    "application::services::delivery_worker::tests::": 10
+  },
+  "selected_unique": 1448
+}

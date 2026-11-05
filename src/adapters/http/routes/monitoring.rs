@@ -38,7 +38,7 @@ mod tests {
             username: "operator".into(),
             email: "OPERATOR@example.com".into(),
             email_verified_at: None,
-            password_hash: String::new(),
+            password_hash: None,
             avatar_url: None,
             created_at: chrono::Utc::now(),
         };

@@ -1,0 +1,34 @@
+[
+  {
+    "file": "migrations/20260817000000_init_schema.sql",
+    "changed_lines": 6
+  },
+  {
+    "file": "src/adapters/persistence/dashboard.rs",
+    "changed_lines": 3
+  },
+  {
+    "file": "src/adapters/persistence/workflow/action_reconciliation_child_policy_tests.rs",
+    "changed_lines": 2
+  },
+  {
+    "file": "src/adapters/persistence/workflow/action_reconciliation_claim_abort_probes.rs",
+    "changed_lines": 2
+  },
+  {
+    "file": "src/adapters/persistence/workflow/action_reconciliation_claim_sql_historical_tests.rs",
+    "changed_lines": 1
+  },
+  {
+    "file": "src/adapters/persistence/workflow/action_reconciliation_eligibility_poison_tests.rs",
+    "changed_lines": 2
+  },
+  {
+    "file": "src/adapters/persistence/workflow/action_reconciliation_eligibility_remaining_tests.rs",
+    "changed_lines": 1
+  },
+  {
+    "file": "src/adapters/persistence/workflow/token_budget.rs",
+    "changed_lines": 1
+  }
+]
