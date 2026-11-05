@@ -37,7 +37,7 @@ pub fn knowledge_library(
 <h1 class="text-2xl font-bold">Knowledge</h1><p>Upload reference documents for your team. Your access level is {level}.</p>{feedback}
 <form method="post" enctype="multipart/form-data" action="/ui/knowledge/upload?company_id={company}" class="card bg-base-200 p-4 space-y-3" data-submit="busy-once" data-pending-label="Indexing…">
 <label for="knowledge-files" class="font-medium">Files</label><input id="knowledge-files" class="file-input w-full" type="file" name="files" multiple accept=".txt,.md,text/plain,text/markdown" required aria-describedby="knowledge-help">
-<p id="knowledge-help" class="text-sm text-base-content/70">Use UTF-8 .txt or .md files with a level prefix, such as 0_sales.md or 5-sales.md. Upload up to your own level. Up to 10 files, 1 MiB each; 10 MiB and 4096 file layers per company. A matching name and level replaces that layer. Very long headings or more than 4096 chunks per file (8192 per upload) are refused.</p>
+<p id="knowledge-help" class="text-sm text-base-content/70">Use UTF-8 .txt or .md files with a level prefix, such as 0_sales.md or 5-sales.md. Upload up to your own level. Up to 10 files, 1 MiB each; 10 MiB, 4096 file layers and 8192 indexed chunks per company. A matching name and level replaces that layer. Very long headings or more than 4096 chunks per file (8192 per upload) are refused.</p>
 {upload_button}</form><div class="space-y-4">{entries}</div></div></main>"#,
         upload_button = super::onboarding::busy_submit_button("Upload and index"),
         level = view.actor.access_level.as_i16()

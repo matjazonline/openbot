@@ -88,7 +88,11 @@ impl Session {
                 )?;
                 (output, SampleEffectKind::WorkflowChild)
             }
-            ToolKind::Message | ToolKind::Provisioning | ToolKind::Slot(_) | ToolKind::Http => {
+            ToolKind::Message
+            | ToolKind::Provisioning
+            | ToolKind::Knowledge
+            | ToolKind::Slot(_)
+            | ToolKind::Http => {
                 let output = fixture.ok_or_else(|| {
                     refused("External tool needs a fixture output; no production fallback exists")
                 })?;

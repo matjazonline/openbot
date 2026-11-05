@@ -67,7 +67,12 @@ impl WorkflowBinding<'_> {
             .iter()
             .map(|tool| ToolDefinition {
                 name: tool.declared.clone(),
-                description: format!("Workflow tool {}", tool.name),
+                description: match tool.target {
+                    crate::application::workflow::agent::AgentToolTarget::Knowledge => {
+                        crate::application::workflow::knowledge::KNOWLEDGE_TOOL_DESCRIPTION.into()
+                    }
+                    _ => format!("Workflow tool {}", tool.name),
+                },
                 parameters: tool.input_schema.clone(),
             })
             .collect()

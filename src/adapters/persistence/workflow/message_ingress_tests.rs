@@ -33,6 +33,9 @@ mod provisioning_runtime_tests;
 #[path = "reviewed_delivery_tests.rs"]
 mod reviewed_delivery_tests;
 
+#[path = "message_ingress_composition.rs"]
+mod composition;
+
 const CUSTOMER: &str = "customer@partner.test";
 
 /// The production engine and ingest over one company: a `support` channel the customer may
@@ -108,21 +111,7 @@ impl Deployment {
                 .register(Arc::new(EmailRenderer::new(APP_DOMAIN)))
                 .unwrap(),
         );
-        let engine = WorkflowEngine::new(
-            p.clone(),
-            "https://agents.test",
-            APP_DOMAIN,
-            DeliveryComposer::new(renderers.clone(), Arc::new(p.clone())),
-            Arc::new(crate::adapters::mcp::HttpMcpClient::new(
-                crate::adapters::mcp::policy::EndpointPolicy::default(),
-            )),
-            Arc::new(crate::adapters::monitoring::InMemoryMonitor::new()),
-            // One slot: this test database's pool holds five connections, and a slot needs two
-            // while the intent worker, the schedule materializer and this test's polling need
-            // one each (WF-P08-F029).
-            1,
-        )
-        .unwrap();
+        let engine = composition::engine(&p, &config, renderers.clone());
         let shared = Arc::new(p.clone());
         let threads = ThreadUseCases::new(
             ThreadStores {

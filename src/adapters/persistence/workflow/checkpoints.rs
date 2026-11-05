@@ -519,3 +519,6 @@ mod models;
 
 #[path = "checkpoint_updates.rs"]
 mod updates;
+
+#[path = "knowledge_checkpoint.rs"]
+mod knowledge;

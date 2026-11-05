@@ -130,9 +130,14 @@ impl TextEmbedder for Model {
         ])
     }
     fn embed_query(&self, _: &str) -> AppResult<[f32; 384]> {
-        panic!("unused")
+        self.embed_passages(&["query"])?
+            .pop()
+            .ok_or_else(|| AppError::ServiceUnavailable("Missing test model output".into()))
     }
 }
+
+#[path = "query_embedding_tests.rs"]
+mod queries;
 #[tokio::test(start_paused = true)]
 async fn knowledge_upload_cancellation_retains_actual_native_permit_and_bounded_shutdown_never_writes()
  {

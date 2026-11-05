@@ -10,6 +10,10 @@ use std::sync::Arc;
 use uuid::Uuid;
 mod constraints;
 mod races;
+#[path = "search_tests.rs"]
+mod search;
+#[path = "search_quota_tests.rs"]
+mod search_quota;
 struct Fixture {
     pool: PgPool,
     store: Arc<PostgresPersistence>,

@@ -226,6 +226,7 @@ fn frozen_tools(bundle: &PublishedBundle) -> String {
             let kind = match tool.kind() {
                 ToolKind::Message => "built-in message tool".to_owned(),
                 ToolKind::Provisioning => "built-in provisioning tool".to_owned(),
+                ToolKind::Knowledge => "knowledge search".to_owned(),
                 ToolKind::Slot(slot) => format!("through slot {}", slot.as_str()),
                 ToolKind::Http => "company HTTP operation".to_owned(),
                 ToolKind::Workflow(pin) => format!(

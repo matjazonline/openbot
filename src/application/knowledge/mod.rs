@@ -1,13 +1,16 @@
 //! Synchronous, bounded library indexing; provider and persistence types stay behind ports.
 mod admission;
 mod chunking;
+pub mod search;
 mod service;
+#[cfg(test)]
+pub mod test_support;
 mod types;
 mod vectors;
 mod visibility;
 pub use admission::UploadAdmissionRefused;
 pub use chunking::{KnowledgeChunk, chunk_document};
-pub use service::KnowledgeLibrary;
+pub use service::{KnowledgeLibrary, QueryEmbedding};
 pub use types::*;
 pub use vectors::normalize_embedding;
 pub use visibility::PayloadVisibility;

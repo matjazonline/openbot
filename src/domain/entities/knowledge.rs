@@ -11,6 +11,8 @@ pub const MAX_KNOWLEDGE_FILES: usize = 10;
 pub const MAX_KNOWLEDGE_FILE_BYTES: usize = 1024 * 1024;
 pub const MAX_COMPANY_KNOWLEDGE_BYTES: usize = 10 * MAX_KNOWLEDGE_FILE_BYTES;
 pub const MAX_COMPANY_KNOWLEDGE_LAYERS: usize = 4096;
+/// Bounds the vectors and repeated heading paths loaded by one exact hybrid scan.
+pub const MAX_COMPANY_KNOWLEDGE_CHUNKS: usize = 8192;
 pub const EMBEDDING_DIMENSIONS: usize = 384;
 
 #[derive(Debug, Clone, PartialEq, Eq)]

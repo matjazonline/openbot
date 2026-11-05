@@ -1,6 +1,7 @@
 //! Short, company-serialized knowledge operations. Model work never runs in these transactions.
 mod bounds;
 mod rows;
+mod search;
 mod writes;
 use super::{PostgresPersistence, company_invite::authority};
 use crate::{

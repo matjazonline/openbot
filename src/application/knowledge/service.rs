@@ -13,6 +13,10 @@ use tokio::{
 };
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 
+#[path = "query_embedding.rs"]
+mod query;
+pub use query::QueryEmbedding;
+
 const INDEXING_DEADLINE: Duration = Duration::from_secs(30);
 pub struct KnowledgeLibrary {
     documents: Arc<dyn KnowledgeDocuments>,

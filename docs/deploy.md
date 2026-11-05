@@ -69,6 +69,13 @@ the expected path. There is no runtime download, fallback model or first-request
 public-fixture quality, shape, timing and peak resident-memory measurements. Normal unit/database
 tests use an explicit fake embedder.
 
+Knowledge search returns five passages by default. `KNOWLEDGE_SEARCH_TOP_K` accepts integers from
+1 through 8; startup rejects other values. A company can store at most 8192 indexed chunks, in
+addition to the 10 MiB text and 4096 file-layer limits. An upload that would exceed a limit is
+rejected as a whole. Search and uploads share the same model and processing slot; busy or timed
+out searches return retryable errors. A search question must also fit the local model's 512-token
+input limit, including its prefix and special tokens.
+
 The Linux/aarch64 image probe with two CPUs measured about **1452 MiB cold peak RSS**, including
 four 512-token passages. `fly.toml` therefore provisions **2 GiB**. CI requires
 `scripts/check-knowledge-image.py --image <built-image>` to pass under a **hard 2048 MiB container

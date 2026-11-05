@@ -25,6 +25,7 @@ pub mod guard;
 pub mod history;
 pub mod http;
 pub mod jev;
+pub mod knowledge;
 pub mod lease;
 pub mod lifecycle;
 pub mod manual;

@@ -133,15 +133,25 @@ pub(super) async fn project_quota(
 struct Usage {
     layers: i64,
     bytes: i64,
+    chunks: i64,
 }
 pub(super) async fn check_quota(
     tx: &mut Transaction<'_, Postgres>,
     scope: KnowledgeScope,
 ) -> AppResult<()> {
-    let usage=sqlx::query_as::<_,Usage>("SELECT count(*) AS layers,coalesce(sum(octet_length(content)),0)::bigint AS bytes FROM knowledge_documents WHERE company_id=$1")
-        .bind(scope.company.as_uuid()).fetch_one(&mut **tx).await.map_err(authority::database)?;
+    let usage = sqlx::query_as::<_, Usage>(
+        "SELECT count(*) AS layers,
+        coalesce(sum(octet_length(document.content)),0)::bigint AS bytes,
+        (SELECT count(*) FROM knowledge_chunks AS chunk WHERE chunk.company_id=$1) AS chunks
+        FROM knowledge_documents AS document WHERE document.company_id=$1",
+    )
+    .bind(scope.company.as_uuid())
+    .fetch_one(&mut **tx)
+    .await
+    .map_err(authority::database)?;
     if usage.layers > MAX_COMPANY_KNOWLEDGE_LAYERS as i64
         || usage.bytes > MAX_COMPANY_KNOWLEDGE_BYTES as i64
+        || usage.chunks > MAX_COMPANY_KNOWLEDGE_CHUNKS as i64
     {
         return Err(quota());
     }

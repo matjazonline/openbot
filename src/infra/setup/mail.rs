@@ -27,15 +27,17 @@ pub(super) fn workflow(
     Ok(Arc::new(
         crate::infra::workflow::WorkflowEngine::new(
             (*f.persistence).clone(),
-            &f.config.public_base_url(),
-            &f.config.app_domain_name,
-            mail.composer.clone(),
-            clients.mcp.clone(),
-            f.monitoring.clone(),
-            crate::infra::workflow::worker_slots(
-                std::env::var("WORKFLOW_WORKER_SLOTS").ok().as_deref(),
-                crate::infra::db::max_connections(),
-            )?,
+            crate::infra::workflow::WorkflowEngineSetup {
+                config: &f.config,
+                composer: mail.composer.clone(),
+                mcp_client: clients.mcp.clone(),
+                monitoring: f.monitoring.clone(),
+                slots: crate::infra::workflow::worker_slots(
+                    std::env::var("WORKFLOW_WORKER_SLOTS").ok().as_deref(),
+                    crate::infra::db::max_connections(),
+                )?,
+                knowledge: f.knowledge.clone(),
+            },
         )?
         .with_jev_assets(Arc::new(
             crate::adapters::workflow_jev::JevAssetReader::new(

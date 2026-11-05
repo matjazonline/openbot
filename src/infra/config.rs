@@ -72,6 +72,7 @@ fn parse_smtp_allow_plaintext_local(value: Option<&str>) -> bool {
 
 pub struct AppConfig {
     pub knowledge_model_dir: std::path::PathBuf,
+    pub knowledge_search_limit: crate::application::knowledge::search::KnowledgeSearchLimit,
     pub jwt_secret: String,
     pub auth_attempt_secret: crate::use_cases::user::AuthAttemptSecret,
     pub refresh_token_ttl: Duration,
@@ -113,6 +114,31 @@ pub struct AppConfig {
     pub sendgrid_inbound: Option<SendGridInboundConfig>,
     /// How this deployment reaches Resend, for the companies that have configured an account.
     pub resend_api: ResendApiConfig,
+}
+
+fn knowledge_search_limit_from_env() -> crate::application::knowledge::search::KnowledgeSearchLimit
+{
+    match env::var("KNOWLEDGE_SEARCH_TOP_K") {
+        Ok(value) => parse_knowledge_search_limit(Some(&value)),
+        Err(env::VarError::NotPresent) => parse_knowledge_search_limit(None),
+        Err(env::VarError::NotUnicode(_)) => {
+            panic!("KNOWLEDGE_SEARCH_TOP_K must be an integer from 1 to 8")
+        }
+    }
+}
+
+fn parse_knowledge_search_limit(
+    value: Option<&str>,
+) -> crate::application::knowledge::search::KnowledgeSearchLimit {
+    use crate::application::knowledge::search::KnowledgeSearchLimit;
+    match value {
+        None => KnowledgeSearchLimit::default(),
+        Some(value) => value
+            .parse::<usize>()
+            .ok()
+            .and_then(|value| KnowledgeSearchLimit::new(value).ok())
+            .expect("KNOWLEDGE_SEARCH_TOP_K must be an integer from 1 to 8"),
+    }
 }
 
 fn parse_auth_attempt_secret(
@@ -581,6 +607,7 @@ impl AppConfig {
 
         Self {
             knowledge_model_dir: crate::adapters::embedding::model_directory_from_env(),
+            knowledge_search_limit: knowledge_search_limit_from_env(),
             jwt_secret,
             auth_attempt_secret,
             refresh_token_ttl: Duration::days(refresh_token_ttl_days),
@@ -664,6 +691,8 @@ impl AppConfig {
     pub fn for_test() -> Self {
         Self {
             knowledge_model_dir: std::path::PathBuf::from("/test/no-model-required"),
+            knowledge_search_limit:
+                crate::application::knowledge::search::KnowledgeSearchLimit::default(),
             jwt_secret: "a-test-secret-long-enough-to-sign-with-01".to_string(),
             auth_attempt_secret: "a-distinct-auth-attempt-test-secret-02".into(),
             refresh_token_ttl: Duration::days(30),
@@ -701,6 +730,18 @@ mod tests {
 
     /// Long enough to pass the startup check, which is itself part of what is under test.
     const TEST_SECRET: &str = "a-test-secret-long-enough-to-sign-with-01";
+
+    #[test]
+    fn knowledge_search_config_limit_defaults_to_five_and_rejects_invalid_bounds() {
+        assert_eq!(parse_knowledge_search_limit(None).get(), 5);
+        assert_eq!(parse_knowledge_search_limit(Some("1")).get(), 1);
+        assert_eq!(parse_knowledge_search_limit(Some("8")).get(), 8);
+        for value in ["0", "9", "-1", "invalid", ""] {
+            assert!(
+                std::panic::catch_unwind(|| parse_knowledge_search_limit(Some(value))).is_err()
+            );
+        }
+    }
 
     #[test]
     fn runtime_thread_stack_is_bounded_and_defaults_to_sixteen_mebibytes() {

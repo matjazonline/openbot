@@ -19,7 +19,7 @@ use crate::{
 };
 use async_trait::async_trait;
 use secrecy::SecretString;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
@@ -30,7 +30,7 @@ const MAX_DECLARED_NAME: usize = 64;
 
 /// The concrete dispatch edge resolved at preparation. A saved call follows this
 /// target; a later registry rebind is refused at dispatch rather than followed.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum AgentToolTarget {
     Http {
@@ -46,13 +46,16 @@ pub enum AgentToolTarget {
     Provisioning {
         name: TypeName,
     },
+    /// Local, read-only retrieval with an atomic canonical observation and classification rise.
+    Knowledge,
     /// A pinned child workflow (07-D2 §D2.3); dispatched without ActionService.
     Workflow {
         pin: WorkflowToolPin,
     },
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct PreparedTool {
     /// Provider-safe declaration; the only name through which a saved call dispatches.
     pub declared: String,
@@ -261,6 +264,9 @@ fn prepared_tool(snapshot: &ToolSnapshot, target: AgentToolTarget) -> AppResult<
     let consistent = match (&target, snapshot.kind()) {
         (AgentToolTarget::Message { name: target }, ToolKind::Message) => target == &name,
         (AgentToolTarget::Provisioning { name: target }, ToolKind::Provisioning) => target == &name,
+        (AgentToolTarget::Knowledge, ToolKind::Knowledge) => {
+            super::knowledge::is_trusted_knowledge_snapshot(snapshot)?
+        }
         (AgentToolTarget::Mcp { slot }, ToolKind::Slot(frozen)) => frozen == slot,
         (AgentToolTarget::Http { .. }, ToolKind::Http) => true,
         (AgentToolTarget::Workflow { pin }, ToolKind::Workflow(frozen)) => frozen == pin,

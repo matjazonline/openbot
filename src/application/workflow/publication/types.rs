@@ -123,6 +123,8 @@ pub enum ToolKind<'a> {
     /// A trusted built-in provisioning tool (p08 D2.1). Only a name-only snapshot carries a
     /// provisioning name this way; an MCP tool of the same name stays a slot tool.
     Provisioning,
+    /// A name-only, exactly verified local knowledge search built-in.
+    Knowledge,
     /// A tool reached through one of the workflow's resource slots (MCP or slot-bound HTTP).
     Slot(&'a ResourceName),
     /// A company HTTP operation registered by name.
@@ -147,6 +149,13 @@ impl ToolSnapshot {
             )
         {
             return ToolKind::Provisioning;
+        }
+        if self.contract.connection.is_none()
+            && crate::application::workflow::knowledge::is_builtin_knowledge_tool(
+                self.contract.name.as_str(),
+            )
+        {
+            return ToolKind::Knowledge;
         }
         match &self.contract.connection {
             Some(slot) => ToolKind::Slot(slot),

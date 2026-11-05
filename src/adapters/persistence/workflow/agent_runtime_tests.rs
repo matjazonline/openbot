@@ -772,6 +772,9 @@ mod recovery;
 #[path = "agent_model_step_tests.rs"]
 mod model_steps;
 
+#[path = "knowledge_search_tests.rs"]
+mod knowledge_search;
+
 #[tokio::test]
 async fn knowledge_run_level_model_continues_after_refused_http_tool_without_egress() {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();

@@ -1186,6 +1186,8 @@ mod tests {
 
         let config = Arc::new(AppConfig {
             knowledge_model_dir: std::path::PathBuf::from("/test/no-model-required"),
+            knowledge_search_limit:
+                crate::application::knowledge::search::KnowledgeSearchLimit::default(),
             auth_attempt_secret: "a-distinct-auth-attempt-test-secret-02".into(),
             jwt_secret: "secret".to_string(),
             sendgrid_inbound: None,
@@ -1406,6 +1408,8 @@ regis";
 
         let config = Arc::new(AppConfig {
             knowledge_model_dir: std::path::PathBuf::from("/test/no-model-required"),
+            knowledge_search_limit:
+                crate::application::knowledge::search::KnowledgeSearchLimit::default(),
             auth_attempt_secret: "a-distinct-auth-attempt-test-secret-02".into(),
             jwt_secret: "secret".to_string(),
             sendgrid_inbound: None,
@@ -1528,6 +1532,8 @@ Message-ID: <CAGj=2VKEn_MHfovWkBCqn4sp3AXPR=ZTLMso=mPjWtnMDStiRw@mail.gmail.com>
         let thread_persistence = Arc::new(InMemoryThreads::new());
         let config = Arc::new(AppConfig {
             knowledge_model_dir: std::path::PathBuf::from("/test/no-model-required"),
+            knowledge_search_limit:
+                crate::application::knowledge::search::KnowledgeSearchLimit::default(),
             auth_attempt_secret: "a-distinct-auth-attempt-test-secret-02".into(),
             jwt_secret: "secret".to_string(),
             sendgrid_inbound: None,

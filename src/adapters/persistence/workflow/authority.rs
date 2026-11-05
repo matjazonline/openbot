@@ -135,6 +135,7 @@ pub(super) async fn supported_publication(
                     builtin_message_tool(tool)?;
                 }
                 ToolKind::Provisioning => builtin_provisioning_tool(tool)?,
+                ToolKind::Knowledge => builtin_knowledge_tool(tool)?,
                 ToolKind::Http => {
                     http::registered_on(tx, current.company_id(), tool).await?;
                 }
@@ -160,4 +161,12 @@ pub(super) async fn supported_publication(
         );
     }
     Ok(())
+}
+
+pub(super) fn builtin_knowledge_tool(tool: &ToolSnapshot) -> AppResult<()> {
+    if crate::application::workflow::knowledge::is_trusted_knowledge_snapshot(tool)? {
+        Ok(())
+    } else {
+        Err(missing())
+    }
 }

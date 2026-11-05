@@ -3,11 +3,12 @@
 //! equality, so a caller can never persist a forged or widened agent capability.
 use super::http::begin_http;
 use super::*;
+use crate::application::workflow::knowledge::{
+    builtin_knowledge_snapshot, is_builtin_knowledge_tool,
+};
 use crate::application::workflow::lifecycle::{PublicationDependencies, PublicationDirectory};
 use crate::application::workflow::message::{MessageKind, builtin_message_snapshot};
-use crate::application::workflow::provisioning::{
-    ProvisioningKind, builtin_provisioning_snapshot, is_trusted_provisioning_snapshot,
-};
+use crate::application::workflow::provisioning::{ProvisioningKind, builtin_provisioning_snapshot};
 use crate::application::workflow::templates::CompanyWorkflowDraft;
 use serde_json::Value;
 
@@ -296,15 +297,10 @@ async fn granted_tool(
             "Agent tool {name} conflicts with another tool of the same name in this workflow"
         ))
     };
-    // A provisioning name resolves to the built-in before anything captured (p08 D2.1, F047): an
-    // MCP tool of that name stays a slot tool and must never answer the grant.
-    if let Some(kind) = ProvisioningKind::parse(name.as_str()) {
-        let mut known = captured.iter().filter(|tool| &tool.contract.name == name);
-        return match (known.next(), known.next()) {
-            (None, _) => Ok(Some(builtin_provisioning_snapshot(company, kind)?)),
-            (Some(tool), None) if is_trusted_provisioning_snapshot(tool)? => Ok(None),
-            _ => Err(ambiguous()),
-        };
+    match granted_builtin(company, name, captured)? {
+        BuiltinGrant::New(snapshot) => return Ok(Some(*snapshot)),
+        BuiltinGrant::Captured => return Ok(None),
+        BuiltinGrant::Other => {}
     }
     let workflow = super::workflow_tools::workflow_tool_snapshot(tx, company, name).await?;
     let known: Vec<&ToolSnapshot> = captured
@@ -327,7 +323,7 @@ async fn granted_tool(
         ([tool], None)
             if match tool.kind() {
                 ToolKind::Message | ToolKind::Http => true,
-                ToolKind::Provisioning => false,
+                ToolKind::Provisioning | ToolKind::Knowledge => false,
                 ToolKind::Slot(slot) => {
                     super::resources::slot_kind(definition, slot) == Some("mcp")
                 }
@@ -365,6 +361,40 @@ async fn granted_tool(
         ))),
         _ => Err(refused(format!(
             "Agent tool {name} is registered on several connections"
+        ))),
+    }
+}
+
+enum BuiltinGrant {
+    Other,
+    Captured,
+    New(Box<ToolSnapshot>),
+}
+
+/// Built-ins resolve before external captures; an equal external name never answers the grant.
+fn granted_builtin(
+    company: CompanyId,
+    name: &TypeName,
+    captured: &[ToolSnapshot],
+) -> AppResult<BuiltinGrant> {
+    let trusted = if let Some(kind) = ProvisioningKind::parse(name.as_str()) {
+        builtin_provisioning_snapshot(company, kind)?
+    } else if is_builtin_knowledge_tool(name.as_str()) {
+        builtin_knowledge_snapshot(company)?
+    } else {
+        return Ok(BuiltinGrant::Other);
+    };
+    let mut known = captured.iter().filter(|tool| &tool.contract.name == name);
+    match (known.next(), known.next()) {
+        (None, _) => Ok(BuiltinGrant::New(Box::new(trusted))),
+        (Some(tool), None)
+            if serde_json::to_value(tool).map_err(|_| invalid())?
+                == serde_json::to_value(trusted).map_err(|_| invalid())? =>
+        {
+            Ok(BuiltinGrant::Captured)
+        }
+        _ => Err(refused(format!(
+            "Agent tool {name} conflicts with another tool of the same name in this workflow"
         ))),
     }
 }

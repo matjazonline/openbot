@@ -186,83 +186,136 @@ pub struct WorkflowEngine {
     pub worker_wakeups: Arc<Notify>,
 }
 
+/// Named composition inputs keep the shared model explicit and avoid positional domain/URL arguments.
+pub struct WorkflowEngineSetup<'a> {
+    pub config: &'a crate::infra::config::AppConfig,
+    pub composer: DeliveryComposer,
+    pub mcp_client: Arc<dyn McpClient>,
+    pub monitoring: Arc<dyn MonitoringService>,
+    pub slots: usize,
+    pub knowledge: Arc<crate::application::knowledge::KnowledgeLibrary>,
+}
+
+struct ToolRuntimes {
+    http: Arc<HttpRuntime>,
+    mcp: Arc<McpRuntime>,
+    message: Arc<MessageRuntime>,
+    dispatch: AgentActionTools,
+}
+
+fn compose_tools(
+    persistence: &PostgresPersistence,
+    setup: &WorkflowEngineSetup<'_>,
+    notices: &DecisionNotices,
+    templates: &ProvisioningDeployment,
+    lease: LeasePolicy,
+) -> ToolRuntimes {
+    let http = Arc::new(HttpRuntime::with_approvals(
+        persistence.clone(),
+        HttpDestinationPolicy::default(),
+        lease,
+        Some(notices.clone()),
+    ));
+    let mcp = Arc::new(McpRuntime::with_approvals(
+        persistence.clone(),
+        setup.mcp_client.clone(),
+        lease,
+        Some(notices.clone()),
+    ));
+    let message = Arc::new(MessageRuntime::with_approvals(
+        persistence.clone(),
+        setup.composer.clone(),
+        setup.config.app_domain_name.clone(),
+        lease,
+        Some(notices.clone()),
+    ));
+    let provisioning = Arc::new(ProvisioningRuntime::new(
+        persistence.clone(),
+        ProvisioningEffects::new(templates.clone()),
+        lease,
+    ));
+    let store = Arc::new(persistence.clone());
+    let knowledge = crate::application::workflow::knowledge::KnowledgeSearchRuntime::new(
+        setup.knowledge.clone(),
+        store.clone(),
+        store,
+        setup.config.knowledge_search_limit,
+    );
+    let dispatch = AgentActionTools::new(http.clone(), mcp.clone(), message.clone())
+        .with_workflow_tools(Arc::new(persistence.clone()))
+        .with_provisioning(provisioning)
+        .with_knowledge(Arc::new(knowledge));
+    ToolRuntimes {
+        http,
+        mcp,
+        message,
+        dispatch,
+    }
+}
+
+fn compose_handler(
+    persistence: &PostgresPersistence,
+    setup: &WorkflowEngineSetup<'_>,
+    notices: &DecisionNotices,
+    templates: &ProvisioningDeployment,
+    lease: LeasePolicy,
+) -> anyhow::Result<Arc<ProductionHandler>> {
+    let tools = compose_tools(persistence, setup, notices, templates, lease);
+    let agent = WorkflowAgentRuntime::new(
+        ProviderRegistry::standard().map_err(|error| anyhow::anyhow!("{error}"))?,
+        persistence.clone(),
+        tools.dispatch,
+        Some(notices.clone()),
+        lease,
+    );
+    Ok(Arc::new(ProductionHandler {
+        jev: crate::application::workflow::jev::JevRuntime::new(
+            persistence.clone(),
+            Arc::new(crate::adapters::workflow_jev::JevHttp::new()?),
+            lease,
+        ),
+        agent,
+        http: tools.http,
+        mcp: tools.mcp,
+        message: tools.message,
+        history: WorkflowHistoryRuntime::new(persistence.clone()),
+    }))
+}
+
 impl WorkflowEngine {
-    /// `public_base_url` is `AppConfig::public_base_url()`; `app_domain` is `APP_DOMAIN_NAME`.
+    /// Every production caller supplies the Foundation-owned knowledge library.
     pub fn new(
         persistence: PostgresPersistence,
-        public_base_url: &str,
-        app_domain: &str,
-        composer: DeliveryComposer,
-        mcp_client: Arc<dyn McpClient>,
-        monitoring: Arc<dyn MonitoringService>,
-        slots: usize,
+        setup: WorkflowEngineSetup<'_>,
     ) -> anyhow::Result<Self> {
         let lease = LeasePolicy::new(LEASE).map_err(anyhow::Error::msg)?;
-        let notices = DecisionNotices::new(composer.clone(), public_base_url, app_domain);
-        let http = Arc::new(HttpRuntime::with_approvals(
-            persistence.clone(),
-            HttpDestinationPolicy::default(),
-            lease,
-            Some(notices.clone()),
-        ));
-        let mcp = Arc::new(McpRuntime::with_approvals(
-            persistence.clone(),
-            mcp_client,
-            lease,
-            Some(notices.clone()),
-        ));
-        let message = Arc::new(MessageRuntime::with_approvals(
-            persistence.clone(),
-            composer,
-            app_domain.to_string(),
-            lease,
-            Some(notices.clone()),
-        ));
+        let notices = DecisionNotices::new(
+            setup.composer.clone(),
+            &setup.config.public_base_url(),
+            &setup.config.app_domain_name,
+        );
         let catalogue = TemplateCatalogue::shipped(&WorkflowSourceDecoder)
             .map_err(|error| anyhow::anyhow!("shipped workflow templates: {error:?}"))?;
-        let templates =
-            ProvisioningDeployment::new(Arc::new(catalogue), UNHANDLED_STEP_KINDS, app_domain);
-        let provisioning = Arc::new(ProvisioningRuntime::new(
-            persistence.clone(),
-            ProvisioningEffects::new(templates.clone()),
-            lease,
-        ));
-        let tools = AgentActionTools::new(http.clone(), mcp.clone(), message.clone())
-            .with_workflow_tools(Arc::new(persistence.clone()))
-            .with_provisioning(provisioning);
-        let agent = WorkflowAgentRuntime::new(
-            ProviderRegistry::standard().map_err(|error| anyhow::anyhow!("{error}"))?,
-            persistence.clone(),
-            tools,
-            Some(notices.clone()),
-            lease,
+        let templates = ProvisioningDeployment::new(
+            Arc::new(catalogue),
+            UNHANDLED_STEP_KINDS,
+            &setup.config.app_domain_name,
         );
-        let handler = Arc::new(ProductionHandler {
-            jev: crate::application::workflow::jev::JevRuntime::new(
-                persistence.clone(),
-                Arc::new(crate::adapters::workflow_jev::JevHttp::new()?),
-                lease,
-            ),
-            agent,
-            http,
-            mcp,
-            message,
-            history: WorkflowHistoryRuntime::new(persistence.clone()),
-        });
+        let handler = compose_handler(&persistence, &setup, &notices, &templates, lease)?;
         let worker_wakeups = Arc::new(Notify::new());
         let services = Arc::new(WorkflowServices {
             persistence,
             notices,
             templates,
-            monitoring: monitoring.clone(),
+            monitoring: setup.monitoring.clone(),
             worker_wakeups: worker_wakeups.clone(),
         });
         Ok(Self {
             services,
             handler,
-            slots,
+            slots: setup.slots,
             active_jobs: ActiveWorkflowJobs::default(),
-            monitoring,
+            monitoring: setup.monitoring,
             intent_wakeups: Arc::new(Notify::new()),
             worker_wakeups,
         })
@@ -421,14 +474,26 @@ impl WorkflowEngine {
         let client = Arc::new(crate::adapters::mcp::HttpMcpClient::new(
             crate::adapters::mcp::policy::EndpointPolicy::default(),
         ));
+        let config = crate::infra::config::AppConfig {
+            app_domain_name: "agents.test".into(),
+            ..crate::infra::config::AppConfig::for_test()
+        };
+        let knowledge = Arc::new(crate::application::knowledge::KnowledgeLibrary::new(
+            Arc::new(persistence.clone()),
+            Arc::new(
+                crate::application::knowledge::test_support::DeterministicTextEmbedder::default(),
+            ),
+        ));
         Self::new(
             persistence,
-            "https://agents.test",
-            "agents.test",
-            composer,
-            client,
-            Arc::new(crate::adapters::monitoring::InMemoryMonitor::new()),
-            1,
+            WorkflowEngineSetup {
+                config: &config,
+                composer,
+                mcp_client: client,
+                monitoring: Arc::new(crate::adapters::monitoring::InMemoryMonitor::new()),
+                slots: 1,
+                knowledge,
+            },
         )
         .unwrap()
     }

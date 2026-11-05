@@ -2,6 +2,7 @@
 //! through the HTTP, MCP, messaging or provisioning runtime's direct-tool entry, one call at a
 //! time. A workflow
 //! tool starts its pinned child through the workflow tool runtime instead (07-D2 §D2.3a).
+//! Knowledge search commits a read observation and its classification locally, without actions.
 use crate::{
     adapters::{
         workflow_http::HttpRuntime, workflow_mcp::McpRuntime, workflow_message::MessageRuntime,
@@ -12,6 +13,7 @@ use crate::{
         actions::{ModelToolCallId, RemoteDispatchObservation},
         agent::{AgentToolDispatch, AgentToolObservation, AgentToolTarget, PreparedTool},
         http::HttpToolCall,
+        knowledge::{KnowledgeToolCall, KnowledgeToolDispatch},
         lease::WorkflowFence,
         mcp::McpToolCall,
         message::{MessageObservation, MessageToolCall},
@@ -35,6 +37,7 @@ pub struct AgentActionTools {
     /// The built-in provisioning tools (p08 D2.2a); without them a frozen provisioning tool
     /// fails closed.
     provisioning: Option<Arc<ProvisioningRuntime>>,
+    knowledge: Option<Arc<dyn KnowledgeToolDispatch>>,
 }
 impl AgentActionTools {
     pub fn new(http: Arc<HttpRuntime>, mcp: Arc<McpRuntime>, message: Arc<MessageRuntime>) -> Self {
@@ -44,6 +47,7 @@ impl AgentActionTools {
             message,
             workflow: None,
             provisioning: None,
+            knowledge: None,
         }
     }
     pub fn with_workflow_tools(mut self, workflow: Arc<dyn WorkflowToolDispatch>) -> Self {
@@ -52,6 +56,10 @@ impl AgentActionTools {
     }
     pub fn with_provisioning(mut self, provisioning: Arc<ProvisioningRuntime>) -> Self {
         self.provisioning = Some(provisioning);
+        self
+    }
+    pub fn with_knowledge(mut self, knowledge: Arc<dyn KnowledgeToolDispatch>) -> Self {
+        self.knowledge = Some(knowledge);
         self
     }
 }
@@ -63,6 +71,7 @@ enum ToolInvocation {
     Workflow(Box<WorkflowToolCall>),
     Provisioning(Box<ProvisioningToolCall>),
     Message(Box<MessageToolCall>),
+    Knowledge(Box<KnowledgeToolCall>),
 }
 fn invocation(
     tool: &PreparedTool,
@@ -107,6 +116,9 @@ fn invocation(
             arguments,
             call,
         })),
+        AgentToolTarget::Knowledge => {
+            ToolInvocation::Knowledge(Box::new(KnowledgeToolCall { call, arguments }))
+        }
     })
 }
 #[async_trait]
@@ -146,6 +158,14 @@ impl AgentToolDispatch for AgentActionTools {
                 }
                 ToolInvocation::Message(call) => {
                     message(Box::pin(self.message.call_tool(fence, *call)).await?)
+                }
+                ToolInvocation::Knowledge(call) => {
+                    let knowledge = self.knowledge.as_ref().ok_or_else(|| {
+                        AppError::ServiceUnavailable(
+                            "Knowledge search is unavailable to this worker".into(),
+                        )
+                    })?;
+                    Box::pin(knowledge.call_knowledge_tool(fence, *call)).await
                 }
             }
         }

@@ -149,6 +149,10 @@ async fn targets(
                     name: tool.contract.name.clone(),
                 }
             }
+            ToolKind::Knowledge => {
+                super::authority::builtin_knowledge_tool(tool)?;
+                AgentToolTarget::Knowledge
+            }
             ToolKind::Http => AgentToolTarget::Http {
                 connection: registered_on(tx, company, tool).await?,
             },
