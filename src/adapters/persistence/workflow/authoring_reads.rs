@@ -56,7 +56,7 @@ fn options_sql(operations: &str, connections: &str, label: &str, live: &str) -> 
              FROM {operations} AS operation \
              JOIN {connections} AS connection ON connection.company_id = operation.company_id \
               AND connection.id = operation.connection_id{live} \
-            WHERE operation.company_id = $1 AND operation.name = ANY($2)) AS ranked \
+            WHERE operation.revoked_at IS NULL AND operation.company_id = $1 AND operation.name = ANY($2)) AS ranked \
           WHERE rank <= $3 ORDER BY name, rank"
     )
 }
@@ -392,7 +392,9 @@ impl AuthoringReads for PostgresPersistence {
         agent: Uuid,
     ) -> AppResult<Option<Vec<String>>> {
         Ok(sqlx::query_scalar(
-            "SELECT workflow_tools FROM agents WHERE company_id = $1 AND id = $2",
+            "SELECT ARRAY(SELECT assigned.alias FROM agent_draft_bindings AS assigned
+                WHERE assigned.agent_id=agent.id ORDER BY assigned.position)
+             FROM agents AS agent WHERE agent.company_id = $1 AND agent.id = $2",
         )
         .bind(company.as_uuid())
         .bind(agent)

@@ -1,5 +1,6 @@
 use super::*;
-use crate::application::workflow::publication::ActionRecovery;
+use crate::application::agent::ActionRecovery;
+
 use std::sync::Mutex;
 use std::time::Duration;
 
@@ -162,7 +163,7 @@ async fn workflow_action_replay_unsupported_or_mismatched_contract_never_marks_o
             4 => changed.contract.contract.output_schema = json!(true),
             5 => changed.contract.policy.capability = TypeName::parse("other").unwrap(),
             6 => changed.contract.policy.policy_revision += 1,
-            _ => changed.contract.policy.effect = publication::ActionEffect::Read,
+            _ => changed.contract.policy.effect = crate::application::agent::ActionEffect::Read,
         }
         variants.push(Some(
             ProviderReplayContract::approve(

@@ -1,0 +1,184 @@
+{
+  "pattern": "ModelSettings",
+  "filesSearched": 1270,
+  "totalHits": 11,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/agent_publication.rs#derive_on",
+        "name": "derive_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/agent_publication.rs",
+        "span": "L54-L143"
+      },
+      "path": "src/adapters/persistence/workflow/agent_publication.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 130,
+          "text": "model: ModelSettings {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/tests.rs#agent",
+        "name": "agent",
+        "kind": "function",
+        "path": "src/application/workflow/publication/tests.rs",
+        "span": "L24-L38"
+      },
+      "path": "src/application/workflow/publication/tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 30,
+          "text": "model: ModelSettings {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/fixtures/mod.rs#agent_snapshots",
+        "name": "agent_snapshots",
+        "kind": "function",
+        "path": "src/application/workflow/fixtures/mod.rs",
+        "span": "L86-L121"
+      },
+      "path": "src/application/workflow/fixtures/mod.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 94,
+          "text": "model: ModelSettings {"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/agent/definition.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1,
+          "text": "use super::{AgentKey, ApprovedActionPolicy, ModelSettings, SkillSnapshot};"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/agent/definition.rs#AgentDraft",
+        "name": "AgentDraft",
+        "kind": "struct",
+        "path": "src/application/agent/definition.rs",
+        "span": "L17-L26"
+      },
+      "path": "src/application/agent/definition.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 23,
+          "text": "pub model: Option<ModelSettings>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/agent/definition.rs#ResolvedAgentDefinition",
+        "name": "ResolvedAgentDefinition",
+        "kind": "struct",
+        "path": "src/application/agent/definition.rs",
+        "span": "L38-L46"
+      },
+      "path": "src/application/agent/definition.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 43,
+          "text": "pub model: ModelSettings,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/agent/mod.rs#ModelSettings",
+        "name": "ModelSettings",
+        "kind": "struct",
+        "path": "src/application/agent/mod.rs",
+        "span": "L39-L43"
+      },
+      "path": "src/application/agent/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 39,
+          "text": "pub struct ModelSettings {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/completion.rs#workflow_completion_declared_choice_and_terminal_schema",
+        "name": "workflow_completion_declared_choice_and_terminal_schema",
+        "kind": "function",
+        "path": "src/application/workflow/completion.rs",
+        "span": "L96-L150"
+      },
+      "path": "src/application/workflow/completion.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 111,
+          "text": "model: ModelSettings {"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/fixtures/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 7,
+          "text": "DependencySnapshots, ModelSettings, SkillSnapshot, ToolSnapshot,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/publication/types.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1,
+          "text": "pub use crate::application::agent::{AgentKey, ModelSettings, SkillSnapshot, ActionEffect, ActionRecovery, ApprovedActionPolicy};"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/types.rs#AgentSnapshot",
+        "name": "AgentSnapshot",
+        "kind": "struct",
+        "path": "src/application/workflow/publication/types.rs",
+        "span": "L17-L26"
+      },
+      "path": "src/application/workflow/publication/types.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 23,
+          "text": "pub model: ModelSettings,"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 7,
+    "baselineChars": 58070
+  }
+}

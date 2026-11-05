@@ -21,9 +21,13 @@ async fn builder(d: &Deployment) -> Uuid {
             provider: Some(SCRIPTED_PROVIDER.into()),
             model: Some(SCRIPTED_MODEL.into()),
             system_prompt: Some("Design and create agents.".into()),
-            workflow_tools: Some(vec![
-                TypeName::parse(LIST_COMPANY_AGENTS).unwrap(),
-                TypeName::parse(CREATE_AGENT_CHANNEL).unwrap(),
+            tool_bindings: Some(vec![
+                crate::entities::agent_capability::AgentToolBinding::builtin(
+                    crate::entities::agent_capability::AgentBuiltinTool::ListCompanyAgents,
+                ),
+                crate::entities::agent_capability::AgentToolBinding::builtin(
+                    crate::entities::agent_capability::AgentBuiltinTool::CreateAgentChannel,
+                ),
             ]),
             ..Default::default()
         },

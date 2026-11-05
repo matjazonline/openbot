@@ -3,6 +3,7 @@
 //! Every case uses the real control transition, the real dispatch service/writer and
 //! whole-database snapshots; refusals are asserted to write nothing at all.
 use super::*;
+use crate::application::agent::ActionRecovery;
 use crate::application::workflow::lease::FencedWorkflowResult;
 use tokio::sync::Notify;
 

@@ -1,7 +1,6 @@
 use super::*;
-use crate::application::workflow::publication::{
-    ActionEffect, ActionRecovery, ApprovedActionPolicy, ToolSnapshot,
-};
+use crate::application::agent::{ActionEffect, ActionRecovery, ApprovedActionPolicy};
+use crate::application::workflow::publication::ToolSnapshot;
 use crate::application::workflow::registry::ToolContract;
 use crate::domain::workflow::TypeName;
 use serde_json::{Value, json};

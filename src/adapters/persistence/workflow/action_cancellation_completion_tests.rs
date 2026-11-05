@@ -2,6 +2,7 @@
 //! CancelCommand in both orders with the exact run blockers observed (DEC-002/005); the ordinary
 //! completion attempt told apart from ambiguous-COMMIT recovery (R-008/DEC-012); and cancelled
 //! SafeRepeat/ProviderIdempotency history refused at the terminal fence (DEC-001).
+use crate::application::agent::{ActionRecovery};
 use super::*;
 use crate::adapters::persistence::workflow::persistence_bound::recorder::{Injected, Observed};
 use crate::adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::cancellation_order_tests::{

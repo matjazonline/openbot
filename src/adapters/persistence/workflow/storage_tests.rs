@@ -8,6 +8,9 @@ use crate::use_cases::agent::{AgentPersistence, AgentWrite};
 use chrono::{Duration, Utc};
 use run_lineage_tests::admitted;
 
+#[path = "autonomous_agent_storage_tests.rs"]
+mod autonomous_agent_storage_tests;
+
 #[path = "storage_boundary_tests.rs"]
 mod boundary_tests;
 #[path = "storage_bundle_tests.rs"]

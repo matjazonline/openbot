@@ -1,0 +1,666 @@
+{
+  "pattern": "ActionEffect",
+  "filesSearched": 1271,
+  "totalHits": 54,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/application/workflow/message.rs#builtin_message_snapshot",
+        "name": "builtin_message_snapshot",
+        "kind": "function",
+        "path": "src/application/workflow/message.rs",
+        "span": "L65-L86"
+      },
+      "path": "src/application/workflow/message.rs",
+      "inDegree": 7,
+      "hits": [
+        {
+          "line": 82,
+          "text": "effect: ActionEffect::Write,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/tests.rs#tool_snapshot",
+        "name": "tool_snapshot",
+        "kind": "function",
+        "path": "src/application/workflow/publication/tests.rs",
+        "span": "L54-L66"
+      },
+      "path": "src/application/workflow/publication/tests.rs",
+      "inDegree": 5,
+      "hits": [
+        {
+          "line": 62,
+          "text": "effect: ActionEffect::Read,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/tests.rs#request",
+        "name": "request",
+        "kind": "function",
+        "path": "src/application/workflow/actions/tests.rs",
+        "span": "L10-L41"
+      },
+      "path": "src/application/workflow/actions/tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 30,
+          "text": "effect: ActionEffect::Write,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/knowledge/builtin.rs#builtin_knowledge_snapshot",
+        "name": "builtin_knowledge_snapshot",
+        "kind": "function",
+        "path": "src/application/workflow/knowledge/builtin.rs",
+        "span": "L57-L76"
+      },
+      "path": "src/application/workflow/knowledge/builtin.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 72,
+          "text": "effect: ActionEffect::Read,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/sample/tools_tests.rs#tool_bundle",
+        "name": "tool_bundle",
+        "kind": "function",
+        "path": "src/application/workflow/sample/tools_tests.rs",
+        "span": "L2-L36"
+      },
+      "path": "src/application/workflow/sample/tools_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 21,
+          "text": "effect: ActionEffect::Write,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/ui/authoring/tests.rs#reviewed_connection_at",
+        "name": "reviewed_connection_at",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/ui/authoring/tests.rs",
+        "span": "L479-L542"
+      },
+      "path": "src/adapters/http/routes/workflows/ui/authoring/tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 482,
+          "text": "ActionEffect, ActionRecovery, ApprovedActionPolicy, ToolSnapshot,"
+        },
+        {
+          "line": 531,
+          "text": "effect: ActionEffect::Read,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/mcp_runtime.rs#dispatch_prepared",
+        "name": "dispatch_prepared",
+        "kind": "function",
+        "path": "src/application/workflow/mcp_runtime.rs",
+        "span": "L137-L176"
+      },
+      "path": "src/application/workflow/mcp_runtime.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 155,
+          "text": "if state == ActionEffectState::Prepared {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/mcp.rs#snapshot",
+        "name": "snapshot",
+        "kind": "function",
+        "path": "src/application/workflow/mcp.rs",
+        "span": "L146-L163"
+      },
+      "path": "src/application/workflow/mcp.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 159,
+          "text": "effect: ActionEffect::Read,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/lifecycle_tests.rs#http_operation",
+        "name": "http_operation",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/lifecycle_tests.rs",
+        "span": "L319-L368"
+      },
+      "path": "src/adapters/http/routes/workflows/lifecycle_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 351,
+          "text": "effect: ActionEffect::Write,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/http_test_support.rs#operation",
+        "name": "operation",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/http_test_support.rs",
+        "span": "L21-L41"
+      },
+      "path": "src/adapters/persistence/workflow/http_test_support.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 35,
+          "text": "effect: ActionEffect::Write,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/mcp_test_support.rs#operation",
+        "name": "operation",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/mcp_test_support.rs",
+        "span": "L232-L252"
+      },
+      "path": "src/adapters/persistence/workflow/mcp_test_support.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 246,
+          "text": "effect: ActionEffect::Read,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/workflow_tool_registration_tests.rs#http_operation",
+        "name": "http_operation",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/workflow_tool_registration_tests.rs",
+        "span": "L393-L413"
+      },
+      "path": "src/adapters/persistence/workflow/workflow_tool_registration_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 407,
+          "text": "effect: ActionEffect::Write,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/workflow_tools.rs#workflow_tool_snapshot",
+        "name": "workflow_tool_snapshot",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/workflow_tools.rs",
+        "span": "L129-L166"
+      },
+      "path": "src/adapters/persistence/workflow/workflow_tools.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 157,
+          "text": "effect: ActionEffect::Write,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/fixtures/mod.rs#read_policy",
+        "name": "read_policy",
+        "kind": "function",
+        "path": "src/application/workflow/fixtures/mod.rs",
+        "span": "L123-L130"
+      },
+      "path": "src/application/workflow/fixtures/mod.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 127,
+          "text": "effect: ActionEffect::Read,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/provisioning.rs#effect",
+        "name": "effect",
+        "kind": "function",
+        "path": "src/application/workflow/provisioning.rs",
+        "span": "L71-L76"
+      },
+      "path": "src/application/workflow/provisioning.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 71,
+          "text": "const fn effect(self) -> ActionEffect {"
+        },
+        {
+          "line": 73,
+          "text": "Self::ListAgents => ActionEffect::Read,"
+        },
+        {
+          "line": 74,
+          "text": "Self::CreateAgentChannel => ActionEffect::Write,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/sample/dispatch.rs#effect_kind",
+        "name": "effect_kind",
+        "kind": "function",
+        "path": "src/application/workflow/sample/dispatch.rs",
+        "span": "L264-L269"
+      },
+      "path": "src/application/workflow/sample/dispatch.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 264,
+          "text": "pub(super) fn effect_kind(effect: super::super::publication::ActionEffect) -> SampleEffectKind {"
+        },
+        {
+          "line": 266,
+          "text": "super::super::publication::ActionEffect::Read => SampleEffectKind::FixtureRead,"
+        },
+        {
+          "line": 267,
+          "text": "super::super::publication::ActionEffect::Write => SampleEffectKind::InterceptedWrite,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "scripts/workflow-sample-boundary.py",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 22,
+          "text": "'publication::ToolKind', 'publication::ToolSnapshot', 'publication::ActionEffect',"
+        },
+        {
+          "line": 23,
+          "text": "'publication::ToolKind::Workflow', 'publication::ActionEffect::Read', 'publication::ActionEffect::Write',"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/http/routes/workflows/lifecycle_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 8,
+          "text": "ActionEffect, ActionRecovery, ApprovedActionPolicy, ToolSnapshot,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_replay_tests.rs#workflow_action_replay_unsupported_or_mismatched_contract_never_marks_or_polls",
+        "name": "workflow_action_replay_unsupported_or_mismatched_contract_never_marks_or_polls",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_replay_tests.rs",
+        "span": "L146-L213"
+      },
+      "path": "src/adapters/persistence/workflow/action_replay_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 165,
+          "text": "_ => changed.contract.policy.effect = publication::ActionEffect::Read,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/mcp.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 337,
+          "text": "impl ActionEffectStates for PostgresPersistence {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/mcp.rs#effect_state",
+        "name": "effect_state",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/mcp.rs",
+        "span": "L338-L356"
+      },
+      "path": "src/adapters/persistence/workflow/mcp.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 342,
+          "text": ") -> AppResult<ActionEffectState> {"
+        },
+        {
+          "line": 347,
+          "text": "Some(\"prepared\") => Ok(ActionEffectState::Prepared),"
+        },
+        {
+          "line": 348,
+          "text": "Some(\"possible_dispatch\") => Ok(ActionEffectState::PossibleDispatch),"
+        },
+        {
+          "line": 349,
+          "text": "Some(\"needs_reconciliation\") => Ok(ActionEffectState::NeedsReconciliation),"
+        },
+        {
+          "line": 350,
+          "text": "Some(\"not_applied\") => Ok(ActionEffectState::NotApplied),"
+        },
+        {
+          "line": 351,
+          "text": "Some(\"applied_without_result\") => Ok(ActionEffectState::AppliedWithoutResult),"
+        },
+        {
+          "line": 352,
+          "text": "Some(\"committed\") => Ok(ActionEffectState::Committed),"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/workflow_tool_registration_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 11,
+          "text": "publication::{ActionEffect, ActionRecovery, ApprovedActionPolicy, WorkflowToolPin},"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/workflow_tools.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 6,
+          "text": "ActionEffect, ActionRecovery, ApprovedActionPolicy, PublishedBundle, WorkflowToolPin,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/agent/mod.rs#ActionEffect",
+        "name": "ActionEffect",
+        "kind": "enum",
+        "path": "src/application/agent/mod.rs",
+        "span": "L57-L60"
+      },
+      "path": "src/application/agent/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 57,
+          "text": "pub enum ActionEffect {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/agent/mod.rs#ApprovedActionPolicy",
+        "name": "ApprovedActionPolicy",
+        "kind": "struct",
+        "path": "src/application/agent/mod.rs",
+        "span": "L73-L78"
+      },
+      "path": "src/application/agent/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 76,
+          "text": "pub effect: ActionEffect,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/effect.rs#ActionEffectState",
+        "name": "ActionEffectState",
+        "kind": "enum",
+        "path": "src/application/workflow/actions/effect.rs",
+        "span": "L9-L19"
+      },
+      "path": "src/application/workflow/actions/effect.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 9,
+          "text": "pub enum ActionEffectState {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/effect.rs#ActionEffectStates",
+        "name": "ActionEffectStates",
+        "kind": "interface",
+        "path": "src/application/workflow/actions/effect.rs",
+        "span": "L22-L30"
+      },
+      "path": "src/application/workflow/actions/effect.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 22,
+          "text": "pub trait ActionEffectStates: Send + Sync {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/effect.rs#effect_state",
+        "name": "effect_state",
+        "kind": "function",
+        "path": "src/application/workflow/actions/effect.rs",
+        "span": "L25-L29"
+      },
+      "path": "src/application/workflow/actions/effect.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 29,
+          "text": ") -> AppResult<ActionEffectState>;"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/actions/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 3,
+          "text": "ActionEffect, ActionRecovery, ApprovedActionPolicy, ToolSnapshot,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/fixtures/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 6,
+          "text": "ActionEffect, ActionRecovery, AgentKey, AgentSnapshot, ApprovedActionPolicy,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/knowledge/builtin.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 4,
+          "text": "publication::{ActionEffect, ActionRecovery, ApprovedActionPolicy, ToolKind, ToolSnapshot},"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/mcp_runtime.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 92,
+          "text": "P: McpActionPreparation + McpActionUse + ActionIntents + ActionEffectStates + Clone + 'static,"
+        },
+        {
+          "line": 182,
+          "text": "P: McpActionPreparation + McpActionUse + ActionIntents + ActionEffectStates + Clone + 'static,"
+        },
+        {
+          "line": 198,
+          "text": "P: McpActionPreparation + McpActionUse + ActionIntents + ActionEffectStates + Clone + 'static,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/mcp.rs#tests",
+        "name": "tests",
+        "kind": "module",
+        "path": "src/application/workflow/mcp.rs",
+        "span": "L139-L240"
+      },
+      "path": "src/application/workflow/mcp.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 142,
+          "text": "publication::{ActionEffect, ApprovedActionPolicy},"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/message.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 15,
+          "text": "ActionEffect, ActionRecovery, ApprovedActionPolicy, ToolSnapshot,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/provisioning_tests.rs#only_the_exact_name_only_built_in_is_trusted",
+        "name": "only_the_exact_name_only_built_in_is_trusted",
+        "kind": "function",
+        "path": "src/application/workflow/provisioning_tests.rs",
+        "span": "L30-L60"
+      },
+      "path": "src/application/workflow/provisioning_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 44,
+          "text": "approved.policy.effect = ActionEffect::Read;"
+        },
+        {
+          "line": 58,
+          "text": "ActionEffect::Write"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/provisioning.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 15,
+          "text": "ActionEffect, ActionRecovery, ApprovedActionPolicy, ToolSnapshot,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/tests.rs#workflow_publication_mcp_contract_policy_and_resource_are_frozen_together",
+        "name": "workflow_publication_mcp_contract_policy_and_resource_are_frozen_together",
+        "kind": "function",
+        "path": "src/application/workflow/publication/tests.rs",
+        "span": "L169-L202"
+      },
+      "path": "src/application/workflow/publication/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 196,
+          "text": "later.tools[0].policy.effect = ActionEffect::Write;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/tests.rs#workflow_publication_freezes_workflow_tool_pins_like_children",
+        "name": "workflow_publication_freezes_workflow_tool_pins_like_children",
+        "kind": "function",
+        "path": "src/application/workflow/publication/tests.rs",
+        "span": "L420-L519"
+      },
+      "path": "src/application/workflow/publication/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 435,
+          "text": "effect: ActionEffect::Write,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/publication/types.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1,
+          "text": "pub use crate::application::agent::{AgentKey, ModelSettings, SkillSnapshot, ActionEffect, ActionRecovery, ApprovedActionPolicy};"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 23,
+    "baselineChars": 266122
+  }
+}

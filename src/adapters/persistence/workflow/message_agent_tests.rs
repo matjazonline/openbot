@@ -45,7 +45,11 @@ async fn workflow_agent_message_tool_parks_on_delivery_and_continues_with_its_re
             provider: Some(SCRIPTED_PROVIDER.into()),
             model: Some(SCRIPTED_MODEL.into()),
             system_prompt: Some("Notify the member, then answer.".into()),
-            workflow_tools: Some(vec![TypeName::parse("message.send").unwrap()]),
+            tool_bindings: Some(vec![
+                crate::entities::agent_capability::AgentToolBinding::builtin(
+                    crate::entities::agent_capability::AgentBuiltinTool::MessageSend,
+                ),
+            ]),
             ..Default::default()
         },
     )

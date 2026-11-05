@@ -1,0 +1,4 @@
+Replacing only the two correction files in a disposable reviewer index with their retained R1 blobs reproduces exact R1 snapshot digest. Real source/index untouched.
+R1 reconstructed: 99a9302dc995a1d7aae4038625c27b3b66f934c421f8aaf1871f2370a8d67dbd
+R1 blobs: migrations 5b3c800; skill lifetime tests 4082539.
+No source unstaged/untracked deltas.

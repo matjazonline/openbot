@@ -1,0 +1,243 @@
+{
+  "pattern": "AgentSnapshot",
+  "filesSearched": 1265,
+  "totalHits": 16,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/agent_publication.rs#derive_on",
+        "name": "derive_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/agent_publication.rs",
+        "span": "L54-L143"
+      },
+      "path": "src/adapters/persistence/workflow/agent_publication.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 59,
+          "text": ") -> AppResult<(AgentSnapshot, Vec<SkillSnapshot>)> {"
+        },
+        {
+          "line": 120,
+          "text": "let agent = AgentSnapshot {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/tests.rs#agent",
+        "name": "agent",
+        "kind": "function",
+        "path": "src/application/workflow/publication/tests.rs",
+        "span": "L24-L38"
+      },
+      "path": "src/application/workflow/publication/tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 24,
+          "text": "fn agent() -> AgentSnapshot {"
+        },
+        {
+          "line": 25,
+          "text": "AgentSnapshot {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/agent_runtime_tests.rs#setup_agent_snapshot",
+        "name": "setup_agent_snapshot",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/agent_runtime_tests.rs",
+        "span": "L352-L365"
+      },
+      "path": "src/adapters/persistence/workflow/agent_runtime_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 352,
+          "text": "async fn setup_agent_snapshot(setup: &AgentSetup) -> AgentSnapshot {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/fixtures/mod.rs#agent_snapshots",
+        "name": "agent_snapshots",
+        "kind": "function",
+        "path": "src/application/workflow/fixtures/mod.rs",
+        "span": "L86-L121"
+      },
+      "path": "src/application/workflow/fixtures/mod.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 88,
+          "text": "agents: vec![AgentSnapshot {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/preflight.rs#agent",
+        "name": "agent",
+        "kind": "function",
+        "path": "src/application/workflow/publication/preflight.rs",
+        "span": "L114-L146"
+      },
+      "path": "src/application/workflow/publication/preflight.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 114,
+          "text": "fn agent(&self, agent: &AgentSnapshot) -> Result<(), Diagnostic> {"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/agent_runtime_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 21,
+          "text": "lifecycle::PublicationDependencies, publication::AgentSnapshot,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/agent_runtime_tests.rs#ForgedAgents",
+        "name": "ForgedAgents",
+        "kind": "struct",
+        "path": "src/adapters/persistence/workflow/agent_runtime_tests.rs",
+        "span": "L32-L35"
+      },
+      "path": "src/adapters/persistence/workflow/agent_runtime_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 34,
+          "text": "agent: AgentSnapshot,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/completion.rs#workflow_completion_declared_choice_and_terminal_schema",
+        "name": "workflow_completion_declared_choice_and_terminal_schema",
+        "kind": "function",
+        "path": "src/application/workflow/completion.rs",
+        "span": "L96-L150"
+      },
+      "path": "src/application/workflow/completion.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 106,
+          "text": "agents: vec![AgentSnapshot {"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/fixtures/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 6,
+          "text": "ActionEffect, ActionRecovery, AgentKey, AgentSnapshot, ApprovedActionPolicy,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/capabilities.rs#ResolvedAgent",
+        "name": "ResolvedAgent",
+        "kind": "struct",
+        "path": "src/application/workflow/publication/capabilities.rs",
+        "span": "L11-L16"
+      },
+      "path": "src/application/workflow/publication/capabilities.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 13,
+          "text": "agent: AgentSnapshot,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/capabilities.rs#agent",
+        "name": "agent",
+        "kind": "function",
+        "path": "src/application/workflow/publication/capabilities.rs",
+        "span": "L22-L24"
+      },
+      "path": "src/application/workflow/publication/capabilities.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 22,
+          "text": "pub fn agent(&self) -> &AgentSnapshot {"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/publication/types.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 41,
+          "text": "/// credentials. `(AgentSnapshot.company_id, provider)` is the existing company model"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/types.rs#AgentSnapshot",
+        "name": "AgentSnapshot",
+        "kind": "struct",
+        "path": "src/application/workflow/publication/types.rs",
+        "span": "L51-L60"
+      },
+      "path": "src/application/workflow/publication/types.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 51,
+          "text": "pub struct AgentSnapshot {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/types.rs#DependencySnapshots",
+        "name": "DependencySnapshots",
+        "kind": "struct",
+        "path": "src/application/workflow/publication/types.rs",
+        "span": "L170-L174"
+      },
+      "path": "src/application/workflow/publication/types.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 171,
+          "text": "pub agents: Vec<AgentSnapshot>,"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 8,
+    "baselineChars": 93222
+  }
+}

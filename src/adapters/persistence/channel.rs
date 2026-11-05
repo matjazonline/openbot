@@ -565,13 +565,8 @@ pub(crate) async fn prepare_library_agent_on(
     // The definition's workflow tool grants come with it (p08 D2.6). A workflow runs an agent
     // only on an explicit model, so a copy that grants tools and would inherit gets the
     // company's default connection's first model, when it has a key.
-    let workflow_tools: Vec<String> =
-        sqlx::query_scalar("SELECT workflow_tools FROM agents WHERE id = $1")
-            .bind(library_agent_id)
-            .fetch_one(&mut **tx)
-            .await
-            .map_err(AppError::from)?;
-    if !workflow_tools.is_empty() {
+    let mut bindings = super::agent_capability::bindings_on(tx, None, library_agent_id).await?;
+    if !bindings.is_empty() {
         if agent.provider.is_none() && agent.model.is_none() {
             let default: Option<(String, String)> = sqlx::query_as(
                 "SELECT provider, models[1] FROM company_model_connections \
@@ -587,16 +582,10 @@ pub(crate) async fn prepare_library_agent_on(
                 agent.model = Some(model);
             }
         }
-        agent.workflow_tools = Some(
-            workflow_tools
-                .iter()
-                .map(|name| {
-                    crate::domain::workflow::TypeName::parse(name).map_err(|_| {
-                        AppError::Internal("Stored workflow tool grant is invalid".into())
-                    })
-                })
-                .collect::<AppResult<_>>()?,
-        );
+        for binding in &mut bindings {
+            binding.id = crate::entities::agent_capability::AgentBindingId::new(Uuid::new_v4());
+        }
+        agent.tool_bindings = Some(bindings);
     }
     Ok(())
 }

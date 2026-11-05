@@ -1,0 +1,11 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 5 tests
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::workflow_agent_publication_refuses_forged_snapshot_and_keeps_frozen_version ... ok
+test adapters::persistence::workflow::tests::mcp_tests::agent_tests::workflow_agent_mcp_tool_dispatches_once_through_the_bound_slot ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::workflow_agent_run_saves_tool_call_dispatches_once_and_replays_final_output ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::workflow_tool_dispatch_starts_one_child_per_call_and_one_resumer_continues ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::workflow_agent_run_refuses_unlinked_skill_before_provider_entry ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 2906 filtered out; finished in 2.22s
+

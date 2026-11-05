@@ -90,7 +90,7 @@ impl LibraryAgentResponse {
 fn write(payload: AgentJsonPayload) -> Result<AgentWrite, AppError> {
     let avatar_url = payload.avatar_url().map_err(AppError::BadRequest)?;
     Ok(AgentWrite {
-        workflow_tools: None,
+        tool_bindings: None,
         name: payload.name,
         slug: payload.slug,
         provider: payload.provider,

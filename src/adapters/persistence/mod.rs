@@ -5,6 +5,8 @@ use crate::app_error::AppError;
 
 pub(crate) mod account_identity;
 pub mod agent;
+mod agent_binding_selection;
+pub(crate) mod agent_capability;
 pub mod attention;
 mod auth_attempts;
 pub mod channel;

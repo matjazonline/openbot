@@ -109,7 +109,16 @@ async fn agent_setup_source(
             provider: Some(SCRIPTED_PROVIDER.into()),
             model: Some(SCRIPTED_MODEL.into()),
             system_prompt: Some("Answer with the requested JSON string.".into()),
-            workflow_tools: Some(vec![TypeName::parse("registered.request").unwrap()]),
+            tool_bindings: Some(
+                crate::adapters::persistence::agent_binding_selection::resolve_bindings_on(
+                    &mut p.pool().acquire().await.unwrap(),
+                    company.as_uuid(),
+                    None,
+                    &[TypeName::parse("registered.request").unwrap()],
+                )
+                .await
+                .unwrap(),
+            ),
             ..Default::default()
         },
     )
@@ -296,11 +305,19 @@ async fn workflow_agent_publication_refuses_forged_snapshot_and_keeps_frozen_ver
     request.key = IdempotencyKey::parse("forged-agent").unwrap();
     assert!(definitions.publish(request).await.is_err());
     // Editing the agent after publication neither blocks nor changes the frozen version.
-    sqlx::query("UPDATE agents SET system_prompt='Edited later', workflow_tools=array_append(workflow_tools,'message.send') WHERE id=$1")
+    sqlx::query("UPDATE agents SET system_prompt='Edited later' WHERE id=$1")
         .bind(setup.agent)
         .execute(p.pool())
         .await
         .unwrap();
+    crate::adapters::persistence::agent_capability::assign_test_tool_names(
+        p,
+        setup.agent,
+        &["registered.request", "message.send"],
+    )
+    .await
+    .unwrap();
+
     let mut llm = scripted_llm(vec![LlmTurn::text("\"frozen\"")]).await;
     register_scripted_agent_base_url(setup.agent, &llm.base_url);
     let outcome = Box::pin(
@@ -326,7 +343,7 @@ async fn workflow_agent_run_refuses_removed_tool_grant_before_provider_entry() {
     let llm = scripted_llm(vec![]).await;
     register_scripted_agent_base_url(setup.agent, &llm.base_url);
     let p = &setup.fixture.persistence;
-    sqlx::query("UPDATE agents SET workflow_tools='{}' WHERE id=$1")
+    sqlx::query("DELETE FROM agent_draft_bindings WHERE agent_id=$1")
         .bind(setup.agent)
         .execute(p.pool())
         .await
@@ -374,7 +391,7 @@ async fn workflow_agent_capability_writers_preserve_unsupplied_lists() {
     let p = &setup.fixture.persistence;
     let company = setup.fixture.target.company.as_uuid();
     let stored = |id: Uuid| async move {
-        sqlx::query_scalar::<_, Vec<String>>("SELECT workflow_tools FROM agents WHERE id=$1")
+        sqlx::query_scalar::<_, Vec<String>>("SELECT ARRAY(SELECT alias FROM agent_draft_bindings WHERE agent_id=agents.id ORDER BY position) FROM agents WHERE id=$1")
             .bind(id)
             .fetch_one(p.pool())
             .await
@@ -395,7 +412,7 @@ async fn workflow_agent_capability_writers_preserve_unsupplied_lists() {
         vec!["registered.request".to_string()]
     );
     let mut cleared = unrelated;
-    cleared.workflow_tools = Some(vec![]);
+    cleared.tool_bindings = Some(vec![]);
     AgentPersistence::update(p, setup.agent, cleared)
         .await
         .unwrap();
@@ -481,7 +498,12 @@ async fn workflow_agent_run_competing_revocation_refuses_admission() {
     register_scripted_agent_base_url(setup.agent, &llm.base_url);
     let p = &setup.fixture.persistence;
     let mut revoke = p.pool().begin().await.unwrap();
-    sqlx::query("UPDATE agents SET workflow_tools='{}' WHERE id=$1")
+    sqlx::query("SELECT id FROM agents WHERE id=$1 FOR UPDATE")
+        .bind(setup.agent)
+        .execute(&mut *revoke)
+        .await
+        .unwrap();
+    sqlx::query("DELETE FROM agent_draft_bindings WHERE agent_id=$1")
         .bind(setup.agent)
         .execute(&mut *revoke)
         .await
@@ -539,7 +561,7 @@ async fn workflow_agent_capture_refuses_unrunnable_agents() {
         ),
         (
             "unregistered",
-            "UPDATE agents SET provider='openai',model='gpt-4o-mini', workflow_tools='{missing.tool}' WHERE id=$1",
+            "WITH agent AS (UPDATE agents SET provider='openai',model='gpt-4o-mini' WHERE id=$1 RETURNING company_id) UPDATE workflow_http_operations SET revoked_at=clock_timestamp() WHERE company_id IN (SELECT company_id FROM agent)",
         ),
     ] {
         sqlx::query(change)

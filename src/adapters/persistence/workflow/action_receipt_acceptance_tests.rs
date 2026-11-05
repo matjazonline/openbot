@@ -1,4 +1,5 @@
 use super::*;
+use crate::application::agent::ActionRecovery;
 
 struct LostReceiptAck(Dispatch);
 #[async_trait]

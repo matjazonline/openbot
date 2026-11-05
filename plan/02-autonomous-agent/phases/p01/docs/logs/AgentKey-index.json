@@ -1,0 +1,439 @@
+{
+  "pattern": "AgentKey",
+  "filesSearched": 1271,
+  "totalHits": 32,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/capabilities.rs#resolve_agent",
+        "name": "resolve_agent",
+        "kind": "function",
+        "path": "src/application/workflow/publication/capabilities.rs",
+        "span": "L46-L88"
+      },
+      "path": "src/application/workflow/publication/capabilities.rs",
+      "inDegree": 5,
+      "hits": [
+        {
+          "line": 46,
+          "text": "pub fn resolve_agent(&self, company: CompanyId, key: &AgentKey) -> AppResult<ResolvedAgent> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/agent_publication.rs#derive_on",
+        "name": "derive_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/agent_publication.rs",
+        "span": "L53-L143"
+      },
+      "path": "src/adapters/persistence/workflow/agent_publication.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 56,
+          "text": "key: &AgentKey,"
+        },
+        {
+          "line": 122,
+          "text": "key: AgentKey::parse(&agent.slug).ok_or_else(|| {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/agent_tests.rs#selection",
+        "name": "selection",
+        "kind": "function",
+        "path": "src/application/workflow/agent_tests.rs",
+        "span": "L11-L26"
+      },
+      "path": "src/application/workflow/agent_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 24,
+          "text": ".resolve_agent(company(), &AgentKey::parse(\"assistant\").unwrap())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/capabilities_tests.rs#resolve",
+        "name": "resolve",
+        "kind": "function",
+        "path": "src/application/workflow/publication/capabilities_tests.rs",
+        "span": "L27-L29"
+      },
+      "path": "src/application/workflow/publication/capabilities_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 28,
+          "text": "bundle.resolve_agent(company(), &AgentKey::parse(\"assistant\").unwrap())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/tests.rs#agent",
+        "name": "agent",
+        "kind": "function",
+        "path": "src/application/workflow/publication/tests.rs",
+        "span": "L24-L38"
+      },
+      "path": "src/application/workflow/publication/tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 28,
+          "text": "key: AgentKey::parse(\"assistant\").unwrap(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/knowledge_checkpoint.rs#frozen_selection",
+        "name": "frozen_selection",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/knowledge_checkpoint.rs",
+        "span": "L194-L245"
+      },
+      "path": "src/adapters/persistence/workflow/knowledge_checkpoint.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 236,
+          "text": ".and_then(AgentKey::parse)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/fixtures/mod.rs#agent_snapshots",
+        "name": "agent_snapshots",
+        "kind": "function",
+        "path": "src/application/workflow/fixtures/mod.rs",
+        "span": "L86-L121"
+      },
+      "path": "src/application/workflow/fixtures/mod.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 91,
+          "text": "key: AgentKey::parse(\"assistant\").expect(\"static fixture agent\"),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/capabilities.rs#agent_universe",
+        "name": "agent_universe",
+        "kind": "function",
+        "path": "src/application/workflow/publication/capabilities.rs",
+        "span": "L94-L131"
+      },
+      "path": "src/application/workflow/publication/capabilities.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 94,
+          "text": "pub fn agent_universe(decoded: &compiler::DecodedSource) -> Result<Vec<AgentKey>, String> {"
+        },
+        {
+          "line": 129,
+          "text": ".map(|key| AgentKey::parse(&key).ok_or_else(|| format!(\"Invalid agent key {key}\")))"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "scripts/workflow-sample-boundary.py",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 21,
+          "text": "'publication::PublishedBundle', 'publication::ContentHash', 'publication::AgentKey',"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/agent_preparation.rs#prepare_agent",
+        "name": "prepare_agent",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/agent_preparation.rs",
+        "span": "L176-L239"
+      },
+      "path": "src/adapters/persistence/workflow/agent_preparation.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 199,
+          "text": ".and_then(AgentKey::parse)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/agent_publication.rs#AgentSelection",
+        "name": "AgentSelection",
+        "kind": "struct",
+        "path": "src/adapters/persistence/workflow/agent_publication.rs",
+        "span": "L216-L219"
+      },
+      "path": "src/adapters/persistence/workflow/agent_publication.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 217,
+          "text": "keys: Vec<AgentKey>,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/knowledge_checkpoint.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 10,
+          "text": "publication::{AgentKey, ResolvedAgent},"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/agent/definition.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1,
+          "text": "use super::{AgentKey, ApprovedActionPolicy, ModelSettings, SkillSnapshot};"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/agent/definition.rs#AgentDraft",
+        "name": "AgentDraft",
+        "kind": "struct",
+        "path": "src/application/agent/definition.rs",
+        "span": "L17-L26"
+      },
+      "path": "src/application/agent/definition.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 21,
+          "text": "pub key: AgentKey,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/agent/definition.rs#ResolvedAgentDefinition",
+        "name": "ResolvedAgentDefinition",
+        "kind": "struct",
+        "path": "src/application/agent/definition.rs",
+        "span": "L38-L46"
+      },
+      "path": "src/application/agent/definition.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 41,
+          "text": "pub key: AgentKey,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/agent/mod.rs#AgentKey",
+        "name": "AgentKey",
+        "kind": "struct",
+        "path": "src/application/agent/mod.rs",
+        "span": "L12-L12"
+      },
+      "path": "src/application/agent/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 12,
+          "text": "pub struct AgentKey(String);"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/agent/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 13,
+          "text": "impl<'de> Deserialize<'de> for AgentKey {"
+        },
+        {
+          "line": 19,
+          "text": "impl AgentKey {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/completion.rs#workflow_completion_declared_choice_and_terminal_schema",
+        "name": "workflow_completion_declared_choice_and_terminal_schema",
+        "kind": "function",
+        "path": "src/application/workflow/completion.rs",
+        "span": "L96-L150"
+      },
+      "path": "src/application/workflow/completion.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 109,
+          "text": "key: AgentKey::parse(\"reviewer\").unwrap(),"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/fixtures/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 6,
+          "text": "ActionEffect, ActionRecovery, AgentKey, AgentSnapshot, ApprovedActionPolicy,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/capabilities_tests.rs#workflow_capabilities_refuse_other_company_and_unknown_agent",
+        "name": "workflow_capabilities_refuse_other_company_and_unknown_agent",
+        "kind": "function",
+        "path": "src/application/workflow/publication/capabilities_tests.rs",
+        "span": "L68-L82"
+      },
+      "path": "src/application/workflow/publication/capabilities_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 73,
+          "text": "&AgentKey::parse(\"assistant\").unwrap()"
+        },
+        {
+          "line": 79,
+          "text": ".resolve_agent(company(), &AgentKey::parse(\"other\").unwrap())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/capabilities_tests.rs#workflow_capabilities_agent_universe_is_literal_or_finite_parameter_enum",
+        "name": "workflow_capabilities_agent_universe_is_literal_or_finite_parameter_enum",
+        "kind": "function",
+        "path": "src/application/workflow/publication/capabilities_tests.rs",
+        "span": "L105-L129"
+      },
+      "path": "src/application/workflow/publication/capabilities_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 111,
+          "text": "vec![AgentKey::parse(\"assistant\").unwrap()]"
+        },
+        {
+          "line": 119,
+          "text": "AgentKey::parse(\"sales\").unwrap(),"
+        },
+        {
+          "line": 120,
+          "text": "AgentKey::parse(\"support\").unwrap()"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/capabilities_tests.rs#workflow_capabilities_classify_captures_and_requires_its_agent",
+        "name": "workflow_capabilities_classify_captures_and_requires_its_agent",
+        "kind": "function",
+        "path": "src/application/workflow/publication/capabilities_tests.rs",
+        "span": "L133-L155"
+      },
+      "path": "src/application/workflow/publication/capabilities_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 139,
+          "text": "vec![AgentKey::parse(\"assistant\").unwrap()]"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/publication/types.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1,
+          "text": "pub use crate::application::agent::{AgentKey, ModelSettings, SkillSnapshot, ActionEffect, ActionRecovery, ApprovedActionPolicy};"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/types.rs#AgentSnapshot",
+        "name": "AgentSnapshot",
+        "kind": "struct",
+        "path": "src/application/workflow/publication/types.rs",
+        "span": "L17-L26"
+      },
+      "path": "src/application/workflow/publication/types.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 21,
+          "text": "pub key: AgentKey,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/sample/tools.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 3,
+          "text": "use crate::application::workflow::publication::{AgentKey, ToolKind, ToolSnapshot};"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/sample/tools.rs#agent_tools",
+        "name": "agent_tools",
+        "kind": "function",
+        "path": "src/application/workflow/sample/tools.rs",
+        "span": "L23-L58"
+      },
+      "path": "src/application/workflow/sample/tools.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 35,
+          "text": ".and_then(AgentKey::parse)"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 14,
+    "baselineChars": 106451
+  }
+}

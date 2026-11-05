@@ -155,12 +155,13 @@ async fn workflow_tool_routes_register_revoke_and_grant() {
     .unwrap()
     .id;
     let provisioning = json!(["list_company_agents", "create_agent_channel"]);
-    sqlx::query("UPDATE agents SET workflow_tools = $2 WHERE id = $1")
-        .bind(builder)
-        .bind(vec!["list_company_agents", "create_agent_channel"])
-        .execute(f.persistence.pool())
-        .await
-        .unwrap();
+    crate::adapters::persistence::agent_capability::assign_test_tool_names(
+        &f.persistence,
+        builder,
+        &["list_company_agents", "create_agent_channel"],
+    )
+    .await
+    .unwrap();
     let kept = json!(["list_company_agents", "create_agent_channel", "report.make"]);
     assert_eq!(
         answer(grant(f.owner, builder, provisioning, kept.clone()).await)
@@ -182,7 +183,7 @@ async fn workflow_tool_routes_register_revoke_and_grant() {
             StatusCode::NOT_FOUND
         );
     }
-    let stored: Vec<String> = sqlx::query_scalar("SELECT workflow_tools FROM agents WHERE id = $1")
+    let stored: Vec<String> = sqlx::query_scalar("SELECT ARRAY(SELECT alias FROM agent_draft_bindings WHERE agent_id=agents.id ORDER BY position) FROM agents WHERE id = $1")
         .bind(agent)
         .fetch_one(f.persistence.pool())
         .await
@@ -247,7 +248,7 @@ async fn competing_agent_grants_apply_once() {
     let mut statuses = [first.unwrap(), second.unwrap()];
     statuses.sort();
     assert_eq!(statuses, [StatusCode::OK, StatusCode::CONFLICT]);
-    let stored: Vec<String> = sqlx::query_scalar("SELECT workflow_tools FROM agents WHERE id = $1")
+    let stored: Vec<String> = sqlx::query_scalar("SELECT ARRAY(SELECT alias FROM agent_draft_bindings WHERE agent_id=agents.id ORDER BY position) FROM agents WHERE id = $1")
         .bind(agent)
         .fetch_one(f.persistence.pool())
         .await

@@ -192,7 +192,11 @@ async fn configure_agent(f: &Fixture) -> Uuid {
             slug: "assistant".into(),
             provider: Some(SCRIPTED_PROVIDER.into()),
             model: Some(SCRIPTED_MODEL.into()),
-            workflow_tools: Some(vec![TypeName::parse(SEARCH_KNOWLEDGE).unwrap()]),
+            tool_bindings: Some(vec![
+                crate::entities::agent_capability::AgentToolBinding::builtin(
+                    crate::entities::agent_capability::AgentBuiltinTool::SearchKnowledge,
+                ),
+            ]),
             system_prompt: Some("Answer with the requested JSON string.".into()),
             ..Default::default()
         },

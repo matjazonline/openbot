@@ -3,6 +3,7 @@
 //! equality, so a caller can never persist a forged or widened agent capability.
 use super::http::begin_http;
 use super::*;
+use crate::application::agent::{AgentKey, ModelSettings, SkillSnapshot};
 use crate::application::workflow::knowledge::{
     builtin_knowledge_snapshot, is_builtin_knowledge_tool,
 };
@@ -19,7 +20,6 @@ struct AgentRow {
     system_prompt: Option<String>,
     provider: Option<String>,
     model: Option<String>,
-    workflow_tools: Vec<String>,
 }
 
 #[derive(sqlx::FromRow)]
@@ -64,7 +64,7 @@ async fn derive_on(
     };
     let key_name = key.as_str();
     let agent: AgentRow = sqlx::query_as(&format!(
-        "SELECT id, slug::text AS slug, system_prompt, provider, model, workflow_tools FROM agents WHERE company_id=$1 AND slug=$2{share}"
+        "SELECT id, slug::text AS slug, system_prompt, provider, model FROM agents WHERE company_id=$1 AND slug=$2{share}"
     ))
     .bind(company.as_uuid())
     .bind(key.as_str())
@@ -101,22 +101,7 @@ async fn derive_on(
     .bind(agent.id)
     .fetch_all(&mut *db)
     .await?;
-    let mut snapshots = Vec::with_capacity(skills.len());
-    for skill in skills {
-        let name = TypeName::parse(&skill.slug).map_err(|_| {
-            refused(format!(
-                "Skill {} has a slug workflows cannot name",
-                skill.slug
-            ))
-        })?;
-        snapshots.push(SkillSnapshot {
-            company_id: company,
-            skill_id: skill.id,
-            name,
-            instructions: skill.instructions,
-            required_tools: type_names(&skill.required_tools, "required tool")?,
-        });
-    }
+    let snapshots = skill_snapshots(company, skills)?;
     let agent = AgentSnapshot {
         company_id: company,
         agent_id: agent.id,
@@ -136,10 +121,34 @@ async fn derive_on(
             )
             .map_err(|_| invalid())?,
         },
-        tools: type_names(&agent.workflow_tools, "workflow tool")?,
+        tools: super::super::agent_capability::bindings_on(db, Some(company.as_uuid()), agent.id)
+            .await?
+            .into_iter()
+            .map(|binding| binding.alias.as_type_name().clone())
+            .collect(),
         skills: snapshots.iter().map(|skill| skill.name.clone()).collect(),
     };
     Ok((agent, snapshots))
+}
+
+fn skill_snapshots(company: CompanyId, rows: Vec<SkillRow>) -> AppResult<Vec<SkillSnapshot>> {
+    rows.into_iter()
+        .map(|skill| {
+            let name = TypeName::parse(&skill.slug).map_err(|_| {
+                refused(format!(
+                    "Skill {} has a slug workflows cannot name",
+                    skill.slug
+                ))
+            })?;
+            Ok(SkillSnapshot {
+                company_id: company,
+                skill_id: skill.id,
+                name,
+                instructions: skill.instructions,
+                required_tools: type_names(&skill.required_tools, "required tool")?,
+            })
+        })
+        .collect()
 }
 
 /// Publish-only (06-D5 F008): every agent snapshot in the new root bundle, and every skill
@@ -339,7 +348,7 @@ async fn granted_tool(
     if let Some(kind) = MessageKind::parse(name.as_str()) {
         return Ok(Some(builtin_message_snapshot(company, kind)?));
     }
-    let snapshots: Vec<Value> = sqlx::query_scalar("SELECT operation.snapshot FROM workflow_http_operations AS operation JOIN workflow_http_connections AS connection ON connection.company_id=operation.company_id AND connection.id=operation.connection_id WHERE operation.company_id=$1 AND operation.name=$2 AND connection.enabled AND (NOT connection.bearer OR EXISTS(SELECT 1 FROM workflow_http_credentials AS credential WHERE credential.company_id=connection.company_id AND credential.connection_id=connection.id)) LIMIT 2")
+    let snapshots: Vec<Value> = sqlx::query_scalar("SELECT operation.snapshot FROM workflow_http_operations AS operation JOIN workflow_http_connections AS connection ON connection.company_id=operation.company_id AND connection.id=operation.connection_id WHERE operation.revoked_at IS NULL AND operation.company_id=$1 AND operation.name=$2 AND connection.enabled AND (NOT connection.bearer OR EXISTS(SELECT 1 FROM workflow_http_credentials AS credential WHERE credential.company_id=connection.company_id AND credential.connection_id=connection.id)) LIMIT 2")
         .bind(company.as_uuid())
         .bind(name.as_str())
         .fetch_all(&mut **tx)

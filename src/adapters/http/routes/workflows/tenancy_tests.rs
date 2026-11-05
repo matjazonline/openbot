@@ -279,7 +279,7 @@ async fn workflow_routes_refuse_other_tenants_and_members() {
     )
     .await;
     assert_eq!(Fixture::items(&listed).0.len(), 1, "{listed}");
-    let stored: Vec<String> = sqlx::query_scalar("SELECT workflow_tools FROM agents WHERE id = $1")
+    let stored: Vec<String> = sqlx::query_scalar("SELECT ARRAY(SELECT alias FROM agent_draft_bindings WHERE agent_id=agents.id ORDER BY position) FROM agents WHERE id = $1")
         .bind(theirs.agent)
         .fetch_one(f.persistence.pool())
         .await

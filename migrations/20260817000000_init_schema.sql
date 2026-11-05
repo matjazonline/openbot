@@ -3354,8 +3354,6 @@ CREATE TABLE public.agents (
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     avatar_url text,
     created_by jsonb NOT NULL,
-    -- Ordered workflow tool names this agent grants (06-D5).
-    workflow_tools text[] DEFAULT '{}'::text[] NOT NULL CONSTRAINT agents_workflow_tools_shape CHECK (public.valid_workflow_type_names(workflow_tools)),
     CONSTRAINT agents_avatar_url_scheme_check CHECK (((avatar_url IS NULL) OR (avatar_url ~ '^https?://'::text))),
     CONSTRAINT agents_created_by_shape_check CHECK (public.valid_creation_provenance(created_by)),
     CONSTRAINT agents_model_pair_check CHECK ((provider IS NULL) = (model IS NULL)),
@@ -11979,3 +11977,459 @@ BEGIN
 END $$;
 CREATE CONSTRAINT TRIGGER harness_knowledge_observation AFTER INSERT OR UPDATE ON public.task_harness_runs
     DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.guard_harness_knowledge_observations();
+
+-- Autonomous agents own configuration and retained revision identities. Reset incompatible data.
+ALTER TABLE public.agents ADD COLUMN draft_revision bigint NOT NULL DEFAULT 1 CHECK (draft_revision>0);
+ALTER TABLE public.workflow_http_operations ADD COLUMN revoked_at timestamptz;
+ALTER TABLE public.workflow_mcp_operations ADD COLUMN revoked_at timestamptz;
+ALTER TABLE public.workflow_tool_registrations ADD COLUMN revoked_at timestamptz;
+ALTER TABLE public.company_mcp_tool_grants ADD COLUMN revoked_at timestamptz;
+
+CREATE FUNCTION public.guard_retained_mcp_grant() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP='DELETE' THEN
+        IF NOT EXISTS(SELECT 1 FROM public.companies WHERE id=OLD.company_id) THEN RETURN OLD; END IF;
+        RAISE EXCEPTION 'retained MCP grant keys must be revoked, not deleted' USING ERRCODE='23514';
+    END IF;
+    IF to_jsonb(NEW)-'revoked_at' IS DISTINCT FROM to_jsonb(OLD)-'revoked_at' THEN
+        RAISE EXCEPTION 'MCP grant key is immutable' USING ERRCODE='23514';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER company_mcp_grant_retained BEFORE UPDATE OR DELETE ON public.company_mcp_tool_grants
+    FOR EACH ROW EXECUTE FUNCTION public.guard_retained_mcp_grant();
+
+CREATE FUNCTION public.guard_mcp_operation_current_grant() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF NEW.revoked_at IS NULL THEN
+        -- Status edits take NO KEY UPDATE: KEY SHARE would not serialize this race.
+        PERFORM 1 FROM public.company_mcp_tool_grants WHERE company_id=NEW.company_id
+            AND connection_id=NEW.connection_id AND tool_name=NEW.name AND revoked_at IS NULL FOR SHARE;
+        IF NOT FOUND THEN
+            RAISE EXCEPTION 'active MCP operation requires a current company grant' USING ERRCODE='23503';
+        END IF;
+        IF TG_OP='UPDATE' AND OLD.revoked_at IS NOT NULL AND OLD.version=NEW.version THEN
+            RAISE EXCEPTION 'MCP operation reactivation requires a fresh review version' USING ERRCODE='23514';
+        END IF;
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER workflow_mcp_operation_current_grant BEFORE INSERT OR UPDATE ON public.workflow_mcp_operations
+    FOR EACH ROW EXECUTE FUNCTION public.guard_mcp_operation_current_grant();
+
+CREATE FUNCTION public.revoke_mcp_grant_operations() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF OLD.revoked_at IS NULL AND NEW.revoked_at IS NOT NULL THEN
+        UPDATE public.workflow_mcp_operations SET revoked_at=clock_timestamp()
+            WHERE company_id=NEW.company_id AND connection_id=NEW.connection_id AND name=NEW.tool_name AND revoked_at IS NULL;
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER company_mcp_grant_revokes_operations AFTER UPDATE ON public.company_mcp_tool_grants
+    FOR EACH ROW EXECUTE FUNCTION public.revoke_mcp_grant_operations();
+
+CREATE TABLE public.agent_capability_bindings (
+    company_id uuid REFERENCES public.companies(id) ON DELETE CASCADE,
+    agent_id uuid NOT NULL REFERENCES public.agents(id) ON DELETE CASCADE,
+    id uuid PRIMARY KEY,
+    alias text NOT NULL CHECK (public.valid_workflow_type_names(ARRAY[alias])),
+    kind text NOT NULL,
+    builtin text,
+    http_connection_id uuid,
+    mcp_connection_id uuid,
+    operation_name text,
+    reviewed_version uuid,
+    remote_name text CHECK (octet_length(remote_name) BETWEEN 1 AND 256),
+    workflow_registration text,
+    workflow_id uuid,
+    version_id uuid,
+    params jsonb CHECK (jsonb_typeof(params)='object' AND octet_length(params::text)<=65536),
+    UNIQUE(company_id,agent_id,id),
+    UNIQUE(id,agent_id,alias),
+    FOREIGN KEY(company_id,agent_id) REFERENCES public.agents(company_id,id) DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY(company_id,http_connection_id,operation_name)
+        REFERENCES public.workflow_http_operations(company_id,connection_id,name) DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY(company_id,mcp_connection_id,operation_name)
+        REFERENCES public.workflow_mcp_operations(company_id,connection_id,name) DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY(company_id,workflow_registration) REFERENCES public.workflow_tool_registrations(company_id,name) DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY(company_id,workflow_id,version_id) REFERENCES public.workflow_versions(company_id,workflow_id,id) DEFERRABLE INITIALLY DEFERRED,
+    CHECK(company_id IS NOT NULL OR kind='builtin'),
+    CONSTRAINT agent_binding_target_shape CHECK (
+        (kind='builtin' AND builtin IS NOT NULL AND builtin IN ('message_send','message_reply','list_company_agents','create_agent_channel','search_knowledge')
+            AND num_nonnulls(builtin,http_connection_id,mcp_connection_id,operation_name,reviewed_version,remote_name,workflow_registration,workflow_id,version_id,params)=1)
+        OR (kind='http' AND http_connection_id IS NOT NULL AND operation_name IS NOT NULL
+            AND num_nonnulls(builtin,http_connection_id,mcp_connection_id,operation_name,reviewed_version,remote_name,workflow_registration,workflow_id,version_id,params)=2)
+        OR (kind='mcp' AND mcp_connection_id IS NOT NULL AND operation_name IS NOT NULL AND reviewed_version IS NOT NULL AND remote_name IS NOT NULL
+            AND num_nonnulls(builtin,http_connection_id,mcp_connection_id,operation_name,reviewed_version,remote_name,workflow_registration,workflow_id,version_id,params)=4)
+        OR (kind='workflow' AND workflow_registration IS NOT NULL AND workflow_id IS NOT NULL AND version_id IS NOT NULL AND params IS NOT NULL
+            AND num_nonnulls(builtin,http_connection_id,mcp_connection_id,operation_name,reviewed_version,remote_name,workflow_registration,workflow_id,version_id,params)=4)),
+    CONSTRAINT agent_binding_reserved_alias CHECK (
+        NOT (alias LIKE 'message.%' OR alias IN ('list_company_agents','create_agent_channel','search_knowledge'))
+        OR (kind='builtin' AND alias=CASE builtin WHEN 'message_send' THEN 'message.send' WHEN 'message_reply' THEN 'message.reply' ELSE builtin END))
+);
+CREATE TABLE public.agent_draft_bindings (
+    company_id uuid,
+    agent_id uuid NOT NULL REFERENCES public.agents(id) ON DELETE CASCADE,
+    binding_id uuid NOT NULL,
+    alias text NOT NULL,
+    position smallint NOT NULL CHECK(position BETWEEN 0 AND 31),
+    PRIMARY KEY(agent_id,binding_id),
+    UNIQUE(agent_id,alias),
+    UNIQUE(agent_id,position),
+    FOREIGN KEY(binding_id,agent_id,alias) REFERENCES public.agent_capability_bindings(id,agent_id,alias) DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY(company_id,agent_id,binding_id) REFERENCES public.agent_capability_bindings(company_id,agent_id,id) DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY(company_id,agent_id) REFERENCES public.agents(company_id,id) DEFERRABLE INITIALLY DEFERRED
+);
+CREATE TABLE public.agent_skill_assignments (
+    company_id uuid REFERENCES public.companies(id) ON DELETE CASCADE,
+    agent_id uuid NOT NULL REFERENCES public.agents(id) ON DELETE CASCADE,
+    id uuid PRIMARY KEY,
+    -- Original identity is retained history; the separately constrained live edge may retire.
+    skill_id uuid NOT NULL,
+    live_skill_id uuid REFERENCES public.skills(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED,
+    UNIQUE(company_id,agent_id,id,skill_id),
+    UNIQUE(id,agent_id,skill_id),
+    FOREIGN KEY(company_id,agent_id) REFERENCES public.agents(company_id,id) DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY(company_id,live_skill_id) REFERENCES public.skills(company_id,id)
+        ON DELETE SET NULL (live_skill_id) DEFERRABLE INITIALLY DEFERRED,
+    CHECK(live_skill_id IS NULL OR live_skill_id=skill_id)
+);
+ALTER TABLE public.agent_skills ADD COLUMN assignment_id uuid NOT NULL DEFAULT gen_random_uuid();
+ALTER TABLE public.agent_skills ADD CONSTRAINT agent_skills_assignment_fk
+    FOREIGN KEY(assignment_id,agent_id,skill_id) REFERENCES public.agent_skill_assignments(id,agent_id,skill_id) DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.agent_skills ADD CONSTRAINT agent_skills_assignment_scope_fk
+    FOREIGN KEY(company_id,agent_id,assignment_id,skill_id) REFERENCES public.agent_skill_assignments(company_id,agent_id,id,skill_id) DEFERRABLE INITIALLY DEFERRED;
+
+CREATE TABLE public.agent_revisions (
+    company_id uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
+    agent_id uuid NOT NULL,
+    id uuid NOT NULL,
+    draft_revision bigint NOT NULL CHECK(draft_revision>0),
+    content text NOT NULL CHECK(octet_length(content) BETWEEN 1 AND 1048576),
+    digest bytea NOT NULL CHECK(octet_length(digest)=32 AND digest=sha256(convert_to(content,'UTF8'))),
+    created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+    PRIMARY KEY(company_id,id),
+    UNIQUE(company_id,agent_id,id),
+    FOREIGN KEY(company_id,agent_id) REFERENCES public.agents(company_id,id) DEFERRABLE INITIALLY DEFERRED,
+    CHECK((content::jsonb->>'company_id'=company_id::text AND content::jsonb->>'agent_id'=agent_id::text) IS TRUE),
+    CHECK((jsonb_typeof(content::jsonb->'tools')='array' AND jsonb_array_length(content::jsonb->'tools')<=32) IS TRUE),
+    CHECK((jsonb_typeof(content::jsonb->'skills')='array' AND jsonb_array_length(content::jsonb->'skills')<=16) IS TRUE)
+);
+CREATE TABLE public.agent_revision_bindings (
+    company_id uuid NOT NULL,
+    agent_id uuid NOT NULL,
+    revision_id uuid NOT NULL,
+    binding_id uuid NOT NULL,
+    position smallint NOT NULL CHECK(position BETWEEN 0 AND 31),
+    PRIMARY KEY(company_id,revision_id,binding_id),
+    UNIQUE(company_id,revision_id,position),
+    FOREIGN KEY(company_id,agent_id,revision_id) REFERENCES public.agent_revisions(company_id,agent_id,id) ON DELETE CASCADE,
+    FOREIGN KEY(company_id,agent_id,binding_id) REFERENCES public.agent_capability_bindings(company_id,agent_id,id) DEFERRABLE INITIALLY DEFERRED
+);
+CREATE TABLE public.agent_revision_skills (
+    company_id uuid NOT NULL,
+    agent_id uuid NOT NULL,
+    revision_id uuid NOT NULL,
+    assignment_id uuid NOT NULL,
+    skill_id uuid NOT NULL,
+    position smallint NOT NULL CHECK(position BETWEEN 0 AND 15),
+    PRIMARY KEY(company_id,revision_id,assignment_id),
+    UNIQUE(company_id,revision_id,position),
+    FOREIGN KEY(company_id,agent_id,revision_id) REFERENCES public.agent_revisions(company_id,agent_id,id) ON DELETE CASCADE,
+    FOREIGN KEY(company_id,agent_id,assignment_id,skill_id) REFERENCES public.agent_skill_assignments(company_id,agent_id,id,skill_id) DEFERRABLE INITIALLY DEFERRED
+);
+CREATE TABLE public.agent_active_revisions (
+    company_id uuid NOT NULL,
+    agent_id uuid NOT NULL,
+    revision_id uuid NOT NULL,
+    PRIMARY KEY(company_id,agent_id),
+    FOREIGN KEY(company_id,agent_id) REFERENCES public.agents(company_id,id) ON DELETE CASCADE,
+    FOREIGN KEY(company_id,agent_id,revision_id) REFERENCES public.agent_revisions(company_id,agent_id,id) DEFERRABLE INITIALLY DEFERRED
+);
+CREATE TABLE public.agent_binding_grants (
+    company_id uuid NOT NULL,
+    agent_id uuid NOT NULL,
+    binding_id uuid NOT NULL,
+    revoked_at timestamptz,
+    PRIMARY KEY(company_id,agent_id,binding_id),
+    FOREIGN KEY(company_id) REFERENCES public.companies(id) ON DELETE CASCADE,
+    FOREIGN KEY(company_id,agent_id,binding_id) REFERENCES public.agent_capability_bindings(company_id,agent_id,id) DEFERRABLE INITIALLY DEFERRED
+);
+CREATE TABLE public.agent_skill_grants (
+    company_id uuid NOT NULL,
+    agent_id uuid NOT NULL,
+    assignment_id uuid NOT NULL,
+    skill_id uuid NOT NULL,
+    revoked_at timestamptz,
+    PRIMARY KEY(company_id,agent_id,assignment_id),
+    FOREIGN KEY(company_id) REFERENCES public.companies(id) ON DELETE CASCADE,
+    FOREIGN KEY(company_id,agent_id,assignment_id,skill_id) REFERENCES public.agent_skill_assignments(company_id,agent_id,id,skill_id) DEFERRABLE INITIALLY DEFERRED
+);
+
+CREATE TABLE public.agent_dependency_manifests (
+    company_id uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
+    id uuid NOT NULL,
+    root_run_id uuid NOT NULL,
+    content text NOT NULL CHECK(octet_length(content) BETWEEN 1 AND 4194304),
+    digest bytea NOT NULL CHECK(octet_length(digest)=32 AND digest=sha256(convert_to(content,'UTF8'))),
+    PRIMARY KEY(company_id,id),
+    UNIQUE(company_id,root_run_id),
+    UNIQUE(company_id,id,root_run_id),
+    FOREIGN KEY(company_id,root_run_id) REFERENCES public.workflow_runs(company_id,id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED,
+    CHECK((content::jsonb->>'company_id'=company_id::text AND content::jsonb->>'root_run_id'=root_run_id::text) IS TRUE),
+    CHECK((jsonb_typeof(content::jsonb->'agents')='array' AND jsonb_typeof(content::jsonb->'workflows')='array'
+        AND jsonb_array_length(content::jsonb->'agents')+jsonb_array_length(content::jsonb->'workflows')<=256) IS TRUE)
+);
+CREATE TABLE public.agent_manifest_revisions (
+    company_id uuid NOT NULL,
+    manifest_id uuid NOT NULL,
+    agent_id uuid NOT NULL,
+    revision_id uuid NOT NULL,
+    PRIMARY KEY(company_id,manifest_id,agent_id),
+    FOREIGN KEY(company_id,manifest_id) REFERENCES public.agent_dependency_manifests(company_id,id) ON DELETE CASCADE,
+    FOREIGN KEY(company_id,agent_id,revision_id) REFERENCES public.agent_revisions(company_id,agent_id,id) DEFERRABLE INITIALLY DEFERRED
+);
+CREATE TABLE public.agent_manifest_workflows (
+    company_id uuid NOT NULL,
+    manifest_id uuid NOT NULL,
+    workflow_id uuid NOT NULL,
+    version_id uuid NOT NULL,
+    PRIMARY KEY(company_id,manifest_id,version_id),
+    FOREIGN KEY(company_id,manifest_id) REFERENCES public.agent_dependency_manifests(company_id,id) ON DELETE CASCADE,
+    FOREIGN KEY(company_id,workflow_id,version_id) REFERENCES public.workflow_versions(company_id,workflow_id,id) DEFERRABLE INITIALLY DEFERRED
+);
+CREATE TABLE public.run_dependency_manifests (
+    company_id uuid NOT NULL,
+    run_id uuid NOT NULL,
+    root_run_id uuid NOT NULL,
+    manifest_id uuid NOT NULL,
+    PRIMARY KEY(company_id,run_id),
+    FOREIGN KEY(company_id,run_id,root_run_id) REFERENCES public.workflow_run_budgets(company_id,run_id,root_run_id)
+        ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY(company_id,manifest_id,root_run_id) REFERENCES public.agent_dependency_manifests(company_id,id,root_run_id)
+        ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED
+);
+
+CREATE FUNCTION public.agent_binding_source(binding public.agent_capability_bindings) RETURNS jsonb
+    LANGUAGE sql IMMUTABLE STRICT AS $$
+    SELECT CASE binding.kind
+        WHEN 'builtin' THEN jsonb_build_object('kind','builtin','tool',binding.builtin)
+        WHEN 'http' THEN jsonb_build_object('kind','http','connection',binding.http_connection_id,'operation',binding.operation_name)
+        WHEN 'mcp' THEN jsonb_build_object('kind','mcp','connection',binding.mcp_connection_id,'operation',binding.operation_name,
+            'reviewed_version',binding.reviewed_version,'remote_name',binding.remote_name)
+        WHEN 'workflow' THEN jsonb_build_object('kind','workflow','registration',binding.workflow_registration,
+            'workflow',binding.workflow_id,'version',binding.version_id,'params',binding.params)
+    END
+$$;
+CREATE FUNCTION public.guard_agent_owned_identity() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_TABLE_NAME='agent_skill_assignments' AND TG_OP='UPDATE' THEN
+        IF OLD.live_skill_id IS NOT NULL AND NEW.live_skill_id IS NULL
+            AND to_jsonb(NEW)-'live_skill_id'=to_jsonb(OLD)-'live_skill_id'
+            AND NOT EXISTS(SELECT 1 FROM public.skills WHERE id=OLD.live_skill_id) THEN RETURN NEW; END IF;
+    END IF;
+    IF TG_OP='DELETE' AND (NOT EXISTS(SELECT 1 FROM public.companies WHERE id=OLD.company_id)
+        AND OLD.company_id IS NOT NULL OR NOT EXISTS(SELECT 1 FROM public.agents WHERE id=OLD.agent_id)) THEN RETURN OLD; END IF;
+    RAISE EXCEPTION 'agent capability identity is immutable' USING ERRCODE='23514';
+END $$;
+CREATE TRIGGER agent_binding_immutable BEFORE UPDATE OR DELETE ON public.agent_capability_bindings
+    FOR EACH ROW EXECUTE FUNCTION public.guard_agent_owned_identity();
+CREATE TRIGGER agent_assignment_immutable BEFORE UPDATE OR DELETE ON public.agent_skill_assignments
+    FOR EACH ROW EXECUTE FUNCTION public.guard_agent_owned_identity();
+CREATE TRIGGER agent_revision_immutable BEFORE UPDATE OR DELETE ON public.agent_revisions
+    FOR EACH ROW EXECUTE FUNCTION public.guard_agent_owned_identity();
+
+CREATE FUNCTION public.guard_agent_library_scope() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE owner_company uuid; related_company uuid;
+BEGIN
+    SELECT company_id INTO owner_company FROM public.agents WHERE id=NEW.agent_id;
+    IF owner_company IS DISTINCT FROM NEW.company_id THEN
+        RAISE EXCEPTION 'agent capability scope mismatch' USING ERRCODE='23514';
+    END IF;
+    IF TG_TABLE_NAME='agent_skill_assignments' THEN
+        IF NEW.live_skill_id IS NULL OR NEW.live_skill_id IS DISTINCT FROM NEW.skill_id
+            OR NOT EXISTS(SELECT 1 FROM public.skills WHERE id=NEW.live_skill_id) THEN
+            RAISE EXCEPTION 'new assignment requires its actual live skill' USING ERRCODE='23503';
+        END IF;
+        SELECT company_id INTO related_company FROM public.skills WHERE id=NEW.skill_id;
+        IF related_company IS DISTINCT FROM NEW.company_id THEN
+            RAISE EXCEPTION 'agent skill assignment scope mismatch' USING ERRCODE='23514';
+        END IF;
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER agent_binding_scope BEFORE INSERT ON public.agent_capability_bindings
+    FOR EACH ROW EXECUTE FUNCTION public.guard_agent_library_scope();
+CREATE TRIGGER agent_assignment_scope BEFORE INSERT ON public.agent_skill_assignments
+    FOR EACH ROW EXECUTE FUNCTION public.guard_agent_library_scope();
+CREATE TRIGGER agent_draft_binding_scope BEFORE INSERT OR UPDATE ON public.agent_draft_bindings
+    FOR EACH ROW EXECUTE FUNCTION public.guard_agent_library_scope();
+
+CREATE FUNCTION public.capture_agent_skill_assignment() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    INSERT INTO public.agent_skill_assignments(company_id,agent_id,id,skill_id,live_skill_id)
+        VALUES(NEW.company_id,NEW.agent_id,NEW.assignment_id,NEW.skill_id,NEW.skill_id) ON CONFLICT(id) DO NOTHING;
+    PERFORM 1 FROM public.agent_skill_assignments WHERE id=NEW.assignment_id AND agent_id=NEW.agent_id
+        AND company_id IS NOT DISTINCT FROM NEW.company_id AND live_skill_id=NEW.skill_id FOR SHARE;
+    IF NOT FOUND THEN RAISE EXCEPTION 'retired skill assignment cannot be attached' USING ERRCODE='23514'; END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER agent_skill_assignment_identity BEFORE INSERT OR UPDATE ON public.agent_skills
+    FOR EACH ROW EXECUTE FUNCTION public.capture_agent_skill_assignment();
+
+CREATE FUNCTION public.guard_agent_live_grant() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP='DELETE' AND NOT EXISTS(SELECT 1 FROM public.companies WHERE id=OLD.company_id) THEN RETURN OLD; END IF;
+    IF TG_OP='UPDATE' AND OLD.revoked_at IS NULL AND NEW.revoked_at IS NOT NULL
+        AND to_jsonb(NEW)-'revoked_at'=to_jsonb(OLD)-'revoked_at' THEN RETURN NEW; END IF;
+    RAISE EXCEPTION 'agent grant incarnation cannot be restored or replaced' USING ERRCODE='23514';
+END $$;
+CREATE TRIGGER agent_binding_grant_revoke BEFORE UPDATE OR DELETE ON public.agent_binding_grants
+    FOR EACH ROW EXECUTE FUNCTION public.guard_agent_live_grant();
+CREATE TRIGGER agent_skill_grant_revoke BEFORE UPDATE OR DELETE ON public.agent_skill_grants
+    FOR EACH ROW EXECUTE FUNCTION public.guard_agent_live_grant();
+
+CREATE FUNCTION public.retire_agent_skill_authority() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF OLD.live_skill_id IS NOT NULL AND NEW.live_skill_id IS NULL THEN
+        UPDATE public.agent_skill_grants SET revoked_at=clock_timestamp()
+            WHERE company_id=NEW.company_id AND agent_id=NEW.agent_id AND assignment_id=NEW.id AND revoked_at IS NULL;
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER agent_skill_source_retired AFTER UPDATE ON public.agent_skill_assignments
+    FOR EACH ROW EXECUTE FUNCTION public.retire_agent_skill_authority();
+
+CREATE FUNCTION public.revoke_registered_agent_bindings() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_TABLE_NAME='workflow_tool_registrations' THEN
+        IF (OLD.revoked_at IS NULL AND NEW.revoked_at IS NOT NULL) OR OLD.workflow_id IS DISTINCT FROM NEW.workflow_id THEN
+            UPDATE public.agent_binding_grants AS grant_row SET revoked_at=clock_timestamp()
+            FROM public.agent_capability_bindings AS binding WHERE grant_row.company_id=binding.company_id
+                AND grant_row.agent_id=binding.agent_id AND grant_row.binding_id=binding.id AND grant_row.revoked_at IS NULL
+                AND binding.company_id=NEW.company_id AND binding.workflow_registration=NEW.name;
+        END IF;
+    ELSIF OLD.revoked_at IS NULL AND NEW.revoked_at IS NOT NULL THEN
+        UPDATE public.agent_binding_grants AS grant_row SET revoked_at=clock_timestamp()
+        FROM public.agent_capability_bindings AS binding WHERE grant_row.company_id=binding.company_id
+            AND grant_row.agent_id=binding.agent_id AND grant_row.binding_id=binding.id AND grant_row.revoked_at IS NULL
+            AND binding.company_id=NEW.company_id AND binding.operation_name=NEW.name
+            AND ((TG_TABLE_NAME='workflow_http_operations' AND binding.http_connection_id=NEW.connection_id)
+                OR (TG_TABLE_NAME='workflow_mcp_operations' AND binding.mcp_connection_id=NEW.connection_id));
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER agent_http_operation_revoke AFTER UPDATE ON public.workflow_http_operations
+    FOR EACH ROW EXECUTE FUNCTION public.revoke_registered_agent_bindings();
+CREATE TRIGGER agent_mcp_operation_revoke AFTER UPDATE ON public.workflow_mcp_operations
+    FOR EACH ROW EXECUTE FUNCTION public.revoke_registered_agent_bindings();
+CREATE TRIGGER agent_workflow_registration_revoke AFTER UPDATE ON public.workflow_tool_registrations
+    FOR EACH ROW EXECUTE FUNCTION public.revoke_registered_agent_bindings();
+
+CREATE FUNCTION public.guard_agent_revision_member() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP='DELETE' AND NOT EXISTS(SELECT 1 FROM public.agent_revisions
+        WHERE company_id=OLD.company_id AND id=OLD.revision_id) THEN RETURN OLD; END IF;
+    RAISE EXCEPTION 'agent revision membership is immutable' USING ERRCODE='23514';
+END $$;
+CREATE TRIGGER agent_revision_binding_immutable BEFORE UPDATE OR DELETE ON public.agent_revision_bindings
+    FOR EACH ROW EXECUTE FUNCTION public.guard_agent_revision_member();
+CREATE TRIGGER agent_revision_skill_immutable BEFORE UPDATE OR DELETE ON public.agent_revision_skills
+    FOR EACH ROW EXECUTE FUNCTION public.guard_agent_revision_member();
+
+CREATE FUNCTION public.check_agent_revision_members() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE owner_company uuid; revision uuid; saved jsonb; expected jsonb; actual jsonb;
+BEGIN
+    IF TG_TABLE_NAME='agent_revisions' THEN owner_company:=NEW.company_id; revision:=NEW.id;
+    ELSE owner_company:=NEW.company_id; revision:=NEW.revision_id; END IF;
+    SELECT content::jsonb INTO saved FROM public.agent_revisions
+        WHERE company_id=owner_company AND id=revision FOR UPDATE;
+    IF saved IS NULL THEN RETURN NULL; END IF;
+    SELECT coalesce(jsonb_agg(item->'binding' ORDER BY position),'[]') INTO expected
+        FROM jsonb_array_elements(saved->'tools') WITH ORDINALITY AS declared(item,position);
+    SELECT coalesce(jsonb_agg(jsonb_build_object('id',binding.id,'alias',binding.alias,'source',public.agent_binding_source(binding))
+        ORDER BY member.position),'[]') INTO actual FROM public.agent_revision_bindings AS member
+        JOIN public.agent_capability_bindings AS binding ON binding.company_id=member.company_id
+            AND binding.agent_id=member.agent_id AND binding.id=member.binding_id
+        WHERE member.company_id=owner_company AND member.revision_id=revision;
+    IF expected IS DISTINCT FROM actual OR EXISTS(SELECT 1 FROM public.agent_revision_bindings
+        WHERE company_id=owner_company AND revision_id=revision GROUP BY revision_id
+        HAVING min(position)<>0 OR max(position)<>count(*)-1) THEN
+        RAISE EXCEPTION 'agent revision bindings must exactly match immutable content' USING ERRCODE='23514';
+    END IF;
+    SELECT coalesce(jsonb_agg(jsonb_build_object('assignment_id',item->'assignment_id','skill_id',item->'skill'->'skill_id') ORDER BY position),'[]')
+        INTO expected FROM jsonb_array_elements(saved->'skills') WITH ORDINALITY AS declared(item,position);
+    SELECT coalesce(jsonb_agg(jsonb_build_object('assignment_id',assignment_id,'skill_id',skill_id) ORDER BY position),'[]')
+        INTO actual FROM public.agent_revision_skills WHERE company_id=owner_company AND revision_id=revision;
+    IF expected IS DISTINCT FROM actual OR EXISTS(SELECT 1 FROM public.agent_revision_skills
+        WHERE company_id=owner_company AND revision_id=revision GROUP BY revision_id
+        HAVING min(position)<>0 OR max(position)<>count(*)-1) THEN
+        RAISE EXCEPTION 'agent revision skills must exactly match immutable content' USING ERRCODE='23514';
+    END IF;
+    RETURN NULL;
+END $$;
+CREATE CONSTRAINT TRIGGER agent_revision_complete AFTER INSERT ON public.agent_revisions
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.check_agent_revision_members();
+CREATE CONSTRAINT TRIGGER agent_revision_bindings_complete AFTER INSERT ON public.agent_revision_bindings
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.check_agent_revision_members();
+CREATE CONSTRAINT TRIGGER agent_revision_skills_complete AFTER INSERT ON public.agent_revision_skills
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.check_agent_revision_members();
+
+CREATE FUNCTION public.guard_agent_manifest() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE owner_company uuid; root uuid; manifest uuid;
+BEGIN
+    owner_company:=OLD.company_id;
+    IF TG_TABLE_NAME='agent_dependency_manifests' THEN root:=OLD.root_run_id;
+    ELSIF TG_TABLE_NAME='run_dependency_manifests' THEN
+        root:=OLD.root_run_id;
+        IF TG_OP='DELETE' AND NOT EXISTS(SELECT 1 FROM public.workflow_runs WHERE company_id=owner_company AND id=OLD.run_id)
+            THEN RETURN OLD; END IF;
+    ELSE
+        SELECT root_run_id INTO root FROM public.agent_dependency_manifests WHERE company_id=owner_company AND id=OLD.manifest_id;
+    END IF;
+    IF TG_OP='DELETE' AND (root IS NULL OR NOT EXISTS(SELECT 1 FROM public.workflow_runs WHERE company_id=owner_company AND id=root))
+        THEN RETURN OLD; END IF;
+    RAISE EXCEPTION 'run dependency capture is immutable' USING ERRCODE='23514';
+END $$;
+CREATE TRIGGER agent_manifest_immutable BEFORE UPDATE OR DELETE ON public.agent_dependency_manifests
+    FOR EACH ROW EXECUTE FUNCTION public.guard_agent_manifest();
+CREATE TRIGGER agent_manifest_revision_immutable BEFORE UPDATE OR DELETE ON public.agent_manifest_revisions
+    FOR EACH ROW EXECUTE FUNCTION public.guard_agent_manifest();
+CREATE TRIGGER agent_manifest_workflow_immutable BEFORE UPDATE OR DELETE ON public.agent_manifest_workflows
+    FOR EACH ROW EXECUTE FUNCTION public.guard_agent_manifest();
+CREATE TRIGGER run_manifest_immutable BEFORE UPDATE OR DELETE ON public.run_dependency_manifests
+    FOR EACH ROW EXECUTE FUNCTION public.guard_agent_manifest();
+
+CREATE FUNCTION public.check_agent_manifest_members() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE owner_company uuid; manifest uuid; saved jsonb; root uuid; expected jsonb; actual jsonb;
+BEGIN
+    owner_company:=NEW.company_id;
+    IF TG_TABLE_NAME='agent_dependency_manifests' THEN manifest:=NEW.id; ELSE manifest:=NEW.manifest_id; END IF;
+    SELECT content::jsonb,root_run_id INTO saved,root FROM public.agent_dependency_manifests
+        WHERE company_id=owner_company AND id=manifest FOR UPDATE;
+    IF saved IS NULL THEN RETURN NULL; END IF;
+    SELECT coalesce(jsonb_agg(item ORDER BY item->>'agent_id'),'[]') INTO expected
+        FROM jsonb_array_elements(saved->'agents') AS declared(item);
+    SELECT coalesce(jsonb_agg(jsonb_build_object('agent_id',agent_id,'revision_id',revision_id) ORDER BY agent_id),'[]') INTO actual
+        FROM public.agent_manifest_revisions WHERE company_id=owner_company AND manifest_id=manifest;
+    IF expected IS DISTINCT FROM actual THEN
+        RAISE EXCEPTION 'agent revision selections must exactly match immutable manifest' USING ERRCODE='23514';
+    END IF;
+    SELECT coalesce(jsonb_agg(item ORDER BY item->>'workflow_id',item->>'version_id'),'[]') INTO expected
+        FROM jsonb_array_elements(saved->'workflows') AS declared(item);
+    SELECT coalesce(jsonb_agg(jsonb_build_object('workflow_id',workflow_id,'version_id',version_id) ORDER BY workflow_id,version_id),'[]') INTO actual
+        FROM public.agent_manifest_workflows WHERE company_id=owner_company AND manifest_id=manifest;
+    IF expected IS DISTINCT FROM actual OR NOT EXISTS(SELECT 1 FROM public.run_dependency_manifests
+        WHERE company_id=owner_company AND manifest_id=manifest AND run_id=root AND root_run_id=root) THEN
+        RAISE EXCEPTION 'workflow selections and root association must exactly match immutable manifest' USING ERRCODE='23514';
+    END IF;
+    RETURN NULL;
+END $$;
+CREATE CONSTRAINT TRIGGER agent_manifest_complete AFTER INSERT ON public.agent_dependency_manifests
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.check_agent_manifest_members();
+CREATE CONSTRAINT TRIGGER agent_manifest_revisions_complete AFTER INSERT ON public.agent_manifest_revisions
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.check_agent_manifest_members();
+CREATE CONSTRAINT TRIGGER agent_manifest_workflows_complete AFTER INSERT ON public.agent_manifest_workflows
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.check_agent_manifest_members();
+CREATE CONSTRAINT TRIGGER agent_manifest_association_complete AFTER INSERT ON public.run_dependency_manifests
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.check_agent_manifest_members();

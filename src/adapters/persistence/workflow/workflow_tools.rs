@@ -2,10 +2,8 @@
 //! snapshot of a granted name, and the publish/run checks of a frozen pin (P07-Q2).
 use super::http::begin_http;
 use super::*;
-use crate::application::workflow::publication::{
-    ActionEffect, ActionRecovery, ApprovedActionPolicy, PublishedBundle, WorkflowToolPin,
-    restore_bundle,
-};
+use crate::application::agent::{ActionEffect, ActionRecovery, ApprovedActionPolicy};
+use crate::application::workflow::publication::{PublishedBundle, WorkflowToolPin, restore_bundle};
 use crate::application::workflow::registry::ToolContract;
 use crate::application::workflow::tools::*;
 use serde_json::Value;
@@ -49,7 +47,7 @@ pub(super) async fn registration_on(
 ) -> AppResult<Option<WorkflowToolRegistration>> {
     sqlx::query_as::<_, RegistrationRow>(
         "SELECT name, workflow_id, version_id, params, revision FROM workflow_tool_registrations \
-         WHERE company_id=$1 AND name=$2 FOR SHARE",
+         WHERE revoked_at IS NULL AND company_id=$1 AND name=$2 FOR SHARE",
     )
     .bind(company.as_uuid())
     .bind(name.as_str())
@@ -205,7 +203,7 @@ impl WorkflowTools for PostgresPersistence {
         let written = match write.expected {
             None => {
                 let count: i64 = sqlx::query_scalar(
-                    "SELECT count(*) FROM workflow_tool_registrations WHERE company_id=$1",
+                    "SELECT count(*) FROM workflow_tool_registrations WHERE revoked_at IS NULL AND company_id=$1",
                 )
                 .bind(company.as_uuid())
                 .fetch_one(&mut *tx)
@@ -215,7 +213,7 @@ impl WorkflowTools for PostgresPersistence {
                 }
                 sqlx::query_as::<_, RegistrationRow>(
                     "INSERT INTO workflow_tool_registrations(company_id,name,workflow_id,version_id,params) \
-                     VALUES($1,$2,$3,$4,$5) ON CONFLICT (company_id,name) DO NOTHING \
+                     VALUES($1,$2,$3,$4,$5) ON CONFLICT (company_id,name) DO UPDATE SET workflow_id=EXCLUDED.workflow_id,version_id=EXCLUDED.version_id,params=EXCLUDED.params,revision=workflow_tool_registrations.revision+1,revoked_at=NULL WHERE workflow_tool_registrations.revoked_at IS NOT NULL \
                      RETURNING name, workflow_id, version_id, params, revision",
                 )
                 .bind(company.as_uuid())
@@ -229,7 +227,7 @@ impl WorkflowTools for PostgresPersistence {
             Some(revision) => sqlx::query_as::<_, RegistrationRow>(
                 "UPDATE workflow_tool_registrations SET workflow_id=$3, version_id=$4, params=$5, \
                  revision=revision+1, updated_at=clock_timestamp() \
-                 WHERE company_id=$1 AND name=$2 AND revision=$6 \
+                 WHERE company_id=$1 AND name=$2 AND revision=$6 AND revoked_at IS NULL \
                  RETURNING name, workflow_id, version_id, params, revision",
             )
             .bind(company.as_uuid())
@@ -256,7 +254,7 @@ impl WorkflowTools for PostgresPersistence {
         let mut tx = begin_http(self).await?;
         authority::authorize_company(&mut tx, company, actor).await?;
         let current: Option<i64> = sqlx::query_scalar(
-            "SELECT revision FROM workflow_tool_registrations WHERE company_id=$1 AND name=$2 FOR UPDATE",
+            "SELECT revision FROM workflow_tool_registrations WHERE revoked_at IS NULL AND company_id=$1 AND name=$2 FOR UPDATE",
         )
         .bind(company.as_uuid())
         .bind(name.as_str())
@@ -267,7 +265,7 @@ impl WorkflowTools for PostgresPersistence {
             Some(current) if current != revision => return Err(conflict()),
             Some(_) => {}
         }
-        sqlx::query("DELETE FROM workflow_tool_registrations WHERE company_id=$1 AND name=$2")
+        sqlx::query("UPDATE workflow_tool_registrations SET revoked_at=clock_timestamp(),revision=revision+1 WHERE company_id=$1 AND name=$2")
             .bind(company.as_uuid())
             .bind(name.as_str())
             .execute(&mut *tx)
@@ -285,7 +283,7 @@ impl WorkflowTools for PostgresPersistence {
         authority::authorize_company(&mut tx, company, actor).await?;
         let rows = sqlx::query_as::<_, RegistrationRow>(
             "SELECT name, workflow_id, version_id, params, revision FROM workflow_tool_registrations \
-             WHERE company_id=$1 ORDER BY name LIMIT 257",
+             WHERE revoked_at IS NULL AND company_id=$1 ORDER BY name LIMIT 257",
         )
         .bind(company.as_uuid())
         .fetch_all(&mut *tx)
@@ -318,14 +316,19 @@ impl WorkflowTools for PostgresPersistence {
         }
         let mut tx = begin_http(self).await?;
         authority::authorize_company(&mut tx, company, actor).await?;
-        let current: Option<Vec<String>> = sqlx::query_scalar(
-            "SELECT workflow_tools FROM agents WHERE company_id=$1 AND id=$2 FOR UPDATE",
-        )
-        .bind(company.as_uuid())
-        .bind(agent)
-        .fetch_optional(&mut *tx)
-        .await?;
-        let current = current.ok_or_else(|| AppError::NotFound("Agent not found".into()))?;
+        let current: Option<Uuid> =
+            sqlx::query_scalar("SELECT id FROM agents WHERE company_id=$1 AND id=$2 FOR UPDATE")
+                .bind(company.as_uuid())
+                .bind(agent)
+                .fetch_optional(&mut *tx)
+                .await?;
+        current.ok_or_else(|| AppError::NotFound("Agent not found".into()))?;
+        let current =
+            super::super::agent_capability::bindings_on(&mut tx, Some(company.as_uuid()), agent)
+                .await?
+                .into_iter()
+                .map(|binding| binding.alias.as_str().to_owned())
+                .collect::<Vec<_>>();
         // A retry of a grant that already applied finds its own list: done, whatever it expected.
         if current == granted {
             return Ok(tools.to_vec());
@@ -343,12 +346,27 @@ impl WorkflowTools for PostgresPersistence {
                 "Provisioning tools (list_company_agents, create_agent_channel) are granted only to the Agent Builder",
             ));
         }
-        sqlx::query("UPDATE agents SET workflow_tools=$3 WHERE company_id=$1 AND id=$2")
-            .bind(company.as_uuid())
-            .bind(agent)
-            .bind(&granted)
-            .execute(&mut *tx)
-            .await?;
+        let bindings = super::super::agent_binding_selection::resolve_bindings_on(
+            &mut tx,
+            company.as_uuid(),
+            Some(agent),
+            tools,
+        )
+        .await?;
+        super::super::agent_capability::replace_bindings_on(
+            &mut tx,
+            Some(company.as_uuid()),
+            agent,
+            &bindings,
+        )
+        .await?;
+        sqlx::query(
+            "UPDATE agents SET draft_revision=draft_revision+1 WHERE company_id=$1 AND id=$2",
+        )
+        .bind(company.as_uuid())
+        .bind(agent)
+        .execute(&mut *tx)
+        .await?;
         tx.commit().await?;
         Ok(tools.to_vec())
     }

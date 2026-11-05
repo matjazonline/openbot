@@ -67,8 +67,22 @@ async fn configure_connection(
         })
         .await
         .unwrap();
-    sqlx::query("UPDATE agents SET workflow_tools=ARRAY['search_knowledge',$2] WHERE company_id=$1 AND slug='assistant'")
-        .bind(j.d.fixture.target.company.as_uuid()).bind(mcp_fixture::TOOL).execute(j.d.p().pool()).await.unwrap();
+    let agent =
+        sqlx::query_scalar("SELECT id FROM agents WHERE company_id=$1 AND slug='assistant'")
+            .bind(j.d.fixture.target.company.as_uuid())
+            .fetch_one(j.d.p().pool())
+            .await
+            .unwrap();
+    crate::adapters::persistence::agent_capability::assign_test_tool_names(
+        j.d.p(),
+        agent,
+        &[
+            crate::application::workflow::knowledge::SEARCH_KNOWLEDGE,
+            mcp_fixture::TOOL,
+        ],
+    )
+    .await
+    .unwrap();
     j.d.mcp_selections = vec![McpPublicationSelection {
         connection: connection.id,
         slot: ResourceName::parse("service").unwrap(),

@@ -1,0 +1,68 @@
+[
+  {
+    "name": "WB1-contract-r2",
+    "argv": [
+      "scripts/test-network-isolation.sh",
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "autonomous_agent_contract_"
+    ],
+    "selected": 8,
+    "exit_code": 0
+  },
+  {
+    "name": "WB1-final-callers-r1",
+    "argv": [
+      "scripts/test-network-isolation.sh",
+      "/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p01/target/debug/deps/open_bots-c19a0b960dacdcef",
+      "--exact",
+      "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::workflow_agent_publication_refuses_forged_snapshot_and_keeps_frozen_version",
+      "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::workflow_agent_run_refuses_unlinked_skill_before_provider_entry",
+      "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::workflow_agent_run_saves_tool_call_dispatches_once_and_replays_final_output",
+      "adapters::persistence::workflow::tests::mcp_tests::agent_tests::workflow_agent_mcp_tool_dispatches_once_through_the_bound_slot",
+      "adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::workflow_tool_dispatch_starts_one_child_per_call_and_one_resumer_continues"
+    ],
+    "selected": 5,
+    "exit_code": 0
+  },
+  {
+    "name": "WB1-clippy-r3",
+    "argv": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "--offline",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "selected": null,
+    "exit_code": 0
+  },
+  {
+    "name": "WB1-final-fmt",
+    "argv": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--",
+      "--check"
+    ],
+    "selected": null,
+    "exit_code": 0
+  },
+  {
+    "name": "WB1-final-diff",
+    "argv": [
+      "git",
+      "diff",
+      "--check"
+    ],
+    "selected": null,
+    "exit_code": 0
+  }
+]

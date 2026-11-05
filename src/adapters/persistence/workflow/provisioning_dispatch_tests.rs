@@ -803,7 +803,11 @@ async fn provisioning_grants_capture_the_built_in_or_refuse_an_ambiguous_capture
             slug: "builder".into(),
             provider: Some("openai".into()),
             model: Some("gpt-4o-mini".into()),
-            workflow_tools: Some(vec![TypeName::parse(CREATE_AGENT_CHANNEL).unwrap()]),
+            tool_bindings: Some(vec![
+                crate::entities::agent_capability::AgentToolBinding::builtin(
+                    crate::entities::agent_capability::AgentBuiltinTool::CreateAgentChannel,
+                ),
+            ]),
             ..Default::default()
         },
     )

@@ -1,5 +1,6 @@
 pub mod access_level;
 pub mod agent;
+pub mod agent_capability;
 pub mod attention;
 pub mod auth;
 pub mod channel;

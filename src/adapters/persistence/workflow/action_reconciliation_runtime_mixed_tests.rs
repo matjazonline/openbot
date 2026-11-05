@@ -1,5 +1,6 @@
 //! Mixed frozen policies use an explicit current policy registry.
 use super::*;
+use crate::application::agent::ActionRecovery;
 
 #[path = "action_reconciliation_runtime_mixed_truth_tests.rs"]
 mod truth_tests;

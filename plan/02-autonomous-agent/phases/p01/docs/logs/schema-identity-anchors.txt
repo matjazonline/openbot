@@ -1,0 +1,218 @@
+365:        RAISE EXCEPTION 'Workflow admission identity is immutable' USING ERRCODE='23514', CONSTRAINT='workflow_guard:check_workflow_parent_source';
+449:-- Name: company_mcp_endpoint_immutable(); Type: FUNCTION; Schema: public; Owner: -
+452:CREATE FUNCTION public.company_mcp_endpoint_immutable() RETURNS trigger
+458:        RAISE EXCEPTION 'MCP connection endpoint is immutable';
+647:    RAISE EXCEPTION 'workflow capacity policy is immutable' USING ERRCODE = '23514', CONSTRAINT='workflow_guard:guard_workflow_capacity_policy';
+653:-- Name: immutable_workflow_wait_event(); Type: FUNCTION; Schema: public; Owner: -
+656:CREATE FUNCTION public.immutable_workflow_wait_event() RETURNS trigger
+664:        RAISE EXCEPTION 'workflow event facts are immutable' USING ERRCODE='23514', CONSTRAINT='workflow_guard:immutable_workflow_wait_event';
+710:-- Name: internal_note_tombstones_are_immutable(); Type: FUNCTION; Schema: public; Owner: -
+713:CREATE FUNCTION public.internal_note_tombstones_are_immutable() RETURNS trigger
+722:    RAISE EXCEPTION 'internal note tombstones are immutable' USING ERRCODE = '55000';
+728:-- Name: internal_notes_are_immutable(); Type: FUNCTION; Schema: public; Owner: -
+731:CREATE FUNCTION public.internal_notes_are_immutable() RETURNS trigger
+741:    RAISE EXCEPTION 'internal note audit rows are immutable' USING ERRCODE = '55000';
+1100:        RAISE EXCEPTION 'background task queue identity is immutable' USING ERRCODE = '23514';
+1142:        RAISE EXCEPTION 'Workflow budget identity is immutable' USING ERRCODE='23514', CONSTRAINT='workflow_guard:preserve_workflow_budget_identity';
+1163:        RAISE EXCEPTION 'Workflow budget receipt is immutable' USING ERRCODE='23514', CONSTRAINT='workflow_guard:preserve_workflow_budget_receipt';
+1211:            RAISE EXCEPTION 'workflow control receipts are immutable' USING ERRCODE='23514', CONSTRAINT='workflow_guard:preserve_workflow_control_receipt';
+1216:        RAISE EXCEPTION 'workflow control receipts are immutable' USING ERRCODE='23514', CONSTRAINT='workflow_guard:preserve_workflow_control_receipt';
+1233:        RAISE EXCEPTION 'workflow activation inputs are immutable'
+1234:            USING ERRCODE = '23514', CONSTRAINT = 'workflow_guard:workflow_activation_immutable';
+1239:        RAISE EXCEPTION 'workflow committed output is immutable'
+1240:            USING ERRCODE = '23514', CONSTRAINT = 'workflow_guard:workflow_output_immutable';
+1257:        RAISE EXCEPTION 'workflow execution identity is immutable'
+1258:            USING ERRCODE = '23514', CONSTRAINT = 'workflow_guard:workflow_execution_identity_immutable';
+1300:    -- A rerun links a top-level original (07-D1 §D1.7). Lineage is immutable, so insert suffices.
+1320:        RAISE EXCEPTION 'Admitted workflow parent is immutable' USING ERRCODE='23514', CONSTRAINT='workflow_guard:preserve_workflow_parent';
+1335:        RAISE EXCEPTION 'Workflow parent link is immutable' USING ERRCODE='23514', CONSTRAINT='workflow_guard:preserve_workflow_parent_link';
+1350:        RAISE EXCEPTION 'workflow rule choice is immutable' USING ERRCODE = '23514', CONSTRAINT='workflow_guard:preserve_workflow_progression';
+1355:        RAISE EXCEPTION 'workflow route is immutable' USING ERRCODE = '23514', CONSTRAINT='workflow_guard:preserve_workflow_progression';
+1378:        RAISE EXCEPTION 'workflow run association is immutable'
+1379:            USING ERRCODE = '23514', CONSTRAINT = 'workflow_guard:workflow_run_association_immutable';
+1395:        RAISE EXCEPTION 'Workflow parent wakeup is immutable' USING ERRCODE='23514', CONSTRAINT='workflow_guard:preserve_workflow_wakeup';
+1454:-- Name: require_immutable_schedule_channel(); Type: FUNCTION; Schema: public; Owner: -
+1457:CREATE FUNCTION public.require_immutable_schedule_channel() RETURNS trigger
+1463:            USING ERRCODE = '23514', CONSTRAINT = 'schedule_channel_immutable';
+1480:        RAISE EXCEPTION 'harness owner and prepared inputs are immutable' USING ERRCODE='23514';
+1605:            RAISE EXCEPTION 'Captured schedule occurrence identity is immutable'
+1606:                USING ERRCODE = '23514', CONSTRAINT = 'schedule_occurrence_identity_immutable';
+1610:                USING ERRCODE = '23514', CONSTRAINT = 'schedule_occurrence_run_immutable';
+1735:    -- Link identity is immutable. Discover it before taking locks in run-first order.
+1889:-- Name: workflow_action_audit_immutable(); Type: FUNCTION; Schema: public; Owner: -
+1892:CREATE FUNCTION public.workflow_action_audit_immutable() RETURNS trigger
+1900:        RAISE EXCEPTION 'workflow reconciliation actor audit is append-only' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_action_audit_immutable';
+1904:        RAISE EXCEPTION 'workflow event cannot become a reconciliation actor audit' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_action_audit_immutable';
+2076:-- Name: workflow_action_claim_refusal_audit_immutable(); Type: FUNCTION; Schema: public; Owner: -
+2079:CREATE FUNCTION public.workflow_action_claim_refusal_audit_immutable() RETURNS trigger
+2090:    THEN RAISE EXCEPTION 'workflow claim budget retirement audit is immutable' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_action_claim_refusal_audit_immutable'; END IF;
+2357:-- Name: workflow_action_fact_immutable(); Type: FUNCTION; Schema: public; Owner: -
+2360:CREATE FUNCTION public.workflow_action_fact_immutable() RETURNS trigger
+2371:    RAISE EXCEPTION 'workflow action effect fact is append-only' USING CONSTRAINT='workflow_guard:workflow_action_fact_immutable';
+2388:-- Name: workflow_action_intent_immutable(); Type: FUNCTION; Schema: public; Owner: -
+2391:CREATE FUNCTION public.workflow_action_intent_immutable() RETURNS trigger
+2396:        RAISE EXCEPTION 'workflow action intent is immutable' USING CONSTRAINT='workflow_guard:workflow_action_intent_immutable';
+2860:-- Name: workflow_decision_fact_immutable(); Type: FUNCTION; Schema: public; Owner: -
+2863:CREATE FUNCTION public.workflow_decision_fact_immutable() RETURNS trigger
+2867:    RAISE EXCEPTION 'workflow decision facts are immutable' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_decision_fact_immutable';
+2872:-- Name: workflow_decision_immutable(); Type: FUNCTION; Schema: public; Owner: -
+2875:CREATE FUNCTION public.workflow_decision_immutable() RETURNS trigger
+2885:    RAISE EXCEPTION 'workflow decision facts are immutable' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_decision_immutable';
+2958:-- Name: workflow_http_identity_immutable(); Type: FUNCTION; Schema: public; Owner: -
+2961:CREATE FUNCTION public.workflow_http_identity_immutable() RETURNS trigger
+2967:        RAISE EXCEPTION 'HTTP connection identity is immutable' USING CONSTRAINT='workflow_guard:workflow_http_identity_immutable';
+3038:    THEN RAISE EXCEPTION 'workflow message action linkage is immutable' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_message_action_guard'; END IF;
+5178:COMMENT ON COLUMN public.workflow_executions.committed_output IS 'Execution-owned immutable committed result; written with progression by the runtime result owner.';
+5635:    RAISE EXCEPTION 'workflow bundle is immutable or still referenced' USING ERRCODE='23514';
+5637:CREATE TRIGGER workflow_bundle_immutable BEFORE UPDATE OR DELETE ON public.workflow_bundles
+5698:-- Name: workflow_versions; Type: TABLE; Schema: public; Owner: -
+5701:CREATE TABLE public.workflow_versions (
+5716:    CONSTRAINT workflow_versions_agent_ids_check CHECK ((array_position(agent_ids, NULL::uuid) IS NULL)),
+5717:    CONSTRAINT workflow_versions_bundle_check CHECK (((octet_length(bundle) >= 1) AND (octet_length(bundle) <= 4194304))),
+5718:    CONSTRAINT workflow_versions_command_key_check CHECK (((octet_length(command_key) >= 1) AND (octet_length(command_key) <= 128))),
+5719:    CONSTRAINT workflow_versions_content_hash_check CHECK ((content_hash ~ '^[0-9a-f]{64}$'::text)),
+5720:    CONSTRAINT workflow_versions_description_check CHECK ((octet_length(description) <= 4096)),
+5721:    CONSTRAINT workflow_versions_draft_revision_check CHECK ((draft_revision > 0)),
+5722:    CONSTRAINT workflow_versions_source_check CHECK ((octet_length(source) <= 262144)),
+5723:    CONSTRAINT workflow_versions_template_origin_check CHECK (((template_origin IS NULL) OR ((jsonb_typeof(template_origin) = 'object'::text) AND (octet_length((template_origin)::text) <= 1024)))),
+5724:    CONSTRAINT workflow_versions_title_check CHECK (((octet_length(title) >= 1) AND (octet_length(title) <= 256)))
+5729:-- Name: COLUMN workflow_versions.agent_ids; Type: COMMENT; Schema: public; Owner: -
+5732:COMMENT ON COLUMN public.workflow_versions.agent_ids IS 'Display index only: the distinct agents frozen in this version''s bundle and its pinned children, written once with the row. Read only by the Used-by listing and the run list''s agent filter; no execution, admission or authorization path reads it.';
+5806:-- Name: agents agents_company_id_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+5810:    ADD CONSTRAINT agents_company_id_id_key UNIQUE (company_id, id);
+5814:-- Name: agents agents_company_slug_key; Type: CONSTRAINT; Schema: public; Owner: -
+5818:    ADD CONSTRAINT agents_company_slug_key UNIQUE (company_id, slug);
+5822:-- Name: agents agents_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+5826:    ADD CONSTRAINT agents_pkey PRIMARY KEY (id);
+7206:-- Name: workflow_http_operations workflow_http_operations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+7210:    ADD CONSTRAINT workflow_http_operations_pkey PRIMARY KEY (company_id, connection_id, name);
+7222:-- Name: workflow_mcp_operations workflow_mcp_operations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+7226:    ADD CONSTRAINT workflow_mcp_operations_pkey PRIMARY KEY (company_id, connection_id, name);
+7498:-- Name: workflow_versions workflow_versions_company_id_command_key_key; Type: CONSTRAINT; Schema: public; Owner: -
+7501:ALTER TABLE ONLY public.workflow_versions
+7502:    ADD CONSTRAINT workflow_versions_company_id_command_key_key UNIQUE (company_id, command_key);
+7506:-- Name: workflow_versions workflow_versions_company_id_workflow_id_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+7509:ALTER TABLE ONLY public.workflow_versions
+7510:    ADD CONSTRAINT workflow_versions_company_id_workflow_id_id_key UNIQUE (company_id, workflow_id, id);
+7514:-- Name: workflow_versions workflow_versions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+7517:ALTER TABLE ONLY public.workflow_versions
+7518:    ADD CONSTRAINT workflow_versions_pkey PRIMARY KEY (company_id, id);
+7585:-- Name: agents_company_created_idx; Type: INDEX; Schema: public; Owner: -
+7588:CREATE INDEX agents_company_created_idx ON public.agents USING btree (company_id, created_at DESC, id DESC);
+8264:-- Name: company_mcp_connections company_mcp_endpoint_immutable; Type: TRIGGER; Schema: public; Owner: -
+8267:CREATE TRIGGER company_mcp_endpoint_immutable BEFORE UPDATE ON public.company_mcp_connections FOR EACH ROW EXECUTE FUNCTION public.company_mcp_endpoint_immutable();
+8287:-- Name: internal_note_tombstones internal_note_tombstones_immutable; Type: TRIGGER; Schema: public; Owner: -
+8290:CREATE TRIGGER internal_note_tombstones_immutable BEFORE DELETE OR UPDATE ON public.internal_note_tombstones FOR EACH ROW EXECUTE FUNCTION public.internal_note_tombstones_are_immutable();
+8301:-- Name: internal_notes internal_notes_immutable; Type: TRIGGER; Schema: public; Owner: -
+8304:CREATE TRIGGER internal_notes_immutable BEFORE DELETE OR UPDATE ON public.internal_notes FOR EACH ROW EXECUTE FUNCTION public.internal_notes_are_immutable();
+8389:-- Name: channel_schedules schedule_channel_immutable; Type: TRIGGER; Schema: public; Owner: -
+8392:CREATE TRIGGER schedule_channel_immutable BEFORE UPDATE OF channel_id ON public.channel_schedules FOR EACH ROW EXECUTE FUNCTION public.require_immutable_schedule_channel();
+8417:-- Name: workflow_action_actual_receipt_observations workflow_action_actual_observation_immutable; Type: TRIGGER; Schema: public; Owner: -
+8420:CREATE TRIGGER workflow_action_actual_observation_immutable BEFORE DELETE OR UPDATE ON public.workflow_action_actual_receipt_observations FOR EACH ROW EXECUTE FUNCTION public.workflow_action_fact_immutable();
+8445:-- Name: workflow_run_events workflow_action_audit_immutable; Type: TRIGGER; Schema: public; Owner: -
+8448:CREATE TRIGGER workflow_action_audit_immutable BEFORE DELETE OR UPDATE ON public.workflow_run_events FOR EACH ROW EXECUTE FUNCTION public.workflow_action_audit_immutable();
+8494:-- Name: workflow_action_claim_budget_refusals workflow_action_claim_budget_refusal_immutable; Type: TRIGGER; Schema: public; Owner: -
+8497:CREATE TRIGGER workflow_action_claim_budget_refusal_immutable BEFORE DELETE OR UPDATE ON public.workflow_action_claim_budget_refusals FOR EACH ROW EXECUTE FUNCTION public.workflow_action_fact_immutable();
+8508:-- Name: workflow_action_claim_episodes workflow_action_claim_episode_immutable; Type: TRIGGER; Schema: public; Owner: -
+8511:CREATE TRIGGER workflow_action_claim_episode_immutable BEFORE DELETE OR UPDATE ON public.workflow_action_claim_episodes FOR EACH ROW EXECUTE FUNCTION public.workflow_action_fact_immutable();
+8515:-- Name: workflow_run_events workflow_action_claim_refusal_audit_immutable; Type: TRIGGER; Schema: public; Owner: -
+8518:CREATE TRIGGER workflow_action_claim_refusal_audit_immutable BEFORE DELETE OR UPDATE ON public.workflow_run_events FOR EACH ROW EXECUTE FUNCTION public.workflow_action_claim_refusal_audit_immutable();
+8578:-- Name: workflow_action_dispatches workflow_action_dispatch_immutable; Type: TRIGGER; Schema: public; Owner: -
+8581:CREATE TRIGGER workflow_action_dispatch_immutable BEFORE DELETE OR UPDATE ON public.workflow_action_dispatches FOR EACH ROW EXECUTE FUNCTION public.workflow_action_fact_immutable();
+8592:-- Name: workflow_action_evidence_commands workflow_action_evidence_command_immutable; Type: TRIGGER; Schema: public; Owner: -
+8595:CREATE TRIGGER workflow_action_evidence_command_immutable BEFORE DELETE OR UPDATE ON public.workflow_action_evidence_commands FOR EACH ROW EXECUTE FUNCTION public.workflow_action_fact_immutable();
+8606:-- Name: workflow_action_evidence_conflicts workflow_action_evidence_conflict_immutable; Type: TRIGGER; Schema: public; Owner: -
+8609:CREATE TRIGGER workflow_action_evidence_conflict_immutable BEFORE DELETE OR UPDATE ON public.workflow_action_evidence_conflicts FOR EACH ROW EXECUTE FUNCTION public.workflow_action_fact_immutable();
+8620:-- Name: workflow_action_evidence_consumptions workflow_action_evidence_consumption_immutable; Type: TRIGGER; Schema: public; Owner: -
+8623:CREATE TRIGGER workflow_action_evidence_consumption_immutable BEFORE DELETE OR UPDATE ON public.workflow_action_evidence_consumptions FOR EACH ROW EXECUTE FUNCTION public.workflow_action_fact_immutable();
+8627:-- Name: workflow_action_evidence_coverage workflow_action_evidence_coverage_immutable; Type: TRIGGER; Schema: public; Owner: -
+8630:CREATE TRIGGER workflow_action_evidence_coverage_immutable BEFORE DELETE OR UPDATE ON public.workflow_action_evidence_coverage FOR EACH ROW EXECUTE FUNCTION public.workflow_action_fact_immutable();
+8634:-- Name: workflow_action_evidence workflow_action_evidence_immutable; Type: TRIGGER; Schema: public; Owner: -
+8637:CREATE TRIGGER workflow_action_evidence_immutable BEFORE DELETE OR UPDATE ON public.workflow_action_evidence FOR EACH ROW EXECUTE FUNCTION public.workflow_action_fact_immutable();
+8648:-- Name: workflow_action_intents workflow_action_intent_immutable; Type: TRIGGER; Schema: public; Owner: -
+8651:CREATE TRIGGER workflow_action_intent_immutable BEFORE UPDATE ON public.workflow_action_intents FOR EACH ROW EXECUTE FUNCTION public.workflow_action_intent_immutable();
+8662:-- Name: workflow_action_model_calls workflow_action_model_call_immutable; Type: TRIGGER; Schema: public; Owner: -
+8665:CREATE TRIGGER workflow_action_model_call_immutable BEFORE UPDATE ON public.workflow_action_model_calls FOR EACH ROW EXECUTE FUNCTION public.workflow_action_intent_immutable();
+8683:-- Name: workflow_action_receipts workflow_action_receipt_immutable; Type: TRIGGER; Schema: public; Owner: -
+8686:CREATE TRIGGER workflow_action_receipt_immutable BEFORE DELETE OR UPDATE ON public.workflow_action_receipts FOR EACH ROW EXECUTE FUNCTION public.workflow_action_fact_immutable();
+8697:-- Name: workflow_action_reconciliations workflow_action_reconciliation_immutable; Type: TRIGGER; Schema: public; Owner: -
+8700:CREATE TRIGGER workflow_action_reconciliation_immutable BEFORE DELETE OR UPDATE ON public.workflow_action_reconciliations FOR EACH ROW EXECUTE FUNCTION public.workflow_action_fact_immutable();
+8711:-- Name: workflow_action_remote_entries workflow_action_remote_entry_immutable; Type: TRIGGER; Schema: public; Owner: -
+8714:CREATE TRIGGER workflow_action_remote_entry_immutable BEFORE DELETE OR UPDATE ON public.workflow_action_remote_entries FOR EACH ROW EXECUTE FUNCTION public.workflow_action_fact_immutable();
+8718:-- Name: workflow_action_schedule_witnesses workflow_action_schedule_witness_immutable; Type: TRIGGER; Schema: public; Owner: -
+8721:CREATE TRIGGER workflow_action_schedule_witness_immutable BEFORE DELETE OR UPDATE ON public.workflow_action_schedule_witnesses FOR EACH ROW EXECUTE FUNCTION public.workflow_action_fact_immutable();
+8732:-- Name: workflow_action_state_witnesses workflow_action_state_witness_immutable; Type: TRIGGER; Schema: public; Owner: -
+8735:CREATE TRIGGER workflow_action_state_witness_immutable BEFORE DELETE OR UPDATE ON public.workflow_action_state_witnesses FOR EACH ROW EXECUTE FUNCTION public.workflow_action_fact_immutable();
+8767:-- Name: workflow_budget_receipts workflow_budget_receipt_immutable; Type: TRIGGER; Schema: public; Owner: -
+8770:CREATE TRIGGER workflow_budget_receipt_immutable BEFORE DELETE OR UPDATE ON public.workflow_budget_receipts FOR EACH ROW EXECUTE FUNCTION public.preserve_workflow_budget_receipt();
+8781:-- Name: workflow_capacity_policy workflow_capacity_policy_immutable; Type: TRIGGER; Schema: public; Owner: -
+8784:CREATE TRIGGER workflow_capacity_policy_immutable BEFORE DELETE OR UPDATE ON public.workflow_capacity_policy FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_capacity_policy();
+8788:-- Name: workflow_control_commands workflow_control_receipt_immutable; Type: TRIGGER; Schema: public; Owner: -
+8791:CREATE TRIGGER workflow_control_receipt_immutable BEFORE DELETE OR UPDATE ON public.workflow_control_commands FOR EACH ROW EXECUTE FUNCTION public.preserve_workflow_control_receipt();
+8837:-- Name: workflow_http_connections workflow_http_identity_immutable; Type: TRIGGER; Schema: public; Owner: -
+8840:CREATE TRIGGER workflow_http_identity_immutable BEFORE UPDATE ON public.workflow_http_connections FOR EACH ROW EXECUTE FUNCTION public.workflow_http_identity_immutable();
+8886:-- Name: workflow_message_destinations workflow_message_destination_immutable; Type: TRIGGER; Schema: public; Owner: -
+8889:CREATE TRIGGER workflow_message_destination_immutable BEFORE DELETE OR UPDATE ON public.workflow_message_destinations FOR EACH ROW EXECUTE FUNCTION public.workflow_action_fact_immutable();
+8911:-- Name: workflow_message_delivery_events workflow_message_event_immutable; Type: TRIGGER; Schema: public; Owner: -
+8914:CREATE TRIGGER workflow_message_event_immutable BEFORE DELETE OR UPDATE ON public.workflow_message_delivery_events FOR EACH ROW EXECUTE FUNCTION public.workflow_action_fact_immutable();
+8939:-- Name: workflow_message_delivery_reopens workflow_message_reopen_immutable; Type: TRIGGER; Schema: public; Owner: -
+8942:CREATE TRIGGER workflow_message_reopen_immutable BEFORE DELETE OR UPDATE ON public.workflow_message_delivery_reopens FOR EACH ROW EXECUTE FUNCTION public.workflow_action_fact_immutable();
+8946:-- Name: workflow_runs workflow_parent_immutable; Type: TRIGGER; Schema: public; Owner: -
+8949:CREATE TRIGGER workflow_parent_immutable BEFORE UPDATE OF parent_run_id, parent_execution_id, rerun_of_run_id ON public.workflow_runs FOR EACH ROW EXECUTE FUNCTION public.preserve_workflow_parent();
+8974:-- Name: workflow_run_parents workflow_parent_link_immutable; Type: TRIGGER; Schema: public; Owner: -
+8977:CREATE TRIGGER workflow_parent_link_immutable BEFORE UPDATE ON public.workflow_run_parents FOR EACH ROW EXECUTE FUNCTION public.preserve_workflow_parent_link();
+8995:-- Name: workflow_root_budgets workflow_root_budget_immutable; Type: TRIGGER; Schema: public; Owner: -
+8998:CREATE TRIGGER workflow_root_budget_immutable BEFORE DELETE OR UPDATE ON public.workflow_root_budgets FOR EACH ROW EXECUTE FUNCTION public.preserve_workflow_budget_identity();
+9009:-- Name: workflow_run_budgets workflow_run_budget_immutable; Type: TRIGGER; Schema: public; Owner: -
+9012:CREATE TRIGGER workflow_run_budget_immutable BEFORE DELETE OR UPDATE ON public.workflow_run_budgets FOR EACH ROW EXECUTE FUNCTION public.preserve_workflow_budget_identity();
+9089:-- a write the stamp undoes leaves the revision alone, and before `workflow_run_snapshot_immutable`.
+9148:-- Name: workflow_wait_events workflow_wait_event_immutable; Type: TRIGGER; Schema: public; Owner: -
+9151:CREATE TRIGGER workflow_wait_event_immutable BEFORE UPDATE ON public.workflow_wait_events FOR EACH ROW EXECUTE FUNCTION public.immutable_workflow_wait_event();
+9155:-- Name: workflow_decision_comments workflow_decision_comment_immutable; Type: TRIGGER; Schema: public; Owner: -
+9161:CREATE TRIGGER workflow_decision_comment_immutable BEFORE UPDATE ON public.workflow_decision_comments FOR EACH ROW EXECUTE FUNCTION public.workflow_decision_fact_immutable();
+9172:-- Name: workflow_decision_reviewers workflow_decision_reviewer_immutable; Type: TRIGGER; Schema: public; Owner: -
+9175:CREATE TRIGGER workflow_decision_reviewer_immutable BEFORE UPDATE ON public.workflow_decision_reviewers FOR EACH ROW EXECUTE FUNCTION public.workflow_decision_fact_immutable();
+9179:-- Name: workflow_decisions workflow_decision_immutable; Type: TRIGGER; Schema: public; Owner: -
+9182:CREATE TRIGGER workflow_decision_immutable BEFORE UPDATE ON public.workflow_decisions FOR EACH ROW EXECUTE FUNCTION public.workflow_decision_immutable();
+9193:-- Name: workflow_run_events workflow_wakeup_immutable; Type: TRIGGER; Schema: public; Owner: -
+9196:CREATE TRIGGER workflow_wakeup_immutable BEFORE UPDATE ON public.workflow_run_events FOR EACH ROW EXECUTE FUNCTION public.preserve_workflow_wakeup();
+9224:-- Name: agents agents_company_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+9228:    ADD CONSTRAINT agents_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+10421:    ADD CONSTRAINT workflow_binding_revisions_company_id_version_id_fkey FOREIGN KEY (company_id, version_id) REFERENCES public.workflow_versions(company_id, id);
+10542:    ADD CONSTRAINT workflow_definition_events_company_id_workflow_id_version__fkey FOREIGN KEY (company_id, workflow_id, version_id) REFERENCES public.workflow_versions(company_id, workflow_id, id);
+10623:    ADD CONSTRAINT workflow_tool_registration_pin FOREIGN KEY (company_id, workflow_id, version_id) REFERENCES public.workflow_versions(company_id, workflow_id, id);
+10995:    ADD CONSTRAINT workflow_runs_company_id_workflow_id_version_id_fkey FOREIGN KEY (company_id, workflow_id, version_id) REFERENCES public.workflow_versions(company_id, workflow_id, id);
+11007:-- Name: workflow_versions workflow_versions_company_id_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+11010:ALTER TABLE ONLY public.workflow_versions
+11011:    ADD CONSTRAINT workflow_versions_company_id_workflow_id_fkey FOREIGN KEY (company_id, workflow_id) REFERENCES public.workflow_definitions(company_id, id) ON DELETE CASCADE;
+11068:-- Approval names one immutable operation, including both digests (05-D2 §16.3).
+11123:        RAISE EXCEPTION 'model usage identity and settled usage are immutable' USING ERRCODE='23514';
+11128:CREATE TRIGGER model_usage_immutable BEFORE UPDATE ON public.model_usage_calls
+11156:-- Successful approval continuations have their own bounded debit and immutable subject.
+11431:    -- Every valid run creates its immutable budget link in its insert trigger.
+11527:        RAISE EXCEPTION 'workflow run snapshot is immutable' USING ERRCODE='23514', CONSTRAINT='workflow_guard:guard_workflow_run_snapshot';
+11531:CREATE TRIGGER workflow_run_snapshot_immutable BEFORE UPDATE OF company_id, id, binding_id,
+11542:            IF TG_TABLE_NAME='workflow_versions' THEN
+11552:        RAISE EXCEPTION 'published workflow configuration is immutable' USING ERRCODE='23514', CONSTRAINT='workflow_guard:guard_workflow_publication_snapshot';
+11555:        RAISE EXCEPTION 'published workflow configuration is immutable' USING ERRCODE='23514', CONSTRAINT='workflow_guard:guard_workflow_publication_snapshot';
+11559:CREATE TRIGGER workflow_version_immutable BEFORE UPDATE OR DELETE ON public.workflow_versions
+11561:CREATE TRIGGER workflow_binding_revision_immutable BEFORE UPDATE OR DELETE ON public.workflow_binding_revisions
+11569:    RAISE EXCEPTION 'workflow history snapshot is immutable' USING ERRCODE='23514', CONSTRAINT='workflow_guard:guard_workflow_history_snapshot';
+11571:CREATE TRIGGER workflow_history_members_immutable BEFORE UPDATE OR DELETE ON public.workflow_history_members
+11573:CREATE TRIGGER workflow_history_snapshots_immutable BEFORE UPDATE OR DELETE ON public.workflow_history_snapshots
+11625:        RAISE EXCEPTION 'Jev invocation identity and completed outcome are immutable' USING ERRCODE='23514';
+11630:CREATE TRIGGER workflow_jev_immutable BEFORE UPDATE ON public.workflow_jev_invocations
+11712:    FOREIGN KEY(company_id,workflow_id,version_id) REFERENCES public.workflow_versions(company_id,workflow_id,id)
+11722:        RAISE EXCEPTION 'model usage history is immutable' USING ERRCODE='23514';
+11764:        RAISE EXCEPTION 'message access level is immutable'
+11769:CREATE TRIGGER message_access_level_immutable BEFORE UPDATE OF access_level ON public.messages
+11792:CREATE FUNCTION public.guard_workflow_history_consumption_immutable() RETURNS trigger LANGUAGE plpgsql AS $$
+11800:    RAISE EXCEPTION 'workflow history consumption proof is immutable'
+11801:        USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_history_consumption_immutable';
+11803:CREATE TRIGGER workflow_history_consumption_immutable BEFORE UPDATE OR DELETE ON public.workflow_history_consumptions
+11804:    FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_history_consumption_immutable();
+11906:CREATE FUNCTION public.guard_workflow_knowledge_consumption_immutable() RETURNS trigger LANGUAGE plpgsql AS $$
+11915:    RAISE EXCEPTION 'knowledge consumption proof is immutable'
+11916:        USING ERRCODE='23514', CONSTRAINT='workflow_guard:knowledge_consumption_immutable';
+11918:CREATE TRIGGER workflow_knowledge_consumption_immutable BEFORE UPDATE OR DELETE ON public.workflow_knowledge_consumptions
+11919:    FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_knowledge_consumption_immutable();

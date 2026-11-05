@@ -197,7 +197,7 @@ async fn library_builder_copy_keeps_its_grants_on_an_explicit_model() {
             .iter()
             .any(|warning| warning.code == "library_model_pinned")
     );
-    let grants: Vec<String> = sqlx::query_scalar("SELECT workflow_tools FROM agents WHERE id = $1")
+    let grants: Vec<String> = sqlx::query_scalar("SELECT ARRAY(SELECT alias FROM agent_draft_bindings WHERE agent_id=agents.id ORDER BY position) FROM agents WHERE id = $1")
         .bind(copied.agent.id)
         .fetch_one(f.persistence.pool())
         .await

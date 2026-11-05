@@ -1,0 +1,9 @@
+2026-11-05T19:20:33.812737+00:00
+Authority revision1 matches immutable coordination-r1.md byte for byte
+Authority SHA256 012a7858c5b1c423cfaf6cb3b71804d37b50c8ea32a90aef71625c2c09a6028e
+Decision revision2 matches immutable reviewed effective pin; retained r1 evidence unchanged
+Effective decision SHA256 01c54b2aec4e8717fa0855f50b6c68536f9262847dc4e5768201bfbe42901267
+Sole exclusion plan/02-autonomous-agent/phases/p01/docs
+base:   ce93ff340a54db18770d8a5eec1c1d2008c5e5b1
+digest: 25e5de5914e1c34da8bdb2a4fd1e611d6b6576cc24a16eeb7839d614e10020b8
+files:

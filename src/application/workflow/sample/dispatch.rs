@@ -261,9 +261,9 @@ fn approval(inputs: &Value, approved: Option<bool>) -> AppResult<()> {
     }
     Ok(())
 }
-pub(super) fn effect_kind(effect: super::super::publication::ActionEffect) -> SampleEffectKind {
+pub(super) fn effect_kind(effect: crate::application::agent::ActionEffect) -> SampleEffectKind {
     match effect {
-        super::super::publication::ActionEffect::Read => SampleEffectKind::FixtureRead,
-        super::super::publication::ActionEffect::Write => SampleEffectKind::InterceptedWrite,
+        crate::application::agent::ActionEffect::Read => SampleEffectKind::FixtureRead,
+        crate::application::agent::ActionEffect::Write => SampleEffectKind::InterceptedWrite,
     }
 }

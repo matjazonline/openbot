@@ -1,6 +1,7 @@
 use super::*;
+use crate::application::agent::AgentKey;
 use crate::application::workflow::compiler::{Schema, SourceSpan};
-use crate::application::workflow::publication::{AgentKey, ToolKind, ToolSnapshot};
+use crate::application::workflow::publication::{ToolKind, ToolSnapshot};
 
 impl Session {
     pub(super) fn step_tool(

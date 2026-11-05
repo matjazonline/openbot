@@ -1,0 +1,49 @@
+[
+  {
+    "name": "WB1-F1-extraction-test",
+    "argv": [
+      "scripts/test-network-isolation.sh",
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "autonomous_agent_storage_skill_delete_preserves_history_and_cannot_revive_assignment"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "WB1-F1-extraction-clippy",
+    "argv": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "--offline",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "WB1-F1-extraction-fmt",
+    "argv": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--",
+      "--check"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "WB1-F1-extraction-diff",
+    "argv": [
+      "git",
+      "diff",
+      "--check"
+    ],
+    "exit_code": 0
+  }
+]

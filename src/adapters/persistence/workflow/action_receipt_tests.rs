@@ -1,5 +1,6 @@
 use super::*;
-use crate::application::workflow::publication::ActionRecovery;
+use crate::application::agent::ActionRecovery;
+
 use std::sync::atomic::AtomicBool;
 
 struct DeduplicatingProvider<'a> {

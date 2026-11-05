@@ -1,0 +1,950 @@
+{
+  "pattern": "workflow_tools",
+  "filesSearched": 1271,
+  "totalHits": 63,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/provisioning_runtime_tests.rs#builder",
+        "name": "builder",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/provisioning_runtime_tests.rs",
+        "span": "L12-L53"
+      },
+      "path": "src/adapters/persistence/workflow/provisioning_runtime_tests.rs",
+      "inDegree": 37,
+      "hits": [
+        {
+          "line": 24,
+          "text": "workflow_tools: Some(vec!["
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/workflow_tool_support.rs#new",
+        "name": "new",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/workflow_tool_support.rs",
+        "span": "L173-L233"
+      },
+      "path": "src/adapters/persistence/workflow/workflow_tool_support.rs",
+      "inDegree": 8,
+      "hits": [
+        {
+          "line": 203,
+          "text": "workflow_tools: Some(vec![TypeName::parse(TOOL).unwrap()]),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/agent_runtime_tests.rs#agent_setup_source",
+        "name": "agent_setup_source",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/agent_runtime_tests.rs",
+        "span": "L85-L179"
+      },
+      "path": "src/adapters/persistence/workflow/agent_runtime_tests.rs",
+      "inDegree": 7,
+      "hits": [
+        {
+          "line": 112,
+          "text": "workflow_tools: Some(vec![TypeName::parse(\"registered.request\").unwrap()]),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/ui/authoring/tools.rs#registrations",
+        "name": "registrations",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/ui/authoring/tools.rs",
+        "span": "L19-L36"
+      },
+      "path": "src/adapters/http/routes/workflows/ui/authoring/tools.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 26,
+          "text": ".workflow_tools()"
+        },
+        {
+          "line": 27,
+          "text": ".workflow_tools(company_id, self.actor()?)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/ui/authoring/tools.rs#tools_pane_html",
+        "name": "tools_pane_html",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/ui/authoring/tools.rs",
+        "span": "L38-L52"
+      },
+      "path": "src/adapters/http/routes/workflows/ui/authoring/tools.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 45,
+          "text": "Ok(pages::workflow_tools_pane(&pages::ToolsView {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/authority.rs#supported_publication",
+        "name": "supported_publication",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/authority.rs",
+        "span": "L115-L164"
+      },
+      "path": "src/adapters/persistence/workflow/authority.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 118,
+          "text": "check: workflow_tools::ToolCheck,"
+        },
+        {
+          "line": 120,
+          "text": "if matches!(check, workflow_tools::ToolCheck::Publish) {"
+        },
+        {
+          "line": 152,
+          "text": "workflow_tools::registered_on(tx, current.company_id(), tool, check).await?;"
+        },
+        {
+          "line": 160,
+          "text": ".map(|child| (child.as_ref(), workflow_tools::ToolCheck::Run)),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/ui/authoring/tools.rs#revoke_tool",
+        "name": "revoke_tool",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/ui/authoring/tools.rs",
+        "span": "L101-L137"
+      },
+      "path": "src/adapters/http/routes/workflows/ui/authoring/tools.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 113,
+          "text": ".workflow_tools()"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/ui/authoring/tools.rs#register_tool",
+        "name": "register_tool",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/ui/authoring/tools.rs",
+        "span": "L142-L271"
+      },
+      "path": "src/adapters/http/routes/workflows/ui/authoring/tools.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 200,
+          "text": ".workflow_tools()"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/bindings.rs#verify_selection",
+        "name": "verify_selection",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/bindings.rs",
+        "span": "L115-L137"
+      },
+      "path": "src/adapters/persistence/workflow/bindings.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 136,
+          "text": "authority::supported_publication(tx, &stored, workflow_tools::ToolCheck::Run).await"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/workflow_tool_calls.rs#call_on",
+        "name": "call_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/workflow_tool_calls.rs",
+        "span": "L44-L148"
+      },
+      "path": "src/adapters/persistence/workflow/workflow_tool_calls.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 51,
+          "text": "let registration = workflow_tools::registration_on(db, scope.company, &call.name).await?;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/workflow_tool_registration_tests.rs#grant",
+        "name": "grant",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/workflow_tool_registration_tests.rs",
+        "span": "L50-L57"
+      },
+      "path": "src/adapters/persistence/workflow/workflow_tool_registration_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 51,
+          "text": "sqlx::query(\"UPDATE agents SET workflow_tools=$2 WHERE id=$1\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/workflow_tool_support.rs#registration",
+        "name": "registration",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/workflow_tool_support.rs",
+        "span": "L370-L378"
+      },
+      "path": "src/adapters/persistence/workflow/workflow_tool_support.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 372,
+          "text": ".workflow_tools(self.fixture.target.company, self.fixture.target.actor)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/workflow_agent/mod.rs#with_workflow_tools",
+        "name": "with_workflow_tools",
+        "kind": "function",
+        "path": "src/adapters/workflow_agent/mod.rs",
+        "span": "L53-L56"
+      },
+      "path": "src/adapters/workflow_agent/mod.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 53,
+          "text": "pub fn with_workflow_tools(mut self, workflow: Arc<dyn WorkflowToolDispatch>) -> Self {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/workflow_authoring/tools.rs#workflow_tools_pane",
+        "name": "workflow_tools_pane",
+        "kind": "function",
+        "path": "src/adapters/http/pages/workflow_authoring/tools.rs",
+        "span": "L51-L94"
+      },
+      "path": "src/adapters/http/pages/workflow_authoring/tools.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 51,
+          "text": "pub fn workflow_tools_pane(view: &ToolsView<'_>) -> String {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/ui/authoring/tools.rs#grant_agent_tools",
+        "name": "grant_agent_tools",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/ui/authoring/tools.rs",
+        "span": "L334-L393"
+      },
+      "path": "src/adapters/http/routes/workflows/ui/authoring/tools.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 361,
+          "text": ".workflow_tools()"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/admission_replay.rs#replay",
+        "name": "replay",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/admission_replay.rs",
+        "span": "L64-L98"
+      },
+      "path": "src/adapters/persistence/workflow/admission_replay.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 94,
+          "text": "authority::supported_publication(tx, configuration.bundle(), workflow_tools::ToolCheck::Run)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/agent_publication.rs#granted_tool",
+        "name": "granted_tool",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/agent_publication.rs",
+        "span": "L289-L367"
+      },
+      "path": "src/adapters/persistence/workflow/agent_publication.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 306,
+          "text": "let workflow = super::workflow_tools::workflow_tool_snapshot(tx, company, name).await?;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/definitions.rs#publish_on",
+        "name": "publish_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/definitions.rs",
+        "span": "L183-L223"
+      },
+      "path": "src/adapters/persistence/workflow/definitions.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 207,
+          "text": "super::workflow_tools::ToolCheck::Publish,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/knowledge_e2e_mcp_tests.rs#configure_connection",
+        "name": "configure_connection",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/knowledge_e2e_mcp_tests.rs",
+        "span": "L53-L81"
+      },
+      "path": "src/adapters/persistence/workflow/knowledge_e2e_mcp_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 70,
+          "text": "sqlx::query(\"UPDATE agents SET workflow_tools=ARRAY['search_knowledge',$2] WHERE company_id=$1 AND slug='assistant'\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/knowledge_e2e_support.rs#configure",
+        "name": "configure",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/knowledge_e2e_support.rs",
+        "span": "L120-L153"
+      },
+      "path": "src/adapters/persistence/workflow/knowledge_e2e_support.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 126,
+          "text": "\"UPDATE agents SET workflow_tools=ARRAY[$2] WHERE company_id=$1 AND slug='assistant'\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/knowledge_search_support.rs#configure_agent",
+        "name": "configure_agent",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/knowledge_search_support.rs",
+        "span": "L186-L216"
+      },
+      "path": "src/adapters/persistence/workflow/knowledge_search_support.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 195,
+          "text": "workflow_tools: Some(vec![TypeName::parse(SEARCH_KNOWLEDGE).unwrap()]),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/workflow_tool_revocation_tests.rs#capture",
+        "name": "capture",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/workflow_tool_revocation_tests.rs",
+        "span": "L120-L147"
+      },
+      "path": "src/adapters/persistence/workflow/workflow_tool_revocation_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 128,
+          "text": ".workflow_tools(self.company, actor)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/workflow_tool_support.rs#runtime",
+        "name": "runtime",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/workflow_tool_support.rs",
+        "span": "L346-L368"
+      },
+      "path": "src/adapters/persistence/workflow/workflow_tool_support.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 364,
+          "text": ".with_workflow_tools(Arc::new(p.clone())),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/infra/workflow.rs#compose_tools",
+        "name": "compose_tools",
+        "kind": "function",
+        "path": "src/infra/workflow.rs",
+        "span": "L206-L254"
+      },
+      "path": "src/infra/workflow.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 245,
+          "text": ".with_workflow_tools(Arc::new(persistence.clone()))"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "plan/fix-app/phases/p07/docs/logs/extract-workflow-services.py",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 38,
+          "text": "service_names=['service','authorization','schedule_run_now','reads','authoring_reads','run_views','selectable_bundle','step_catalogue','sample','decisions','jev"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/agent_api_tests.rs#library_builder_copy_keeps_its_grants_on_an_explicit_model",
+        "name": "library_builder_copy_keeps_its_grants_on_an_explicit_model",
+        "kind": "function",
+        "path": "src/adapters/http/routes/agent_api_tests.rs",
+        "span": "L135-L250"
+      },
+      "path": "src/adapters/http/routes/agent_api_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 200,
+          "text": "let grants: Vec<String> = sqlx::query_scalar(\"SELECT workflow_tools FROM agents WHERE id = $1\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/tenancy_tests.rs#workflow_routes_refuse_other_tenants_and_members",
+        "name": "workflow_routes_refuse_other_tenants_and_members",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/tenancy_tests.rs",
+        "span": "L231-L288"
+      },
+      "path": "src/adapters/http/routes/workflows/tenancy_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 282,
+          "text": "let stored: Vec<String> = sqlx::query_scalar(\"SELECT workflow_tools FROM agents WHERE id = $1\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/tool_tests.rs#workflow_tool_routes_register_revoke_and_grant",
+        "name": "workflow_tool_routes_register_revoke_and_grant",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/tool_tests.rs",
+        "span": "L7-L205"
+      },
+      "path": "src/adapters/http/routes/workflows/tool_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 158,
+          "text": "sqlx::query(\"UPDATE agents SET workflow_tools = $2 WHERE id = $1\")"
+        },
+        {
+          "line": 185,
+          "text": "let stored: Vec<String> = sqlx::query_scalar(\"SELECT workflow_tools FROM agents WHERE id = $1\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/tool_tests.rs#competing_agent_grants_apply_once",
+        "name": "competing_agent_grants_apply_once",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/tool_tests.rs",
+        "span": "L210-L256"
+      },
+      "path": "src/adapters/http/routes/workflows/tool_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 250,
+          "text": "let stored: Vec<String> = sqlx::query_scalar(\"SELECT workflow_tools FROM agents WHERE id = $1\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/tools.rs#list",
+        "name": "list",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/tools.rs",
+        "span": "L25-L37"
+      },
+      "path": "src/adapters/http/routes/workflows/tools.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 31,
+          "text": ".workflow_tools()"
+        },
+        {
+          "line": 32,
+          "text": ".workflow_tools(company(company_id), actor(&user)?)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/tools.rs#register",
+        "name": "register",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/tools.rs",
+        "span": "L54-L81"
+      },
+      "path": "src/adapters/http/routes/workflows/tools.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 62,
+          "text": ".workflow_tools()"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/tools.rs#revoke",
+        "name": "revoke",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/tools.rs",
+        "span": "L89-L105"
+      },
+      "path": "src/adapters/http/routes/workflows/tools.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 96,
+          "text": ".workflow_tools()"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/tools.rs#grant",
+        "name": "grant",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/tools.rs",
+        "span": "L115-L141"
+      },
+      "path": "src/adapters/http/routes/workflows/tools.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 128,
+          "text": ".workflow_tools()"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/agent_model_step_tests.rs#workflow_model_steps_check_only_the_capabilities_they_use",
+        "name": "workflow_model_steps_check_only_the_capabilities_they_use",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/agent_model_step_tests.rs",
+        "span": "L190-L239"
+      },
+      "path": "src/adapters/persistence/workflow/agent_model_step_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 200,
+          "text": "sqlx::query(\"UPDATE agents SET workflow_tools='{}' WHERE id=$1\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/agent_runtime_tests.rs#workflow_agent_publication_refuses_forged_snapshot_and_keeps_frozen_version",
+        "name": "workflow_agent_publication_refuses_forged_snapshot_and_keeps_frozen_version",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/agent_runtime_tests.rs",
+        "span": "L278-L321"
+      },
+      "path": "src/adapters/persistence/workflow/agent_runtime_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 299,
+          "text": "sqlx::query(\"UPDATE agents SET system_prompt='Edited later', workflow_tools=array_append(workflow_tools,'message.send') WHERE id=$1\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/agent_runtime_tests.rs#workflow_agent_run_refuses_removed_tool_grant_before_provider_entry",
+        "name": "workflow_agent_run_refuses_removed_tool_grant_before_provider_entry",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/agent_runtime_tests.rs",
+        "span": "L324-L349"
+      },
+      "path": "src/adapters/persistence/workflow/agent_runtime_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 329,
+          "text": "sqlx::query(\"UPDATE agents SET workflow_tools='{}' WHERE id=$1\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/agent_runtime_tests.rs#workflow_agent_capability_writers_preserve_unsupplied_lists",
+        "name": "workflow_agent_capability_writers_preserve_unsupplied_lists",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/agent_runtime_tests.rs",
+        "span": "L369-L427"
+      },
+      "path": "src/adapters/persistence/workflow/agent_runtime_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 377,
+          "text": "sqlx::query_scalar::<_, Vec<String>>(\"SELECT workflow_tools FROM agents WHERE id=$1\")"
+        },
+        {
+          "line": 398,
+          "text": "cleared.workflow_tools = Some(vec![]);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/agent_runtime_tests.rs#workflow_agent_run_competing_revocation_refuses_admission",
+        "name": "workflow_agent_run_competing_revocation_refuses_admission",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/agent_runtime_tests.rs",
+        "span": "L478-L508"
+      },
+      "path": "src/adapters/persistence/workflow/agent_runtime_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 484,
+          "text": "sqlx::query(\"UPDATE agents SET workflow_tools='{}' WHERE id=$1\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/agent_runtime_tests.rs#workflow_agent_capture_refuses_unrunnable_agents",
+        "name": "workflow_agent_capture_refuses_unrunnable_agents",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/agent_runtime_tests.rs",
+        "span": "L512-L552"
+      },
+      "path": "src/adapters/persistence/workflow/agent_runtime_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 542,
+          "text": "\"UPDATE agents SET provider='openai',model='gpt-4o-mini', workflow_tools='{missing.tool}' WHERE id=$1\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/knowledge_search_atomic_tests.rs#knowledge_search_current_grant_revocation_blocks_saved_invocation_before_embedding",
+        "name": "knowledge_search_current_grant_revocation_blocks_saved_invocation_before_embedding",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/knowledge_search_atomic_tests.rs",
+        "span": "L290-L308"
+      },
+      "path": "src/adapters/persistence/workflow/knowledge_search_atomic_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 293,
+          "text": "sqlx::query(\"UPDATE agents SET workflow_tools='{}' WHERE id=$1\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/mcp_agent_tests.rs#workflow_agent_mcp_tool_dispatches_once_through_the_bound_slot",
+        "name": "workflow_agent_mcp_tool_dispatches_once_through_the_bound_slot",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/mcp_agent_tests.rs",
+        "span": "L27-L169"
+      },
+      "path": "src/adapters/persistence/workflow/mcp_agent_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 46,
+          "text": "workflow_tools: Some(vec![TypeName::parse(TOOL).unwrap()]),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_agent_tests.rs#workflow_agent_message_tool_parks_on_delivery_and_continues_with_its_receipt",
+        "name": "workflow_agent_message_tool_parks_on_delivery_and_continues_with_its_receipt",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_agent_tests.rs",
+        "span": "L33-L178"
+      },
+      "path": "src/adapters/persistence/workflow/message_agent_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 48,
+          "text": "workflow_tools: Some(vec![TypeName::parse(\"message.send\").unwrap()]),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/mod.rs#workflow_tools",
+        "name": "workflow_tools",
+        "kind": "module",
+        "path": "src/adapters/persistence/workflow/mod.rs",
+        "span": "L81-L81"
+      },
+      "path": "src/adapters/persistence/workflow/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 81,
+          "text": "mod workflow_tools;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs#provisioning_competing_claimants_create_one_assistant",
+        "name": "provisioning_competing_claimants_create_one_assistant",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs",
+        "span": "L233-L324"
+      },
+      "path": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 315,
+          "text": "sqlx::query_as(\"SELECT provider, model, workflow_tools FROM agents WHERE slug = 'helper' AND company_id = $1\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs#provisioning_grants_capture_the_built_in_or_refuse_an_ambiguous_capture",
+        "name": "provisioning_grants_capture_the_built_in_or_refuse_an_ambiguous_capture",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs",
+        "span": "L792-L857"
+      },
+      "path": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 806,
+          "text": "workflow_tools: Some(vec![TypeName::parse(CREATE_AGENT_CHANNEL).unwrap()]),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/resources.rs#check_readiness",
+        "name": "check_readiness",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/resources.rs",
+        "span": "L44-L116"
+      },
+      "path": "src/adapters/persistence/workflow/resources.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 70,
+          "text": "super::workflow_tools::registered_on("
+        },
+        {
+          "line": 74,
+          "text": "super::workflow_tools::ToolCheck::Run,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/workflow_tool_registration_tests.rs#workflow_tool_registration_commands_keep_revisions_authority_and_bounds",
+        "name": "workflow_tool_registration_commands_keep_revisions_authority_and_bounds",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/workflow_tool_registration_tests.rs",
+        "span": "L77-L282"
+      },
+      "path": "src/adapters/persistence/workflow/workflow_tool_registration_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 134,
+          "text": "p.workflow_tools(company, actor).await,"
+        },
+        {
+          "line": 140,
+          "text": "p.workflow_tools(company, admin_member).await.unwrap().len(),"
+        },
+        {
+          "line": 225,
+          "text": "p.workflow_tools(company, admin).await.unwrap().len(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/workflow_tool_registration_tests.rs#workflow_tool_pins_and_grants_stay_within_the_agents_company",
+        "name": "workflow_tool_pins_and_grants_stay_within_the_agents_company",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/workflow_tool_registration_tests.rs",
+        "span": "L288-L392"
+      },
+      "path": "src/adapters/persistence/workflow/workflow_tool_registration_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 386,
+          "text": "p.workflow_tools(company, admin)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/workflow_tools.rs#workflow_tools",
+        "name": "workflow_tools",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/workflow_tools.rs",
+        "span": "L280-L299"
+      },
+      "path": "src/adapters/persistence/workflow/workflow_tools.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 280,
+          "text": "async fn workflow_tools("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/builtin_agent_library.rs#agent_builder_is_granted_the_provisioning_tools_and_told_their_rules",
+        "name": "agent_builder_is_granted_the_provisioning_tools_and_told_their_rules",
+        "kind": "function",
+        "path": "src/application/use_cases/builtin_agent_library.rs",
+        "span": "L125-L150"
+      },
+      "path": "src/application/use_cases/builtin_agent_library.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 129,
+          "text": ".workflow_tools"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/sample/tools_tests.rs#direct_agent_tools_and_pinned_workflow_tools_stay_in_sample",
+        "name": "direct_agent_tools_and_pinned_workflow_tools_stay_in_sample",
+        "kind": "function",
+        "path": "src/application/workflow/sample/tools_tests.rs",
+        "span": "L39-L91"
+      },
+      "path": "src/application/workflow/sample/tools_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 39,
+          "text": "fn direct_agent_tools_and_pinned_workflow_tools_stay_in_sample() {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/tools.rs#workflow_tools",
+        "name": "workflow_tools",
+        "kind": "function",
+        "path": "src/application/workflow/tools.rs",
+        "span": "L72-L76"
+      },
+      "path": "src/application/workflow/tools.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 72,
+          "text": "async fn workflow_tools("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/infra/workflow/services.rs#workflow_tools",
+        "name": "workflow_tools",
+        "kind": "function",
+        "path": "src/infra/workflow/services.rs",
+        "span": "L113-L115"
+      },
+      "path": "src/infra/workflow/services.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 113,
+          "text": "pub fn workflow_tools(&self) -> &dyn crate::application::workflow::tools::WorkflowTools {"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 35,
+    "baselineChars": 422655
+  }
+}

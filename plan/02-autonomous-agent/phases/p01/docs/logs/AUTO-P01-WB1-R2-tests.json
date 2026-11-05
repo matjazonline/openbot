@@ -1,0 +1,36 @@
+{
+  "binary_sha256": "fe2f0068c95567505d45caee3ccc6baca121a4296f3041839214c753ceef557d",
+  "results": [
+    {
+      "name": "skill-list",
+      "argv": [
+        "scripts/test-network-isolation.sh",
+        "/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p01/target/debug/deps/open_bots-c19a0b960dacdcef",
+        "autonomous_agent_storage_skill_",
+        "--list"
+      ],
+      "exit": 0
+    },
+    {
+      "name": "skill-run",
+      "argv": [
+        "scripts/test-network-isolation.sh",
+        "/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p01/target/debug/deps/open_bots-c19a0b960dacdcef",
+        "autonomous_agent_storage_skill_"
+      ],
+      "exit": 0
+    },
+    {
+      "name": "original-probe",
+      "argv": [
+        "scripts/test-network-isolation.sh",
+        "psql",
+        "postgres://mac02@127.0.0.1:55601/open_bots_test",
+        "-X",
+        "-f",
+        "/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p01/plan/02-autonomous-agent/phases/p01/docs/logs/AUTO-P01-WB1-R1-retired-update-probe.sql"
+      ],
+      "exit": 3
+    }
+  ]
+}

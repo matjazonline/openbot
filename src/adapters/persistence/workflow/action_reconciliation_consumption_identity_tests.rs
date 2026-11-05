@@ -1,5 +1,6 @@
 //! Public SQL reservation history attacks with genuine service-owned final proof.
 use super::*;
+use crate::application::agent::ActionRecovery;
 
 struct ProofOwner {
     fixture: AdmissionFixture,

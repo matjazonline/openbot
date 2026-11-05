@@ -2,6 +2,7 @@
 use super::*;
 use crate::adapters::persistence::workflow::persistence_bound::recorder::Injected;
 use crate::adapters::persistence::workflow::tests::admission_tests::lease_tests::resolution_gate::*;
+use crate::application::agent::ActionRecovery;
 use crate::application::workflow::completion::*;
 
 async fn observations(f: &AdmissionFixture) -> (i64, i64) {

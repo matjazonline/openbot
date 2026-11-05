@@ -1,0 +1,22 @@
+{
+  "worktree": "/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p01",
+  "branch": "autonomous/p01",
+  "base": "ce93ff340a54db18770d8a5eec1c1d2008c5e5b1",
+  "postgres_version": "18.6",
+  "postgres_data": "/Users/mac02/dev/openbot-recovery/.worktrees/pg-autonomous-p01",
+  "postgres_socket": "/Users/mac02/dev/openbot-recovery/.worktrees/pg-autonomous-p01-socket",
+  "postgres_port": 55601,
+  "databases": [
+    "open_bots",
+    "open_bots_test"
+  ],
+  "target": "/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p01/target",
+  "target_isolation": "APFS COW copy; distinct inode verified",
+  "env_mode": "0o600",
+  "env_ignored": true,
+  "baseline_migrations": {
+    "main": "Applied 20260817000000/migrate init schema (252.5695ms)\n",
+    "test": "Applied 20260817000000/migrate init schema (237.328416ms)\n"
+  },
+  "authority_r1_sha256": "012a7858c5b1c423cfaf6cb3b71804d37b50c8ea32a90aef71625c2c09a6028e"
+}

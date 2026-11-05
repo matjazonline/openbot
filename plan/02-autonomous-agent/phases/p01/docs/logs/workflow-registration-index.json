@@ -1,0 +1,146 @@
+{
+  "pattern": "workflow_tool_registrations",
+  "filesSearched": 1265,
+  "totalHits": 10,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/workflow_tools.rs#registration_on",
+        "name": "registration_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/workflow_tools.rs",
+        "span": "L45-L60"
+      },
+      "path": "src/adapters/persistence/workflow/workflow_tools.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 51,
+          "text": "\"SELECT name, workflow_id, version_id, params, revision FROM workflow_tool_registrations \\"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/workflow_tool_registration_tests.rs#registrations",
+        "name": "registrations",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/workflow_tool_registration_tests.rs",
+        "span": "L40-L46"
+      },
+      "path": "src/adapters/persistence/workflow/workflow_tool_registration_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 41,
+          "text": "sqlx::query_scalar(\"SELECT count(*) FROM workflow_tool_registrations WHERE company_id=$1\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/workflow_tool_registration_tests.rs#workflow_tool_registration_commands_keep_revisions_authority_and_bounds",
+        "name": "workflow_tool_registration_commands_keep_revisions_authority_and_bounds",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/workflow_tool_registration_tests.rs",
+        "span": "L76-L281"
+      },
+      "path": "src/adapters/persistence/workflow/workflow_tool_registration_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 193,
+          "text": "\"INSERT INTO workflow_tool_registrations(company_id,name,workflow_id,version_id,params) \\"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/workflow_tool_registration_tests.rs#workflow_tool_pins_and_grants_stay_within_the_agents_company",
+        "name": "workflow_tool_pins_and_grants_stay_within_the_agents_company",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/workflow_tool_registration_tests.rs",
+        "span": "L287-L391"
+      },
+      "path": "src/adapters/persistence/workflow/workflow_tool_registration_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 339,
+          "text": "\"INSERT INTO workflow_tool_registrations(company_id,name,workflow_id,version_id) \\"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/workflow_tools.rs#register_workflow_tool",
+        "name": "register_workflow_tool",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/workflow_tools.rs",
+        "span": "L174-L247"
+      },
+      "path": "src/adapters/persistence/workflow/workflow_tools.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 208,
+          "text": "\"SELECT count(*) FROM workflow_tool_registrations WHERE company_id=$1\","
+        },
+        {
+          "line": 217,
+          "text": "\"INSERT INTO workflow_tool_registrations(company_id,name,workflow_id,version_id,params) \\"
+        },
+        {
+          "line": 230,
+          "text": "\"UPDATE workflow_tool_registrations SET workflow_id=$3, version_id=$4, params=$5, \\"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/workflow_tools.rs#revoke_workflow_tool",
+        "name": "revoke_workflow_tool",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/workflow_tools.rs",
+        "span": "L249-L277"
+      },
+      "path": "src/adapters/persistence/workflow/workflow_tools.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 259,
+          "text": "\"SELECT revision FROM workflow_tool_registrations WHERE company_id=$1 AND name=$2 FOR UPDATE\","
+        },
+        {
+          "line": 270,
+          "text": "sqlx::query(\"DELETE FROM workflow_tool_registrations WHERE company_id=$1 AND name=$2\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/workflow_tools.rs#workflow_tools",
+        "name": "workflow_tools",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/workflow_tools.rs",
+        "span": "L279-L298"
+      },
+      "path": "src/adapters/persistence/workflow/workflow_tools.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 287,
+          "text": "\"SELECT name, workflow_id, version_id, params, revision FROM workflow_tool_registrations \\"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 2,
+    "baselineChars": 33152
+  }
+}

@@ -45,10 +45,12 @@ async fn workflow_mcp_registration_competes_with_grant_removal_refresh_and_delet
                 "{error:?}"
             );
         }
-        let approvals: i64 = sqlx::query_scalar("SELECT count(*) FROM workflow_mcp_operations")
-            .fetch_one(p.pool())
-            .await
-            .unwrap();
+        let approvals: i64 = sqlx::query_scalar(
+            "SELECT count(*) FROM workflow_mcp_operations WHERE revoked_at IS NULL",
+        )
+        .fetch_one(p.pool())
+        .await
+        .unwrap();
         assert_eq!(
             approvals, 0,
             "{change}: approval cannot outlive its grant/connection"
@@ -128,10 +130,12 @@ async fn workflow_mcp_operation_cas_cascades_and_tenant_constraints() {
         .await
         .unwrap();
     let approvals = || async {
-        sqlx::query_scalar::<_, i64>("SELECT count(*) FROM workflow_mcp_operations")
-            .fetch_one(p.pool())
-            .await
-            .unwrap()
+        sqlx::query_scalar::<_, i64>(
+            "SELECT count(*) FROM workflow_mcp_operations WHERE revoked_at IS NULL",
+        )
+        .fetch_one(p.pool())
+        .await
+        .unwrap()
     };
     assert_eq!(approvals().await, 0, "grant removal cascades");
     assert!(

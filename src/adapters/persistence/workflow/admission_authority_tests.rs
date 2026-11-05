@@ -158,7 +158,7 @@ async fn workflow_admit_sql_saved_resource_revocation_blocks_new_replay_and_alia
             .execute(&mut *revoked)
             .await
             .unwrap();
-        sqlx::query("DELETE FROM company_mcp_tool_grants WHERE company_id=$1 AND connection_id=$2")
+        sqlx::query("UPDATE company_mcp_tool_grants SET revoked_at=clock_timestamp() WHERE company_id=$1 AND connection_id=$2")
             .bind(f.binding.target.company.as_uuid())
             .bind(resource)
             .execute(&mut *revoked)

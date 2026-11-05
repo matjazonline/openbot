@@ -1,4 +1,5 @@
 use super::*;
+use crate::application::agent::{AgentKey, SkillSnapshot};
 
 fn skill(name_: &str, id: u128, required: Vec<TypeName>) -> SkillSnapshot {
     SkillSnapshot {

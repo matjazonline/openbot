@@ -2,6 +2,7 @@
 //! frozen selection to what the agent and company still allow; it never widens it.
 use super::http::{registered_on, runtime};
 use super::*;
+use crate::application::agent::AgentKey;
 use crate::application::workflow::{
     agent::{AgentLaunch, AgentPreparation, AgentToolTarget, PreparedAgent, PreparedStep},
     lease::ClaimedWorkflow,
@@ -71,14 +72,19 @@ pub(in crate::adapters::persistence::workflow) async fn current_on(
     prepared: &Value,
 ) -> AppResult<()> {
     let selected = Selected::read(prepared)?;
-    let grants: Option<Vec<String>> = sqlx::query_scalar(
-        "SELECT workflow_tools FROM agents WHERE id=$1 AND company_id=$2 FOR SHARE",
-    )
-    .bind(selected.agent)
-    .bind(company.as_uuid())
-    .fetch_optional(&mut *db)
-    .await?;
-    let grants = grants.ok_or_else(revoked)?;
+    let owner: Option<Uuid> =
+        sqlx::query_scalar("SELECT id FROM agents WHERE id=$1 AND company_id=$2 FOR SHARE")
+            .bind(selected.agent)
+            .bind(company.as_uuid())
+            .fetch_optional(&mut *db)
+            .await?;
+    owner.ok_or_else(revoked)?;
+    let grants =
+        super::super::agent_capability::bindings_on(db, Some(company.as_uuid()), selected.agent)
+            .await?
+            .into_iter()
+            .map(|binding| binding.alias.as_str().to_owned())
+            .collect::<Vec<_>>();
     if selected.tools.iter().any(|tool| !grants.contains(tool)) {
         return Err(revoked());
     }

@@ -51,7 +51,7 @@ pub(in super::super::super) async fn foreign_action(
     Box::pin(initialize_action_on_claim(
         foreign,
         claim,
-        publication::ActionRecovery::Reconcile,
+        crate::application::agent::ActionRecovery::Reconcile,
         json!({"value":2}),
     ))
     .await

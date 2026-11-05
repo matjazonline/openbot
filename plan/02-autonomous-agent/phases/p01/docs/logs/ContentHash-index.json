@@ -1,0 +1,126 @@
+{
+  "pattern": "ContentHash",
+  "filesSearched": 1265,
+  "totalHits": 8,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/mod.rs#hash",
+        "name": "hash",
+        "kind": "function",
+        "path": "src/application/workflow/publication/mod.rs",
+        "span": "L187-L192"
+      },
+      "path": "src/application/workflow/publication/mod.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 187,
+          "text": "fn hash(value: &Value) -> ContentHash {"
+        },
+        {
+          "line": 191,
+          "text": "ContentHash(format!(\"{:x}\", Sha256::digest(bytes)))"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "scripts/workflow-sample-boundary.py",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 21,
+          "text": "'publication::PublishedBundle', 'publication::ContentHash', 'publication::AgentKey',"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/mod.rs#PublishedBundle",
+        "name": "PublishedBundle",
+        "kind": "struct",
+        "path": "src/application/workflow/publication/mod.rs",
+        "span": "L28-L36"
+      },
+      "path": "src/application/workflow/publication/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 34,
+          "text": "hash: ContentHash,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/mod.rs#content_hash",
+        "name": "content_hash",
+        "kind": "function",
+        "path": "src/application/workflow/publication/mod.rs",
+        "span": "L54-L56"
+      },
+      "path": "src/application/workflow/publication/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 54,
+          "text": "pub fn content_hash(&self) -> &ContentHash {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/types.rs#ContentHash",
+        "name": "ContentHash",
+        "kind": "struct",
+        "path": "src/application/workflow/publication/types.rs",
+        "span": "L33-L33"
+      },
+      "path": "src/application/workflow/publication/types.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 33,
+          "text": "pub struct ContentHash(pub(super) String);"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/publication/types.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 34,
+          "text": "impl ContentHash {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/sample/types.rs#SampleReport",
+        "name": "SampleReport",
+        "kind": "struct",
+        "path": "src/application/workflow/sample/types.rs",
+        "span": "L99-L108"
+      },
+      "path": "src/application/workflow/sample/types.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 100,
+          "text": "pub content_hash: super::super::publication::ContentHash,"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 4,
+    "baselineChars": 22924
+  }
+}

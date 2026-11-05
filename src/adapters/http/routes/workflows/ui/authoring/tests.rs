@@ -7,6 +7,7 @@ use crate::adapters::persistence::{
     PostgresPersistence,
     test_support::{OwnDatabase, own_database},
 };
+use crate::application::agent::{ActionEffect, ActionRecovery, ApprovedActionPolicy};
 use crate::use_cases::agent::{AgentPersistence, AgentWrite};
 use axum::extract::State;
 use axum::http::{Request, header};
@@ -478,9 +479,7 @@ async fn reviewed_connection(f: &Fixture) -> Uuid {
 }
 async fn reviewed_connection_at(f: &Fixture, endpoint: &str) -> Uuid {
     use crate::application::workflow::mcp::{McpOperation, McpOperationWrite, McpOperations};
-    use crate::application::workflow::publication::{
-        ActionEffect, ActionRecovery, ApprovedActionPolicy, ToolSnapshot,
-    };
+    use crate::application::workflow::publication::ToolSnapshot;
     use crate::entities::mcp::{McpAuth, McpDiscoveredTool};
     use crate::use_cases::mcp::{McpConnectionWrite, McpPersistence};
     let input = json!({"type": "object", "properties": {"key": {"type": "string", "maxLength": 128}},

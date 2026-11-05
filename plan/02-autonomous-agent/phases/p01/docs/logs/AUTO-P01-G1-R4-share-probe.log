@@ -1,0 +1,51 @@
+exit=0 expected_error=None
+
+exit=0 expected_error=None
+
+CASE 1: new operation activation first
+exit=3 expected_error=55P03
+ERROR:  55P03: canceling statement due to lock timeout
+CONTEXT:  while updating tuple (0,1) in relation "grant_key"
+LOCATION:  ProcessInterrupts, postgres.c:3439
+
+held commit exit=0
+
+exit=0 expected_error=None
+
+exit=0 expected_error=None
+t|t
+
+CASE 2: revocation first
+exit=3 expected_error=55P03
+ERROR:  55P03: canceling statement due to lock timeout
+CONTEXT:  while locking tuple (0,2) in relation "grant_key"
+SQL statement "SELECT 1 FROM grant_key WHERE id=NEW.grant_id AND revoked_at IS NULL FOR SHARE"
+PL/pgSQL function activation_guard() line 4 at PERFORM
+LOCATION:  ProcessInterrupts, postgres.c:3439
+
+held commit exit=0
+
+exit=3 expected_error=23503
+ERROR:  23503: inactive grant
+CONTEXT:  PL/pgSQL function activation_guard() line 5 at RAISE
+LOCATION:  exec_stmt_raise, pl_exec.c:3923
+
+CASE 3: retained-key operation reactivation first
+exit=3 expected_error=55P03
+ERROR:  55P03: canceling statement due to lock timeout
+CONTEXT:  while updating tuple (0,3) in relation "grant_key"
+LOCATION:  ProcessInterrupts, postgres.c:3439
+
+held commit exit=0
+
+exit=0 expected_error=None
+
+exit=0 expected_error=None
+t|t
+
+exit=0 expected_error=None
+0
+
+PASS: 3 targeted concurrent ordering/reactivation cases; zero active-operation/revoked-grant rows.
+exit=0 expected_error=None
+

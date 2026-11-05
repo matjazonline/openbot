@@ -30,7 +30,7 @@ async fn completed_action(source: Value) -> CompletedAction {
     let (f, request) = Box::pin(setup_action_on_fixture(
         f,
         scope,
-        publication::ActionRecovery::Reconcile,
+        crate::application::agent::ActionRecovery::Reconcile,
         json!({"value":1}),
     ))
     .await;
@@ -97,7 +97,7 @@ async fn successor_action(completed: &CompletedAction) -> SuccessorAction {
         execution: scope.execution,
     });
     action.context.actor = f.binding.target.actor.user_id();
-    action.contract.policy.recovery = publication::ActionRecovery::Reconcile;
+    action.contract.policy.recovery = crate::application::agent::ActionRecovery::Reconcile;
     action.arguments = json!({"value":2});
     let intent = ActionService::new(f.persistence().clone())
         .prepare_step(action)

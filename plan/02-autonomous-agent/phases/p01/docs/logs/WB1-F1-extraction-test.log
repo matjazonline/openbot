@@ -1,0 +1,10 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p01)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 59s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-c19a0b960dacdcef)
+
+running 1 test
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::skill_lifetime_tests::autonomous_agent_storage_skill_delete_preserves_history_and_cannot_revive_assignment ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2910 filtered out; finished in 0.62s
+

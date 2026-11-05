@@ -1,7 +1,8 @@
 //! Provider promises come from trusted registration, never transport metadata.
 use super::*;
 use crate::app_error::AppResult;
-use crate::application::workflow::publication::{ActionRecovery, ToolSnapshot};
+use crate::application::agent::ActionRecovery;
+use crate::application::workflow::publication::ToolSnapshot;
 use crate::domain::workflow::TypeName;
 use serde::Serialize;
 use serde_json::{Value, json};

@@ -1,0 +1,811 @@
+{
+  "pattern": "Agent {",
+  "filesSearched": 1280,
+  "totalHits": 57,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/tests.rs#settings_agent",
+        "name": "settings_agent",
+        "kind": "function",
+        "path": "src/adapters/http/pages/tests.rs",
+        "span": "L1377-L1391"
+      },
+      "path": "src/adapters/http/pages/tests.rs",
+      "inDegree": 9,
+      "hits": [
+        {
+          "line": 1377,
+          "text": "fn settings_agent(company_id: Uuid, name: &str, slug: &str) -> Agent {"
+        },
+        {
+          "line": 1378,
+          "text": "Agent {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/autonomous_agent_storage_support.rs#new_agent",
+        "name": "new_agent",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/autonomous_agent_storage_support.rs",
+        "span": "L3-L22"
+      },
+      "path": "src/adapters/persistence/workflow/autonomous_agent_storage_support.rs",
+      "inDegree": 9,
+      "hits": [
+        {
+          "line": 6,
+          "text": ") -> crate::entities::agent::Agent {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/capabilities.rs#resolve_agent",
+        "name": "resolve_agent",
+        "kind": "function",
+        "path": "src/application/workflow/publication/capabilities.rs",
+        "span": "L47-L89"
+      },
+      "path": "src/application/workflow/publication/capabilities.rs",
+      "inDegree": 5,
+      "hits": [
+        {
+          "line": 83,
+          "text": "Ok(ResolvedAgent {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/agent_retire_tests.rs#spoken_agent",
+        "name": "spoken_agent",
+        "kind": "function",
+        "path": "src/adapters/persistence/agent_retire_tests.rs",
+        "span": "L27-L171"
+      },
+      "path": "src/adapters/persistence/agent_retire_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 27,
+          "text": "async fn spoken_agent(persistence: &PostgresPersistence) -> SpokenAgent {"
+        },
+        {
+          "line": 164,
+          "text": "SpokenAgent {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/agent_publication.rs#derive_on",
+        "name": "derive_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/agent_publication.rs",
+        "span": "L54-L147"
+      },
+      "path": "src/adapters/persistence/workflow/agent_publication.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 73,
+          "text": ".ok_or_else(|| refused(format!(\"Agent {key_name} is not an agent of this company\")))?;"
+        },
+        {
+          "line": 76,
+          "text": "\"Agent {key_name} needs an explicit provider and model for workflows\""
+        },
+        {
+          "line": 88,
+          "text": "\"Agent {key_name}: the company {provider} connection does not offer model {model}\""
+        },
+        {
+          "line": 125,
+          "text": "\"Agent {} has a slug workflows cannot name\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/agent_tests.rs#create",
+        "name": "create",
+        "kind": "function",
+        "path": "src/application/use_cases/agent_tests.rs",
+        "span": "L36-L52"
+      },
+      "path": "src/application/use_cases/agent_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 37,
+          "text": "let agent = Agent {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/agent_tests.rs#selection",
+        "name": "selection",
+        "kind": "function",
+        "path": "src/application/workflow/agent_tests.rs",
+        "span": "L12-L27"
+      },
+      "path": "src/application/workflow/agent_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 12,
+          "text": "fn selection(tools: Vec<&str>) -> ResolvedAgent {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/onboarding.rs#create_agents",
+        "name": "create_agents",
+        "kind": "function",
+        "path": "src/adapters/http/routes/onboarding.rs",
+        "span": "L227-L274"
+      },
+      "path": "src/adapters/http/routes/onboarding.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 261,
+          "text": ".map(|created| pages::OnboardedAgent {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/onboarding.rs#library_agent",
+        "name": "library_agent",
+        "kind": "function",
+        "path": "src/adapters/http/routes/onboarding.rs",
+        "span": "L403-L417"
+      },
+      "path": "src/adapters/http/routes/onboarding.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 403,
+          "text": "fn library_agent(name: &str, slug: &str) -> Agent {"
+        },
+        {
+          "line": 404,
+          "text": "Agent {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/agent.rs#try_from",
+        "name": "try_from",
+        "kind": "function",
+        "path": "src/adapters/persistence/agent.rs",
+        "span": "L49-L65"
+      },
+      "path": "src/adapters/persistence/agent.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 50,
+          "text": "Ok(Agent {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/agent_publication.rs#verify_on",
+        "name": "verify_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/agent_publication.rs",
+        "span": "L152-L189"
+      },
+      "path": "src/adapters/persistence/workflow/agent_publication.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 165,
+          "text": "\"Agent {} changed or does not match its saved definition\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/onboarding.rs#prepare",
+        "name": "prepare",
+        "kind": "function",
+        "path": "src/application/use_cases/onboarding.rs",
+        "span": "L172-L209"
+      },
+      "path": "src/application/use_cases/onboarding.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 202,
+          "text": "prepared.push(PreparedAgent {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/onboarding.rs#selection",
+        "name": "selection",
+        "kind": "function",
+        "path": "src/application/use_cases/onboarding.rs",
+        "span": "L250-L306"
+      },
+      "path": "src/application/use_cases/onboarding.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 274,
+          "text": "selected.push(SelectedAgent {"
+        },
+        {
+          "line": 296,
+          "text": "selected.push(SelectedAgent {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/tests.rs#legacy_agent_fields_and_confirmation_attribute_are_escaped",
+        "name": "legacy_agent_fields_and_confirmation_attribute_are_escaped",
+        "kind": "function",
+        "path": "src/adapters/http/pages/tests.rs",
+        "span": "L29-L48"
+      },
+      "path": "src/adapters/http/pages/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 31,
+          "text": "let agent = Agent {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/tests.rs#agent_settings_list_targets_the_pane_and_swaps_out_of_band",
+        "name": "agent_settings_list_targets_the_pane_and_swaps_out_of_band",
+        "kind": "function",
+        "path": "src/adapters/http/pages/tests.rs",
+        "span": "L958-L1004"
+      },
+      "path": "src/adapters/http/pages/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 960,
+          "text": "let agent = Agent {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/tests.rs#agent_edit_pane_prefills_the_stored_agent_and_offers_delete",
+        "name": "agent_edit_pane_prefills_the_stored_agent_and_offers_delete",
+        "kind": "function",
+        "path": "src/adapters/http/pages/tests.rs",
+        "span": "L1007-L1065"
+      },
+      "path": "src/adapters/http/pages/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1009,
+          "text": "let agent = Agent {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/tests.rs#an_agent_with_a_picture_shows_it_and_one_without_falls_back_to_its_letter",
+        "name": "an_agent_with_a_picture_shows_it_and_one_without_falls_back_to_its_letter",
+        "kind": "function",
+        "path": "src/adapters/http/pages/tests.rs",
+        "span": "L1068-L1115"
+      },
+      "path": "src/adapters/http/pages/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1070,
+          "text": "let pictured = Agent {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/tests.rs#the_easy_tab_creates_the_picked_library_agents",
+        "name": "the_easy_tab_creates_the_picked_library_agents",
+        "kind": "function",
+        "path": "src/adapters/http/pages/tests.rs",
+        "span": "L1220-L1270"
+      },
+      "path": "src/adapters/http/pages/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1222,
+          "text": "let triage = Agent {"
+        },
+        {
+          "line": 1227,
+          "text": "let billing = Agent {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/tests.rs#each_agent_form_owns_its_own_picker",
+        "name": "each_agent_form_owns_its_own_picker",
+        "kind": "function",
+        "path": "src/adapters/http/pages/tests.rs",
+        "span": "L3507-L3546"
+      },
+      "path": "src/adapters/http/pages/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 3527,
+          "text": "let agent = Agent {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/agent.rs#agent_pages_and_fragments_render_correctly",
+        "name": "agent_pages_and_fragments_render_correctly",
+        "kind": "function",
+        "path": "src/adapters/http/routes/agent.rs",
+        "span": "L761-L803"
+      },
+      "path": "src/adapters/http/routes/agent.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 772,
+          "text": "let agent = Agent {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/onboarding.rs#complete",
+        "name": "complete",
+        "kind": "function",
+        "path": "src/adapters/http/routes/onboarding.rs",
+        "span": "L350-L380"
+      },
+      "path": "src/adapters/http/routes/onboarding.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 372,
+          "text": "onboarded.push(pages::OnboardedAgent { agent, channel });"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/onboarding.rs#onboarding_pages_render_each_step",
+        "name": "onboarding_pages_render_each_step",
+        "kind": "function",
+        "path": "src/adapters/http/routes/onboarding.rs",
+        "span": "L420-L561"
+      },
+      "path": "src/adapters/http/routes/onboarding.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 511,
+          "text": "pages::OnboardedAgent {"
+        },
+        {
+          "line": 518,
+          "text": "pages::OnboardedAgent {"
+        },
+        {
+          "line": 524,
+          "text": "pages::OnboardedAgent {"
+        },
+        {
+          "line": 550,
+          "text": "&[pages::OnboardedAgent {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/onboarding.rs#the_channel_step_gives_each_modelled_agent_one_assistant_channel",
+        "name": "the_channel_step_gives_each_modelled_agent_one_assistant_channel",
+        "kind": "function",
+        "path": "src/adapters/http/routes/onboarding.rs",
+        "span": "L568-L760"
+      },
+      "path": "src/adapters/http/routes/onboarding.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 630,
+          "text": "name: format!(\"Agent {slug}\"),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_agents.rs#SubmittedAgent",
+        "name": "SubmittedAgent",
+        "kind": "struct",
+        "path": "src/adapters/http/routes/ui_agents.rs",
+        "span": "L712-L718"
+      },
+      "path": "src/adapters/http/routes/ui_agents.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 712,
+          "text": "pub(super) struct SubmittedAgent {"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/http/routes/ui_agents.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 720,
+          "text": "impl SubmittedAgent {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/ui/authoring/publish_tests.rs#a_parameter_selected_agent_step_previews_every_frozen_candidate",
+        "name": "a_parameter_selected_agent_step_previews_every_frozen_candidate",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/ui/authoring/publish_tests.rs",
+        "span": "L315-L370"
+      },
+      "path": "src/adapters/http/routes/workflows/ui/authoring/publish_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 332,
+          "text": "name: format!(\"Agent {slug}\"),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/ui/authoring/publish_tests.rs#a_parameter_selected_step_lists_its_own_parameters_agents",
+        "name": "a_parameter_selected_step_lists_its_own_parameters_agents",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/ui/authoring/publish_tests.rs",
+        "span": "L415-L473"
+      },
+      "path": "src/adapters/http/routes/workflows/ui/authoring/publish_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 432,
+          "text": "name: format!(\"Agent {slug}\"),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/ui/authoring/tests.rs#the_catalogue_lists_every_runnable_type_and_the_agents_a_step_can_name",
+        "name": "the_catalogue_lists_every_runnable_type_and_the_agents_a_step_can_name",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/ui/authoring/tests.rs",
+        "span": "L402-L428"
+      },
+      "path": "src/adapters/http/routes/workflows/ui/authoring/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 411,
+          "text": "name: format!(\"Agent {slug}\"),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/agent_retire_tests.rs#SpokenAgent",
+        "name": "SpokenAgent",
+        "kind": "struct",
+        "path": "src/adapters/persistence/agent_retire_tests.rs",
+        "span": "L19-L25"
+      },
+      "path": "src/adapters/persistence/agent_retire_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 19,
+          "text": "struct SpokenAgent {"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/agent.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 46,
+          "text": "impl TryFrom<AgentDb> for Agent {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/onboarding.rs#complete",
+        "name": "complete",
+        "kind": "function",
+        "path": "src/adapters/persistence/onboarding.rs",
+        "span": "L107-L137"
+      },
+      "path": "src/adapters/persistence/onboarding.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 133,
+          "text": "results.push(OnboardedAgent { agent, channel });"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs#provisioning_lists_an_oversized_directory_within_its_bound",
+        "name": "provisioning_lists_an_oversized_directory_within_its_bound",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs",
+        "span": "L581-L616"
+      },
+      "path": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 588,
+          "text": "name: format!(\"Agent {index} {}\", \"n\".repeat(200)),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/provisioning.rs#AssistantAgent",
+        "name": "AssistantAgent",
+        "kind": "enum",
+        "path": "src/adapters/persistence/workflow/provisioning.rs",
+        "span": "L398-L403"
+      },
+      "path": "src/adapters/persistence/workflow/provisioning.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 398,
+          "text": "pub(crate) enum AssistantAgent {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/agent_tests.rs#a_library_pick_is_copied_into_the_company_with_a_model_it_can_run",
+        "name": "a_library_pick_is_copied_into_the_company_with_a_model_it_can_run",
+        "kind": "function",
+        "path": "src/application/use_cases/agent_tests.rs",
+        "span": "L558-L693"
+      },
+      "path": "src/application/use_cases/agent_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 575,
+          "text": "let definition = |name: &str, slug: &str, provider: &str, model: &str| Agent {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/agent.rs#ProvisionedAgent",
+        "name": "ProvisionedAgent",
+        "kind": "struct",
+        "path": "src/application/use_cases/agent.rs",
+        "span": "L141-L144"
+      },
+      "path": "src/application/use_cases/agent.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 141,
+          "text": "pub struct ProvisionedAgent {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/agent.rs#create_agent_from_library~2",
+        "name": "create_agent_from_library~2",
+        "kind": "function",
+        "path": "src/application/use_cases/agent.rs",
+        "span": "L337-L374"
+      },
+      "path": "src/application/use_cases/agent.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 373,
+          "text": "Ok(ProvisionedAgent { agent, warnings })"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/onboarding.rs#PreparedAgent",
+        "name": "PreparedAgent",
+        "kind": "struct",
+        "path": "src/application/use_cases/onboarding.rs",
+        "span": "L62-L66"
+      },
+      "path": "src/application/use_cases/onboarding.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 62,
+          "text": "pub struct PreparedAgent {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/onboarding.rs#OnboardedAgent",
+        "name": "OnboardedAgent",
+        "kind": "struct",
+        "path": "src/application/use_cases/onboarding.rs",
+        "span": "L74-L78"
+      },
+      "path": "src/application/use_cases/onboarding.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 74,
+          "text": "pub struct OnboardedAgent {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/onboarding.rs#SelectedAgent",
+        "name": "SelectedAgent",
+        "kind": "struct",
+        "path": "src/application/use_cases/onboarding.rs",
+        "span": "L245-L248"
+      },
+      "path": "src/application/use_cases/onboarding.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 245,
+          "text": "struct SelectedAgent {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/agent.rs#PreparedAgent",
+        "name": "PreparedAgent",
+        "kind": "struct",
+        "path": "src/application/workflow/agent.rs",
+        "span": "L96-L104"
+      },
+      "path": "src/application/workflow/agent.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 96,
+          "text": "pub struct PreparedAgent {"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/agent.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 106,
+          "text": "impl PreparedAgent {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/agent.rs#selection",
+        "name": "selection",
+        "kind": "function",
+        "path": "src/application/workflow/agent.rs",
+        "span": "L164-L166"
+      },
+      "path": "src/application/workflow/agent.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 164,
+          "text": "pub fn selection(&self) -> &ResolvedAgent {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/capabilities.rs#ResolvedAgent",
+        "name": "ResolvedAgent",
+        "kind": "struct",
+        "path": "src/application/workflow/publication/capabilities.rs",
+        "span": "L12-L17"
+      },
+      "path": "src/application/workflow/publication/capabilities.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 12,
+          "text": "pub struct ResolvedAgent {"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/publication/capabilities.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 19,
+          "text": "impl ResolvedAgent {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/agent.rs#Agent",
+        "name": "Agent",
+        "kind": "struct",
+        "path": "src/domain/entities/agent.rs",
+        "span": "L9-L26"
+      },
+      "path": "src/domain/entities/agent.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 9,
+          "text": "pub struct Agent {"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/domain/entities/agent.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 28,
+          "text": "impl Agent {"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 20,
+    "baselineChars": 527221
+  }
+}

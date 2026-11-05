@@ -1,5 +1,6 @@
 use super::*;
 use crate::adapters::persistence::workflow::{action_uncertainty, pending_recovery};
+use crate::application::agent::ActionRecovery;
 use crate::application::workflow::{budget::*, polling::WorkflowPolling};
 use crate::domain::workflow::{
     BudgetCharge, BudgetResource, FailureClass, FailureCode, RetrySafety, StepFailure,

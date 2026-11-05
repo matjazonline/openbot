@@ -1,12 +1,11 @@
 //! Drafts, publication, bindings, runs and template copies: revisions, keys and pages.
 use super::*;
+use crate::application::agent::{ActionEffect, ActionRecovery, ApprovedActionPolicy};
 use crate::application::workflow::WorkflowActor;
 use crate::application::workflow::http::{
     HttpConnectionWrite, HttpConnections, HttpOperation, HttpOrigin,
 };
-use crate::application::workflow::publication::{
-    ActionEffect, ActionRecovery, ApprovedActionPolicy, ToolSnapshot,
-};
+use crate::application::workflow::publication::ToolSnapshot;
 use crate::application::workflow::registry::ToolContract;
 use crate::domain::workflow::{CompanyId, TypeName};
 

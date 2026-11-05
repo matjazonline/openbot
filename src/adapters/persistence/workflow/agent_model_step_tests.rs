@@ -197,7 +197,7 @@ async fn workflow_model_steps_check_only_the_capabilities_they_use() {
     ))
     .await;
     let p = &setup.fixture.persistence;
-    sqlx::query("UPDATE agents SET workflow_tools='{}' WHERE id=$1")
+    sqlx::query("DELETE FROM agent_draft_bindings WHERE agent_id=$1")
         .bind(setup.agent)
         .execute(p.pool())
         .await

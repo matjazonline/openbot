@@ -71,10 +71,14 @@ fn adapter(f: &AdmissionFixture, mode: u8) -> Dispatch {
     PostgresActionDispatch::new(f.persistence().clone(), Authority, Effect(mode))
 }
 async fn setup() -> (AdmissionFixture, ActionDispatchRequest) {
-    setup_action(publication::ActionRecovery::Reconcile, json!({"value":1})).await
+    setup_action(
+        crate::application::agent::ActionRecovery::Reconcile,
+        json!({"value":1}),
+    )
+    .await
 }
 async fn setup_action(
-    recovery: publication::ActionRecovery,
+    recovery: crate::application::agent::ActionRecovery,
     arguments: Value,
 ) -> (AdmissionFixture, ActionDispatchRequest) {
     let (f, scope) = fixture().await;
@@ -84,7 +88,7 @@ async fn setup_action(
 async fn setup_action_on_fixture(
     f: AdmissionFixture,
     scope: ActivationRequest,
-    recovery: publication::ActionRecovery,
+    recovery: crate::application::agent::ActionRecovery,
     arguments: Value,
 ) -> (AdmissionFixture, ActionDispatchRequest) {
     let claim = f
@@ -100,7 +104,7 @@ async fn setup_action_on_fixture(
 async fn setup_action_on_claim(
     f: AdmissionFixture,
     claim: ClaimedWorkflow,
-    recovery: publication::ActionRecovery,
+    recovery: crate::application::agent::ActionRecovery,
     arguments: Value,
 ) -> (AdmissionFixture, ActionDispatchRequest) {
     sqlx::raw_sql("CREATE TABLE fixture_action_resources(company_id uuid PRIMARY KEY,enabled bool NOT NULL); CREATE TABLE fixture_action_policies(company_id uuid PRIMARY KEY,enabled bool NOT NULL,approval bool NOT NULL,tool jsonb NOT NULL); CREATE TABLE fixture_action_effects(execution_id uuid PRIMARY KEY);")
@@ -111,7 +115,7 @@ async fn setup_action_on_claim(
 async fn initialize_action_on_claim(
     f: AdmissionFixture,
     claim: ClaimedWorkflow,
-    recovery: publication::ActionRecovery,
+    recovery: crate::application::agent::ActionRecovery,
     arguments: Value,
 ) -> (AdmissionFixture, ActionDispatchRequest) {
     let scope = claim.fence.scope;

@@ -122,12 +122,17 @@ async fn configure(d: &Deployment, audience: Audience) {
         .execute(d.p().pool())
         .await
         .unwrap();
-    sqlx::query(
-        "UPDATE agents SET workflow_tools=ARRAY[$2] WHERE company_id=$1 AND slug='assistant'",
+    let agent =
+        sqlx::query_scalar("SELECT id FROM agents WHERE company_id=$1 AND slug='assistant'")
+            .bind(d.fixture.target.company.as_uuid())
+            .fetch_one(d.p().pool())
+            .await
+            .unwrap();
+    crate::adapters::persistence::agent_capability::assign_test_tool_names(
+        d.p(),
+        agent,
+        &[crate::application::workflow::knowledge::SEARCH_KNOWLEDGE],
     )
-    .bind(d.fixture.target.company.as_uuid())
-    .bind(crate::application::workflow::knowledge::SEARCH_KNOWLEDGE)
-    .execute(d.p().pool())
     .await
     .unwrap();
     ChannelPersistence::update(

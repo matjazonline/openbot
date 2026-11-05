@@ -1,0 +1,15 @@
+database=postgres exit=0
+
+database=auto_p01_g1r3_probe_dc187a9e15a8 exit=0
+
+left barrier: activation_inserted_uncommitted
+database=auto_p01_g1r3_probe_dc187a9e15a8 exit=0
+
+left commit exit=0
+
+database=auto_p01_g1r3_probe_dc187a9e15a8 exit=0
+t|t
+
+REPRODUCED: both transactions committed; grant revoked=true, operation active=true. FOR KEY SHARE did not serialize status revocation.
+database=postgres exit=0
+

@@ -7,7 +7,6 @@ use uuid::Uuid;
 use crate::{
     app_error::AppResult,
     application::workflow::provisioning::{CREATE_AGENT_CHANNEL, LIST_COMPANY_AGENTS},
-    domain::workflow::TypeName,
     entities::creation::CreationProvenance,
     use_cases::agent::AgentWrite,
 };
@@ -68,10 +67,15 @@ pub fn agent_builder_definition() -> BuiltinAgentDefinition {
                 "Designs and creates focused company agents from a guided conversation.".into(),
             ),
             system_prompt: Some(AGENT_BUILDER_PROMPT.into()),
-            workflow_tools: Some(
+            tool_bindings: Some(
                 [LIST_COMPANY_AGENTS, CREATE_AGENT_CHANNEL]
                     .into_iter()
-                    .map(|name| TypeName::parse(name).expect("built-in tool name"))
+                    .map(|name| {
+                        crate::entities::agent_capability::AgentToolBinding::builtin(
+                            crate::entities::agent_capability::AgentBuiltinTool::parse(name)
+                                .expect("built-in tool name"),
+                        )
+                    })
                     .collect(),
             ),
             created_by: Some(CreationProvenance::system()),
@@ -125,10 +129,10 @@ mod tests {
         let definition = agent_builder_definition();
         let grants: Vec<_> = definition
             .write
-            .workflow_tools
+            .tool_bindings
             .unwrap()
             .iter()
-            .map(|name| name.as_str().to_owned())
+            .map(|binding| binding.alias.as_str().to_owned())
             .collect();
         assert_eq!(grants, [LIST_COMPANY_AGENTS, CREATE_AGENT_CHANNEL]);
         let prompt = definition.write.system_prompt.unwrap();

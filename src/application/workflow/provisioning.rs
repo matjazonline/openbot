@@ -7,13 +7,12 @@
 //! built-in approval (P08-Q5); a deployment that wants one puts a `decision.human` step in its
 //! workflow.
 use crate::app_error::{AppError, AppResult};
+use crate::application::agent::{ActionEffect, ActionRecovery, ApprovedActionPolicy};
 use crate::application::workflow::actions::*;
 use crate::application::workflow::agent::AgentToolObservation;
 use crate::application::workflow::compiler::{Schema, SourceSpan};
 use crate::application::workflow::lease::{LeasePolicy, WorkflowFence};
-use crate::application::workflow::publication::{
-    ActionEffect, ActionRecovery, ApprovedActionPolicy, ToolSnapshot,
-};
+use crate::application::workflow::publication::ToolSnapshot;
 use crate::application::workflow::registry::ToolContract;
 use crate::application::workflow::templates::{AgentWorkflow, CustomStep, MAX_CUSTOM_STEPS};
 use crate::application::workflow::tools::tool_error;

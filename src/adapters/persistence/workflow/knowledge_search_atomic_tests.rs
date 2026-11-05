@@ -290,7 +290,7 @@ async fn knowledge_search_busy_model_is_retryable_without_saving_an_empty_observ
 async fn knowledge_search_current_grant_revocation_blocks_saved_invocation_before_embedding() {
     let f = Box::pin(SearchFixture::new(AccessLevel::L5)).await;
     let call = f.prepare(json!({"query":"floor"})).await;
-    sqlx::query("UPDATE agents SET workflow_tools='{}' WHERE id=$1")
+    sqlx::query("DELETE FROM agent_draft_bindings WHERE agent_id=$1")
         .bind(f.agent)
         .execute(f.p().pool())
         .await

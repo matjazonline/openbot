@@ -1,0 +1,96 @@
+[
+  {
+    "name": "WB1-F1-storage",
+    "argv": [
+      "scripts/test-network-isolation.sh",
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "autonomous_agent_storage_"
+    ],
+    "extra_env": {},
+    "selected": 16,
+    "exit_code": 0
+  },
+  {
+    "name": "WB1-F1-skills",
+    "argv": [
+      "scripts/test-network-isolation.sh",
+      "/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p01/target/debug/deps/open_bots-c19a0b960dacdcef",
+      "--exact",
+      "adapters::persistence::skill::tests::a_capability_snapshot_never_mixes_an_agent_row_with_a_different_relationship_version",
+      "adapters::persistence::skill::tests::a_company_skill_round_trips",
+      "adapters::persistence::skill::tests::a_stored_skill_the_domain_refuses_is_a_contextual_conversion_error",
+      "adapters::persistence::skill::tests::another_companys_skill_is_not_readable_updatable_or_deletable",
+      "adapters::persistence::skill::tests::capability_selection_is_scoped_and_updates_atomically",
+      "adapters::persistence::skill::tests::copied_slugs_stay_bounded",
+      "adapters::persistence::skill::tests::copying_a_library_skill_produces_a_company_owned_row_and_preserves_the_source",
+      "adapters::persistence::skill::tests::database_bounds_skill_positions",
+      "adapters::persistence::skill::tests::database_scope_trigger_refuses_live_cross_library_skill_links",
+      "adapters::persistence::skill::tests::deleting_an_in_use_library_skill_is_refused",
+      "adapters::persistence::skill::tests::deleting_either_side_cascades_a_company_agent_skill_selection",
+      "adapters::persistence::skill::tests::picking_a_library_agent_copies_its_skills_with_the_agent_and_channel",
+      "adapters::persistence::skill::tests::two_competing_library_skill_copies_receive_distinct_slugs"
+    ],
+    "extra_env": {},
+    "selected": 13,
+    "exit_code": 0
+  },
+  {
+    "name": "WB1-F1-sqlx",
+    "argv": [
+      "cargo",
+      "sqlx",
+      "prepare",
+      "--",
+      "--all-targets"
+    ],
+    "extra_env": {
+      "SQLX_OFFLINE": "false"
+    },
+    "selected": null,
+    "exit_code": 0
+  },
+  {
+    "name": "WB1-F1-clippy",
+    "argv": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "--offline",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "extra_env": {},
+    "selected": null,
+    "exit_code": 0
+  },
+  {
+    "name": "WB1-F1-fmt",
+    "argv": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--",
+      "--check"
+    ],
+    "extra_env": {},
+    "selected": null,
+    "exit_code": 0
+  },
+  {
+    "name": "WB1-F1-diff",
+    "argv": [
+      "git",
+      "diff",
+      "--check"
+    ],
+    "extra_env": {},
+    "selected": null,
+    "exit_code": 0
+  }
+]

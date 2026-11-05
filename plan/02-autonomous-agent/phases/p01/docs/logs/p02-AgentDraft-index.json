@@ -1,0 +1,811 @@
+{
+  "pattern": "AgentDraft",
+  "filesSearched": 1283,
+  "totalHits": 59,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/tests.rs#settings_agent",
+        "name": "settings_agent",
+        "kind": "function",
+        "path": "src/adapters/http/pages/tests.rs",
+        "span": "L1379-L1394"
+      },
+      "path": "src/adapters/http/pages/tests.rs",
+      "inDegree": 9,
+      "hits": [
+        {
+          "line": 1381,
+          "text": "draft_revision: crate::entities::agent_capability::AgentDraftRevision::new(1).unwrap(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/agent_settings.rs#library_agent_fields",
+        "name": "library_agent_fields",
+        "kind": "function",
+        "path": "src/adapters/http/pages/agent_settings.rs",
+        "span": "L547-L549"
+      },
+      "path": "src/adapters/http/pages/agent_settings.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 547,
+          "text": "pub fn library_agent_fields(draft: &AgentDraft<'_>, agent_id: Option<Uuid>) -> String {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/agent_settings.rs#library_agent_fields_with_capabilities",
+        "name": "library_agent_fields_with_capabilities",
+        "kind": "function",
+        "path": "src/adapters/http/pages/agent_settings.rs",
+        "span": "L551-L563"
+      },
+      "path": "src/adapters/http/pages/agent_settings.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 552,
+          "text": "draft: &AgentDraft<'_>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/onboarding.rs#onboarding_channel_draft_page",
+        "name": "onboarding_channel_draft_page",
+        "kind": "function",
+        "path": "src/adapters/http/pages/onboarding.rs",
+        "span": "L107-L146"
+      },
+      "path": "src/adapters/http/pages/onboarding.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 111,
+          "text": "draft: &OnboardingAgentDraft<'_>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/onboarding.rs#onboarding_channel_page",
+        "name": "onboarding_channel_page",
+        "kind": "function",
+        "path": "src/adapters/http/pages/onboarding.rs",
+        "span": "L89-L105"
+      },
+      "path": "src/adapters/http/pages/onboarding.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 99,
+          "text": "&OnboardingAgentDraft {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_agents.rs#draft",
+        "name": "draft",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui_agents.rs",
+        "span": "L764-L782"
+      },
+      "path": "src/adapters/http/routes/ui_agents.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 764,
+          "text": "pub(super) fn draft(&self) -> pages::AgentDraft<'_> {"
+        },
+        {
+          "line": 771,
+          "text": "pages::AgentDraft {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/agent.rs#try_from",
+        "name": "try_from",
+        "kind": "function",
+        "path": "src/adapters/persistence/agent.rs",
+        "span": "L50-L72"
+      },
+      "path": "src/adapters/persistence/agent.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 56,
+          "text": "crate::entities::agent_capability::AgentDraftRevision::new(value).ok()"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/agent_tests.rs#create",
+        "name": "create",
+        "kind": "function",
+        "path": "src/application/use_cases/agent_tests.rs",
+        "span": "L36-L53"
+      },
+      "path": "src/application/use_cases/agent_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 38,
+          "text": "draft_revision: crate::entities::agent_capability::AgentDraftRevision::new(1).unwrap(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/agent_settings.rs#skill_picker",
+        "name": "skill_picker",
+        "kind": "function",
+        "path": "src/adapters/http/pages/agent_settings.rs",
+        "span": "L675-L714"
+      },
+      "path": "src/adapters/http/pages/agent_settings.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 675,
+          "text": "fn skill_picker(skills: &[Skill], draft: &AgentDraft<'_>, scope: AgentFormScope) -> String {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/agent_settings.rs#company_model_selection",
+        "name": "company_model_selection",
+        "kind": "function",
+        "path": "src/adapters/http/pages/agent_settings.rs",
+        "span": "L716-L774"
+      },
+      "path": "src/adapters/http/pages/agent_settings.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 718,
+          "text": "draft: &AgentDraft<'_>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/agent_settings.rs#stored_draft",
+        "name": "stored_draft",
+        "kind": "function",
+        "path": "src/adapters/http/pages/agent_settings.rs",
+        "span": "L876-L892"
+      },
+      "path": "src/adapters/http/pages/agent_settings.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 876,
+          "text": "fn stored_draft(agent: &Agent) -> AgentDraft<'_> {"
+        },
+        {
+          "line": 877,
+          "text": "AgentDraft {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/onboarding.rs#create_agents",
+        "name": "create_agents",
+        "kind": "function",
+        "path": "src/adapters/http/routes/onboarding.rs",
+        "span": "L227-L274"
+      },
+      "path": "src/adapters/http/routes/onboarding.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 250,
+          "text": "&pages::OnboardingAgentDraft {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/onboarding.rs#library_agent",
+        "name": "library_agent",
+        "kind": "function",
+        "path": "src/adapters/http/routes/onboarding.rs",
+        "span": "L403-L418"
+      },
+      "path": "src/adapters/http/routes/onboarding.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 405,
+          "text": "draft_revision: crate::entities::agent_capability::AgentDraftRevision::new(1).unwrap(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_agents.rs#library_rejected",
+        "name": "library_rejected",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui_agents.rs",
+        "span": "L617-L627"
+      },
+      "path": "src/adapters/http/routes/ui_agents.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 620,
+          "text": "draft: &pages::AgentDraft::default(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/agent_settings.rs#AgentDraft",
+        "name": "AgentDraft",
+        "kind": "struct",
+        "path": "src/adapters/http/pages/agent_settings.rs",
+        "span": "L69-L82"
+      },
+      "path": "src/adapters/http/pages/agent_settings.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 69,
+          "text": "pub struct AgentDraft<'a> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/agent_settings.rs#AgentEditPane",
+        "name": "AgentEditPane",
+        "kind": "struct",
+        "path": "src/adapters/http/pages/agent_settings.rs",
+        "span": "L85-L94"
+      },
+      "path": "src/adapters/http/pages/agent_settings.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 91,
+          "text": "pub draft: Option<&'a AgentDraft<'a>>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/agent_settings.rs#AgentCreatePane",
+        "name": "AgentCreatePane",
+        "kind": "struct",
+        "path": "src/adapters/http/pages/agent_settings.rs",
+        "span": "L113-L125"
+      },
+      "path": "src/adapters/http/pages/agent_settings.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 122,
+          "text": "pub draft: &'a AgentDraft<'a>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/agent_settings.rs#AgentFields",
+        "name": "AgentFields",
+        "kind": "struct",
+        "path": "src/adapters/http/pages/agent_settings.rs",
+        "span": "L531-L539"
+      },
+      "path": "src/adapters/http/pages/agent_settings.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 536,
+          "text": "draft: &'a AgentDraft<'a>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/agent_settings.rs#agent_avatar_field",
+        "name": "agent_avatar_field",
+        "kind": "function",
+        "path": "src/adapters/http/pages/agent_settings.rs",
+        "span": "L780-L790"
+      },
+      "path": "src/adapters/http/pages/agent_settings.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 780,
+          "text": "fn agent_avatar_field(id_prefix: &str, draft: &AgentDraft<'_>) -> String {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/agent_settings.rs#the_agent_form_offers_no_tool_grants_or_harness_choice",
+        "name": "the_agent_form_offers_no_tool_grants_or_harness_choice",
+        "kind": "function",
+        "path": "src/adapters/http/pages/agent_settings.rs",
+        "span": "L916-L921"
+      },
+      "path": "src/adapters/http/pages/agent_settings.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 917,
+          "text": "let html = library_agent_fields(&AgentDraft::default(), None);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/agent_settings.rs#a_library_agent_picker_offers_only_global_skills",
+        "name": "a_library_agent_picker_offers_only_global_skills",
+        "kind": "function",
+        "path": "src/adapters/http/pages/agent_settings.rs",
+        "span": "L924-L935"
+      },
+      "path": "src/adapters/http/pages/agent_settings.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 929,
+          "text": "&AgentDraft::default(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/onboarding.rs#OnboardingAgentDraft",
+        "name": "OnboardingAgentDraft",
+        "kind": "struct",
+        "path": "src/adapters/http/pages/onboarding.rs",
+        "span": "L82-L87"
+      },
+      "path": "src/adapters/http/pages/onboarding.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 82,
+          "text": "pub struct OnboardingAgentDraft<'a> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/tests.rs#library_agent_fields_reuse_the_advanced_editor_and_avatar_picker",
+        "name": "library_agent_fields_reuse_the_advanced_editor_and_avatar_picker",
+        "kind": "function",
+        "path": "src/adapters/http/pages/tests.rs",
+        "span": "L94-L109"
+      },
+      "path": "src/adapters/http/pages/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 96,
+          "text": "&AgentDraft {"
+        },
+        {
+          "line": 99,
+          "text": "..AgentDraft::default()"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/tests.rs#agent_edit_pane_keeps_a_rejected_save_in_the_form",
+        "name": "agent_edit_pane_keeps_a_rejected_save_in_the_form",
+        "kind": "function",
+        "path": "src/adapters/http/pages/tests.rs",
+        "span": "L1118-L1147"
+      },
+      "path": "src/adapters/http/pages/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1121,
+          "text": "let draft = AgentDraft {"
+        },
+        {
+          "line": 1126,
+          "text": "..AgentDraft::default()"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/tests.rs#prompt_generator_names_the_pane_it_answers_into",
+        "name": "prompt_generator_names_the_pane_it_answers_into",
+        "kind": "function",
+        "path": "src/adapters/http/pages/tests.rs",
+        "span": "L1150-L1194"
+      },
+      "path": "src/adapters/http/pages/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1187,
+          "text": "draft: &AgentDraft::default(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/tests.rs#the_easy_tab_creates_the_picked_library_agents",
+        "name": "the_easy_tab_creates_the_picked_library_agents",
+        "kind": "function",
+        "path": "src/adapters/http/pages/tests.rs",
+        "span": "L1220-L1272"
+      },
+      "path": "src/adapters/http/pages/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1223,
+          "text": "draft_revision: crate::entities::agent_capability::AgentDraftRevision::new(1).unwrap(),"
+        },
+        {
+          "line": 1229,
+          "text": "draft_revision: crate::entities::agent_capability::AgentDraftRevision::new(1).unwrap(),"
+        },
+        {
+          "line": 1240,
+          "text": "draft: &AgentDraft::default(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/tests.rs#an_empty_library_leaves_no_easy_tab_to_open",
+        "name": "an_empty_library_leaves_no_easy_tab_to_open",
+        "kind": "function",
+        "path": "src/adapters/http/pages/tests.rs",
+        "span": "L1275-L1292"
+      },
+      "path": "src/adapters/http/pages/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1284,
+          "text": "draft: &AgentDraft::default(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/tests.rs#agent_create_pane_opens_on_the_tab_that_was_submitted",
+        "name": "agent_create_pane_opens_on_the_tab_that_was_submitted",
+        "kind": "function",
+        "path": "src/adapters/http/pages/tests.rs",
+        "span": "L1295-L1342"
+      },
+      "path": "src/adapters/http/pages/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1305,
+          "text": "draft: &AgentDraft {"
+        },
+        {
+          "line": 1308,
+          "text": "..AgentDraft::default()"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/tests.rs#each_agent_form_owns_its_own_picker",
+        "name": "each_agent_form_owns_its_own_picker",
+        "kind": "function",
+        "path": "src/adapters/http/pages/tests.rs",
+        "span": "L3510-L3549"
+      },
+      "path": "src/adapters/http/pages/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 3522,
+          "text": "draft: &AgentDraft::default(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/agent_library.rs#workspace",
+        "name": "workspace",
+        "kind": "function",
+        "path": "src/adapters/http/routes/agent_library.rs",
+        "span": "L263-L347"
+      },
+      "path": "src/adapters/http/routes/agent_library.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 290,
+          "text": "let draft = pages::AgentDraft {"
+        },
+        {
+          "line": 316,
+          "text": "&pages::AgentDraft {"
+        },
+        {
+          "line": 318,
+          "text": "..pages::AgentDraft::default()"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/agent.rs#agent_pages_and_fragments_render_correctly",
+        "name": "agent_pages_and_fragments_render_correctly",
+        "kind": "function",
+        "path": "src/adapters/http/routes/agent.rs",
+        "span": "L761-L804"
+      },
+      "path": "src/adapters/http/routes/agent.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 773,
+          "text": "draft_revision: crate::entities::agent_capability::AgentDraftRevision::new(1).unwrap(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/onboarding.rs#onboarding_pages_render_each_step",
+        "name": "onboarding_pages_render_each_step",
+        "kind": "function",
+        "path": "src/adapters/http/routes/onboarding.rs",
+        "span": "L421-L562"
+      },
+      "path": "src/adapters/http/routes/onboarding.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 469,
+          "text": "&pages::OnboardingAgentDraft {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_agents.rs#agents_page",
+        "name": "agents_page",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui_agents.rs",
+        "span": "L170-L229"
+      },
+      "path": "src/adapters/http/routes/ui_agents.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 207,
+          "text": "draft: &pages::AgentDraft::default(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_agents.rs#create_pane",
+        "name": "create_pane",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui_agents.rs",
+        "span": "L233-L249"
+      },
+      "path": "src/adapters/http/routes/ui_agents.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 242,
+          "text": "draft: &pages::AgentDraft::default(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_agents.rs#CreateForm",
+        "name": "CreateForm",
+        "kind": "struct",
+        "path": "src/adapters/http/routes/ui_agents.rs",
+        "span": "L507-L514"
+      },
+      "path": "src/adapters/http/routes/ui_agents.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 508,
+          "text": "draft: &'a pages::AgentDraft<'a>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_agents.rs#edit_pane~2",
+        "name": "edit_pane~2",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui_agents.rs",
+        "span": "L630-L674"
+      },
+      "path": "src/adapters/http/routes/ui_agents.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 633,
+          "text": "draft: Option<&pages::AgentDraft<'_>>,"
+        },
+        {
+          "line": 648,
+          "text": "let stored = pages::AgentDraft {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/agent/contract_tests.rs#autonomous_agent_contract_manifest_is_canonical_unique_bounded_identity_content",
+        "name": "autonomous_agent_contract_manifest_is_canonical_unique_bounded_identity_content",
+        "kind": "function",
+        "path": "src/application/agent/contract_tests.rs",
+        "span": "L192-L227"
+      },
+      "path": "src/application/agent/contract_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 219,
+          "text": "assert!(AgentDraftRevision::new(0).is_err());"
+        },
+        {
+          "line": 220,
+          "text": "assert!(AgentDraftRevision::new(i64::MAX as u64 + 1).is_err());"
+        },
+        {
+          "line": 222,
+          "text": "serde_json::from_str::<AgentDraftRevision>(\"1\")"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/agent/definition.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 4,
+          "text": "AgentDraftRevision, AgentId, AgentSkillAssignmentId, AgentToolBinding, validate_agent_bindings,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/agent/definition.rs#AgentDraft",
+        "name": "AgentDraft",
+        "kind": "struct",
+        "path": "src/application/agent/definition.rs",
+        "span": "L17-L26"
+      },
+      "path": "src/application/agent/definition.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 17,
+          "text": "pub struct AgentDraft {"
+        },
+        {
+          "line": 20,
+          "text": "pub revision: AgentDraftRevision,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/agent_tests.rs#a_library_pick_is_copied_into_the_company_with_a_model_it_can_run",
+        "name": "a_library_pick_is_copied_into_the_company_with_a_model_it_can_run",
+        "kind": "function",
+        "path": "src/application/use_cases/agent_tests.rs",
+        "span": "L559-L695"
+      },
+      "path": "src/application/use_cases/agent_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 577,
+          "text": "draft_revision: crate::entities::agent_capability::AgentDraftRevision::new(1).unwrap(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/agent_capability.rs#AgentDraftRevision",
+        "name": "AgentDraftRevision",
+        "kind": "struct",
+        "path": "src/domain/entities/agent_capability.rs",
+        "span": "L34-L34"
+      },
+      "path": "src/domain/entities/agent_capability.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 34,
+          "text": "pub struct AgentDraftRevision(u64);"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/domain/entities/agent_capability.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 35,
+          "text": "impl AgentDraftRevision {"
+        },
+        {
+          "line": 46,
+          "text": "impl TryFrom<u64> for AgentDraftRevision {"
+        },
+        {
+          "line": 52,
+          "text": "impl From<AgentDraftRevision> for u64 {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/agent_capability.rs#from",
+        "name": "from",
+        "kind": "function",
+        "path": "src/domain/entities/agent_capability.rs",
+        "span": "L53-L55"
+      },
+      "path": "src/domain/entities/agent_capability.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 53,
+          "text": "fn from(value: AgentDraftRevision) -> Self {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/agent.rs#Agent",
+        "name": "Agent",
+        "kind": "struct",
+        "path": "src/domain/entities/agent.rs",
+        "span": "L9-L27"
+      },
+      "path": "src/domain/entities/agent.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 11,
+          "text": "pub draft_revision: super::agent_capability::AgentDraftRevision,"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 13,
+    "baselineChars": 403275
+  }
+}

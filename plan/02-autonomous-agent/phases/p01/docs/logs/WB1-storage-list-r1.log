@@ -1,0 +1,14 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p01)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 42s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-c19a0b960dacdcef)
+adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::draft_tests::autonomous_agent_storage_competing_writers_cannot_retarget_a_binding_identity: test
+adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::draft_tests::autonomous_agent_storage_draft_round_trip_order_and_live_grants_are_independent: test
+adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::draft_tests::autonomous_agent_storage_native_scope_kind_and_reserved_alias_constraints: test
+adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::manifest_tests::autonomous_agent_storage_manifest_retention_races_preserve_surviving_revisions: test
+adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::manifest_tests::autonomous_agent_storage_manifest_seals_selection_and_accepts_only_its_tree: test
+adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::revision_tests::autonomous_agent_storage_revision_round_trip_seals_members_and_active_owner: test
+adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::revision_tests::autonomous_agent_storage_skill_incarnations_and_sealed_revision_assignments: test
+adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::targets_tests::autonomous_agent_storage_external_targets_round_trip_and_revoke_without_aba: test
+adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::targets_tests::autonomous_agent_storage_workflow_pin_survives_repin_and_revocation_is_permanent: test
+
+9 tests, 0 benchmarks

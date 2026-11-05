@@ -227,7 +227,7 @@ pub(super) async fn agent_write_from_instructions(
 
     Ok(AgentWrite {
         // Workflow tool grants are edited in phase 09; keep the stored list.
-        workflow_tools: None,
+        tool_bindings: None,
         name: request.name.to_string(),
         slug: request.slug.to_string(),
         provider: request.overrides.provider.map(str::to_string),
@@ -289,7 +289,7 @@ async fn create_agent_handler(
                 company_id,
                 AgentWrite {
                     // Workflow tool grants are edited in phase 09; keep the stored list.
-                    workflow_tools: None,
+                    tool_bindings: None,
                     name: form.name.clone(),
                     slug: form.slug(),
                     provider: form.provider.clone(),
@@ -414,7 +414,7 @@ async fn update_agent_handler(
                 agent_id,
                 AgentWrite {
                     // Workflow tool grants are edited in phase 09; keep the stored list.
-                    workflow_tools: None,
+                    tool_bindings: None,
                     name: form.name.clone(),
                     slug: form.slug(),
                     provider: form.provider.clone(),
@@ -492,7 +492,7 @@ async fn create_agent_json(
             company_id,
             AgentWrite {
                 // Workflow tool grants are edited in phase 09; keep the stored list.
-                workflow_tools: None,
+                tool_bindings: None,
                 name: payload.name.clone(),
                 slug: payload.slug.clone(),
                 provider: payload.provider.clone(),
@@ -564,7 +564,7 @@ async fn update_agent_json(
             agent_id,
             AgentWrite {
                 // Workflow tool grants are edited in phase 09; keep the stored list.
-                workflow_tools: None,
+                tool_bindings: None,
                 name: payload.name.clone(),
                 slug: payload.slug.clone(),
                 provider: payload.provider.clone(),
@@ -770,6 +770,7 @@ mod tests {
         };
 
         let agent = Agent {
+            draft_revision: crate::entities::agent_capability::AgentDraftRevision::new(1).unwrap(),
             id: Uuid::new_v4(),
             company_id: Some(company.id),
             name: "Support Agent".to_string(),

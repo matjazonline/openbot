@@ -8,6 +8,7 @@ pub const MAX_AGENT_SKILLS: usize = 16;
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Agent {
     pub id: Uuid,
+    pub draft_revision: super::agent_capability::AgentDraftRevision,
     /// `None` identifies an operator-managed definition in the global agent library.
     #[serde(default)]
     pub company_id: Option<Uuid>,

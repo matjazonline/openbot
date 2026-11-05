@@ -1,4 +1,5 @@
 use super::*;
+use crate::application::agent::ActionRecovery;
 
 async fn observation(
     db: &mut PgConnection,

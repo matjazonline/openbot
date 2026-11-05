@@ -200,7 +200,16 @@ impl ToolSetup {
                 provider: Some(SCRIPTED_PROVIDER.into()),
                 model: Some(SCRIPTED_MODEL.into()),
                 system_prompt: Some("Ask the refund review, then answer.".into()),
-                workflow_tools: Some(vec![TypeName::parse(TOOL).unwrap()]),
+                tool_bindings: Some(
+                    crate::adapters::persistence::agent_binding_selection::resolve_bindings_on(
+                        &mut p.pool().acquire().await.unwrap(),
+                        company.as_uuid(),
+                        None,
+                        &[TypeName::parse(TOOL).unwrap()],
+                    )
+                    .await
+                    .unwrap(),
+                ),
                 ..Default::default()
             },
         )

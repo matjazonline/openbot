@@ -41,8 +41,8 @@ pub struct AgentWrite {
     pub system_prompt: Option<String>,
     /// Short statement of what the agent is for, read by the agent directory tool.
     pub description: Option<String>,
-    /// Ordered workflow tool grants (06-D5). `None` keeps the stored list on update.
-    pub workflow_tools: Option<Vec<crate::domain::workflow::TypeName>>,
+    /// Ordered concrete capability bindings. `None` preserves the draft's bindings on update.
+    pub tool_bindings: Option<Vec<crate::entities::agent_capability::AgentToolBinding>>,
     pub skill_ids: Vec<Uuid>,
     pub avatar_url: Option<AvatarUrl>,
     pub created_by: Option<CreationProvenance>,
@@ -76,7 +76,10 @@ impl AgentWrite {
             }
         }
 
-        validate_workflow_names(self.workflow_tools.as_deref(), "workflow tools")?;
+        if let Some(bindings) = &self.tool_bindings {
+            crate::entities::agent_capability::validate_agent_bindings(bindings)
+                .map_err(AppError::BadRequest)?;
+        }
         deduplicate(&mut self.skill_ids);
         if self.skill_ids.len() > MAX_AGENT_SKILLS {
             return Err(AppError::BadRequest(format!(
@@ -190,7 +193,7 @@ pub enum LibraryCopyModel {
 /// tool grants are copied with its skills, in the creating transaction.
 pub(super) fn library_agent_write(definition: &Agent) -> AgentWrite {
     AgentWrite {
-        workflow_tools: None,
+        tool_bindings: None,
         name: definition.name.clone(),
         slug: definition.slug.clone(),
         provider: definition.provider.clone(),

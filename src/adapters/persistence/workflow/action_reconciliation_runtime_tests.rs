@@ -1,6 +1,6 @@
 //! Genuine supported-provider truth, mixed-policy siblings and live conflict gates.
 use super::*;
-use crate::application::workflow::publication::ActionRecovery;
+use crate::application::agent::ActionRecovery;
 
 #[path = "action_reconciliation_consumption_identity_tests.rs"]
 mod consumption_identity_tests;

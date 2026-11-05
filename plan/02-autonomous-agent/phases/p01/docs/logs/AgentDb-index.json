@@ -1,0 +1,224 @@
+{
+  "pattern": "AgentDb",
+  "filesSearched": 1280,
+  "totalHits": 13,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/agent.rs#try_from",
+        "name": "try_from",
+        "kind": "function",
+        "path": "src/adapters/persistence/agent.rs",
+        "span": "L49-L65"
+      },
+      "path": "src/adapters/persistence/agent.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 49,
+          "text": "fn try_from(db: AgentDb) -> AppResult<Self> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/agent.rs#update_agent",
+        "name": "update_agent",
+        "kind": "function",
+        "path": "src/adapters/persistence/agent.rs",
+        "span": "L249-L284"
+      },
+      "path": "src/adapters/persistence/agent.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 264,
+          "text": "let db = sqlx::query_as::<_, AgentDb>(&format!("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/agent.rs#create",
+        "name": "create",
+        "kind": "function",
+        "path": "src/adapters/persistence/agent.rs",
+        "span": "L300-L313"
+      },
+      "path": "src/adapters/persistence/agent.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 305,
+          "text": "let db = sqlx::query_as::<_, AgentDb>(&format!("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/agent.rs#get_by_id",
+        "name": "get_by_id",
+        "kind": "function",
+        "path": "src/adapters/persistence/agent.rs",
+        "span": "L329-L339"
+      },
+      "path": "src/adapters/persistence/agent.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 330,
+          "text": "let db = sqlx::query_as::<_, AgentDb>(&format!("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/agent.rs#list_by_company_id",
+        "name": "list_by_company_id",
+        "kind": "function",
+        "path": "src/adapters/persistence/agent.rs",
+        "span": "L341-L352"
+      },
+      "path": "src/adapters/persistence/agent.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 342,
+          "text": "let db_list = sqlx::query_as::<_, AgentDb>(&format!("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/onboarding.rs#existing_agents",
+        "name": "existing_agents",
+        "kind": "function",
+        "path": "src/adapters/persistence/onboarding.rs",
+        "span": "L88-L100"
+      },
+      "path": "src/adapters/persistence/onboarding.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 89,
+          "text": "sqlx::query_as::<_, AgentDb>(&format!("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/agent.rs#AgentDb",
+        "name": "AgentDb",
+        "kind": "struct",
+        "path": "src/adapters/persistence/agent.rs",
+        "span": "L26-L38"
+      },
+      "path": "src/adapters/persistence/agent.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 26,
+          "text": "pub struct AgentDb {"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/agent.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 46,
+          "text": "impl TryFrom<AgentDb> for Agent {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/agent.rs#create_library",
+        "name": "create_library",
+        "kind": "function",
+        "path": "src/adapters/persistence/agent.rs",
+        "span": "L315-L327"
+      },
+      "path": "src/adapters/persistence/agent.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 319,
+          "text": "let db = sqlx::query_as::<_, AgentDb>(&format!("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/agent.rs#list_library",
+        "name": "list_library",
+        "kind": "function",
+        "path": "src/adapters/persistence/agent.rs",
+        "span": "L354-L363"
+      },
+      "path": "src/adapters/persistence/agent.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 355,
+          "text": "let rows = sqlx::query_as::<_, AgentDb>(&format!("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/agent.rs#load_capabilities",
+        "name": "load_capabilities",
+        "kind": "function",
+        "path": "src/adapters/persistence/agent.rs",
+        "span": "L430-L472"
+      },
+      "path": "src/adapters/persistence/agent.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 440,
+          "text": "let row = sqlx::query_as::<_, AgentDb>(&format!("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/agent.rs#malformed_provenance_is_a_conversion_error_not_a_panic",
+        "name": "malformed_provenance_is_a_conversion_error_not_a_panic",
+        "kind": "function",
+        "path": "src/adapters/persistence/agent.rs",
+        "span": "L488-L505"
+      },
+      "path": "src/adapters/persistence/agent.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 489,
+          "text": "let db = AgentDb {"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/onboarding.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 8,
+          "text": "agent::{AGENT_COLUMNS, AgentDb, insert_agent_on},"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 2,
+    "baselineChars": 30201
+  }
+}

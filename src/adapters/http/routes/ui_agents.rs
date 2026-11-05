@@ -741,7 +741,7 @@ impl SubmittedAgent {
     pub(super) fn agent_write(&self) -> Result<AgentWrite, String> {
         let capabilities = self.form.capabilities()?;
         Ok(AgentWrite {
-            workflow_tools: None,
+            tool_bindings: None,
             name: self.form.name.clone(),
             slug: self.slug.clone(),
             provider: self.form.provider.clone(),

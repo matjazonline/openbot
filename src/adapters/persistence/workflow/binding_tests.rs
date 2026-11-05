@@ -343,7 +343,7 @@ async fn workflow_binding_sql_mcp_revocation_readiness_and_contract_scope() {
     let activation = f.activity(configured.revision).await;
     let edit = f.prepare(f.request(Some(configured.revision))).await;
     let mut blocker = block_company(&f).await;
-    sqlx::query("DELETE FROM company_mcp_tool_grants WHERE company_id = $1 AND connection_id = $2")
+    sqlx::query("UPDATE company_mcp_tool_grants SET revoked_at=clock_timestamp() WHERE company_id = $1 AND connection_id = $2")
         .bind(f.target.company.as_uuid())
         .bind(id)
         .execute(&mut *blocker)

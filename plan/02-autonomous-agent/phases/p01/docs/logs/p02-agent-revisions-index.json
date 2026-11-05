@@ -1,0 +1,99 @@
+{
+  "pattern": "agent_revisions",
+  "filesSearched": 1283,
+  "totalHits": 8,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/autonomous_agent_storage_skill_lifetime_tests.rs#assert_retired",
+        "name": "assert_retired",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/autonomous_agent_storage_skill_lifetime_tests.rs",
+        "span": "L68-L101"
+      },
+      "path": "src/adapters/persistence/workflow/autonomous_agent_storage_skill_lifetime_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 82,
+          "text": "let saved: String = sqlx::query_scalar(\"SELECT content FROM agent_revisions WHERE id=$1\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/autonomous_agent_storage_support.rs#insert_revision",
+        "name": "insert_revision",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/autonomous_agent_storage_support.rs",
+        "span": "L82-L103"
+      },
+      "path": "src/adapters/persistence/workflow/autonomous_agent_storage_support.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 90,
+          "text": "sqlx::query(\"INSERT INTO agent_revisions(company_id,agent_id,id,draft_revision,content,digest) VALUES($1,$2,$3,1,$4,$5)\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/autonomous_agent_storage_manifest_tests.rs#autonomous_agent_storage_manifest_retention_races_preserve_surviving_revisions",
+        "name": "autonomous_agent_storage_manifest_retention_races_preserve_surviving_revisions",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/autonomous_agent_storage_manifest_tests.rs",
+        "span": "L71-L122"
+      },
+      "path": "src/adapters/persistence/workflow/autonomous_agent_storage_manifest_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 112,
+          "text": "assert_eq!(count(&f, \"agent_revisions\").await, 1);"
+        },
+        {
+          "line": 121,
+          "text": "assert_eq!(count(&f, \"agent_revisions\").await, 0);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/autonomous_agent_storage_revision_tests.rs#autonomous_agent_storage_revision_round_trip_seals_members_and_active_owner",
+        "name": "autonomous_agent_storage_revision_round_trip_seals_members_and_active_owner",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/autonomous_agent_storage_revision_tests.rs",
+        "span": "L4-L69"
+      },
+      "path": "src/adapters/persistence/workflow/autonomous_agent_storage_revision_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 12,
+          "text": "\"SELECT content FROM agent_revisions WHERE company_id=$1 AND agent_id=$2 AND id=$3\","
+        },
+        {
+          "line": 28,
+          "text": "\"UPDATE agent_revisions SET content=content WHERE id=$1\","
+        },
+        {
+          "line": 29,
+          "text": "\"DELETE FROM agent_revisions WHERE id=$1\","
+        },
+        {
+          "line": 65,
+          "text": "sqlx::query(\"INSERT INTO agent_revisions(company_id,agent_id,id,draft_revision,content,digest) VALUES($1,$2,$3,1,$4,$5)\")"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 4,
+    "baselineChars": 32826
+  }
+}

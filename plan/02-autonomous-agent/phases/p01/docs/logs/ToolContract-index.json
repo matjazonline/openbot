@@ -1,0 +1,454 @@
+{
+  "pattern": "ToolContract",
+  "filesSearched": 1265,
+  "totalHits": 29,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/application/workflow/provisioning.rs#builtin_provisioning_snapshot",
+        "name": "builtin_provisioning_snapshot",
+        "kind": "function",
+        "path": "src/application/workflow/provisioning.rs",
+        "span": "L204-L226"
+      },
+      "path": "src/application/workflow/provisioning.rs",
+      "inDegree": 8,
+      "hits": [
+        {
+          "line": 213,
+          "text": "contract: ToolContract {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/message.rs#builtin_message_snapshot",
+        "name": "builtin_message_snapshot",
+        "kind": "function",
+        "path": "src/application/workflow/message.rs",
+        "span": "L65-L86"
+      },
+      "path": "src/application/workflow/message.rs",
+      "inDegree": 7,
+      "hits": [
+        {
+          "line": 73,
+          "text": "contract: ToolContract {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/tests.rs#request",
+        "name": "request",
+        "kind": "function",
+        "path": "src/application/workflow/actions/tests.rs",
+        "span": "L10-L41"
+      },
+      "path": "src/application/workflow/actions/tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 21,
+          "text": "contract: ToolContract {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/knowledge/builtin.rs#builtin_knowledge_snapshot",
+        "name": "builtin_knowledge_snapshot",
+        "kind": "function",
+        "path": "src/application/workflow/knowledge/builtin.rs",
+        "span": "L57-L76"
+      },
+      "path": "src/application/workflow/knowledge/builtin.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 63,
+          "text": "contract: ToolContract {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/sample/tools_tests.rs#tool_bundle",
+        "name": "tool_bundle",
+        "kind": "function",
+        "path": "src/application/workflow/sample/tools_tests.rs",
+        "span": "L2-L36"
+      },
+      "path": "src/application/workflow/sample/tools_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 12,
+          "text": "contract: registry::ToolContract {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/ui/authoring/tests.rs#reviewed_connection_at",
+        "name": "reviewed_connection_at",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/ui/authoring/tests.rs",
+        "span": "L479-L542"
+      },
+      "path": "src/adapters/http/routes/workflows/ui/authoring/tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 521,
+          "text": "contract: crate::application::workflow::registry::ToolContract {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/mcp.rs#snapshot",
+        "name": "snapshot",
+        "kind": "function",
+        "path": "src/application/workflow/mcp.rs",
+        "span": "L146-L163"
+      },
+      "path": "src/application/workflow/mcp.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 150,
+          "text": "contract: ToolContract {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/lifecycle_tests.rs#http_operation",
+        "name": "http_operation",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/lifecycle_tests.rs",
+        "span": "L319-L368"
+      },
+      "path": "src/adapters/http/routes/workflows/lifecycle_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 340,
+          "text": "contract: ToolContract {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/http_test_support.rs#operation",
+        "name": "operation",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/http_test_support.rs",
+        "span": "L21-L41"
+      },
+      "path": "src/adapters/persistence/workflow/http_test_support.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 26,
+          "text": "contract: registry::ToolContract {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/mcp_test_support.rs#operation",
+        "name": "operation",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/mcp_test_support.rs",
+        "span": "L232-L252"
+      },
+      "path": "src/adapters/persistence/workflow/mcp_test_support.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 237,
+          "text": "contract: registry::ToolContract {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/workflow_tool_registration_tests.rs#http_operation",
+        "name": "http_operation",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/workflow_tool_registration_tests.rs",
+        "span": "L393-L413"
+      },
+      "path": "src/adapters/persistence/workflow/workflow_tool_registration_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 398,
+          "text": "contract: registry::ToolContract {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/workflow_tools.rs#workflow_tool_snapshot",
+        "name": "workflow_tool_snapshot",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/workflow_tools.rs",
+        "span": "L129-L166"
+      },
+      "path": "src/adapters/persistence/workflow/workflow_tools.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 148,
+          "text": "contract: ToolContract {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/fixtures/mod.rs#agent_snapshots",
+        "name": "agent_snapshots",
+        "kind": "function",
+        "path": "src/application/workflow/fixtures/mod.rs",
+        "span": "L86-L121"
+      },
+      "path": "src/application/workflow/fixtures/mod.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 112,
+          "text": "contract: ToolContract {"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/http/routes/workflows/lifecycle_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 10,
+          "text": "use crate::application::workflow::registry::ToolContract;"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/workflow_tools.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 9,
+          "text": "use crate::application::workflow::registry::ToolContract;"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/actions/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 5,
+          "text": "use crate::application::workflow::registry::ToolContract;"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/fixtures/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 9,
+          "text": "use super::registry::ToolContract;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/fixtures/mod.rs#mcp_snapshot",
+        "name": "mcp_snapshot",
+        "kind": "function",
+        "path": "src/application/workflow/fixtures/mod.rs",
+        "span": "L132-L152"
+      },
+      "path": "src/application/workflow/fixtures/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 136,
+          "text": "contract: ToolContract {"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/knowledge/builtin.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 5,
+          "text": "registry::ToolContract,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/mcp.rs#tests",
+        "name": "tests",
+        "kind": "module",
+        "path": "src/application/workflow/mcp.rs",
+        "span": "L139-L240"
+      },
+      "path": "src/application/workflow/mcp.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 143,
+          "text": "registry::ToolContract,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/message.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 17,
+          "text": "use crate::application::workflow::registry::{MAX_MESSAGE_DESTINATIONS, ToolContract};"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/provisioning.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 17,
+          "text": "use crate::application::workflow::registry::ToolContract;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/tests.rs#workflow_publication_freezes_workflow_tool_pins_like_children",
+        "name": "workflow_publication_freezes_workflow_tool_pins_like_children",
+        "kind": "function",
+        "path": "src/application/workflow/publication/tests.rs",
+        "span": "L420-L519"
+      },
+      "path": "src/application/workflow/publication/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 426,
+          "text": "contract: registry::ToolContract {"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/publication/types.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1,
+          "text": "use super::registry::ToolContract;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/types.rs#ToolSnapshot",
+        "name": "ToolSnapshot",
+        "kind": "struct",
+        "path": "src/application/workflow/publication/types.rs",
+        "span": "L98-L106"
+      },
+      "path": "src/application/workflow/publication/types.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 100,
+          "text": "pub contract: ToolContract,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/registry/examples.rs#example",
+        "name": "example",
+        "kind": "function",
+        "path": "src/application/workflow/registry/examples.rs",
+        "span": "L11-L80"
+      },
+      "path": "src/application/workflow/registry/examples.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 41,
+          "text": "facts.tools.push(ToolContract {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/registry/facts.rs#CatalogueFacts",
+        "name": "CatalogueFacts",
+        "kind": "struct",
+        "path": "src/application/workflow/registry/facts.rs",
+        "span": "L6-L12"
+      },
+      "path": "src/application/workflow/registry/facts.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 7,
+          "text": "pub tools: Vec<ToolContract>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/registry/facts.rs#ToolContract",
+        "name": "ToolContract",
+        "kind": "struct",
+        "path": "src/application/workflow/registry/facts.rs",
+        "span": "L15-L21"
+      },
+      "path": "src/application/workflow/registry/facts.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 15,
+          "text": "pub struct ToolContract {"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/registry/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 26,
+          "text": "pub use facts::{CatalogueFacts, ChildContract, ToolContract};"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 18,
+    "baselineChars": 222550
+  }
+}

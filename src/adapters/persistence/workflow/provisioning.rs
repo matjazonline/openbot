@@ -781,7 +781,15 @@ async fn agent_write(
         model: Some(spec.model.clone()),
         system_prompt: Some(spec.system_prompt.clone()),
         description: spec.description.clone(),
-        workflow_tools: Some(tools),
+        tool_bindings: Some(
+            super::super::agent_binding_selection::resolve_bindings_on(
+                tx,
+                company.as_uuid(),
+                None,
+                &tools,
+            )
+            .await?,
+        ),
         skill_ids,
         created_by: Some(created_by.clone()),
         ..AgentWrite::default()

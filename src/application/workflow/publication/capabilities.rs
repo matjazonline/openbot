@@ -3,6 +3,7 @@
 //! revocation is a separate execution-time check, never a source of new grants.
 use super::*;
 use crate::app_error::{AppError, AppResult};
+use crate::application::agent::{AgentKey, SkillSnapshot};
 use serde::Serialize;
 
 /// Constructed only from a validated publication. Serialized content is trace

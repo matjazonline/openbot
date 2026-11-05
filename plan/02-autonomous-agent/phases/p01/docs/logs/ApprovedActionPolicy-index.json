@@ -1,0 +1,456 @@
+{
+  "pattern": "ApprovedActionPolicy",
+  "filesSearched": 1270,
+  "totalHits": 31,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/application/workflow/provisioning.rs#builtin_provisioning_snapshot",
+        "name": "builtin_provisioning_snapshot",
+        "kind": "function",
+        "path": "src/application/workflow/provisioning.rs",
+        "span": "L204-L226"
+      },
+      "path": "src/application/workflow/provisioning.rs",
+      "inDegree": 8,
+      "hits": [
+        {
+          "line": 219,
+          "text": "policy: ApprovedActionPolicy {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/message.rs#builtin_message_snapshot",
+        "name": "builtin_message_snapshot",
+        "kind": "function",
+        "path": "src/application/workflow/message.rs",
+        "span": "L65-L86"
+      },
+      "path": "src/application/workflow/message.rs",
+      "inDegree": 7,
+      "hits": [
+        {
+          "line": 79,
+          "text": "policy: ApprovedActionPolicy {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/tests.rs#tool_snapshot",
+        "name": "tool_snapshot",
+        "kind": "function",
+        "path": "src/application/workflow/publication/tests.rs",
+        "span": "L54-L66"
+      },
+      "path": "src/application/workflow/publication/tests.rs",
+      "inDegree": 5,
+      "hits": [
+        {
+          "line": 59,
+          "text": "policy: ApprovedActionPolicy {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/tests.rs#request",
+        "name": "request",
+        "kind": "function",
+        "path": "src/application/workflow/actions/tests.rs",
+        "span": "L10-L41"
+      },
+      "path": "src/application/workflow/actions/tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 27,
+          "text": "policy: ApprovedActionPolicy {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/knowledge/builtin.rs#builtin_knowledge_snapshot",
+        "name": "builtin_knowledge_snapshot",
+        "kind": "function",
+        "path": "src/application/workflow/knowledge/builtin.rs",
+        "span": "L57-L76"
+      },
+      "path": "src/application/workflow/knowledge/builtin.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 69,
+          "text": "policy: ApprovedActionPolicy {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/sample/tools_tests.rs#tool_bundle",
+        "name": "tool_bundle",
+        "kind": "function",
+        "path": "src/application/workflow/sample/tools_tests.rs",
+        "span": "L2-L36"
+      },
+      "path": "src/application/workflow/sample/tools_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 18,
+          "text": "policy: ApprovedActionPolicy {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/ui/authoring/tests.rs#reviewed_connection_at",
+        "name": "reviewed_connection_at",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/ui/authoring/tests.rs",
+        "span": "L479-L542"
+      },
+      "path": "src/adapters/http/routes/workflows/ui/authoring/tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 482,
+          "text": "ActionEffect, ActionRecovery, ApprovedActionPolicy, ToolSnapshot,"
+        },
+        {
+          "line": 527,
+          "text": "policy: ApprovedActionPolicy {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/mcp.rs#snapshot",
+        "name": "snapshot",
+        "kind": "function",
+        "path": "src/application/workflow/mcp.rs",
+        "span": "L146-L163"
+      },
+      "path": "src/application/workflow/mcp.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 156,
+          "text": "policy: ApprovedActionPolicy {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/lifecycle_tests.rs#http_operation",
+        "name": "http_operation",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/lifecycle_tests.rs",
+        "span": "L319-L368"
+      },
+      "path": "src/adapters/http/routes/workflows/lifecycle_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 348,
+          "text": "policy: ApprovedActionPolicy {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/http_test_support.rs#operation",
+        "name": "operation",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/http_test_support.rs",
+        "span": "L21-L41"
+      },
+      "path": "src/adapters/persistence/workflow/http_test_support.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 32,
+          "text": "policy: ApprovedActionPolicy {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/mcp_test_support.rs#operation",
+        "name": "operation",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/mcp_test_support.rs",
+        "span": "L232-L252"
+      },
+      "path": "src/adapters/persistence/workflow/mcp_test_support.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 243,
+          "text": "policy: ApprovedActionPolicy {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/workflow_tool_registration_tests.rs#http_operation",
+        "name": "http_operation",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/workflow_tool_registration_tests.rs",
+        "span": "L393-L413"
+      },
+      "path": "src/adapters/persistence/workflow/workflow_tool_registration_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 404,
+          "text": "policy: ApprovedActionPolicy {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/workflow_tools.rs#workflow_tool_snapshot",
+        "name": "workflow_tool_snapshot",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/workflow_tools.rs",
+        "span": "L129-L166"
+      },
+      "path": "src/adapters/persistence/workflow/workflow_tools.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 154,
+          "text": "policy: ApprovedActionPolicy {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/fixtures/mod.rs#read_policy",
+        "name": "read_policy",
+        "kind": "function",
+        "path": "src/application/workflow/fixtures/mod.rs",
+        "span": "L123-L130"
+      },
+      "path": "src/application/workflow/fixtures/mod.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 123,
+          "text": "fn read_policy() -> ApprovedActionPolicy {"
+        },
+        {
+          "line": 124,
+          "text": "ApprovedActionPolicy {"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/http/routes/workflows/lifecycle_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 8,
+          "text": "ActionEffect, ActionRecovery, ApprovedActionPolicy, ToolSnapshot,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/workflow_tool_registration_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 11,
+          "text": "publication::{ActionEffect, ActionRecovery, ApprovedActionPolicy, WorkflowToolPin},"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/workflow_tools.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 6,
+          "text": "ActionEffect, ActionRecovery, ApprovedActionPolicy, PublishedBundle, WorkflowToolPin,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/agent/definition.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1,
+          "text": "use super::{AgentKey, ApprovedActionPolicy, ModelSettings, SkillSnapshot};"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/agent/definition.rs#ResolvedAgentTool",
+        "name": "ResolvedAgentTool",
+        "kind": "struct",
+        "path": "src/application/agent/definition.rs",
+        "span": "L50-L56"
+      },
+      "path": "src/application/agent/definition.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 54,
+          "text": "pub policy: ApprovedActionPolicy,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/agent/mod.rs#ApprovedActionPolicy",
+        "name": "ApprovedActionPolicy",
+        "kind": "struct",
+        "path": "src/application/agent/mod.rs",
+        "span": "L73-L78"
+      },
+      "path": "src/application/agent/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 73,
+          "text": "pub struct ApprovedActionPolicy {"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/actions/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 3,
+          "text": "ActionEffect, ActionRecovery, ApprovedActionPolicy, ToolSnapshot,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/fixtures/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 6,
+          "text": "ActionEffect, ActionRecovery, AgentKey, AgentSnapshot, ApprovedActionPolicy,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/knowledge/builtin.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 4,
+          "text": "publication::{ActionEffect, ActionRecovery, ApprovedActionPolicy, ToolKind, ToolSnapshot},"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/mcp.rs#tests",
+        "name": "tests",
+        "kind": "module",
+        "path": "src/application/workflow/mcp.rs",
+        "span": "L139-L240"
+      },
+      "path": "src/application/workflow/mcp.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 142,
+          "text": "publication::{ActionEffect, ApprovedActionPolicy},"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/message.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 15,
+          "text": "ActionEffect, ActionRecovery, ApprovedActionPolicy, ToolSnapshot,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/provisioning.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 15,
+          "text": "ActionEffect, ActionRecovery, ApprovedActionPolicy, ToolSnapshot,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/tests.rs#workflow_publication_freezes_workflow_tool_pins_like_children",
+        "name": "workflow_publication_freezes_workflow_tool_pins_like_children",
+        "kind": "function",
+        "path": "src/application/workflow/publication/tests.rs",
+        "span": "L420-L519"
+      },
+      "path": "src/application/workflow/publication/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 432,
+          "text": "policy: ApprovedActionPolicy {"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/publication/types.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1,
+          "text": "pub use crate::application::agent::{AgentKey, ModelSettings, SkillSnapshot, ActionEffect, ActionRecovery, ApprovedActionPolicy};"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/types.rs#ToolSnapshot",
+        "name": "ToolSnapshot",
+        "kind": "struct",
+        "path": "src/application/workflow/publication/types.rs",
+        "span": "L29-L37"
+      },
+      "path": "src/application/workflow/publication/types.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 32,
+          "text": "pub policy: ApprovedActionPolicy,"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 17,
+    "baselineChars": 201648
+  }
+}

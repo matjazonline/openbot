@@ -1,6 +1,7 @@
 //! A local Streamable HTTP MCP server that records every request, plus the real
 //! publish → bind → admit → claim path for `mcp.call`.
 use super::*;
+use crate::application::agent::{ActionEffect, ActionRecovery, ApprovedActionPolicy};
 use axum::{
     Json, Router,
     body::Bytes,

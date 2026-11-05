@@ -2,11 +2,11 @@
 //! support template (07-D1 §D1.8); production catalogue wiring belongs to phases 08 and 09.
 //! None of these is a company grant.
 
-use super::publication::{
-    ActionEffect, ActionRecovery, AgentKey, AgentSnapshot, ApprovedActionPolicy,
-    DependencySnapshots, ModelSettings, SkillSnapshot, ToolSnapshot,
-};
+use super::publication::{AgentSnapshot, DependencySnapshots, ToolSnapshot};
 use super::registry::ToolContract;
+use crate::application::agent::{
+    ActionEffect, ActionRecovery, AgentKey, ApprovedActionPolicy, ModelSettings, SkillSnapshot,
+};
 use crate::domain::workflow::{CompanyId, ResourceName, TypeName, VersionId};
 use serde_json::json;
 use uuid::Uuid;

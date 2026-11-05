@@ -30,7 +30,7 @@ const CONNECTION_SELECT: &str = "SELECT connection.company_id, connection.id, co
     connection.endpoint_url, connection.enabled, connection.auth_type, connection.revision,
     connection.credential_revision, connection.discovery_json,
     EXISTS(SELECT 1 FROM company_mcp_credentials AS credential WHERE credential.company_id = connection.company_id AND credential.connection_id = connection.id) AS secret_set,
-    ARRAY(SELECT grant_row.tool_name FROM company_mcp_tool_grants AS grant_row WHERE grant_row.company_id = connection.company_id AND grant_row.connection_id = connection.id ORDER BY grant_row.tool_name) AS tool_grants
+    ARRAY(SELECT grant_row.tool_name FROM company_mcp_tool_grants AS grant_row WHERE grant_row.company_id = connection.company_id AND grant_row.connection_id = connection.id AND grant_row.revoked_at IS NULL ORDER BY grant_row.tool_name) AS tool_grants
     FROM company_mcp_connections AS connection";
 impl TryFrom<ConnectionRow> for CompanyMcpConnection {
     type Error = AppError;
@@ -133,12 +133,12 @@ async fn replace_grants(
     id: Uuid,
     grants: &[McpToolName],
 ) -> AppResult<()> {
-    // A set difference, not delete-and-reinsert: workflow MCP operations reference their grant
-    // with ON DELETE CASCADE, so only grants actually removed may revoke those approvals.
+    // Only removed permissions retire approvals. Retained keys keep historical binding FKs;
+    // regranting a key never restores a reviewed operation or an old agent grant.
     let names: Vec<&str> = grants.iter().map(McpToolName::as_str).collect();
-    sqlx::query("DELETE FROM company_mcp_tool_grants WHERE company_id = $1 AND connection_id = $2 AND NOT (tool_name = ANY($3::text[]))")
+    sqlx::query("UPDATE company_mcp_tool_grants SET revoked_at=clock_timestamp() WHERE company_id = $1 AND connection_id = $2 AND revoked_at IS NULL AND NOT (tool_name = ANY($3::text[]))")
         .bind(company).bind(id).bind(&names).execute(&mut **tx).await?;
-    sqlx::query("INSERT INTO company_mcp_tool_grants (company_id, connection_id, tool_name) SELECT $1, $2, unnest($3::text[]) ON CONFLICT (company_id, connection_id, tool_name) DO NOTHING")
+    sqlx::query("INSERT INTO company_mcp_tool_grants (company_id, connection_id, tool_name) SELECT $1, $2, unnest($3::text[]) ON CONFLICT (company_id, connection_id, tool_name) DO UPDATE SET revoked_at=NULL WHERE company_mcp_tool_grants.revoked_at IS NOT NULL")
         .bind(company).bind(id).bind(&names).execute(&mut **tx).await?;
     Ok(())
 }
@@ -259,7 +259,7 @@ impl McpPersistence for PostgresPersistence {
         .await?;
         // The soft-deleted row stays for audit; its workflow approvals do not.
         sqlx::query(
-            "DELETE FROM workflow_mcp_operations WHERE company_id = $1 AND connection_id = $2",
+            "UPDATE workflow_mcp_operations SET revoked_at=coalesce(revoked_at,clock_timestamp()) WHERE company_id = $1 AND connection_id = $2",
         )
         .bind(company_id)
         .bind(id)

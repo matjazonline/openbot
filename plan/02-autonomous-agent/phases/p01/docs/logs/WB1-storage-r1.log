@@ -1,0 +1,41 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.55s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-c19a0b960dacdcef)
+
+running 9 tests
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::manifest_tests::autonomous_agent_storage_manifest_seals_selection_and_accepts_only_its_tree ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::draft_tests::autonomous_agent_storage_native_scope_kind_and_reserved_alias_constraints ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::targets_tests::autonomous_agent_storage_external_targets_round_trip_and_revoke_without_aba ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::draft_tests::autonomous_agent_storage_draft_round_trip_order_and_live_grants_are_independent ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::manifest_tests::autonomous_agent_storage_manifest_retention_races_preserve_surviving_revisions ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::draft_tests::autonomous_agent_storage_competing_writers_cannot_retarget_a_binding_identity ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::revision_tests::autonomous_agent_storage_revision_round_trip_seals_members_and_active_owner ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::revision_tests::autonomous_agent_storage_skill_incarnations_and_sealed_revision_assignments ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::targets_tests::autonomous_agent_storage_workflow_pin_survives_repin_and_revocation_is_permanent ... ok
+
+failures:
+
+---- adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::draft_tests::autonomous_agent_storage_native_scope_kind_and_reserved_alias_constraints stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::draft_tests::autonomous_agent_storage_native_scope_kind_and_reserved_alias_constraints' (31445612) panicked at src/adapters/persistence/workflow/autonomous_agent_storage_draft_tests.rs:112:142:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "23503", message: "insert or update on table \"workflow_mcp_operations\" violates foreign key constraint \"workflow_mcp_operations_company_id_connection_id_name_fkey\"", detail: Some("Key (company_id, connection_id, name)=(b4cc6827-e7e8-4a7f-b5e1-a2e5a654e32b, 0c1197f1-b6d8-4e66-9cae-c9cbffb4c8d8, lookup) is not present in table \"company_mcp_tool_grants\"."), hint: None, position: None, where: None, schema: Some("public"), table: Some("workflow_mcp_operations"), column: None, data_type: None, constraint: Some("workflow_mcp_operations_company_id_connection_id_name_fkey"), file: Some("ri_triggers.c"), line: Some(2783), routine: Some("ri_ReportViolation") })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::targets_tests::autonomous_agent_storage_external_targets_round_trip_and_revoke_without_aba stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::targets_tests::autonomous_agent_storage_external_targets_round_trip_and_revoke_without_aba' (31445617) panicked at src/adapters/persistence/workflow/autonomous_agent_storage_support.rs:224:148:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "23503", message: "insert or update on table \"workflow_mcp_operations\" violates foreign key constraint \"workflow_mcp_operations_company_id_connection_id_name_fkey\"", detail: Some("Key (company_id, connection_id, name)=(23602296-3220-47e7-a230-09a9cf90b67b, 73ed3f74-3e9e-487a-a945-7db5044f88f1, lookup) is not present in table \"company_mcp_tool_grants\"."), hint: None, position: None, where: None, schema: Some("public"), table: Some("workflow_mcp_operations"), column: None, data_type: None, constraint: Some("workflow_mcp_operations_company_id_connection_id_name_fkey"), file: Some("ri_triggers.c"), line: Some(2783), routine: Some("ri_ReportViolation") })
+
+---- adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::manifest_tests::autonomous_agent_storage_manifest_retention_races_preserve_surviving_revisions stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::manifest_tests::autonomous_agent_storage_manifest_retention_races_preserve_surviving_revisions' (31445613) panicked at src/adapters/persistence/workflow/autonomous_agent_storage_manifest_tests.rs:119:10:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "23503", message: "update or delete on table \"agent_revisions\" violates foreign key constraint \"agent_manifest_revisions_company_id_agent_id_revision_id_fkey\" on table \"agent_manifest_revisions\"", detail: Some("Key (company_id, agent_id, id)=(cbb2da0b-4800-4802-9cd2-f14233c66a48, e1bd73a0-2eda-4bc9-8ebb-229cb44be0d7, 2e27240f-8e14-422e-8e24-5cc4ccf04906) is still referenced from table \"agent_manifest_revisions\"."), hint: None, position: None, where: None, schema: Some("public"), table: Some("agent_manifest_revisions"), column: None, data_type: None, constraint: Some("agent_manifest_revisions_company_id_agent_id_revision_id_fkey"), file: Some("ri_triggers.c"), line: Some(2811), routine: Some("ri_ReportViolation") })
+
+
+failures:
+    adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::draft_tests::autonomous_agent_storage_native_scope_kind_and_reserved_alias_constraints
+    adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::manifest_tests::autonomous_agent_storage_manifest_retention_races_preserve_surviving_revisions
+    adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::targets_tests::autonomous_agent_storage_external_targets_round_trip_and_revoke_without_aba
+
+test result: FAILED. 6 passed; 3 failed; 0 ignored; 0 measured; 2895 filtered out; finished in 3.05s
+
+error: test failed, to rerun pass `--lib`

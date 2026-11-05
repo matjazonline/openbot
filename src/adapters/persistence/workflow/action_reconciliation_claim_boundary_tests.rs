@@ -150,7 +150,7 @@ async fn workflow_action_reconciliation_claim_boundary_activation_repetition_equ
     let (f, request) = Box::pin(setup_action_on_fixture(
         f,
         scope,
-        publication::ActionRecovery::Reconcile,
+        crate::application::agent::ActionRecovery::Reconcile,
         json!({"value":1}),
     ))
     .await;

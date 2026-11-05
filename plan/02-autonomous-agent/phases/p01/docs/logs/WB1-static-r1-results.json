@@ -1,0 +1,65 @@
+[
+  {
+    "name": "WB1-fmt-check-r1",
+    "argv": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--",
+      "--check"
+    ],
+    "extra_env": {},
+    "exit_code": 0
+  },
+  {
+    "name": "WB1-diff-check-r1",
+    "argv": [
+      "git",
+      "diff",
+      "--check"
+    ],
+    "extra_env": {},
+    "exit_code": 0
+  },
+  {
+    "name": "WB1-sqlx-prepare-r1",
+    "argv": [
+      "cargo",
+      "sqlx",
+      "prepare",
+      "--",
+      "--all-targets"
+    ],
+    "extra_env": {
+      "SQLX_OFFLINE": "false"
+    },
+    "exit_code": 0
+  },
+  {
+    "name": "WB1-offline-check-r2",
+    "argv": [
+      "cargo",
+      "check",
+      "--locked",
+      "--offline",
+      "--all-targets"
+    ],
+    "extra_env": {},
+    "exit_code": 0
+  },
+  {
+    "name": "WB1-clippy-r1",
+    "argv": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "--offline",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "extra_env": {},
+    "exit_code": 101
+  }
+]

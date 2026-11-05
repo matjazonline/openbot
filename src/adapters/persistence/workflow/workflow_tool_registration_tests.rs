@@ -5,10 +5,11 @@ use super::*;
 use crate::adapters::persistence::workflow::http::{
     HttpPublicationDirectory, HttpPublicationSelection,
 };
+use crate::application::agent::{ActionEffect, ActionRecovery, ApprovedActionPolicy};
 use crate::application::workflow::{
     http::{HttpConnectionWrite, HttpConnections, HttpOperation, HttpOrigin},
     lifecycle::LifecycleError,
-    publication::{ActionEffect, ActionRecovery, ApprovedActionPolicy, WorkflowToolPin},
+    publication::WorkflowToolPin,
     tools::{MAX_WORKFLOW_TOOLS, WorkflowToolWrite, WorkflowTools},
 };
 
@@ -47,12 +48,13 @@ async fn registrations(p: &PostgresPersistence, company: CompanyId) -> i64 {
 
 /// Grant the fixture's `assistant` exactly `tools`.
 async fn grant(setup: &ToolSetup, tools: &[&str]) {
-    sqlx::query("UPDATE agents SET workflow_tools=$2 WHERE id=$1")
-        .bind(setup.agent)
-        .bind(tools)
-        .execute(setup.persistence().pool())
-        .await
-        .unwrap();
+    crate::adapters::persistence::agent_capability::assign_test_tool_names(
+        setup.persistence(),
+        setup.agent,
+        tools,
+    )
+    .await
+    .unwrap();
 }
 
 fn bad_request(result: LifecycleResult<VersionId>) -> String {
@@ -350,10 +352,22 @@ async fn workflow_tool_pins_and_grants_stay_within_the_agents_company() {
         Some("23503")
     );
 
-    // A's agent granted a name only B registered cannot publish.
-    grant(&setup, &["refund.foreign"]).await;
-    let message = bad_request(publish_parent(&setup.fixture, "foreign-grant").await);
-    assert!(message.contains("refund.foreign"), "{message}");
+    // Concrete draft bindings reject B's registration before any publication can capture it.
+    let refused = crate::adapters::persistence::agent_capability::assign_test_tool_names(
+        setup.persistence(),
+        setup.agent,
+        &["refund.foreign"],
+    )
+    .await;
+    assert!(matches!(refused, Err(AppError::BadRequest(_))));
+    let stored: Vec<String> = sqlx::query_scalar(
+        "SELECT ARRAY(SELECT alias FROM agent_draft_bindings WHERE agent_id=$1 ORDER BY position)",
+    )
+    .bind(setup.agent)
+    .fetch_one(p.pool())
+    .await
+    .unwrap();
+    assert!(!stored.iter().any(|alias| alias == "refund.foreign"));
 
     // A's own registration freezes A's child, though B registered the same name.
     grant(&setup, &[TOOL]).await;

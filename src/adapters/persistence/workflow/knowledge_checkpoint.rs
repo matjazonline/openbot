@@ -1,14 +1,11 @@
 //! A local read commits directly into the canonical harness invocation. The driver's normal
 //! result update then observes the exact AlreadyApplied value, without a second state machine.
 use super::*;
+use crate::application::agent::AgentKey;
 use crate::{
     application::{
         knowledge::search::KnowledgeObservation,
-        workflow::{
-            agent::PreparedTool,
-            knowledge::*,
-            publication::{AgentKey, ResolvedAgent},
-        },
+        workflow::{agent::PreparedTool, knowledge::*, publication::ResolvedAgent},
     },
     domain::{entities::access_level::AccessLevel, workflow::StepId},
     services::harness::runs::InvocationState,

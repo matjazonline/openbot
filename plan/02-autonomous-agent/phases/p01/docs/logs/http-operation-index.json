@@ -1,0 +1,155 @@
+{
+  "pattern": "workflow_http_operations",
+  "filesSearched": 1265,
+  "totalHits": 9,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/http.rs#status_on",
+        "name": "status_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/http.rs",
+        "span": "L300-L326"
+      },
+      "path": "src/adapters/persistence/workflow/http.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 304,
+          "text": "let names: Vec<String> = sqlx::query_scalar(\"SELECT name FROM workflow_http_operations WHERE company_id=$1 AND connection_id=$2 ORDER BY name LIMIT 257\").bind(c"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/http.rs#policy_on",
+        "name": "policy_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/http.rs",
+        "span": "L328-L353"
+      },
+      "path": "src/adapters/persistence/workflow/http.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 334,
+          "text": "let (snapshot, approval_required): (Value, bool) = sqlx::query_as(\"SELECT snapshot,approval_required FROM workflow_http_operations WHERE company_id=$1 AND conne"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/agent_publication.rs#granted_tool",
+        "name": "granted_tool",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/agent_publication.rs",
+        "span": "L288-L366"
+      },
+      "path": "src/adapters/persistence/workflow/agent_publication.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 342,
+          "text": "let snapshots: Vec<Value> = sqlx::query_scalar(\"SELECT operation.snapshot FROM workflow_http_operations AS operation JOIN workflow_http_connections AS connectio"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/authoring_reads.rs#publication_options",
+        "name": "publication_options",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/authoring_reads.rs",
+        "span": "L434-L478"
+      },
+      "path": "src/adapters/persistence/workflow/authoring_reads.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 462,
+          "text": "\"workflow_http_operations\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/http_publication.rs#capture",
+        "name": "capture",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/http_publication.rs",
+        "span": "L20-L58"
+      },
+      "path": "src/adapters/persistence/workflow/http_publication.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 38,
+          "text": "let snapshot: Value = sqlx::query_scalar(\"SELECT snapshot FROM workflow_http_operations WHERE company_id=$1 AND connection_id=$2 AND name=$3\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/http.rs#registered_on",
+        "name": "registered_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/http.rs",
+        "span": "L32-L52"
+      },
+      "path": "src/adapters/persistence/workflow/http.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 45,
+          "text": "let ids: Vec<Uuid> = sqlx::query_scalar(\"SELECT operation.connection_id FROM workflow_http_operations AS operation JOIN workflow_http_connections AS connection "
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/http.rs#register_http_operation",
+        "name": "register_http_operation",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/http.rs",
+        "span": "L261-L282"
+      },
+      "path": "src/adapters/persistence/workflow/http.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 273,
+          "text": "let count: i64 = sqlx::query_scalar(\"SELECT count(*) FROM workflow_http_operations WHERE company_id=$1 AND connection_id=$2 AND name<>$3\").bind(company.as_uuid("
+        },
+        {
+          "line": 277,
+          "text": "sqlx::query(\"INSERT INTO workflow_http_operations(company_id,connection_id,name,snapshot,approval_required) VALUES($1,$2,$3,$4,$5) ON CONFLICT(company_id,connec"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/http.rs#revoke_http_operation",
+        "name": "revoke_http_operation",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/http.rs",
+        "span": "L283-L297"
+      },
+      "path": "src/adapters/persistence/workflow/http.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 293,
+          "text": "sqlx::query(\"DELETE FROM workflow_http_operations WHERE company_id=$1 AND connection_id=$2 AND name=$3\").bind(company.as_uuid()).bind(id).bind(name.as_str()).ex"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 4,
+    "baselineChars": 54135
+  }
+}

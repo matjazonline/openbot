@@ -5,8 +5,9 @@
 use super::{
     authorization::WorkflowActor,
     compiler::{Schema, SourceSpan},
-    publication::{ActionRecovery, ToolSnapshot},
+    publication::ToolSnapshot,
 };
+use crate::application::agent::ActionRecovery;
 use crate::{
     app_error::{AppError, AppResult},
     domain::workflow::{CompanyId, TypeName},
@@ -138,10 +139,8 @@ pub fn invalid() -> AppError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::application::workflow::{
-        publication::{ActionEffect, ApprovedActionPolicy},
-        registry::ToolContract,
-    };
+    use crate::application::agent::{ActionEffect, ApprovedActionPolicy};
+    use crate::application::workflow::registry::ToolContract;
 
     fn snapshot(output: Value) -> ToolSnapshot {
         ToolSnapshot {

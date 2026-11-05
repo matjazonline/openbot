@@ -1,0 +1,18 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+BEGIN
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+DELETE 1
+ original_assignment_retired 
+-----------------------------
+ t
+(1 row)
+
+INSERT 0 1
+INSERT 0 1
+psql:/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p01/plan/02-autonomous-agent/phases/p01/docs/logs/AUTO-P01-WB1-R1-retired-update-probe.sql:14: ERROR:  retired skill assignment cannot be attached
+CONTEXT:  PL/pgSQL function capture_agent_skill_assignment() line 7 at RAISE

@@ -1,4 +1,5 @@
 use super::*;
+use crate::application::agent::{ActionEffect, ActionRecovery, ApprovedActionPolicy};
 
 #[derive(Debug, PartialEq, Eq, sqlx::FromRow)]
 pub(super) struct ActionCounts {

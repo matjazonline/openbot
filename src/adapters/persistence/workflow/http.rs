@@ -42,7 +42,7 @@ pub(super) async fn registered_on(
     }
     .validate(company)?;
     let snapshot = serde_json::to_value(normalized).map_err(|_| invalid())?;
-    let ids: Vec<Uuid> = sqlx::query_scalar("SELECT operation.connection_id FROM workflow_http_operations AS operation JOIN workflow_http_connections AS connection ON connection.company_id=operation.company_id AND connection.id=operation.connection_id WHERE operation.company_id=$1 AND operation.name=$2 AND operation.snapshot=$3 AND connection.enabled AND (NOT connection.bearer OR EXISTS(SELECT 1 FROM workflow_http_credentials AS credential WHERE credential.company_id=connection.company_id AND credential.connection_id=connection.id)) ORDER BY operation.connection_id LIMIT 2")
+    let ids: Vec<Uuid> = sqlx::query_scalar("SELECT operation.connection_id FROM workflow_http_operations AS operation JOIN workflow_http_connections AS connection ON connection.company_id=operation.company_id AND connection.id=operation.connection_id WHERE operation.revoked_at IS NULL AND operation.company_id=$1 AND operation.name=$2 AND operation.snapshot=$3 AND connection.enabled AND (NOT connection.bearer OR EXISTS(SELECT 1 FROM workflow_http_credentials AS credential WHERE credential.company_id=connection.company_id AND credential.connection_id=connection.id)) ORDER BY operation.connection_id LIMIT 2")
         .bind(company.as_uuid()).bind(wanted.contract.name.as_str()).bind(snapshot).fetch_all(&mut **tx).await?;
     // A tool without a binding must have exactly one owner; ambiguous routing fails closed.
     if ids.is_empty() || (wanted.contract.connection.is_none() && ids.len() != 1) {
@@ -270,11 +270,11 @@ impl HttpConnections for PostgresPersistence {
         let snapshot = serde_json::to_value(&operation.tool).map_err(|_| invalid())?;
         let mut tx = begin_http(self).await?;
         edit_on(&mut tx, company, actor, id, revision).await?;
-        let count: i64 = sqlx::query_scalar("SELECT count(*) FROM workflow_http_operations WHERE company_id=$1 AND connection_id=$2 AND name<>$3").bind(company.as_uuid()).bind(id).bind(operation.tool.contract.name.as_str()).fetch_one(&mut *tx).await?;
+        let count: i64 = sqlx::query_scalar("SELECT count(*) FROM workflow_http_operations WHERE revoked_at IS NULL AND company_id=$1 AND connection_id=$2 AND name<>$3").bind(company.as_uuid()).bind(id).bind(operation.tool.contract.name.as_str()).fetch_one(&mut *tx).await?;
         if count >= 256 {
             return Err(invalid());
         }
-        sqlx::query("INSERT INTO workflow_http_operations(company_id,connection_id,name,snapshot,approval_required) VALUES($1,$2,$3,$4,$5) ON CONFLICT(company_id,connection_id,name) DO UPDATE SET snapshot=EXCLUDED.snapshot,approval_required=EXCLUDED.approval_required")
+        sqlx::query("INSERT INTO workflow_http_operations(company_id,connection_id,name,snapshot,approval_required) VALUES($1,$2,$3,$4,$5) ON CONFLICT(company_id,connection_id,name) DO UPDATE SET snapshot=EXCLUDED.snapshot,approval_required=EXCLUDED.approval_required,revoked_at=NULL")
             .bind(company.as_uuid()).bind(id).bind(operation.tool.contract.name.as_str()).bind(snapshot).bind(operation.approval_required).execute(&mut *tx).await?;
         let result = revised(&mut tx, company, id).await?;
         tx.commit().await?;
@@ -290,7 +290,7 @@ impl HttpConnections for PostgresPersistence {
     ) -> AppResult<HttpConnection> {
         let mut tx = begin_http(self).await?;
         edit_on(&mut tx, company, actor, id, revision).await?;
-        sqlx::query("DELETE FROM workflow_http_operations WHERE company_id=$1 AND connection_id=$2 AND name=$3").bind(company.as_uuid()).bind(id).bind(name.as_str()).execute(&mut *tx).await?;
+        sqlx::query("UPDATE workflow_http_operations SET revoked_at=clock_timestamp() WHERE revoked_at IS NULL AND company_id=$1 AND connection_id=$2 AND name=$3").bind(company.as_uuid()).bind(id).bind(name.as_str()).execute(&mut *tx).await?;
         let result = revised(&mut tx, company, id).await?;
         tx.commit().await?;
         Ok(result)
@@ -301,7 +301,7 @@ pub(super) async fn status_on(
     tx: &mut Transaction<'_, Postgres>,
     connection: &HttpConnection,
 ) -> AppResult<ResourceStatus> {
-    let names: Vec<String> = sqlx::query_scalar("SELECT name FROM workflow_http_operations WHERE company_id=$1 AND connection_id=$2 ORDER BY name LIMIT 257").bind(connection.company.as_uuid()).bind(connection.id).fetch_all(&mut **tx).await?;
+    let names: Vec<String> = sqlx::query_scalar("SELECT name FROM workflow_http_operations WHERE revoked_at IS NULL AND company_id=$1 AND connection_id=$2 ORDER BY name LIMIT 257").bind(connection.company.as_uuid()).bind(connection.id).fetch_all(&mut **tx).await?;
     if names.len() > 256 {
         return Err(invalid());
     }
@@ -331,7 +331,7 @@ pub(super) async fn policy_on(
     id: Uuid,
     wanted: &publication::ToolSnapshot,
 ) -> AppResult<CurrentActionPolicy> {
-    let (snapshot, approval_required): (Value, bool) = sqlx::query_as("SELECT snapshot,approval_required FROM workflow_http_operations WHERE company_id=$1 AND connection_id=$2 AND name=$3 FOR SHARE")
+    let (snapshot, approval_required): (Value, bool) = sqlx::query_as("SELECT snapshot,approval_required FROM workflow_http_operations WHERE revoked_at IS NULL AND company_id=$1 AND connection_id=$2 AND name=$3 FOR SHARE")
         .bind(company.as_uuid()).bind(id).bind(wanted.contract.name.as_str()).fetch_optional(&mut **tx).await?.ok_or_else(missing)?;
     let mut tool: publication::ToolSnapshot =
         serde_json::from_value(snapshot).map_err(|_| invalid())?;

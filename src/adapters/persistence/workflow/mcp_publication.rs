@@ -36,7 +36,7 @@ impl PublicationDirectory for McpPublicationDirectory {
             if status_on(&mut tx, &connection).await?.readiness != ResourceReadiness::Ready {
                 return Err(missing());
             }
-            let snapshot: Value = sqlx::query_scalar("SELECT snapshot FROM workflow_mcp_operations WHERE company_id=$1 AND connection_id=$2 AND name=$3")
+            let snapshot: Value = sqlx::query_scalar("SELECT snapshot FROM workflow_mcp_operations WHERE revoked_at IS NULL AND company_id=$1 AND connection_id=$2 AND name=$3")
                 .bind(company.as_uuid()).bind(connection.id).bind(selection.tool.as_str()).fetch_optional(&mut *tx).await?.ok_or_else(missing)?;
             let mut tool: publication::ToolSnapshot =
                 serde_json::from_value(snapshot).map_err(|_| invalid())?;

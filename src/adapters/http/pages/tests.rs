@@ -1220,11 +1220,13 @@ fn a_generated_prompt_swaps_into_the_field_without_a_script() {
 fn the_easy_tab_creates_the_picked_library_agents() {
     let company = mailbox_company();
     let triage = Agent {
+        draft_revision: crate::entities::agent_capability::AgentDraftRevision::new(1).unwrap(),
         company_id: None,
         description: Some("Sorts incoming support mail".into()),
         ..settings_agent(company.id, "Triage", "triage")
     };
     let billing = Agent {
+        draft_revision: crate::entities::agent_capability::AgentDraftRevision::new(1).unwrap(),
         company_id: None,
         ..settings_agent(company.id, "Billing", "billing")
     };
@@ -1376,6 +1378,7 @@ fn channel_settings_list_targets_the_pane_and_swaps_out_of_band() {
 
 fn settings_agent(company_id: Uuid, name: &str, slug: &str) -> Agent {
     Agent {
+        draft_revision: crate::entities::agent_capability::AgentDraftRevision::new(1).unwrap(),
         id: Uuid::new_v4(),
         company_id: Some(company_id),
         name: name.to_string(),

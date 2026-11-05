@@ -1,0 +1,10 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 4 tests
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::skill_lifetime_tests::autonomous_agent_storage_skill_authority_reader_serializes_before_source_delete ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::skill_lifetime_tests::autonomous_agent_storage_skill_delete_preserves_history_and_cannot_revive_assignment ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::revision_tests::autonomous_agent_storage_skill_incarnations_and_sealed_revision_assignments ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::skill_lifetime_tests::autonomous_agent_storage_skill_delete_serializes_before_authority_reader ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 2907 filtered out; finished in 1.80s
+

@@ -1,5 +1,8 @@
 use super::*;
 use crate::adapters::workflow_source::decode;
+use crate::application::agent::{
+    ActionEffect, ActionRecovery, AgentKey, ApprovedActionPolicy, ModelSettings, SkillSnapshot,
+};
 use crate::domain::workflow::{ResourceName, RunId, RunMetadata, TypeName, WorkflowId};
 use uuid::Uuid;
 

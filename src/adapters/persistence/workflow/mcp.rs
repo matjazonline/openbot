@@ -40,7 +40,7 @@ pub(super) async fn status_on(
     tx: &mut Transaction<'_, Postgres>,
     connection: &CompanyMcpConnection,
 ) -> AppResult<ResourceStatus> {
-    let names: Vec<String> = sqlx::query_scalar("SELECT name FROM workflow_mcp_operations WHERE company_id=$1 AND connection_id=$2 ORDER BY name LIMIT 257")
+    let names: Vec<String> = sqlx::query_scalar("SELECT name FROM workflow_mcp_operations WHERE revoked_at IS NULL AND company_id=$1 AND connection_id=$2 ORDER BY name LIMIT 257")
         .bind(connection.company_id).bind(connection.id).fetch_all(&mut **tx).await?;
     if names.len() > MAX_MCP_OPERATIONS {
         return Err(invalid());
@@ -97,7 +97,7 @@ pub(super) async fn policy_on(
     connection: &CompanyMcpConnection,
     wanted: &publication::ToolSnapshot,
 ) -> AppResult<CurrentActionPolicy> {
-    let (snapshot, approval_required): (Value, bool) = sqlx::query_as("SELECT snapshot,approval_required FROM workflow_mcp_operations WHERE company_id=$1 AND connection_id=$2 AND name=$3 FOR SHARE")
+    let (snapshot, approval_required): (Value, bool) = sqlx::query_as("SELECT snapshot,approval_required FROM workflow_mcp_operations WHERE revoked_at IS NULL AND company_id=$1 AND connection_id=$2 AND name=$3 FOR SHARE")
         .bind(connection.company_id).bind(connection.id).bind(wanted.contract.name.as_str()).fetch_optional(&mut **tx).await?.ok_or_else(missing)?;
     let mut tool: publication::ToolSnapshot =
         serde_json::from_value(snapshot).map_err(|_| invalid())?;
@@ -124,7 +124,7 @@ pub(super) async fn registered_on(
     let mut normalized = wanted.clone();
     normalized.contract.connection = None;
     let snapshot = serde_json::to_value(&normalized).map_err(|_| invalid())?;
-    let ids: Vec<Uuid> = sqlx::query_scalar("SELECT operation.connection_id FROM workflow_mcp_operations AS operation JOIN company_mcp_connections AS connection ON connection.company_id=operation.company_id AND connection.id=operation.connection_id WHERE operation.company_id=$1 AND operation.name=$2 AND operation.snapshot=$3 AND connection.deleted_at IS NULL AND connection.enabled ORDER BY operation.connection_id LIMIT 65")
+    let ids: Vec<Uuid> = sqlx::query_scalar("SELECT operation.connection_id FROM workflow_mcp_operations AS operation JOIN company_mcp_connections AS connection ON connection.company_id=operation.company_id AND connection.id=operation.connection_id WHERE operation.revoked_at IS NULL AND operation.company_id=$1 AND operation.name=$2 AND operation.snapshot=$3 AND connection.deleted_at IS NULL AND connection.enabled ORDER BY operation.connection_id LIMIT 65")
         .bind(company.as_uuid()).bind(wanted.contract.name.as_str()).bind(snapshot).fetch_all(&mut **tx).await?;
     for id in ids {
         let Some(connection) = connection_on(tx, company, id).await? else {
@@ -208,7 +208,7 @@ async fn current_version(
     connection: Uuid,
     name: &str,
 ) -> AppResult<Option<Uuid>> {
-    Ok(sqlx::query_scalar("SELECT version FROM workflow_mcp_operations WHERE company_id=$1 AND connection_id=$2 AND name=$3 FOR UPDATE")
+    Ok(sqlx::query_scalar("SELECT version FROM workflow_mcp_operations WHERE revoked_at IS NULL AND company_id=$1 AND connection_id=$2 AND name=$3 FOR UPDATE")
         .bind(company.as_uuid()).bind(connection).bind(name).fetch_optional(&mut **tx).await?)
 }
 
@@ -244,7 +244,7 @@ impl McpOperations for PostgresPersistence {
                 .iter()
                 .any(|grant| grant.as_str() == name),
         )?;
-        let others: i64 = sqlx::query_scalar("SELECT count(*) FROM workflow_mcp_operations WHERE company_id=$1 AND connection_id=$2 AND name<>$3")
+        let others: i64 = sqlx::query_scalar("SELECT count(*) FROM workflow_mcp_operations WHERE revoked_at IS NULL AND company_id=$1 AND connection_id=$2 AND name<>$3")
             .bind(company.as_uuid()).bind(connection.id).bind(name).fetch_one(&mut *tx).await?;
         if others >= MAX_MCP_OPERATIONS as i64 {
             return Err(crate::application::workflow::mcp::invalid());
@@ -252,7 +252,7 @@ impl McpOperations for PostgresPersistence {
         let version = Uuid::new_v4();
         let current = current_version(&mut tx, company, connection.id, name).await?;
         let written = match (current, write.expected_version) {
-            (None, None) => sqlx::query("INSERT INTO workflow_mcp_operations(company_id,connection_id,name,snapshot,approval_required,version) VALUES($1,$2,$3,$4,$5,$6)")
+            (None, None) => sqlx::query("INSERT INTO workflow_mcp_operations(company_id,connection_id,name,snapshot,approval_required,version) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(company_id,connection_id,name) DO UPDATE SET snapshot=EXCLUDED.snapshot,approval_required=EXCLUDED.approval_required,version=EXCLUDED.version,revoked_at=NULL WHERE workflow_mcp_operations.revoked_at IS NOT NULL")
                 .bind(company.as_uuid()).bind(connection.id).bind(name).bind(snapshot).bind(write.operation.approval_required).bind(version).execute(&mut *tx).await?,
             (Some(current), Some(expected)) if current == expected => sqlx::query("UPDATE workflow_mcp_operations SET snapshot=$4,approval_required=$5,version=$6 WHERE company_id=$1 AND connection_id=$2 AND name=$3 AND version=$7")
                 .bind(company.as_uuid()).bind(connection.id).bind(name).bind(snapshot).bind(write.operation.approval_required).bind(version).bind(expected).execute(&mut *tx).await?,
@@ -279,7 +279,7 @@ impl McpOperations for PostgresPersistence {
             revoke.catalog_revision,
         )
         .await?;
-        let deleted = sqlx::query("DELETE FROM workflow_mcp_operations WHERE company_id=$1 AND connection_id=$2 AND name=$3 AND version=$4")
+        let deleted = sqlx::query("UPDATE workflow_mcp_operations SET revoked_at=clock_timestamp() WHERE revoked_at IS NULL AND company_id=$1 AND connection_id=$2 AND name=$3 AND version=$4")
             .bind(company.as_uuid()).bind(revoke.connection).bind(revoke.name.as_str()).bind(revoke.version).execute(&mut *tx).await?;
         if deleted.rows_affected() != 1 {
             return Err(conflict());

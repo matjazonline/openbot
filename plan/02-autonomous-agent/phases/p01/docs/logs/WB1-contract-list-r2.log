@@ -1,0 +1,13 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p01)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 50s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-c19a0b960dacdcef)
+application::agent::contract_tests::autonomous_agent_contract_alias_and_identity_uniqueness_is_agent_local: test
+application::agent::contract_tests::autonomous_agent_contract_binding_count_and_parameter_bytes_fail_before_execution: test
+application::agent::contract_tests::autonomous_agent_contract_canonical_content_keeps_order_and_all_effect_facts: test
+application::agent::contract_tests::autonomous_agent_contract_definition_decoding_is_bounded_and_rejects_extra_secrets: test
+application::agent::contract_tests::autonomous_agent_contract_manifest_is_canonical_unique_bounded_identity_content: test
+application::agent::contract_tests::autonomous_agent_contract_reserved_names_cannot_manufacture_builtin_authority: test
+application::agent::contract_tests::autonomous_agent_contract_skills_require_local_aliases_without_granting_tools: test
+application::agent::contract_tests::autonomous_agent_contract_target_variants_and_remote_aliases_round_trip: test
+
+8 tests, 0 benchmarks

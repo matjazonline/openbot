@@ -1,0 +1,149 @@
+{
+  "pattern": "company_mcp_tool_grants",
+  "filesSearched": 1278,
+  "totalHits": 9,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/connection_level_tests.rs#snapshot",
+        "name": "snapshot",
+        "kind": "function",
+        "path": "src/adapters/http/routes/connection_level_tests.rs",
+        "span": "L150-L152"
+      },
+      "path": "src/adapters/http/routes/connection_level_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 151,
+          "text": "sqlx::query_scalar(\"SELECT jsonb_build_object('http',(SELECT jsonb_agg(to_jsonb(connection) ORDER BY id) FROM workflow_http_connections AS connection),'mcp',(SE"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/mcp.rs#replace_grants",
+        "name": "replace_grants",
+        "kind": "function",
+        "path": "src/adapters/persistence/mcp.rs",
+        "span": "L130-L144"
+      },
+      "path": "src/adapters/persistence/mcp.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 139,
+          "text": "sqlx::query(\"DELETE FROM company_mcp_tool_grants WHERE company_id = $1 AND connection_id = $2 AND NOT (tool_name = ANY($3::text[]))\")"
+        },
+        {
+          "line": 141,
+          "text": "sqlx::query(\"INSERT INTO company_mcp_tool_grants (company_id, connection_id, tool_name) SELECT $1, $2, unnest($3::text[]) ON CONFLICT (company_id, connection_id"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/ui/authoring/tests.rs#approved_rows",
+        "name": "approved_rows",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/ui/authoring/tests.rs",
+        "span": "L432-L473"
+      },
+      "path": "src/adapters/http/routes/workflows/ui/authoring/tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 446,
+          "text": "\"INSERT INTO company_mcp_tool_grants(company_id, connection_id, tool_name) VALUES ($1, $2, $3)\","
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "plan/fix-app/phases/p08/docs/logs/add-json-tests.py",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 92,
+          "text": "let stored: i64 = sqlx::query_scalar(\"SELECT count(*) FROM company_mcp_tool_grants WHERE company_id=$1 AND connection_id=$2\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/mcp_tests.rs#jsonb_row_context_mcp_quarantines_discovery_and_effective_grants",
+        "name": "jsonb_row_context_mcp_quarantines_discovery_and_effective_grants",
+        "kind": "function",
+        "path": "src/adapters/persistence/mcp_tests.rs",
+        "span": "L269-L328"
+      },
+      "path": "src/adapters/persistence/mcp_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 313,
+          "text": "\"SELECT count(*) FROM company_mcp_tool_grants WHERE company_id=$1 AND connection_id=$2\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/mcp.rs#CONNECTION_SELECT",
+        "name": "CONNECTION_SELECT",
+        "kind": "constant",
+        "path": "src/adapters/persistence/mcp.rs",
+        "span": "L29-L34"
+      },
+      "path": "src/adapters/persistence/mcp.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 33,
+          "text": "ARRAY(SELECT grant_row.tool_name FROM company_mcp_tool_grants AS grant_row WHERE grant_row.company_id = connection.company_id AND grant_row.connection_id = conn"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/admission_authority_tests.rs#workflow_admit_sql_saved_resource_revocation_blocks_new_replay_and_alias",
+        "name": "workflow_admit_sql_saved_resource_revocation_blocks_new_replay_and_alias",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/admission_authority_tests.rs",
+        "span": "L150-L169"
+      },
+      "path": "src/adapters/persistence/workflow/admission_authority_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 161,
+          "text": "sqlx::query(\"DELETE FROM company_mcp_tool_grants WHERE company_id=$1 AND connection_id=$2\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/binding_tests.rs#workflow_binding_sql_mcp_revocation_readiness_and_contract_scope",
+        "name": "workflow_binding_sql_mcp_revocation_readiness_and_contract_scope",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/binding_tests.rs",
+        "span": "L338-L428"
+      },
+      "path": "src/adapters/persistence/workflow/binding_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 346,
+          "text": "sqlx::query(\"DELETE FROM company_mcp_tool_grants WHERE company_id = $1 AND connection_id = $2\")"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 7,
+    "baselineChars": 100192
+  }
+}

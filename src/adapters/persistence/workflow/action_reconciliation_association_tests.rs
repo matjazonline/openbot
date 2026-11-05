@@ -71,7 +71,7 @@ async fn associated(kind: AssociationKind) -> Associated {
     let (f, request) = Box::pin(setup_action_on_fixture(
         f,
         scope,
-        publication::ActionRecovery::Reconcile,
+        crate::application::agent::ActionRecovery::Reconcile,
         json!({"value":1}),
     ))
     .await;

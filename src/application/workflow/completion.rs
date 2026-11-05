@@ -1,5 +1,7 @@
 //! Validated successful progression. Failure recovery and parking have separate owners.
 use super::{activation::*, batch::*, lease::FencedWorkflowResult, publication::PublishedBundle};
+#[cfg(test)]
+use crate::application::agent::{AgentKey, ModelSettings};
 use crate::application::app_error::{AppError, AppResult};
 use crate::domain::workflow::{ChoiceName, RouteSelection, TransitionTarget};
 use async_trait::async_trait;

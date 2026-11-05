@@ -1,5 +1,6 @@
 //! Native agent preparation is deterministic, delimited and never widens the selection.
 use super::*;
+use crate::application::agent::AgentKey;
 use crate::application::workflow::registry::ModelStep;
 use crate::application::workflow::{
     agent::{AgentToolTarget, PreparedAgent, PreparedStep},

@@ -1,0 +1,77 @@
+diff --git a/migrations/20260817000000_init_schema.sql b/migrations/20260817000000_init_schema.sql
+index 5b3c800..21a0e7e 100644
+--- a/migrations/20260817000000_init_schema.sql
++++ b/migrations/20260817000000_init_schema.sql
+@@ -12274,7 +12274,7 @@ BEGIN
+     IF NOT FOUND THEN RAISE EXCEPTION 'retired skill assignment cannot be attached' USING ERRCODE='23514'; END IF;
+     RETURN NEW;
+ END $$;
+-CREATE TRIGGER agent_skill_assignment_identity BEFORE INSERT ON public.agent_skills
++CREATE TRIGGER agent_skill_assignment_identity BEFORE INSERT OR UPDATE ON public.agent_skills
+     FOR EACH ROW EXECUTE FUNCTION public.capture_agent_skill_assignment();
+ 
+ CREATE FUNCTION public.guard_agent_live_grant() RETURNS trigger LANGUAGE plpgsql AS $$
+diff --git a/src/adapters/persistence/workflow/autonomous_agent_storage_skill_lifetime_tests.rs b/src/adapters/persistence/workflow/autonomous_agent_storage_skill_lifetime_tests.rs
+index 4082539..ba64190 100644
+--- a/src/adapters/persistence/workflow/autonomous_agent_storage_skill_lifetime_tests.rs
++++ b/src/adapters/persistence/workflow/autonomous_agent_storage_skill_lifetime_tests.rs
+@@ -99,6 +99,51 @@ impl SkillHistory {
+                 .unwrap();
+         assert_eq!(remaining, 0);
+     }
++    async fn assert_retired_update_rejected(&self, fresh: Uuid) {
++        let p = self.f.persistence();
++        let mut update = p.pool().begin().await.unwrap();
++        sqlx::query("SET CONSTRAINTS ALL IMMEDIATE")
++            .execute(&mut *update)
++            .await
++            .unwrap();
++        let error = sqlx::query("UPDATE agent_skills SET assignment_id=$2 WHERE agent_id=$1")
++            .bind(self.agent.id)
++            .bind(self.assignment)
++            .execute(&mut *update)
++            .await
++            .unwrap_err();
++        assert_eq!(
++            error.as_database_error().unwrap().code().as_deref(),
++            Some("23514")
++        );
++        update.rollback().await.unwrap();
++        let retained: Uuid =
++            sqlx::query_scalar("SELECT assignment_id FROM agent_skills WHERE agent_id=$1")
++                .bind(self.agent.id)
++                .fetch_one(p.pool())
++                .await
++                .unwrap();
++        assert_eq!(
++            retained, fresh,
++            "failed UPDATE must preserve the current live incarnation"
++        );
++        sqlx::query("UPDATE agent_skills SET position=1 WHERE agent_id=$1")
++            .bind(self.agent.id)
++            .execute(p.pool())
++            .await
++            .unwrap();
++        let reordered: Uuid = sqlx::query_scalar(
++            "SELECT assignment_id FROM agent_skills WHERE agent_id=$1 AND position=1",
++        )
++        .bind(self.agent.id)
++        .fetch_one(p.pool())
++        .await
++        .unwrap();
++        assert_eq!(
++            reordered, fresh,
++            "valid ordering updates retain their live identity"
++        );
++    }
+ }
+ 
+ #[tokio::test]
+@@ -153,6 +198,7 @@ async fn autonomous_agent_storage_skill_delete_preserves_history_and_cannot_revi
+             .await
+             .unwrap();
+     assert_eq!(current, Some(saved.skill.id));
++    saved.assert_retired_update_rejected(fresh).await;
+     native_rejection(sqlx::query("INSERT INTO agent_skill_assignments(company_id,agent_id,id,skill_id) VALUES($1,$2,$3,$4)")
+         .bind(saved.f.binding.target.company.as_uuid()).bind(saved.agent.id).bind(Uuid::new_v4()).bind(saved.skill.id)
+         .execute(p.pool()).await.unwrap_err());

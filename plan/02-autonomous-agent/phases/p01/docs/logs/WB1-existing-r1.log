@@ -1,0 +1,89 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 57 tests
+test adapters::persistence::agent::tests::postgres_agent_persistence_works ... ok
+test adapters::http::routes::agent::api_tests::library_builder_copy_keeps_its_grants_on_an_explicit_model ... ok
+test adapters::http::routes::workflows::tests::tool_tests::workflow_tool_routes_register_revoke_and_grant ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::recovery::workflow_agent_run_crash_during_effect_is_indeterminate_and_reconciled ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::driver::workflow_agent_run_refuses_model_invented_tool_without_dispatch ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::driver::workflow_agent_run_repairs_invalid_output_once ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::driver::workflow_agent_run_protected_tool_waits_for_approval_and_dispatches_once ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::driver::workflow_agent_run_two_approval_cycles_dispatch_each_call_once ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::driver::workflow_agent_run_refuses_rebound_tool_target ... FAILED
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::driver::workflow_agent_run_token_pause_resumes_with_the_saved_request ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::recovery::workflow_agent_run_dynamic_selection_runs_the_bound_agent ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::recovery::workflow_agent_run_invalid_output_after_repairs_is_terminal ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::recovery::workflow_agent_run_reservation_without_provider_io_retries_with_a_new_request ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::recovery::workflow_agent_run_restart_after_receipt_reuses_the_saved_effect ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::recovery::workflow_agent_run_restart_after_provider_entry_charges_a_new_request ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::recovery::workflow_agent_run_settlement_pause_and_second_pause_resume_exact_requests ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::model_steps::workflow_model_steps_check_only_the_capabilities_they_use ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::recovery::workflow_agent_run_token_denial_never_enters_the_provider ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::workflow_agent_capability_sql_shape_matches_type_names ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::recovery::workflow_agent_run_unanswered_effect_is_terminal_and_reconciled ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::workflow_agent_capability_writers_preserve_unsupplied_lists ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::workflow_agent_capture_refuses_slot_bound_http_grant ... ok
+test adapters::persistence::workflow::tests::binding_tests::workflow_binding_sql_mcp_revocation_readiness_and_contract_scope ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::workflow_agent_capture_refuses_unrunnable_agents ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::workflow_agent_publication_refuses_forged_snapshot_and_keeps_frozen_version ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::workflow_agent_publish_competing_agent_edit_fails_publication ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::workflow_agent_run_competing_revocation_refuses_admission ... FAILED
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::workflow_agent_run_refuses_removed_tool_grant_before_provider_entry ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::workflow_agent_run_refuses_revoked_model_connection_before_provider_entry ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::workflow_agent_run_refuses_unlinked_skill_before_provider_entry ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::workflow_agent_run_saves_tool_call_dispatches_once_and_replays_final_output ... ok
+test adapters::persistence::workflow::tests::http_tests::workflow_http_publication_rejects_forged_policy_and_registration_revocation ... ok
+test adapters::persistence::workflow::tests::mcp_tests::agent_tests::workflow_agent_mcp_tool_dispatches_once_through_the_bound_slot ... ok
+test adapters::persistence::workflow::tests::mcp_tests::catalog_tests::workflow_mcp_operation_cas_cascades_and_tenant_constraints ... ok
+test application::workflow::mcp::tests::workflow_mcp_discovery_must_offer_exactly_the_frozen_schemas ... ok
+test application::workflow::mcp::tests::workflow_mcp_operation_requires_grant_review_and_reconcile_recovery ... ok
+test application::workflow::publication::tests::agent_tests::workflow_agent_preparation_declares_provider_safe_names_and_delimits_context ... ok
+test application::workflow::publication::tests::agent_tests::workflow_agent_preparation_refuses_unsupported_or_colliding_bindings ... ok
+test application::workflow::publication::tests::capabilities_tests::workflow_capabilities_agent_receives_exactly_its_saved_tools_and_skills_in_order ... ok
+test application::workflow::publication::tests::capabilities_tests::workflow_capabilities_agent_universe_is_literal_or_finite_parameter_enum ... ok
+test application::workflow::publication::tests::capabilities_tests::workflow_capabilities_agent_without_saved_capabilities_receives_none ... ok
+test application::workflow::publication::tests::capabilities_tests::workflow_capabilities_classify_captures_and_requires_its_agent ... ok
+test application::workflow::publication::tests::capabilities_tests::workflow_capabilities_refuse_other_company_and_unknown_agent ... ok
+test application::workflow::publication::tests::capabilities_tests::workflow_capabilities_skill_requirement_outside_agent_tools_fails_publication ... ok
+test adapters::persistence::workflow::tests::mcp_tests::approval_tests::workflow_action_approval_mcp_never_opens_before_approval_then_calls_once ... ok
+test application::workflow::publication::tests::capabilities_tests::workflow_capabilities_step_and_workflow_narrowing_inputs_are_rejected ... ok
+test application::workflow::publication::tests::workflow_publication_mcp_contract_policy_and_resource_are_frozen_together ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_registration_tests::workflow_tool_pins_and_grants_stay_within_the_agents_company ... FAILED
+test adapters::persistence::workflow::tests::message_tests::agent_tests::workflow_agent_message_tool_parks_on_delivery_and_continues_with_its_receipt ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_registration_tests::workflow_tool_publication_freezes_the_child_contract_and_refuses_conflicts ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_registration_tests::workflow_tool_registration_commands_keep_revisions_authority_and_bounds ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_revocation_tests::workflow_tool_repin_and_archive_leave_published_workflows_on_their_frozen_version ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_revocation_tests::workflow_tool_stored_children_keep_their_frozen_pin_until_the_tool_is_revoked ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_revocation_tests::workflow_tool_revocation_refuses_new_runs_and_calls_while_parked_calls_deliver ... ok
+test adapters::persistence::workflow::tests::mcp_tests::recovery_tests::workflow_mcp_revocation_and_rotation_racing_dispatch_never_call ... ok
+test adapters::persistence::workflow::tests::mcp_tests::catalog_tests::workflow_mcp_registration_competes_with_grant_removal_refresh_and_delete ... ok
+test adapters::persistence::workflow::tests::http_tests::workflow_http_current_revocation_and_protection_prevent_network ... ok
+
+failures:
+
+---- adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::driver::workflow_agent_run_refuses_rebound_tool_target stdout ----
+
+thread 'adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::driver::workflow_agent_run_refuses_rebound_tool_target' (31474059) panicked at src/adapters/persistence/workflow/agent_driver_tests.rs:241:6:
+called `Result::unwrap()` on an `Err` value: Database("error returned from database: update or delete on table \"workflow_http_operations\" violates foreign key constraint \"agent_capability_bindings_company_id_http_connection_id_op_fkey\" on table \"agent_capability_bindings\"")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::workflow_agent_run_competing_revocation_refuses_admission stdout ----
+
+thread 'adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::workflow_agent_run_competing_revocation_refuses_admission' (31474275) panicked at src/adapters/persistence/workflow/agent_runtime_tests.rs:514:5:
+assertion `left == right` failed
+  left: "agent.unresolved"
+ right: "agent.rejected"
+
+---- adapters::persistence::workflow::tests::message_tests::workflow_tool_registration_tests::workflow_tool_pins_and_grants_stay_within_the_agents_company stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::workflow_tool_registration_tests::workflow_tool_pins_and_grants_stay_within_the_agents_company' (31474435) panicked at src/adapters/persistence/workflow/workflow_tool_registration_tests.rs:57:6:
+called `Result::unwrap()` on an `Err` value: BadRequest("Select one existing, unambiguous company tool target")
+
+
+failures:
+    adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::driver::workflow_agent_run_refuses_rebound_tool_target
+    adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::workflow_agent_run_competing_revocation_refuses_admission
+    adapters::persistence::workflow::tests::message_tests::workflow_tool_registration_tests::workflow_tool_pins_and_grants_stay_within_the_agents_company
+
+test result: FAILED. 54 passed; 3 failed; 0 ignored; 0 measured; 2851 filtered out; finished in 15.87s
+

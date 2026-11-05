@@ -1,0 +1,18 @@
+{
+  "binary": "target/debug/deps/open_bots-c19a0b960dacdcef",
+  "binary_sha256": "e62b86c77c987beaea959ea225a65a08bf49c5f0b20407d70ce44391bde75809",
+  "results": [
+    {
+      "prefix": "autonomous_agent_contract_",
+      "selected": 8,
+      "exit": 0,
+      "summary": "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 2903 filtered out; finished in 0.02s"
+    },
+    {
+      "prefix": "autonomous_agent_storage_",
+      "selected": 16,
+      "exit": 0,
+      "summary": "test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 2895 filtered out; finished in 5.85s"
+    }
+  ]
+}

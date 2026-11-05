@@ -1,5 +1,6 @@
 //! Company HTTP resources and registered HTTP operations. Credentials never enter actions.
 use super::{authorization::WorkflowActor, publication::ToolSnapshot};
+use crate::application::agent::ActionRecovery;
 use crate::{
     app_error::{AppError, AppResult},
     domain::workflow::{CompanyId, TypeName},
@@ -75,10 +76,7 @@ pub struct HttpOperation {
 }
 impl HttpOperation {
     pub fn validate(&self, company: CompanyId) -> AppResult<()> {
-        use super::{
-            compiler::{Schema, SourceSpan},
-            publication::ActionRecovery,
-        };
+        use super::compiler::{Schema, SourceSpan};
         if self.tool.company_id != company
             || self.tool.workflow.is_some()
             || self.tool.contract.connection.is_some()

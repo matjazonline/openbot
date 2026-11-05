@@ -1,4 +1,5 @@
 use super::*;
+use crate::application::agent::ActionRecovery;
 use sha2::{Digest, Sha256};
 
 #[derive(Clone)]

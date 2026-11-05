@@ -20,7 +20,7 @@ use crate::{
 
 pub(crate) const AGENT_COLUMNS: &str = "\
     agent.id, agent.company_id, agent.name, agent.slug::text AS slug, agent.provider, agent.model, \
-    agent.system_prompt, agent.description, agent.avatar_url, agent.created_by, agent.created_at";
+    agent.system_prompt, agent.description, agent.avatar_url, agent.created_by, agent.created_at, agent.draft_revision";
 
 #[derive(sqlx::FromRow, Debug, Serialize)]
 pub struct AgentDb {
@@ -35,6 +35,13 @@ pub struct AgentDb {
     pub avatar_url: Option<String>,
     pub created_by: serde_json::Value,
     pub created_at: DateTime<Utc>,
+    pub draft_revision: i64,
+}
+
+#[derive(sqlx::FromRow)]
+struct AssignedSkillIdentity {
+    skill_id: Uuid,
+    assignment_id: Uuid,
 }
 
 impl TryFrom<AgentDb> for Agent {
@@ -43,6 +50,12 @@ impl TryFrom<AgentDb> for Agent {
     fn try_from(db: AgentDb) -> AppResult<Self> {
         Ok(Agent {
             id: db.id,
+            draft_revision: u64::try_from(db.draft_revision)
+                .ok()
+                .and_then(|value| {
+                    crate::entities::agent_capability::AgentDraftRevision::new(value).ok()
+                })
+                .ok_or_else(|| AppError::Internal("Invalid agents.draft_revision".into()))?,
             company_id: db.company_id,
             name: db.name,
             slug: db.slug,
@@ -86,8 +99,8 @@ pub(crate) async fn insert_agent_on(
     sqlx::query(
         r#"INSERT INTO agents
            (id, company_id, name, slug, provider, model, system_prompt, description,
-            avatar_url, created_by, workflow_tools)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, COALESCE($11, '{}'::text[]))"#,
+            avatar_url, created_by)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)"#,
     )
     .bind(id)
     .bind(company_id)
@@ -99,12 +112,6 @@ pub(crate) async fn insert_agent_on(
     .bind(&write.description)
     .bind(write.avatar_url.as_ref().map(AvatarUrl::as_str))
     .bind(created_by)
-    .bind(write.workflow_tools.as_ref().map(|names| {
-        names
-            .iter()
-            .map(|name| name.as_str().to_owned())
-            .collect::<Vec<_>>()
-    }))
     .execute(&mut **transaction)
     .await
     .map_err(|error| {
@@ -158,6 +165,15 @@ pub(crate) async fn replace_agent_capabilities_on(
     write: &AgentWrite,
 ) -> AppResult<()> {
     let _ = validate_agent_capabilities_on(transaction, company_id, write).await?;
+    if let Some(bindings) = &write.tool_bindings {
+        super::agent_capability::replace_bindings_on(transaction, company_id, agent_id, bindings)
+            .await?;
+    }
+    let previous: Vec<AssignedSkillIdentity> =
+        sqlx::query_as("SELECT skill_id,assignment_id FROM agent_skills WHERE agent_id=$1")
+            .bind(agent_id)
+            .fetch_all(&mut **transaction)
+            .await?;
     sqlx::query("DELETE FROM agent_skills WHERE agent_id = $1")
         .bind(agent_id)
         .execute(&mut **transaction)
@@ -170,13 +186,20 @@ pub(crate) async fn replace_agent_capabilities_on(
     // as one statement; `plan/db_audit/phase2.md` has the reasoning.
     for (position, skill_id) in write.skill_ids.iter().enumerate() {
         sqlx::query(
-            "INSERT INTO agent_skills (company_id, agent_id, skill_id, position) \
-             VALUES ($1, $2, $3, $4)",
+            "INSERT INTO agent_skills (company_id, agent_id, skill_id, position, assignment_id) \
+             VALUES ($1, $2, $3, $4, $5)",
         )
         .bind(company_id)
         .bind(agent_id)
         .bind(skill_id)
         .bind(position as i32)
+        .bind(
+            previous
+                .iter()
+                .find(|assigned| &assigned.skill_id == skill_id)
+                .map(|assigned| assigned.assignment_id)
+                .unwrap_or_else(Uuid::new_v4),
+        )
         .execute(&mut **transaction)
         .await
         .map_err(capability_relationship_error)?;
@@ -248,9 +271,8 @@ pub(crate) async fn update_agent(
     let db = sqlx::query_as::<_, AgentDb>(&format!(
         r#"UPDATE agents AS agent
            SET name = $1, slug = $2, provider = $3, model = $4, system_prompt = $5,
-               description = $6, avatar_url = $7,
-               workflow_tools = COALESCE($8, agent.workflow_tools)
-           WHERE id = $9
+               description = $6, avatar_url = $7, draft_revision = draft_revision + 1
+           WHERE id = $8
            RETURNING {AGENT_COLUMNS}"#
     ))
     .bind(&write.name)
@@ -260,17 +282,13 @@ pub(crate) async fn update_agent(
     .bind(&write.system_prompt)
     .bind(&write.description)
     .bind(write.avatar_url.as_ref().map(AvatarUrl::as_str))
-    .bind(write.workflow_tools.as_ref().map(|names| {
-        names
-            .iter()
-            .map(|name| name.as_str().to_owned())
-            .collect::<Vec<_>>()
-    }))
     .bind(id)
     .fetch_one(&mut *tx)
     .await
     .map_err(slug_conflict)?;
-    tx.commit().await.map_err(AppError::from)?;
+    tx.commit()
+        .await
+        .map_err(super::agent_capability::relationship_error)?;
     db.try_into()
 }
 
@@ -299,7 +317,10 @@ impl AgentPersistence for PostgresPersistence {
         .bind(id)
         .fetch_one(&mut *transaction)
         .await?;
-        transaction.commit().await?;
+        transaction
+            .commit()
+            .await
+            .map_err(super::agent_capability::relationship_error)?;
         db.try_into()
     }
 
@@ -313,7 +334,10 @@ impl AgentPersistence for PostgresPersistence {
         .bind(id)
         .fetch_one(&mut *transaction)
         .await?;
-        transaction.commit().await?;
+        transaction
+            .commit()
+            .await
+            .map_err(super::agent_capability::relationship_error)?;
         db.try_into()
     }
 
@@ -478,6 +502,7 @@ mod tests {
     #[test]
     fn malformed_provenance_is_a_conversion_error_not_a_panic() {
         let db = AgentDb {
+            draft_revision: 1,
             id: Uuid::new_v4(),
             company_id: None,
             name: "Broken".into(),
