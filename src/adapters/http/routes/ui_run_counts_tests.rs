@@ -417,9 +417,13 @@ async fn admin(f: &CountsFixture) -> Viewer {
     let invite = f
         .persistence
         .create_invite(
-            f.company_id,
-            &email,
-            crate::entities::company_member::CompanyAccessRole::Admin,
+            crate::adapters::persistence::test_support::invite_command(
+                &f.persistence,
+                f.company_id,
+                &email,
+                crate::entities::company_member::CompanyAccessRole::Admin,
+            )
+            .await,
         )
         .await
         .unwrap();

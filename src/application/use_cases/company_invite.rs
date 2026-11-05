@@ -14,6 +14,13 @@ use crate::{
     use_cases::company::{CompanyPersistence, owned_company, readable_company},
 };
 
+#[path = "company_invite_commands.rs"]
+mod commands;
+pub use commands::*;
+#[path = "company_level_use_cases.rs"]
+mod levels;
+pub(crate) use levels::{level_actor, level_error};
+
 /// An invite belonging to another company is reported exactly like a missing one, so an id probe
 /// cannot tell a foreign invite from a nonexistent one. See [`owned_company`].
 fn invite_not_found() -> AppError {
@@ -30,7 +37,7 @@ fn not_pending_error() -> AppError {
 
 /// The address an invite is written to: trimmed and lower-cased, and refused as a form error when
 /// it is plainly not an address.
-fn invite_address(raw: &str) -> AppResult<String> {
+pub(crate) fn invite_address(raw: &str) -> AppResult<String> {
     let email = raw.trim().to_lowercase();
     if email.is_empty() || !email.contains('@') {
         return Err(AppError::BadRequest(
@@ -42,24 +49,31 @@ fn invite_address(raw: &str) -> AppResult<String> {
 
 #[async_trait]
 pub trait CompanyInvitePersistence: Send + Sync {
-    async fn create_invite(
+    async fn create_invite(&self, command: CreateCompanyInvite) -> AppResult<CompanyInvite>;
+    async fn get_invite_by_id(
         &self,
         company_id: Uuid,
-        email: &str,
-        role: CompanyAccessRole,
-    ) -> AppResult<CompanyInvite>;
-    async fn get_invite_by_id(&self, id: Uuid) -> AppResult<Option<CompanyInvite>>;
+        id: Uuid,
+    ) -> AppResult<Option<CompanyInvite>>;
     async fn list_invites_by_company(&self, company_id: Uuid) -> AppResult<Vec<CompanyInvite>>;
     /// Whether `email` is the address of this company's owner.
     async fn is_company_owner_address(&self, company_id: Uuid, email: &str) -> AppResult<bool>;
     /// Rewrites the invite only while it is still pending and belongs to `company_id`; `None`
     /// when it no longer is.
-    async fn update_invite(
+    async fn update_invite(&self, command: UpdateCompanyInvite)
+    -> AppResult<Option<CompanyInvite>>;
+    async fn get_member_by_user_id(
         &self,
         company_id: Uuid,
-        id: Uuid,
-        new_email: &str,
-        role: CompanyAccessRole,
+        user_id: Uuid,
+    ) -> AppResult<Option<CompanyMember>>;
+    async fn set_member_access_level(
+        &self,
+        change: MemberLevelChange,
+    ) -> AppResult<Option<CompanyMember>>;
+    async fn set_invite_access_level(
+        &self,
+        change: InviteLevelChange,
     ) -> AppResult<Option<CompanyInvite>>;
     async fn delete_invite(&self, id: Uuid) -> AppResult<()>;
     async fn list_invites_for_user(
@@ -129,19 +143,28 @@ impl CompanyInviteUseCases {
     #[instrument(skip_all)]
     pub async fn create_company_invite(
         &self,
-        user_id: Uuid,
-        company_id: Uuid,
-        email: &str,
-        role: CompanyAccessRole,
+        mut command: CreateCompanyInvite,
     ) -> AppResult<CompanyInvite> {
-        self.verify_company_owner(user_id, company_id).await?;
-        let email = invite_address(email)?;
-        self.refuse_owner_address(company_id, &email).await?;
-
-        info!(%company_id, "Creating invite");
-        self.invite_persistence
-            .create_invite(company_id, &email, role)
-            .await
+        let access = self
+            .level_manager(command.actor_id, command.company_id)
+            .await?;
+        if !access.membership.is_owner() {
+            return Err(AppError::Forbidden(
+                "Only the company owner can do this.".into(),
+            ));
+        }
+        crate::entities::access_level::may_assign_level(
+            level_actor(&access),
+            crate::entities::access_level::LevelTarget::Assignable(
+                crate::entities::access_level::AccessLevel::PUBLIC,
+            ),
+            command.access_level,
+        )
+        .map_err(level_error)?;
+        command.email = invite_address(&command.email)?.into();
+        self.refuse_owner_address(command.company_id, &command.email)
+            .await?;
+        self.invite_persistence.create_invite(command).await
     }
 
     #[instrument(skip_all)]
@@ -150,7 +173,7 @@ impl CompanyInviteUseCases {
         user_id: Uuid,
         company_id: Uuid,
     ) -> AppResult<Vec<CompanyInvite>> {
-        self.verify_company_owner(user_id, company_id).await?;
+        self.level_manager(user_id, company_id).await?;
         self.invite_persistence
             .list_invites_by_company(company_id)
             .await
@@ -163,8 +186,11 @@ impl CompanyInviteUseCases {
         company_id: Uuid,
         invite_id: Uuid,
     ) -> AppResult<Option<CompanyInvite>> {
-        self.verify_company_owner(user_id, company_id).await?;
-        let invite = self.invite_persistence.get_invite_by_id(invite_id).await?;
+        self.level_manager(user_id, company_id).await?;
+        let invite = self
+            .invite_persistence
+            .get_invite_by_id(company_id, invite_id)
+            .await?;
         if let Some(ref inv) = invite
             && inv.company_id != company_id
         {
@@ -176,34 +202,36 @@ impl CompanyInviteUseCases {
     #[instrument(skip_all)]
     pub async fn update_company_invite(
         &self,
-        user_id: Uuid,
-        company_id: Uuid,
-        invite_id: Uuid,
-        new_email: &str,
-        role: Option<CompanyAccessRole>,
+        mut command: UpdateCompanyInvite,
     ) -> AppResult<CompanyInvite> {
-        self.verify_company_owner(user_id, company_id).await?;
-
+        let access = self
+            .level_manager(command.actor_id, command.company_id)
+            .await?;
+        if !access.membership.is_owner() {
+            return Err(AppError::Forbidden(
+                "Only the company owner can do this.".into(),
+            ));
+        }
         let invite = self
             .invite_persistence
-            .get_invite_by_id(invite_id)
+            .get_invite_by_id(command.company_id, command.invite_id)
             .await?
             .ok_or_else(invite_not_found)?;
-
-        if invite.company_id != company_id {
-            return Err(invite_not_found());
-        }
         if invite.status != "pending" {
             return Err(not_pending_error());
         }
-        let email = invite_address(new_email)?;
-        self.refuse_owner_address(company_id, &email).await?;
-
-        info!(%invite_id, "Updating invite email");
-        // The status read above is only for the error message: the write itself is conditional on
-        // the invite still being pending, so an acceptance in between is not overwritten.
+        let requested = command.access_level.unwrap_or(invite.access_level);
+        crate::entities::access_level::may_assign_level(
+            level_actor(&access),
+            crate::entities::access_level::LevelTarget::Assignable(invite.access_level),
+            requested,
+        )
+        .map_err(level_error)?;
+        command.email = invite_address(&command.email)?.into();
+        self.refuse_owner_address(command.company_id, &command.email)
+            .await?;
         self.invite_persistence
-            .update_invite(company_id, invite_id, &email, role.unwrap_or(invite.role))
+            .update_invite(command)
             .await?
             .ok_or_else(not_pending_error)
     }
@@ -219,7 +247,7 @@ impl CompanyInviteUseCases {
 
         let invite = self
             .invite_persistence
-            .get_invite_by_id(invite_id)
+            .get_invite_by_id(company_id, invite_id)
             .await?
             .ok_or_else(invite_not_found)?;
 

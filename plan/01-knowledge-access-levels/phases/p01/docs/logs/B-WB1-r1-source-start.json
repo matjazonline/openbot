@@ -1,0 +1,10 @@
+{
+  "base": "73799dc6ac685008d5c97f154e861d11ae15bfa0",
+  "head": "73799dc6ac685008d5c97f154e861d11ae15bfa0",
+  "exclusions": [
+    "plan/01-knowledge-access-levels/phases/p01/docs/"
+  ],
+  "diff_sha256": "641208154e1a5a250445f369843d0f3c25ca83b922ebd6ef177fb7cd3aa91f52",
+  "tree_sha256": "19c8cb813f6ff0bbc9fc45ecbbcac2c31cb0a667a5c2b6b601b894a59ad36900",
+  "files_count": 2529
+}

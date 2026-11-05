@@ -63,6 +63,7 @@ fn set_membership(
     store.state.lock().unwrap().access.insert(
         (company_id, actor().user_id()),
         PrincipalAccessContext {
+            access_level: crate::entities::access_level::fixture_level(membership),
             principal_id,
             membership,
             grant_authority: crate::entities::participant::PrincipalGrantAuthority::Available,

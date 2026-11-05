@@ -246,6 +246,7 @@ async fn schedules_page(
     let Some(CompanyAccess {
         company,
         membership,
+        ..
     }) = company
     else {
         return Ok(Html(pages::mailbox_no_company_page(&workspace_user)));
@@ -370,6 +371,7 @@ async fn create_pane(
     let Some(CompanyAccess {
         company,
         membership: _,
+        ..
     }) = company
     else {
         return Ok(Html(String::new()));
@@ -403,6 +405,7 @@ async fn edit_schedule_pane(
     let Some(CompanyAccess {
         company,
         membership: _,
+        ..
     }) = company
     else {
         return Ok(Html(String::new()));

@@ -73,7 +73,15 @@ impl Fixture {
         let channel = create_channel(&p, company.id).await;
         let foreign_channel = create_channel(&p, foreign.id).await;
         let invite = p
-            .create_invite(company.id, &member.email, CompanyAccessRole::Member)
+            .create_invite(
+                crate::adapters::persistence::test_support::invite_command(
+                    &p,
+                    company.id,
+                    &member.email,
+                    CompanyAccessRole::Member,
+                )
+                .await,
+            )
             .await
             .expect("member invitation");
         p.accept_pending_invite(invite.id, member.id, &member.email)

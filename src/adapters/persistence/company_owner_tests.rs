@@ -64,7 +64,15 @@ impl OwnedCompany {
         let user = Self::account(&self.persistence, label).await;
         let invite = self
             .persistence
-            .create_invite(self.company_id, &user.email, role)
+            .create_invite(
+                crate::adapters::persistence::test_support::invite_command(
+                    &self.persistence,
+                    self.company_id,
+                    &user.email,
+                    role,
+                )
+                .await,
+            )
             .await
             .unwrap();
         self.persistence
@@ -130,19 +138,14 @@ async fn company_owner_accepting_an_invite_to_own_company_stays_owner() {
         return;
     };
     let fixture = OwnedCompany::new(pool).await;
-    let invite = fixture
-        .persistence
-        .create_invite(
-            fixture.company_id,
-            &fixture.owner.email,
-            CompanyAccessRole::Member,
-        )
-        .await
-        .unwrap();
+    let invite_id = Uuid::new_v4();
+    sqlx::query("INSERT INTO company_invites (id,company_id,email,role,access_level) VALUES ($1,$2,$3,'member',0)")
+        .bind(invite_id).bind(fixture.company_id).bind(&fixture.owner.email)
+        .execute(fixture.persistence.pool()).await.unwrap();
 
     let accepted = fixture
         .persistence
-        .accept_pending_invite(invite.id, fixture.owner.id, &fixture.owner.email)
+        .accept_pending_invite(invite_id, fixture.owner.id, &fixture.owner.email)
         .await
         .unwrap()
         .expect("the invite reads back accepted");
@@ -274,24 +277,26 @@ async fn company_invite_refuses_the_owner_address_and_malformed_ones() {
     let shouted = fixture.owner.email.to_uppercase();
 
     let created = invitations
-        .create_company_invite(
-            fixture.owner.id,
-            fixture.company_id,
-            &shouted,
-            CompanyAccessRole::Member,
-        )
+        .create_company_invite(crate::use_cases::company_invite::CreateCompanyInvite {
+            actor_id: fixture.owner.id,
+            company_id: fixture.company_id,
+            email: shouted.to_string().into(),
+            role: CompanyAccessRole::Member,
+            access_level: crate::entities::access_level::AccessLevel::PUBLIC,
+        })
         .await;
     assert!(
         matches!(created, Err(AppError::BadRequest(_))),
         "{created:?}"
     );
     let malformed = invitations
-        .create_company_invite(
-            fixture.owner.id,
-            fixture.company_id,
-            "not-an-address",
-            CompanyAccessRole::Member,
-        )
+        .create_company_invite(crate::use_cases::company_invite::CreateCompanyInvite {
+            actor_id: fixture.owner.id,
+            company_id: fixture.company_id,
+            email: ("not-an-address").to_string().into(),
+            role: CompanyAccessRole::Member,
+            access_level: crate::entities::access_level::AccessLevel::PUBLIC,
+        })
         .await;
     assert!(
         matches!(malformed, Err(AppError::BadRequest(_))),
@@ -299,22 +304,26 @@ async fn company_invite_refuses_the_owner_address_and_malformed_ones() {
     );
 
     let invite = invitations
-        .create_company_invite(
-            fixture.owner.id,
-            fixture.company_id,
-            &format!("guest-{}@example.test", Uuid::new_v4().simple()),
-            CompanyAccessRole::Member,
-        )
+        .create_company_invite(crate::use_cases::company_invite::CreateCompanyInvite {
+            actor_id: fixture.owner.id,
+            company_id: fixture.company_id,
+            email: format!("guest-{}@example.test", Uuid::new_v4().simple())
+                .to_string()
+                .into(),
+            role: CompanyAccessRole::Member,
+            access_level: crate::entities::access_level::AccessLevel::PUBLIC,
+        })
         .await
         .unwrap();
     let edited = invitations
-        .update_company_invite(
-            fixture.owner.id,
-            fixture.company_id,
-            invite.id,
-            &shouted,
-            None,
-        )
+        .update_company_invite(crate::use_cases::company_invite::UpdateCompanyInvite {
+            actor_id: fixture.owner.id,
+            company_id: fixture.company_id,
+            invite_id: invite.id,
+            email: shouted.to_string().into(),
+            role: None,
+            access_level: None,
+        })
         .await;
     assert!(matches!(edited, Err(AppError::BadRequest(_))), "{edited:?}");
     assert!(
@@ -342,17 +351,29 @@ async fn company_invite_update_matches_only_a_pending_invite_of_its_company() {
     let guest = OwnedCompany::account(&fixture.persistence, "guest").await;
     let invite = fixture
         .persistence
-        .create_invite(fixture.company_id, &guest.email, CompanyAccessRole::Member)
+        .create_invite(
+            crate::adapters::persistence::test_support::invite_command(
+                &fixture.persistence,
+                fixture.company_id,
+                &guest.email,
+                CompanyAccessRole::Member,
+            )
+            .await,
+        )
         .await
         .unwrap();
 
     let foreign = fixture
         .persistence
         .update_invite(
-            other.company_id,
-            invite.id,
-            "x@example.test",
-            CompanyAccessRole::Admin,
+            crate::adapters::persistence::test_support::invite_update_command(
+                &fixture.persistence,
+                other.company_id,
+                invite.id,
+                "x@example.test",
+                CompanyAccessRole::Admin,
+            )
+            .await,
         )
         .await
         .unwrap();
@@ -367,10 +388,14 @@ async fn company_invite_update_matches_only_a_pending_invite_of_its_company() {
     let after_acceptance = fixture
         .persistence
         .update_invite(
-            fixture.company_id,
-            invite.id,
-            "x@example.test",
-            CompanyAccessRole::Admin,
+            crate::adapters::persistence::test_support::invite_update_command(
+                &fixture.persistence,
+                fixture.company_id,
+                invite.id,
+                "x@example.test",
+                CompanyAccessRole::Admin,
+            )
+            .await,
         )
         .await
         .unwrap();
@@ -380,7 +405,7 @@ async fn company_invite_update_matches_only_a_pending_invite_of_its_company() {
     );
     let stored = fixture
         .persistence
-        .get_invite_by_id(invite.id)
+        .get_invite_by_id(fixture.company_id, invite.id)
         .await
         .unwrap()
         .unwrap();
@@ -402,7 +427,15 @@ async fn company_invite_edit_of_an_invite_accepted_after_the_read_is_refused() {
     let guest = OwnedCompany::account(&fixture.persistence, "racer").await;
     let invite = fixture
         .persistence
-        .create_invite(fixture.company_id, &guest.email, CompanyAccessRole::Member)
+        .create_invite(
+            crate::adapters::persistence::test_support::invite_command(
+                &fixture.persistence,
+                fixture.company_id,
+                &guest.email,
+                CompanyAccessRole::Member,
+            )
+            .await,
+        )
         .await
         .unwrap();
 
@@ -419,13 +452,14 @@ async fn company_invite_edit_of_an_invite_accepted_after_the_read_is_refused() {
         let company_id = fixture.company_id;
         tokio::spawn(async move {
             invitations
-                .update_company_invite(
-                    owner,
+                .update_company_invite(crate::use_cases::company_invite::UpdateCompanyInvite {
+                    actor_id: owner,
                     company_id,
-                    invite.id,
-                    "rewritten@example.test",
-                    Some(CompanyAccessRole::Admin),
-                )
+                    invite_id: invite.id,
+                    email: ("rewritten@example.test").to_string().into(),
+                    role: Some(CompanyAccessRole::Admin),
+                    access_level: None,
+                })
                 .await
         })
     };
@@ -445,7 +479,7 @@ async fn company_invite_edit_of_an_invite_accepted_after_the_read_is_refused() {
     }
     let stored = fixture
         .persistence
-        .get_invite_by_id(invite.id)
+        .get_invite_by_id(fixture.company_id, invite.id)
         .await
         .unwrap()
         .unwrap();

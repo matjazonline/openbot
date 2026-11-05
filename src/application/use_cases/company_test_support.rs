@@ -242,6 +242,7 @@ impl CompanyPersistence for MockCompanyPersistence {
             .filter_map(|company| {
                 self.membership(user_id, company.id)
                     .map(|membership| CompanyAccess {
+                        access_level: crate::entities::access_level::fixture_level(membership),
                         company: company.clone(),
                         membership,
                     })
@@ -265,6 +266,7 @@ impl CompanyPersistence for MockCompanyPersistence {
             .iter()
             .find(|company| company.id == company_id)
             .map(|company| CompanyAccess {
+                access_level: crate::entities::access_level::fixture_level(membership),
                 company: company.clone(),
                 membership,
             }))

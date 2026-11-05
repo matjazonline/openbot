@@ -6,7 +6,9 @@
 //! picking a channel swaps the Channels pane. Every write re-renders the pane and sends the list
 //! along out of band, so an invite, a rename or a removal shows up immediately.
 
+use super::team_levels::{LevelControl, level_control, level_options};
 use super::*;
+use crate::entities::access_level::{AccessLevel, LevelActor, LevelTarget};
 
 /// What the signed-in user may do with this company's team.
 ///
@@ -15,16 +17,34 @@ use super::*;
 /// buttons the server will refuse.
 ///
 /// [`CompanyInviteUseCases`]: crate::use_cases::company_invite::CompanyInviteUseCases
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TeamRole {
     Owner,
+    Admin,
     Member,
 }
 
 impl TeamRole {
-    /// The owner's view is the only one with anything to manage.
+    /// Role, address and membership changes remain owner-only.
     pub fn manages(self) -> bool {
         self == TeamRole::Owner
+    }
+}
+
+impl TeamRole {
+    pub fn manages_levels(self) -> bool {
+        matches!(self, Self::Owner | Self::Admin)
+    }
+    pub fn level_actor(self, access_level: AccessLevel) -> LevelActor {
+        LevelActor {
+            membership: match self {
+                Self::Owner => crate::entities::company_member::CompanyMembership::Owner,
+                Self::Admin => crate::entities::company_member::CompanyMembership::Admin,
+                Self::Member => crate::entities::company_member::CompanyMembership::Member,
+            },
+            access_level,
+        }
     }
 }
 
@@ -56,6 +76,7 @@ pub struct MemberPane<'a> {
     pub company: &'a Company,
     pub member: &'a CompanyMember,
     pub role: TeamRole,
+    pub viewer_access_level: AccessLevel,
     /// The signed-in user, so the pane can tell "this is you" from "this is a colleague".
     pub viewer_id: Uuid,
     /// What the user last typed in the avatar field, when a save was rejected; `None` shows the
@@ -87,6 +108,7 @@ pub struct InvitePane<'a> {
     pub company: &'a Company,
     pub invite: &'a CompanyInvite,
     pub role: TeamRole,
+    pub viewer_access_level: AccessLevel,
     /// What the user last submitted when a save was rejected; `None` shows the stored invite.
     pub email_draft: Option<&'a str>,
     pub role_draft: Option<CompanyAccessRole>,
@@ -235,9 +257,9 @@ pub fn team_settings_list(list: &TeamSettingsList<'_>, swap: FragmentSwap) -> St
             .collect()
     };
 
-    // Only the owner can see invites at all, so a member's sidebar is the joined list and nothing
+    // Owners and admins manage invitation levels; a member's sidebar is the joined list and nothing
     // else — no empty "Invites" heading implying something is being withheld.
-    let invites = if list.role.manages() {
+    let invites = if list.role.manages_levels() {
         let entries = if list.invites.is_empty() {
             r##"<li class="px-3 py-3 text-xs opacity-60">No invites sent yet.</li>"##.to_string()
         } else {
@@ -300,7 +322,7 @@ fn member_entry(company: &Company, member: &CompanyMember, selected: bool) -> St
                         <span class="flex min-w-0 flex-col items-start gap-0.5">
                             <span class="flex w-full items-center gap-2">
                                 <span class="min-w-0 truncate">{username}</span>
-                                <span class="badge badge-ghost badge-sm shrink-0">{role}</span>
+                                <span class="badge badge-ghost badge-sm shrink-0">{role} · {level}</span>
                             </span>
                             <span class="w-full truncate font-mono text-[11px] opacity-60">{email}</span>
                         </span>
@@ -317,6 +339,7 @@ fn member_entry(company: &Company, member: &CompanyMember, selected: bool) -> St
         ),
         username = escape_html_text(member_name(member)),
         role = escape_html_text(role),
+        level = member.access_level.label(),
         email = escape_html_text(member.email.as_deref().unwrap_or("")),
     )
 }
@@ -334,7 +357,7 @@ fn invite_entry(company_id: Uuid, invite: &CompanyInvite, selected: bool) -> Str
                         hx-push-url="{push_url}"
                         data-action="select-sidebar-item">
                         <span class="min-w-0 truncate font-mono text-[13px]">{email}</span>
-                        <span class="badge badge-ghost badge-sm ml-auto shrink-0">{role}</span>
+                        <span class="badge badge-ghost badge-sm ml-auto shrink-0">{role} · {level}</span>
                         <span class="badge {badge} badge-sm shrink-0">{label}</span>
                     </a>
                 </li>
@@ -342,8 +365,9 @@ fn invite_entry(company_id: Uuid, invite: &CompanyInvite, selected: bool) -> Str
         active = if selected { "menu-active" } else { "" },
         endpoint = team_endpoint(company_id, &format!("/invites/{}", invite.id)),
         push_url = team_url(company_id, TeamSelection::Invite(invite.id)),
-        email = escape_html_text(&invite.email),
+        email = escape_html_attr(&invite.email),
         role = invite.role.label(),
+        level = invite.access_level.label(),
         badge = status.badge_class(),
         label = status.label(),
     )
@@ -399,6 +423,7 @@ pub fn member_pane(pane: &MemberPane<'_>) -> String {
                 {error_html}
                 {avatar_form}
                 {access_role_form}
+                {access_level_form}
                 <dl class="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div class="rounded-box bg-base-200 px-4 py-3">
                         <dt class="text-[11px] uppercase tracking-wider opacity-60">Joined</dt>
@@ -430,6 +455,20 @@ pub fn member_pane(pane: &MemberPane<'_>) -> String {
         error_html = form_error_banner(pane.error),
         avatar_form = avatar_form(pane),
         access_role_form = member_access_role_form(pane),
+        access_level_form = level_control(LevelControl {
+            actor: pane.role.level_actor(pane.viewer_access_level),
+            target: if is_owner {
+                LevelTarget::Owner
+            } else {
+                LevelTarget::Assignable(member.access_level)
+            },
+            current: member.access_level,
+            endpoint: &team_endpoint(
+                pane.company.id,
+                &format!("/members/{}/level", member.user_id)
+            ),
+            swap_target: "#team-pane",
+        }),
         removal = removal_block(pane),
         joined = super::format_date(member.created_at),
         company_name = escape_html_text(&pane.company.name),
@@ -587,21 +626,15 @@ fn avatar_form(pane: &MemberPane<'_>) -> String {
     )
 }
 
-pub fn invite_pane(pane: &InvitePane<'_>) -> String {
+fn pending_invite_details(pane: &InvitePane<'_>) -> String {
     let invite = pane.invite;
-    let status = InviteStatus::parse(&invite.status);
     let email = pane.email_draft.unwrap_or(&invite.email);
     let role = pane.role_draft.unwrap_or(invite.role);
-    let company_id = pane.company.id;
-    let invite_endpoint = team_endpoint(company_id, &format!("/invites/{}", invite.id));
-    let close_endpoint = team_endpoint(company_id, "/close");
-    let cleared_url = team_url(company_id, TeamSelection::None);
-
-    // An invite that has already been answered is a record, not a form: re-sending it to another
-    // address would silently rewrite what somebody already accepted or declined.
-    let body = if status == InviteStatus::Pending && pane.role.manages() {
-        format!(
-            r##"
+    let invite_endpoint = team_endpoint(pane.company.id, &format!("/invites/{}", invite.id));
+    let close_endpoint = team_endpoint(pane.company.id, "/close");
+    let cleared_url = team_url(pane.company.id, TeamSelection::None);
+    format!(
+        r##"
                 <form hx-put="{invite_endpoint}" hx-target="#team-pane" hx-swap="outerHTML" class="space-y-4">
                     <label class="form-control w-full">
                         <div class="label"><span class="text-xs opacity-70">Invited Email</span></div>
@@ -632,26 +665,33 @@ pub fn invite_pane(pane: &InvitePane<'_>) -> String {
                     </div>
                 </form>
             "##,
-            email = escape_html_text(email),
-            role_options = access_role_options(role),
-        )
-    } else {
-        let delete_button = if pane.role.manages() {
-            format!(
-                r##"<button type="button" class="btn btn-error btn-outline ml-auto"
+        email = escape_html_attr(email),
+        role_options = access_role_options(role),
+    )
+}
+
+fn answered_invite_details(pane: &InvitePane<'_>) -> String {
+    let invite = pane.invite;
+    let status = InviteStatus::parse(&invite.status);
+    let invite_endpoint = team_endpoint(pane.company.id, &format!("/invites/{}", invite.id));
+    let close_endpoint = team_endpoint(pane.company.id, "/close");
+    let cleared_url = team_url(pane.company.id, TeamSelection::None);
+    let delete_button = if pane.role.manages() {
+        format!(
+            r##"<button type="button" class="btn btn-error btn-outline ml-auto"
                             hx-delete="{invite_endpoint}"
                             hx-target="#team-pane" hx-swap="outerHTML"
                             hx-confirm="Delete the {label} invite for {email}? It only removes the record."
                             hx-push-url="{cleared_url}">Delete Record</button>"##,
-                label = status.label().to_lowercase(),
-                email = escape_html_text(&invite.email),
-            )
-        } else {
-            String::new()
-        };
+            label = status.label().to_lowercase(),
+            email = escape_html_attr(&invite.email),
+        )
+    } else {
+        String::new()
+    };
 
-        format!(
-            r##"
+    format!(
+        r##"
                 <p class="mb-4 text-sm opacity-70">This invite was already {label}, so its address is fixed. Send a new invite to bring somebody else in.</p>
                 <div class="flex items-center gap-3 border-t border-base-300 pt-4">
                     <button type="button" class="btn btn-ghost"
@@ -662,9 +702,27 @@ pub fn invite_pane(pane: &InvitePane<'_>) -> String {
                     {delete_button}
                 </div>
             "##,
-            label = status.label().to_lowercase(),
-        )
-    };
+        label = status.label().to_lowercase(),
+    )
+}
+
+fn invite_details(pane: &InvitePane<'_>) -> String {
+    if InviteStatus::parse(&pane.invite.status) != InviteStatus::Pending {
+        return answered_invite_details(pane);
+    }
+    if pane.role.manages() {
+        return pending_invite_details(pane);
+    }
+    format!("<p>Pending invitation · {}</p>", pane.invite.role.label())
+}
+
+pub fn invite_pane(pane: &InvitePane<'_>) -> String {
+    let invite = pane.invite;
+    let status = InviteStatus::parse(&invite.status);
+    let company_id = pane.company.id;
+    let invite_endpoint = team_endpoint(company_id, &format!("/invites/{}", invite.id));
+
+    let body = invite_details(pane);
 
     format!(
         r##"
@@ -679,15 +737,27 @@ pub fn invite_pane(pane: &InvitePane<'_>) -> String {
             <div class="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
                 {error_html}
                 {body}
+                {level}
             </div>
         </section>
         "##,
-        stored_email = escape_html_text(&invite.email),
+        stored_email = escape_html_attr(&invite.email),
         created_at = super::format_date(invite.created_at),
         access_role = invite.role.label(),
         badge = status.badge_class(),
         label = status.label(),
         error_html = form_error_banner(pane.error),
+        level = if status == InviteStatus::Pending {
+            level_control(LevelControl {
+                actor: pane.role.level_actor(pane.viewer_access_level),
+                target: LevelTarget::Assignable(invite.access_level),
+                current: invite.access_level,
+                endpoint: &format!("{invite_endpoint}/level"),
+                swap_target: "#team-pane",
+            })
+        } else {
+            format!("<p>{}</p>", invite.access_level.label())
+        },
     )
 }
 
@@ -713,6 +783,8 @@ pub fn invite_create_pane(pane: &InviteCreatePane<'_>) -> String {
                         <select name="role" class="select w-full">{role_options}</select>
                         <div class="label"><span class="text-[11px] opacity-60">Choose the access they receive as soon as they accept.</span></div>
                     </label>
+                    <label class="form-control"><span>Access level</span><select name="access_level" class="select">{level_options}</select></label>
+                    <p class="text-xs opacity-60">{level_help}</p>
                     <div class="flex items-center gap-3">
                         <button type="submit" class="btn btn-primary">
                             <span class="loading loading-spinner loading-sm hidden [.htmx-request_&]:inline-block"></span>
@@ -736,5 +808,11 @@ pub fn invite_create_pane(pane: &InviteCreatePane<'_>) -> String {
         error_html = form_error_banner(pane.error),
         email = escape_html_text(pane.email_draft),
         role_options = access_role_options(pane.role_draft),
+        level_options = level_options(
+            TeamRole::Owner.level_actor(AccessLevel::MAX),
+            LevelTarget::Assignable(AccessLevel::PUBLIC),
+            AccessLevel::PUBLIC
+        ),
+        level_help = super::team_levels::LEVEL_HELP,
     )
 }

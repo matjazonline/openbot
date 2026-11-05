@@ -323,13 +323,15 @@ impl PrincipalAccessPersistence for InMemoryParticipantDirectory {
         // bootstrap that would have inserted their identity rows. Derive the same stable principal
         // for a read, but do not put it in `state`: a policy lookup must remain observable as
         // read-only, and accepted-message tests still resolve the same actor their grants name.
+        let membership = self.membership_for_subject(company_id, identity).await?;
         Ok(PrincipalAccessContext {
+            access_level: crate::entities::access_level::fixture_level(membership),
             principal_id: Some(
                 known
                     .map(|known| known.principal_id)
                     .unwrap_or_else(|| principal_for_identity(company_id, identity)),
             ),
-            membership: self.membership_for_subject(company_id, identity).await?,
+            membership,
             grant_authority: PrincipalGrantAuthority::Available,
         })
     }
@@ -358,6 +360,7 @@ impl PrincipalAccessPersistence for InMemoryParticipantDirectory {
             None => CompanyMembership::None,
         };
         Ok(Some(PrincipalAccessContext {
+            access_level: crate::entities::access_level::fixture_level(membership),
             principal_id: Some(principal_id),
             membership,
             grant_authority: if verified {

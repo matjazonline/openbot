@@ -1,0 +1,19 @@
+{
+  "filters": {
+    "access_level_": 20,
+    "adapters::persistence::participant::": 4,
+    "domain::entities::channel::": 11,
+    "application::use_cases::thread::": 69,
+    "application::use_cases::channel::": 14,
+    "company_invite": 29,
+    "company_owner": 7,
+    "application::use_cases::company::": 7,
+    "adapters::persistence::company::": 5,
+    "ui_team": 7,
+    "team_": 22,
+    "invite_": 17,
+    "account_identity": 8,
+    "workflow::message_authority_tests::": 0
+  },
+  "selected_unique": 173
+}

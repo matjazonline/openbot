@@ -46,6 +46,22 @@ pub fn router() -> Router<AppState> {
             "/companies/{company_id}/team/{user_id}",
             put(update_team_member_role).delete(remove_team_member),
         )
+        .route(
+            "/companies/{company_id}/team/{user_id}/level",
+            put(levels::set_member_level),
+        )
+        .route(
+            "/companies/{company_id}/invites/{invite_id}/level",
+            put(levels::set_invite_level),
+        )
+        .route(
+            "/api/companies/{company_id}/team/{user_id}/level",
+            put(levels::set_member_level_json),
+        )
+        .route(
+            "/api/companies/{company_id}/invites/{invite_id}/level",
+            put(levels::set_invite_level_json),
+        )
         // Web / HTMX User Invites
         .route("/invites", get(user_invites_page))
         .route("/invites/{invite_id}/accept", post(accept_user_invite))
@@ -82,6 +98,7 @@ pub fn router() -> Router<AppState> {
 #[derive(Debug, Clone, Deserialize)]
 pub struct InviteForm {
     pub email: String,
+    pub access_level: Option<crate::entities::access_level::AccessLevel>,
     #[serde(default)]
     pub role: Option<CompanyAccessRole>,
 }
@@ -111,7 +128,11 @@ async fn company_invites_page(
     user: AuthenticatedUser,
     Path(company_id): Path<Uuid>,
 ) -> AppResult<Html<String>> {
-    let company = company_use_cases.owned_company(user.id, company_id).await?;
+    let access = company_use_cases
+        .readable_company(user.id, company_id)
+        .await?;
+    let company = &access.company;
+    let actor = pages::team_level_actor(&access);
     let invites = invite_use_cases
         .list_company_invites(user.id, company_id)
         .await?;
@@ -120,7 +141,7 @@ async fn company_invites_page(
         .await?;
 
     Ok(Html(pages::company_invites_page(
-        &company, &invites, &members,
+        company, &invites, &members, actor,
     )))
 }
 
@@ -132,13 +153,18 @@ async fn create_company_invite(
     Path(company_id): Path<Uuid>,
     Form(form): Form<InviteForm>,
 ) -> AppResult<Html<String>> {
+    let access = invite_use_cases.level_manager(user.id, company_id).await?;
+    let actor = pages::team_level_actor(&access);
     let error_html = match invite_use_cases
-        .create_company_invite(
-            user.id,
+        .create_company_invite(crate::use_cases::company_invite::CreateCompanyInvite {
+            actor_id: user.id,
             company_id,
-            &form.email,
-            form.role.unwrap_or_default(),
-        )
+            email: form.email.to_string().into(),
+            role: form.role.unwrap_or_default(),
+            access_level: form
+                .access_level
+                .unwrap_or(crate::entities::access_level::AccessLevel::PUBLIC),
+        })
         .await
     {
         Ok(_) => String::new(),
@@ -152,7 +178,7 @@ async fn create_company_invite(
         .await?;
     Ok(Html(format!(
         "{error_html}{}",
-        pages::company_invite_list_fragment(company_id, &invites)
+        pages::company_invite_list_fragment(company_id, &invites, actor)
     )))
 }
 
@@ -163,12 +189,14 @@ async fn edit_invite_form(
     user: AuthenticatedUser,
     Path((company_id, invite_id)): Path<(Uuid, Uuid)>,
 ) -> AppResult<Html<String>> {
+    let access = invite_use_cases.level_manager(user.id, company_id).await?;
+    let actor = pages::team_level_actor(&access);
     let invite = invite_use_cases
         .get_company_invite(user.id, company_id, invite_id)
         .await?
         .ok_or_else(|| AppError::NotFound("Invite not found.".into()))?;
     Ok(Html(pages::company_invite_edit_fragment(
-        company_id, &invite,
+        company_id, &invite, actor,
     )))
 }
 
@@ -179,12 +207,14 @@ async fn cancel_invite_edit(
     user: AuthenticatedUser,
     Path((company_id, invite_id)): Path<(Uuid, Uuid)>,
 ) -> AppResult<Html<String>> {
+    let access = invite_use_cases.level_manager(user.id, company_id).await?;
+    let actor = pages::team_level_actor(&access);
     let invite = invite_use_cases
         .get_company_invite(user.id, company_id, invite_id)
         .await?
         .ok_or_else(|| AppError::NotFound("Invite not found.".into()))?;
     Ok(Html(pages::company_invite_row_fragment(
-        company_id, &invite,
+        company_id, &invite, actor,
     )))
 }
 
@@ -196,12 +226,23 @@ async fn update_company_invite(
     Path((company_id, invite_id)): Path<(Uuid, Uuid)>,
     Form(form): Form<InviteForm>,
 ) -> AppResult<Html<String>> {
+    let access = invite_use_cases.level_manager(user.id, company_id).await?;
+    let actor = pages::team_level_actor(&access);
     Ok(
         match invite_use_cases
-            .update_company_invite(user.id, company_id, invite_id, &form.email, form.role)
+            .update_company_invite(crate::use_cases::company_invite::UpdateCompanyInvite {
+                actor_id: user.id,
+                company_id,
+                invite_id,
+                email: form.email.to_string().into(),
+                role: form.role,
+                access_level: form.access_level,
+            })
             .await
         {
-            Ok(invite) => Html(pages::company_invite_row_fragment(company_id, &invite)),
+            Ok(invite) => Html(pages::company_invite_row_fragment(
+                company_id, &invite, actor,
+            )),
             Err(err @ (AppError::BadRequest(_) | AppError::Conflict(_))) => {
                 Html(pages::error_alert(&format!("Update failed: {err}")))
             }
@@ -218,12 +259,14 @@ async fn update_team_member_role(
     Path((company_id, member_user_id)): Path<(Uuid, Uuid)>,
     Form(form): Form<MemberRoleForm>,
 ) -> AppResult<Html<String>> {
+    let access = invite_use_cases.level_manager(user.id, company_id).await?;
+    let actor = pages::team_level_actor(&access);
     Ok(
         match invite_use_cases
             .update_company_team_member_role(user.id, company_id, member_user_id, form.role)
             .await
         {
-            Ok(member) => Html(pages::company_team_row_fragment(company_id, &member)),
+            Ok(member) => Html(pages::company_team_row_fragment(company_id, &member, actor)),
             Err(err @ (AppError::BadRequest(_) | AppError::Conflict(_))) => Html(
                 pages::error_alert(&format!("Failed to update member access: {err}")),
             ),
@@ -344,12 +387,15 @@ async fn create_company_invite_json(
     Json(payload): Json<InviteForm>,
 ) -> AppResult<impl IntoResponse> {
     let invite = invite_use_cases
-        .create_company_invite(
-            user.id,
+        .create_company_invite(crate::use_cases::company_invite::CreateCompanyInvite {
+            actor_id: user.id,
             company_id,
-            &payload.email,
-            payload.role.unwrap_or_default(),
-        )
+            email: payload.email.to_string().into(),
+            role: payload.role.unwrap_or_default(),
+            access_level: payload
+                .access_level
+                .unwrap_or(crate::entities::access_level::AccessLevel::PUBLIC),
+        })
         .await?;
     Ok((
         StatusCode::CREATED,
@@ -368,7 +414,14 @@ async fn update_company_invite_json(
     Json(payload): Json<InviteForm>,
 ) -> AppResult<impl IntoResponse> {
     let invite = invite_use_cases
-        .update_company_invite(user.id, company_id, invite_id, &payload.email, payload.role)
+        .update_company_invite(crate::use_cases::company_invite::UpdateCompanyInvite {
+            actor_id: user.id,
+            company_id,
+            invite_id,
+            email: payload.email.to_string().into(),
+            role: payload.role,
+            access_level: payload.access_level,
+        })
         .await?;
     Ok((
         StatusCode::OK,
@@ -515,6 +568,7 @@ mod tests {
         };
 
         let invite = CompanyInvite {
+            access_level: crate::entities::access_level::AccessLevel::PUBLIC,
             id: Uuid::new_v4(),
             company_id: company.id,
             company_name: Some(company.name.clone()),
@@ -525,6 +579,7 @@ mod tests {
         };
 
         let member = CompanyMember {
+            access_level: crate::entities::access_level::AccessLevel::PUBLIC,
             id: Uuid::new_v4(),
             company_id: company.id,
             user_id: Uuid::new_v4(),
@@ -539,6 +594,10 @@ mod tests {
             &company,
             std::slice::from_ref(&invite),
             std::slice::from_ref(&member),
+            crate::entities::access_level::LevelActor {
+                membership: crate::entities::company_member::CompanyMembership::Owner,
+                access_level: crate::entities::access_level::AccessLevel::MAX,
+            },
         );
         assert!(page_html.contains("Test Company Management"));
         assert!(page_html.contains("invited@test.com"));
@@ -554,3 +613,7 @@ mod tests {
 #[cfg(test)]
 #[path = "company_invite_authorization_tests.rs"]
 mod authorization_tests;
+
+#[path = "company_invite_levels.rs"]
+mod levels;
+pub(super) use levels::LevelForm;

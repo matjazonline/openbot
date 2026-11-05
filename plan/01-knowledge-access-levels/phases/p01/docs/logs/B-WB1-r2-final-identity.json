@@ -1,0 +1,27 @@
+{
+  "base": "73799dc6ac685008d5c97f154e861d11ae15bfa0",
+  "head": "73799dc6ac685008d5c97f154e861d11ae15bfa0",
+  "exclusions": [
+    "plan/01-knowledge-access-levels/phases/p01/docs/"
+  ],
+  "diff_sha256": "a99d4f5447f43e04e2346f283bdf587f86043ae9b70d1040ee6c8d3a9762deea",
+  "tree_sha256": "1fadfc702fd6508d7c10e6a1c355e3a25123c37487de42784fbea8284682a62b",
+  "files_count": 2531,
+  "checked_at_utc": "2026-11-05T02:33:59.675576+00:00",
+  "authority_revision": 3,
+  "authority_sha256": "c8efef558d538c998b28392ab4ffb03c87040aca836c3afcdd8264a76db7d7dc",
+  "decision_sha256": "180f1e6ebcee3154defc2ddebaa01260a98c67524d77402f35c9b2f7818ff361",
+  "installed_digest": "2474cb464ac7b4e31e09102c4b37f551f5cc7ab8514ba13a899031e6c58515ac",
+  "reviewer_tests": {
+    "selected": 4,
+    "passed": 4,
+    "failed": 0,
+    "ignored": 0,
+    "exit_code": 0
+  },
+  "outcome": "PASS",
+  "closed_findings": [
+    "KNOW-P01-WB1-F1"
+  ],
+  "open_findings": []
+}

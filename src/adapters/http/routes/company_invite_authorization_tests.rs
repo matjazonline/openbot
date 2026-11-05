@@ -10,9 +10,13 @@ async fn invite_pages_and_fragments_hide_foreign_companies_and_propagate_failure
     let invite = f
         .persistence
         .create_invite(
-            f.foreign.id,
-            &format!("invite-{}@example.test", Uuid::new_v4().simple()),
-            CompanyAccessRole::Member,
+            crate::adapters::persistence::test_support::invite_command(
+                &f.persistence,
+                f.foreign.id,
+                &format!("invite-{}@example.test", Uuid::new_v4().simple()),
+                CompanyAccessRole::Member,
+            )
+            .await,
         )
         .await
         .unwrap();
@@ -80,6 +84,7 @@ async fn check_fragments(f: &Fixture, case: ScopeCase<'_>, invite_id: Uuid) {
             Fixture::auth(user),
             Path(id),
             Form(InviteForm {
+                access_level: None,
                 email: "new@example.test".into(),
                 role: None,
             }),

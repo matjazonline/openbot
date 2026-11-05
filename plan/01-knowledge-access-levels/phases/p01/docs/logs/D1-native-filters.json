@@ -1,0 +1,9 @@
+{
+  "filters": {
+    "access_level_": 5,
+    "adapters::persistence::participant::": 4,
+    "domain::entities::channel::": 11,
+    "application::use_cases::participant::": 0
+  },
+  "selected_unique": 20
+}

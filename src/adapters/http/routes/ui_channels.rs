@@ -153,6 +153,7 @@ async fn channels_page(
     let Some(CompanyAccess {
         company,
         membership,
+        ..
     }) = company
     else {
         return Ok(Html(pages::mailbox_no_company_page(&workspace_user)));

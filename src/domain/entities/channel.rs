@@ -301,6 +301,7 @@ mod tests {
 
     fn actor(principal_id: PrincipalId, membership: CompanyMembership) -> PrincipalAccessContext {
         PrincipalAccessContext {
+            access_level: crate::entities::access_level::fixture_level(membership),
             principal_id: Some(principal_id),
             membership,
             grant_authority: PrincipalGrantAuthority::Available,
@@ -426,6 +427,7 @@ mod tests {
     /// principal: an allowlist channel must not let them in on an empty match.
     fn unresolved(membership: CompanyMembership) -> PrincipalAccessContext {
         PrincipalAccessContext {
+            access_level: crate::entities::access_level::fixture_level(membership),
             principal_id: None,
             membership,
             grant_authority: PrincipalGrantAuthority::Available,

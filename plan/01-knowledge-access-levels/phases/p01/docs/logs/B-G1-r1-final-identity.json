@@ -1,0 +1,17 @@
+{
+  "base": "73799dc6ac685008d5c97f154e861d11ae15bfa0",
+  "head": "73799dc6ac685008d5c97f154e861d11ae15bfa0",
+  "exclusions": [
+    "plan/01-knowledge-access-levels/phases/p01/docs/"
+  ],
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "tree_sha256": "5b624ab697f5c84450fd9298bd7492eb0ae82b98261130f810e5ffc7e6fbc5b2",
+  "files_count": 2518,
+  "decision_sha256": "180f1e6ebcee3154defc2ddebaa01260a98c67524d77402f35c9b2f7818ff361",
+  "authority_revision": 2,
+  "authority_sha256": "ad522cb3dfd49a29d7ff8f22626bd8f9c870f5c5d4185e943d1da970eec5251e",
+  "installed_digest": "fed6443aec1e9375c6f1573ab9682eb8b58693b2aba2c1bef595fbf1d858ba6e",
+  "checked_at_utc": "2026-11-05T01:11:29.030326+00:00",
+  "branch": "knowledge/p01",
+  "outcome": "PASS architecture decision r1 only"
+}

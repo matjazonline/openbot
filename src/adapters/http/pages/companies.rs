@@ -1,4 +1,6 @@
 //! Company settings, team members and invitations.
+use super::team_levels::{LEVEL_HELP, LevelControl, level_control, level_options};
+use crate::entities::access_level::{AccessLevel, LevelActor, LevelTarget};
 
 use super::*;
 
@@ -167,9 +169,10 @@ pub fn company_invites_page(
     company: &Company,
     invites: &[CompanyInvite],
     members: &[CompanyMember],
+    actor: LevelActor,
 ) -> String {
-    let invites_html = company_invite_list_fragment(company.id, invites);
-    let team_html = company_team_list_fragment(company.id, members);
+    let invites_html = company_invite_list_fragment(company.id, invites, actor);
+    let team_html = company_team_list_fragment(company.id, members, actor);
 
     let content = format!(
         r##"
@@ -183,24 +186,7 @@ pub fn company_invites_page(
 
         <div id="response-message" class="mb-6"></div>
 
-        <!-- Create Invite Card -->
-        <div class="bg-base-100 border border-base-300 rounded-xl p-5 mb-8">
-            <h3 class="text-md font-semibold text-base-content mb-3 flex items-center gap-2">
-                <span class="text-primary">+</span> Invite User by Email
-            </h3>
-            <form hx-post="/companies/{company_id}/invites" hx-target="#invite-list" hx-swap="innerHTML" class="flex gap-3"
-                data-after-request="reset-form">
-                <input type="email" name="email" required placeholder="colleague@example.com"
-                    class="flex-1 px-3.5 py-2 bg-base-200 border border-base-300 rounded-lg text-base-content text-sm placeholder-base-content/60 focus:outline-none focus:ring-2 focus:ring-primary">
-                <select name="role" class="px-3.5 py-2 bg-base-200 border border-base-300 rounded-lg text-base-content text-sm">
-                    {role_options}
-                </select>
-                <button type="submit"
-                    class="px-5 py-2 bg-primary hover:bg-primary/90 text-primary-content text-sm font-semibold rounded-lg shadow-md shadow-primary/20 transition cursor-pointer">
-                    Send Invite
-                </button>
-            </form>
-        </div>
+        {create_invite}
 
         <!-- Invites List Section -->
         <div class="mb-10">
@@ -220,16 +206,19 @@ pub fn company_invites_page(
         "##,
         company_name = escape_html_text(&company.name),
         slug = escape_html_text(&company.slug),
-        company_id = company.id,
         invites_html = invites_html,
         team_html = team_html,
-        role_options = company_access_role_options(CompanyAccessRole::Member),
+        create_invite = legacy_invite_create(company.id, actor),
     );
 
     base_layout(&format!("Manage {}", company.name), &content)
 }
 
-pub fn company_invite_list_fragment(company_id: Uuid, invites: &[CompanyInvite]) -> String {
+pub fn company_invite_list_fragment(
+    company_id: Uuid,
+    invites: &[CompanyInvite],
+    actor: LevelActor,
+) -> String {
     if invites.is_empty() {
         return r##"
             <div class="bg-base-100 border border-dashed border-base-300 rounded-xl p-6 text-center">
@@ -241,11 +230,15 @@ pub fn company_invite_list_fragment(company_id: Uuid, invites: &[CompanyInvite])
 
     invites
         .iter()
-        .map(|inv| company_invite_row_fragment(company_id, inv))
+        .map(|inv| company_invite_row_fragment(company_id, inv, actor))
         .collect()
 }
 
-pub fn company_invite_row_fragment(company_id: Uuid, invite: &CompanyInvite) -> String {
+pub fn company_invite_row_fragment(
+    company_id: Uuid,
+    invite: &CompanyInvite,
+    actor: LevelActor,
+) -> String {
     let created_at_str = super::format_date(invite.created_at);
     let status_badge = match invite.status.as_str() {
         "accepted" => {
@@ -270,7 +263,29 @@ pub fn company_invite_row_fragment(company_id: Uuid, invite: &CompanyInvite) -> 
                 </div>
                 <p class="text-xs text-base-content/70 mt-1">Invited on {created_at_str}</p>
             </div>
-            <div class="flex items-center gap-2">
+            {level}
+            {actions}
+        </div>
+        "##,
+        invite_id = invite.id,
+        email = escape_html_attr(&invite.email),
+        role = invite.role.label(),
+        status_badge = status_badge,
+        created_at_str = created_at_str,
+        level = if invite.status == "pending" {
+            level_control(LevelControl {
+                actor,
+                target: LevelTarget::Assignable(invite.access_level),
+                current: invite.access_level,
+                endpoint: &format!("/companies/{company_id}/invites/{}/level", invite.id),
+                swap_target: &format!("#invite-{}", invite.id),
+            })
+        } else {
+            format!("<p>{}</p>", invite.access_level.label())
+        },
+        actions = if actor.membership.is_owner() {
+            format!(
+                r##"            <div class="flex items-center gap-2">
                 <button hx-get="/companies/{company_id}/invites/{invite_id}/edit" hx-target="#invite-{invite_id}" hx-swap="outerHTML"
                     class="px-3 py-1.5 text-xs font-medium bg-base-300 hover:bg-base-content/15 text-base-content rounded-lg transition cursor-pointer">
                     Edit
@@ -279,19 +294,25 @@ pub fn company_invite_row_fragment(company_id: Uuid, invite: &CompanyInvite) -> 
                     class="px-3 py-1.5 text-xs font-medium bg-error/10 hover:bg-error/20 text-base-content border border-error/40 rounded-lg transition cursor-pointer">
                     Delete
                 </button>
-            </div>
-        </div>
-        "##,
-        company_id = company_id,
-        invite_id = invite.id,
-        email = escape_html_text(&invite.email),
-        role = invite.role.label(),
-        status_badge = status_badge,
-        created_at_str = created_at_str,
+            </div>"##,
+                invite_id = invite.id,
+                email = escape_html_attr(&invite.email)
+            )
+        } else {
+            String::new()
+        },
     )
 }
 
-pub fn company_invite_edit_fragment(company_id: Uuid, invite: &CompanyInvite) -> String {
+pub fn company_invite_edit_fragment(
+    company_id: Uuid,
+    invite: &CompanyInvite,
+    actor: LevelActor,
+) -> String {
+    if !actor.membership.is_owner() || invite.status != "pending" {
+        return company_invite_row_fragment(company_id, invite, actor);
+    }
+
     format!(
         r##"
         <form id="invite-{invite_id}" hx-put="/companies/{company_id}/invites/{invite_id}" hx-target="#invite-{invite_id}" hx-swap="outerHTML"
@@ -301,6 +322,7 @@ pub fn company_invite_edit_fragment(company_id: Uuid, invite: &CompanyInvite) ->
             <select name="role" class="px-3.5 py-2 bg-base-200 border border-base-300 rounded-lg text-base-content text-sm">
                 {role_options}
             </select>
+            <select aria-label="Access level" name="access_level" class="select">{levels}</select>
             <div class="flex items-center gap-2">
                 <button type="button" hx-get="/companies/{company_id}/invites/{invite_id}/cancel" hx-target="#invite-{invite_id}" hx-swap="outerHTML"
                     class="px-3 py-1.5 text-xs font-medium bg-base-300 hover:bg-base-content/15 text-base-content rounded-lg transition cursor-pointer">
@@ -315,12 +337,21 @@ pub fn company_invite_edit_fragment(company_id: Uuid, invite: &CompanyInvite) ->
         "##,
         company_id = company_id,
         invite_id = invite.id,
-        email = escape_html_text(&invite.email),
+        email = escape_html_attr(&invite.email),
         role_options = company_access_role_options(invite.role),
+        levels = level_options(
+            actor,
+            LevelTarget::Assignable(invite.access_level),
+            invite.access_level
+        ),
     )
 }
 
-pub fn company_team_list_fragment(company_id: Uuid, members: &[CompanyMember]) -> String {
+pub fn company_team_list_fragment(
+    company_id: Uuid,
+    members: &[CompanyMember],
+    actor: LevelActor,
+) -> String {
     if members.is_empty() {
         return r##"
             <div class="bg-base-100 border border-dashed border-base-300 rounded-xl p-6 text-center">
@@ -332,11 +363,15 @@ pub fn company_team_list_fragment(company_id: Uuid, members: &[CompanyMember]) -
 
     members
         .iter()
-        .map(|m| company_team_row_fragment(company_id, m))
+        .map(|m| company_team_row_fragment(company_id, m, actor))
         .collect()
 }
 
-pub fn company_team_row_fragment(company_id: Uuid, member: &CompanyMember) -> String {
+pub fn company_team_row_fragment(
+    company_id: Uuid,
+    member: &CompanyMember,
+    actor: LevelActor,
+) -> String {
     let created_at_str = super::format_date(member.created_at);
     let username_display = member.username.as_deref().unwrap_or("Unknown User");
     let email_display = member.email.as_deref().unwrap_or("");
@@ -348,28 +383,52 @@ pub fn company_team_row_fragment(company_id: Uuid, member: &CompanyMember) -> St
                 <div class="flex items-center gap-3">
                     <h4 class="text-md font-semibold text-base-content">{username}</h4>
                     <span class="text-xs text-base-content/70">({email})</span>
-                    <form hx-put="/companies/{company_id}/team/{user_id}" hx-target="#member-{user_id}" hx-swap="outerHTML" class="flex items-center gap-2">
+                    {role_form}
+                </div>
+                <p class="text-xs text-base-content/70 mt-1">Joined {created_at_str}</p>
+            </div>
+            {level}
+            {remove}
+        </div>
+        "##,
+        user_id = member.user_id,
+        username = escape_html_attr(username_display),
+        email = escape_html_text(email_display),
+        role_form = if actor.membership.is_owner() {
+            format!(
+                r##"                    <form hx-put="/companies/{company_id}/team/{user_id}" hx-target="#member-{user_id}" hx-swap="outerHTML" class="flex items-center gap-2">
                         <select name="role" class="px-2.5 py-1 bg-base-200 border border-base-300 rounded-lg text-base-content text-xs">
                             {role_options}
                         </select>
                         <button type="submit" class="px-2.5 py-1 text-xs font-medium bg-primary hover:bg-primary/90 text-primary-content rounded-lg">Save</button>
-                    </form>
-                </div>
-                <p class="text-xs text-base-content/70 mt-1">Joined {created_at_str}</p>
-            </div>
-            <div class="flex items-center gap-2">
+                    </form>"##,
+                user_id = member.user_id,
+                role_options = company_access_role_options(member.role)
+            )
+        } else {
+            format!("<span>{}</span>", member.role.label())
+        },
+        remove = if actor.membership.is_owner() {
+            format!(
+                r##"            <div class="flex items-center gap-2">
                 <button hx-delete="/companies/{company_id}/team/{user_id}" hx-target="#member-{user_id}" hx-swap="outerHTML" hx-confirm="Remove '{username}' from company team?"
                     class="px-3 py-1.5 text-xs font-medium bg-error/10 hover:bg-error/20 text-base-content border border-error/40 rounded-lg transition cursor-pointer">
                     Remove
                 </button>
-            </div>
-        </div>
-        "##,
-        company_id = company_id,
-        user_id = member.user_id,
-        username = escape_html_attr(username_display),
-        email = escape_html_text(email_display),
-        role_options = company_access_role_options(member.role),
+            </div>"##,
+                user_id = member.user_id,
+                username = escape_html_attr(username_display)
+            )
+        } else {
+            String::new()
+        },
+        level = level_control(LevelControl {
+            actor,
+            target: LevelTarget::Assignable(member.access_level),
+            current: member.access_level,
+            endpoint: &format!("/companies/{company_id}/team/{}/level", member.user_id),
+            swap_target: &format!("#member-{}", member.user_id)
+        }),
         created_at_str = created_at_str,
     )
 }
@@ -466,9 +525,45 @@ pub fn user_invite_row_fragment(invite: &CompanyInvite) -> String {
         "##,
         invite_id = invite.id,
         company_name = escape_html_text(company_name),
-        email = escape_html_text(&invite.email),
+        email = escape_html_attr(&invite.email),
         role = invite.role.label(),
         created_at_str = created_at_str,
         action_buttons = action_buttons,
+    )
+}
+
+fn legacy_invite_create(company_id: Uuid, actor: LevelActor) -> String {
+    if !actor.membership.is_owner() {
+        return String::new();
+    }
+    format!(
+        r##"        <!-- Create Invite Card -->
+        <div class="bg-base-100 border border-base-300 rounded-xl p-5 mb-8">
+            <h3 class="text-md font-semibold text-base-content mb-3 flex items-center gap-2">
+                <span class="text-primary">+</span> Invite User by Email
+            </h3>
+            <form hx-post="/companies/{company_id}/invites" hx-target="#invite-list" hx-swap="innerHTML" class="flex gap-3"
+                data-after-request="reset-form">
+                <input type="email" name="email" required placeholder="colleague@example.com"
+                    class="flex-1 px-3.5 py-2 bg-base-200 border border-base-300 rounded-lg text-base-content text-sm placeholder-base-content/60 focus:outline-none focus:ring-2 focus:ring-primary">
+                <select name="role" class="px-3.5 py-2 bg-base-200 border border-base-300 rounded-lg text-base-content text-sm">
+                    {role_options}
+                </select>
+                <select aria-label="Access level" name="access_level" class="select">{levels}</select>
+                <button type="submit"
+                    class="px-5 py-2 bg-primary hover:bg-primary/90 text-primary-content text-sm font-semibold rounded-lg shadow-md shadow-primary/20 transition cursor-pointer">
+                    Send Invite
+                </button>
+            </form>
+            <p class="text-xs opacity-60">{LEVEL_HELP}</p>
+        </div>
+
+"##,
+        role_options = company_access_role_options(CompanyAccessRole::Member),
+        levels = level_options(
+            actor,
+            LevelTarget::Assignable(AccessLevel::PUBLIC),
+            AccessLevel::PUBLIC
+        )
     )
 }

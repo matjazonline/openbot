@@ -1,0 +1,50 @@
+{
+  "review": "KNOW-P01-WB1-R2",
+  "stage": "F1 correction recheck",
+  "findings": [
+    "KNOW-P01-WB1-F1"
+  ],
+  "source": {
+    "base": "73799dc6ac685008d5c97f154e861d11ae15bfa0",
+    "head": "73799dc6ac685008d5c97f154e861d11ae15bfa0",
+    "exclusions": [
+      "plan/01-knowledge-access-levels/phases/p01/docs/"
+    ],
+    "diff_sha256": "a99d4f5447f43e04e2346f283bdf587f86043ae9b70d1040ee6c8d3a9762deea",
+    "tree_sha256": "1fadfc702fd6508d7c10e6a1c355e3a25123c37487de42784fbea8284682a62b",
+    "files_count": 2531
+  },
+  "installed_digest": "2474cb464ac7b4e31e09102c4b37f551f5cc7ab8514ba13a899031e6c58515ac",
+  "installed_exclude_argument": "plan/01-knowledge-access-levels/phases/p01/docs",
+  "changed_since_R1": [
+    "src/adapters/http/routes/company_invite_level_route_tests.rs",
+    "src/adapters/http/routes/company_invite_level_test_support.rs",
+    "src/adapters/http/routes/company_invite_levels.rs"
+  ],
+  "unchanged_source_manifest_verified": true,
+  "authority_revision": 3,
+  "notices": {
+    "KNOW-I001": "r1 unchanged acknowledged",
+    "KNOW-I002": "r1 unchanged acknowledged",
+    "KNOW-I003": "r1 unchanged acknowledged",
+    "KNOW-I004": "r1 unchanged acknowledged",
+    "KNOW-I005": "r1 unchanged acknowledged"
+  },
+  "authority_pin": "COORDINATION-r3-WB1.md",
+  "gated_decision_sha256": "180f1e6ebcee3154defc2ddebaa01260a98c67524d77402f35c9b2f7818ff361",
+  "evidence_sha256": {
+    "WB1-r4-native-result.json": "0a39f8385fa627cd787ae2e63825ca705bd896c7511ee0c165761bdd8380608d",
+    "WB1-r4-native-filters.json": "655b52e64b8abfe39b90e42dbddd65a5c06a7a84e5a76eeaebc68c2789294ed8",
+    "WB1-r4-native-focused.log": "aa2468ae067775b3fe9d430dae4b888f39f04a4ab4e3d4e8c856e373ae20eeec",
+    "WB1-r4-F1-coverage.json": "e14dec03df27e4298c3ecbb78d8981612cd26beaa2f3c50e9af4d57180d90f16",
+    "WB1-r4-sqlx-prepare.log": "a36bcce367e570a58348d057c2dafd857f46ba70e46100122f307c9f14566f76",
+    "WB1-r4-sqlx-check.log": "24903c0a93c760fc0af159c3da16b2e73a8619809d9016301bce945afb5598b7",
+    "WB1-r5-clippy.jsonl": "01069b43846e78101fefa18b75ad407db68f937d56fc883d443bed5ccb1767e9",
+    "WB1-r5-clippy.stderr": "a3ef4fc68dcec542badf3451e081392dd3b6078d79a342dfb3453fa94246f5b2",
+    "WB1-r4-offline-check.log": "96d082eedc152f413fcd602eb2fd04822b6f2e4d63aba203dc12bbc812e454c6",
+    "WB1-r4-format.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "WB1-r4-diff-check.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "WB1-r4-graft-build.log": "d9e985955dbedd016fbfc4d30777f02adbb35f76368233d9d285bb16440f828c"
+  },
+  "status": "author correction verified179/0/0 all14 selectors,24 access_level_,all4 endpoint cases independently selected/executed; B recheck/root acceptance pending"
+}

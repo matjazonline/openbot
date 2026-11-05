@@ -190,13 +190,17 @@ impl DashboardScope {
                     .operator_company(caller, company_id)
                     .await?
                     .map(|company| {
-                        let membership = managed
+                        let managed_access = managed
                             .iter()
-                            .find(|access| access.company.id == company.id)
-                            .map_or(CompanyMembership::None, |access| access.membership);
+                            .find(|access| access.company.id == company.id);
                         CompanyAccess {
+                            membership: managed_access
+                                .map_or(CompanyMembership::None, |access| access.membership),
+                            access_level: managed_access.map_or(
+                                crate::entities::access_level::AccessLevel::PUBLIC,
+                                |access| access.access_level,
+                            ),
                             company,
-                            membership,
                         }
                     }),
                 None => managed.first().cloned(),

@@ -834,13 +834,18 @@ CREATE TABLE public.channels (
 -- Name: company_members; Type: TABLE; Schema: public; Owner: -
 --
 
+CREATE DOMAIN public.access_level AS smallint
+    CONSTRAINT access_level_range CHECK (VALUE BETWEEN 0 AND 9);
+
 CREATE TABLE public.company_members (
     id uuid NOT NULL,
     company_id uuid NOT NULL,
     user_id uuid NOT NULL,
     role text DEFAULT 'member'::text NOT NULL,
+    access_level public.access_level DEFAULT 0 NOT NULL,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    CONSTRAINT company_members_role_check CHECK ((role = ANY (ARRAY['owner'::text, 'member'::text, 'admin'::text])))
+    CONSTRAINT company_members_role_check CHECK ((role = ANY (ARRAY['owner'::text, 'member'::text, 'admin'::text]))),
+    CONSTRAINT company_members_owner_level_check CHECK (role <> 'owner' OR access_level = 9)
 );
 
 
@@ -3524,6 +3529,7 @@ CREATE TABLE public.company_invites (
     company_id uuid NOT NULL,
     email public.citext NOT NULL,
     status text DEFAULT 'pending'::text NOT NULL,
+    access_level public.access_level DEFAULT 0 NOT NULL,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     role text DEFAULT 'member'::text NOT NULL,
     CONSTRAINT company_invites_role_check CHECK ((role = ANY (ARRAY['member'::text, 'admin'::text]))),

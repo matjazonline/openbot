@@ -261,6 +261,7 @@ pub struct ChannelPrincipalGrant {
 pub struct PrincipalAccessContext {
     pub principal_id: Option<PrincipalId>,
     pub membership: CompanyMembership,
+    pub access_level: crate::entities::access_level::AccessLevel,
     /// Whether a signed-in account may use participant grants derived from its current email.
     /// Its principal remains available for attribution even when this is withheld.
     pub grant_authority: PrincipalGrantAuthority,
@@ -277,6 +278,7 @@ impl PrincipalAccessContext {
         Self {
             principal_id: Some(principal_id),
             membership: CompanyMembership::None,
+            access_level: crate::entities::access_level::AccessLevel::PUBLIC,
             grant_authority: PrincipalGrantAuthority::Available,
         }
     }

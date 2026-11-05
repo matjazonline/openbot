@@ -42,7 +42,15 @@ impl InviteSecurityFixture {
         .await
         .unwrap();
         let invite = persistence
-            .create_invite(company.id, &claimant_email, CompanyAccessRole::Member)
+            .create_invite(
+                crate::adapters::persistence::test_support::invite_command(
+                    &persistence,
+                    company.id,
+                    &claimant_email,
+                    CompanyAccessRole::Member,
+                )
+                .await,
+            )
             .await
             .unwrap();
         Self {
@@ -156,7 +164,11 @@ async fn security_email_identity_invite_accept_requires_current_account_even_for
         Err(AppError::NotFound(_))
     ));
     assert_eq!(
-        p.get_invite_by_id(invite.id).await.unwrap().unwrap().status,
+        p.get_invite_by_id(invite.company_id, invite.id)
+            .await
+            .unwrap()
+            .unwrap()
+            .status,
         "accepted"
     );
 }
@@ -206,7 +218,11 @@ async fn security_email_identity_invite_decline_requires_current_account_even_fo
         Err(AppError::NotFound(_))
     ));
     assert_eq!(
-        p.get_invite_by_id(invite.id).await.unwrap().unwrap().status,
+        p.get_invite_by_id(invite.company_id, invite.id)
+            .await
+            .unwrap()
+            .unwrap()
+            .status,
         "declined"
     );
 }
@@ -247,7 +263,7 @@ async fn security_email_identity_concurrent_address_change_defeats_stale_invite_
     assert_eq!(
         fixture
             .persistence
-            .get_invite_by_id(invite_id)
+            .get_invite_by_id(fixture.invite.company_id, invite_id)
             .await
             .unwrap()
             .unwrap()
@@ -316,7 +332,15 @@ async fn postgres_company_invite_and_member_persistence_works() {
 
     // 1. Create Invite
     let invite = persistence
-        .create_invite(company.id, &member_email, CompanyAccessRole::Admin)
+        .create_invite(
+            crate::adapters::persistence::test_support::invite_command(
+                &persistence,
+                company.id,
+                &member_email,
+                CompanyAccessRole::Admin,
+            )
+            .await,
+        )
         .await
         .unwrap();
     assert_eq!(invite.email, member_email);
@@ -334,10 +358,14 @@ async fn postgres_company_invite_and_member_persistence_works() {
     let updated_email = format!("new_{}", member_email);
     let updated = persistence
         .update_invite(
-            company.id,
-            invite.id,
-            &updated_email,
-            CompanyAccessRole::Member,
+            crate::adapters::persistence::test_support::invite_update_command(
+                &persistence,
+                company.id,
+                invite.id,
+                &updated_email,
+                CompanyAccessRole::Member,
+            )
+            .await,
         )
         .await
         .unwrap()
@@ -348,10 +376,14 @@ async fn postgres_company_invite_and_member_persistence_works() {
     // Update back
     let _ = persistence
         .update_invite(
-            company.id,
-            invite.id,
-            &member_email,
-            CompanyAccessRole::Admin,
+            crate::adapters::persistence::test_support::invite_update_command(
+                &persistence,
+                company.id,
+                invite.id,
+                &member_email,
+                CompanyAccessRole::Admin,
+            )
+            .await,
         )
         .await
         .unwrap()
@@ -492,7 +524,15 @@ async fn removing_a_member_demotes_their_principal_and_spares_the_owner() {
     .await
     .unwrap();
     let invite = persistence
-        .create_invite(company.id, &member_email, CompanyAccessRole::Member)
+        .create_invite(
+            crate::adapters::persistence::test_support::invite_command(
+                &persistence,
+                company.id,
+                &member_email,
+                CompanyAccessRole::Member,
+            )
+            .await,
+        )
         .await
         .unwrap();
     persistence

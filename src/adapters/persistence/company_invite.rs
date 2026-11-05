@@ -12,8 +12,15 @@ use crate::{
         company_member::{CompanyAccessRole, CompanyMember},
         value_objects::AvatarUrl,
     },
-    use_cases::company_invite::CompanyInvitePersistence,
+    use_cases::company_invite::{
+        CompanyInvitePersistence, CreateCompanyInvite, InviteLevelChange, MemberLevelChange,
+        UpdateCompanyInvite, invite_address,
+    },
 };
+
+#[path = "company_level_authority.rs"]
+mod authority;
+use authority::{InviteTarget, TeamScope};
 
 #[derive(sqlx::FromRow, Debug, Serialize)]
 pub struct CompanyInviteDb {
@@ -22,6 +29,7 @@ pub struct CompanyInviteDb {
     pub company_name: Option<String>,
     pub email: String,
     pub role: String,
+    pub access_level: i16,
     pub status: String,
     pub created_at: DateTime<Utc>,
 }
@@ -36,6 +44,13 @@ impl TryFrom<CompanyInviteDb> for CompanyInvite {
             company_name: db.company_name,
             email: db.email,
             role: CompanyAccessRole::from_str(&db.role).map_err(AppError::Internal)?,
+            access_level: crate::entities::access_level::AccessLevel::try_from(db.access_level)
+                .map_err(|error| {
+                    AppError::Internal(format!(
+                        "Invalid stored company access level {}: {error}",
+                        db.id
+                    ))
+                })?,
             status: db.status,
             created_at: db.created_at,
         })
@@ -68,6 +83,7 @@ pub struct CompanyMemberDb {
     pub email: Option<String>,
     pub avatar_url: Option<String>,
     pub role: String,
+    pub access_level: i16,
     pub created_at: DateTime<Utc>,
 }
 
@@ -83,6 +99,13 @@ impl TryFrom<CompanyMemberDb> for CompanyMember {
             email: db.email,
             avatar_url: db.avatar_url.map(AvatarUrl::from),
             role: CompanyAccessRole::from_str(&db.role).map_err(AppError::Internal)?,
+            access_level: crate::entities::access_level::AccessLevel::try_from(db.access_level)
+                .map_err(|error| {
+                    AppError::Internal(format!(
+                        "Invalid stored company access level {}: {error}",
+                        db.id
+                    ))
+                })?,
             created_at: db.created_at,
         })
     }
@@ -90,54 +113,48 @@ impl TryFrom<CompanyMemberDb> for CompanyMember {
 
 #[async_trait]
 impl CompanyInvitePersistence for PostgresPersistence {
-    async fn create_invite(
-        &self,
-        company_id: Uuid,
-        email: &str,
-        role: CompanyAccessRole,
-    ) -> AppResult<CompanyInvite> {
-        let uuid = Uuid::new_v4();
-
-        let db = sqlx::query_as::<_, CompanyInviteDb>(
-            r#"
-            WITH invite AS (
-                INSERT INTO company_invites (id, company_id, email, role, status)
-                VALUES ($1, $2, $3, $4, 'pending')
-                ON CONFLICT (company_id, email)
-                DO UPDATE SET role = EXCLUDED.role, status = 'pending', created_at = CURRENT_TIMESTAMP
-                RETURNING id, company_id, email, role, status, created_at
-            )
-            SELECT invite.id, invite.company_id, company.name AS company_name, invite.email,
-                   invite.role, invite.status, invite.created_at
-            FROM invite
-            JOIN companies AS company ON company.id = invite.company_id
-            "#,
-        )
-        .bind(uuid)
-        .bind(company_id)
-        .bind(email)
-        .bind(role.as_str())
-        .fetch_one(&self.pool)
-        .await
-        .map_err(AppError::from)?;
-
-        db.try_into()
+    async fn create_invite(&self, command: CreateCompanyInvite) -> AppResult<CompanyInvite> {
+        use crate::entities::access_level::{AccessLevel, LevelTarget};
+        let email = invite_address(&command.email)?;
+        let scope = TeamScope {
+            actor_id: command.actor_id,
+            company_id: command.company_id,
+        };
+        let mut tx = authority::start(&self.pool, scope).await?;
+        let previous =
+            authority::lock_invite(&mut tx, scope.company_id, InviteTarget::Email(&email)).await?;
+        let team = authority::lock_team(&mut tx, scope, None).await?;
+        team.require_owner()?;
+        let current = previous
+            .as_ref()
+            .map(|row| AccessLevel::try_from(row.access_level))
+            .transpose()
+            .map_err(|e| AppError::Internal(e.into()))?
+            .unwrap_or(AccessLevel::PUBLIC);
+        team.assign(LevelTarget::Assignable(current), command.access_level)?;
+        authority::refuse_owner_address(&mut tx, team.owner_id, &email).await?;
+        let id: Uuid = sqlx::query_scalar("INSERT INTO company_invites(id,company_id,email,role,access_level,status)
+            VALUES($1,$2,$3,$4,$5::smallint,'pending') ON CONFLICT(company_id,email)
+            DO UPDATE SET role=EXCLUDED.role,access_level=EXCLUDED.access_level,status='pending',created_at=CURRENT_TIMESTAMP RETURNING id")
+            .bind(Uuid::new_v4()).bind(scope.company_id).bind(&email).bind(command.role.as_str())
+            .bind(command.access_level.as_i16()).fetch_one(&mut *tx).await.map_err(authority::database)?;
+        let row = authority::read_invite(&mut tx, scope.company_id, id)
+            .await?
+            .ok_or_else(|| AppError::Internal("Created invitation disappeared".into()))?;
+        tx.commit().await.map_err(authority::database)?;
+        row.try_into()
     }
 
-    async fn get_invite_by_id(&self, id: Uuid) -> AppResult<Option<CompanyInvite>> {
-        let db = sqlx::query_as!(
-            CompanyInviteDb,
-            r#"SELECT invite.id, invite.company_id, company.name AS "company_name?", invite.email,
-                      invite.role, invite.status, invite.created_at AS "created_at!"
-               FROM company_invites AS invite
-               JOIN companies AS company ON company.id = invite.company_id
-               WHERE invite.id = $1"#,
-            id
-        )
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(AppError::from)?;
-
+    async fn get_invite_by_id(
+        &self,
+        company_id: Uuid,
+        id: Uuid,
+    ) -> AppResult<Option<CompanyInvite>> {
+        let db = sqlx::query_as::<_, CompanyInviteDb>("SELECT invite.id,invite.company_id,company.name AS company_name,
+            invite.email::text AS email,invite.role,invite.access_level::smallint AS access_level,invite.status,invite.created_at
+            FROM company_invites AS invite JOIN companies AS company ON company.id=invite.company_id
+            WHERE invite.company_id=$1 AND invite.id=$2")
+            .bind(company_id).bind(id).fetch_optional(&self.pool).await?;
         db.map(TryInto::try_into).transpose()
     }
 
@@ -145,7 +162,7 @@ impl CompanyInvitePersistence for PostgresPersistence {
         let db_list = sqlx::query_as!(
             CompanyInviteDb,
             r#"SELECT invite.id, invite.company_id, company.name AS "company_name?", invite.email,
-                      invite.role, invite.status, invite.created_at AS "created_at!"
+                      invite.role, invite.access_level::smallint AS "access_level!: i16", invite.status, invite.created_at AS "created_at!"
                FROM company_invites AS invite
                JOIN companies AS company ON company.id = invite.company_id
                WHERE invite.company_id = $1
@@ -179,34 +196,124 @@ impl CompanyInvitePersistence for PostgresPersistence {
     /// `UPDATE` itself, so an invite accepted after the caller read it is left as it was accepted.
     async fn update_invite(
         &self,
-        company_id: Uuid,
-        id: Uuid,
-        new_email: &str,
-        role: CompanyAccessRole,
+        command: UpdateCompanyInvite,
     ) -> AppResult<Option<CompanyInvite>> {
-        let db = sqlx::query_as::<_, CompanyInviteDb>(
-            r#"
-            WITH invite AS (
-                UPDATE company_invites
-                SET email = $1, role = $2
-                WHERE id = $3 AND company_id = $4 AND status = 'pending'
-                RETURNING id, company_id, email, role, status, created_at
-            )
-            SELECT invite.id, invite.company_id, company.name AS company_name, invite.email,
-                   invite.role, invite.status, invite.created_at
-            FROM invite
-            JOIN companies AS company ON company.id = invite.company_id
-            "#,
+        use crate::entities::access_level::{AccessLevel, LevelTarget};
+        let email = invite_address(&command.email)?;
+        let scope = TeamScope {
+            actor_id: command.actor_id,
+            company_id: command.company_id,
+        };
+        let mut tx = authority::start(&self.pool, scope).await?;
+        let Some(previous) = authority::lock_invite(
+            &mut tx,
+            scope.company_id,
+            InviteTarget::Id(command.invite_id),
         )
-        .bind(new_email)
-        .bind(role.as_str())
-        .bind(id)
-        .bind(company_id)
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(AppError::from)?;
+        .await?
+        else {
+            return Ok(None);
+        };
+        let team = authority::lock_team(&mut tx, scope, None).await?;
+        team.require_owner()?;
+        if previous.status != "pending" {
+            return Ok(None);
+        }
+        let current = AccessLevel::try_from(previous.access_level)
+            .map_err(|e| AppError::Internal(e.into()))?;
+        let requested = command.access_level.unwrap_or(current);
+        team.assign(LevelTarget::Assignable(current), requested)?;
+        authority::refuse_owner_address(&mut tx, team.owner_id, &email).await?;
+        let role = command
+            .role
+            .unwrap_or(CompanyAccessRole::from_str(&previous.role).map_err(AppError::Internal)?);
+        sqlx::query("UPDATE company_invites SET email=$3,role=$4,access_level=$5::smallint WHERE company_id=$1 AND id=$2 AND status='pending'")
+            .bind(scope.company_id).bind(command.invite_id).bind(email).bind(role.as_str()).bind(requested.as_i16())
+            .execute(&mut *tx).await.map_err(authority::database)?;
+        let row = authority::read_invite(&mut tx, scope.company_id, command.invite_id).await?;
+        tx.commit().await.map_err(authority::database)?;
+        row.map(TryInto::try_into).transpose()
+    }
 
-        db.map(TryInto::try_into).transpose()
+    async fn get_member_by_user_id(
+        &self,
+        company_id: Uuid,
+        user_id: Uuid,
+    ) -> AppResult<Option<CompanyMember>> {
+        sqlx::query_as::<_, CompanyMemberDb>(authority::MEMBER_SELECT)
+            .bind(company_id)
+            .bind(user_id)
+            .fetch_optional(&self.pool)
+            .await?
+            .map(TryInto::try_into)
+            .transpose()
+    }
+
+    async fn set_member_access_level(
+        &self,
+        change: MemberLevelChange,
+    ) -> AppResult<Option<CompanyMember>> {
+        use crate::entities::access_level::LevelTarget;
+        let scope = TeamScope {
+            actor_id: change.actor_id,
+            company_id: change.company_id,
+        };
+        let mut tx = authority::start(&self.pool, scope).await?;
+        let team = authority::lock_team(&mut tx, scope, Some(change.member_user_id)).await?;
+        let Some(target) = team.member(change.member_user_id) else {
+            return Ok(None);
+        };
+        let current = if change.member_user_id == team.owner_id {
+            LevelTarget::Owner
+        } else {
+            LevelTarget::Assignable(target.actor()?.access_level)
+        };
+        team.assign(current, change.access_level)?;
+        sqlx::query("UPDATE company_members SET access_level=$3::smallint WHERE company_id=$1 AND user_id=$2 AND role<>'owner'")
+            .bind(scope.company_id).bind(change.member_user_id).bind(change.access_level.as_i16())
+            .execute(&mut *tx).await.map_err(authority::database)?;
+        let row = sqlx::query_as::<_, CompanyMemberDb>(authority::MEMBER_SELECT)
+            .bind(scope.company_id)
+            .bind(change.member_user_id)
+            .fetch_optional(&mut *tx)
+            .await
+            .map_err(authority::database)?;
+        tx.commit().await.map_err(authority::database)?;
+        row.map(TryInto::try_into).transpose()
+    }
+
+    async fn set_invite_access_level(
+        &self,
+        change: InviteLevelChange,
+    ) -> AppResult<Option<CompanyInvite>> {
+        use crate::entities::access_level::{AccessLevel, LevelTarget};
+        let scope = TeamScope {
+            actor_id: change.actor_id,
+            company_id: change.company_id,
+        };
+        let mut tx = authority::start(&self.pool, scope).await?;
+        let Some(previous) = authority::lock_invite(
+            &mut tx,
+            scope.company_id,
+            InviteTarget::Id(change.invite_id),
+        )
+        .await?
+        else {
+            return Ok(None);
+        };
+        let team = authority::lock_team(&mut tx, scope, None).await?;
+        if previous.status != "pending" {
+            return Ok(None);
+        }
+        let current = AccessLevel::try_from(previous.access_level)
+            .map_err(|e| AppError::Internal(e.into()))?;
+        team.assign(LevelTarget::Assignable(current), change.access_level)?;
+        sqlx::query("UPDATE company_invites SET access_level=$3::smallint WHERE company_id=$1 AND id=$2 AND status='pending'")
+            .bind(scope.company_id).bind(change.invite_id).bind(change.access_level.as_i16())
+            .execute(&mut *tx).await.map_err(authority::database)?;
+        let row = authority::read_invite(&mut tx, scope.company_id, change.invite_id).await?;
+        tx.commit().await.map_err(authority::database)?;
+        row.map(TryInto::try_into).transpose()
     }
 
     async fn delete_invite(&self, id: Uuid) -> AppResult<()> {
@@ -226,7 +333,7 @@ impl CompanyInvitePersistence for PostgresPersistence {
         let db_list = sqlx::query_as!(
             CompanyInviteDb,
             r#"SELECT invite.id, invite.company_id, company.name AS "company_name?", invite.email,
-                      invite.role, invite.status, invite.created_at AS "created_at!"
+                      invite.role, invite.access_level::smallint AS "access_level!: i16", invite.status, invite.created_at AS "created_at!"
                FROM company_invites AS invite
                JOIN companies AS company ON company.id = invite.company_id
                JOIN users AS account ON account.id = $1
@@ -260,21 +367,21 @@ impl CompanyInvitePersistence for PostgresPersistence {
                 UPDATE company_invites
                 SET status = 'accepted'
                 WHERE id = $1 AND status = 'pending' AND email = $2
-                RETURNING id, company_id, email, role, status, created_at
+                RETURNING id, company_id, email, role, access_level::smallint AS access_level, status, created_at
             ), membership AS (
                 -- An invite never rewrites the owner's row: accepting one addressed to the owner
                 -- leaves them the owner (the database also refuses an owner row that disagrees
                 -- with companies.user_id). A data-modifying CTE runs whether or not it is read, so
                 -- the invite still reads back accepted when this writes nothing.
-                INSERT INTO company_members (id, company_id, user_id, role)
-                SELECT $3, company_id, $4, role
+                INSERT INTO company_members (id, company_id, user_id, role, access_level)
+                SELECT $3, company_id, $4, role, access_level
                 FROM accepted
                 ON CONFLICT (company_id, user_id)
                 DO UPDATE SET role = EXCLUDED.role WHERE company_members.role <> 'owner'
                 RETURNING company_id
             )
             SELECT accepted.id, accepted.company_id, company.name AS company_name, accepted.email,
-                   accepted.role, accepted.status, accepted.created_at
+                   accepted.role, accepted.access_level::smallint AS access_level, accepted.status, accepted.created_at
             FROM accepted
             JOIN companies AS company ON company.id = accepted.company_id
             "#,
@@ -308,7 +415,7 @@ impl CompanyInvitePersistence for PostgresPersistence {
         } else {
             sqlx::query_as::<_, CompanyInviteDb>(
                 r#"SELECT invite.id, invite.company_id, company.name AS company_name, invite.email,
-                          invite.role, invite.status, invite.created_at
+                          invite.role, invite.access_level::smallint AS access_level, invite.status, invite.created_at
                    FROM company_invites AS invite
                    JOIN companies AS company ON company.id = invite.company_id
                    WHERE invite.id = $1 AND invite.email = $2 AND invite.status = 'accepted'"#,
@@ -340,10 +447,10 @@ impl CompanyInvitePersistence for PostgresPersistence {
                 UPDATE company_invites
                 SET status = 'declined'
                 WHERE id = $1 AND status = 'pending' AND email = $2
-                RETURNING id, company_id, email, role, status, created_at
+                RETURNING id, company_id, email, role, access_level::smallint AS access_level, status, created_at
             )
             SELECT declined.id, declined.company_id, company.name AS company_name, declined.email,
-                   declined.role, declined.status, declined.created_at
+                   declined.role, declined.access_level::smallint AS access_level, declined.status, declined.created_at
             FROM declined
             JOIN companies AS company ON company.id = declined.company_id
             "#,
@@ -358,7 +465,7 @@ impl CompanyInvitePersistence for PostgresPersistence {
         } else {
             sqlx::query_as::<_, CompanyInviteDb>(
                 r#"SELECT invite.id, invite.company_id, company.name AS company_name, invite.email,
-                          invite.role, invite.status, invite.created_at
+                          invite.role, invite.access_level::smallint AS access_level, invite.status, invite.created_at
                    FROM company_invites AS invite
                    JOIN companies AS company ON company.id = invite.company_id
                    WHERE invite.id = $1 AND invite.email = $2 AND invite.status = 'declined'"#,
@@ -383,7 +490,7 @@ impl CompanyInvitePersistence for PostgresPersistence {
             CompanyMemberDb,
             r#"SELECT member.id, member.company_id, member.user_id,
                       account.username AS "username?", account.email AS "email?", account.avatar_url,
-                      member.role, member.created_at AS "created_at!"
+                      member.role, member.access_level::smallint AS "access_level!: i16", member.created_at AS "created_at!"
                FROM company_members AS member
                JOIN users AS account ON account.id = member.user_id
                WHERE member.company_id = $1 AND member.role <> 'owner'
@@ -409,11 +516,11 @@ impl CompanyInvitePersistence for PostgresPersistence {
                    UPDATE company_members
                    SET role = $3
                    WHERE company_id = $1 AND user_id = $2 AND role <> 'owner'
-                   RETURNING id, company_id, user_id, role, created_at
+                   RETURNING id, company_id, user_id, role, access_level, created_at
                )
                SELECT updated.id, updated.company_id, updated.user_id,
                       account.username AS "username?", account.email AS "email?", account.avatar_url,
-                      updated.role, updated.created_at AS "created_at!"
+                      updated.role, updated.access_level::smallint AS "access_level!: i16", updated.created_at AS "created_at!"
                FROM updated
                JOIN users AS account ON account.id = updated.user_id"#,
             company_id,
@@ -499,3 +606,7 @@ mod tests;
 #[cfg(test)]
 #[path = "company_owner_tests.rs"]
 mod owner_tests;
+
+#[cfg(test)]
+#[path = "company_access_level_tests.rs"]
+mod access_level_tests;

@@ -63,6 +63,14 @@ pub fn router() -> Router<AppState> {
             "/ui/companies/{company_id}/team/members/{user_id}/avatar",
             put(set_member_avatar),
         )
+        .route(
+            "/ui/companies/{company_id}/team/members/{user_id}/level",
+            put(set_member_level),
+        )
+        .route(
+            "/ui/companies/{company_id}/team/invites/{invite_id}/level",
+            put(set_invite_level),
+        )
         // Removal. A POST rather than a DELETE, kept from when it carried who took over the
         // member's legacy work, which went with the legacy runtime (p08 B4b).
         .route(
@@ -143,6 +151,7 @@ pub struct LegacyTeamQuery {
 #[derive(Debug, Clone, Deserialize)]
 pub struct InviteForm {
     pub email: String,
+    pub access_level: Option<crate::entities::access_level::AccessLevel>,
     #[serde(default)]
     pub role: Option<CompanyAccessRole>,
 }
@@ -216,6 +225,7 @@ impl Workspace {
             user_id: self.user_id,
             company: &access.company,
             membership: access.membership,
+            access_level: access.access_level,
         }
     }
 }
@@ -235,6 +245,7 @@ pub(super) async fn team_tab_body(
         user_id,
         company: &access.company,
         membership: access.membership,
+        access_level: access.access_level,
     };
     let members = view.members().await?;
     let invites = view.invites().await?;
@@ -407,12 +418,15 @@ async fn create_invite(
 
     let created = view
         .invite_use_cases
-        .create_company_invite(
-            view.user_id,
-            view.company.id,
-            &form.email,
-            form.role.unwrap_or_default(),
-        )
+        .create_company_invite(crate::use_cases::company_invite::CreateCompanyInvite {
+            actor_id: view.user_id,
+            company_id: view.company.id,
+            email: form.email.to_string().into(),
+            role: form.role.unwrap_or_default(),
+            access_level: form
+                .access_level
+                .unwrap_or(crate::entities::access_level::AccessLevel::PUBLIC),
+        })
         .await;
 
     match created {
@@ -446,13 +460,14 @@ async fn update_invite(
 
     let saved = view
         .invite_use_cases
-        .update_company_invite(
-            view.user_id,
-            view.company.id,
+        .update_company_invite(crate::use_cases::company_invite::UpdateCompanyInvite {
+            actor_id: view.user_id,
+            company_id: view.company.id,
             invite_id,
-            &form.email,
-            form.role,
-        )
+            email: form.email.to_string().into(),
+            role: form.role,
+            access_level: form.access_level,
+        })
         .await;
 
     match saved {
@@ -558,6 +573,7 @@ struct TeamView<'a> {
     company: &'a Company,
     /// What the caller is to the company, from their membership row.
     membership: CompanyMembership,
+    access_level: crate::entities::access_level::AccessLevel,
 }
 
 impl TeamView<'_> {
@@ -569,6 +585,8 @@ impl TeamView<'_> {
     fn role(&self) -> TeamRole {
         if self.membership.is_owner() {
             TeamRole::Owner
+        } else if self.membership == CompanyMembership::Admin {
+            TeamRole::Admin
         } else {
             TeamRole::Member
         }
@@ -578,7 +596,7 @@ impl TeamView<'_> {
     fn require_owner(&self) -> AppResult<()> {
         match self.role() {
             TeamRole::Owner => Ok(()),
-            TeamRole::Member => Err(AppError::Forbidden(
+            TeamRole::Admin | TeamRole::Member => Err(AppError::Forbidden(
                 "Only the company owner can manage invites and team members.".into(),
             )),
         }
@@ -594,7 +612,7 @@ impl TeamView<'_> {
     /// member's list is empty rather than an error.
     async fn invites(&self) -> AppResult<Vec<CompanyInvite>> {
         match self.role() {
-            TeamRole::Owner => {
+            TeamRole::Owner | TeamRole::Admin => {
                 self.invite_use_cases
                     .list_company_invites(self.user_id, self.company.id)
                     .await
@@ -604,10 +622,9 @@ impl TeamView<'_> {
     }
 
     async fn member(&self, user_id: Uuid) -> AppResult<CompanyMember> {
-        self.members()
+        self.invite_use_cases
+            .get_company_team_member(self.user_id, self.company.id, user_id)
             .await?
-            .into_iter()
-            .find(|member| member.user_id == user_id)
             .ok_or_else(|| AppError::NotFound("Team member not found".into()))
     }
 
@@ -695,6 +712,7 @@ impl TeamView<'_> {
             company: self.company,
             member,
             role: self.role(),
+            viewer_access_level: self.access_level,
             viewer_id: self.user_id,
             avatar_draft,
             error,
@@ -712,6 +730,7 @@ impl TeamView<'_> {
             company: self.company,
             invite,
             role: self.role(),
+            viewer_access_level: self.access_level,
             email_draft,
             role_draft,
             error,
@@ -786,3 +805,7 @@ impl TeamView<'_> {
 #[cfg(test)]
 #[path = "ui_team_authorization_tests.rs"]
 mod authorization_tests;
+
+#[path = "ui_team_levels.rs"]
+mod levels;
+use levels::{set_invite_level, set_member_level};

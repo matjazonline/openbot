@@ -52,6 +52,7 @@ struct AccessibleCompanyDb {
     #[sqlx(flatten)]
     company: CompanyDb,
     role: String,
+    access_level: i16,
 }
 
 impl TryFrom<AccessibleCompanyDb> for CompanyAccess {
@@ -70,16 +71,31 @@ impl TryFrom<AccessibleCompanyDb> for CompanyAccess {
                 )));
             }
         };
+        let access_level = crate::entities::access_level::AccessLevel::try_from(db.access_level)
+            .map_err(|error| {
+                AppError::Internal(format!(
+                    "Invalid stored company level {}: {error}",
+                    db.company.id
+                ))
+            })?;
+        if membership.is_owner() && access_level != crate::entities::access_level::AccessLevel::MAX
+        {
+            return Err(AppError::Internal(format!(
+                "Invalid stored owner level {}",
+                db.company.id
+            )));
+        }
         Ok(CompanyAccess {
             company: db.company.into(),
             membership,
+            access_level,
         })
     }
 }
 
 /// The columns of [`AccessibleCompanyDb`], joined from `company` and `member`.
 const ACCESSIBLE_COMPANY_COLUMNS: &str = "company.id, company.user_id, company.name, company.slug, \
-     company.default_add_3rd_party, company.avatar_url, company.created_at, member.role";
+     company.default_add_3rd_party, company.avatar_url, company.created_at, member.role, member.access_level::smallint AS access_level";
 
 /// How many dependent agents a rejected model-connection change names before it stops listing
 /// them. The message is for a person reading a form, not an inventory.
@@ -146,8 +162,8 @@ impl CompanyPersistence for PostgresPersistence {
         .map_err(AppError::from)?;
 
         sqlx::query(
-            r#"INSERT INTO company_members (id, company_id, user_id, role)
-               VALUES ($1, $2, $3, 'owner')"#,
+            r#"INSERT INTO company_members (id, company_id, user_id, role, access_level)
+               VALUES ($1, $2, $3, 'owner', 9)"#,
         )
         .bind(Uuid::new_v4())
         .bind(uuid)
@@ -491,7 +507,15 @@ mod tests {
         assert!(accessible_ids(&persistence, member.0).await.is_empty());
 
         let invite = persistence
-            .create_invite(company.id, &member.1, CompanyAccessRole::Member)
+            .create_invite(
+                crate::adapters::persistence::test_support::invite_command(
+                    &persistence,
+                    company.id,
+                    &member.1,
+                    CompanyAccessRole::Member,
+                )
+                .await,
+            )
             .await
             .expect("an invite");
         persistence
@@ -499,7 +523,15 @@ mod tests {
             .await
             .expect("the invite is accepted");
         let admin_invite = persistence
-            .create_invite(company.id, &admin.1, CompanyAccessRole::Admin)
+            .create_invite(
+                crate::adapters::persistence::test_support::invite_command(
+                    &persistence,
+                    company.id,
+                    &admin.1,
+                    CompanyAccessRole::Admin,
+                )
+                .await,
+            )
             .await
             .expect("an admin invite");
         persistence

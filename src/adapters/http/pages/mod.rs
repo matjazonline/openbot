@@ -65,6 +65,7 @@ mod run_counts;
 mod schedules;
 mod simulation;
 mod skeleton;
+mod team_levels;
 mod team_settings;
 mod thread_activity;
 mod workflow_authoring;
@@ -101,6 +102,7 @@ pub(crate) use skeleton::{
     LIST_SKELETON, PANE_SKELETON, PANELS_SKELETON, THREAD_COLUMN_SKELETON, THREAD_ROWS_SKELETON,
     panels_placeholder, skeleton_script,
 };
+pub use team_levels::*;
 pub use team_settings::*;
 pub use thread_activity::*;
 pub use workflow_authoring::*;
@@ -191,3 +193,6 @@ mod model_usage;
 pub use model_usage::model_usage_page;
 
 pub mod company_typesafe;
+
+#[cfg(test)]
+mod team_level_tests;

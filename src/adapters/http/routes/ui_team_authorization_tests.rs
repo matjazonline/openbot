@@ -59,6 +59,7 @@ async fn denied_mutations(
             make_workspace(),
             Path(company_id),
             Form(InviteForm {
+                access_level: None,
                 email: format!("new-{}@example.test", Uuid::new_v4().simple()),
                 role: Some(CompanyAccessRole::Member),
             }),
@@ -138,6 +139,7 @@ async fn team_owner_business_refusals_keep_inline_feedback() {
         workspace(&f, f.owner.id),
         Path(f.company.id),
         Form(InviteForm {
+            access_level: None,
             email: "not-an-address".into(),
             role: None,
         }),
@@ -147,18 +149,22 @@ async fn team_owner_business_refusals_keep_inline_feedback() {
     assert_eq!(invalid.status(), StatusCode::OK);
     let invite = f
         .invites
-        .create_company_invite(
-            f.owner.id,
-            f.company.id,
-            &format!("draft-{}@example.test", Uuid::new_v4().simple()),
-            CompanyAccessRole::Member,
-        )
+        .create_company_invite(crate::use_cases::company_invite::CreateCompanyInvite {
+            actor_id: f.owner.id,
+            company_id: f.company.id,
+            email: format!("draft-{}@example.test", Uuid::new_v4().simple())
+                .to_string()
+                .into(),
+            role: CompanyAccessRole::Member,
+            access_level: crate::entities::access_level::AccessLevel::PUBLIC,
+        })
         .await
         .unwrap();
     let invalid = update_invite(
         workspace(&f, f.owner.id),
         Path((f.company.id, invite.id)),
         Form(InviteForm {
+            access_level: None,
             email: "not-an-address".into(),
             role: None,
         }),
@@ -219,4 +225,73 @@ async fn team_owner_self_refusals_are_client_errors_and_owner_member_panes_stay_
             .membership
             .is_owner()
     );
+}
+
+#[tokio::test]
+async fn access_level_browser_self_demotion_refreshes_caps_and_foreign_targets_are_hidden() {
+    use crate::entities::access_level::AccessLevel;
+    let Some(f) = Fixture::new().await else {
+        return;
+    };
+    sqlx::query(
+        "UPDATE company_members SET role='admin',access_level=4 WHERE company_id=$1 AND user_id=$2",
+    )
+    .bind(f.company.id)
+    .bind(f.member.id)
+    .execute(f.persistence.pool())
+    .await
+    .unwrap();
+    let saved = levels::set_member_level(
+        workspace(&f, f.member.id),
+        Path((f.company.id, f.member.id)),
+        Form(super::super::company_invite::LevelForm {
+            access_level: AccessLevel::L2,
+        }),
+    )
+    .await
+    .unwrap();
+    let body = axum::body::to_bytes(saved.into_body(), 2 * 1024 * 1024)
+        .await
+        .unwrap();
+    let html = String::from_utf8(body.to_vec()).unwrap();
+    assert!(html.contains("value=\"2\""));
+    assert!(!html.contains("value=\"3\""));
+    assert!(!html.contains("name=\"role\""));
+    denied(
+        levels::set_member_level(
+            workspace(&f, f.owner.id),
+            Path((f.company.id, f.stranger.id)),
+            Form(super::super::company_invite::LevelForm {
+                access_level: AccessLevel::PUBLIC,
+            }),
+        )
+        .await,
+        StatusCode::NOT_FOUND,
+        &f.foreign.name,
+    )
+    .await;
+    let invite = f
+        .invites
+        .create_company_invite(crate::use_cases::company_invite::CreateCompanyInvite {
+            actor_id: f.stranger.id,
+            company_id: f.foreign.id,
+            email: f.member.email.clone().into(),
+            role: CompanyAccessRole::Member,
+            access_level: AccessLevel::PUBLIC,
+        })
+        .await
+        .unwrap();
+    denied(
+        levels::set_invite_level(
+            workspace(&f, f.owner.id),
+            Path((f.company.id, invite.id)),
+            Form(super::super::company_invite::LevelForm {
+                access_level: AccessLevel::PUBLIC,
+            }),
+        )
+        .await,
+        StatusCode::NOT_FOUND,
+        &f.foreign.name,
+    )
+    .await;
 }

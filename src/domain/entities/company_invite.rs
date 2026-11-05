@@ -10,8 +10,8 @@ pub struct CompanyInvite {
     pub company_name: Option<String>,
     pub email: String,
     /// The access the account receives when this invitation is accepted.
-    #[serde(default)]
     pub role: CompanyAccessRole,
+    pub access_level: crate::entities::access_level::AccessLevel,
     pub status: String,
     pub created_at: chrono::DateTime<chrono::Utc>,
 }
@@ -21,17 +21,28 @@ mod tests {
     use super::*;
 
     #[test]
-    fn an_invite_without_a_stored_role_keeps_the_member_default() {
-        let invite: CompanyInvite = serde_json::from_value(serde_json::json!({
-            "id": Uuid::nil(),
-            "company_id": Uuid::nil(),
-            "company_name": "Acme",
-            "email": "member@example.com",
-            "status": "pending",
-            "created_at": "2026-08-24T00:00:00Z"
-        }))
-        .unwrap();
-
+    fn access_level_invite_payload_requires_current_fields() {
+        let current = serde_json::json!({
+            "id": Uuid::new_v4(), "company_id": Uuid::new_v4(), "company_name": null,
+            "email": "invite@example.test", "role": "member", "access_level": 0,
+            "status": "pending", "created_at": chrono::Utc::now(),
+        });
+        let invite: CompanyInvite = serde_json::from_value(current.clone()).unwrap();
         assert_eq!(invite.role, CompanyAccessRole::Member);
+        assert_eq!(
+            invite.access_level,
+            crate::entities::access_level::AccessLevel::PUBLIC
+        );
+        for field in ["role", "access_level"] {
+            let mut missing = current.clone();
+            missing.as_object_mut().unwrap().remove(field);
+            assert!(
+                serde_json::from_value::<CompanyInvite>(missing).is_err(),
+                "{field}"
+            );
+        }
+        let mut invalid = current;
+        invalid["access_level"] = serde_json::json!(10);
+        assert!(serde_json::from_value::<CompanyInvite>(invalid).is_err());
     }
 }

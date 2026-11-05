@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "WITH updated AS (\n                   UPDATE company_members\n                   SET role = $3\n                   WHERE company_id = $1 AND user_id = $2 AND role <> 'owner'\n                   RETURNING id, company_id, user_id, role, created_at\n               )\n               SELECT updated.id, updated.company_id, updated.user_id,\n                      account.username AS \"username?\", account.email AS \"email?\", account.avatar_url,\n                      updated.role, updated.created_at AS \"created_at!\"\n               FROM updated\n               JOIN users AS account ON account.id = updated.user_id",
+  "query": "SELECT member.id, member.company_id, member.user_id,\n                      account.username AS \"username?\", account.email AS \"email?\", account.avatar_url,\n                      member.role, member.access_level::smallint AS \"access_level!: i16\", member.created_at AS \"created_at!\"\n               FROM company_members AS member\n               JOIN users AS account ON account.id = member.user_id\n               WHERE member.company_id = $1 AND member.role <> 'owner'\n               ORDER BY member.created_at ASC, member.id ASC LIMIT 200",
   "describe": {
     "columns": [
       {
@@ -50,15 +50,18 @@
       },
       {
         "ordinal": 7,
+        "name": "access_level!: i16",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 8,
         "name": "created_at!",
         "type_info": "Timestamptz"
       }
     ],
     "parameters": {
       "Left": [
-        "Uuid",
-        "Uuid",
-        "Text"
+        "Uuid"
       ]
     },
     "nullable": [
@@ -69,8 +72,9 @@
       false,
       true,
       false,
+      null,
       false
     ]
   },
-  "hash": "53053372f22be0ccd2483cb28118eaa5f6e225d18a98c1237c3e68947bdd273f"
+  "hash": "7f0c6f79e79b96566a4c77f21c04db642505801108467c9890eae68cb6970eab"
 }

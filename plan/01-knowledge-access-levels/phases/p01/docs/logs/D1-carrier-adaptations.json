@@ -1,0 +1,122 @@
+[
+  {
+    "file": "src/adapters/http/routes/ui_agents.rs",
+    "line": 184,
+    "code": "E0027"
+  },
+  {
+    "file": "src/adapters/http/routes/ui_channels.rs",
+    "line": 153,
+    "code": "E0027"
+  },
+  {
+    "file": "src/adapters/http/routes/ui_deliveries.rs",
+    "line": 179,
+    "code": "E0027"
+  },
+  {
+    "file": "src/adapters/http/routes/ui_schedules.rs",
+    "line": 403,
+    "code": "E0027"
+  },
+  {
+    "file": "src/adapters/http/routes/ui_schedules.rs",
+    "line": 370,
+    "code": "E0027"
+  },
+  {
+    "file": "src/adapters/http/routes/ui_schedules.rs",
+    "line": 246,
+    "code": "E0027"
+  },
+  {
+    "file": "src/adapters/http/pages/tests.rs",
+    "line": 3251,
+    "code": "E0063"
+  },
+  {
+    "file": "src/adapters/http/pages/tests.rs",
+    "line": 3238,
+    "code": "E0063"
+  },
+  {
+    "file": "src/adapters/http/routes/company_invite.rs",
+    "line": 527,
+    "code": "E0063"
+  },
+  {
+    "file": "src/adapters/http/routes/company_invite.rs",
+    "line": 517,
+    "code": "E0063"
+  },
+  {
+    "file": "src/application/use_cases/company_invite_tests.rs",
+    "line": 231,
+    "code": "E0063"
+  },
+  {
+    "file": "src/application/use_cases/company_invite_tests.rs",
+    "line": 143,
+    "code": "E0063"
+  },
+  {
+    "file": "src/application/use_cases/company_invite_tests.rs",
+    "line": 36,
+    "code": "E0063"
+  },
+  {
+    "file": "src/application/use_cases/company_test_support.rs",
+    "line": 267,
+    "code": "E0063"
+  },
+  {
+    "file": "src/application/use_cases/company_test_support.rs",
+    "line": 244,
+    "code": "E0063"
+  },
+  {
+    "file": "src/application/use_cases/participant/test_support.rs",
+    "line": 360,
+    "code": "E0063"
+  },
+  {
+    "file": "src/application/use_cases/participant/test_support.rs",
+    "line": 326,
+    "code": "E0063"
+  },
+  {
+    "file": "src/application/workflow/templates/test_support.rs",
+    "line": 54,
+    "code": "E0063"
+  },
+  {
+    "file": "src/application/workflow/tests.rs",
+    "line": 209,
+    "code": "E0063"
+  },
+  {
+    "file": "src/application/workflow/tests/authorization_cases/mod.rs",
+    "line": 65,
+    "code": "E0063"
+  },
+  {
+    "file": "src/application/workflow/tests/authorization_cases/replay.rs",
+    "line": 26,
+    "code": "E0063"
+  },
+  {
+    "file": "src/application/workflow/tests/cases.rs",
+    "line": 99,
+    "code": "E0063"
+  },
+  {
+    "file": "src/domain/entities/channel.rs",
+    "line": 428,
+    "code": "E0063"
+  },
+  {
+    "file": "src/domain/entities/channel.rs",
+    "line": 303,
+    "code": "E0063"
+  }
+]

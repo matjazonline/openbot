@@ -97,5 +97,6 @@ pub struct CompanyMember {
     /// The member's own profile picture, carried from their account so the team list can show it.
     pub avatar_url: Option<AvatarUrl>,
     pub role: CompanyAccessRole,
+    pub access_level: crate::entities::access_level::AccessLevel,
     pub created_at: chrono::DateTime<chrono::Utc>,
 }

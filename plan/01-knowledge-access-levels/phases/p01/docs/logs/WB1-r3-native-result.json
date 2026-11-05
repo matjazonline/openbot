@@ -1,0 +1,35 @@
+{
+  "build_command": [
+    "cargo",
+    "test",
+    "--locked",
+    "--offline",
+    "--lib",
+    "--no-run",
+    "--message-format=json"
+  ],
+  "command": [
+    "/Users/mac02/dev/openbot-recovery/.worktrees/knowledge-p01/target/debug/deps/open_bots-7b3508cbfb62bd10",
+    "access_level_",
+    "adapters::persistence::participant::",
+    "domain::entities::channel::",
+    "application::use_cases::thread::",
+    "application::use_cases::channel::",
+    "company_invite",
+    "company_owner",
+    "application::use_cases::company::",
+    "adapters::persistence::company::",
+    "ui_team",
+    "team_",
+    "invite_",
+    "account_identity",
+    "workflow::tests::message_tests::authority_tests::"
+  ],
+  "exit_code": 0,
+  "environment": {
+    "CARGO_INCREMENTAL": "0",
+    "SQLX_OFFLINE": "true",
+    "DATABASE_URL": "postgres://mac02@127.0.0.1:55501/open_bots",
+    "TEST_DATABASE_URL": "postgres://mac02@127.0.0.1:55501/open_bots_test"
+  }
+}

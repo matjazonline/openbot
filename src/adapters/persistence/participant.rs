@@ -461,6 +461,44 @@ pub(crate) async fn create_agent_principal_on(
     Ok(PrincipalId::new(stored))
 }
 
+#[derive(sqlx::FromRow)]
+struct IdentityAccessRow {
+    principal_id: Uuid,
+    status: String,
+    membership: Option<String>,
+    access_level: Option<i16>,
+}
+#[derive(sqlx::FromRow)]
+struct UserAccessRow {
+    principal_id: Uuid,
+    email_proved: bool,
+    membership: String,
+    access_level: i16,
+}
+fn reader_level(
+    principal: Uuid,
+    membership: CompanyMembership,
+    stored: Option<i16>,
+) -> AppResult<crate::entities::access_level::AccessLevel> {
+    use crate::entities::access_level::AccessLevel;
+    if membership == CompanyMembership::None {
+        return Ok(AccessLevel::PUBLIC);
+    }
+    let stored = stored
+        .ok_or_else(|| AppError::Internal(format!("Missing stored principal level {principal}")))?;
+    let level = AccessLevel::try_from(stored).map_err(|error| {
+        AppError::Internal(format!(
+            "Invalid stored principal level {principal}: {error}"
+        ))
+    })?;
+    if membership.is_owner() && level != AccessLevel::MAX {
+        return Err(AppError::Internal(format!(
+            "Invalid stored owner level {principal}"
+        )));
+    }
+    Ok(level)
+}
+
 #[async_trait]
 impl IdentityDirectory for PostgresPersistence {
     async fn resolve_or_create_external_identity(
@@ -479,7 +517,7 @@ impl IdentityDirectory for PostgresPersistence {
     }
 }
 
-fn membership_from_db(value: Option<&str>) -> AppResult<CompanyMembership> {
+pub(super) fn membership_from_db(value: Option<&str>) -> AppResult<CompanyMembership> {
     match value {
         Some("owner") => Ok(CompanyMembership::Owner),
         Some("admin") => Ok(CompanyMembership::Admin),
@@ -498,48 +536,37 @@ impl PrincipalAccessPersistence for PostgresPersistence {
         company_id: Uuid,
         identity: &QualifiedIdentity,
     ) -> AppResult<PrincipalAccessContext> {
-        let row: Option<(Uuid, String, Option<String>)> = sqlx::query_as(
-            r#"SELECT principal.id, identity.status,
-                      CASE
-                          WHEN company.user_id = principal.user_id THEN 'owner'
-                          ELSE member.role
-                      END AS membership
+        let row = sqlx::query_as::<_, IdentityAccessRow>(
+            r#"SELECT principal.id AS principal_id, identity.status,
+                      CASE WHEN company.user_id = principal.user_id THEN 'owner' ELSE member.role END AS membership,
+                      member.access_level::smallint AS access_level
                FROM participant_identities AS identity
-               JOIN principals AS principal
-                 ON (principal.company_id, principal.id) =
-                    (identity.company_id, identity.principal_id)
+               JOIN principals AS principal ON (principal.company_id, principal.id) = (identity.company_id, identity.principal_id)
                JOIN companies AS company ON company.id = principal.company_id
-               LEFT JOIN company_members AS member
-                 ON (member.company_id, member.user_id) =
-                    (principal.company_id, principal.user_id)
-               WHERE identity.company_id = $1 AND identity.transport = $2
-                 AND identity.namespace = $3 AND identity.subject = $4"#,
-        )
-        .bind(company_id)
-        .bind(identity.transport().as_str())
-        .bind(identity.namespace().as_str())
-        .bind(identity.subject().as_str())
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(AppError::from)?;
-
-        let Some((principal_id, status, membership)) = row else {
+               LEFT JOIN company_members AS member ON (member.company_id, member.user_id) = (principal.company_id, principal.user_id)
+               WHERE identity.company_id=$1 AND identity.transport=$2 AND identity.namespace=$3 AND identity.subject=$4"#)
+            .bind(company_id).bind(identity.transport().as_str()).bind(identity.namespace().as_str())
+            .bind(identity.subject().as_str()).fetch_optional(&self.pool).await?;
+        let Some(row) = row else {
             return Ok(PrincipalAccessContext {
                 principal_id: None,
                 membership: CompanyMembership::None,
+                access_level: crate::entities::access_level::AccessLevel::PUBLIC,
                 grant_authority: PrincipalGrantAuthority::Available,
             });
         };
-        if status == "disabled" {
-            return Ok(PrincipalAccessContext {
-                principal_id: None,
-                membership: CompanyMembership::None,
-                grant_authority: PrincipalGrantAuthority::Available,
-            });
+        let status = IdentityStatus::from_str(&row.status)
+            .map_err(|error| AppError::Internal(error.to_string()))?;
+        if status == IdentityStatus::Observed {
+            return Ok(PrincipalAccessContext::external(PrincipalId::new(
+                row.principal_id,
+            )));
         }
+        let membership = membership_from_db(row.membership.as_deref())?;
         Ok(PrincipalAccessContext {
-            principal_id: Some(PrincipalId::new(principal_id)),
-            membership: membership_from_db(membership.as_deref())?,
+            principal_id: Some(PrincipalId::new(row.principal_id)),
+            membership,
+            access_level: reader_level(row.principal_id, membership, row.access_level)?,
             grant_authority: PrincipalGrantAuthority::Available,
         })
     }
@@ -549,28 +576,23 @@ impl PrincipalAccessPersistence for PostgresPersistence {
         company_id: Uuid,
         user_id: Uuid,
     ) -> AppResult<Option<PrincipalAccessContext>> {
-        let row: Option<(Uuid, bool, String)> = sqlx::query_as(
-            r#"SELECT principal.id, account.email_verified_at IS NOT NULL AS email_proved,
-                      CASE WHEN company.user_id = principal.user_id
-                           THEN 'owner' ELSE member.role END AS membership
+        let row = sqlx::query_as::<_, UserAccessRow>(
+            r#"SELECT principal.id AS principal_id, account.email_verified_at IS NOT NULL AS email_proved,
+                      CASE WHEN company.user_id = principal.user_id THEN 'owner' ELSE member.role END AS membership,
+                      member.access_level::smallint AS access_level
                FROM principals AS principal
-               JOIN users AS account ON account.id = principal.user_id
-               JOIN companies AS company ON company.id = principal.company_id
-               JOIN company_members AS member
-                 ON (member.company_id, member.user_id) =
-                    (principal.company_id, principal.user_id)
-               WHERE principal.company_id = $1 AND principal.user_id = $2"#,
-        )
-        .bind(company_id)
-        .bind(user_id)
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(AppError::from)?;
-        row.map(|(principal_id, email_proved, membership)| {
+               JOIN users AS account ON account.id=principal.user_id
+               JOIN companies AS company ON company.id=principal.company_id
+               JOIN company_members AS member ON (member.company_id,member.user_id)=(principal.company_id,principal.user_id)
+               WHERE principal.company_id=$1 AND principal.user_id=$2"#)
+            .bind(company_id).bind(user_id).fetch_optional(&self.pool).await?;
+        row.map(|row| {
+            let membership = membership_from_db(Some(&row.membership))?;
             Ok(PrincipalAccessContext {
-                principal_id: Some(PrincipalId::new(principal_id)),
-                membership: membership_from_db(Some(&membership))?,
-                grant_authority: if email_proved {
+                principal_id: Some(PrincipalId::new(row.principal_id)),
+                membership,
+                access_level: reader_level(row.principal_id, membership, Some(row.access_level))?,
+                grant_authority: if row.email_proved {
                     PrincipalGrantAuthority::Available
                 } else {
                     PrincipalGrantAuthority::WithheldUnverifiedEmail

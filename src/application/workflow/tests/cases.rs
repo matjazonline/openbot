@@ -97,6 +97,7 @@ async fn replay_conflict_and_company_scoped_key() {
     store.state.lock().unwrap().access.insert(
         (company_b, actor().user_id()),
         PrincipalAccessContext {
+            access_level: crate::entities::access_level::fixture_level(CompanyMembership::Owner),
             principal_id: None,
             membership: CompanyMembership::Owner,
             grant_authority: crate::entities::participant::PrincipalGrantAuthority::Available,

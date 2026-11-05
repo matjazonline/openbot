@@ -405,7 +405,7 @@ async fn test_high_spam_score_rejection() {
 }
 
 #[tokio::test]
-async fn test_dmarc_authentication_failure_rejection() {
+async fn access_level_dmarc_failure_rejects_a_known_member_address() {
     let company_id = Uuid::new_v4();
     let channel_id = Uuid::new_v4();
 
@@ -445,17 +445,28 @@ async fn test_dmarc_authentication_failure_rejection() {
         max_spam_score: 5.0,
     });
 
+    let participants =
+        Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence.clone()));
+    let identity =
+        crate::adapters::protocols::email::EmailIdentity::parse("member@acme.example".into())
+            .unwrap()
+            .qualify_default();
+    let access = crate::application::ports::participant::PrincipalAccessPersistence::access_context_for_identity(participants.as_ref(),company_id,&identity).await.unwrap();
+    assert_eq!(
+        access.membership,
+        crate::entities::company_member::CompanyMembership::Member
+    );
     let thread_use_cases = ThreadUseCases::for_test(
         thread_persistence,
         channel_persistence,
         company_persistence.clone(),
-        Arc::new(InMemoryParticipantDirectory::new().with_team(company_persistence)),
+        participants,
         config,
     );
 
     let raw_payload = RawInboundPayload {
         to: "inbound@acme.mailagents.com".to_string(),
-        from: "spoofed@external.com".to_string(),
+        from: "member@acme.example".to_string(),
         subject: Some("Spoofed email".to_string()),
         text: Some("Hello".to_string()),
         dmarc: crate::entities::auth::AuthVerdict::Fail,

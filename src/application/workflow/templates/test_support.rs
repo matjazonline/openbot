@@ -52,6 +52,7 @@ impl PrincipalAccessPersistence for Store {
             .membership
             .get(&(CompanyId::new(company), user))
             .map(|membership| PrincipalAccessContext {
+                access_level: crate::entities::access_level::fixture_level(*membership),
                 principal_id: None,
                 membership: *membership,
                 grant_authority: crate::entities::participant::PrincipalGrantAuthority::Available,

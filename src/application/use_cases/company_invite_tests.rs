@@ -27,32 +27,31 @@ impl MockCompanyInvitePersistence {
 
 #[async_trait]
 impl CompanyInvitePersistence for MockCompanyInvitePersistence {
-    async fn create_invite(
-        &self,
-        company_id: Uuid,
-        email: &str,
-        role: CompanyAccessRole,
-    ) -> AppResult<CompanyInvite> {
+    async fn create_invite(&self, command: CreateCompanyInvite) -> AppResult<CompanyInvite> {
         let invite = CompanyInvite {
             id: Uuid::new_v4(),
-            company_id,
-            company_name: Some("Acme".to_string()),
-            email: email.to_string(),
-            role,
-            status: "pending".to_string(),
+            company_id: command.company_id,
+            company_name: Some("Acme".into()),
+            email: command.email.to_string(),
+            role: command.role,
+            access_level: command.access_level,
+            status: "pending".into(),
             created_at: Utc::now(),
         };
         self.invites.lock().unwrap().push(invite.clone());
         Ok(invite)
     }
-
-    async fn get_invite_by_id(&self, id: Uuid) -> AppResult<Option<CompanyInvite>> {
+    async fn get_invite_by_id(
+        &self,
+        company_id: Uuid,
+        id: Uuid,
+    ) -> AppResult<Option<CompanyInvite>> {
         Ok(self
             .invites
             .lock()
             .unwrap()
             .iter()
-            .find(|i| i.id == id)
+            .find(|i| i.id == id && i.company_id == company_id)
             .cloned())
     }
 
@@ -75,21 +74,51 @@ impl CompanyInvitePersistence for MockCompanyInvitePersistence {
 
     async fn update_invite(
         &self,
-        company_id: Uuid,
-        id: Uuid,
-        new_email: &str,
-        role: CompanyAccessRole,
+        command: UpdateCompanyInvite,
     ) -> AppResult<Option<CompanyInvite>> {
         let mut list = self.invites.lock().unwrap();
-        let Some(invite) = list
-            .iter_mut()
-            .find(|i| i.id == id && i.company_id == company_id && i.status == "pending")
-        else {
+        let Some(invite) = list.iter_mut().find(|i| {
+            i.id == command.invite_id && i.company_id == command.company_id && i.status == "pending"
+        }) else {
             return Ok(None);
         };
-        invite.email = new_email.to_string();
-        invite.role = role;
+        invite.email = command.email.to_string();
+        if let Some(role) = command.role {
+            invite.role = role;
+        }
+        if let Some(level) = command.access_level {
+            invite.access_level = level;
+        }
         Ok(Some(invite.clone()))
+    }
+    async fn get_member_by_user_id(
+        &self,
+        company_id: Uuid,
+        user_id: Uuid,
+    ) -> AppResult<Option<CompanyMember>> {
+        Ok(self
+            .members
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|m| m.company_id == company_id && m.user_id == user_id)
+            .cloned())
+    }
+    async fn set_member_access_level(
+        &self,
+        _change: MemberLevelChange,
+    ) -> AppResult<Option<CompanyMember>> {
+        Err(AppError::Internal(
+            "Level writes require the native authority fixture".into(),
+        ))
+    }
+    async fn set_invite_access_level(
+        &self,
+        _change: InviteLevelChange,
+    ) -> AppResult<Option<CompanyInvite>> {
+        Err(AppError::Internal(
+            "Level writes require the native authority fixture".into(),
+        ))
     }
 
     async fn delete_invite(&self, id: Uuid) -> AppResult<()> {
@@ -141,6 +170,7 @@ impl CompanyInvitePersistence for MockCompanyInvitePersistence {
             member.role = invite.role;
         } else {
             members.push(CompanyMember {
+                access_level: invite.access_level,
                 id: Uuid::new_v4(),
                 company_id: invite.company_id,
                 user_id,
@@ -229,6 +259,7 @@ fn acme(owner_id: Uuid, company_id: Uuid) -> Arc<MockCompanyPersistence> {
 
 fn member_row(company_id: Uuid, user_id: Uuid) -> CompanyMember {
     CompanyMember {
+        access_level: crate::entities::access_level::AccessLevel::PUBLIC,
         id: Uuid::new_v4(),
         company_id,
         user_id,
@@ -362,12 +393,13 @@ async fn company_invites_crud_and_accept_flow() {
 
     // Owner creates invite
     let invite = use_cases
-        .create_company_invite(
-            owner_id,
+        .create_company_invite(crate::use_cases::company_invite::CreateCompanyInvite {
+            actor_id: owner_id,
             company_id,
-            "user@example.com",
-            CompanyAccessRole::Admin,
-        )
+            email: ("user@example.com").to_string().into(),
+            role: CompanyAccessRole::Admin,
+            access_level: crate::entities::access_level::AccessLevel::PUBLIC,
+        })
         .await
         .unwrap();
     assert_eq!(invite.email, "user@example.com");
@@ -375,30 +407,39 @@ async fn company_invites_crud_and_accept_flow() {
 
     // Non-owner cannot create invite
     let err = use_cases
-        .create_company_invite(
-            Uuid::new_v4(),
+        .create_company_invite(crate::use_cases::company_invite::CreateCompanyInvite {
+            actor_id: Uuid::new_v4(),
             company_id,
-            "other@example.com",
-            CompanyAccessRole::Member,
-        )
+            email: ("other@example.com").to_string().into(),
+            role: CompanyAccessRole::Member,
+            access_level: crate::entities::access_level::AccessLevel::PUBLIC,
+        })
         .await;
     assert!(err.is_err());
 
     // Update invite email
     let updated = use_cases
-        .update_company_invite(
-            owner_id,
+        .update_company_invite(crate::use_cases::company_invite::UpdateCompanyInvite {
+            actor_id: owner_id,
             company_id,
-            invite.id,
-            "newuser@example.com",
-            Some(CompanyAccessRole::Admin),
-        )
+            invite_id: invite.id,
+            email: ("newuser@example.com").to_string().into(),
+            role: Some(CompanyAccessRole::Admin),
+            access_level: None,
+        })
         .await
         .unwrap();
     assert_eq!(updated.email, "newuser@example.com");
 
     let backwards_compatible_update = use_cases
-        .update_company_invite(owner_id, company_id, invite.id, "newuser@example.com", None)
+        .update_company_invite(crate::use_cases::company_invite::UpdateCompanyInvite {
+            actor_id: owner_id,
+            company_id,
+            invite_id: invite.id,
+            email: ("newuser@example.com").to_string().into(),
+            role: None,
+            access_level: None,
+        })
         .await
         .unwrap();
     assert_eq!(backwards_compatible_update.role, CompanyAccessRole::Admin);
@@ -452,13 +493,14 @@ async fn company_invites_crud_and_accept_flow() {
     assert!(use_cases.decline_invite(&user, invite.id).await.is_err());
     assert!(
         use_cases
-            .update_company_invite(
-                owner_id,
+            .update_company_invite(crate::use_cases::company_invite::UpdateCompanyInvite {
+                actor_id: owner_id,
                 company_id,
-                invite.id,
-                "another@example.com",
-                Some(CompanyAccessRole::Member),
-            )
+                invite_id: invite.id,
+                email: ("another@example.com").to_string().into(),
+                role: Some(CompanyAccessRole::Member),
+                access_level: None
+            })
             .await
             .is_err(),
         "an accepted invitation cannot drift away from the membership it created"

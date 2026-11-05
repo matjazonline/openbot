@@ -1,0 +1,48 @@
+{
+  "review": "KNOW-P01-WB1-R1",
+  "stage": "whole-phase code review",
+  "scope": "original README and phase01 A-D, whole domain/application/persistence/HTTP/UI/migration/test batch",
+  "starting_commit": "73799dc6ac685008d5c97f154e861d11ae15bfa0",
+  "review_base": "73799dc6ac685008d5c97f154e861d11ae15bfa0",
+  "head": "73799dc6ac685008d5c97f154e861d11ae15bfa0",
+  "source": {
+    "base": "73799dc6ac685008d5c97f154e861d11ae15bfa0",
+    "head": "73799dc6ac685008d5c97f154e861d11ae15bfa0",
+    "exclusions": [
+      "plan/01-knowledge-access-levels/phases/p01/docs/"
+    ],
+    "diff_sha256": "641208154e1a5a250445f369843d0f3c25ca83b922ebd6ef177fb7cd3aa91f52",
+    "tree_sha256": "19c8cb813f6ff0bbc9fc45ecbbcac2c31cb0a667a5c2b6b601b894a59ad36900",
+    "files_count": 2529
+  },
+  "installed_digest": "443d2bcfae471a20d864a5584faeaa9b333efde7b34c9d606a97391b3cf9b72c",
+  "installed_exclude_argument": "plan/01-knowledge-access-levels/phases/p01/docs",
+  "authority_revision": 3,
+  "notices": {
+    "KNOW-I001": "r1 acknowledged, unchanged",
+    "KNOW-I002": "r1 acknowledged, unchanged",
+    "KNOW-I003": "r1 acknowledged, unchanged",
+    "KNOW-I004": "r1 acknowledged, unchanged",
+    "KNOW-I005": "r1 acknowledged, unchanged"
+  },
+  "authority_pin": "COORDINATION-r3-WB1.md",
+  "authority_sha256": "c8efef558d538c998b28392ab4ffb03c87040aca836c3afcdd8264a76db7d7dc",
+  "gated_decision": "G1-r1-decisions.md",
+  "gated_decision_sha256": "180f1e6ebcee3154defc2ddebaa01260a98c67524d77402f35c9b2f7818ff361",
+  "evidence_sha256": {
+    "WB1-r3-native-result.json": "0a39f8385fa627cd787ae2e63825ca705bd896c7511ee0c165761bdd8380608d",
+    "WB1-r3-native-filters.json": "1ca25be78e278ccf35ca43adf9713d53a596e2397af69e5b94753bb7faa464a2",
+    "WB1-r3-native-focused.log": "acb3260bcb75d7718b7e9c34e5c6399bed1c0ad58b716f36a5015275eaf477b2",
+    "WB1-r3-sqlx-prepare.log": "0eaec598163b903cd93f8ccda214926cb1173f752a59a390b733432063566b66",
+    "WB1-r3-sqlx-check.log": "8962125c11fa133ae24d455b2f1e4e6068fbb6504c148fbded9f50ab1ac8ede3",
+    "WB1-r3-clippy.jsonl": "155c032b6185745dffcd8b09974d2a0f1cfb5be994d2c6297a6eb763c4f819db",
+    "WB1-r3-clippy.stderr": "a5e7c45ea557ec4f6250bc6881c5e9d1172bc0a732e670ab9523822cc9c81c37",
+    "WB1-r3-offline-check.log": "c233b69c85159f775af8791a1449ae968c0b20b465c62c47eeb99697f8b92e65",
+    "WB1-r3-format.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "WB1-r3-diff-check.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "WB1-r3-resource-identity.json": "30c480f981c47be9774964dc3c53cef05cce26ff4d02c9bd9d5821b93a6ec007",
+    "WB1-r3-graft-build.log": "a118eb9cd5d598261d3d86917fa77b788c28aeb02ed1e71fe4115487702c5a98"
+  },
+  "implementation_frozen": true,
+  "status": "author checks pass; B code review and root acceptance pending"
+}

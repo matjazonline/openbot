@@ -73,12 +73,13 @@ async fn invitation_for_journey(
     .await
     .unwrap();
     let invite = invitations
-        .create_company_invite(
-            h.owner.user_id,
-            company.id,
-            &member.email,
-            CompanyAccessRole::Admin,
-        )
+        .create_company_invite(crate::use_cases::company_invite::CreateCompanyInvite {
+            actor_id: h.owner.user_id,
+            company_id: company.id,
+            email: member.email.to_string().into(),
+            role: CompanyAccessRole::Admin,
+            access_level: crate::entities::access_level::AccessLevel::PUBLIC,
+        })
         .await
         .unwrap();
     (invitations, invite)

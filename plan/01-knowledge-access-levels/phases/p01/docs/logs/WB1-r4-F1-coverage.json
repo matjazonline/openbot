@@ -1,0 +1,12 @@
+{
+  "finding": "KNOW-P01-WB1-F1",
+  "new_endpoint_tests": [
+    "adapters::http::routes::company_invite::levels::route_tests::access_level_json_invite_route_enforces_actor_scope_and_caps",
+    "adapters::http::routes::company_invite::levels::route_tests::access_level_json_member_route_enforces_actor_scope_and_caps",
+    "adapters::http::routes::company_invite::levels::route_tests::access_level_legacy_html_invite_route_enforces_actor_scope_and_caps",
+    "adapters::http::routes::company_invite::levels::route_tests::access_level_legacy_html_member_route_enforces_actor_scope_and_caps"
+  ],
+  "each_selected_once": true,
+  "each_executed_pass": true,
+  "checks": "foreign-only ordinary member/pending invite, ordinary member/stranger refusals, owner/admin allowed changes, admin caps, complete stored-fact invariance on every refusal"
+}

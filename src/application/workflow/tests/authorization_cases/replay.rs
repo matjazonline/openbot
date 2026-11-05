@@ -24,6 +24,7 @@ async fn replay_reauthorizes_and_association_is_part_of_dedup() {
     store.state.lock().unwrap().access.insert(
         (company_id, other_actor.user_id()),
         PrincipalAccessContext {
+            access_level: crate::entities::access_level::fixture_level(CompanyMembership::Owner),
             principal_id: None,
             membership: CompanyMembership::Owner,
             grant_authority: crate::entities::participant::PrincipalGrantAuthority::Available,

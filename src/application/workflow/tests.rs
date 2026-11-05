@@ -207,6 +207,9 @@ impl MemoryStore {
         state.access.insert(
             (version.company_id(), actor().user_id()),
             PrincipalAccessContext {
+                access_level: crate::entities::access_level::fixture_level(
+                    CompanyMembership::Owner,
+                ),
                 principal_id: None,
                 membership: CompanyMembership::Owner,
                 grant_authority: crate::entities::participant::PrincipalGrantAuthority::Available,

@@ -84,7 +84,15 @@ async fn company_of(persistence: &PostgresPersistence, owner: &User, label: &str
 
 async fn join(persistence: &PostgresPersistence, company_id: Uuid, user: &User) {
     let invite = persistence
-        .create_invite(company_id, &user.email, CompanyAccessRole::Member)
+        .create_invite(
+            crate::adapters::persistence::test_support::invite_command(
+                persistence,
+                company_id,
+                &user.email,
+                CompanyAccessRole::Member,
+            )
+            .await,
+        )
         .await
         .unwrap();
     persistence
@@ -628,7 +636,15 @@ async fn account_email_change_races_invite_acceptance() {
         let host = verified_account(&persistence, "racehost").await;
         let company_id = company_of(&persistence, &host, "race").await;
         let invite = persistence
-            .create_invite(company_id, &user.email, CompanyAccessRole::Member)
+            .create_invite(
+                crate::adapters::persistence::test_support::invite_command(
+                    &persistence,
+                    company_id,
+                    &user.email,
+                    CompanyAccessRole::Member,
+                )
+                .await,
+            )
             .await
             .unwrap();
         let old = user.email.clone();

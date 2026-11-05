@@ -51,6 +51,7 @@ pub struct Company {
 pub struct CompanyAccess {
     pub company: Company,
     pub membership: CompanyMembership,
+    pub access_level: crate::entities::access_level::AccessLevel,
 }
 
 #[cfg(test)]

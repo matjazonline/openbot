@@ -503,7 +503,7 @@ pub async fn insert_company_with_owner(
         .await
         .expect("the company row");
     sqlx::query(
-        "INSERT INTO company_members (id, company_id, user_id, role) VALUES ($1, $2, $3, 'owner')",
+        "INSERT INTO company_members (id, company_id, user_id, role, access_level) VALUES ($1, $2, $3, 'owner', 9)",
     )
     .bind(Uuid::new_v4())
     .bind(company_id)
@@ -545,9 +545,9 @@ pub async fn transfer_company_ownership(
         .await
         .expect("the previous owner is demoted");
     sqlx::query(
-        r#"INSERT INTO company_members (id, company_id, user_id, role)
-           VALUES ($1, $2, $3, 'owner')
-           ON CONFLICT (company_id, user_id) DO UPDATE SET role = 'owner'"#,
+        r#"INSERT INTO company_members (id, company_id, user_id, role, access_level)
+           VALUES ($1, $2, $3, 'owner', 9)
+           ON CONFLICT (company_id, user_id) DO UPDATE SET role = 'owner', access_level = 9"#,
     )
     .bind(Uuid::new_v4())
     .bind(company_id)
@@ -601,7 +601,7 @@ pub async fn revoke_membership(connection: &mut PgConnection, company_id: Uuid, 
     .await
     .expect("a replacement owner account");
     sqlx::query(
-        "INSERT INTO company_members (id, company_id, user_id, role) VALUES ($1, $2, $3, 'owner')",
+        "INSERT INTO company_members (id, company_id, user_id, role, access_level) VALUES ($1, $2, $3, 'owner', 9)",
     )
     .bind(Uuid::new_v4())
     .bind(company_id)
@@ -651,6 +651,48 @@ pub async fn wait_until_backends_are_blocked(pool: &PgPool, count: i64) {
         tokio::time::sleep(std::time::Duration::from_millis(10)).await;
     }
     panic!("fewer than {count} backends ever blocked on the locks this test holds");
+}
+
+/// Native fixture commands carry the actual owner, rather than bypassing writer authority.
+pub async fn invite_command(
+    persistence: &super::PostgresPersistence,
+    company_id: Uuid,
+    email: &str,
+    role: crate::entities::company_member::CompanyAccessRole,
+) -> crate::use_cases::company_invite::CreateCompanyInvite {
+    let actor_id = sqlx::query_scalar("SELECT user_id FROM companies WHERE id=$1")
+        .bind(company_id)
+        .fetch_one(&persistence.pool)
+        .await
+        .unwrap();
+    crate::use_cases::company_invite::CreateCompanyInvite {
+        actor_id,
+        company_id,
+        email: email.into(),
+        role,
+        access_level: crate::entities::access_level::AccessLevel::PUBLIC,
+    }
+}
+pub async fn invite_update_command(
+    persistence: &super::PostgresPersistence,
+    company_id: Uuid,
+    invite_id: Uuid,
+    email: &str,
+    role: crate::entities::company_member::CompanyAccessRole,
+) -> crate::use_cases::company_invite::UpdateCompanyInvite {
+    let actor_id = sqlx::query_scalar("SELECT user_id FROM companies WHERE id=$1")
+        .bind(company_id)
+        .fetch_one(&persistence.pool)
+        .await
+        .unwrap();
+    crate::use_cases::company_invite::UpdateCompanyInvite {
+        actor_id,
+        company_id,
+        invite_id,
+        email: email.into(),
+        role: Some(role),
+        access_level: None,
+    }
 }
 
 #[cfg(test)]
