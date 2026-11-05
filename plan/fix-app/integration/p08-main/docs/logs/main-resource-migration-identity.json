@@ -1,0 +1,143 @@
+{
+  "expected_init_sha384": "4c60b1f336667412aff98e56a58bffbade499af934bc060643d02ed74a80d9cba75cc421c693decfc468f3ef7af4c61c",
+  "databases": [
+    {
+      "identity": {
+        "database": "open_bots",
+        "user": "mac02",
+        "port": "55400",
+        "data_directory": "/Users/mac02/dev/openbot-recovery/.worktrees/pg-main",
+        "checksum": "4c60b1f336667412aff98e56a58bffbade499af934bc060643d02ed74a80d9cba75cc421c693decfc468f3ef7af4c61c"
+      },
+      "retired_columns": 0,
+      "workflow_execution_id_required": true,
+      "triggers": [
+        {
+          "name": "background_tasks_preserve_queue_identity",
+          "definition": "CREATE TRIGGER background_tasks_preserve_queue_identity BEFORE UPDATE OF workflow_execution_id ON public.background_tasks FOR EACH ROW EXECUTE FUNCTION preserve_background_task_queue_identity()"
+        },
+        {
+          "name": "background_tasks_validate_workflow_association",
+          "definition": "CREATE TRIGGER background_tasks_validate_workflow_association BEFORE INSERT OR UPDATE OF company_id, channel_id, thread_id, workflow_execution_id ON public.background_tasks FOR EACH ROW EXECUTE FUNCTION validate_workflow_job_association()"
+        },
+        {
+          "name": "guard_harness_model_owner",
+          "definition": "CREATE TRIGGER guard_harness_model_owner BEFORE INSERT OR UPDATE ON public.task_harness_runs FOR EACH ROW EXECUTE FUNCTION guard_harness_model_owner()"
+        },
+        {
+          "name": "require_harness_owner",
+          "definition": "CREATE TRIGGER require_harness_owner BEFORE INSERT OR UPDATE ON public.task_harness_runs FOR EACH ROW EXECUTE FUNCTION require_harness_owner()"
+        },
+        {
+          "name": "workflow_action_capture_schedule",
+          "definition": "CREATE TRIGGER workflow_action_capture_schedule BEFORE UPDATE ON public.background_tasks FOR EACH ROW EXECUTE FUNCTION workflow_action_capture_schedule()"
+        },
+        {
+          "name": "workflow_action_confirm_claim_retirement",
+          "definition": "CREATE TRIGGER workflow_action_confirm_claim_retirement BEFORE UPDATE ON public.background_tasks FOR EACH ROW EXECUTE FUNCTION workflow_action_confirm_claim_retirement()"
+        },
+        {
+          "name": "workflow_control_retry_guard",
+          "definition": "CREATE CONSTRAINT TRIGGER workflow_control_retry_guard AFTER UPDATE ON public.background_tasks DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION check_workflow_control_retry()"
+        },
+        {
+          "name": "workflow_fenced_completion_guard",
+          "definition": "CREATE CONSTRAINT TRIGGER workflow_fenced_completion_guard AFTER UPDATE ON public.background_tasks DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION check_workflow_fenced_completion()"
+        },
+        {
+          "name": "workflow_fenced_retirement_guard",
+          "definition": "CREATE CONSTRAINT TRIGGER workflow_fenced_retirement_guard AFTER UPDATE ON public.background_tasks DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION check_workflow_fenced_retirement()"
+        },
+        {
+          "name": "workflow_job_revision",
+          "definition": "CREATE TRIGGER workflow_job_revision AFTER INSERT OR UPDATE ON public.background_tasks FOR EACH ROW EXECUTE FUNCTION advance_workflow_owned_revision()"
+        },
+        {
+          "name": "workflow_continuation_counter_guard",
+          "definition": "CREATE TRIGGER workflow_continuation_counter_guard BEFORE INSERT OR UPDATE ON public.background_tasks FOR EACH ROW EXECUTE FUNCTION workflow_continuation_counter_guard()"
+        },
+        {
+          "name": "guard_harness_token_pause",
+          "definition": "CREATE CONSTRAINT TRIGGER guard_harness_token_pause AFTER INSERT OR UPDATE ON public.task_harness_runs DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION guard_harness_token_pause()"
+        },
+        {
+          "name": "guard_harness_token_admission",
+          "definition": "CREATE TRIGGER guard_harness_token_admission BEFORE UPDATE OF model_request_id ON public.task_harness_runs FOR EACH ROW WHEN (((old.model_request_id IS NULL) AND (new.model_request_id IS NOT NULL))) EXECUTE FUNCTION guard_harness_token_admission()"
+        },
+        {
+          "name": "guard_harness_workflow_progression",
+          "definition": "CREATE TRIGGER guard_harness_workflow_progression BEFORE UPDATE ON public.task_harness_runs FOR EACH ROW EXECUTE FUNCTION guard_harness_workflow_progression()"
+        }
+      ]
+    },
+    {
+      "identity": {
+        "database": "open_bots_test",
+        "user": "mac02",
+        "port": "55400",
+        "data_directory": "/Users/mac02/dev/openbot-recovery/.worktrees/pg-main",
+        "checksum": "4c60b1f336667412aff98e56a58bffbade499af934bc060643d02ed74a80d9cba75cc421c693decfc468f3ef7af4c61c"
+      },
+      "retired_columns": 0,
+      "workflow_execution_id_required": true,
+      "triggers": [
+        {
+          "name": "background_tasks_preserve_queue_identity",
+          "definition": "CREATE TRIGGER background_tasks_preserve_queue_identity BEFORE UPDATE OF workflow_execution_id ON public.background_tasks FOR EACH ROW EXECUTE FUNCTION preserve_background_task_queue_identity()"
+        },
+        {
+          "name": "background_tasks_validate_workflow_association",
+          "definition": "CREATE TRIGGER background_tasks_validate_workflow_association BEFORE INSERT OR UPDATE OF company_id, channel_id, thread_id, workflow_execution_id ON public.background_tasks FOR EACH ROW EXECUTE FUNCTION validate_workflow_job_association()"
+        },
+        {
+          "name": "guard_harness_model_owner",
+          "definition": "CREATE TRIGGER guard_harness_model_owner BEFORE INSERT OR UPDATE ON public.task_harness_runs FOR EACH ROW EXECUTE FUNCTION guard_harness_model_owner()"
+        },
+        {
+          "name": "require_harness_owner",
+          "definition": "CREATE TRIGGER require_harness_owner BEFORE INSERT OR UPDATE ON public.task_harness_runs FOR EACH ROW EXECUTE FUNCTION require_harness_owner()"
+        },
+        {
+          "name": "workflow_action_capture_schedule",
+          "definition": "CREATE TRIGGER workflow_action_capture_schedule BEFORE UPDATE ON public.background_tasks FOR EACH ROW EXECUTE FUNCTION workflow_action_capture_schedule()"
+        },
+        {
+          "name": "workflow_action_confirm_claim_retirement",
+          "definition": "CREATE TRIGGER workflow_action_confirm_claim_retirement BEFORE UPDATE ON public.background_tasks FOR EACH ROW EXECUTE FUNCTION workflow_action_confirm_claim_retirement()"
+        },
+        {
+          "name": "workflow_control_retry_guard",
+          "definition": "CREATE CONSTRAINT TRIGGER workflow_control_retry_guard AFTER UPDATE ON public.background_tasks DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION check_workflow_control_retry()"
+        },
+        {
+          "name": "workflow_fenced_completion_guard",
+          "definition": "CREATE CONSTRAINT TRIGGER workflow_fenced_completion_guard AFTER UPDATE ON public.background_tasks DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION check_workflow_fenced_completion()"
+        },
+        {
+          "name": "workflow_fenced_retirement_guard",
+          "definition": "CREATE CONSTRAINT TRIGGER workflow_fenced_retirement_guard AFTER UPDATE ON public.background_tasks DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION check_workflow_fenced_retirement()"
+        },
+        {
+          "name": "workflow_job_revision",
+          "definition": "CREATE TRIGGER workflow_job_revision AFTER INSERT OR UPDATE ON public.background_tasks FOR EACH ROW EXECUTE FUNCTION advance_workflow_owned_revision()"
+        },
+        {
+          "name": "workflow_continuation_counter_guard",
+          "definition": "CREATE TRIGGER workflow_continuation_counter_guard BEFORE INSERT OR UPDATE ON public.background_tasks FOR EACH ROW EXECUTE FUNCTION workflow_continuation_counter_guard()"
+        },
+        {
+          "name": "guard_harness_token_pause",
+          "definition": "CREATE CONSTRAINT TRIGGER guard_harness_token_pause AFTER INSERT OR UPDATE ON public.task_harness_runs DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION guard_harness_token_pause()"
+        },
+        {
+          "name": "guard_harness_token_admission",
+          "definition": "CREATE TRIGGER guard_harness_token_admission BEFORE UPDATE OF model_request_id ON public.task_harness_runs FOR EACH ROW WHEN (((old.model_request_id IS NULL) AND (new.model_request_id IS NOT NULL))) EXECUTE FUNCTION guard_harness_token_admission()"
+        },
+        {
+          "name": "guard_harness_workflow_progression",
+          "definition": "CREATE TRIGGER guard_harness_workflow_progression BEFORE UPDATE ON public.task_harness_runs FOR EACH ROW EXECUTE FUNCTION guard_harness_workflow_progression()"
+        }
+      ]
+    }
+  ]
+}

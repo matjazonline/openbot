@@ -1,0 +1,22 @@
+{
+  "status": "accepted and integrated; whole fix-app implementation complete",
+  "review": "FIXAPP-P08-INT-R1-MAC02",
+  "source": {
+    "base": "77edd70862a88e2189587fda50fb2b0b913082b6",
+    "head": "615baa7739156d0b5433d322860ace4dd2239a89",
+    "exclusions": [
+      "plan/fix-app/integration/p08-main/docs/",
+      "plan/fix-app/COORDINATION.md"
+    ],
+    "diff_sha256": "b7d3e720a95368a85ce156535ac1a5d921823a9af7419d741557fc5244bc3f3d",
+    "tree_sha256": "fb8e1c4b57b748d1f3b2b81f7de258686c3a1cc212618b98597f7685f78bd8c6",
+    "files_count": 2477
+  },
+  "coordination_revision": 30,
+  "checks": "11PASS;1037nativePASS/5intentionalignored+main5PASS;B18nativePASS;I004fullsuiteexclusionsretained",
+  "review_record_hashes": {
+    "REVIEW.md": "ce8abbd7f23f2ca7766cf7f8e7d267421751829928c5a99cc5a0e02c36950397",
+    "agent-review-notes.md": "72d43f635047192c6008bd799dd393995db90cd779c34e6ebc37f02272cac145",
+    "agent-review-findings.md": "8ce30adb3a1cdf15312b3d293aa132641eab45419230403c7e048038d0188aad"
+  }
+}

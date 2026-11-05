@@ -1,0 +1,165 @@
+[
+  {
+    "check": "main-reset",
+    "command": [
+      "bash",
+      "scripts/reset-db.sh",
+      "--all",
+      "--yes"
+    ],
+    "exit_code": 0
+  },
+  {
+    "check": "main-test-migrate",
+    "command": [
+      "cargo",
+      "sqlx",
+      "migrate",
+      "run",
+      "--database-url",
+      "postgres://mac02@127.0.0.1:55400/open_bots_test"
+    ],
+    "exit_code": 0
+  },
+  {
+    "check": "main-resource-identity",
+    "command": [
+      "python3",
+      "plan/fix-app/integration/p08-main/docs/logs/verify-main-resources.py"
+    ],
+    "exit_code": 0
+  },
+  {
+    "check": "final-lib-build",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "--no-run",
+      "--message-format=json"
+    ],
+    "exit_code": 0
+  },
+  {
+    "check": "final-affected-union",
+    "command": [
+      "/Users/mac02/dev/openbot-recovery/target/debug/deps/open_bots-7b3508cbfb62bd10",
+      "application::use_cases::user::",
+      "application::use_cases::channel::",
+      "application::use_cases::thread::",
+      "application::transport::",
+      "adapters::spam_scanner::",
+      "adapters::smtp::",
+      "adapters::protocols::email::",
+      "adapters::http::routes::channel",
+      "adapters::http::routes::webhooks::",
+      "adapters::http::routes::workflows::",
+      "adapters::http::routes::user",
+      "adapters::http::routes::ui_profile",
+      "adapters::http::session",
+      "adapters::persistence::user::",
+      "adapters::persistence::auth_attempts::",
+      "adapters::persistence::auth_key_rotation_tests::",
+      "adapters::persistence::account_identity::",
+      "adapters::persistence::channel::",
+      "adapters::persistence::thread::",
+      "adapters::persistence::integration::",
+      "application::workflow::tests",
+      "adapters::persistence::workflow::tests::message_tests::",
+      "message_ingress",
+      "::mcp_tests::",
+      "provisioning_runtime",
+      "infra::",
+      "notification",
+      "application::services::delivery_worker",
+      "application::services::inbound_event_worker",
+      "adapters::http::pages::tests::",
+      "stream_tests",
+      "onboarding",
+      "schema_constraint_",
+      "jsonb_row_context_",
+      "adapters::persistence::dashboard::",
+      "adapters::http::pages::dashboard::",
+      "adapters::persistence::delivery::",
+      "model_usage",
+      "workflow_batch_",
+      "workflow_context_history_",
+      "workflow_control_competing_retry_preserves_identity_facts_and_remaining_allowance",
+      "workflow_agent_capture_refuses_unrunnable_agents",
+      "workflow_harness_owner_",
+      "workflow_io_",
+      "run_retention_complete_tree_jobs_usage_and_idempotent_retry",
+      "run_retention_rollback_after_runs_before_jobs_preserves_every_owner",
+      "run_retention_archive_guards_refuse_forgery_duplicates_and_mutation",
+      "workflow_maintenance_live_expired_and_spent_attempts_debit_once"
+    ],
+    "exit_code": 0
+  },
+  {
+    "check": "main-lifecycle",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--bin",
+      "open_bots"
+    ],
+    "exit_code": 0
+  },
+  {
+    "check": "deploy-regression",
+    "command": [
+      "bash",
+      "scripts/tests/deploy.sh"
+    ],
+    "exit_code": 0
+  },
+  {
+    "check": "final-sqlx-live",
+    "command": [
+      "cargo",
+      "sqlx",
+      "prepare",
+      "--",
+      "--all-targets"
+    ],
+    "exit_code": 0
+  },
+  {
+    "check": "final-clippy-offline",
+    "command": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "--offline",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 0
+  },
+  {
+    "check": "final-fmt",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--check"
+    ],
+    "exit_code": 0
+  },
+  {
+    "check": "final-whitespace",
+    "command": [
+      "git",
+      "diff",
+      "--check",
+      "77edd70862a88e2189587fda50fb2b0b913082b6"
+    ],
+    "exit_code": 0
+  }
+]

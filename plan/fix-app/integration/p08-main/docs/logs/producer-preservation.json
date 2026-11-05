@@ -1,0 +1,18 @@
+{
+  "main_head": "615baa7739156d0b5433d322860ace4dd2239a89",
+  "producer": "450665a4306aaf9abd053db2e262f6e47a733952",
+  "producer_base": "77edd70862a88e2189587fda50fb2b0b913082b6",
+  "compared_files": 2257,
+  "excluded_from_comparison": [
+    "plan/fix-app/COORDINATION.md"
+  ],
+  "result": "All producer manifest source files byte/mode identical; producer phase records separately merged intact",
+  "committed_tree_identical_to_producer": true,
+  "committed_tree_comparison_command": [
+    "git",
+    "diff",
+    "--quiet",
+    "450665a4306aaf9abd053db2e262f6e47a733952",
+    "HEAD"
+  ]
+}

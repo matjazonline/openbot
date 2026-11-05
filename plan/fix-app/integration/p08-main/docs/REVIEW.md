@@ -1,0 +1,15 @@
+# P08-main independent combined integration review
+
+## FIXAPP-P08-INT-R1-MAC02 — PASS
+
+2026-11-05. **PASS** for the frozen combined integration artifact. No actionable findings or optional suggestions. Independent B `/root/p08_reviewer`, assigned Astra/high under `implement-astra-reviewed-2-2`; actual runtime model metadata not separately exposed. No project source/design authorship by B.
+
+Primary worktree `/Users/mac02/dev/openbot-recovery`, branch `main`, HEAD `615baa7739156d0b5433d322860ace4dd2239a89`, review base `77edd70862a88e2189587fda50fb2b0b913082b6`. Installed snapshot digest `0f4e0126c07ed519ee9803e33a79c6f0275150b6f721a81402be40ab6a1608bb`; complete-base diff `b7d3e720a95368a85ce156535ac1a5d921823a9af7419d741557fc5244bc3f3d`; tree `fb8e1c4b57b748d1f3b2b81f7de258686c3a1cc212618b98597f7685f78bd8c6`, 2477 files. Exact exclusions: `plan/fix-app/integration/p08-main/docs/` and `plan/fix-app/COORDINATION.md`. Both algorithms matched at start and immediately before verdict; [final identity](logs/B-INT-final-identity.json), [installed snapshot](logs/B-INT-installed-final.txt).
+
+Authoritative coordination `/Users/mac02/dev/openbot-recovery/plan/fix-app/COORDINATION.md`, root writer, revision 30, is byte-identical to [pin](logs/COORDINATION-r30-start.md). Applicable I001r1/I002r3/I003r2/I004r1/I005r2/I006r1; C002/C004/C006/C009/C010r1. Compared against previously reviewed r29: only execution status changed. Original p08/README requirements and scoped AGENTS remain applicable; I004 supersedes their full-suite/check.sh/stack-budget gate.
+
+Independently verified producer `450665a4306aaf9abd053db2e262f6e47a733952` and merged HEAD have identical committed trees. All 2257 accepted phase source files except machine-local coordination retain their exact bytes and modes; 135 committed source/deliverable changes are the accepted batch and the other committed additions are its phase records. No integration source edits. [Preservation evidence](logs/B-INT-start-identity.json), [committed batch inventory](logs/B-INT-committed-batch.json). Reused actual whole-phase review FIXAPP-P08-WB1-R1-MAC02, including its original G1 architecture decision and unchanged whole-workflow checks.
+
+B independently ran [18 native checks, all PASS](logs/B-INT-focused-tests.log), and read both private primary database identities/checksums and relevant physical facts [here](logs/B-INT-resource-facts.json). All pinned author evidence hashes match. Fresh combined author coverage: 1037 PASS/0 FAIL/5 intentional ignored from 1042 selected and 48 nonzero filters, main 5 PASS, deploy-script regressions, fresh owned migrations, live all-target SQLx, offline all-target clippy, fmt and whitespace PASS. All four phase corrections passed again in the fresh combined run. No required affected check unavailable.
+
+Coverage and limits: [review notes](agent-review-notes.md); no open entries in [findings](agent-review-findings.md). This is a combined integration verdict, not a full-suite, external-provider or deployment claim. Root acceptance and publication remain separate.

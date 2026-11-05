@@ -1,0 +1,16 @@
+{
+  "base": "77edd70862a88e2189587fda50fb2b0b913082b6",
+  "head": "615baa7739156d0b5433d322860ace4dd2239a89",
+  "exclusions": [
+    "plan/fix-app/integration/p08-main/docs/",
+    "plan/fix-app/COORDINATION.md"
+  ],
+  "tree_sha256": "fb8e1c4b57b748d1f3b2b81f7de258686c3a1cc212618b98597f7685f78bd8c6",
+  "diff_sha256": "b7d3e720a95368a85ce156535ac1a5d921823a9af7419d741557fc5244bc3f3d",
+  "files_count": 2477,
+  "authority_sha256": "b4730b1a82c75951de67c35d1a41e5a56ccc060e3bfd8fab010c32e6aefa7f3f",
+  "authority_matches": true,
+  "all_pinned_logs_hash_match": true,
+  "accepted_source_files_preserved": 2257,
+  "producer_tree_identical": true
+}

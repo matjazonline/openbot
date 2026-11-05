@@ -1,0 +1,38 @@
+{
+  "stage": "FIXAPP-P08-INT-R1-MAC02",
+  "source": {
+    "base": "77edd70862a88e2189587fda50fb2b0b913082b6",
+    "head": "615baa7739156d0b5433d322860ace4dd2239a89",
+    "exclusions": [
+      "plan/fix-app/integration/p08-main/docs/",
+      "plan/fix-app/COORDINATION.md"
+    ],
+    "diff_sha256": "b7d3e720a95368a85ce156535ac1a5d921823a9af7419d741557fc5244bc3f3d",
+    "tree_sha256": "fb8e1c4b57b748d1f3b2b81f7de258686c3a1cc212618b98597f7685f78bd8c6",
+    "files_count": 2477
+  },
+  "installed_snapshot": [
+    "base:   615baa7739156d0b5433d322860ace4dd2239a89",
+    "digest: 0f4e0126c07ed519ee9803e33a79c6f0275150b6f721a81402be40ab6a1608bb"
+  ],
+  "authority_revision": 30,
+  "logs": {
+    "final-check-results.json": "43760f23b7f188cf2da43ee71f423e412ea9ba5c4938eca338ad7dbea15ee3d9",
+    "final-filter-counts.json": "38a112607a929e98d4fdfb9ac07acabb3cb2a75c2da8f027e2dfcd05e495078f",
+    "final-environment.json": "980fbbb4a8926d9403160e18efc4fef00f512fc4305a9f50180135efd37ec5ac",
+    "main-resource-migration-identity.json": "29f35fd4cc21a47a514ff666ffa599b16f03f8f0fa2d5f4880bb84a61058c8b6",
+    "producer-preservation.json": "2b88108163233fba9555034da55e71e220bdc19add3aabdc6a672c7a453ac9d2",
+    "main-reset.log": "a9147b650598280ef086d218487ebaaa0e6c160fde73b20251694c7bfb06ecaa",
+    "main-test-migrate.log": "239b0005e33850599d421ca2cad4b2e2e533d53e4848dc22b7eb53b6ac53bd27",
+    "main-resource-identity.log": "ed5605d1545289320ee2b07c4ec064b53f66133bd10802037ba1172f4ee2f273",
+    "final-lib-build.log": "ccfd255f52770d4cd7888d979c1088e1e729d793b920a54877ea0fe0a5529848",
+    "final-affected-union.log": "d68199addf2cc2dfff6e99db5cd64ada8e1aa615ef5b895495a4ebf5be9f1217",
+    "main-lifecycle.log": "1eb0e2048a5532079532cbe489b1058fd7ae06d78a7fbb3a2815698869668201",
+    "deploy-regression.log": "10048c098b86cefd7b9112da5f754b6ae5cca22a8f858f9510d9d8ccab28c2e7",
+    "final-sqlx-live.log": "f403305856276a7c23d768f769469cf3a2b3925f94b84e34f794ec149901ef88",
+    "final-clippy-offline.log": "4577e65dcf7b373906daa207ca9dab5cc8690443b82ef780d7e7ae3ed06d76e1",
+    "final-fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "final-whitespace.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "result": "11 checksPASS;1037nativePASS/5ignored+main5PASS;all48filtersnonzero;producercommittedtreeidentical;I004fullsuiteexclusionsretained"
+}

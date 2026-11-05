@@ -1,0 +1,6 @@
+{
+  "CARGO_INCREMENTAL": "0",
+  "SQLX_OFFLINE": "true",
+  "DATABASE_URL": "postgres://mac02@127.0.0.1:55400/open_bots",
+  "TEST_DATABASE_URL": "postgres://mac02@127.0.0.1:55400/open_bots_test"
+}
