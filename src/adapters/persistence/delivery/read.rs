@@ -18,7 +18,7 @@ use crate::{
         delivery::{DeliveryEntry, DeliveryFilter, DeliveryPartEntry},
         transport::{DeliveryId, DeliveryPartId},
     },
-    use_cases::delivery::DeliveryReader,
+    use_cases::delivery::{DeliveryReadScope, DeliveryReader, project_delivery},
 };
 
 /// The row plus its two joined labels, which is what a reader sees.
@@ -62,7 +62,7 @@ const DELIVERY_VIEW_SELECT: &str = r#"
 impl DeliveryReader for PostgresPersistence {
     async fn list_company_deliveries(
         &self,
-        company_id: Uuid,
+        scope: DeliveryReadScope,
         filter: &DeliveryFilter,
     ) -> AppResult<Vec<DeliveryEntry>> {
         // `QueryBuilder` rather than string interpolation: every filter value is a bind parameter,
@@ -70,7 +70,7 @@ impl DeliveryReader for PostgresPersistence {
         let mut query = QueryBuilder::<Postgres>::new(format!(
             "{DELIVERY_VIEW_SELECT} WHERE delivery.company_id = "
         ));
-        query.push_bind(company_id);
+        query.push_bind(scope.company_id);
         if let Some(channel_id) = filter.channel_id {
             query
                 .push(" AND delivery.channel_id = ")
@@ -110,20 +110,27 @@ impl DeliveryReader for PostgresPersistence {
             .fetch_all(&self.pool)
             .await
             .map_err(AppError::from)?;
-        self.with_parts(rows).await
+        let entries = self.with_parts(rows).await?;
+        self.project_delivery_entries(scope, entries).await
     }
 
-    async fn get_delivery(&self, delivery_id: DeliveryId) -> AppResult<Option<DeliveryEntry>> {
+    async fn get_delivery(
+        &self,
+        scope: DeliveryReadScope,
+        delivery_id: DeliveryId,
+    ) -> AppResult<Option<DeliveryEntry>> {
         let row = sqlx::query_as::<_, DeliveryViewDb>(&format!(
-            "{DELIVERY_VIEW_SELECT} WHERE delivery.id = $1"
+            "{DELIVERY_VIEW_SELECT} WHERE delivery.id = $1 AND delivery.company_id = $2"
         ))
         .bind(delivery_id.as_uuid())
+        .bind(scope.company_id)
         .fetch_optional(&self.pool)
         .await
         .map_err(AppError::from)?;
 
+        let entries = self.with_parts(row.into_iter().collect()).await?;
         Ok(self
-            .with_parts(row.into_iter().collect())
+            .project_delivery_entries(scope, entries)
             .await?
             .into_iter()
             .next())
@@ -131,6 +138,32 @@ impl DeliveryReader for PostgresPersistence {
 }
 
 impl PostgresPersistence {
+    async fn project_delivery_entries(
+        &self,
+        scope: DeliveryReadScope,
+        mut entries: Vec<DeliveryEntry>,
+    ) -> AppResult<Vec<DeliveryEntry>> {
+        let messages = entries
+            .iter()
+            .map(|entry| entry.message_id.as_uuid())
+            .collect::<Vec<_>>();
+        // Parts and provider diagnostics have already loaded; this is the final authority read.
+        let levels = crate::adapters::persistence::view_visibility::message_levels_on(
+            self.pool(),
+            crate::domain::workflow::CompanyId::new(scope.company_id),
+            scope.viewer,
+            &messages,
+        )
+        .await?;
+        for entry in &mut entries {
+            let visibility = levels
+                .get(&entry.message_id.as_uuid())
+                .copied()
+                .ok_or_else(|| AppError::NotFound("Message not found".into()))?;
+            project_delivery(entry, visibility);
+        }
+        Ok(entries)
+    }
     /// Attach every delivery's parts, in one batch read rather than one query per delivery.
     ///
     /// `src/adapters/persistence/AGENTS.md`: replace per-parent query loops with bounded batch

@@ -36,6 +36,12 @@ pub fn qualified_email_identity(address: impl Into<String>) -> AppResult<Qualifi
 
 #[async_trait]
 pub trait ThreadPersistence: Send + Sync {
+    /// Classification of thread titles/previews, including messages outside the history window.
+    async fn thread_access_levels(
+        &self,
+        company_id: Uuid,
+        thread_ids: &[Uuid],
+    ) -> AppResult<std::collections::HashMap<Uuid, crate::entities::access_level::AccessLevel>>;
     async fn create_thread(
         &self,
         channel_id: Uuid,

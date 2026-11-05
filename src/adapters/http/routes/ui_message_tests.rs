@@ -350,7 +350,20 @@ async fn source_message_outside_window_is_exact_and_authorized() {
     };
     let thread = h.thread("Context").await;
     let ids = seed(&h, thread).await;
-    let history = h.threads.get_thread_history(thread).await.unwrap();
+    let history = h
+        .threads
+        .get_thread_history(
+            &h.owner,
+            crate::use_cases::thread::ThreadReadScope {
+                channel: crate::use_cases::thread::ChannelReadScope {
+                    company_id: h.company_id,
+                    channel_id: h.channel_id,
+                },
+                thread_id: thread,
+            },
+        )
+        .await
+        .unwrap();
     assert_eq!(history.len(), 200);
     let old = ids[209];
     assert!(

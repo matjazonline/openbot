@@ -267,6 +267,12 @@ struct DeliveriesView<'a> {
 }
 
 impl DeliveriesView<'_> {
+    fn read_scope(&self) -> AppResult<crate::use_cases::delivery::DeliveryReadScope> {
+        Ok(crate::use_cases::delivery::DeliveryReadScope {
+            company_id: self.company.id,
+            viewer: crate::application::workflow::WorkflowActor::authenticated(self.user_id)?,
+        })
+    }
     async fn channels(&self) -> AppResult<Vec<Channel>> {
         self.channel_use_cases
             .list_company_channels(self.user_id, self.company.id)
@@ -278,7 +284,7 @@ impl DeliveriesView<'_> {
         record_pagination_observation(self.monitoring, "deliveries", filter.offset());
         let probed = self
             .deliveries
-            .list_company_deliveries(self.company.id, filter)
+            .list_company_deliveries(self.read_scope()?, filter)
             .await?;
 
         Ok(filter.split_probe(probed))
@@ -289,7 +295,7 @@ impl DeliveriesView<'_> {
     async fn entry(&self, entry_id: Uuid) -> AppResult<Option<DeliveryEntry>> {
         let entry = self
             .deliveries
-            .get_delivery(DeliveryId::new(entry_id))
+            .get_delivery(self.read_scope()?, DeliveryId::new(entry_id))
             .await?;
 
         Ok(entry.filter(|entry| entry.company_id == self.company.id))

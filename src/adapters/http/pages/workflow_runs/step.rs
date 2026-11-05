@@ -20,6 +20,24 @@ pub struct StepBodyView<'a> {
 
 pub fn run_step_body(view: &StepBodyView<'_>) -> String {
     let step = view.step;
+    if step.payload_restricted {
+        return format!(
+            "<p>Restricted run content</p><p>Step {} · created {}{}{} </p>",
+            escape_html_text(&step.step),
+            format_date_time(step.created_at),
+            step.activated_at
+                .map(|at| format!(" · started {}", format_date_time(at)))
+                .unwrap_or_default(),
+            step.completed_at
+                .map(|at| format!(" · finished {}", format_date_time(at)))
+                .unwrap_or_default()
+        );
+    }
+    unrestricted_step_body(view)
+}
+
+fn unrestricted_step_body(view: &StepBodyView<'_>) -> String {
+    let step = view.step;
     let company_id = view.company_id;
     let section = |title: &str, body: String| {
         format!(

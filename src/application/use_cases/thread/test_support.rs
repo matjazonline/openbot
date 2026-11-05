@@ -379,6 +379,25 @@ fn identity_id_for(identity: &QualifiedIdentity) -> ParticipantIdentityId {
 
 #[async_trait]
 impl ThreadPersistence for InMemoryThreads {
+    async fn thread_access_levels(
+        &self,
+        company_id: Uuid,
+        thread_ids: &[Uuid],
+    ) -> AppResult<HashMap<Uuid, crate::entities::access_level::AccessLevel>> {
+        Ok(thread_ids
+            .iter()
+            .map(|id| {
+                let level = self
+                    .thread_messages(*id)
+                    .iter()
+                    .filter(|message| message.company_id == company_id)
+                    .map(|message| message.access_level)
+                    .max()
+                    .unwrap_or(crate::entities::access_level::AccessLevel::PUBLIC);
+                (*id, level)
+            })
+            .collect())
+    }
     async fn create_thread(
         &self,
         channel_id: Uuid,
@@ -1008,6 +1027,7 @@ impl ThreadPersistence for InMemoryThreads {
 /// The email-shaped stored message projected the way the SQL reads project it.
 fn thread_message_view(message: &Message) -> ThreadMessageView {
     ThreadMessageView {
+        restricted: false,
         access_level: message.access_level,
         response_contract: message.response_contract.clone(),
         id: message.id,

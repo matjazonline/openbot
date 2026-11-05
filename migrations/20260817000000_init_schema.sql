@@ -4201,6 +4201,16 @@ CREATE TABLE public.task_attempts (
     workflow_failure_code text,
     workflow_retry_safety text,
     workflow_retirement text,
+    knowledge_content_level public.access_level,
+    knowledge_destination_level public.access_level,
+    CONSTRAINT workflow_attempt_knowledge_refusal CHECK (
+        (knowledge_content_level IS NULL AND knowledge_destination_level IS NULL
+         AND workflow_failure_code IS DISTINCT FROM 'knowledge.audience_below_content')
+        OR (knowledge_content_level IS NOT NULL AND knowledge_destination_level IS NOT NULL
+            AND workflow_failure_code IS NOT DISTINCT FROM 'knowledge.audience_below_content'
+            AND workflow_failure_class IS NOT DISTINCT FROM 'terminal'
+            AND knowledge_content_level > knowledge_destination_level)
+    ),
     CONSTRAINT task_attempts_status_check CHECK ((status = ANY (ARRAY['processing'::text, 'completed'::text, 'failed'::text]))),
     CONSTRAINT task_attempts_finished_check CHECK ((status = 'processing') = (finished_at IS NULL)),
     CONSTRAINT task_attempts_stop_reason_check CHECK (CASE status

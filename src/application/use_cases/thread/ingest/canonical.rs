@@ -1,3 +1,4 @@
+//! Canonicalization consumes the submitted ingress payload, not a classified viewer projection.
 //! Trusted canonical ingress; transport syntax remains behind the renderer port.
 use super::super::*;
 use crate::transport::ingress::MAX_REPLY_CANDIDATES;

@@ -289,6 +289,8 @@ fn status_banner(glyph: Icon, tint: &str, sentence: &str) -> String {
     )
 }
 
+/// Echoes the caller's submitted ingress data. Persisted conversation content is rendered only
+/// from the separate, viewer-projected history read.
 pub fn channel_simulation_result_fragment(
     company_id: Uuid,
     channel_id: Uuid,

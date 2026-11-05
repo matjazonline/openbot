@@ -93,13 +93,35 @@ pub enum FailureClass {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StepFailure {
+    knowledge_refusal: Option<KnowledgeRefusal>,
     class: FailureClass,
     code: FailureCode,
     /// Internal diagnostic; callers must decide separately whether it is safe to log.
     diagnostic: Option<String>,
 }
 
+/// Safe historical classification facts, never message content or a provider diagnostic.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct KnowledgeRefusal {
+    pub content: crate::entities::access_level::AccessLevel,
+    pub destination: crate::entities::access_level::AccessLevel,
+}
+
 impl StepFailure {
+    pub fn from_knowledge_refusal(refusal: KnowledgeRefusal) -> Self {
+        Self {
+            class: FailureClass::Terminal,
+            code: FailureCode::parse(KNOWLEDGE_AUDIENCE_BELOW_CONTENT)
+                .expect("static knowledge failure code"),
+            diagnostic: None,
+            knowledge_refusal: Some(refusal),
+        }
+    }
+
+    pub fn knowledge_refusal(&self) -> Option<KnowledgeRefusal> {
+        self.knowledge_refusal
+    }
+
     pub fn new(
         class: FailureClass,
         code: FailureCode,
@@ -115,6 +137,7 @@ impl StepFailure {
             class,
             code,
             diagnostic,
+            knowledge_refusal: None,
         })
     }
 

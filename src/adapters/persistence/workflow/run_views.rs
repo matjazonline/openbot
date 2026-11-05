@@ -418,7 +418,25 @@ impl PostgresPersistence {
 
 #[async_trait]
 impl RunViews for PostgresPersistence {
-    async fn run_view(&self, company: CompanyId, run: RunId) -> AppResult<Option<RunView>> {
+    async fn run_visibility(
+        &self,
+        scope: RunReadScope,
+    ) -> AppResult<Option<crate::application::knowledge::PayloadVisibility>> {
+        let levels = crate::adapters::persistence::view_visibility::run_levels_on(
+            self.pool(),
+            scope.company,
+            scope.viewer,
+            &[scope.run.as_uuid()],
+        )
+        .await?;
+        Ok(levels.get(&scope.run.as_uuid()).copied())
+    }
+    async fn run_view(&self, scope: RunReadScope) -> AppResult<Option<RunView>> {
+        let RunReadScope {
+            company,
+            run,
+            viewer,
+        } = scope;
         let Some(detail) = self.run_detail(company, run).await? else {
             return Ok(None);
         };
@@ -436,7 +454,8 @@ impl RunViews for PostgresPersistence {
             listed::<ReconciliationRow, _>(self.run_rows(RECONCILIATIONS_SQL, company, run).await?);
         let (events, events_truncated) =
             listed::<EventRow, _>(self.run_rows(EVENTS_SQL, company, run).await?);
-        Ok(Some(RunView {
+        let mut view = RunView {
+            payload_restricted: false,
             detail,
             workflow_title: facts.title,
             draft_revision: revision_of(facts.draft_revision)?,
@@ -455,15 +474,27 @@ impl RunViews for PostgresPersistence {
             reconciliations_truncated,
             events,
             events_truncated,
-        }))
+        };
+        let levels = crate::adapters::persistence::view_visibility::run_levels_on(
+            self.pool(),
+            company,
+            viewer,
+            &[run.as_uuid()],
+        )
+        .await?;
+        let Some(visibility) = levels.get(&run.as_uuid()).copied() else {
+            return Ok(None);
+        };
+        view.project(visibility);
+        Ok(Some(view))
     }
 
-    async fn step_view(
-        &self,
-        company: CompanyId,
-        run: RunId,
-        execution: Uuid,
-    ) -> AppResult<Option<StepView>> {
+    async fn step_view(&self, scope: RunReadScope, execution: Uuid) -> AppResult<Option<StepView>> {
+        let RunReadScope {
+            company,
+            run,
+            viewer,
+        } = scope;
         let row: Option<StepRow> = sqlx::query_as(
             "SELECT step_id, activation, created_at, activated_at, completed_at, frozen_inputs, \
                     committed_output, frozen_choice, committed_route, route_target \
@@ -493,7 +524,8 @@ impl RunViews for PostgresPersistence {
             self.children(company, run, Some(execution), MAX_STEP_ITEMS)
                 .await?,
         );
-        Ok(Some(StepView {
+        let mut view = StepView {
+            payload_restricted: false,
             execution,
             step: row.step_id,
             activation: row.activation,
@@ -510,7 +542,19 @@ impl RunViews for PostgresPersistence {
             attempts,
             children,
             truncated: calls_cut || receipts_cut || attempts_cut || children_cut,
-        }))
+        };
+        let levels = crate::adapters::persistence::view_visibility::run_levels_on(
+            self.pool(),
+            company,
+            viewer,
+            &[run.as_uuid()],
+        )
+        .await?;
+        let Some(visibility) = levels.get(&run.as_uuid()).copied() else {
+            return Ok(None);
+        };
+        view.project(visibility);
+        Ok(Some(view))
     }
 
     async fn workflow_titles(

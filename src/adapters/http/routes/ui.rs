@@ -251,10 +251,11 @@ async fn page_activity(
 /// Thread ids whose activity badges a newly connected column may already be displaying.
 async fn first_page_thread_ids(
     thread_use_cases: &ThreadUseCases,
-    channel_id: Uuid,
+    viewer: &Viewer,
+    channel: &Channel,
 ) -> AppResult<HashSet<Uuid>> {
     Ok(thread_use_cases
-        .list_channel_threads(channel_id, None, STREAM_BATCH_LIMIT)
+        .list_channel_threads(viewer, channel.into(), None, STREAM_BATCH_LIMIT)
         .await?
         .into_iter()
         .map(|thread| thread.id)
@@ -270,7 +271,12 @@ pub(super) async fn render_message_pane(
     viewer: &Viewer,
     error: Option<&str>,
 ) -> AppResult<String> {
-    let messages = thread_use_cases.get_thread_history(thread.id).await?;
+    let messages = thread_use_cases
+        .get_thread_history(
+            viewer,
+            crate::use_cases::thread::ThreadReadScope::new(channel, thread.id),
+        )
+        .await?;
     let activity = activity_reader
         .thread_runs(company_id, thread.id, viewer.user_id)
         .await?;
@@ -331,7 +337,13 @@ async fn mailbox_page(
 
     let thread_page = match selected_channel {
         Some(channel) => {
-            load_thread_page(&thread_use_cases, channel.id, &ThreadListQuery::default()).await?
+            load_thread_page(
+                &thread_use_cases,
+                &viewer,
+                channel,
+                &ThreadListQuery::default(),
+            )
+            .await?
         }
         None => empty_thread_page(),
     };
@@ -400,7 +412,13 @@ async fn thread_column_fragment(
         .await?
         .ok_or_else(|| AppError::NotFound("Channel not found".into()))?;
 
-    let page = load_thread_page(&thread_use_cases, channel.id, &ThreadListQuery::default()).await?;
+    let page = load_thread_page(
+        &thread_use_cases,
+        &viewer,
+        &channel,
+        &ThreadListQuery::default(),
+    )
+    .await?;
 
     let activity = page_activity(activity_reader.as_ref(), query.company_id, &page.threads).await?;
     let column = pages::thread_column(&pages::ThreadColumn {
@@ -442,7 +460,8 @@ async fn thread_page_fragment(
 
     let page = load_thread_page(
         &thread_use_cases,
-        channel.id,
+        &viewer,
+        &channel,
         &ThreadListQuery {
             limit: query.limit,
             cursor: query.cursor,
@@ -531,8 +550,8 @@ async fn thread_message_stream(
     headers: HeaderMap,
     Query(query): Query<ThreadStreamQuery>,
 ) -> AppResult<Sse<impl Stream<Item = Result<Event, Infallible>>>> {
-    // Authorize once, here: the stream that follows filters on ids alone, so nothing past this
-    // point re-checks ownership.
+    // Authorize the stream path; each application message batch repeats current access and level
+    // checks, so a long-lived connection never caches a knowledge grant.
     let channel = channel_use_cases
         .get_readable_channel(&viewer, query.company_id, query.channel_id)
         .await?
@@ -577,7 +596,7 @@ async fn thread_message_stream(
 
             if pending_messages {
                 match thread_use_cases
-                    .get_thread_messages_after(thread_id, cursor, STREAM_BATCH_LIMIT)
+                    .get_thread_messages_after(&viewer, crate::use_cases::thread::ThreadReadScope::new(&channel, thread_id), cursor, STREAM_BATCH_LIMIT)
                     .await
                 {
                     Ok(messages) => {
@@ -664,7 +683,7 @@ async fn thread_column_stream(
     headers: HeaderMap,
     Query(query): Query<ChannelStreamQuery>,
 ) -> AppResult<Sse<impl Stream<Item = Result<Event, Infallible>>>> {
-    // Authorize once, here: the stream that follows filters on ids alone.
+    // Authorize the stream path; application row reads repeat current access and level checks.
     let channel = channel_use_cases
         .get_readable_channel(&viewer, query.company_id, query.channel_id)
         .await?
@@ -679,7 +698,7 @@ async fn thread_column_stream(
     // Subscribe first, then snapshot every badge that can already be on screen. An activity
     // change during this query stays buffered; one before the connection is recovered by the
     // snapshot itself.
-    let initial_stale_badges = first_page_thread_ids(&thread_use_cases, channel_id).await?;
+    let initial_stale_badges = first_page_thread_ids(&thread_use_cases, &viewer, &channel).await?;
 
     let stream = async_stream::stream! {
         let mut pending_rows = true;
@@ -712,7 +731,7 @@ async fn thread_column_stream(
 
             if pending_rows {
                 match thread_use_cases
-                    .get_channel_threads_after(channel_id, cursor, STREAM_BATCH_LIMIT)
+                    .get_channel_threads_after(&viewer, (&channel).into(), cursor, STREAM_BATCH_LIMIT)
                     .await
                 {
                     Ok(threads) => {
@@ -794,7 +813,7 @@ async fn thread_column_stream(
                 // likely to be showing rather than leave a stale spinner or a stale badge behind.
                 Some(Wake::Lagged) => {
                     pending_rows = true;
-                    match first_page_thread_ids(&thread_use_cases, channel_id).await {
+                    match first_page_thread_ids(&thread_use_cases, &viewer, &channel).await {
                         Ok(ids) => stale_badges.extend(ids),
                         Err(_) => {
                             warn!(%channel_id, "Thread column catch-up query failed");
@@ -1090,7 +1109,13 @@ async fn sent_message_response(
         None,
     )
     .await?;
-    let page = load_thread_page(thread_use_cases, channel.id, &ThreadListQuery::default()).await?;
+    let page = load_thread_page(
+        thread_use_cases,
+        viewer,
+        channel,
+        &ThreadListQuery::default(),
+    )
+    .await?;
     let activity = page_activity(activity_reader, company_id, &page.threads).await?;
     let refreshed_list = pages::thread_list_oob(&pages::ThreadColumn {
         company_id,

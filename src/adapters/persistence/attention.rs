@@ -181,7 +181,13 @@ WITH params AS (
            COALESCE(actor.display_label,
                     CASE WHEN run.channel_id IS NULL THEN 'Owners and admins'
                          ELSE 'Channel team' END),
-           version.title, 'Review the failed run (failed in the last 7 days)', 'normal',
+           version.title,
+           CASE WHEN refusal.workflow_failure_code = 'knowledge.audience_below_content'
+             THEN 'Knowledge release refused · thread ' || COALESCE(run.thread_id::text, 'none')
+               || ' · run ' || run.id::text || ' · content level ' || refusal.knowledge_content_level::text
+               || ' · destination level ' || refusal.knowledge_destination_level::text
+             ELSE 'Review the failed run (failed in the last 7 days)' END,
+           'normal',
            NULL::timestamptz, NULL::timestamptz, run.revision, run.created_at, run.created_at
     FROM workflow_runs AS run
     CROSS JOIN params
@@ -192,6 +198,18 @@ WITH params AS (
      AND actor.kind = 'person'
      AND EXISTS (SELECT 1 FROM company_members AS member
                  WHERE member.company_id = run.company_id AND member.user_id = run.actor_id)
+    -- Only the newest attempt of this exact terminal execution can describe its refusal.
+    LEFT JOIN LATERAL (
+        SELECT attempt.workflow_failure_code, attempt.knowledge_content_level,
+               attempt.knowledge_destination_level
+        FROM background_tasks AS task
+        JOIN workflow_executions AS execution
+          ON (execution.company_id,execution.id)=(task.company_id,task.workflow_execution_id)
+        JOIN task_attempts AS attempt ON attempt.task_id = task.id
+        WHERE task.company_id = run.company_id AND execution.run_id = run.id
+          AND task.workflow_execution_id = run.terminal_execution_id
+        ORDER BY attempt.attempt_number DESC, task.id DESC LIMIT 1
+    ) AS refusal ON true
     WHERE run.company_id = $1 AND run.state = 'failed'
       AND run.created_at >= params.as_of - interval '7 days'
       AND NOT EXISTS (SELECT 1 FROM workflow_runs AS rerun

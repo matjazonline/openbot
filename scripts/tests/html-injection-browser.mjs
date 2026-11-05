@@ -12,6 +12,7 @@ assert.ok(directory, 'HTML_INJECTION_BROWSER_FIXTURES is required');
 const fixture = name => readFileSync(join(directory, name), 'utf8');
 const root = new URL('../../', import.meta.url);
 const htmx = readFileSync(new URL('assets/htmx-2.0.4.min.js', root));
+const css = readFileSync(new URL('assets/app.css', root));
 const cspSource = readFileSync(new URL('src/adapters/http/security.rs', root), 'utf8');
 const csp = cspSource.match(/const CSP: &str = "([^"]+)";/)?.[1];
 assert.ok(csp, 'production CSP is present');
@@ -31,7 +32,11 @@ test('form feedback and another member’s team autocomplete stay text under pro
   const unexpectedRequests = [];
   const server = createServer(async (request, response) => {
     const pathname = new URL(request.url, 'http://127.0.0.1').pathname;
-    if (pathname === '/favicon.ico' || pathname === '/assets/app.css' || pathname.startsWith('/assets/busybots-') || pathname === '/assets/theme-init.js') {
+    if (pathname === '/assets/app.css') {
+      response.writeHead(200, { 'content-type': 'text/css' }).end(css);
+      return;
+    }
+    if (pathname === '/favicon.ico' || pathname.startsWith('/assets/busybots-') || pathname === '/assets/theme-init.js') {
       response.writeHead(204).end();
       return;
     }
@@ -56,7 +61,7 @@ test('form feedback and another member’s team autocomplete stay text under pro
       response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }).end(fixture(name));
       return;
     }
-    const page = pathname === '/register' ? 'register.html' : pathname === '/login' ? 'login.html' : pathname === '/team' ? 'team.html' : null;
+    const page = pathname === '/register' ? 'register.html' : pathname === '/login' ? 'login.html' : pathname === '/team' ? 'team.html' : pathname === '/restricted' ? 'restricted.html' : null;
     if (page) {
       response.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': csp }).end(fixture(page));
       return;
@@ -112,6 +117,26 @@ test('form feedback and another member’s team autocomplete stay text under pro
     await input.fill('tag<svg');
     await expect(page.locator('.team-dropdown > div').first()).toContainText(maliciousEmail);
     assert.equal(await page.locator('.team-dropdown img, .team-dropdown svg').count(), 0);
+
+    await page.goto(`${base}/restricted`);
+    const restricted = page.locator('[data-restricted-message]');
+    await expect(restricted).toContainText('Restricted message');
+    await expect(restricted.locator('.chat-header')).toContainText("writer<img/src=x/onerror=fetch('/exfil')>");
+    assert.equal(await restricted.locator('img, svg, a, textarea, [download]').count(), 0);
+    const markup = await page.content();
+    for (const secret of ['private-subject-canary', 'private-body-canary', 'private-attachment-canary']) {
+      assert.ok(!markup.includes(secret), `restricted markup leaked ${secret}`);
+    }
+    for (const theme of ['light', 'dark']) {
+      await page.evaluate(value => document.documentElement.setAttribute('data-theme', value), theme);
+      await expect(restricted.locator('.chat-bubble')).toBeVisible();
+      const style = await restricted.locator('.chat-bubble').evaluate(element => {
+        const value = getComputedStyle(element);
+        return { opacity: value.opacity, color: value.color, background: value.backgroundColor };
+      });
+      assert.equal(style.opacity, '0.7');
+      assert.notEqual(style.color, style.background);
+    }
 
     assert.deepEqual(unexpectedRequests, []);
     assert.deepEqual(pageErrors, []);

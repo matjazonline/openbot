@@ -1,3 +1,4 @@
+//! Parsing incoming MIME produces ingress data, not a view of a stored classified message.
 //! MIME and RFC 5322 parsing: the syntax only mail has.
 //!
 //! This lives in the email adapter rather than in `src/application/services` because everything it

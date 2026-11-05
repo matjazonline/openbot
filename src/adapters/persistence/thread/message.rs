@@ -1,3 +1,5 @@
+//! Canonical storage for producers and protocol workers, not a viewer read model. Viewer reads
+//! go through the application thread projections with fresh authority and immutable stamps.
 //! Canonical message writes and reads.
 //!
 //! One `messages` row is the payload; one `thread_messages` row per conversation it landed in is

@@ -1,3 +1,5 @@
+//! Canonical content serialization serves frozen deliveries, not human views. Workflow effect
+//! publication checks the actual destination group before committing a new delivery.
 //! Delivery intent, rendered parts, and what a provider said about one send.
 //!
 //! A delivery is a durable attempt to expose one canonical message through one destination. This

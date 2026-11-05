@@ -224,7 +224,8 @@ fn parse_thread_cursor(cursor: &str) -> AppResult<ThreadCursor> {
 
 pub(crate) async fn load_thread_page(
     thread_use_cases: &ThreadUseCases,
-    channel_id: Uuid,
+    viewer: &crate::entities::user::Viewer,
+    channel: &Channel,
     query: &ThreadListQuery,
 ) -> AppResult<ThreadListResponse> {
     let limit = query.limit.unwrap_or(DEFAULT_THREAD_PAGE_SIZE);
@@ -240,7 +241,7 @@ pub(crate) async fn load_thread_page(
         .transpose()?;
 
     let mut threads = thread_use_cases
-        .list_channel_threads(channel_id, before, limit + 1)
+        .list_channel_threads(viewer, channel.into(), before, limit + 1)
         .await?;
     let has_more = threads.len() > limit;
     threads.truncate(limit);
@@ -607,20 +608,21 @@ async fn list_channel_threads_page(
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
     State(config): State<Arc<AppConfig>>,
-    user: AuthenticatedUser,
+    viewer: crate::entities::user::Viewer,
     Path((company_id, channel_id)): Path<(Uuid, Uuid)>,
 ) -> AppResult<Html<String>> {
     let (company, channel) = managed_channel(
         &company_use_cases,
         &channel_use_cases,
-        user.id,
+        viewer.user_id,
         company_id,
         channel_id,
     )
     .await?;
     let page = load_thread_page(
         &thread_use_cases,
-        channel_id,
+        &viewer,
+        &channel,
         &ThreadListQuery {
             limit: None,
             cursor: None,
@@ -642,15 +644,15 @@ async fn list_channel_threads_fragment(
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
     State(config): State<Arc<AppConfig>>,
-    user: AuthenticatedUser,
+    viewer: crate::entities::user::Viewer,
     Path((company_id, channel_id)): Path<(Uuid, Uuid)>,
     Query(query): Query<ThreadListQuery>,
 ) -> AppResult<Html<String>> {
-    channel_use_cases
-        .get_company_channel(user.id, company_id, channel_id)
+    let channel = channel_use_cases
+        .get_company_channel(viewer.user_id, company_id, channel_id)
         .await?
         .ok_or_else(|| AppError::NotFound("Channel not found".into()))?;
-    let page = load_thread_page(&thread_use_cases, channel_id, &query).await?;
+    let page = load_thread_page(&thread_use_cases, &viewer, &channel, &query).await?;
 
     Ok(Html(pages::channel_thread_list_fragment(
         company_id,
@@ -678,16 +680,16 @@ async fn list_channels_json(
 async fn list_channel_threads_json(
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
-    user: AuthenticatedUser,
+    viewer: crate::entities::user::Viewer,
     Path((company_id, channel_id)): Path<(Uuid, Uuid)>,
     Query(query): Query<ThreadListQuery>,
 ) -> AppResult<impl IntoResponse> {
-    channel_use_cases
-        .get_company_channel(user.id, company_id, channel_id)
+    let channel = channel_use_cases
+        .get_company_channel(viewer.user_id, company_id, channel_id)
         .await?
         .ok_or_else(|| AppError::NotFound("Channel not found".into()))?;
 
-    let page = load_thread_page(&thread_use_cases, channel_id, &query).await?;
+    let page = load_thread_page(&thread_use_cases, &viewer, &channel, &query).await?;
 
     Ok((StatusCode::OK, Json(page)))
 }
@@ -1091,6 +1093,7 @@ mod tests {
                 binding_id: Uuid::new_v4(),
                 workflow_title: "Triage".into(),
                 outcome: BindingOutcome::Admitted(AdmittedRun {
+                    payload_restricted: false,
                     run_id,
                     state: RunState::Waiting(WaitingReason::Decision),
                     executions: vec![RunExecutionSummary {

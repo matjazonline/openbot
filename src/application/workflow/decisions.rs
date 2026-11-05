@@ -185,6 +185,7 @@ pub struct DecisionContext {
 /// Bounded links to exact artifacts in this run and sibling revision rounds.
 #[derive(Debug, Clone, PartialEq)]
 pub struct DecisionHistoryEntry {
+    pub payload_restricted: bool,
     pub decision: DecisionId,
     pub run: RunId,
     pub step: StepId,
@@ -200,6 +201,7 @@ pub struct DecisionHistoryEntry {
 /// What a member with run visibility may see. Comments are internal discussion.
 #[derive(Debug, Clone, PartialEq)]
 pub struct DecisionView {
+    pub payload_restricted: bool,
     pub subject: DecisionSubject,
     pub context: DecisionContext,
     pub data_schema: Option<Value>,
@@ -434,4 +436,32 @@ impl DecisionNotices {
 
 fn invalid() -> AppError {
     AppError::BadRequest("Invalid workflow decision".into())
+}
+
+impl DecisionView {
+    pub fn project(&mut self, visibility: crate::application::knowledge::PayloadVisibility) {
+        if visibility.is_visible() {
+            return;
+        }
+        self.payload_restricted = true;
+        self.can_submit = false;
+        self.proposal = Value::Null;
+        self.artifact_digest.clear();
+        self.data_schema = None;
+        self.feedback_required.clear();
+        self.choices.clear();
+        self.submission = None;
+        self.comments.clear();
+        for entry in &mut self.history {
+            entry.redact_payload();
+        }
+    }
+}
+impl DecisionHistoryEntry {
+    pub fn redact_payload(&mut self) {
+        self.payload_restricted = true;
+        self.artifact_digest.clear();
+        self.choice = None;
+        self.feedback = None;
+    }
 }

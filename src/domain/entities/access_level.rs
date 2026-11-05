@@ -160,6 +160,11 @@ pub const fn may_release(content: AccessLevel, destination: AccessLevel) -> bool
     content.as_i16() <= destination.as_i16()
 }
 
+/// Knowledge classification never grants channel or company access on its own.
+pub const fn visible_to(viewer: AccessLevel, stamp: AccessLevel) -> bool {
+    viewer.as_i16() >= stamp.as_i16()
+}
+
 /// Immutable admission ceiling and the monotone classification of data already consumed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub struct RunKnowledge {

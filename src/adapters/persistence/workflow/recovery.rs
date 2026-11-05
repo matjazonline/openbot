@@ -172,11 +172,20 @@ async fn close_attempt(
     report: &WorkflowFailure,
     reason: &Retirement,
 ) -> AppResult<()> {
-    let closed = sqlx::query("UPDATE task_attempts SET status='failed',finished_at=clock_timestamp(),workflow_failure_class=$5,workflow_failure_code=$6,workflow_retry_safety=$7,workflow_retirement=$8,stop_reason=$9 WHERE task_id=$1 AND attempt_number=$2 AND execution_generation=$3 AND worker_id=$4 AND status='processing'")
+    let refusal = report.failure.knowledge_refusal();
+    let closed = sqlx::query(
+        "UPDATE task_attempts SET status='failed', finished_at=clock_timestamp(), \
+             workflow_failure_class=$5, workflow_failure_code=$6, workflow_retry_safety=$7, \
+             workflow_retirement=$8, stop_reason=$9, knowledge_content_level=$10, knowledge_destination_level=$11 \
+         WHERE task_id=$1 AND attempt_number=$2 AND execution_generation=$3 AND worker_id=$4 AND status='processing'")
         .bind(fence.scope.job.0).bind(fence.attempt.0).bind(fence.generation.0).bind(fence.worker.0)
         .bind(match report.failure.class() { FailureClass::Retryable => "retryable", FailureClass::Terminal => "terminal" })
         .bind(report.failure.code().as_str()).bind(match report.safety { RetrySafety::SafeToRetry => "safe", RetrySafety::EffectOutcomeUnknown => "unknown" })
-        .bind(if matches!(reason,Retirement::Expired) { "expired" } else { "live" }).bind(match reason { Retirement::Expired | Retirement::Interrupted(LeaseReleaseCause::LeaseLost) => Some("lease_lost"), Retirement::Interrupted(LeaseReleaseCause::Deadline) => Some("timed_out"), _ => None }).execute(db).await?;
+        .bind(if matches!(reason,Retirement::Expired) { "expired" } else { "live" })
+        .bind(match reason { Retirement::Expired | Retirement::Interrupted(LeaseReleaseCause::LeaseLost) => Some("lease_lost"), Retirement::Interrupted(LeaseReleaseCause::Deadline) => Some("timed_out"), _ => None })
+        .bind(refusal.map(|levels| levels.content.as_i16()))
+        .bind(refusal.map(|levels| levels.destination.as_i16()))
+        .execute(db).await?;
     if closed.rows_affected() != 1 {
         return Err(invalid());
     }

@@ -58,6 +58,7 @@ mod invite_settings;
 mod knowledge;
 mod layout;
 mod mailbox;
+pub(crate) mod message_visibility;
 mod model_connection;
 mod notifications;
 mod onboarding;

@@ -275,6 +275,32 @@ pub(super) async fn insert_thread_principals(
 
 #[async_trait]
 impl ThreadPersistence for PostgresPersistence {
+    async fn thread_access_levels(
+        &self,
+        company_id: Uuid,
+        thread_ids: &[Uuid],
+    ) -> AppResult<std::collections::HashMap<Uuid, crate::entities::access_level::AccessLevel>>
+    {
+        #[derive(sqlx::FromRow)]
+        struct LevelRow {
+            thread_id: Uuid,
+            access_level: i16,
+        }
+        let rows = sqlx::query_as::<_, LevelRow>(
+            "SELECT thread.id AS thread_id, COALESCE(MAX(message.access_level),0)::smallint AS access_level \
+             FROM threads AS thread LEFT JOIN thread_messages AS association \
+               ON (association.company_id,association.thread_id)=(thread.company_id,thread.id) \
+             LEFT JOIN messages AS message ON (message.company_id,message.id)=(association.company_id,association.message_id) \
+             WHERE thread.company_id=$1 AND thread.id=ANY($2) GROUP BY thread.id")
+            .bind(company_id).bind(thread_ids).fetch_all(&self.pool).await?;
+        rows.into_iter()
+            .map(|row| {
+                let level = crate::entities::access_level::AccessLevel::try_from(row.access_level)
+                    .map_err(|error| AppError::Internal(error.into()))?;
+                Ok((row.thread_id, level))
+            })
+            .collect()
+    }
     async fn create_thread(
         &self,
         channel_id: Uuid,

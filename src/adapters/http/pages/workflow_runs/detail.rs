@@ -202,8 +202,16 @@ pub fn run_body(view: &RunPaneView<'_>) -> String {
         waits = waits(view),
         actions = actions(view),
         children = children(view),
-        input = json_preview(&run.input),
-        params = json_preview(&run.params),
+        input = if run.payload_restricted {
+            "<p>Restricted run content</p>".into()
+        } else {
+            json_preview(&run.input)
+        },
+        params = if run.payload_restricted {
+            String::new()
+        } else {
+            json_preview(&run.params)
+        },
     )
 }
 

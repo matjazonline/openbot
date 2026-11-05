@@ -40,6 +40,15 @@ pub fn workflow_decision_section(
     outcome: Option<DecisionOutcome<'_>>,
     inputs: Option<&DecisionFormInputs>,
 ) -> String {
+    if view.payload_restricted {
+        return format!(
+            r#"<section id="workflow-decision"><p>Restricted run content</p><p>Run {} · step {} · {}</p></section>"#,
+            view.run.as_uuid(),
+            escape_html_text(view.step.as_str()),
+            escape_html_text(&view.state)
+        );
+    }
+
     let submission = inputs.and_then(|inputs| match inputs {
         DecisionFormInputs::Submission(inputs) => Some(inputs),
         _ => None,
@@ -149,7 +158,7 @@ fn settled(view: &DecisionView, inputs: Option<&DecisionInputs>, open: bool) -> 
 fn history(view: &DecisionView) -> String {
     let rows:String=view.history.iter().map(|entry|{
         let round=entry.round.map(|round|format!(" · round {round}")).unwrap_or_default();
-        let choice=entry.choice.as_deref().unwrap_or(&entry.state);
+        let choice=if entry.payload_restricted { "Restricted run content" } else { entry.choice.as_deref().unwrap_or(&entry.state) };
         format!(r#"<li class="space-y-1 rounded-box border border-base-300 p-3 text-xs">
             <a class="link" href="/ui/workflow-decisions/{id}">{subject} · {step}{round}{current}</a>
             <p>{choice} · {at}</p><p class="break-all font-mono">Artifact {digest}</p><p class="whitespace-pre-wrap">{feedback}</p></li>"#,

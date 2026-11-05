@@ -1,3 +1,5 @@
+//! Trigger payloads feed run admission, which checks the immutable message stamp against the
+//! admitted knowledge ceiling. This is an internal execution read, not a viewer endpoint.
 //! The workflow-admission intent queue (p08 D1.3/D1.4). Claims are fair per company and fenced by
 //! a per-claim generation; every later write names it, so a stale worker changes nothing.
 use super::*;

@@ -4,11 +4,13 @@ mod chunking;
 mod service;
 mod types;
 mod vectors;
+mod visibility;
 pub use admission::UploadAdmissionRefused;
 pub use chunking::{KnowledgeChunk, chunk_document};
 pub use service::KnowledgeLibrary;
 pub use types::*;
 pub use vectors::normalize_embedding;
+pub use visibility::PayloadVisibility;
 
 pub const MAX_CHUNKS_PER_FILE: usize = 4096;
 pub const MAX_CHUNKS_PER_REQUEST: usize = 8192;

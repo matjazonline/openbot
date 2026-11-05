@@ -1,3 +1,5 @@
+//! Transport rendering sends the frozen delivery payload. Workflow publication already approved
+//! its actual recipients at the logical release boundary; this is not a viewer read.
 //! Email egress: freezing one delivery into an RFC 5322 message, and posting it.
 //!
 //! The split matters. [`EmailRenderer`] makes every mail decision -- the `From` mailbox, the `Re:`

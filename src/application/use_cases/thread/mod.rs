@@ -77,6 +77,10 @@ pub use ingest::{
     PreparedInbound, UnusableHint,
 };
 mod notices;
+mod reads;
+#[cfg(test)]
+pub(crate) use reads::project_message;
+pub use reads::{ChannelReadScope, ThreadReadScope};
 mod support;
 pub use notices::{
     BounceInfo, BounceSuggestion, ChannelDirectoryEntry, bounce_cause, format_bounce_email_body,
@@ -243,22 +247,15 @@ impl ThreadUseCases {
         else {
             return Ok(None);
         };
-        Ok(self
+        let thread = self
             .thread_persistence
             .get_thread_by_id(thread_id)
             .await?
-            .filter(|thread| thread.channel_id == channel.id))
-    }
-
-    pub async fn list_channel_threads(
-        &self,
-        channel_id: Uuid,
-        before: Option<ThreadCursor>,
-        limit: usize,
-    ) -> AppResult<Vec<Thread>> {
-        self.thread_persistence
-            .list_threads_by_channel_id(channel_id, before, limit)
-            .await
+            .filter(|thread| thread.channel_id == channel.id);
+        let projected = self
+            .project_thread_titles(viewer, company_id, thread.into_iter().collect())
+            .await?;
+        Ok(projected.into_iter().next())
     }
 
     /// Who sent the newest message in each of these threads, for the live column's reply mark.
@@ -271,29 +268,7 @@ impl ThreadUseCases {
             .await
     }
 
-    /// The threads a live column is missing, oldest first.
-    ///
-    /// Cursor-driven for the same reason the message stream is: one call covers a single bumped
-    /// thread, a burst that overflowed the broadcast channel, and a reconnect after an outage.
-    pub async fn get_channel_threads_after(
-        &self,
-        channel_id: Uuid,
-        after: Option<ThreadCursor>,
-        limit: usize,
-    ) -> AppResult<Vec<Thread>> {
-        self.thread_persistence
-            .list_threads_updated_after(channel_id, after, limit)
-            .await
-    }
-
-    /// The newest turns of a thread, oldest first, as a page renders them.
-    pub async fn get_thread_history(&self, thread_id: Uuid) -> AppResult<Vec<ThreadMessageView>> {
-        self.thread_persistence
-            .list_thread_message_views(thread_id)
-            .await
-    }
-
-    /// What the mail renderer needs to answer this thread's newest turn.
+    /// Internal email threading metadata; viewer rendering uses viewer_email_reply_context.
     pub async fn latest_email_reply_context(
         &self,
         thread_id: Uuid,
@@ -390,44 +365,7 @@ impl ThreadUseCases {
         Ok(None)
     }
 
-    /// One message's operational detail, for an authorized diagnostic pane.
-    pub async fn get_message_audit(
-        &self,
-        company_id: Uuid,
-        association_id: Uuid,
-    ) -> AppResult<Option<MessageAuditView>> {
-        self.thread_persistence
-            .get_message_audit(company_id, association_id)
-            .await
-    }
-
-    /// One exact message after the caller authorizes the containing thread.
-    pub async fn get_thread_message_view(
-        &self,
-        thread_id: Uuid,
-        message_id: CanonicalMessageId,
-    ) -> AppResult<Option<ThreadMessageView>> {
-        self.thread_persistence
-            .get_thread_message_view(thread_id, message_id)
-            .await
-    }
-
-    /// The messages a live reader is missing, oldest first.
-    ///
-    /// Driving the message stream off a cursor rather than off the notification payload means one
-    /// call covers three cases with the same code: a single new message, a burst that overflowed
-    /// the broadcast channel, and a reconnect after the connection dropped.
-    pub async fn get_thread_messages_after(
-        &self,
-        thread_id: Uuid,
-        after: Option<MessageCursor>,
-        limit: usize,
-    ) -> AppResult<Vec<ThreadMessageView>> {
-        self.thread_persistence
-            .list_thread_message_views_after(thread_id, after, limit)
-            .await
-    }
-
+    /// Internal outbound correlation for runtime processing; not a viewer projection.
     pub async fn find_outbound_reply_after(
         &self,
         thread_id: Uuid,

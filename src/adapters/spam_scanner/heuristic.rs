@@ -1,3 +1,4 @@
+//! Content inspection is ingress classification, not a human read of a stored message.
 //! Local scoring policy, unchanged from the former application scanner.
 use crate::application::services::spam_scanner::SpamScanResult;
 pub(super) struct HeuristicScanner;

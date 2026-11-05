@@ -5,6 +5,7 @@ use serde_json::json;
 
 fn view() -> DecisionView {
     DecisionView {
+        payload_restricted: false,
         subject: DecisionSubject::Business,
         context: DecisionContext {
             company: CompanyId::new(Uuid::new_v4()),
@@ -125,4 +126,54 @@ fn decision_browser_markup_and_closed_draft_recovery() {
         .unwrap();
         std::fs::write(dir.join("closed.html"), settled).unwrap();
     }
+}
+
+#[test]
+fn knowledge_view_decision_redaction_never_echoes_proposal_comments_or_form_input() {
+    let mut view = view();
+    view.proposal = json!({"private-proposal-canary":"secret"});
+    view.comments.push(DecisionCommentView {
+        sequence: 1,
+        author_principal: Uuid::new_v4(),
+        body: "private-comment-canary".into(),
+        created_at: chrono::Utc::now(),
+    });
+    view.project(crate::application::knowledge::PayloadVisibility {
+        viewer: crate::entities::access_level::AccessLevel::PUBLIC,
+        content: crate::entities::access_level::AccessLevel::L5,
+    });
+    let html = workflow_decision_section(&view, None, None);
+    assert!(html.contains("Restricted run content"));
+    assert!(!html.contains("private-proposal-canary") && !html.contains("private-comment-canary"));
+    assert!(!html.contains("<form") && !view.can_submit && view.comments.is_empty());
+}
+
+#[test]
+fn knowledge_view_history_redaction_keeps_position_and_names_the_restriction() {
+    let mut view = view();
+    let mut entry = DecisionHistoryEntry {
+        payload_restricted: false,
+        decision: DecisionId(Uuid::new_v4()),
+        run: RunId::new(Uuid::new_v4()),
+        step: StepId::parse("earlier").unwrap(),
+        round: Some(1),
+        artifact_digest: "private-digest-canary".into(),
+        subject: DecisionSubject::Business,
+        state: "completed".into(),
+        choice: Some("private-choice-canary".into()),
+        feedback: Some("private-feedback-canary".into()),
+        created_at: chrono::Utc::now(),
+    };
+    entry.redact_payload();
+    view.history.push(entry);
+    let html = workflow_decision_section(&view, None, None);
+    assert!(html.contains("Restricted run content") && html.contains("earlier"));
+    for secret in [
+        "private-digest-canary",
+        "private-choice-canary",
+        "private-feedback-canary",
+    ] {
+        assert!(!html.contains(secret));
+    }
+    assert_eq!(view.history.len(), 1);
 }

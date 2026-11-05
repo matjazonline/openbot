@@ -1,3 +1,5 @@
+//! Message views are raw at this port; the application projects them for the current viewer.
+//! Agent history and email threading reads are internal runtime/protocol inputs, not viewer grants.
 //! The purpose-built message reads.
 //!
 //! Each query selects the columns of exactly one projection in
@@ -140,6 +142,7 @@ impl ThreadMessageDb {
             }
         };
         Ok(ThreadMessageView {
+            restricted: false,
             access_level: crate::entities::access_level::AccessLevel::try_from(self.access_level)
                 .map_err(|e| AppError::Internal(e.into()))?,
             response_contract: decode_response_contract(

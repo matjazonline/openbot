@@ -217,7 +217,11 @@ impl Ui {
         let view = self
             .engine
             .run_views()
-            .run_view(company_id, RunId::new(run))
+            .run_view(crate::application::workflow::run_views::RunReadScope {
+                company: company_id,
+                run: RunId::new(run),
+                viewer: self.actor()?,
+            })
             .await?
             .ok_or_else(not_found)?;
         let mut visibility = Visibility::new(&self.engine, company_id, self.actor()?);
@@ -713,7 +717,14 @@ async fn step(
     let step = ui
         .engine
         .run_views()
-        .step_view(company_id, RunId::new(run), execution)
+        .step_view(
+            crate::application::workflow::run_views::RunReadScope {
+                company: company_id,
+                run: RunId::new(run),
+                viewer: ui.actor()?,
+            },
+            execution,
+        )
         .await?
         .ok_or_else(|| AppError::NotFound("Workflow step not found".into()))?;
     let bundle = ui
@@ -723,6 +734,7 @@ async fn step(
         .await?;
     let agent = bundle
         .as_deref()
+        .filter(|_| !step.payload_restricted)
         .and_then(|bundle| frozen_agent(bundle, &step));
     Ok(Html(pages::run_step_body(&pages::StepBodyView {
         company_id: company,

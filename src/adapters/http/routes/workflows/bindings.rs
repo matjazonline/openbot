@@ -548,7 +548,7 @@ pub async fn run(
     let (company, actor) = (company(company_id), actor(&user)?);
     let not_found = || AppError::NotFound("Workflow run not found".into());
     authorize(&engine, company, actor, RelatedAssociation::Company).await?;
-    let detail = engine
+    let mut detail = engine
         .reads()
         .run_detail(company, RunId::new(run))
         .await?
@@ -556,6 +556,22 @@ pub async fn run(
     if !visible_to(&engine, company, actor, detail.summary.association).await? {
         return Err(not_found().into());
     }
+    let visibility = engine
+        .run_views()
+        .run_visibility(crate::application::workflow::run_views::RunReadScope {
+            company,
+            run: RunId::new(run),
+            viewer: actor,
+        })
+        .await?
+        .ok_or_else(not_found)?;
+    detail.project(visibility);
+    let mut body = run_detail_json(&detail);
+    body["payload_restricted"] = json!(!visibility.is_visible());
+    Ok(ok(body))
+}
+
+fn run_detail_json(detail: &crate::application::workflow::reads::RunDetail) -> Value {
     let mut body = run_json(&detail.summary);
     body["executions"] = json!(
         detail
@@ -614,7 +630,7 @@ pub async fn run(
             }))
             .collect::<Vec<_>>()
     );
-    Ok(ok(body))
+    body
 }
 
 #[derive(Debug, Deserialize)]

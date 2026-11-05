@@ -536,3 +536,6 @@ mod conversation_stream_tests;
 
 #[path = "ui_message_tests.rs"]
 mod message_source_tests;
+
+#[path = "ui_knowledge_view_tests.rs"]
+mod knowledge_views;

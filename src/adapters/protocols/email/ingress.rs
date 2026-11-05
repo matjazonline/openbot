@@ -1,3 +1,5 @@
+//! Incoming provider content is validated/committed as ingress; it is not a stored-message viewer
+//! path. Human mailbox and simulation history use the application visibility projections.
 //! The email ingress boundary: one arriving mail, validated, into one canonical inbound message.
 //!
 //! Everything email-only stops in this file. Address syntax (`support+billing.quiet@acme.…`),

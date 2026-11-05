@@ -1,3 +1,5 @@
+//! Provider output consumes the frozen delivery envelope approved at logical effect publication;
+//! rendering it is transport work, not a current-viewer message read.
 //! Sending one frozen mail through the Resend HTTP API.
 //!
 //! The interesting difference from SMTP is not the protocol, it is what a failure means. A relay

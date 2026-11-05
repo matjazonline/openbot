@@ -24,11 +24,35 @@ pub trait DeliveryReader: Send + Sync {
     /// with the page itself; see [`DeliveryFilter::probe_limit`].
     async fn list_company_deliveries(
         &self,
-        company_id: Uuid,
+        scope: DeliveryReadScope,
         filter: &DeliveryFilter,
     ) -> AppResult<Vec<DeliveryEntry>>;
 
-    /// One delivery by id. The caller checks its `company_id` before showing it -- the id comes
-    /// from a URL.
-    async fn get_delivery(&self, delivery_id: DeliveryId) -> AppResult<Option<DeliveryEntry>>;
+    /// One delivery by its company-scoped id, with current viewer classification applied.
+    async fn get_delivery(
+        &self,
+        scope: DeliveryReadScope,
+        delivery_id: DeliveryId,
+    ) -> AppResult<Option<DeliveryEntry>>;
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct DeliveryReadScope {
+    pub company_id: Uuid,
+    pub viewer: crate::application::workflow::WorkflowActor,
+}
+
+pub(crate) fn project_delivery(
+    entry: &mut DeliveryEntry,
+    visibility: crate::application::knowledge::PayloadVisibility,
+) {
+    if visibility.is_visible() {
+        return;
+    }
+    entry.subject = "Restricted message".into();
+    entry.last_error_detail = None;
+    for part in &mut entry.parts {
+        part.last_error_detail = None;
+        part.provider_message_key = None;
+    }
 }

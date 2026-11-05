@@ -48,6 +48,7 @@ pub(super) async fn read(
         .into_iter()
         .map(|row| {
             Ok(DecisionHistoryEntry {
+                payload_restricted: false,
                 decision: DecisionId(row.id),
                 run: RunId::new(row.run_id),
                 step: StepId::parse(row.step_id).map_err(|_| invalid())?,

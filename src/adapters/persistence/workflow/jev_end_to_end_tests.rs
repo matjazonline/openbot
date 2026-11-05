@@ -69,7 +69,14 @@ async fn assert_history(f: &Fixture, run: RunId, step_name: &str, output: &Value
         .execution;
     let view = f
         .persistence
-        .step_view(f.target.company, run, execution)
+        .step_view(
+            crate::application::workflow::run_views::RunReadScope {
+                company: f.target.company,
+                run,
+                viewer: f.target.actor,
+            },
+            execution,
+        )
         .await
         .unwrap()
         .unwrap();

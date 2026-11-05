@@ -52,7 +52,7 @@ async fn message_diagnostics(
     Path((thread_id, association_id)): Path<(Uuid, Uuid)>,
     Query(query): Query<AttachmentQuery>,
 ) -> AppResult<Html<String>> {
-    let (company, channel) = load_viewable_channel(
+    let (_, channel) = load_viewable_channel(
         &company_use_cases,
         &channel_use_cases,
         &viewer,
@@ -67,7 +67,11 @@ async fn message_diagnostics(
         .ok_or_else(missing)?;
 
     let audit = thread_use_cases
-        .get_message_audit(company.id, association_id)
+        .get_message_audit(
+            &viewer,
+            crate::use_cases::thread::ThreadReadScope::new(&channel, thread.id),
+            association_id,
+        )
         .await?
         .filter(|audit| audit.thread_id == thread.id && audit.channel_id == channel.id)
         .ok_or_else(missing)?;

@@ -1,3 +1,5 @@
+//! Ingress attachment extraction stores provider bytes. Viewer downloads separately authorize
+//! the containing message before reading an object or exposing its filename.
 //! Keeping what arrived in the mail.
 //!
 //! Attachments are stored only after application preflight accepts the message. The email boundary

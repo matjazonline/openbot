@@ -1,3 +1,4 @@
+//! Bounce/help notices describe the incoming delivery or directory, not a stored classified reply.
 //! Bounce/help notices and their durable dispatch.
 use super::*;
 use serde::{Deserialize, Serialize};

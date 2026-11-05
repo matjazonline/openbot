@@ -1425,7 +1425,14 @@ async fn message_outcomes_lookup_and_activity_read_every_binding_of_a_message() 
 
     let outcomes = s
         .p()
-        .message_outcomes(company, s.thread, &[message])
+        .message_outcomes(
+            crate::application::message_outcomes::MessageOutcomeScope {
+                company: CompanyId::new(company),
+                thread_id: s.thread,
+                viewer: s.fixture.target.actor,
+            },
+            &[message],
+        )
         .await
         .unwrap();
     let mut bindings = vec![refused.as_uuid(), first.as_uuid(), second.as_uuid()];
@@ -1462,7 +1469,14 @@ async fn message_outcomes_lookup_and_activity_read_every_binding_of_a_message() 
     }
     assert!(
         s.p()
-            .message_outcomes(Uuid::new_v4(), s.thread, &[message])
+            .message_outcomes(
+                crate::application::message_outcomes::MessageOutcomeScope {
+                    company: CompanyId::new(Uuid::new_v4()),
+                    thread_id: s.thread,
+                    viewer: s.fixture.target.actor
+                },
+                &[message]
+            )
             .await
             .unwrap()
             .is_empty(),

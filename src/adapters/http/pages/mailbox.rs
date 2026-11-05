@@ -2483,6 +2483,19 @@ fn message_bubble(
     run_access: RunLinkAccess<'_>,
     actions: MessageActions,
 ) -> String {
+    if message.restricted {
+        return super::message_visibility::restricted_message(message);
+    }
+    unrestricted_message_bubble(message, viewer_email, scope, run_access, actions)
+}
+
+fn unrestricted_message_bubble(
+    message: &ThreadMessageView,
+    viewer_email: Option<&EmailAddress>,
+    scope: MessageScope,
+    run_access: RunLinkAccess<'_>,
+    actions: MessageActions,
+) -> String {
     let is_agent = message.is_agent();
     // Written by an agent in *another* channel: an inbound message only carries the agent role
     // when it came in over the internal delivery path, which validates the sender against its

@@ -1,3 +1,5 @@
+//! Canonical ingress/deduplication consumes the authenticated delivery input. These payload reads
+//! serve ingestion, not a current viewer; mailbox data uses the application visibility projections.
 //! The one transaction an accepted inbound message goes through.
 //!
 //! Every row an accepted message produces is written here, in one transaction, in dependency

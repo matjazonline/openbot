@@ -1,3 +1,4 @@
+//! These writes commit the ingress payload and its delivery facts; they are not viewer reads.
 //! Phase 5: everything one accepted message must make durable, assembled as one request.
 //!
 //! Nothing here awaits. The plan is built from values the earlier phases already loaded, handed to

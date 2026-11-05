@@ -19,9 +19,10 @@ use serde::Deserialize;
 
 fn view_json(view: &DecisionView) -> Value {
     json!({
+        "payload_restricted":view.payload_restricted,
         "subject":view.subject.as_str(),"data_schema":view.data_schema,"feedback_required":view.feedback_required,"can_submit":view.can_submit,
         "version_id":view.context.version.as_uuid(),
-        "history":view.history.iter().map(|entry|json!({"decision_id":entry.decision.0,"run_id":entry.run.as_uuid(),"step":entry.step.as_str(),"round":entry.round,"artifact_digest":entry.artifact_digest,"choice":entry.choice,"feedback":entry.feedback,"state":entry.state})).collect::<Vec<_>>(),
+        "history":view.history.iter().map(|entry|json!({"payload_restricted":entry.payload_restricted,"decision_id":entry.decision.0,"run_id":entry.run.as_uuid(),"step":entry.step.as_str(),"round":entry.round,"artifact_digest":entry.artifact_digest,"choice":entry.choice,"feedback":entry.feedback,"state":entry.state})).collect::<Vec<_>>(),
         "history_truncated":view.history_truncated,
         "decision_id": view.decision.0,
         "run_id": view.run.as_uuid(),

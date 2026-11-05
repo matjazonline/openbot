@@ -1,3 +1,5 @@
+//! Runtime consumption uses the actual live claim, filters by its ceiling, and commits the
+//! observation with the content-level rise. It does not grant any human viewer access.
 //! Reader of the run's frozen thread history for `context.history` (06-D6 A). One read in
 //! the claim's transaction: the admission snapshot (`workflow_history_members`), with
 //! internal notes excluded at capture; only the newest 256 members join their messages,

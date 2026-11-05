@@ -1,3 +1,5 @@
+//! SMTP output renders a frozen delivery. New workflow publication already checked its actual
+//! recipient group; transport retries retain that effect identity rather than granting a view.
 use std::{net::IpAddr, sync::Arc, time::Duration};
 
 use async_trait::async_trait;

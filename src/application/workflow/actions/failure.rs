@@ -103,17 +103,22 @@ pub fn action_step_failure(
     {
         return guard_step_failure(family.prefix(), violation);
     }
-    if let Preparation(AppError::KnowledgeRelease { .. })
-    | Dispatch(AppError::KnowledgeRelease { .. }) = outcome
+    if let Preparation(AppError::KnowledgeRelease {
+        content,
+        destination,
+    })
+    | Dispatch(AppError::KnowledgeRelease {
+        content,
+        destination,
+    }) = outcome
     {
         return WorkflowFailure {
-            failure: StepFailure::new(
-                Terminal,
-                FailureCode::parse(crate::app_error::KNOWLEDGE_AUDIENCE_BELOW_CONTENT)
-                    .expect("static knowledge failure code"),
-                None,
-            )
-            .expect("bounded knowledge failure"),
+            failure: StepFailure::from_knowledge_refusal(
+                crate::domain::workflow::KnowledgeRefusal {
+                    content: *content,
+                    destination: *destination,
+                },
+            ),
             safety: RetrySafety::SafeToRetry,
         };
     }

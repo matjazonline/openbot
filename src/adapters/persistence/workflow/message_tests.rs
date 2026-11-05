@@ -592,3 +592,9 @@ async fn workflow_message_wait_deadline_supersedes_unsent_deliveries() {
 
 #[path = "knowledge_message_tests.rs"]
 mod knowledge_message_tests;
+
+#[path = "knowledge_view_tests.rs"]
+mod knowledge_views;
+
+#[path = "knowledge_view_delivery_tests.rs"]
+mod knowledge_delivery_views;

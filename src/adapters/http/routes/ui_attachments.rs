@@ -60,7 +60,7 @@ pub struct AttachmentQuery {
 
 /// GET /ui/threads/{thread_id}/attachments/{sha256} - One attachment of one thread (Protected).
 #[instrument(skip_all)]
-async fn download_attachment(
+pub(super) async fn download_attachment(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
@@ -86,8 +86,14 @@ async fn download_attachment(
 
     // The attachment has to hang on a message of *this* thread: that, rather than the key, is what
     // stops a caller naming a file that belongs to somebody else's mail.
-    let messages = thread_use_cases.get_thread_history(thread.id).await?;
-    let attachment = find_attachment(&messages, &sha256).ok_or_else(missing)?;
+    let messages = thread_use_cases
+        .get_thread_history(
+            &viewer,
+            crate::use_cases::thread::ThreadReadScope::new(&channel, thread.id),
+        )
+        .await?;
+    let selection = find_attachment(&messages, &sha256).ok_or_else(missing)?;
+    let attachment = selection.attachment;
 
     let key = attachment.storage_key.clone().ok_or_else(|| {
         AppError::NotFound(
@@ -99,6 +105,19 @@ async fn download_attachment(
         .ok_or_else(|| AppError::Internal("No file storage is configured on this server".into()))?;
 
     let object = storage.read_object(BucketKind::Private, &key).await?;
+    // Storage is external I/O. Check again after its bytes load, before returning any bytes/headers.
+    let current = thread_use_cases
+        .get_thread_message_view(
+            &viewer,
+            crate::use_cases::thread::ThreadReadScope::new(&channel, thread.id),
+            selection.message_id,
+        )
+        .await?;
+    if !current
+        .is_some_and(|message| !message.restricted && message.attachments.contains(&attachment))
+    {
+        return Err(missing());
+    }
 
     Ok(attachment_response(
         &attachment,
@@ -107,16 +126,30 @@ async fn download_attachment(
     ))
 }
 
-/// One attachment of these messages, by the hash of its contents.
+/// The selected object retains its owning message for the final post-I/O authorization.
+struct AttachmentSelection {
+    message_id: crate::entities::message::CanonicalMessageId,
+    attachment: AttachmentMetadata,
+}
+
+/// One visible attachment of these messages, by the hash of its contents.
 fn find_attachment(
     messages: &[crate::entities::message_view::ThreadMessageView],
     sha256: &str,
-) -> Option<AttachmentMetadata> {
+) -> Option<AttachmentSelection> {
     messages
         .iter()
-        .flat_map(|message| message.attachments.iter())
-        .find(|attachment| attachment.sha256_hash.eq_ignore_ascii_case(sha256))
-        .cloned()
+        .filter(|message| !message.restricted)
+        .find_map(|message| {
+            message
+                .attachments
+                .iter()
+                .find(|attachment| attachment.sha256_hash.eq_ignore_ascii_case(sha256))
+                .map(|attachment| AttachmentSelection {
+                    message_id: message.canonical_id,
+                    attachment: attachment.clone(),
+                })
+        })
 }
 
 /// What a caller is told about an attachment that is not theirs, does not exist, or is not on the
@@ -250,7 +283,7 @@ mod tests {
         ];
 
         assert_eq!(
-            find_attachment(&messages, "aaa").map(|a| a.filename),
+            find_attachment(&messages, "aaa").map(|selection| selection.attachment.filename),
             Some("first.pdf".to_string())
         );
         // Case-insensitive, because a hash is written both ways.

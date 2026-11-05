@@ -153,8 +153,13 @@ fn admitted_run_detail(run: &AdmittedRun) -> String {
     };
     format!(
         r##"<div class="text-xs font-mono text-base-content/70">Run <span class="text-primary">{run_id}</span></div>
-                                {steps}
+                                {restricted}{steps}
                                 {usage}"##,
+        restricted = if run.payload_restricted {
+            "<p>Restricted run content</p>"
+        } else {
+            ""
+        },
         run_id = run.run_id,
     )
 }
@@ -199,6 +204,9 @@ pub(crate) fn message_bubble(
     msg: &ThreadMessageView,
     outcomes: &[&MessageBindingOutcome],
 ) -> String {
+    if msg.restricted {
+        return crate::adapters::http::pages::message_visibility::restricted_message(msg);
+    }
     let is_agent = msg.is_agent();
     let created_at = super::format_date_time(msg.created_at);
     let params_html = message_workflow_html(msg, outcomes);

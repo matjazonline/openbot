@@ -1,3 +1,4 @@
+//! Authenticated provider input becomes ingress data, not a viewer projection of stored messages.
 //! Decode SendGrid's Inbound Parse request into the shared email-ingress adapter.
 //!
 //! The HTTP route authenticates the untouched bytes first. Only then does this module interpret

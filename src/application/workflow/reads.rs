@@ -505,3 +505,16 @@ pub trait AuthoringReads: Send + Sync {
         versions: &[VersionId],
     ) -> AppResult<Vec<ToolTarget>>;
 }
+
+impl RunDetail {
+    pub fn project(&mut self, visibility: crate::application::knowledge::PayloadVisibility) {
+        if visibility.is_visible() {
+            return;
+        }
+        self.actions.clear();
+        self.actions_truncated = false;
+        for execution in &mut self.executions {
+            execution.route = None;
+        }
+    }
+}

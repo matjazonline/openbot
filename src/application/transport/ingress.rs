@@ -1,3 +1,4 @@
+//! This boundary processes incoming transport data, not a viewer read of stored knowledge.
 //! What one inbound provider message looks like once its adapter is finished with it, and what
 //! the application asks persistence to commit for it.
 //!

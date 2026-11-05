@@ -110,17 +110,32 @@ async fn load_simulation_thread_fragment(
         .readable_thread(viewer, company.id, channel.id, thread_id)
         .await?
         .ok_or_else(|| AppError::NotFound("Thread not found".into()))?;
-    let messages = thread_use_cases.get_thread_history(thread.id).await?;
+    let messages = thread_use_cases
+        .get_thread_history(
+            viewer,
+            crate::use_cases::thread::ThreadReadScope::new(channel, thread.id),
+        )
+        .await?;
     let message_ids: Vec<Uuid> = messages
         .iter()
         .filter(|message| !message.is_agent())
         .map(|message| message.canonical_id.as_uuid())
         .collect();
     let outcomes = outcome_reader
-        .message_outcomes(company.id, thread.id, &message_ids)
+        .message_outcomes(
+            crate::application::message_outcomes::MessageOutcomeScope {
+                company: crate::domain::workflow::CompanyId::new(company.id),
+                thread_id: thread.id,
+                viewer: crate::application::workflow::WorkflowActor::authenticated(viewer.user_id)?,
+            },
+            &message_ids,
+        )
         .await?;
     let reply_context = thread_use_cases
-        .latest_email_reply_context(thread.id)
+        .viewer_email_reply_context(
+            viewer,
+            crate::use_cases::thread::ThreadReadScope::new(channel, thread.id),
+        )
         .await?;
     let fragment = pages::channel_simulation_loaded_thread_fragment(&pages::SimulationThreadView {
         company,

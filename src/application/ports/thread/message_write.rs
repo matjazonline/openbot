@@ -1,3 +1,4 @@
+//! Producers supply content here; this write contract is not a viewer read projection.
 //! What a producer states when it stores a message, and how that message is correlated with the
 //! provider that carried it.
 //!

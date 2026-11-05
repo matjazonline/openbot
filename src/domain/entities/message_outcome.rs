@@ -28,6 +28,7 @@ pub enum BindingOutcome {
 /// The run an admission started, as it stands now.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AdmittedRun {
+    pub payload_restricted: bool,
     pub run_id: Uuid,
     pub state: RunState,
     /// The run's newest executions, oldest first, at most [`RUN_EXECUTION_LIMIT`].

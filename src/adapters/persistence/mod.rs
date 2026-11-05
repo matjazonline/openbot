@@ -34,6 +34,7 @@ pub mod test_support;
 pub mod thread;
 pub mod thread_activity;
 pub mod user;
+mod view_visibility;
 pub mod workflow;
 
 #[derive(Clone)]

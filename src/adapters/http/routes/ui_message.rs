@@ -30,7 +30,11 @@ pub(super) async fn page(
         .await?
         .ok_or_else(|| AppError::NotFound("Thread not found".into()))?;
     let message = threads
-        .get_thread_message_view(thread.id, CanonicalMessageId::new(query.message_id))
+        .get_thread_message_view(
+            &viewer,
+            crate::use_cases::thread::ThreadReadScope::new(&channel, thread.id),
+            CanonicalMessageId::new(query.message_id),
+        )
         .await?
         .ok_or_else(|| AppError::NotFound("Message not found in this thread".into()))?;
     let inspectable = activity

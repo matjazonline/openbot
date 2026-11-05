@@ -1,3 +1,4 @@
+//! Relay preparation operates on ingress delivery data. It does not expose stored message views.
 //! Typed internal transport ingress, without a MIME round trip.
 use super::super::*;
 struct RelaySource {

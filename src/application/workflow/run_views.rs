@@ -1,7 +1,7 @@
 //! What the run pages read (p09 B2a): one run with its lineage, children, controls and
 //! history, and one step of it with its frozen inputs, output, model calls, receipts and worker
-//! attempts. Company-scoped, bounded and lock-free; a route authorizes the company and applies
-//! the run's channel visibility before it reads any of them.
+//! attempts. Routes authorize company/channel access before exposing a view. Bounded payload
+//! reads finish before a fresh joint viewer/run-stamp statement and application projection.
 use super::publication::PublishedBundle;
 use super::reads::RunDetail;
 use crate::app_error::AppResult;
@@ -74,6 +74,7 @@ pub struct RunEvent {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct RunView {
+    pub payload_restricted: bool,
     pub detail: RunDetail,
     pub workflow_title: String,
     pub draft_revision: u64,
@@ -135,6 +136,7 @@ pub struct Attempt {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct StepView {
+    pub payload_restricted: bool,
     pub execution: Uuid,
     pub step: String,
     pub activation: i64,
@@ -157,13 +159,13 @@ pub struct StepView {
 
 #[async_trait]
 pub trait RunViews: Send + Sync {
-    async fn run_view(&self, company: CompanyId, run: RunId) -> AppResult<Option<RunView>>;
-    async fn step_view(
+    /// Fresh joint viewer/stamp facts, after payload reads; never authorizes a later fetch.
+    async fn run_visibility(
         &self,
-        company: CompanyId,
-        run: RunId,
-        execution: Uuid,
-    ) -> AppResult<Option<StepView>>;
+        scope: RunReadScope,
+    ) -> AppResult<Option<crate::application::knowledge::PayloadVisibility>>;
+    async fn run_view(&self, scope: RunReadScope) -> AppResult<Option<RunView>>;
+    async fn step_view(&self, scope: RunReadScope, execution: Uuid) -> AppResult<Option<StepView>>;
     /// The titles of these workflows of the company, by id (the run list names each run's).
     async fn workflow_titles(
         &self,
@@ -176,4 +178,40 @@ pub trait RunViews: Send + Sync {
         company: CompanyId,
         run: RunId,
     ) -> AppResult<Option<Arc<PublishedBundle>>>;
+}
+
+/// Resource identity and authenticated actor, never a caller-supplied level.
+#[derive(Debug, Clone, Copy)]
+pub struct RunReadScope {
+    pub company: CompanyId,
+    pub run: RunId,
+    pub viewer: super::WorkflowActor,
+}
+impl RunView {
+    pub fn project(&mut self, visibility: crate::application::knowledge::PayloadVisibility) {
+        if visibility.is_visible() {
+            return;
+        }
+        self.payload_restricted = true;
+        self.input = Value::Null;
+        self.params = Value::Null;
+        self.detail.project(visibility);
+    }
+}
+impl StepView {
+    pub fn project(&mut self, visibility: crate::application::knowledge::PayloadVisibility) {
+        if visibility.is_visible() {
+            return;
+        }
+        self.payload_restricted = true;
+        self.frozen_inputs = None;
+        self.committed_output = None;
+        self.frozen_choice = None;
+        self.committed_route = None;
+        self.route_target = None;
+        self.model_calls.clear();
+        self.receipts.clear();
+        self.attempts.clear();
+        self.truncated = false;
+    }
 }

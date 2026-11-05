@@ -1775,6 +1775,7 @@ fn mailbox_message(thread_id: Uuid, body: &str) -> ThreadMessageView {
 /// schedule prompt and an in-app reply share.
 fn mailbox_message_view(thread_id: Uuid, body: &str) -> ThreadMessageView {
     ThreadMessageView {
+        restricted: false,
         access_level: crate::entities::access_level::AccessLevel::PUBLIC,
         response_contract: None,
         id: Uuid::new_v4(),
@@ -4780,6 +4781,10 @@ fn dump_html_injection_browser_fixtures() {
     let malicious_name = "victim<img/src=x/onerror=fetch('/exfil')>";
     let files = [
         ("app.js", application_javascript()),
+        (
+            "restricted.html",
+            knowledge_views::restricted_browser_fixture(),
+        ),
         ("register.html", register_page(false, false)),
         ("login.html", login_page(false, false)),
         (
@@ -4828,3 +4833,6 @@ fn test_thread_runs(activity: ThreadActivity) -> crate::application::thread_acti
 
 #[path = "workflow_conversation_tests.rs"]
 mod workflow_conversation_tests;
+
+#[path = "knowledge_view_tests.rs"]
+mod knowledge_views;

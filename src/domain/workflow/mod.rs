@@ -44,8 +44,8 @@ pub use ids::{
 };
 pub use outcome::{
     CompletedStep, CompletionRoute, DurableWaitRequest, EngineDisposition, FailureClass,
-    KNOWLEDGE_AUDIENCE_BELOW_CONTENT, OutcomeError, RetryEligibility, StepFailure, StepOutcome,
-    resolve_outcome,
+    KNOWLEDGE_AUDIENCE_BELOW_CONTENT, KnowledgeRefusal, OutcomeError, RetryEligibility,
+    StepFailure, StepOutcome, resolve_outcome,
 };
 pub use recovery::{
     AttemptBudget, RecoveryDecision, RecoveryLimit, RecoveryPolicy, RecoveryPolicyError,

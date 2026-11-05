@@ -43,6 +43,7 @@ fn reconciliation_is_offered_as_an_annotation_and_a_step_shows_usage_and_receipt
 
     let hostile = format!("<{}>alert(1)</script>", "script");
     let step_view = StepView {
+        payload_restricted: false,
         execution: Uuid::new_v4(),
         step: "lookup".into(),
         activation: 1,
@@ -116,6 +117,7 @@ fn sample_view(
     use crate::domain::workflow::{VersionId, WorkflowId};
     let now = chrono::Utc::now();
     RunView {
+        payload_restricted: false,
         detail: RunDetail {
             summary: RunSummary {
                 run: RunId::new(Uuid::new_v4()),
@@ -207,4 +209,28 @@ fn an_unfinished_step_of_an_ended_run_reads_as_stopped() {
         "{html}"
     );
     assert!(!html.contains("running or waiting"));
+}
+
+#[test]
+fn knowledge_view_run_pane_drops_input_parameter_and_action_payloads() {
+    use crate::application::knowledge::PayloadVisibility;
+    use crate::entities::access_level::AccessLevel;
+    let mut view = sample_view("running", None, Vec::new(), Vec::new());
+    view.input = json!({"private-input-canary":"secret"});
+    view.params = json!({"private-param-canary":"secret"});
+    view.project(PayloadVisibility {
+        viewer: AccessLevel::PUBLIC,
+        content: AccessLevel::L5,
+    });
+    let html = pages::run_pane(&pages::RunPaneView {
+        company_id: Uuid::new_v4(),
+        viewer: Uuid::new_v4(),
+        epoch: Uuid::new_v4(),
+        run: &view,
+        graph_html: "",
+        people: &HashMap::new(),
+        banner: None,
+    });
+    assert!(html.contains("Restricted run content"));
+    assert!(!html.contains("private-input-canary") && !html.contains("private-param-canary"));
 }

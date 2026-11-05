@@ -5,7 +5,7 @@ use chrono::{DateTime, Utc};
 
 use super::*;
 use crate::{
-    application::message_outcomes::MessageOutcomeReader,
+    application::message_outcomes::{MessageOutcomeReader, MessageOutcomeScope, project_outcome},
     domain::entities::message_outcome::{
         AdmittedRun, BindingOutcome, MessageBindingOutcome, RUN_EXECUTION_LIMIT,
         RunExecutionSummary, RunModelUsage,
@@ -96,10 +96,11 @@ struct UsageRow {
 impl MessageOutcomeReader for PostgresPersistence {
     async fn message_outcomes(
         &self,
-        company_id: Uuid,
-        thread_id: Uuid,
+        scope: MessageOutcomeScope,
         message_ids: &[Uuid],
     ) -> AppResult<Vec<MessageBindingOutcome>> {
+        let company_id = scope.company.as_uuid();
+        let thread_id = scope.thread_id;
         if message_ids.is_empty() {
             return Ok(Vec::new());
         }
@@ -118,17 +119,30 @@ impl MessageOutcomeReader for PostgresPersistence {
                 run_model_usage(&self.pool, company_id, &run_ids).await?,
             )
         };
+        let levels = crate::adapters::persistence::view_visibility::run_levels_on(
+            &self.pool,
+            scope.company,
+            scope.viewer,
+            &run_ids,
+        )
+        .await?;
         rows.into_iter()
             .map(|row| {
                 let outcome = match (row.outcome.as_str(), row.run_id, row.reason) {
-                    ("admitted", Some(run_id), None) => BindingOutcome::Admitted(AdmittedRun {
-                        run_id,
-                        state: inspection::run_state(
-                            row.state.as_deref().ok_or_else(invalid)?,
-                            row.waiting_reason.as_deref(),
-                        )?,
-                        executions: executions.remove(&run_id).unwrap_or_default(),
-                        model_usage: usage.remove(&run_id).unwrap_or_default(),
+                    ("admitted", Some(run_id), None) => BindingOutcome::Admitted({
+                        let mut run = AdmittedRun {
+                            payload_restricted: false,
+                            run_id,
+                            state: inspection::run_state(
+                                row.state.as_deref().ok_or_else(invalid)?,
+                                row.waiting_reason.as_deref(),
+                            )?,
+                            executions: executions.remove(&run_id).unwrap_or_default(),
+                            model_usage: usage.remove(&run_id).unwrap_or_default(),
+                        };
+                        let visibility = levels.get(&run_id).copied().ok_or_else(invalid)?;
+                        project_outcome(&mut run, visibility);
+                        run
                     }),
                     ("refused", None, Some(reason)) => BindingOutcome::Refused { reason },
                     ("failed", None, Some(reason)) => BindingOutcome::Failed { reason },

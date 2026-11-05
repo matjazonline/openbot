@@ -82,6 +82,8 @@ impl AuthorView {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ThreadMessageView {
     pub access_level: super::access_level::AccessLevel,
+    /// The application has removed this viewer's inaccessible content.
+    pub restricted: bool,
     /// Saved structured output contract, independent of subsequent agent edits.
     pub response_contract: Option<super::response_contract::ResponseContract>,
     /// `thread_messages.id` -- this message *in this thread*, and what the live stream resumes on.

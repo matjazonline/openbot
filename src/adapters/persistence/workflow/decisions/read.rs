@@ -2,6 +2,7 @@
 use super::*;
 
 mod history;
+mod visibility;
 
 #[derive(sqlx::FromRow)]
 struct ViewRow {
@@ -66,7 +67,7 @@ pub(super) async fn read_on(
          JOIN workflow_message_intents AS intent ON (intent.company_id,intent.id)=(outcome.company_id,outcome.intent_id) \
          WHERE outcome.company_id=$1 AND outcome.run_id=$2 LIMIT 1")
         .bind(company.as_uuid()).bind(context.root_run_id).fetch_optional(&mut **tx).await?;
-    assemble(
+    let mut view = assemble(
         row,
         scope,
         decision,
@@ -89,7 +90,9 @@ pub(super) async fn read_on(
             comments,
             history,
         },
-    )
+    )?;
+    visibility::project_on(tx, company, actor, &mut view).await?;
+    Ok(view)
 }
 
 struct DecisionReadParts {
@@ -136,6 +139,7 @@ fn assemble(
         _ => return Err(invalid()),
     };
     Ok(DecisionView {
+        payload_restricted: false,
         subject: parts.subject,
         context: parts.context,
         data_schema: if parts.subject == DecisionSubject::Business {

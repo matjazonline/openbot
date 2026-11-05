@@ -1,3 +1,4 @@
+//! Provider payload parsing is ingress processing; it is not a stored classified message view.
 //! Turning one stored `email.received` event into a canonical commit.
 //!
 //! The webhook that stored the event did no provider work and made no routing decision: it proved

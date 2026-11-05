@@ -1,3 +1,6 @@
+//! Actionable notifications currently contain a fixed delivery-failure label, scope labels and
+//! a secure link, with no message subject/body/excerpt. Any future quoted content needs a fresh
+//! recipient-level projection before both in-app and email publication.
 //! Supervised projector for durable actionable-notification events.
 
 use std::{sync::Arc, time::Duration};
