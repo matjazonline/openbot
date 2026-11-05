@@ -1,0 +1,16 @@
+{
+  "phase": "p04",
+  "base": "55f44c26564f55a648c04be5cdd50264d3181c83",
+  "head": "55f44c26564f55a648c04be5cdd50264d3181c83",
+  "source_pristine": true,
+  "exclusions": [
+    "plan/01-knowledge-access-levels/phases/p04/docs"
+  ],
+  "source_tree_sha256": "aad12e695582f28546804bb0b70e6c846dda330a87a3c9fee7b953bed12af054",
+  "files_count": 5321,
+  "installed_digest": "c0145b6451c6b8780afc0e58d7920cff96df6adfe980d0da20fd2c754d845ecf",
+  "authority_revision": 17,
+  "authority_sha256": "88317f591b22edc4a3a21e888710fea9c0464cc41b9892ca1a8fb904c7bf7d23",
+  "decision_id": "KNOW-P04-G1-r1",
+  "decision_sha256": "9b74e9a66e3692950c44d7994bc2263561a372708c1eade7faa0393d9c34efce"
+}

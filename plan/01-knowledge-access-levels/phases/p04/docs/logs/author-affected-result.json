@@ -1,0 +1,18 @@
+{
+  "exit": 0,
+  "selected": 450,
+  "families": {
+    "search": 41,
+    "library_and_shared_model": 43,
+    "builtin_publication_preparation_and_samples": 53,
+    "harness_driver": 16,
+    "real_agent_runtime": 51,
+    "current_http_mcp_message_tool_authority": 290,
+    "knowledge_release_and_history": 49,
+    "checkpoint_and_model_budget": 10,
+    "production_composition": 5,
+    "configuration": 1
+  },
+  "source_unchanged": true,
+  "tree_sha256": "819b266f1216f2a7832264f8b8dbc80902e04c9a294aa3b1d620dace218e91f3"
+}

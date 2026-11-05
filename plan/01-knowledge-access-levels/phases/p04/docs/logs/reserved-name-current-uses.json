@@ -1,0 +1,115 @@
+{
+  "pattern": "is_reserved_tool_name",
+  "filesSearched": 1257,
+  "totalHits": 7,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/application/workflow/provisioning.rs#is_reserved_tool_name",
+        "name": "is_reserved_tool_name",
+        "kind": "function",
+        "path": "src/application/workflow/provisioning.rs",
+        "span": "L86-L90"
+      },
+      "path": "src/application/workflow/provisioning.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 86,
+          "text": "pub fn is_reserved_tool_name(name: &str) -> bool {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/workflow_tools.rs#register_workflow_tool",
+        "name": "register_workflow_tool",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/workflow_tools.rs",
+        "span": "L174-L247"
+      },
+      "path": "src/adapters/persistence/workflow/workflow_tools.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 180,
+          "text": "if crate::application::workflow::provisioning::is_reserved_tool_name(write.name.as_str()) {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/http.rs#validate",
+        "name": "validate",
+        "kind": "function",
+        "path": "src/application/workflow/http.rs",
+        "span": "L77-L111"
+      },
+      "path": "src/application/workflow/http.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 92,
+          "text": "if super::provisioning::is_reserved_tool_name(self.tool.contract.name.as_str()) {"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/knowledge/builtin_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 4,
+          "text": "provisioning::is_reserved_tool_name,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/knowledge/builtin_tests.rs#knowledge_search_snapshot_is_reserved_and_exactly_trusted_without_external_targets",
+        "name": "knowledge_search_snapshot_is_reserved_and_exactly_trusted_without_external_targets",
+        "kind": "function",
+        "path": "src/application/workflow/knowledge/builtin_tests.rs",
+        "span": "L45-L57"
+      },
+      "path": "src/application/workflow/knowledge/builtin_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 46,
+          "text": "assert!(is_reserved_tool_name(SEARCH_KNOWLEDGE));"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/provisioning_tests.rs#every_built_in_name_is_reserved",
+        "name": "every_built_in_name_is_reserved",
+        "kind": "function",
+        "path": "src/application/workflow/provisioning_tests.rs",
+        "span": "L63-L74"
+      },
+      "path": "src/application/workflow/provisioning_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 70,
+          "text": "assert!(is_reserved_tool_name(name), \"{name}\");"
+        },
+        {
+          "line": 72,
+          "text": "assert!(!is_reserved_tool_name(\"crm.lookup\"));"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 5,
+    "baselineChars": 51464
+  }
+}

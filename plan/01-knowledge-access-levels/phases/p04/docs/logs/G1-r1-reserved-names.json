@@ -1,0 +1,38 @@
+{
+  "query": "is_reserved_tool_name",
+  "matches": [
+    {
+      "symbol": {
+        "id": "src/application/workflow/provisioning.rs#is_reserved_tool_name",
+        "name": "is_reserved_tool_name",
+        "kind": "function",
+        "path": "src/application/workflow/provisioning.rs",
+        "span": "L86-L89"
+      },
+      "hits": [
+        {
+          "id": "src/adapters/persistence/workflow/workflow_tools.rs#register_workflow_tool",
+          "relation": "calls",
+          "depth": 1,
+          "name": "register_workflow_tool",
+          "kind": "function",
+          "path": "src/adapters/persistence/workflow/workflow_tools.rs",
+          "span": "L174-L247"
+        },
+        {
+          "id": "src/application/workflow/http.rs#validate",
+          "relation": "calls",
+          "depth": 1,
+          "name": "validate",
+          "kind": "function",
+          "path": "src/application/workflow/http.rs",
+          "span": "L77-L111"
+        }
+      ]
+    }
+  ],
+  "saved": {
+    "files": 3,
+    "baselineChars": 41141
+  }
+}

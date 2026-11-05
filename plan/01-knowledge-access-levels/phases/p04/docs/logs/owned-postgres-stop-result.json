@@ -1,0 +1,7 @@
+{
+  "phase": "p04",
+  "port": 55504,
+  "data": "/Users/mac02/dev/openbot-recovery/.worktrees/pg-knowledge-p04",
+  "stopped_cleanly": true,
+  "source_and_target_preserved": true
+}

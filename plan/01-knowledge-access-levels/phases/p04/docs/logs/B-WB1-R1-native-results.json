@@ -1,0 +1,142 @@
+[
+  {
+    "filter": "knowledge_search_",
+    "selected": 41,
+    "command": [
+      "target/debug/deps/open_bots-c19a0b960dacdcef",
+      "knowledge_search_",
+      "--nocapture"
+    ],
+    "exit": 0,
+    "seconds": 11.94,
+    "log": "plan/01-knowledge-access-levels/phases/p04/docs/logs/B-WB1-R1-native-1.log",
+    "summaries": [
+      [
+        "ok",
+        "41",
+        "0",
+        "0"
+      ]
+    ]
+  },
+  {
+    "filter": "knowledge_upload_",
+    "selected": 26,
+    "command": [
+      "target/debug/deps/open_bots-c19a0b960dacdcef",
+      "knowledge_upload_",
+      "--nocapture"
+    ],
+    "exit": 0,
+    "seconds": 9.14,
+    "log": "plan/01-knowledge-access-levels/phases/p04/docs/logs/B-WB1-R1-native-2.log",
+    "summaries": [
+      [
+        "ok",
+        "26",
+        "0",
+        "0"
+      ]
+    ]
+  },
+  {
+    "filter": "workflow_harness_",
+    "selected": 39,
+    "command": [
+      "target/debug/deps/open_bots-c19a0b960dacdcef",
+      "workflow_harness_",
+      "--nocapture"
+    ],
+    "exit": 0,
+    "seconds": 11.23,
+    "log": "plan/01-knowledge-access-levels/phases/p04/docs/logs/B-WB1-R1-native-3.log",
+    "summaries": [
+      [
+        "ok",
+        "39",
+        "0",
+        "0"
+      ]
+    ]
+  },
+  {
+    "filter": "provisioning_",
+    "selected": 20,
+    "command": [
+      "target/debug/deps/open_bots-c19a0b960dacdcef",
+      "provisioning_",
+      "--nocapture"
+    ],
+    "exit": 0,
+    "seconds": 17.78,
+    "log": "plan/01-knowledge-access-levels/phases/p04/docs/logs/B-WB1-R1-native-4.log",
+    "summaries": [
+      [
+        "ok",
+        "20",
+        "0",
+        "0"
+      ]
+    ]
+  },
+  {
+    "filter": "application::workflow::sample::",
+    "selected": 12,
+    "command": [
+      "target/debug/deps/open_bots-c19a0b960dacdcef",
+      "application::workflow::sample::",
+      "--nocapture"
+    ],
+    "exit": 0,
+    "seconds": 0.34,
+    "log": "plan/01-knowledge-access-levels/phases/p04/docs/logs/B-WB1-R1-native-5.log",
+    "summaries": [
+      [
+        "ok",
+        "12",
+        "0",
+        "0"
+      ]
+    ]
+  },
+  {
+    "filter": "workflow_agent_",
+    "selected": 30,
+    "command": [
+      "target/debug/deps/open_bots-c19a0b960dacdcef",
+      "workflow_agent_",
+      "--nocapture"
+    ],
+    "exit": 0,
+    "seconds": 9.15,
+    "log": "plan/01-knowledge-access-levels/phases/p04/docs/logs/B-WB1-R1-native-6.log",
+    "summaries": [
+      [
+        "ok",
+        "30",
+        "0",
+        "0"
+      ]
+    ]
+  },
+  {
+    "filter": "infra::workflow::tests::",
+    "selected": 5,
+    "command": [
+      "target/debug/deps/open_bots-c19a0b960dacdcef",
+      "infra::workflow::tests::",
+      "--nocapture"
+    ],
+    "exit": 0,
+    "seconds": 1.09,
+    "log": "plan/01-knowledge-access-levels/phases/p04/docs/logs/B-WB1-R1-native-7.log",
+    "summaries": [
+      [
+        "ok",
+        "5",
+        "0",
+        "0"
+      ]
+    ]
+  }
+]

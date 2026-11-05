@@ -1,0 +1,13 @@
+{
+  "binary": "/Users/mac02/dev/openbot-recovery/.worktrees/knowledge-p04/target/debug/deps/open_bots-c19a0b960dacdcef",
+  "selected": 3,
+  "test_names": [
+    "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::knowledge_search_driver_persists_observation_and_classification_before_continuing",
+    "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::knowledge_search_low_ceiling_never_observes_private_exact_content_or_raises",
+    "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::knowledge_search_replay_uses_the_canonical_result_without_embedding_again"
+  ],
+  "exit": 0,
+  "stack": "stock2MiB",
+  "source_unchanged": true,
+  "tree_sha256": "a671f1ad0fcb0306ee5d1bcbca67eedf034dcbddd03c48b84150485621ecbaff"
+}

@@ -1,0 +1,33 @@
+import subprocess,os,json,sys
+from pathlib import Path
+logs=Path("plan/01-knowledge-access-levels/phases/p04/docs/logs");binary="target/debug/deps/open_bots-c19a0b960dacdcef"
+helper="/Users/mac02/dev/openbot-recovery/.worktrees/knowledge-tooling/p04-source-manifest.py"
+subprocess.run(["python3",helper,str(logs/"author-affected-start-manifest.json")],check=True)
+env=os.environ.copy();env.pop("RUST_MIN_STACK",None);env.update(DATABASE_URL="postgres://mac02@127.0.0.1:55504/open_bots",TEST_DATABASE_URL="postgres://mac02@127.0.0.1:55504/open_bots_test")
+r=subprocess.run([binary,"--list"],capture_output=True,text=True,env=env,check=True);names=[l[:-6] for l in r.stdout.splitlines() if l.endswith(": test")]
+families={
+ "search":lambda n:"knowledge_search_" in n,
+ "library_and_shared_model":lambda n:"application::knowledge::" in n or "adapters::persistence::knowledge::" in n,
+ "builtin_publication_preparation_and_samples":lambda n:any(s in n for s in ["application::workflow::publication::","application::workflow::provisioning::","application::workflow::sample::","child_publication_tests::"]),
+ "harness_driver":lambda n:"services::harness::runs::" in n or "adapters::workflow_agent::" in n or "adapters::harness::rig::workflow::" in n,
+ "real_agent_runtime":lambda n:"::http_tests::agent_runtime_tests::" in n,
+ "current_http_mcp_message_tool_authority":lambda n:any(s in n for s in ["::http_tests::","::mcp_tests::","adapters::persistence::workflow::tests::message_tests::"]),
+ "knowledge_release_and_history":lambda n:"knowledge_run_level_" in n,
+ "checkpoint_and_model_budget":lambda n:"adapters::persistence::workflow::" in n and any(s in n for s in ["checkpoint_","model_budget_","model_usage_","token_budget_","lease_tests::retirement_tests::"]),
+ "production_composition":lambda n:"infra::workflow::tests::" in n or "::message_ingress_tests::" in n,
+ "configuration":lambda n:"knowledge_search_config_limit_" in n,
+}
+selected=set();counts={}
+for key,select in families.items():
+ subset=[n for n in names if select(n) and "dump_" not in n];assert subset,key;counts[key]=len(subset);selected.update(subset)
+selected=sorted(selected);assert len(selected)<len(names)
+identity={"binary":binary,"families":counts,"selected_count":len(selected),"total_listed":len(names),"rust_min_stack":"unset stock2MiB","q001":"confirmed unchanged existing reverse-usecase guard is outside affected selector; phase06 mandatory closure","selected":selected}
+(logs/"author-affected-selection.json").write_text(json.dumps(identity,indent=2)+"\n");print({k:v for k,v in identity.items() if k!="selected"},flush=True)
+for index,start in enumerate(range(0,len(selected),350),1):
+ batch=selected[start:start+350]
+ with(logs/("author-affected-"+str(index)+".log")).open("w")as out:r=subprocess.run([binary,"--exact",*batch,"--nocapture"],stdout=out,stderr=subprocess.STDOUT,env=env)
+ result={"batch":index,"count":len(batch),"exit":r.returncode};(logs/("author-affected-"+str(index)+"-result.json")).write_text(json.dumps(result,indent=2)+"\n");print(result,flush=True)
+ if r.returncode:sys.exit(r.returncode)
+subprocess.run(["python3",helper,str(logs/"author-affected-finish-manifest.json")],check=True)
+a=json.loads((logs/"author-affected-start-manifest.json").read_text());b=json.loads((logs/"author-affected-finish-manifest.json").read_text());assert a==b
+(logs/"author-affected-result.json").write_text(json.dumps({"exit":0,"selected":len(selected),"families":counts,"source_unchanged":True,"tree_sha256":a["tree_sha256"]},indent=2)+"\n")

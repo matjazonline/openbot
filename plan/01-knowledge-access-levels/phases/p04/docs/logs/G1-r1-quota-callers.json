@@ -1,0 +1,29 @@
+{
+  "query": "check_quota",
+  "matches": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/knowledge/rows.rs#check_quota",
+        "name": "check_quota",
+        "kind": "function",
+        "path": "src/adapters/persistence/knowledge/rows.rs",
+        "span": "L137-L149"
+      },
+      "hits": [
+        {
+          "id": "src/adapters/persistence/knowledge/mod.rs#replace",
+          "relation": "calls",
+          "depth": 1,
+          "name": "replace",
+          "kind": "function",
+          "path": "src/adapters/persistence/knowledge/mod.rs",
+          "span": "L95-L123"
+        }
+      ]
+    }
+  ],
+  "saved": {
+    "files": 2,
+    "baselineChars": 11171
+  }
+}

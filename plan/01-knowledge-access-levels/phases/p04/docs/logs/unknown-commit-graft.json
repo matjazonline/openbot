@@ -1,0 +1,1590 @@
+{
+  "pattern": "commit.*ack|Ambiguous|unresolved",
+  "filesSearched": 400,
+  "totalHits": 110,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/persistence_bound.rs#resolve_retryable",
+        "name": "resolve_retryable",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/persistence_bound.rs",
+        "span": "L316-L331"
+      },
+      "path": "src/adapters/persistence/workflow/persistence_bound.rs",
+      "inDegree": 5,
+      "hits": [
+        {
+          "line": 329,
+          "text": "_ => Err(self.unresolved()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/run_schema_tests.rs#insert_run",
+        "name": "insert_run",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/run_schema_tests.rs",
+        "span": "L33-L48"
+      },
+      "path": "src/adapters/persistence/workflow/run_schema_tests.rs",
+      "inDegree": 5,
+      "hits": [
+        {
+          "line": 39,
+          "text": "// Root budget rows and their run must commit together, including pool-backed fixtures."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_revision_tests.rs#audit_case",
+        "name": "audit_case",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_revision_tests.rs",
+        "span": "L262-L331"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_revision_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 263,
+          "text": "// One genuine unresolved sibling vetoes continuation without inventing history."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/jev_runtime.rs#finish",
+        "name": "finish",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/jev_runtime.rs",
+        "span": "L104-L110"
+      },
+      "path": "src/adapters/persistence/workflow/jev_runtime.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 108,
+          "text": "Attempt::Ambiguous => Err(bound.unresolved()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_cancellation_receipt_tests.rs#settled_truth",
+        "name": "settled_truth",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_cancellation_receipt_tests.rs",
+        "span": "L107-L162"
+      },
+      "path": "src/adapters/persistence/workflow/action_cancellation_receipt_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 159,
+          "text": "First::Cancel => assert_eq!(reconciliations, 1, \"marker was unresolved when cancelled\"),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_dispatch_resolution_tests.rs#elapsed",
+        "name": "elapsed",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_dispatch_resolution_tests.rs",
+        "span": "L210-L214"
+      },
+      "path": "src/adapters/persistence/workflow/action_dispatch_resolution_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 212,
+          "text": "&& ours.cause == Some(\"unresolved\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_state_witness_tests.rs#witness_owner",
+        "name": "witness_owner",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_state_witness_tests.rs",
+        "span": "L125-L171"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_state_witness_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 153,
+          "text": "assert_eq!(committed[\"background_tasks\"], parked[\"background_tasks\"]);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/lease.rs#settle_retirement",
+        "name": "settle_retirement",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/lease.rs",
+        "span": "L432-L457"
+      },
+      "path": "src/adapters/persistence/workflow/lease.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 442,
+          "text": "Attempt::Ambiguous => {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_dispatch_resolution_tests.rs#adopted_attempt",
+        "name": "adopted_attempt",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_dispatch_resolution_tests.rs",
+        "span": "L287-L318"
+      },
+      "path": "src/adapters/persistence/workflow/action_dispatch_resolution_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 300,
+          "text": "_ if elapsed(&first, ours) => Proof::Load(\"ours=unresolved\"),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_dispatch_resolution_tests.rs#fence_loss_attempt",
+        "name": "fence_loss_attempt",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_dispatch_resolution_tests.rs",
+        "span": "L339-L390"
+      },
+      "path": "src/adapters/persistence/workflow/action_dispatch_resolution_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 368,
+          "text": "&& ours.cause == Some(\"unresolved\") =>"
+        },
+        {
+          "line": 371,
+          "text": "return Proof::Load(\"ours=unresolved\");"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_dispatch_resolution_tests.rs#compete_attempt",
+        "name": "compete_attempt",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_dispatch_resolution_tests.rs",
+        "span": "L404-L452"
+      },
+      "path": "src/adapters/persistence/workflow/action_dispatch_resolution_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 450,
+          "text": "(false, _) => Proof::Load(\"ours=unresolved\"),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_dispatch_resolution_tests.rs#lapsed_attempt",
+        "name": "lapsed_attempt",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_dispatch_resolution_tests.rs",
+        "span": "L561-L603"
+      },
+      "path": "src/adapters/persistence/workflow/action_dispatch_resolution_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 596,
+          "text": "Some(\"unresolved\") => Proof::Load(\"ours=unresolved\"),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_receipt_acceptance_tests.rs#finish_remote",
+        "name": "finish_remote",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_receipt_acceptance_tests.rs",
+        "span": "L30-L43"
+      },
+      "path": "src/adapters/persistence/workflow/action_receipt_acceptance_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 41,
+          "text": "\"lost receipt commit acknowledgement\".into(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_receipt_acceptance_tests.rs#invoke",
+        "name": "invoke",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_receipt_acceptance_tests.rs",
+        "span": "L81-L94"
+      },
+      "path": "src/adapters/persistence/workflow/action_receipt_acceptance_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 86,
+          "text": "let unresolved: Option<bool> ="
+        },
+        {
+          "line": 92,
+          "text": "assert_eq!(unresolved, Some(false), \"unresolved Reconcile cannot retry\");"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_receipts.rs#commit_once",
+        "name": "commit_once",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_receipts.rs",
+        "span": "L199-L254"
+      },
+      "path": "src/adapters/persistence/workflow/action_receipts.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 248,
+          "text": "Attempt::Ambiguous => {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_claim_sql_candidate_tests.rs#retire",
+        "name": "retire",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_claim_sql_candidate_tests.rs",
+        "span": "L85-L121"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_claim_sql_candidate_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 95,
+          "text": "let committed = assert_reserve_unknown_backstop("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_command_probe_tests.rs#positive",
+        "name": "positive",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_command_probe_tests.rs",
+        "span": "L265-L337"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_command_probe_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 335,
+          "text": "assert_committed(&witness, &readback, row, target, &result, &database);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_completion_race_queue_support.rs#committing",
+        "name": "committing",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_completion_race_queue_support.rs",
+        "span": "L91-L95"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_completion_race_queue_support.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 91,
+          "text": "fn committing(receipt: &Backend) -> bool {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_completion_race_queue_support.rs#during_commit",
+        "name": "during_commit",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_completion_race_queue_support.rs",
+        "span": "L110-L115"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_completion_race_queue_support.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 110,
+          "text": "fn during_commit(sample: &Sample) -> Option<(&Backend, &Backend)> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_consumption_identity_tests.rs#try_positive_reservation",
+        "name": "try_positive_reservation",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_consumption_identity_tests.rs",
+        "span": "L313-L367"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_consumption_identity_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 326,
+          "text": "let committed = assert_reserve_unknown_backstop("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_assertions.rs#parked_facts",
+        "name": "parked_facts",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_assertions.rs",
+        "span": "L217-L277"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_assertions.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 220,
+          "text": "let unresolved: Vec<_> = rows(before, \"workflow_action_dispatches\")"
+        },
+        {
+          "line": 233,
+          "text": "unresolved.len(),"
+        },
+        {
+          "line": 235,
+          "text": "let markers: Vec<_> = unresolved"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_sibling_boundary_tests.rs#accepted_dispatch",
+        "name": "accepted_dispatch",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_sibling_boundary_tests.rs",
+        "span": "L236-L264"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_sibling_boundary_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 247,
+          "text": "let committed = assert_reserve_unknown_backstop("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/checkpoints.rs#execution_evidence",
+        "name": "execution_evidence",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/checkpoints.rs",
+        "span": "L487-L515"
+      },
+      "path": "src/adapters/persistence/workflow/checkpoints.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 494,
+          "text": "return Err(bound.unresolved());"
+        },
+        {
+          "line": 498,
+          "text": ".ok_or_else(|| bound.unresolved())?;"
+        },
+        {
+          "line": 501,
+          "text": "return Err(bound.unresolved());"
+        },
+        {
+          "line": 512,
+          "text": "Some(_) => Err(bound.unresolved()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/lease.rs#release_once",
+        "name": "release_once",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/lease.rs",
+        "span": "L191-L230"
+      },
+      "path": "src/adapters/persistence/workflow/lease.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 219,
+          "text": "Attempt::Ambiguous => {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_receipts.rs#consume_one",
+        "name": "consume_one",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_receipts.rs",
+        "span": "L66-L99"
+      },
+      "path": "src/adapters/persistence/workflow/message_receipts.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 87,
+          "text": "Attempt::Ambiguous => {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/persistence_bound.rs#attempt",
+        "name": "attempt",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/persistence_bound.rs",
+        "span": "L263-L295"
+      },
+      "path": "src/adapters/persistence/workflow/persistence_bound.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 275,
+          "text": "return Attempt::Ambiguous;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/persistence_bound.rs#unresolved",
+        "name": "unresolved",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/persistence_bound.rs",
+        "span": "L334-L336"
+      },
+      "path": "src/adapters/persistence/workflow/persistence_bound.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 334,
+          "text": "pub(super) fn unresolved(&self) -> AppError {"
+        },
+        {
+          "line": 335,
+          "text": "self.unknown(\"unresolved\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_approval_resolution_tests.rs#workflow_action_approval_race_lost_commit_ack_resolves_exact_park",
+        "name": "workflow_action_approval_race_lost_commit_ack_resolves_exact_park",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_approval_resolution_tests.rs",
+        "span": "L18-L95"
+      },
+      "path": "src/adapters/persistence/workflow/action_approval_resolution_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 18,
+          "text": "async fn workflow_action_approval_race_lost_commit_ack_resolves_exact_park() {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_cancellation_boundary_tests.rs#workflow_action_cancellation_after_reservation_refuses_entry_zero_polls",
+        "name": "workflow_action_cancellation_after_reservation_refuses_entry_zero_polls",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_cancellation_boundary_tests.rs",
+        "span": "L274-L314"
+      },
+      "path": "src/adapters/persistence/workflow/action_cancellation_boundary_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 304,
+          "text": "// The retained marker is unresolved; cancellation records it for reconciliation."
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/action_cancellation_boundary_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 688,
+          "text": "/// The original Reconcile contract after an unresolved marker: no replay permission."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_dispatch_remote_tests.rs#reserve_remote",
+        "name": "reserve_remote",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_dispatch_remote_tests.rs",
+        "span": "L29-L56"
+      },
+      "path": "src/adapters/persistence/workflow/action_dispatch_remote_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 51,
+          "text": "\"Injected lost commit acknowledgement\".into(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_dispatch_remote_tests.rs#workflow_action_dispatch_committed_marker_ambiguous_ack_retry_restart_reclaim_never_send",
+        "name": "workflow_action_dispatch_committed_marker_ambiguous_ack_retry_restart_reclaim_never_send",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_dispatch_remote_tests.rs",
+        "span": "L396-L461"
+      },
+      "path": "src/adapters/persistence/workflow/action_dispatch_remote_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 396,
+          "text": "async fn workflow_action_dispatch_committed_marker_ambiguous_ack_retry_restart_reclaim_never_send()"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_dispatch.rs#local",
+        "name": "local",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_dispatch.rs",
+        "span": "L212-L283"
+      },
+      "path": "src/adapters/persistence/workflow/action_dispatch.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 255,
+          "text": "Attempt::Ambiguous => {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_dispatch.rs#reserve_remote",
+        "name": "reserve_remote",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_dispatch.rs",
+        "span": "L529-L575"
+      },
+      "path": "src/adapters/persistence/workflow/action_dispatch.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 560,
+          "text": "let reservation = take(&pending).ok_or_else(|| bound.unresolved())?;"
+        },
+        {
+          "line": 571,
+          "text": "Attempt::Ambiguous => {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_receipt_acceptance_tests.rs#workflow_action_receipt_committed_ambiguous_ack_restart_zero_io",
+        "name": "workflow_action_receipt_committed_ambiguous_ack_restart_zero_io",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_receipt_acceptance_tests.rs",
+        "span": "L50-L72"
+      },
+      "path": "src/adapters/persistence/workflow/action_receipt_acceptance_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 50,
+          "text": "async fn workflow_action_receipt_committed_ambiguous_ack_restart_zero_io() {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_receipt_tests.rs#workflow_action_receipt_deferred_rollback_returns_no_success",
+        "name": "workflow_action_receipt_deferred_rollback_returns_no_success",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_receipt_tests.rs",
+        "span": "L313-L335"
+      },
+      "path": "src/adapters/persistence/workflow/action_receipt_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 315,
+          "text": "sqlx::raw_sql(\"CREATE FUNCTION receipt_fault() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'receipt commit rollback'; END $$; CREATE CONSTRAINT"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/action_reconciliation_attribution_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1,
+          "text": "//! Host attribution distinguishes proven old-request breach from unresolved provenance."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_attribution_tests.rs#workflow_action_reconciliation_attribution_unattributed_preserves_unresolved_provenance",
+        "name": "workflow_action_reconciliation_attribution_unattributed_preserves_unresolved_provenance",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_attribution_tests.rs",
+        "span": "L310-L312"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_attribution_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 310,
+          "text": "async fn workflow_action_reconciliation_attribution_unattributed_preserves_unresolved_provenance() {"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/action_reconciliation_commit_conflict_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1,
+          "text": "//! A real consumed grant produces new truth whose explicit host attribution is unresolved."
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_source.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 7,
+          "text": "/// committed and the scenario counts entries): its backstop is asserted and the whole"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/action_reconciliation_sibling_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1,
+          "text": "//! Execution-wide safety must not hide an unresolved remote invocation."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_state_witness_tests.rs#workflow_action_reconciliation_first_old_controls",
+        "name": "workflow_action_reconciliation_first_old_controls",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_state_witness_tests.rs",
+        "span": "L351-L358"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_state_witness_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 356,
+          "text": "Box::pin(committed_control(source, \"no-attack\")).await;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_uncertainty_acceptance_tests.rs#workflow_action_uncertainty_cancel_records_all_unresolved_before_any_audit",
+        "name": "workflow_action_uncertainty_cancel_records_all_unresolved_before_any_audit",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_uncertainty_acceptance_tests.rs",
+        "span": "L304-L306"
+      },
+      "path": "src/adapters/persistence/workflow/action_uncertainty_acceptance_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 304,
+          "text": "async fn workflow_action_uncertainty_cancel_records_all_unresolved_before_any_audit() {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_uncertainty_acceptance_tests.rs#workflow_action_uncertainty_deadline_records_all_unresolved_before_any_audit",
+        "name": "workflow_action_uncertainty_deadline_records_all_unresolved_before_any_audit",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_uncertainty_acceptance_tests.rs",
+        "span": "L309-L311"
+      },
+      "path": "src/adapters/persistence/workflow/action_uncertainty_acceptance_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 309,
+          "text": "async fn workflow_action_uncertainty_deadline_records_all_unresolved_before_any_audit() {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_uncertainty_tests.rs#workflow_action_uncertainty_deferred_commit_failure_rolls_back_retirement",
+        "name": "workflow_action_uncertainty_deferred_commit_failure_rolls_back_retirement",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_uncertainty_tests.rs",
+        "span": "L354-L375"
+      },
+      "path": "src/adapters/persistence/workflow/action_uncertainty_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 354,
+          "text": "async fn workflow_action_uncertainty_deferred_commit_failure_rolls_back_retirement() {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/activation_tests.rs#workflow_activation_abort_and_lost_ack_reuse_snapshot_across_attempts",
+        "name": "workflow_activation_abort_and_lost_ack_reuse_snapshot_across_attempts",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/activation_tests.rs",
+        "span": "L91-L126"
+      },
+      "path": "src/adapters/persistence/workflow/activation_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 93,
+          "text": "// A worker dies with an uncommitted activation: dropping rolls back the write."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/activation_tests.rs#workflow_activation_final_statement_failure_rolls_back_snapshot",
+        "name": "workflow_activation_final_statement_failure_rolls_back_snapshot",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/activation_tests.rs",
+        "span": "L264-L278"
+      },
+      "path": "src/adapters/persistence/workflow/activation_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 271,
+          "text": "tx.commit().await.unwrap(); // PostgreSQL commits an aborted transaction as rollback."
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/agent_recovery_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 245,
+          "text": "/// F019(b) provider entry before settlement: the lost request stays charged and unresolved;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/binding_schema_tests.rs#workflow_binding_schema_enforces_selected_revision_and_version_scope",
+        "name": "workflow_binding_schema_enforces_selected_revision_and_version_scope",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/binding_schema_tests.rs",
+        "span": "L4-L86"
+      },
+      "path": "src/adapters/persistence/workflow/binding_schema_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 15,
+          "text": "// A head without its revision fails at commit, including rollback of the head."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/budget_activation_tests.rs#workflow_budget_activation_deferred_commit_failure_preserves_freeze_and_refusal",
+        "name": "workflow_budget_activation_deferred_commit_failure_preserves_freeze_and_refusal",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/budget_activation_tests.rs",
+        "span": "L367-L395"
+      },
+      "path": "src/adapters/persistence/workflow/budget_activation_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 370,
+          "text": "// runtime never produces; it guards the deferred-commit rollback of the shared usage."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/budget_race_tests.rs#workflow_budget_runtime_deferred_commit_failure_rolls_back_grant_and_refusal",
+        "name": "workflow_budget_runtime_deferred_commit_failure_rolls_back_grant_and_refusal",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/budget_race_tests.rs",
+        "span": "L92-L121"
+      },
+      "path": "src/adapters/persistence/workflow/budget_race_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 92,
+          "text": "async fn workflow_budget_runtime_deferred_commit_failure_rolls_back_grant_and_refusal() {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/budget.rs#reserve_budget",
+        "name": "reserve_budget",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/budget.rs",
+        "span": "L9-L46"
+      },
+      "path": "src/adapters/persistence/workflow/budget.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 28,
+          "text": "Attempt::Ambiguous => {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/checkpoints.rs#update_workflow_checkpoint",
+        "name": "update_workflow_checkpoint",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/checkpoints.rs",
+        "span": "L32-L53"
+      },
+      "path": "src/adapters/persistence/workflow/checkpoints.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 51,
+          "text": "Attempt::Ambiguous => Err(bound.unresolved()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/checkpoints.rs#open_workflow_checkpoint",
+        "name": "open_workflow_checkpoint",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/checkpoints.rs",
+        "span": "L55-L100"
+      },
+      "path": "src/adapters/persistence/workflow/checkpoints.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 79,
+          "text": "Attempt::Ambiguous => {"
+        },
+        {
+          "line": 86,
+          "text": "return Err(bound.unresolved());"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/checkpoints.rs#reserve_workflow_model",
+        "name": "reserve_workflow_model",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/checkpoints.rs",
+        "span": "L127-L148"
+      },
+      "path": "src/adapters/persistence/workflow/checkpoints.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 146,
+          "text": "Attempt::Ambiguous => Err(bound.unresolved()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/checkpoints.rs#settle_workflow_model",
+        "name": "settle_workflow_model",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/checkpoints.rs",
+        "span": "L150-L170"
+      },
+      "path": "src/adapters/persistence/workflow/checkpoints.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 168,
+          "text": "Attempt::Ambiguous => Err(bound.unresolved()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/checkpoints.rs#reserve_workflow_execution",
+        "name": "reserve_workflow_execution",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/checkpoints.rs",
+        "span": "L172-L207"
+      },
+      "path": "src/adapters/persistence/workflow/checkpoints.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 195,
+          "text": "Attempt::Ambiguous => {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/completion_race_tests.rs#workflow_completion_deferred_expiry_and_deadline_commit_guard",
+        "name": "workflow_completion_deferred_expiry_and_deadline_commit_guard",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/completion_race_tests.rs",
+        "span": "L158-L189"
+      },
+      "path": "src/adapters/persistence/workflow/completion_race_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 173,
+          "text": "// failed commit rolls the window back too, so `before` is the state without it."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/completion_tests.rs#workflow_completion_competing_results_lost_ack_and_saved_replay",
+        "name": "workflow_completion_competing_results_lost_ack_and_saved_replay",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/completion_tests.rs",
+        "span": "L47-L125"
+      },
+      "path": "src/adapters/persistence/workflow/completion_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 104,
+          "text": "// A new connection after lost commit acknowledgement observes the saved result"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/completion.rs#complete_io",
+        "name": "complete_io",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/completion.rs",
+        "span": "L23-L69"
+      },
+      "path": "src/adapters/persistence/workflow/completion.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 44,
+          "text": "Attempt::Ambiguous => {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/harness_token_atomic_tests.rs#workflow_harness_token_notification_commit_failure_rolls_back_pause",
+        "name": "workflow_harness_token_notification_commit_failure_rolls_back_pause",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/harness_token_atomic_tests.rs",
+        "span": "L18-L35"
+      },
+      "path": "src/adapters/persistence/workflow/harness_token_atomic_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 18,
+          "text": "async fn workflow_harness_token_notification_commit_failure_rolls_back_pause() {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/harness_token_atomic_tests.rs#workflow_harness_token_approval_commit_failure_rolls_back_allowance_and_reopen",
+        "name": "workflow_harness_token_approval_commit_failure_rolls_back_allowance_and_reopen",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/harness_token_atomic_tests.rs",
+        "span": "L38-L49"
+      },
+      "path": "src/adapters/persistence/workflow/harness_token_atomic_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 38,
+          "text": "async fn workflow_harness_token_approval_commit_failure_rolls_back_allowance_and_reopen() {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/history_reader.rs#frozen_history",
+        "name": "frozen_history",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/history_reader.rs",
+        "span": "L57-L78"
+      },
+      "path": "src/adapters/persistence/workflow/history_reader.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 76,
+          "text": "Attempt::Ambiguous => Err(bound.unresolved()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/http_tests.rs#workflow_http_remote_failure_remains_unknown_without_second_entry",
+        "name": "workflow_http_remote_failure_remains_unknown_without_second_entry",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/http_tests.rs",
+        "span": "L102-L141"
+      },
+      "path": "src/adapters/persistence/workflow/http_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 127,
+          "text": "// 04.10-D3: the handler labels Safe; the shared predicate sees the unresolved marker"
+        },
+        {
+          "line": 129,
+          "text": "assert_eq!(failure.failure.code().as_str(), \"http.unresolved\");"
+        },
+        {
+          "line": 135,
+          "text": "\"http.unresolved\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/knowledge_checkpoint.rs#knowledge_context",
+        "name": "knowledge_context",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/knowledge_checkpoint.rs",
+        "span": "L39-L60"
+      },
+      "path": "src/adapters/persistence/workflow/knowledge_checkpoint.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 58,
+          "text": "Attempt::Ambiguous => Err(bound.unresolved()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/knowledge_checkpoint.rs#observe_knowledge",
+        "name": "observe_knowledge",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/knowledge_checkpoint.rs",
+        "span": "L62-L85"
+      },
+      "path": "src/adapters/persistence/workflow/knowledge_checkpoint.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 83,
+          "text": "Attempt::Ambiguous => Err(bound.unresolved()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/knowledge_history_lease_tests.rs#knowledge_run_level_history_expiry_during_statement_and_commit_rolls_back_taint_and_proof",
+        "name": "knowledge_run_level_history_expiry_during_statement_and_commit_rolls_back_taint_and_proof",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/knowledge_history_lease_tests.rs",
+        "span": "L184-L219"
+      },
+      "path": "src/adapters/persistence/workflow/knowledge_history_lease_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 184,
+          "text": "async fn knowledge_run_level_history_expiry_during_statement_and_commit_rolls_back_taint_and_proof()"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/knowledge_http_tests.rs#knowledge_run_level_remote_possible_marker_stays_uncertain_after_taint",
+        "name": "knowledge_run_level_remote_possible_marker_stays_uncertain_after_taint",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/knowledge_http_tests.rs",
+        "span": "L84-L129"
+      },
+      "path": "src/adapters/persistence/workflow/knowledge_http_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 108,
+          "text": "assert_eq!(failure.failure.code().as_str(), \"http.unresolved\");"
+        },
+        {
+          "line": 123,
+          "text": "\"http.unresolved\","
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/lease_resolution_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 467,
+          "text": "/// never commits: its backend's last statement is ROLLBACK."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/lease.rs#claim_io",
+        "name": "claim_io",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/lease.rs",
+        "span": "L27-L65"
+      },
+      "path": "src/adapters/persistence/workflow/lease.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 52,
+          "text": "Attempt::Ambiguous => {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/lease.rs#renew_io",
+        "name": "renew_io",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/lease.rs",
+        "span": "L66-L121"
+      },
+      "path": "src/adapters/persistence/workflow/lease.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 100,
+          "text": "Attempt::Ambiguous => {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/maintenance_tests.rs#workflow_maintenance_commit_fault_rolls_back_every_fact",
+        "name": "workflow_maintenance_commit_fault_rolls_back_every_fact",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/maintenance_tests.rs",
+        "span": "L218-L227"
+      },
+      "path": "src/adapters/persistence/workflow/maintenance_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 218,
+          "text": "async fn workflow_maintenance_commit_fault_rolls_back_every_fact() {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/mcp_reconciliation_tests.rs#workflow_mcp_verified_not_applied_retries_lazily_and_checks_live_drift",
+        "name": "workflow_mcp_verified_not_applied_retries_lazily_and_checks_live_drift",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/mcp_reconciliation_tests.rs",
+        "span": "L123-L167"
+      },
+      "path": "src/adapters/persistence/workflow/mcp_reconciliation_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 151,
+          "text": "assert_eq!(code(&failure), \"mcp.unresolved\");"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/mcp_recovery_tests.rs#workflow_mcp_post_entry_failures_and_session_expiry_park_without_reinitialize",
+        "name": "workflow_mcp_post_entry_failures_and_session_expiry_park_without_reinitialize",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/mcp_recovery_tests.rs",
+        "span": "L51-L87"
+      },
+      "path": "src/adapters/persistence/workflow/mcp_recovery_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 62,
+          "text": "assert_eq!(code(&failure), \"mcp.unresolved\", \"{call:?}\");"
+        },
+        {
+          "line": 80,
+          "text": "\"mcp.unresolved\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/mcp_recovery_tests.rs#workflow_mcp_cancellation_and_dropped_worker_cancel_and_close_without_second_call",
+        "name": "workflow_mcp_cancellation_and_dropped_worker_cancel_and_close_without_second_call",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/mcp_recovery_tests.rs",
+        "span": "L90-L153"
+      },
+      "path": "src/adapters/persistence/workflow/mcp_recovery_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 122,
+          "text": "assert_eq!(code(&failure), \"mcp.unresolved\");"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/mcp_recovery_tests.rs#workflow_mcp_revocation_and_rotation_racing_dispatch_never_call",
+        "name": "workflow_mcp_revocation_and_rotation_racing_dispatch_never_call",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/mcp_recovery_tests.rs",
+        "span": "L197-L275"
+      },
+      "path": "src/adapters/persistence/workflow/mcp_recovery_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 227,
+          "text": "\"mcp.unresolved\","
+        },
+        {
+          "line": 234,
+          "text": "Retired::new(\"running\", None, \"mcp.unresolved\", \"retryable\", \"safe\", 0)"
+        },
+        {
+          "line": 272,
+          "text": "assert_eq!(code(&failure), \"mcp.unresolved\");"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/mcp_tests.rs#workflow_mcp_output_violation_and_oversize_stay_unknown_without_second_call",
+        "name": "workflow_mcp_output_violation_and_oversize_stay_unknown_without_second_call",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/mcp_tests.rs",
+        "span": "L281-L319"
+      },
+      "path": "src/adapters/persistence/workflow/mcp_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 292,
+          "text": "assert_eq!(code(&failure), \"mcp.unresolved\", \"{call:?}\");"
+        },
+        {
+          "line": 312,
+          "text": "\"mcp.unresolved\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_authority_tests.rs#workflow_message_publish_revocation_after_a_marker_stays_retryable",
+        "name": "workflow_message_publish_revocation_after_a_marker_stays_retryable",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_authority_tests.rs",
+        "span": "L184-L223"
+      },
+      "path": "src/adapters/persistence/workflow/message_authority_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 220,
+          "text": "(\"message.unresolved\", FailureClass::Retryable)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_publish.rs#publish",
+        "name": "publish",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_publish.rs",
+        "span": "L556-L582"
+      },
+      "path": "src/adapters/persistence/workflow/message_publish.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 576,
+          "text": "Attempt::Ambiguous => {"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/message_race_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 2,
+          "text": "//! ways under the original's own locks (applied, absent, unresolved). Deliberate stalls run"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_race_tests.rs#workflow_message_race_ambiguous_publication_commit_resolves_three_ways",
+        "name": "workflow_message_race_ambiguous_publication_commit_resolves_three_ways",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_race_tests.rs",
+        "span": "L24-L120"
+      },
+      "path": "src/adapters/persistence/workflow/message_race_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 84,
+          "text": "assert_eq!(failure.failure.code().as_str(), \"message.unresolved\");"
+        },
+        {
+          "line": 93,
+          "text": "assert_eq!(failure.failure.code().as_str(), \"message.unresolved\");"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_race_tests.rs#workflow_message_race_delayed_commit_past_fence_expiry_or_deadline_rolls_back",
+        "name": "workflow_message_race_delayed_commit_past_fence_expiry_or_deadline_rolls_back",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_race_tests.rs",
+        "span": "L127-L218"
+      },
+      "path": "src/adapters/persistence/workflow/message_race_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 127,
+          "text": "async fn workflow_message_race_delayed_commit_past_fence_expiry_or_deadline_rolls_back() {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_recovery_tests.rs#workflow_message_recovery_rolled_back_publication_retries_and_publishes_once",
+        "name": "workflow_message_recovery_rolled_back_publication_retries_and_publishes_once",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_recovery_tests.rs",
+        "span": "L34-L113"
+      },
+      "path": "src/adapters/persistence/workflow/message_recovery_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 56,
+          "text": "\"message.unresolved\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/pending_recovery_tests.rs#workflow_poison_failure_commit_abort_and_lost_ack_preserve_results",
+        "name": "workflow_poison_failure_commit_abort_and_lost_ack_preserve_results",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/pending_recovery_tests.rs",
+        "span": "L40-L75"
+      },
+      "path": "src/adapters/persistence/workflow/pending_recovery_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 40,
+          "text": "async fn workflow_poison_failure_commit_abort_and_lost_ack_preserve_results() {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/persistence_bound.rs#Attempt",
+        "name": "Attempt",
+        "kind": "enum",
+        "path": "src/adapters/persistence/workflow/persistence_bound.rs",
+        "span": "L27-L31"
+      },
+      "path": "src/adapters/persistence/workflow/persistence_bound.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 30,
+          "text": "Ambiguous,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/persistence_bound.rs#Outcome",
+        "name": "Outcome",
+        "kind": "enum",
+        "path": "src/adapters/persistence/workflow/persistence_bound.rs",
+        "span": "L48-L58"
+      },
+      "path": "src/adapters/persistence/workflow/persistence_bound.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 54,
+          "text": "/// A reservation proven committed under the original's locks and handed back as ours."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/persistence_bound.rs#Marks",
+        "name": "Marks",
+        "kind": "struct",
+        "path": "src/adapters/persistence/workflow/persistence_bound.rs",
+        "span": "L75-L86"
+      },
+      "path": "src/adapters/persistence/workflow/persistence_bound.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 83,
+          "text": "/// Why an `Unknown` stayed unknown: `unresolved` (the resolution elapsed or failed) or"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/persistence_bound.rs#read",
+        "name": "read",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/persistence_bound.rs",
+        "span": "L298-L304"
+      },
+      "path": "src/adapters/persistence/workflow/persistence_bound.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 302,
+          "text": "Attempt::Ambiguous => Err(self.not_applied()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/recovery_tests.rs#workflow_failure_commit_failure_rolls_back_all_retirement_writes",
+        "name": "workflow_failure_commit_failure_rolls_back_all_retirement_writes",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/recovery_tests.rs",
+        "span": "L228-L244"
+      },
+      "path": "src/adapters/persistence/workflow/recovery_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 228,
+          "text": "async fn workflow_failure_commit_failure_rolls_back_all_retirement_writes() {"
+        },
+        {
+          "line": 231,
+          "text": "sqlx::raw_sql(\"CREATE FUNCTION reject_retirement() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'injected retirement commit'; END $$; CREATE CON"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/wait_deadline_tests.rs#workflow_wait_commit_crossing_deadline_rolls_back",
+        "name": "workflow_wait_commit_crossing_deadline_rolls_back",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/wait_deadline_tests.rs",
+        "span": "L114-L132"
+      },
+      "path": "src/adapters/persistence/workflow/wait_deadline_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 114,
+          "text": "async fn workflow_wait_commit_crossing_deadline_rolls_back() {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/wakeup_tests.rs#workflow_wakeup_write_and_commit_failures_rollback_progression",
+        "name": "workflow_wakeup_write_and_commit_failures_rollback_progression",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/wakeup_tests.rs",
+        "span": "L179-L211"
+      },
+      "path": "src/adapters/persistence/workflow/wakeup_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 179,
+          "text": "async fn workflow_wakeup_write_and_commit_failures_rollback_progression() {"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 57,
+    "baselineChars": 847357
+  }
+}

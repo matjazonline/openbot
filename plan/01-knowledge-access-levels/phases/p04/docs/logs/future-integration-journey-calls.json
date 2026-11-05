@@ -1,0 +1,587 @@
+{
+  "query": "message_ingress_end_to_end_each_message_gets_its_own_run_and_reply",
+  "matches": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_ingress_tests.rs#message_ingress_end_to_end_each_message_gets_its_own_run_and_reply",
+        "name": "message_ingress_end_to_end_each_message_gets_its_own_run_and_reply",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_ingress_tests.rs",
+        "span": "L349-L410"
+      },
+      "hits": [
+        {
+          "id": "src/adapters/http/pages/tests.rs#collect",
+          "relation": "calls",
+          "depth": 1,
+          "name": "collect",
+          "kind": "function",
+          "path": "src/adapters/http/pages/tests.rs",
+          "span": "L4604-L4613"
+        },
+        {
+          "id": "src/adapters/http/routes/ui_deliveries.rs#filter",
+          "relation": "calls",
+          "depth": 1,
+          "name": "filter",
+          "kind": "function",
+          "path": "src/adapters/http/routes/ui_deliveries.rs",
+          "span": "L90-L103"
+        },
+        {
+          "id": "src/adapters/persistence/workflow/message_ingress_tests.rs#answering_source",
+          "relation": "calls",
+          "depth": 1,
+          "name": "answering_source",
+          "kind": "function",
+          "path": "src/adapters/persistence/workflow/message_ingress_tests.rs",
+          "span": "L290-L312"
+        },
+        {
+          "id": "src/adapters/persistence/workflow/message_ingress_tests.rs#bind",
+          "relation": "calls",
+          "depth": 1,
+          "name": "bind",
+          "kind": "function",
+          "path": "src/adapters/persistence/workflow/message_ingress_tests.rs",
+          "span": "L151-L200"
+        },
+        {
+          "id": "src/adapters/persistence/workflow/message_ingress_tests.rs#customer_email",
+          "relation": "calls",
+          "depth": 1,
+          "name": "customer_email",
+          "kind": "function",
+          "path": "src/adapters/persistence/workflow/message_ingress_tests.rs",
+          "span": "L314-L331"
+        },
+        {
+          "id": "src/adapters/persistence/workflow/message_ingress_tests.rs#email",
+          "relation": "calls",
+          "depth": 1,
+          "name": "email",
+          "kind": "function",
+          "path": "src/adapters/persistence/workflow/message_ingress_tests.rs",
+          "span": "L202-L209"
+        },
+        {
+          "id": "src/adapters/persistence/workflow/message_ingress_tests.rs#new",
+          "relation": "calls",
+          "depth": 1,
+          "name": "new",
+          "kind": "function",
+          "path": "src/adapters/persistence/workflow/message_ingress_tests.rs",
+          "span": "L52-L140"
+        },
+        {
+          "id": "src/adapters/persistence/workflow/message_ingress_tests.rs#p",
+          "relation": "calls",
+          "depth": 1,
+          "name": "p",
+          "kind": "function",
+          "path": "src/adapters/persistence/workflow/message_ingress_tests.rs",
+          "span": "L142-L144"
+        },
+        {
+          "id": "src/adapters/persistence/workflow/message_ingress_tests.rs#replies",
+          "relation": "calls",
+          "depth": 1,
+          "name": "replies",
+          "kind": "function",
+          "path": "src/adapters/persistence/workflow/message_ingress_tests.rs",
+          "span": "L334-L343"
+        },
+        {
+          "id": "src/adapters/persistence/workflow/message_ingress_tests.rs#run_until",
+          "relation": "calls",
+          "depth": 1,
+          "name": "run_until",
+          "kind": "function",
+          "path": "src/adapters/persistence/workflow/message_ingress_tests.rs",
+          "span": "L212-L237"
+        },
+        {
+          "id": "src/application/transport/bounded.rs#map",
+          "relation": "calls",
+          "depth": 1,
+          "name": "map",
+          "kind": "function",
+          "path": "src/application/transport/bounded.rs",
+          "span": "L88-L90"
+        },
+        {
+          "id": "src/application/transport/inbox.rs#iter",
+          "relation": "calls",
+          "depth": 1,
+          "name": "iter",
+          "kind": "function",
+          "path": "src/application/transport/inbox.rs",
+          "span": "L140-L144"
+        },
+        {
+          "id": "src/application/transport/inbox.rs#len",
+          "relation": "calls",
+          "depth": 1,
+          "name": "len",
+          "kind": "function",
+          "path": "src/application/transport/inbox.rs",
+          "span": "L62-L64"
+        },
+        {
+          "id": "src/application/workflow/compiler/schema.rs#find",
+          "relation": "calls",
+          "depth": 1,
+          "name": "find",
+          "kind": "function",
+          "path": "src/application/workflow/compiler/schema.rs",
+          "span": "L172-L206"
+        },
+        {
+          "id": "src/domain/entities/correlation.rs#as_uuid",
+          "relation": "calls",
+          "depth": 1,
+          "name": "as_uuid",
+          "kind": "function",
+          "path": "src/domain/entities/correlation.rs",
+          "span": "L66-L68"
+        },
+        {
+          "id": "src/domain/entities/upload.rs#extension",
+          "relation": "calls",
+          "depth": 2,
+          "name": "extension",
+          "kind": "function",
+          "path": "src/domain/entities/upload.rs",
+          "span": "L53-L60"
+        },
+        {
+          "id": "src/adapters/http/routes/workflows/mod.rs#ok",
+          "relation": "calls",
+          "depth": 2,
+          "name": "ok",
+          "kind": "function",
+          "path": "src/adapters/http/routes/workflows/mod.rs",
+          "span": "L282-L284"
+        },
+        {
+          "id": "src/application/services/test_support/scenario.rs#json",
+          "relation": "calls",
+          "depth": 2,
+          "name": "json",
+          "kind": "function",
+          "path": "src/application/services/test_support/scenario.rs",
+          "span": "L51-L53"
+        },
+        {
+          "id": "src/infra/workflow.rs#services~2",
+          "relation": "calls",
+          "depth": 2,
+          "name": "services",
+          "kind": "function",
+          "path": "src/infra/workflow.rs",
+          "span": "L349-L351"
+        },
+        {
+          "id": "src/adapters/persistence/workflow/message_ingress_tests.rs#address",
+          "relation": "calls",
+          "depth": 2,
+          "name": "address",
+          "kind": "function",
+          "path": "src/adapters/persistence/workflow/message_ingress_tests.rs",
+          "span": "L146-L148"
+        },
+        {
+          "id": "src/application/use_cases/thread/test_support.rs#ingest_test_email",
+          "relation": "calls",
+          "depth": 2,
+          "name": "ingest_test_email",
+          "kind": "function",
+          "path": "src/application/use_cases/thread/test_support.rs",
+          "span": "L1635-L1644"
+        },
+        {
+          "id": "src/application/services/test_support.rs#register_scripted_agent_base_url",
+          "relation": "calls",
+          "depth": 2,
+          "name": "register_scripted_agent_base_url",
+          "kind": "function",
+          "path": "src/application/services/test_support.rs",
+          "span": "L84-L91"
+        },
+        {
+          "id": "src/application/services/test_support.rs#scripted_llm",
+          "relation": "calls",
+          "depth": 2,
+          "name": "scripted_llm",
+          "kind": "function",
+          "path": "src/application/services/test_support.rs",
+          "span": "L179-L201"
+        },
+        {
+          "id": "src/application/workflow/authorization.rs#user_id",
+          "relation": "calls",
+          "depth": 2,
+          "name": "user_id",
+          "kind": "function",
+          "path": "src/application/workflow/authorization.rs",
+          "span": "L28-L30"
+        },
+        {
+          "id": "src/infra/config.rs#thread_settings",
+          "relation": "calls",
+          "depth": 2,
+          "name": "thread_settings",
+          "kind": "function",
+          "path": "src/infra/config.rs",
+          "span": "L660-L665"
+        },
+        {
+          "id": "src/adapters/persistence/workflow/message_ingress_tests.rs#diagnostics",
+          "relation": "calls",
+          "depth": 2,
+          "name": "diagnostics",
+          "kind": "function",
+          "path": "src/adapters/persistence/workflow/message_ingress_tests.rs",
+          "span": "L240-L278"
+        },
+        {
+          "id": "src/application/workflow/compiler/schema.rs#encode_pointer_token",
+          "relation": "calls",
+          "depth": 2,
+          "name": "encode_pointer_token",
+          "kind": "function",
+          "path": "src/application/workflow/compiler/schema.rs",
+          "span": "L212-L228"
+        },
+        {
+          "id": "src/application/services/test_support/scenario.rs#json_body",
+          "relation": "calls",
+          "depth": 3,
+          "name": "json_body",
+          "kind": "function",
+          "path": "src/application/services/test_support/scenario.rs",
+          "span": "L42-L50"
+        },
+        {
+          "id": "src/application/use_cases/thread/test_support.rs#ingest_test_email_as",
+          "relation": "calls",
+          "depth": 3,
+          "name": "ingest_test_email_as",
+          "kind": "function",
+          "path": "src/application/use_cases/thread/test_support.rs",
+          "span": "L1647-L1670"
+        },
+        {
+          "id": "src/application/services/test_support.rs#new",
+          "relation": "calls",
+          "depth": 3,
+          "name": "new",
+          "kind": "function",
+          "path": "src/application/services/test_support.rs",
+          "span": "L221-L226"
+        },
+        {
+          "id": "src/application/services/test_support.rs#require_scripted_endpoint",
+          "relation": "calls",
+          "depth": 3,
+          "name": "require_scripted_endpoint",
+          "kind": "function",
+          "path": "src/application/services/test_support.rs",
+          "span": "L66-L81"
+        },
+        {
+          "id": "src/application/services/test_support.rs#into_body",
+          "relation": "calls",
+          "depth": 3,
+          "name": "into_body",
+          "kind": "function",
+          "path": "src/application/services/test_support.rs",
+          "span": "L135-L163"
+        },
+        {
+          "id": "src/application/services/test_support/scenario.rs#scripted_scenario",
+          "relation": "calls",
+          "depth": 3,
+          "name": "scripted_scenario",
+          "kind": "function",
+          "path": "src/application/services/test_support/scenario.rs",
+          "span": "L119-L148"
+        },
+        {
+          "id": "src/adapters/protocols/email/ingress.rs#accept",
+          "relation": "calls",
+          "depth": 4,
+          "name": "accept",
+          "kind": "function",
+          "path": "src/adapters/protocols/email/ingress.rs",
+          "span": "L247-L277"
+        },
+        {
+          "id": "src/adapters/protocols/email/ingress.rs#into_inbound",
+          "relation": "calls",
+          "depth": 4,
+          "name": "into_inbound",
+          "kind": "function",
+          "path": "src/adapters/protocols/email/ingress.rs",
+          "span": "L149-L157"
+        },
+        {
+          "id": "src/application/workflow/templates/contracts.rs#origin",
+          "relation": "calls",
+          "depth": 4,
+          "name": "origin",
+          "kind": "function",
+          "path": "src/application/workflow/templates/contracts.rs",
+          "span": "L141-L143"
+        },
+        {
+          "id": "src/application/services/test_support.rs#register_origin",
+          "relation": "calls",
+          "depth": 4,
+          "name": "register_origin",
+          "kind": "function",
+          "path": "src/application/services/test_support.rs",
+          "span": "L39-L50"
+        },
+        {
+          "id": "src/application/services/test_support/scenario.rs#serve",
+          "relation": "calls",
+          "depth": 4,
+          "name": "serve",
+          "kind": "function",
+          "path": "src/application/services/test_support/scenario.rs",
+          "span": "L150-L187"
+        },
+        {
+          "id": "src/adapters/protocols/email/ingress.rs#draft",
+          "relation": "calls",
+          "depth": 5,
+          "name": "draft",
+          "kind": "function",
+          "path": "src/adapters/protocols/email/ingress.rs",
+          "span": "L352-L410"
+        },
+        {
+          "id": "src/adapters/protocols/email/ingress.rs#route",
+          "relation": "calls",
+          "depth": 5,
+          "name": "route",
+          "kind": "function",
+          "path": "src/adapters/protocols/email/ingress.rs",
+          "span": "L284-L307"
+        },
+        {
+          "id": "src/application/use_cases/thread/ingest/mod.rs#arriving",
+          "relation": "calls",
+          "depth": 5,
+          "name": "arriving",
+          "kind": "function",
+          "path": "src/application/use_cases/thread/ingest/mod.rs",
+          "span": "L209-L217"
+        },
+        {
+          "id": "src/application/use_cases/thread/ingest/mod.rs#with_unusable_hints",
+          "relation": "calls",
+          "depth": 5,
+          "name": "with_unusable_hints",
+          "kind": "function",
+          "path": "src/application/use_cases/thread/ingest/mod.rs",
+          "span": "L219-L222"
+        },
+        {
+          "id": "src/adapters/protocols/email/ingress.rs#email_metadata",
+          "relation": "calls",
+          "depth": 6,
+          "name": "email_metadata",
+          "kind": "function",
+          "path": "src/adapters/protocols/email/ingress.rs",
+          "span": "L414-L427"
+        },
+        {
+          "id": "src/adapters/protocols/email/ingress.rs#identity",
+          "relation": "calls",
+          "depth": 6,
+          "name": "identity",
+          "kind": "function",
+          "path": "src/adapters/protocols/email/ingress.rs",
+          "span": "L340-L348"
+        },
+        {
+          "id": "src/adapters/protocols/email/ingress.rs#message_key",
+          "relation": "calls",
+          "depth": 6,
+          "name": "message_key",
+          "kind": "function",
+          "path": "src/adapters/protocols/email/ingress.rs",
+          "span": "L429-L431"
+        },
+        {
+          "id": "src/adapters/protocols/email/ingress.rs#new",
+          "relation": "calls",
+          "depth": 6,
+          "name": "new",
+          "kind": "function",
+          "path": "src/adapters/protocols/email/ingress.rs",
+          "span": "L235-L240"
+        },
+        {
+          "id": "src/adapters/protocols/email/ingress.rs#policy",
+          "relation": "calls",
+          "depth": 6,
+          "name": "policy",
+          "kind": "function",
+          "path": "src/adapters/protocols/email/ingress.rs",
+          "span": "L91-L101"
+        },
+        {
+          "id": "src/adapters/protocols/email/ingress.rs#reply_message_keys",
+          "relation": "calls",
+          "depth": 6,
+          "name": "reply_message_keys",
+          "kind": "function",
+          "path": "src/adapters/protocols/email/ingress.rs",
+          "span": "L442-L453"
+        },
+        {
+          "id": "src/adapters/protocols/email/ingress.rs#thread_key",
+          "relation": "calls",
+          "depth": 6,
+          "name": "thread_key",
+          "kind": "function",
+          "path": "src/adapters/protocols/email/ingress.rs",
+          "span": "L433-L435"
+        },
+        {
+          "id": "src/application/transport/ingress.rs#any_files_only",
+          "relation": "calls",
+          "depth": 6,
+          "name": "any_files_only",
+          "kind": "function",
+          "path": "src/application/transport/ingress.rs",
+          "span": "L489-L493"
+        },
+        {
+          "id": "src/domain/entities/email_message.rs#conversation_root_key",
+          "relation": "calls",
+          "depth": 6,
+          "name": "conversation_root_key",
+          "kind": "function",
+          "path": "src/domain/entities/email_message.rs",
+          "span": "L102-L107"
+        },
+        {
+          "id": "src/domain/entities/email_message.rs#direct_parent_id",
+          "relation": "calls",
+          "depth": 6,
+          "name": "direct_parent_id",
+          "kind": "function",
+          "path": "src/domain/entities/email_message.rs",
+          "span": "L45-L47"
+        },
+        {
+          "id": "src/domain/entities/email_message.rs#reference_candidates",
+          "relation": "calls",
+          "depth": 6,
+          "name": "reference_candidates",
+          "kind": "function",
+          "path": "src/domain/entities/email_message.rs",
+          "span": "L83-L94"
+        },
+        {
+          "id": "src/adapters/protocols/email/ingress.rs#classify",
+          "relation": "calls",
+          "depth": 6,
+          "name": "classify",
+          "kind": "function",
+          "path": "src/adapters/protocols/email/ingress.rs",
+          "span": "L311-L329"
+        },
+        {
+          "id": "src/adapters/protocols/email/ingress.rs#disposition_of",
+          "relation": "calls",
+          "depth": 6,
+          "name": "disposition_of",
+          "kind": "function",
+          "path": "src/adapters/protocols/email/ingress.rs",
+          "span": "L331-L338"
+        },
+        {
+          "id": "src/application/use_cases/thread/ingest/mod.rs#new",
+          "relation": "calls",
+          "depth": 6,
+          "name": "new",
+          "kind": "function",
+          "path": "src/application/use_cases/thread/ingest/mod.rs",
+          "span": "L91-L112"
+        },
+        {
+          "id": "src/adapters/protocols/email/ingress.rs#from",
+          "relation": "calls",
+          "depth": 7,
+          "name": "from",
+          "kind": "function",
+          "path": "src/adapters/protocols/email/ingress.rs",
+          "span": "L125-L127"
+        },
+        {
+          "id": "src/domain/entities/email_message.rs#in_reply_to",
+          "relation": "calls",
+          "depth": 7,
+          "name": "in_reply_to",
+          "kind": "function",
+          "path": "src/domain/entities/email_message.rs",
+          "span": "L49-L52"
+        },
+        {
+          "id": "src/domain/entities/email_message.rs#raw_bodies",
+          "relation": "calls",
+          "depth": 7,
+          "name": "raw_bodies",
+          "kind": "function",
+          "path": "src/domain/entities/email_message.rs",
+          "span": "L72-L76"
+        },
+        {
+          "id": "src/domain/entities/email_message.rs#thread_index",
+          "relation": "calls",
+          "depth": 7,
+          "name": "thread_index",
+          "kind": "function",
+          "path": "src/domain/entities/email_message.rs",
+          "span": "L67-L70"
+        },
+        {
+          "id": "src/application/transport/ingress.rs#answers",
+          "relation": "calls",
+          "depth": 7,
+          "name": "answers",
+          "kind": "function",
+          "path": "src/application/transport/ingress.rs",
+          "span": "L159-L161"
+        },
+        {
+          "id": "src/adapters/protocols/email/selector.rs#into_selectors",
+          "relation": "calls",
+          "depth": 7,
+          "name": "into_selectors",
+          "kind": "function",
+          "path": "src/adapters/protocols/email/selector.rs",
+          "span": "L43-L45"
+        },
+        {
+          "id": "src/adapters/protocols/email/selector.rs#is_context_only",
+          "relation": "calls",
+          "depth": 7,
+          "name": "is_context_only",
+          "kind": "function",
+          "path": "src/adapters/protocols/email/selector.rs",
+          "span": "L21-L23"
+        }
+      ]
+    }
+  ],
+  "saved": {
+    "files": 21,
+    "baselineChars": 530900
+  }
+}

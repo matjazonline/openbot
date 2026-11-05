@@ -1,0 +1,722 @@
+{
+  "query": "compose_tools",
+  "matches": [
+    {
+      "symbol": {
+        "id": "src/infra/workflow.rs#compose_tools",
+        "name": "compose_tools",
+        "kind": "function",
+        "path": "src/infra/workflow.rs",
+        "span": "L206-L254"
+      },
+      "hits": [
+        {
+          "id": "src/infra/workflow.rs#compose_handler",
+          "relation": "calls",
+          "depth": 1,
+          "name": "compose_handler",
+          "kind": "function",
+          "path": "src/infra/workflow.rs",
+          "span": "L256-L283"
+        },
+        {
+          "id": "src/infra/workflow.rs#new",
+          "relation": "calls",
+          "depth": 2,
+          "name": "new",
+          "kind": "function",
+          "path": "src/infra/workflow.rs",
+          "span": "L287-L322"
+        },
+        {
+          "id": "src/infra/workflow.rs#composed",
+          "relation": "calls",
+          "depth": 3,
+          "name": "composed",
+          "kind": "function",
+          "path": "src/infra/workflow.rs",
+          "span": "L551-L582"
+        },
+        {
+          "id": "src/infra/workflow.rs#engine",
+          "relation": "calls",
+          "depth": 3,
+          "name": "engine",
+          "kind": "function",
+          "path": "src/infra/workflow.rs",
+          "span": "L519-L523"
+        },
+        {
+          "id": "src/infra/workflow.rs#for_tests",
+          "relation": "calls",
+          "depth": 3,
+          "name": "for_tests",
+          "kind": "function",
+          "path": "src/infra/workflow.rs",
+          "span": "L465-L499"
+        },
+        {
+          "id": "src/infra/workflow.rs#production_admission_refuses_a_child_trigger",
+          "relation": "calls",
+          "depth": 3,
+          "name": "production_admission_refuses_a_child_trigger",
+          "kind": "function",
+          "path": "src/infra/workflow.rs",
+          "span": "L663-L699"
+        },
+        {
+          "id": "src/infra/workflow.rs#production_publication_refuses_memory_steps_and_captures_children",
+          "relation": "calls",
+          "depth": 3,
+          "name": "production_publication_refuses_memory_steps_and_captures_children",
+          "kind": "function",
+          "path": "src/infra/workflow.rs",
+          "span": "L629-L659"
+        },
+        {
+          "id": "src/infra/workflow.rs#production_workers_stop_on_the_shutdown_token",
+          "relation": "calls",
+          "depth": 3,
+          "name": "production_workers_stop_on_the_shutdown_token",
+          "kind": "function",
+          "path": "src/infra/workflow.rs",
+          "span": "L704-L723"
+        },
+        {
+          "id": "src/infra/workflow.rs#publish",
+          "relation": "calls",
+          "depth": 3,
+          "name": "publish",
+          "kind": "function",
+          "path": "src/infra/workflow.rs",
+          "span": "L586-L615"
+        },
+        {
+          "id": "src/infra/workflow.rs#spawn",
+          "relation": "calls",
+          "depth": 3,
+          "name": "spawn",
+          "kind": "function",
+          "path": "src/infra/workflow.rs",
+          "span": "L355-L431"
+        },
+        {
+          "id": "src/infra/workflow.rs#with_jev_test_provider",
+          "relation": "calls",
+          "depth": 3,
+          "name": "with_jev_test_provider",
+          "kind": "function",
+          "path": "src/infra/workflow.rs",
+          "span": "L453-L464"
+        },
+        {
+          "id": "src/infra/workflow.rs#production_handler_covers_every_io_kind_or_refuses_it",
+          "relation": "calls",
+          "depth": 4,
+          "name": "production_handler_covers_every_io_kind_or_refuses_it",
+          "kind": "function",
+          "path": "src/infra/workflow.rs",
+          "span": "L532-L547"
+        },
+        {
+          "id": "src/adapters/http/routes/connection_level_tests.rs#new",
+          "relation": "calls",
+          "depth": 4,
+          "name": "new",
+          "kind": "function",
+          "path": "src/adapters/http/routes/connection_level_tests.rs",
+          "span": "L107-L140"
+        },
+        {
+          "id": "src/adapters/http/routes/workflows/jev_tests.rs#jev_connection_routes_owner_admin_scope_revision_and_secret_free_views",
+          "relation": "calls",
+          "depth": 4,
+          "name": "jev_connection_routes_owner_admin_scope_revision_and_secret_free_views",
+          "kind": "function",
+          "path": "src/adapters/http/routes/workflows/jev_tests.rs",
+          "span": "L5-L119"
+        },
+        {
+          "id": "src/adapters/http/routes/workflows/reconciliation_tests.rs#new",
+          "relation": "calls",
+          "depth": 4,
+          "name": "new",
+          "kind": "function",
+          "path": "src/adapters/http/routes/workflows/reconciliation_tests.rs",
+          "span": "L23-L35"
+        },
+        {
+          "id": "src/adapters/http/routes/workflows/tests.rs#new",
+          "relation": "calls",
+          "depth": 4,
+          "name": "new",
+          "kind": "function",
+          "path": "src/adapters/http/routes/workflows/tests.rs",
+          "span": "L131-L153"
+        },
+        {
+          "id": "src/adapters/http/routes/workflows/ui/authoring/jev_tests.rs#fixture",
+          "relation": "calls",
+          "depth": 4,
+          "name": "fixture",
+          "kind": "function",
+          "path": "src/adapters/http/routes/workflows/ui/authoring/jev_tests.rs",
+          "span": "L6-L14"
+        },
+        {
+          "id": "src/adapters/http/routes/workflows/ui/authoring/tests.rs#new",
+          "relation": "calls",
+          "depth": 4,
+          "name": "new",
+          "kind": "function",
+          "path": "src/adapters/http/routes/workflows/ui/authoring/tests.rs",
+          "span": "L29-L48"
+        },
+        {
+          "id": "src/adapters/http/routes/workflows/ui/runs/authorization_tests.rs#reconciliation_and_step_refuse_foreign_and_hidden_channel_identities",
+          "relation": "calls",
+          "depth": 4,
+          "name": "reconciliation_and_step_refuse_foreign_and_hidden_channel_identities",
+          "kind": "function",
+          "path": "src/adapters/http/routes/workflows/ui/runs/authorization_tests.rs",
+          "span": "L7-L89"
+        },
+        {
+          "id": "src/adapters/http/routes/workflows/ui/runs/controls_tests.rs#an_accepted_action_shows_its_receipt_and_cancel_names_it",
+          "relation": "calls",
+          "depth": 4,
+          "name": "an_accepted_action_shows_its_receipt_and_cancel_names_it",
+          "kind": "function",
+          "path": "src/adapters/http/routes/workflows/ui/runs/controls_tests.rs",
+          "span": "L402-L439"
+        },
+        {
+          "id": "src/adapters/http/routes/workflows/ui/runs/controls_tests.rs#an_uncertain_action_is_annotated_from_the_pane_and_its_step_shows_the_attempt",
+          "relation": "calls",
+          "depth": 4,
+          "name": "an_uncertain_action_is_annotated_from_the_pane_and_its_step_shows_the_attempt",
+          "kind": "function",
+          "path": "src/adapters/http/routes/workflows/ui/runs/controls_tests.rs",
+          "span": "L109-L289"
+        },
+        {
+          "id": "src/adapters/http/routes/workflows/ui/runs/runs_tests.rs#new",
+          "relation": "calls",
+          "depth": 4,
+          "name": "new",
+          "kind": "function",
+          "path": "src/adapters/http/routes/workflows/ui/runs/runs_tests.rs",
+          "span": "L54-L76"
+        },
+        {
+          "id": "src/adapters/persistence/workflow/jev_end_to_end_tests.rs#jev_end_to_end_box_worker_history_and_invalid_output_rejection",
+          "relation": "calls",
+          "depth": 4,
+          "name": "jev_end_to_end_box_worker_history_and_invalid_output_rejection",
+          "kind": "function",
+          "path": "src/adapters/persistence/workflow/jev_end_to_end_tests.rs",
+          "span": "L183-L243"
+        },
+        {
+          "id": "src/adapters/persistence/workflow/jev_end_to_end_tests.rs#jev_end_to_end_mixed_thresholds_automatic_and_uncertain_human",
+          "relation": "calls",
+          "depth": 4,
+          "name": "jev_end_to_end_mixed_thresholds_automatic_and_uncertain_human",
+          "kind": "function",
+          "path": "src/adapters/persistence/workflow/jev_end_to_end_tests.rs",
+          "span": "L103-L180"
+        },
+        {
+          "id": "src/adapters/persistence/workflow/jev_runtime_tests.rs#jev_runtime_production_worker_mixed_fixture_once",
+          "relation": "calls",
+          "depth": 4,
+          "name": "jev_runtime_production_worker_mixed_fixture_once",
+          "kind": "function",
+          "path": "src/adapters/persistence/workflow/jev_runtime_tests.rs",
+          "span": "L271-L323"
+        },
+        {
+          "id": "src/adapters/persistence/workflow/mcp_reconciliation_tests.rs#workflow_mcp_unknown_note_through_the_production_composition",
+          "relation": "calls",
+          "depth": 4,
+          "name": "workflow_mcp_unknown_note_through_the_production_composition",
+          "kind": "function",
+          "path": "src/adapters/persistence/workflow/mcp_reconciliation_tests.rs",
+          "span": "L172-L221"
+        },
+        {
+          "id": "src/adapters/persistence/workflow/message_reconcile_tests.rs#workflow_message_unknown_note_through_the_production_composition",
+          "relation": "calls",
+          "depth": 4,
+          "name": "workflow_message_unknown_note_through_the_production_composition",
+          "kind": "function",
+          "path": "src/adapters/persistence/workflow/message_reconcile_tests.rs",
+          "span": "L908-L970"
+        },
+        {
+          "id": "src/infra/workflow.rs#engine_on",
+          "relation": "calls",
+          "depth": 4,
+          "name": "engine_on",
+          "kind": "function",
+          "path": "src/infra/workflow.rs",
+          "span": "L525-L527"
+        },
+        {
+          "id": "src/infra/workflow.rs#spawn_storage",
+          "relation": "calls",
+          "depth": 4,
+          "name": "spawn_storage",
+          "kind": "function",
+          "path": "src/infra/workflow.rs",
+          "span": "L432-L447"
+        },
+        {
+          "id": "src/adapters/http/routes/connection_level_tests.rs#connections",
+          "relation": "calls",
+          "depth": 5,
+          "name": "connections",
+          "kind": "function",
+          "path": "src/adapters/http/routes/connection_level_tests.rs",
+          "span": "L74-L105"
+        },
+        {
+          "id": "src/adapters/http/routes/connection_level_tests.rs#knowledge_run_level_all_four_connection_level_write_routes_scope_valid_foreign_resources",
+          "relation": "calls",
+          "depth": 5,
+          "name": "knowledge_run_level_all_four_connection_level_write_routes_scope_valid_foreign_resources",
+          "kind": "function",
+          "path": "src/adapters/http/routes/connection_level_tests.rs",
+          "span": "L213-L258"
+        },
+        {
+          "id": "src/adapters/http/routes/connection_level_tests.rs#knowledge_run_level_connection_commands_enforce_caps_and_preserve_other_settings",
+          "relation": "calls",
+          "depth": 5,
+          "name": "knowledge_run_level_connection_commands_enforce_caps_and_preserve_other_settings",
+          "kind": "function",
+          "path": "src/adapters/http/routes/connection_level_tests.rs",
+          "span": "L296-L377"
+        },
+        {
+          "id": "src/adapters/http/routes/connection_level_tests.rs#knowledge_run_level_http_new_read_routes_hide_valid_foreign_company_and_resource_ids",
+          "relation": "calls",
+          "depth": 5,
+          "name": "knowledge_run_level_http_new_read_routes_hide_valid_foreign_company_and_resource_ids",
+          "kind": "function",
+          "path": "src/adapters/http/routes/connection_level_tests.rs",
+          "span": "L172-L211"
+        },
+        {
+          "id": "src/adapters/http/routes/connection_level_tests.rs#knowledge_run_level_race_connection_revision_writers_have_one_winner",
+          "relation": "calls",
+          "depth": 5,
+          "name": "knowledge_run_level_race_connection_revision_writers_have_one_winner",
+          "kind": "function",
+          "path": "src/adapters/http/routes/connection_level_tests.rs",
+          "span": "L379-L399"
+        },
+        {
+          "id": "src/adapters/http/routes/connection_level_tests.rs#knowledge_run_level_race_live_admin_demotion_precedes_connection_level_write",
+          "relation": "calls",
+          "depth": 5,
+          "name": "knowledge_run_level_race_live_admin_demotion_precedes_connection_level_write",
+          "kind": "function",
+          "path": "src/adapters/http/routes/connection_level_tests.rs",
+          "span": "L432-L465"
+        },
+        {
+          "id": "src/adapters/http/routes/workflows/reconciliation_tests.rs#competing_reconciliations_record_once",
+          "relation": "calls",
+          "depth": 5,
+          "name": "competing_reconciliations_record_once",
+          "kind": "function",
+          "path": "src/adapters/http/routes/workflows/reconciliation_tests.rs",
+          "span": "L276-L314"
+        },
+        {
+          "id": "src/adapters/http/routes/workflows/reconciliation_tests.rs#reconciliation_annotates_both_http_forms",
+          "relation": "calls",
+          "depth": 5,
+          "name": "reconciliation_annotates_both_http_forms",
+          "kind": "function",
+          "path": "src/adapters/http/routes/workflows/reconciliation_tests.rs",
+          "span": "L134-L173"
+        },
+        {
+          "id": "src/adapters/http/routes/workflows/reconciliation_tests.rs#reconciliation_needs_a_ready_resource_even_to_replay",
+          "relation": "calls",
+          "depth": 5,
+          "name": "reconciliation_needs_a_ready_resource_even_to_replay",
+          "kind": "function",
+          "path": "src/adapters/http/routes/workflows/reconciliation_tests.rs",
+          "span": "L229-L247"
+        },
+        {
+          "id": "src/adapters/http/routes/workflows/reconciliation_tests.rs#reconciliation_outcomes_follow_the_status_table",
+          "relation": "calls",
+          "depth": 5,
+          "name": "reconciliation_outcomes_follow_the_status_table",
+          "kind": "function",
+          "path": "src/adapters/http/routes/workflows/reconciliation_tests.rs",
+          "span": "L177-L224"
+        },
+        {
+          "id": "src/adapters/http/routes/workflows/reconciliation_tests.rs#reconciliation_refuses_strangers_members_and_foreign_markers",
+          "relation": "calls",
+          "depth": 5,
+          "name": "reconciliation_refuses_strangers_members_and_foreign_markers",
+          "kind": "function",
+          "path": "src/adapters/http/routes/workflows/reconciliation_tests.rs",
+          "span": "L252-L271"
+        },
+        {
+          "id": "src/adapters/http/routes/workflows/reconciliation_tests.rs#set_enabled",
+          "relation": "calls",
+          "depth": 5,
+          "name": "set_enabled",
+          "kind": "function",
+          "path": "src/adapters/http/routes/workflows/reconciliation_tests.rs",
+          "span": "L107-L124"
+        },
+        {
+          "id": "src/adapters/http/routes/workflows/tests.rs#run_until",
+          "relation": "calls",
+          "depth": 5,
+          "name": "run_until",
+          "kind": "function",
+          "path": "src/adapters/http/routes/workflows/tests.rs",
+          "span": "L345-L362"
+        },
+        {
+          "id": "src/adapters/http/routes/workflows/tests.rs#workflow_routes_mount_in_the_app_router",
+          "relation": "calls",
+          "depth": 5,
+          "name": "workflow_routes_mount_in_the_app_router",
+          "kind": "function",
+          "path": "src/adapters/http/routes/workflows/tests.rs",
+          "span": "L384-L387"
+        },
+        {
+          "id": "src/adapters/http/routes/workflows/ui/authoring/jev_tests.rs#workflow_authoring_jev_catalogue_binding_and_sample",
+          "relation": "calls",
+          "depth": 5,
+          "name": "workflow_authoring_jev_catalogue_binding_and_sample",
+          "kind": "function",
+          "path": "src/adapters/http/routes/workflows/ui/authoring/jev_tests.rs",
+          "span": "L113-L170"
+        },
+        {
+          "id": "src/adapters/http/routes/workflows/ui/authoring/jev_tests.rs#workflow_authoring_jev_company_forms_permissions_rotation_and_readiness",
+          "relation": "calls",
+          "depth": 5,
+          "name": "workflow_authoring_jev_company_forms_permissions_rotation_and_readiness",
+          "kind": "function",
+          "path": "src/adapters/http/routes/workflows/ui/authoring/jev_tests.rs",
+          "span": "L26-L110"
+        },
+        {
+          "id": "src/adapters/http/routes/workflows/ui/authoring/tests.rs#a_blank_draft_is_created_once_per_key_and_validates_as_a_one_step_graph",
+          "relation": "calls",
+          "depth": 5,
+          "name": "a_blank_draft_is_created_once_per_key_and_validates_as_a_one_step_graph",
+          "kind": "function",
+          "path": "src/adapters/http/routes/workflows/ui/authoring/tests.rs",
+          "span": "L292-L347"
+        },
+        {
+          "id": "src/adapters/http/routes/workflows/ui/authoring/tests.rs#a_template_copy_is_keyed_and_a_stale_catalogue_revision_is_refused",
+          "relation": "calls",
+          "depth": 5,
+          "name": "a_template_copy_is_keyed_and_a_stale_catalogue_revision_is_refused",
+          "kind": "function",
+          "path": "src/adapters/http/routes/workflows/ui/authoring/tests.rs",
+          "span": "L350-L398"
+        },
+        {
+          "id": "src/adapters/http/routes/workflows/ui/authoring/tests.rs#draft",
+          "relation": "calls",
+          "depth": 5,
+          "name": "draft",
+          "kind": "function",
+          "path": "src/adapters/http/routes/workflows/ui/authoring/tests.rs",
+          "span": "L101-L116"
+        },
+        {
+          "id": "src/adapters/http/routes/workflows/ui/authoring/tests.rs#form",
+          "relation": "calls",
+          "depth": 5,
+          "name": "form",
+          "kind": "function",
+          "path": "src/adapters/http/routes/workflows/ui/authoring/tests.rs",
+          "span": "L215-L221"
+        },
+        {
+          "id": "src/adapters/http/routes/workflows/ui/authoring/tests.rs#published",
+          "relation": "calls",
+          "depth": 5,
+          "name": "published",
+          "kind": "function",
+          "path": "src/adapters/http/routes/workflows/ui/authoring/tests.rs",
+          "span": "L119-L158"
+        },
+        {
+          "id": "src/adapters/http/routes/workflows/ui/authoring/tests.rs#reviewed_connection_at",
+          "relation": "calls",
+          "depth": 5,
+          "name": "reviewed_connection_at",
+          "kind": "function",
+          "path": "src/adapters/http/routes/workflows/ui/authoring/tests.rs",
+          "span": "L479-L542"
+        },
+        {
+          "id": "src/adapters/http/routes/workflows/ui/authoring/tests.rs#run_board_view_filter_workflow_pages_link_to_the_board",
+          "relation": "calls",
+          "depth": 5,
+          "name": "run_board_view_filter_workflow_pages_link_to_the_board",
+          "kind": "function",
+          "path": "src/adapters/http/routes/workflows/ui/authoring/tests.rs",
+          "span": "L596-L627"
+        },
+        {
+          "id": "src/adapters/http/routes/workflows/ui/authoring/tests.rs#the_catalogue_lists_every_runnable_type_and_the_agents_a_step_can_name",
+          "relation": "calls",
+          "depth": 5,
+          "name": "the_catalogue_lists_every_runnable_type_and_the_agents_a_step_can_name",
+          "kind": "function",
+          "path": "src/adapters/http/routes/workflows/ui/authoring/tests.rs",
+          "span": "L401-L427"
+        },
+        {
+          "id": "src/adapters/http/routes/workflows/ui/authoring/tests.rs#the_sidebar_pages_through_every_draft",
+          "relation": "calls",
+          "depth": 5,
+          "name": "the_sidebar_pages_through_every_draft",
+          "kind": "function",
+          "path": "src/adapters/http/routes/workflows/ui/authoring/tests.rs",
+          "span": "L245-L289"
+        },
+        {
+          "id": "src/adapters/http/routes/workflows/ui/authoring/tests.rs#ui",
+          "relation": "calls",
+          "depth": 5,
+          "name": "ui",
+          "kind": "function",
+          "path": "src/adapters/http/routes/workflows/ui/authoring/tests.rs",
+          "span": "L50-L68"
+        },
+        {
+          "id": "src/adapters/http/routes/workflows/ui/runs/runs_tests.rs#a_run_with_a_child_shows_its_lineage_steps_and_controls_through_the_parent",
+          "relation": "calls",
+          "depth": 5,
+          "name": "a_run_with_a_child_shows_its_lineage_steps_and_controls_through_the_parent",
+          "kind": "function",
+          "path": "src/adapters/http/routes/workflows/ui/runs/runs_tests.rs",
+          "span": "L382-L498"
+        },
+        {
+          "id": "src/adapters/http/routes/workflows/ui/runs/runs_tests.rs#bound",
+          "relation": "calls",
+          "depth": 5,
+          "name": "bound",
+          "kind": "function",
+          "path": "src/adapters/http/routes/workflows/ui/runs/runs_tests.rs",
+          "span": "L128-L151"
+        },
+        {
+          "id": "src/adapters/http/routes/workflows/ui/runs/runs_tests.rs#every_runs_write_refuses_a_cross_origin_cookie_post",
+          "relation": "calls",
+          "depth": 5,
+          "name": "every_runs_write_refuses_a_cross_origin_cookie_post",
+          "kind": "function",
+          "path": "src/adapters/http/routes/workflows/ui/runs/runs_tests.rs",
+          "span": "L785-L818"
+        },
+        {
+          "id": "src/adapters/http/routes/workflows/ui/runs/runs_tests.rs#form",
+          "relation": "calls",
+          "depth": 5,
+          "name": "form",
+          "kind": "function",
+          "path": "src/adapters/http/routes/workflows/ui/runs/runs_tests.rs",
+          "span": "L348-L354"
+        },
+        {
+          "id": "src/adapters/http/routes/workflows/ui/runs/runs_tests.rs#other_tenants_and_plain_members_reach_no_run_and_hostile_content_is_escaped",
+          "relation": "calls",
+          "depth": 5,
+          "name": "other_tenants_and_plain_members_reach_no_run_and_hostile_content_is_escaped",
+          "kind": "function",
+          "path": "src/adapters/http/routes/workflows/ui/runs/runs_tests.rs",
+          "span": "L665-L782"
+        },
+        {
+          "id": "src/adapters/http/routes/workflows/ui/runs/runs_tests.rs#published",
+          "relation": "calls",
+          "depth": 5,
+          "name": "published",
+          "kind": "function",
+          "path": "src/adapters/http/routes/workflows/ui/runs/runs_tests.rs",
+          "span": "L93-L125"
+        },
+        {
+          "id": "src/adapters/http/routes/workflows/ui/runs/runs_tests.rs#run_until_done",
+          "relation": "calls",
+          "depth": 5,
+          "name": "run_until_done",
+          "kind": "function",
+          "path": "src/adapters/http/routes/workflows/ui/runs/runs_tests.rs",
+          "span": "L181-L206"
+        },
+        {
+          "id": "src/adapters/http/routes/workflows/ui/runs/runs_tests.rs#the_list_pages_over_runs_an_admin_cannot_see_and_labels_reruns_and_children",
+          "relation": "calls",
+          "depth": 5,
+          "name": "the_list_pages_over_runs_an_admin_cannot_see_and_labels_reruns_and_children",
+          "kind": "function",
+          "path": "src/adapters/http/routes/workflows/ui/runs/runs_tests.rs",
+          "span": "L501-L655"
+        },
+        {
+          "id": "src/adapters/http/routes/workflows/ui/runs/runs_tests.rs#ui_over",
+          "relation": "calls",
+          "depth": 5,
+          "name": "ui_over",
+          "kind": "function",
+          "path": "src/adapters/http/routes/workflows/ui/runs/runs_tests.rs",
+          "span": "L328-L346"
+        },
+        {
+          "id": "src/adapters/http/routes/workflows/ui/authoring/tests.rs#save",
+          "relation": "calls",
+          "depth": 6,
+          "name": "save",
+          "kind": "function",
+          "path": "src/adapters/http/routes/workflows/ui/authoring/tests.rs",
+          "span": "L89-L98"
+        },
+        {
+          "id": "src/adapters/http/routes/workflows/ui/authoring/sample_tests.rs#sample_mcp_fixture_never_contacts_selected_endpoint_and_rejects_foreign_selection",
+          "relation": "calls",
+          "depth": 6,
+          "name": "sample_mcp_fixture_never_contacts_selected_endpoint_and_rejects_foreign_selection",
+          "kind": "function",
+          "path": "src/adapters/http/routes/workflows/ui/authoring/sample_tests.rs",
+          "span": "L179-L224"
+        },
+        {
+          "id": "src/adapters/http/routes/workflows/ui/authoring/tests.rs#reviewed_connection",
+          "relation": "calls",
+          "depth": 6,
+          "name": "reviewed_connection",
+          "kind": "function",
+          "path": "src/adapters/http/routes/workflows/ui/authoring/tests.rs",
+          "span": "L476-L478"
+        },
+        {
+          "id": "src/adapters/http/routes/workflows/ui/authoring/tests.rs#pane",
+          "relation": "calls",
+          "depth": 6,
+          "name": "pane",
+          "kind": "function",
+          "path": "src/adapters/http/routes/workflows/ui/authoring/tests.rs",
+          "span": "L76-L87"
+        },
+        {
+          "id": "src/adapters/http/routes/workflows/ui/runs/runs_tests.rs#parent_and_child",
+          "relation": "calls",
+          "depth": 6,
+          "name": "parent_and_child",
+          "kind": "function",
+          "path": "src/adapters/http/routes/workflows/ui/runs/runs_tests.rs",
+          "span": "L367-L379"
+        },
+        {
+          "id": "src/adapters/http/routes/workflows/ui/runs/board_view_tests.rs#run_board_view_opens_the_pane_answers_its_region_and_leaves_the_list_alone",
+          "relation": "calls",
+          "depth": 6,
+          "name": "run_board_view_opens_the_pane_answers_its_region_and_leaves_the_list_alone",
+          "kind": "function",
+          "path": "src/adapters/http/routes/workflows/ui/runs/board_view_tests.rs",
+          "span": "L336-L434"
+        },
+        {
+          "id": "src/adapters/http/routes/workflows/ui/runs/controls_tests.rs#a_redraw_repeats_its_keys_until_the_command_shows_on_the_page",
+          "relation": "calls",
+          "depth": 6,
+          "name": "a_redraw_repeats_its_keys_until_the_command_shows_on_the_page",
+          "kind": "function",
+          "path": "src/adapters/http/routes/workflows/ui/runs/controls_tests.rs",
+          "span": "L295-L397"
+        },
+        {
+          "id": "src/adapters/http/routes/workflows/ui/runs/controls_tests.rs#controls_act_at_the_revision_seen_and_say_what_they_did",
+          "relation": "calls",
+          "depth": 6,
+          "name": "controls_act_at_the_revision_seen_and_say_what_they_did",
+          "kind": "function",
+          "path": "src/adapters/http/routes/workflows/ui/runs/controls_tests.rs",
+          "span": "L7-L102"
+        },
+        {
+          "id": "src/adapters/http/routes/workflows/ui/runs/runs_tests.rs#ui",
+          "relation": "calls",
+          "depth": 6,
+          "name": "ui",
+          "kind": "function",
+          "path": "src/adapters/http/routes/workflows/ui/runs/runs_tests.rs",
+          "span": "L78-L80"
+        },
+        {
+          "id": "src/adapters/http/routes/workflows/ui/authoring/publish_tests.rs#an_mcp_step_validates_publishes_through_the_selected_slot_and_locates_bad_arguments",
+          "relation": "calls",
+          "depth": 7,
+          "name": "an_mcp_step_validates_publishes_through_the_selected_slot_and_locates_bad_arguments",
+          "kind": "function",
+          "path": "src/adapters/http/routes/workflows/ui/authoring/publish_tests.rs",
+          "span": "L204-L312"
+        },
+        {
+          "id": "src/adapters/http/routes/workflows/ui/runs/runs_tests.rs#body",
+          "relation": "calls",
+          "depth": 7,
+          "name": "body",
+          "kind": "function",
+          "path": "src/adapters/http/routes/workflows/ui/runs/runs_tests.rs",
+          "span": "L213-L224"
+        },
+        {
+          "id": "src/adapters/http/routes/workflows/ui/runs/runs_tests.rs#entries",
+          "relation": "calls",
+          "depth": 7,
+          "name": "entries",
+          "kind": "function",
+          "path": "src/adapters/http/routes/workflows/ui/runs/runs_tests.rs",
+          "span": "L248-L266"
+        },
+        {
+          "id": "src/adapters/http/routes/workflows/ui/runs/runs_tests.rs#list",
+          "relation": "calls",
+          "depth": 7,
+          "name": "list",
+          "kind": "function",
+          "path": "src/adapters/http/routes/workflows/ui/runs/runs_tests.rs",
+          "span": "L227-L245"
+        },
+        {
+          "id": "src/adapters/http/routes/workflows/ui/runs/runs_tests.rs#pane",
+          "relation": "calls",
+          "depth": 7,
+          "name": "pane",
+          "kind": "function",
+          "path": "src/adapters/http/routes/workflows/ui/runs/runs_tests.rs",
+          "span": "L208-L210"
+        }
+      ]
+    }
+  ],
+  "saved": {
+    "files": 17,
+    "baselineChars": 272676
+  }
+}

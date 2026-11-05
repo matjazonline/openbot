@@ -1,0 +1,371 @@
+diff --git a/.env.example b/.env.example
+index 1f7ce94..0cdf8ec 100644
+--- a/.env.example
++++ b/.env.example
+@@ -146,3 +146,5 @@ ENABLE_HEURISTIC_SCANNER=true
+ # python3 scripts/prepare-knowledge-model.py
+ # KNOWLEDGE_MODEL_DIR=./target/knowledge-model
+ # Default in the production image: /app/models/multilingual-e5-small
++# Passages returned by knowledge search: 1–8; invalid values stop startup.
++# KNOWLEDGE_SEARCH_TOP_K=5
+diff --git a/docs/deploy.md b/docs/deploy.md
+index a2d9bf8..4fdd55e 100644
+--- a/docs/deploy.md
++++ b/docs/deploy.md
+@@ -69,6 +69,13 @@ the expected path. There is no runtime download, fallback model or first-request
+ public-fixture quality, shape, timing and peak resident-memory measurements. Normal unit/database
+ tests use an explicit fake embedder.
+ 
++Knowledge search returns five passages by default. `KNOWLEDGE_SEARCH_TOP_K` accepts integers from
++1 through 8; startup rejects other values. A company can store at most 8192 indexed chunks, in
++addition to the 10 MiB text and 4096 file-layer limits. An upload that would exceed a limit is
++rejected as a whole. Search and uploads share the same model and processing slot; busy or timed
++out searches return retryable errors. A search question must also fit the local model's 512-token
++input limit, including its prefix and special tokens.
++
+ The Linux/aarch64 image probe with two CPUs measured about **1452 MiB cold peak RSS**, including
+ four 512-token passages. `fly.toml` therefore provisions **2 GiB**. CI requires
+ `scripts/check-knowledge-image.py --image <built-image>` to pass under a **hard 2048 MiB container
+diff --git a/src/infra/config.rs b/src/infra/config.rs
+index 78d725c..62d9ee7 100644
+--- a/src/infra/config.rs
++++ b/src/infra/config.rs
+@@ -72,6 +72,7 @@ fn parse_smtp_allow_plaintext_local(value: Option<&str>) -> bool {
+ 
+ pub struct AppConfig {
+     pub knowledge_model_dir: std::path::PathBuf,
++    pub knowledge_search_limit: crate::application::knowledge::search::KnowledgeSearchLimit,
+     pub jwt_secret: String,
+     pub auth_attempt_secret: crate::use_cases::user::AuthAttemptSecret,
+     pub refresh_token_ttl: Duration,
+@@ -115,6 +116,31 @@ pub struct AppConfig {
+     pub resend_api: ResendApiConfig,
+ }
+ 
++fn knowledge_search_limit_from_env() -> crate::application::knowledge::search::KnowledgeSearchLimit
++{
++    match env::var("KNOWLEDGE_SEARCH_TOP_K") {
++        Ok(value) => parse_knowledge_search_limit(Some(&value)),
++        Err(env::VarError::NotPresent) => parse_knowledge_search_limit(None),
++        Err(env::VarError::NotUnicode(_)) => {
++            panic!("KNOWLEDGE_SEARCH_TOP_K must be an integer from 1 to 8")
++        }
++    }
++}
++
++fn parse_knowledge_search_limit(
++    value: Option<&str>,
++) -> crate::application::knowledge::search::KnowledgeSearchLimit {
++    use crate::application::knowledge::search::KnowledgeSearchLimit;
++    match value {
++        None => KnowledgeSearchLimit::default(),
++        Some(value) => value
++            .parse::<usize>()
++            .ok()
++            .and_then(|value| KnowledgeSearchLimit::new(value).ok())
++            .expect("KNOWLEDGE_SEARCH_TOP_K must be an integer from 1 to 8"),
++    }
++}
++
+ fn parse_auth_attempt_secret(
+     value: Option<&str>,
+     jwt_secret: &str,
+@@ -581,6 +607,7 @@ impl AppConfig {
+ 
+         Self {
+             knowledge_model_dir: crate::adapters::embedding::model_directory_from_env(),
++            knowledge_search_limit: knowledge_search_limit_from_env(),
+             jwt_secret,
+             auth_attempt_secret,
+             refresh_token_ttl: Duration::days(refresh_token_ttl_days),
+@@ -664,6 +691,8 @@ impl AppConfig {
+     pub fn for_test() -> Self {
+         Self {
+             knowledge_model_dir: std::path::PathBuf::from("/test/no-model-required"),
++            knowledge_search_limit:
++                crate::application::knowledge::search::KnowledgeSearchLimit::default(),
+             jwt_secret: "a-test-secret-long-enough-to-sign-with-01".to_string(),
+             auth_attempt_secret: "a-distinct-auth-attempt-test-secret-02".into(),
+             refresh_token_ttl: Duration::days(30),
+@@ -702,6 +731,18 @@ mod tests {
+     /// Long enough to pass the startup check, which is itself part of what is under test.
+     const TEST_SECRET: &str = "a-test-secret-long-enough-to-sign-with-01";
+ 
++    #[test]
++    fn knowledge_search_config_limit_defaults_to_five_and_rejects_invalid_bounds() {
++        assert_eq!(parse_knowledge_search_limit(None).get(), 5);
++        assert_eq!(parse_knowledge_search_limit(Some("1")).get(), 1);
++        assert_eq!(parse_knowledge_search_limit(Some("8")).get(), 8);
++        for value in ["0", "9", "-1", "invalid", ""] {
++            assert!(
++                std::panic::catch_unwind(|| parse_knowledge_search_limit(Some(value))).is_err()
++            );
++        }
++    }
++
+     #[test]
+     fn runtime_thread_stack_is_bounded_and_defaults_to_sixteen_mebibytes() {
+         assert_eq!(parse_runtime_thread_stack_bytes(None), 16 * 1024 * 1024);
+diff --git a/src/infra/setup/mail.rs b/src/infra/setup/mail.rs
+index d740852..4e3a83f 100644
+--- a/src/infra/setup/mail.rs
++++ b/src/infra/setup/mail.rs
+@@ -27,15 +27,17 @@ pub(super) fn workflow(
+     Ok(Arc::new(
+         crate::infra::workflow::WorkflowEngine::new(
+             (*f.persistence).clone(),
+-            &f.config.public_base_url(),
+-            &f.config.app_domain_name,
+-            mail.composer.clone(),
+-            clients.mcp.clone(),
+-            f.monitoring.clone(),
+-            crate::infra::workflow::worker_slots(
+-                std::env::var("WORKFLOW_WORKER_SLOTS").ok().as_deref(),
+-                crate::infra::db::max_connections(),
+-            )?,
++            crate::infra::workflow::WorkflowEngineSetup {
++                config: &f.config,
++                composer: mail.composer.clone(),
++                mcp_client: clients.mcp.clone(),
++                monitoring: f.monitoring.clone(),
++                slots: crate::infra::workflow::worker_slots(
++                    std::env::var("WORKFLOW_WORKER_SLOTS").ok().as_deref(),
++                    crate::infra::db::max_connections(),
++                )?,
++                knowledge: f.knowledge.clone(),
++            },
+         )?
+         .with_jev_assets(Arc::new(
+             crate::adapters::workflow_jev::JevAssetReader::new(
+diff --git a/src/infra/workflow.rs b/src/infra/workflow.rs
+index 067ca36..1ac4778 100644
+--- a/src/infra/workflow.rs
++++ b/src/infra/workflow.rs
+@@ -186,83 +186,136 @@ pub struct WorkflowEngine {
+     pub worker_wakeups: Arc<Notify>,
+ }
+ 
++/// Named composition inputs keep the shared model explicit and avoid positional domain/URL arguments.
++pub struct WorkflowEngineSetup<'a> {
++    pub config: &'a crate::infra::config::AppConfig,
++    pub composer: DeliveryComposer,
++    pub mcp_client: Arc<dyn McpClient>,
++    pub monitoring: Arc<dyn MonitoringService>,
++    pub slots: usize,
++    pub knowledge: Arc<crate::application::knowledge::KnowledgeLibrary>,
++}
++
++struct ToolRuntimes {
++    http: Arc<HttpRuntime>,
++    mcp: Arc<McpRuntime>,
++    message: Arc<MessageRuntime>,
++    dispatch: AgentActionTools,
++}
++
++fn compose_tools(
++    persistence: &PostgresPersistence,
++    setup: &WorkflowEngineSetup<'_>,
++    notices: &DecisionNotices,
++    templates: &ProvisioningDeployment,
++    lease: LeasePolicy,
++) -> ToolRuntimes {
++    let http = Arc::new(HttpRuntime::with_approvals(
++        persistence.clone(),
++        HttpDestinationPolicy::default(),
++        lease,
++        Some(notices.clone()),
++    ));
++    let mcp = Arc::new(McpRuntime::with_approvals(
++        persistence.clone(),
++        setup.mcp_client.clone(),
++        lease,
++        Some(notices.clone()),
++    ));
++    let message = Arc::new(MessageRuntime::with_approvals(
++        persistence.clone(),
++        setup.composer.clone(),
++        setup.config.app_domain_name.clone(),
++        lease,
++        Some(notices.clone()),
++    ));
++    let provisioning = Arc::new(ProvisioningRuntime::new(
++        persistence.clone(),
++        ProvisioningEffects::new(templates.clone()),
++        lease,
++    ));
++    let store = Arc::new(persistence.clone());
++    let knowledge = crate::application::workflow::knowledge::KnowledgeSearchRuntime::new(
++        setup.knowledge.clone(),
++        store.clone(),
++        store,
++        setup.config.knowledge_search_limit,
++    );
++    let dispatch = AgentActionTools::new(http.clone(), mcp.clone(), message.clone())
++        .with_workflow_tools(Arc::new(persistence.clone()))
++        .with_provisioning(provisioning)
++        .with_knowledge(Arc::new(knowledge));
++    ToolRuntimes {
++        http,
++        mcp,
++        message,
++        dispatch,
++    }
++}
++
++fn compose_handler(
++    persistence: &PostgresPersistence,
++    setup: &WorkflowEngineSetup<'_>,
++    notices: &DecisionNotices,
++    templates: &ProvisioningDeployment,
++    lease: LeasePolicy,
++) -> anyhow::Result<Arc<ProductionHandler>> {
++    let tools = compose_tools(persistence, setup, notices, templates, lease);
++    let agent = WorkflowAgentRuntime::new(
++        ProviderRegistry::standard().map_err(|error| anyhow::anyhow!("{error}"))?,
++        persistence.clone(),
++        tools.dispatch,
++        Some(notices.clone()),
++        lease,
++    );
++    Ok(Arc::new(ProductionHandler {
++        jev: crate::application::workflow::jev::JevRuntime::new(
++            persistence.clone(),
++            Arc::new(crate::adapters::workflow_jev::JevHttp::new()?),
++            lease,
++        ),
++        agent,
++        http: tools.http,
++        mcp: tools.mcp,
++        message: tools.message,
++        history: WorkflowHistoryRuntime::new(persistence.clone()),
++    }))
++}
++
+ impl WorkflowEngine {
+-    /// `public_base_url` is `AppConfig::public_base_url()`; `app_domain` is `APP_DOMAIN_NAME`.
++    /// Every production caller supplies the Foundation-owned knowledge library.
+     pub fn new(
+         persistence: PostgresPersistence,
+-        public_base_url: &str,
+-        app_domain: &str,
+-        composer: DeliveryComposer,
+-        mcp_client: Arc<dyn McpClient>,
+-        monitoring: Arc<dyn MonitoringService>,
+-        slots: usize,
++        setup: WorkflowEngineSetup<'_>,
+     ) -> anyhow::Result<Self> {
+         let lease = LeasePolicy::new(LEASE).map_err(anyhow::Error::msg)?;
+-        let notices = DecisionNotices::new(composer.clone(), public_base_url, app_domain);
+-        let http = Arc::new(HttpRuntime::with_approvals(
+-            persistence.clone(),
+-            HttpDestinationPolicy::default(),
+-            lease,
+-            Some(notices.clone()),
+-        ));
+-        let mcp = Arc::new(McpRuntime::with_approvals(
+-            persistence.clone(),
+-            mcp_client,
+-            lease,
+-            Some(notices.clone()),
+-        ));
+-        let message = Arc::new(MessageRuntime::with_approvals(
+-            persistence.clone(),
+-            composer,
+-            app_domain.to_string(),
+-            lease,
+-            Some(notices.clone()),
+-        ));
++        let notices = DecisionNotices::new(
++            setup.composer.clone(),
++            &setup.config.public_base_url(),
++            &setup.config.app_domain_name,
++        );
+         let catalogue = TemplateCatalogue::shipped(&WorkflowSourceDecoder)
+             .map_err(|error| anyhow::anyhow!("shipped workflow templates: {error:?}"))?;
+-        let templates =
+-            ProvisioningDeployment::new(Arc::new(catalogue), UNHANDLED_STEP_KINDS, app_domain);
+-        let provisioning = Arc::new(ProvisioningRuntime::new(
+-            persistence.clone(),
+-            ProvisioningEffects::new(templates.clone()),
+-            lease,
+-        ));
+-        let tools = AgentActionTools::new(http.clone(), mcp.clone(), message.clone())
+-            .with_workflow_tools(Arc::new(persistence.clone()))
+-            .with_provisioning(provisioning);
+-        let agent = WorkflowAgentRuntime::new(
+-            ProviderRegistry::standard().map_err(|error| anyhow::anyhow!("{error}"))?,
+-            persistence.clone(),
+-            tools,
+-            Some(notices.clone()),
+-            lease,
++        let templates = ProvisioningDeployment::new(
++            Arc::new(catalogue),
++            UNHANDLED_STEP_KINDS,
++            &setup.config.app_domain_name,
+         );
+-        let handler = Arc::new(ProductionHandler {
+-            jev: crate::application::workflow::jev::JevRuntime::new(
+-                persistence.clone(),
+-                Arc::new(crate::adapters::workflow_jev::JevHttp::new()?),
+-                lease,
+-            ),
+-            agent,
+-            http,
+-            mcp,
+-            message,
+-            history: WorkflowHistoryRuntime::new(persistence.clone()),
+-        });
++        let handler = compose_handler(&persistence, &setup, &notices, &templates, lease)?;
+         let worker_wakeups = Arc::new(Notify::new());
+         let services = Arc::new(WorkflowServices {
+             persistence,
+             notices,
+             templates,
+-            monitoring: monitoring.clone(),
++            monitoring: setup.monitoring.clone(),
+             worker_wakeups: worker_wakeups.clone(),
+         });
+         Ok(Self {
+             services,
+             handler,
+-            slots,
++            slots: setup.slots,
+             active_jobs: ActiveWorkflowJobs::default(),
+-            monitoring,
++            monitoring: setup.monitoring,
+             intent_wakeups: Arc::new(Notify::new()),
+             worker_wakeups,
+         })
+@@ -421,14 +474,26 @@ impl WorkflowEngine {
+         let client = Arc::new(crate::adapters::mcp::HttpMcpClient::new(
+             crate::adapters::mcp::policy::EndpointPolicy::default(),
+         ));
++        let config = crate::infra::config::AppConfig {
++            app_domain_name: "agents.test".into(),
++            ..crate::infra::config::AppConfig::for_test()
++        };
++        let knowledge = Arc::new(crate::application::knowledge::KnowledgeLibrary::new(
++            Arc::new(persistence.clone()),
++            Arc::new(
++                crate::application::knowledge::test_support::DeterministicTextEmbedder::default(),
++            ),
++        ));
+         Self::new(
+             persistence,
+-            "https://agents.test",
+-            "agents.test",
+-            composer,
+-            client,
+-            Arc::new(crate::adapters::monitoring::InMemoryMonitor::new()),
+-            1,
++            WorkflowEngineSetup {
++                config: &config,
++                composer,
++                mcp_client: client,
++                monitoring: Arc::new(crate::adapters::monitoring::InMemoryMonitor::new()),
++                slots: 1,
++                knowledge,
++            },
+         )
+         .unwrap()
+     }

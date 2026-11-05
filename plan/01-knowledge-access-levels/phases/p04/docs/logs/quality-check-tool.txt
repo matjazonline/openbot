@@ -1,0 +1,21 @@
+import subprocess,os,json,sys,time
+from pathlib import Path
+logs=Path("plan/01-knowledge-access-levels/phases/p04/docs/logs")
+env=os.environ.copy();env.update(CARGO_INCREMENTAL="0",CARGO_NET_OFFLINE="true",DATABASE_URL="postgres://mac02@127.0.0.1:55504/open_bots",TEST_DATABASE_URL="postgres://mac02@127.0.0.1:55504/open_bots_test")
+steps=[
+("sqlx-live-prepare",["cargo","sqlx","prepare","--","--locked","--offline","--all-targets"],"false"),
+("sqlx-cache-check",["cargo","sqlx","prepare","--check","--","--locked","--offline","--all-targets"],"false"),
+("offline-alltargets",["cargo","check","--locked","--offline","--all-targets"],"true"),
+("clippy-alltargets",["cargo","clippy","--locked","--offline","--all-targets","--","-D","warnings"],"true"),
+("current-production-build",["cargo","build","--locked","--offline"],"true"),
+("stack-frames-after",["bash","scripts/stack-frames.sh","target/debug/open_bots"],"true"),
+("fmt",["cargo","fmt","--all","--","--check"],"true"),
+("source-whitespace",["git","diff","--check","--",".env.example","docs/deploy.md","migrations","src",".sqlx"],"true"),
+]
+for name,cmd,offline in steps:
+ env["SQLX_OFFLINE"]=offline;start=time.monotonic()
+ print({"step":name,"status":"started"},flush=True)
+ with(logs/("author-"+name+".log")).open("w")as out:r=subprocess.run(cmd,env=env,stdout=out,stderr=subprocess.STDOUT)
+ result={"command":cmd,"exit":r.returncode,"seconds":round(time.monotonic()-start,2),"SQLX_OFFLINE":offline}
+ (logs/("author-"+name+"-result.json")).write_text(json.dumps(result,indent=2)+"\n");print({"step":name,**result},flush=True)
+ if r.returncode:sys.exit(r.returncode)

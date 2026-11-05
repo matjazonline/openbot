@@ -1,0 +1,8 @@
+{
+  "identical": true,
+  "functions_at_or_above_32_KiB": 17,
+  "largest_KiB": 65,
+  "before_sha256": "79b0fc255f6c3156f7ee4cc6e511a9d3d8ef370eadf28f8545ce6ab68f3b8a29",
+  "after_sha256": "79b0fc255f6c3156f7ee4cc6e511a9d3d8ef370eadf28f8545ce6ab68f3b8a29",
+  "limits_raised": false
+}

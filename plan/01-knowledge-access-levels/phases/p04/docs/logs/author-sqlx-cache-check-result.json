@@ -1,0 +1,15 @@
+{
+  "command": [
+    "cargo",
+    "sqlx",
+    "prepare",
+    "--check",
+    "--",
+    "--locked",
+    "--offline",
+    "--all-targets"
+  ],
+  "exit": 0,
+  "seconds": 62.57,
+  "SQLX_OFFLINE": "false"
+}

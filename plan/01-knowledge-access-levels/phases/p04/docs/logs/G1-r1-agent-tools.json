@@ -1,0 +1,117 @@
+{
+  "pattern": "AgentActionTools::new",
+  "filesSearched": 1237,
+  "totalHits": 6,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/agent_runtime_tests.rs#agent_runtime",
+        "name": "agent_runtime",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/agent_runtime_tests.rs",
+        "span": "L181-L204"
+      },
+      "path": "src/adapters/persistence/workflow/agent_runtime_tests.rs",
+      "inDegree": 27,
+      "hits": [
+        {
+          "line": 200,
+          "text": "AgentActionTools::new(Arc::new(http), Arc::new(mcp), Arc::new(message)),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/infra/workflow.rs#new",
+        "name": "new",
+        "kind": "function",
+        "path": "src/infra/workflow.rs",
+        "span": "L191-L269"
+      },
+      "path": "src/infra/workflow.rs",
+      "inDegree": 10,
+      "hits": [
+        {
+          "line": 230,
+          "text": "let tools = AgentActionTools::new(http.clone(), mcp.clone(), message.clone())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/workflow_tool_support.rs#runtime",
+        "name": "runtime",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/workflow_tool_support.rs",
+        "span": "L346-L368"
+      },
+      "path": "src/adapters/persistence/workflow/workflow_tool_support.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 351,
+          "text": "AgentActionTools::new("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/agent_recovery_tests.rs#workflow_agent_run_dynamic_selection_runs_the_bound_agent",
+        "name": "workflow_agent_run_dynamic_selection_runs_the_bound_agent",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/agent_recovery_tests.rs",
+        "span": "L461-L604"
+      },
+      "path": "src/adapters/persistence/workflow/agent_recovery_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 568,
+          "text": "AgentActionTools::new("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/mcp_agent_tests.rs#workflow_agent_mcp_tool_dispatches_once_through_the_bound_slot",
+        "name": "workflow_agent_mcp_tool_dispatches_once_through_the_bound_slot",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/mcp_agent_tests.rs",
+        "span": "L27-L169"
+      },
+      "path": "src/adapters/persistence/workflow/mcp_agent_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 125,
+          "text": "AgentActionTools::new("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_agent_tests.rs#workflow_agent_message_tool_parks_on_delivery_and_continues_with_its_receipt",
+        "name": "workflow_agent_message_tool_parks_on_delivery_and_continues_with_its_receipt",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_agent_tests.rs",
+        "span": "L33-L178"
+      },
+      "path": "src/adapters/persistence/workflow/message_agent_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 99,
+          "text": "AgentActionTools::new("
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 6,
+    "baselineChars": 115643
+  }
+}

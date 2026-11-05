@@ -1,0 +1,185 @@
+{
+  "pattern": "knowledge_model_dir",
+  "filesSearched": 1252,
+  "totalHits": 10,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_stream_tests.rs#test_config",
+        "name": "test_config",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui_stream_tests.rs",
+        "span": "L141-L172"
+      },
+      "path": "src/adapters/http/routes/ui_stream_tests.rs",
+      "inDegree": 9,
+      "hits": [
+        {
+          "line": 143,
+          "text": "knowledge_model_dir: std::path::PathBuf::from(\"/test/no-model-required\"),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/smtp/server.rs#submitted_authentication_headers_cannot_authorize_smtp_mail",
+        "name": "submitted_authentication_headers_cannot_authorize_smtp_mail",
+        "kind": "function",
+        "path": "src/adapters/smtp/server.rs",
+        "span": "L1154-L1319"
+      },
+      "path": "src/adapters/smtp/server.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1188,
+          "text": "knowledge_model_dir: std::path::PathBuf::from(\"/test/no-model-required\"),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/smtp/server.rs#stale_dkim_and_submitted_auth_headers_do_not_authorize_smtp_mail",
+        "name": "stale_dkim_and_submitted_auth_headers_do_not_authorize_smtp_mail",
+        "kind": "function",
+        "path": "src/adapters/smtp/server.rs",
+        "span": "L1374-L1518"
+      },
+      "path": "src/adapters/smtp/server.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1408,
+          "text": "knowledge_model_dir: std::path::PathBuf::from(\"/test/no-model-required\"),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/smtp/server.rs#test_smtp_rate_limiting_and_monitoring",
+        "name": "test_smtp_rate_limiting_and_monitoring",
+        "kind": "function",
+        "path": "src/adapters/smtp/server.rs",
+        "span": "L1521-L1605"
+      },
+      "path": "src/adapters/smtp/server.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1530,
+          "text": "knowledge_model_dir: std::path::PathBuf::from(\"/test/no-model-required\"),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/smtp/server.rs#smtp_sender_trust_lookup_failure_is_logged_and_scanned",
+        "name": "smtp_sender_trust_lookup_failure_is_logged_and_scanned",
+        "kind": "function",
+        "path": "src/adapters/smtp/server.rs",
+        "span": "L1618-L1660"
+      },
+      "path": "src/adapters/smtp/server.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1621,
+          "text": "knowledge_model_dir: std::path::PathBuf::from(\"/test/no-model-required\"),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/smtp/server.rs#smtp_sender_trust_matches_routing_aliases_and_distinguishes_strangers",
+        "name": "smtp_sender_trust_matches_routing_aliases_and_distinguishes_strangers",
+        "kind": "function",
+        "path": "src/adapters/smtp/server.rs",
+        "span": "L1663-L1744"
+      },
+      "path": "src/adapters/smtp/server.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1704,
+          "text": "knowledge_model_dir: std::path::PathBuf::from(\"/test/no-model-required\"),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/infra/config.rs#AppConfig",
+        "name": "AppConfig",
+        "kind": "struct",
+        "path": "src/infra/config.rs",
+        "span": "L73-L117"
+      },
+      "path": "src/infra/config.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 74,
+          "text": "pub knowledge_model_dir: std::path::PathBuf,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/infra/config.rs#from_env~5",
+        "name": "from_env~5",
+        "kind": "function",
+        "path": "src/infra/config.rs",
+        "span": "L455-L639"
+      },
+      "path": "src/infra/config.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 609,
+          "text": "knowledge_model_dir: crate::adapters::embedding::model_directory_from_env(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/infra/config.rs#for_test",
+        "name": "for_test",
+        "kind": "function",
+        "path": "src/infra/config.rs",
+        "span": "L691-L724"
+      },
+      "path": "src/infra/config.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 693,
+          "text": "knowledge_model_dir: std::path::PathBuf::from(\"/test/no-model-required\"),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/infra/setup/foundation.rs#build",
+        "name": "build",
+        "kind": "function",
+        "path": "src/infra/setup/foundation.rs",
+        "span": "L13-L60"
+      },
+      "path": "src/infra/setup/foundation.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 14,
+          "text": "let model_path = config.knowledge_model_dir.clone();"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 4,
+    "baselineChars": 124095
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "binary": "/Users/mac02/dev/openbot-recovery/.worktrees/knowledge-p04/target/debug/deps/open_bots-c19a0b960dacdcef",
+  "selected": 5,
+  "test_names": [
+    "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::atomic::knowledge_search_competing_observers_keep_one_canonical_result_and_its_exact_stamp",
+    "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::atomic::knowledge_search_failure_after_result_and_rise_rolls_back_the_entire_observation",
+    "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::atomic::knowledge_search_forged_fences_and_changed_arguments_fail_before_embedding",
+    "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::atomic::knowledge_search_generic_checkpoint_result_cannot_bypass_classification",
+    "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::atomic::knowledge_search_level_argument_is_a_saved_tool_error_without_embedding_or_rise"
+  ],
+  "exit": 0,
+  "stack": "stock2MiB",
+  "source_unchanged": true,
+  "tree_sha256": "b223f2844eae4e2b81f1f4137bd36a9ab4c557c31ac6949c69f281f94d551bed"
+}

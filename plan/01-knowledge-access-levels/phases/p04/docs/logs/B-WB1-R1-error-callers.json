@@ -1,0 +1,1898 @@
+{
+  "pattern": "AppError::Timeout|AppError::ServiceUnavailable",
+  "filesSearched": 1259,
+  "totalHits": 136,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_native_evidence_tests.rs#unknown_source",
+        "name": "unknown_source",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_native_evidence_tests.rs",
+        "span": "L57-L82"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_native_evidence_tests.rs",
+      "inDegree": 10,
+      "hits": [
+        {
+          "line": 68,
+          "text": "matches!(error, AppError::Timeout(ref message) if message == \"provider request remains active\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/user.rs#register_form",
+        "name": "register_form",
+        "kind": "function",
+        "path": "src/adapters/http/routes/user.rs",
+        "span": "L463-L524"
+      },
+      "path": "src/adapters/http/routes/user.rs",
+      "inDegree": 9,
+      "hits": [
+        {
+          "line": 512,
+          "text": "Err(AppError::ServiceUnavailable(_)) => ("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/channel_edit.rs#update_channel_within",
+        "name": "update_channel_within",
+        "kind": "function",
+        "path": "src/adapters/persistence/channel_edit.rs",
+        "span": "L45-L87"
+      },
+      "path": "src/adapters/persistence/channel_edit.rs",
+      "inDegree": 5,
+      "hits": [
+        {
+          "line": 63,
+          "text": "Ok(Err(AppError::DatabaseTimeout(detail))) => AppError::Timeout(format!("
+        },
+        {
+          "line": 68,
+          "text": "Err(_elapsed) => AppError::Timeout(format!("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/knowledge/search/ranking.rs#invalid",
+        "name": "invalid",
+        "kind": "function",
+        "path": "src/application/knowledge/search/ranking.rs",
+        "span": "L168-L170"
+      },
+      "path": "src/application/knowledge/search/ranking.rs",
+      "inDegree": 5,
+      "hits": [
+        {
+          "line": 169,
+          "text": "AppError::ServiceUnavailable(\"Knowledge search could not produce a bounded result\".into())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_eligibility_remaining_tests.rs#pending_action",
+        "name": "pending_action",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_eligibility_remaining_tests.rs",
+        "span": "L16-L44"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_eligibility_remaining_tests.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 27,
+          "text": "Err(AppError::Timeout(_)) => break,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/knowledge/vectors.rs#normalize_embedding",
+        "name": "normalize_embedding",
+        "kind": "function",
+        "path": "src/application/knowledge/vectors.rs",
+        "span": "L3-L18"
+      },
+      "path": "src/application/knowledge/vectors.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 10,
+          "text": "return Err(AppError::ServiceUnavailable("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/knowledge/mod.rs#mutation_error",
+        "name": "mutation_error",
+        "kind": "function",
+        "path": "src/adapters/http/routes/knowledge/mod.rs",
+        "span": "L146-L155"
+      },
+      "path": "src/adapters/http/routes/knowledge/mod.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 148,
+          "text": "AppError::ServiceUnavailable(_) | AppError::Timeout(_) => ("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/session.rs#session_store",
+        "name": "session_store",
+        "kind": "function",
+        "path": "src/adapters/http/session.rs",
+        "span": "L223-L231"
+      },
+      "path": "src/adapters/http/session.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 227,
+          "text": "_ => Err(AppError::ServiceUnavailable("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_bounds_tests.rs#scheduled_limit",
+        "name": "scheduled_limit",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_bounds_tests.rs",
+        "span": "L106-L164"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_bounds_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 112,
+          "text": "Err(AppError::Timeout(_))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_source.rs#provider_timeout",
+        "name": "provider_timeout",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_source.rs",
+        "span": "L12-L51"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_high_bounds_source.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 44,
+          "text": "matches!(&observed, Err(AppError::Timeout(_))),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_prior_bounds_support.rs#withheld_timeout",
+        "name": "withheld_timeout",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_prior_bounds_support.rs",
+        "span": "L305-L322"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_prior_bounds_support.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 311,
+          "text": "matches!(result, Err(AppError::Timeout(message)) if message == \"Workflow reconciliation verification\"),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_reopen_tests.rs#pending_request",
+        "name": "pending_request",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_reopen_tests.rs",
+        "span": "L112-L122"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_reopen_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 116,
+          "text": "Err(AppError::Timeout(_))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_tests.rs#seeded",
+        "name": "seeded",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_tests.rs",
+        "span": "L47-L99"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 72,
+          "text": "Err(AppError::Timeout(_))"
+        },
+        {
+          "line": 78,
+          "text": "Err(AppError::Timeout(_))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/knowledge/query_embedding.rs#query_live",
+        "name": "query_live",
+        "kind": "function",
+        "path": "src/application/knowledge/query_embedding.rs",
+        "span": "L103-L111"
+      },
+      "path": "src/application/knowledge/query_embedding.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 105,
+          "text": "Err(AppError::Timeout("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/knowledge/service.rs#live",
+        "name": "live",
+        "kind": "function",
+        "path": "src/application/knowledge/service.rs",
+        "span": "L128-L135"
+      },
+      "path": "src/application/knowledge/service.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 130,
+          "text": "return Err(AppError::Timeout("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/embedding/mod.rs#unavailable",
+        "name": "unavailable",
+        "kind": "function",
+        "path": "src/adapters/embedding/mod.rs",
+        "span": "L119-L121"
+      },
+      "path": "src/adapters/embedding/mod.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 120,
+          "text": "AppError::ServiceUnavailable(\"The local embedding model could not process the text\".into())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/harness/rig/workflow.rs#failure",
+        "name": "failure",
+        "kind": "function",
+        "path": "src/adapters/harness/rig/workflow.rs",
+        "span": "L408-L432"
+      },
+      "path": "src/adapters/harness/rig/workflow.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 421,
+          "text": "AppError::Timeout(_) => (Retryable, \"timeout\"),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/knowledge/bounds.rs#uncertain",
+        "name": "uncertain",
+        "kind": "function",
+        "path": "src/adapters/persistence/knowledge/bounds.rs",
+        "span": "L9-L13"
+      },
+      "path": "src/adapters/persistence/knowledge/bounds.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 10,
+          "text": "AppError::ServiceUnavailable("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/knowledge/search.rs#unavailable",
+        "name": "unavailable",
+        "kind": "function",
+        "path": "src/adapters/persistence/knowledge/search.rs",
+        "span": "L93-L95"
+      },
+      "path": "src/adapters/persistence/knowledge/search.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 94,
+          "text": "AppError::ServiceUnavailable(\"Knowledge search could not read the company library\".into())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_receipt_tests.rs#invoke",
+        "name": "invoke",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_receipt_tests.rs",
+        "span": "L17-L50"
+      },
+      "path": "src/adapters/persistence/workflow/action_receipt_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 47,
+          "text": "return Err(AppError::Timeout(\"lost after applied remote effect\".into()));"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_association_tests.rs#associated",
+        "name": "associated",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_association_tests.rs",
+        "span": "L52-L109"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_association_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 97,
+          "text": "Err(AppError::Timeout(_))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_live_boundary_tests.rs#invoke",
+        "name": "invoke",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_live_boundary_tests.rs",
+        "span": "L515-L534"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_live_boundary_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 523,
+          "text": "Err(AppError::Timeout(_))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_prior_bounds_support.rs#classify_pending",
+        "name": "classify_pending",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_prior_bounds_support.rs",
+        "span": "L55-L98"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_prior_bounds_support.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 81,
+          "text": "matches!(observed, Err(AppError::Timeout(ref message)) if message == \"provider request remains active\"),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_revision_overflow_tests.rs#lost_applied",
+        "name": "lost_applied",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_revision_overflow_tests.rs",
+        "span": "L87-L126"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_revision_overflow_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 112,
+          "text": "matches!(&observed, Err(AppError::Timeout(message)) if message == \"response lost after durable effect\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_snapshot_binding_tests.rs#claimed_after_final",
+        "name": "claimed_after_final",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_snapshot_binding_tests.rs",
+        "span": "L13-L54"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_snapshot_binding_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 21,
+          "text": "Err(AppError::Timeout(_))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_uncertainty_acceptance_tests.rs#terminal_audit",
+        "name": "terminal_audit",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_uncertainty_acceptance_tests.rs",
+        "span": "L243-L301"
+      },
+      "path": "src/adapters/persistence/workflow/action_uncertainty_acceptance_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 261,
+          "text": "assert!(matches!(result, Err(AppError::Timeout(_))));"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/onboarding.rs#timeout_error",
+        "name": "timeout_error",
+        "kind": "function",
+        "path": "src/application/use_cases/onboarding.rs",
+        "span": "L332-L334"
+      },
+      "path": "src/application/use_cases/onboarding.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 333,
+          "text": "AppError::ServiceUnavailable(\"Onboarding timed out. Please retry this submission.\".into())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/user/mod.rs#password_job",
+        "name": "password_job",
+        "kind": "function",
+        "path": "src/application/use_cases/user/mod.rs",
+        "span": "L83-L99"
+      },
+      "path": "src/application/use_cases/user/mod.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 89,
+          "text": "AppError::ServiceUnavailable(\"Password hashing capacity exhausted\".into())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/harness/rig/workflow.rs#run",
+        "name": "run",
+        "kind": "function",
+        "path": "src/adapters/harness/rig/workflow.rs",
+        "span": "L278-L352"
+      },
+      "path": "src/adapters/harness/rig/workflow.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 310,
+          "text": ".ok_or_else(|| AppError::Timeout(\"Rig deadline exceeded\".into()))?"
+        },
+        {
+          "line": 351,
+          "text": ".map_err(|_| AppError::Timeout(\"Rig deadline exceeded\".into()))?"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/app_error_impl.rs#into_response",
+        "name": "into_response",
+        "kind": "function",
+        "path": "src/adapters/http/app_error_impl.rs",
+        "span": "L8-L72"
+      },
+      "path": "src/adapters/http/app_error_impl.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 19,
+          "text": "AppError::ServiceUnavailable(_) => \"service_unavailable\","
+        },
+        {
+          "line": 25,
+          "text": "AppError::Timeout(_) => \"timeout\","
+        },
+        {
+          "line": 54,
+          "text": "AppError::ServiceUnavailable(_) => ("
+        },
+        {
+          "line": 65,
+          "text": "AppError::Timeout(_) => {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_profile.rs#change_password",
+        "name": "change_password",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui_profile.rs",
+        "span": "L308-L371"
+      },
+      "path": "src/adapters/http/routes/ui_profile.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 351,
+          "text": "Err(error @ AppError::ServiceUnavailable(_)) => return Err(error),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_profile.rs#set_password",
+        "name": "set_password",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui_profile.rs",
+        "span": "L375-L421"
+      },
+      "path": "src/adapters/http/routes/ui_profile.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 402,
+          "text": "Err(error @ AppError::ServiceUnavailable(_)) => return Err(error),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/user.rs#login_form",
+        "name": "login_form",
+        "kind": "function",
+        "path": "src/adapters/http/routes/user.rs",
+        "span": "L558-L616"
+      },
+      "path": "src/adapters/http/routes/user.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 604,
+          "text": "Err(AppError::ServiceUnavailable(_)) => ("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/mod.rs#into_response",
+        "name": "into_response",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/mod.rs",
+        "span": "L186-L215"
+      },
+      "path": "src/adapters/http/routes/workflows/mod.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 191,
+          "text": "Self::App(AppError::Timeout(message)) => {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/knowledge/search_quota_tests.rs#assert_corrupted_scan_is_refused",
+        "name": "assert_corrupted_scan_is_refused",
+        "kind": "function",
+        "path": "src/adapters/persistence/knowledge/search_quota_tests.rs",
+        "span": "L97-L118"
+      },
+      "path": "src/adapters/persistence/knowledge/search_quota_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 111,
+          "text": "Err(AppError::ServiceUnavailable(_))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_receipt_acceptance_tests.rs#finish_remote",
+        "name": "finish_remote",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_receipt_acceptance_tests.rs",
+        "span": "L30-L43"
+      },
+      "path": "src/adapters/persistence/workflow/action_receipt_acceptance_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 40,
+          "text": "Err(AppError::Timeout("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_attribution_tests.rs#owner",
+        "name": "owner",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_attribution_tests.rs",
+        "span": "L165-L233"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_attribution_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 183,
+          "text": "Err(AppError::Timeout(_))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_claim_sql_candidate_tests.rs#retire",
+        "name": "retire",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_claim_sql_candidate_tests.rs",
+        "span": "L85-L121"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_claim_sql_candidate_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 111,
+          "text": "matches!(&observed, Err(AppError::Timeout(_))),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_commit_conflict_tests.rs#source",
+        "name": "source",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_commit_conflict_tests.rs",
+        "span": "L90-L166"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_commit_conflict_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 97,
+          "text": "Err(AppError::Timeout(_))"
+        },
+        {
+          "line": 128,
+          "text": "matches!(lost,Err(AppError::Timeout(ref message)) if message==\"response lost after durable effect\"),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_commit_tests.rs#source",
+        "name": "source",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_commit_tests.rs",
+        "span": "L76-L125"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_commit_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 90,
+          "text": "matches!(lost, Err(AppError::Timeout(ref message)) if message==\"response lost after durable effect\"),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_late_truth_tests.rs#consume_and_park",
+        "name": "consume_and_park",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_late_truth_tests.rs",
+        "span": "L84-L99"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_late_truth_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 89,
+          "text": "Err(AppError::Timeout(_))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_native_attribution_tests.rs#source",
+        "name": "source",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_native_attribution_tests.rs",
+        "span": "L107-L143"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_native_attribution_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 131,
+          "text": "assert!(matches!(error, AppError::Timeout(ref message) if message == expected));"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_native_bounds_tests.rs#result_source",
+        "name": "result_source",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_native_bounds_tests.rs",
+        "span": "L168-L212"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_native_bounds_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 182,
+          "text": "Err(AppError::Timeout(_))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_other_audit_tests.rs#unknown_owner",
+        "name": "unknown_owner",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_other_audit_tests.rs",
+        "span": "L33-L101"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_other_audit_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 40,
+          "text": "Err(AppError::Timeout(_))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_proof_clock_tests.rs#assert_stopped",
+        "name": "assert_stopped",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_proof_clock_tests.rs",
+        "span": "L315-L400"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_proof_clock_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 366,
+          "text": "assert!(matches!(result, Err(AppError::Timeout(_))));"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_proof_tests.rs#lost_retry",
+        "name": "lost_retry",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_proof_tests.rs",
+        "span": "L206-L244"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_proof_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 223,
+          "text": ".filter(|r| matches!(r, Err(AppError::Timeout(_))))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_retained_truth_tests.rs#seeded_final",
+        "name": "seeded_final",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_retained_truth_tests.rs",
+        "span": "L259-L295"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_retained_truth_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 277,
+          "text": "Err(AppError::Timeout(_))"
+        },
+        {
+          "line": 283,
+          "text": "Err(AppError::Timeout(_))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_snapshot_receipt_tests.rs#prepared_receipt",
+        "name": "prepared_receipt",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_snapshot_receipt_tests.rs",
+        "span": "L18-L54"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_snapshot_receipt_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 41,
+          "text": "Observation::Unknown => assert!(matches!(response, Err(AppError::Timeout(_)))),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_terminal_revision_tests.rs#proven_action",
+        "name": "proven_action",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_terminal_revision_tests.rs",
+        "span": "L48-L84"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_terminal_revision_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 54,
+          "text": "Err(AppError::Timeout(_))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_validation_tests.rs#pending_source_result",
+        "name": "pending_source_result",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_validation_tests.rs",
+        "span": "L173-L196"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_validation_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 178,
+          "text": "Err(AppError::Timeout(message)) => {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/lease.rs#confirm_suspension",
+        "name": "confirm_suspension",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/lease.rs",
+        "span": "L170-L187"
+      },
+      "path": "src/adapters/persistence/workflow/lease.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 186,
+          "text": ".map_err(|_| AppError::Timeout(\"Approval suspension confirmation timed out\".into()))?"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/knowledge/query_embedding.rs#embed_query",
+        "name": "embed_query",
+        "kind": "function",
+        "path": "src/application/knowledge/query_embedding.rs",
+        "span": "L51-L78"
+      },
+      "path": "src/application/knowledge/query_embedding.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 59,
+          "text": "AppError::ServiceUnavailable(\"Knowledge processing is busy; retry shortly\".into())"
+        },
+        {
+          "line": 66,
+          "text": ".map_err(|_| AppError::Timeout(\"Knowledge search exceeded its deadline\".into()))?"
+        },
+        {
+          "line": 68,
+          "text": "AppError::ServiceUnavailable(\"Knowledge search could not complete\".into())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/knowledge/query_embedding.rs#register_query",
+        "name": "register_query",
+        "kind": "function",
+        "path": "src/application/knowledge/query_embedding.rs",
+        "span": "L80-L100"
+      },
+      "path": "src/application/knowledge/query_embedding.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 91,
+          "text": ".map_err(|_| AppError::ServiceUnavailable(\"Knowledge search is unavailable\".into()))?;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/knowledge/service.rs#embed_document",
+        "name": "embed_document",
+        "kind": "function",
+        "path": "src/application/knowledge/service.rs",
+        "span": "L174-L208"
+      },
+      "path": "src/application/knowledge/service.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 192,
+          "text": "return Err(AppError::ServiceUnavailable("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/services/inbound_event_worker.rs#classify_commit_error",
+        "name": "classify_commit_error",
+        "kind": "function",
+        "path": "src/application/services/inbound_event_worker.rs",
+        "span": "L658-L677"
+      },
+      "path": "src/application/services/inbound_event_worker.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 667,
+          "text": "AppError::Timeout(_) => (InboundEventErrorClass::Deadline, false),"
+        },
+        {
+          "line": 673,
+          "text": "| AppError::ServiceUnavailable(_)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/storage.rs#bounded",
+        "name": "bounded",
+        "kind": "function",
+        "path": "src/application/workflow/storage.rs",
+        "span": "L47-L63"
+      },
+      "path": "src/application/workflow/storage.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 54,
+          "text": "Err(AppError::Timeout("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/harness/rig/execution.rs#drive",
+        "name": "drive",
+        "kind": "function",
+        "path": "src/adapters/harness/rig/execution.rs",
+        "span": "L75-L143"
+      },
+      "path": "src/adapters/harness/rig/execution.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 78,
+          "text": "return Err(AppError::Timeout(\"Rig deadline exceeded\".into()));"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/harness/rig/providers.rs#completion_error",
+        "name": "completion_error",
+        "kind": "function",
+        "path": "src/adapters/harness/rig/providers.rs",
+        "span": "L189-L198"
+      },
+      "path": "src/adapters/harness/rig/providers.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 194,
+          "text": "crate::app_error::AppError::Timeout(\"Rig provider request timed out\".into())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/harness/rig/providers.rs#a_stalled_provider_returns_a_typed_timeout_without_url_or_credentials",
+        "name": "a_stalled_provider_returns_a_typed_timeout_without_url_or_credentials",
+        "kind": "function",
+        "path": "src/adapters/harness/rig/providers.rs",
+        "span": "L207-L254"
+      },
+      "path": "src/adapters/harness/rig/providers.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 251,
+          "text": "assert!(matches!(error, crate::app_error::AppError::Timeout(_)));"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/auth_admission.rs#admit",
+        "name": "admit",
+        "kind": "function",
+        "path": "src/adapters/http/auth_admission.rs",
+        "span": "L290-L338"
+      },
+      "path": "src/adapters/http/auth_admission.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 297,
+          "text": "AppError::ServiceUnavailable(\"Authentication admission unavailable\".into())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/knowledge/tests.rs#knowledge_upload_http_unavailable_or_canceled_writes_require_refresh_instead_of_claiming_no_change",
+        "name": "knowledge_upload_http_unavailable_or_canceled_writes_require_refresh_instead_of_claiming_no_change",
+        "kind": "function",
+        "path": "src/adapters/http/routes/knowledge/tests.rs",
+        "span": "L337-L350"
+      },
+      "path": "src/adapters/http/routes/knowledge/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 340,
+          "text": "AppError::ServiceUnavailable(\"private diagnostic\".into()),"
+        },
+        {
+          "line": 341,
+          "text": "AppError::Timeout(\"canceled\".into()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/reconciliation_tests.rs#workflow_timeouts_answer_service_unavailable",
+        "name": "workflow_timeouts_answer_service_unavailable",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/reconciliation_tests.rs",
+        "span": "L318-L322"
+      },
+      "path": "src/adapters/http/routes/workflows/reconciliation_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 319,
+          "text": "let response = WorkflowError::App(AppError::Timeout(\"budget\".into())).into_response();"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/session_tests.rs#security_session_mismatched_row_revision_and_failed_insert",
+        "name": "security_session_mismatched_row_revision_and_failed_insert",
+        "kind": "function",
+        "path": "src/adapters/http/session_tests.rs",
+        "span": "L173-L208"
+      },
+      "path": "src/adapters/http/session_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 202,
+          "text": "Err(AppError::ServiceUnavailable(_))"
+        },
+        {
+          "line": 206,
+          "text": "Err(AppError::ServiceUnavailable(_))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/auth_attempts.rs#send_code",
+        "name": "send_code",
+        "kind": "function",
+        "path": "src/adapters/persistence/auth_attempts.rs",
+        "span": "L161-L168"
+      },
+      "path": "src/adapters/persistence/auth_attempts.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 167,
+          "text": "Err(AppError::ServiceUnavailable(\"SMTP delivery failed\".into()))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/auth_attempts.rs#security_email_identity_configured_send_failure_never_bypasses",
+        "name": "security_email_identity_configured_send_failure_never_bypasses",
+        "kind": "function",
+        "path": "src/adapters/persistence/auth_attempts.rs",
+        "span": "L157-L241"
+      },
+      "path": "src/adapters/persistence/auth_attempts.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 204,
+          "text": "Err(AppError::ServiceUnavailable(_))"
+        },
+        {
+          "line": 236,
+          "text": "Err(AppError::ServiceUnavailable(_))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/channel_edit_tests.rs#an_edit_that_cannot_take_its_locks_in_time_is_refused_as_a_timeout",
+        "name": "an_edit_that_cannot_take_its_locks_in_time_is_refused_as_a_timeout",
+        "kind": "function",
+        "path": "src/adapters/persistence/channel_edit_tests.rs",
+        "span": "L133-L170"
+      },
+      "path": "src/adapters/persistence/channel_edit_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 153,
+          "text": "matches!(&refused, Err(AppError::Timeout(message)) if message.contains(\"nothing was changed\")),"
+        },
+        {
+          "line": 163,
+          "text": "matches!(&refused, Err(AppError::Timeout(message)) if message.contains(\"nothing was changed\")),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/channel_edit.rs#edit_failure_kind",
+        "name": "edit_failure_kind",
+        "kind": "function",
+        "path": "src/adapters/persistence/channel_edit.rs",
+        "span": "L90-L97"
+      },
+      "path": "src/adapters/persistence/channel_edit.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 92,
+          "text": "AppError::Timeout(_) => \"timeout\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/knowledge/bounds.rs#knowledge_upload_client_bound_distinguishes_an_unsent_commit_from_an_unknown_acknowledgment",
+        "name": "knowledge_upload_client_bound_distinguishes_an_unsent_commit_from_an_unknown_acknowledgment",
+        "kind": "function",
+        "path": "src/adapters/persistence/knowledge/bounds.rs",
+        "span": "L50-L60"
+      },
+      "path": "src/adapters/persistence/knowledge/bounds.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 58,
+          "text": "assert!(matches!(error, AppError::ServiceUnavailable(_)));"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/knowledge/search.rs#visible",
+        "name": "visible",
+        "kind": "function",
+        "path": "src/adapters/persistence/knowledge/search.rs",
+        "span": "L46-L78"
+      },
+      "path": "src/adapters/persistence/knowledge/search.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 76,
+          "text": "AppError::Timeout(\"Knowledge search exceeded its database deadline\".into())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/onboarding/tests.rs#onboarding_prompt_and_operation_timeouts_cancel_and_allow_retry",
+        "name": "onboarding_prompt_and_operation_timeouts_cancel_and_allow_retry",
+        "kind": "function",
+        "path": "src/adapters/persistence/onboarding/tests.rs",
+        "span": "L611-L658"
+      },
+      "path": "src/adapters/persistence/onboarding/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 626,
+          "text": "matches!(error, AppError::ServiceUnavailable(ref message) if message.contains(\"timed out\"))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_dispatch_remote_tests.rs#reserve_remote",
+        "name": "reserve_remote",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_dispatch_remote_tests.rs",
+        "span": "L29-L56"
+      },
+      "path": "src/adapters/persistence/workflow/action_dispatch_remote_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 50,
+          "text": "return Err(AppError::Timeout("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_dispatch_tests.rs#invoke",
+        "name": "invoke",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_dispatch_tests.rs",
+        "span": "L292-L304"
+      },
+      "path": "src/adapters/persistence/workflow/action_dispatch_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 301,
+          "text": "return Err(AppError::Timeout(\"Lost remote response\".into()));"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_receipt_acceptance_tests.rs#workflow_action_receipt_committed_ambiguous_ack_restart_zero_io",
+        "name": "workflow_action_receipt_committed_ambiguous_ack_restart_zero_io",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_receipt_acceptance_tests.rs",
+        "span": "L50-L72"
+      },
+      "path": "src/adapters/persistence/workflow/action_receipt_acceptance_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 57,
+          "text": "Err(AppError::Timeout(_))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_attribution_tests.rs#workflow_action_reconciliation_attribution_consumed_new_entry_is_legitimate",
+        "name": "workflow_action_reconciliation_attribution_consumed_new_entry_is_legitimate",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_attribution_tests.rs",
+        "span": "L319-L390"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_attribution_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 326,
+          "text": "Err(AppError::Timeout(_))"
+        },
+        {
+          "line": 356,
+          "text": "Err(AppError::Timeout(_))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_prior_bounds_controls.rs#prior_bounds_early_command_failure_drains_pause_waiter",
+        "name": "prior_bounds_early_command_failure_drains_pause_waiter",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_prior_bounds_controls.rs",
+        "span": "L131-L150"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_prior_bounds_controls.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 143,
+          "text": "result.is_err() && !matches!(result, Err(AppError::Timeout(_))),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_prior_bounds_controls.rs#prior_bounds_unexpected_dispatch_error_is_not_void",
+        "name": "prior_bounds_unexpected_dispatch_error_is_not_void",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_prior_bounds_controls.rs",
+        "span": "L174-L185"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_prior_bounds_controls.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 182,
+          "text": "Err(AppError::Timeout(\"unrelated timeout\".into())),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_prior_bounds_support.rs#prior_bounds_timeout_discriminator_rejects_prompt_release_and_wrong_errors",
+        "name": "prior_bounds_timeout_discriminator_rejects_prompt_release_and_wrong_errors",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_prior_bounds_support.rs",
+        "span": "L325-L367"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_prior_bounds_support.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 327,
+          "text": "Err(AppError::Timeout("
+        },
+        {
+          "line": 339,
+          "text": "AppError::Timeout(\"provider request remains active\".into()),"
+        },
+        {
+          "line": 344,
+          "text": "AppError::Timeout(\"Workflow reconciliation verification\".into()),"
+        },
+        {
+          "line": 349,
+          "text": "AppError::Timeout(\"Workflow reconciliation verification\".into()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_provider_tests.rs#invoke",
+        "name": "invoke",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_provider_tests.rs",
+        "span": "L35-L66"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_provider_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 60,
+          "text": "Delivery::Pending => Err(AppError::Timeout(\"provider request remains active\".into())),"
+        },
+        {
+          "line": 61,
+          "text": "Delivery::Apply { lose: true, .. } => Err(AppError::Timeout("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_provider_tests.rs#workflow_action_reconciliation_provider_lost_applied_restart_without_io",
+        "name": "workflow_action_reconciliation_provider_lost_applied_restart_without_io",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_provider_tests.rs",
+        "span": "L216-L267"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_provider_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 229,
+          "text": "matches!(&observed, Err(AppError::Timeout(_))),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_provider_tests.rs#workflow_action_reconciliation_provider_active_is_unknown_until_actual_effect_or_barrier",
+        "name": "workflow_action_reconciliation_provider_active_is_unknown_until_actual_effect_or_barrier",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_provider_tests.rs",
+        "span": "L270-L340"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_provider_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 278,
+          "text": "matches!(&observed, Err(AppError::Timeout(_))),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_provider_tests.rs#workflow_action_reconciliation_provider_applied_without_usable_output_never_downgrades",
+        "name": "workflow_action_reconciliation_provider_applied_without_usable_output_never_downgrades",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_provider_tests.rs",
+        "span": "L343-L407"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_provider_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 361,
+          "text": "matches!(&observed, Err(AppError::Timeout(_))),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_snapshot_binding_tests.rs#workflow_action_reconciliation_snapshot_binding_under_bound_entry_change_refuses",
+        "name": "workflow_action_reconciliation_snapshot_binding_under_bound_entry_change_refuses",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_snapshot_binding_tests.rs",
+        "span": "L239-L292"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_snapshot_binding_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 261,
+          "text": "Err(AppError::Timeout(_))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_replay_tests.rs#invoke",
+        "name": "invoke",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_replay_tests.rs",
+        "span": "L27-L50"
+      },
+      "path": "src/adapters/persistence/workflow/action_replay_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 42,
+          "text": "Response::Lost => Err(AppError::Timeout(\"lost provider response\".into())),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/knowledge_search_atomic_tests.rs#knowledge_search_busy_model_is_retryable_without_saving_an_empty_observation",
+        "name": "knowledge_search_busy_model_is_retryable_without_saving_an_empty_observation",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/knowledge_search_atomic_tests.rs",
+        "span": "L254-L287"
+      },
+      "path": "src/adapters/persistence/workflow/knowledge_search_atomic_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 269,
+          "text": "matches!(error, AppError::ServiceUnavailable(_)),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/knowledge_search_support.rs#dispatch",
+        "name": "dispatch",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/knowledge_search_support.rs",
+        "span": "L293-L303"
+      },
+      "path": "src/adapters/persistence/workflow/knowledge_search_support.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 300,
+          "text": "Err(AppError::Timeout("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/metrics.rs#workflow_metrics",
+        "name": "workflow_metrics",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/metrics.rs",
+        "span": "L8-L31"
+      },
+      "path": "src/adapters/persistence/workflow/metrics.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 30,
+          "text": ".map_err(|_| AppError::Timeout(\"Workflow metrics collection\".into()))?"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/workflow_agent/mod.rs#dispatch",
+        "name": "dispatch",
+        "kind": "function",
+        "path": "src/adapters/workflow_agent/mod.rs",
+        "span": "L126-L182"
+      },
+      "path": "src/adapters/workflow_agent/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 164,
+          "text": "AppError::ServiceUnavailable("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/knowledge/query_embedding_tests.rs#knowledge_search_cancellation_retains_the_actual_shared_native_slot",
+        "name": "knowledge_search_cancellation_retains_the_actual_shared_native_slot",
+        "kind": "function",
+        "path": "src/application/knowledge/query_embedding_tests.rs",
+        "span": "L36-L56"
+      },
+      "path": "src/application/knowledge/query_embedding_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 45,
+          "text": "Err(AppError::ServiceUnavailable(_))"
+        },
+        {
+          "line": 49,
+          "text": "Err(AppError::ServiceUnavailable(_))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/knowledge/query_embedding_tests.rs#knowledge_search_timeout_is_an_error_and_retains_the_slot_until_native_completion",
+        "name": "knowledge_search_timeout_is_an_error_and_retains_the_slot_until_native_completion",
+        "kind": "function",
+        "path": "src/application/knowledge/query_embedding_tests.rs",
+        "span": "L59-L79"
+      },
+      "path": "src/application/knowledge/query_embedding_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 65,
+          "text": "assert!(matches!(first.await.unwrap(), Err(AppError::Timeout(_))));"
+        },
+        {
+          "line": 68,
+          "text": "Err(AppError::ServiceUnavailable(_))"
+        },
+        {
+          "line": 74,
+          "text": "assert!(matches!(shutdown.await.unwrap(), Err(AppError::Timeout(_))));"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/knowledge/query_embedding_tests.rs#knowledge_search_result_holds_the_slot_through_consumption_and_releases_on_drop",
+        "name": "knowledge_search_result_holds_the_slot_through_consumption_and_releases_on_drop",
+        "kind": "function",
+        "path": "src/application/knowledge/query_embedding_tests.rs",
+        "span": "L82-L96"
+      },
+      "path": "src/application/knowledge/query_embedding_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 90,
+          "text": "Err(AppError::ServiceUnavailable(_))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/knowledge/service_tests.rs#embed_query",
+        "name": "embed_query",
+        "kind": "function",
+        "path": "src/application/knowledge/service_tests.rs",
+        "span": "L132-L136"
+      },
+      "path": "src/application/knowledge/service_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 135,
+          "text": ".ok_or_else(|| AppError::ServiceUnavailable(\"Missing test model output\".into()))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/knowledge/service_tests.rs#knowledge_upload_cancellation_retains_actual_native_permit_and_bounded_shutdown_never_writes",
+        "name": "knowledge_upload_cancellation_retains_actual_native_permit_and_bounded_shutdown_never_writes",
+        "kind": "function",
+        "path": "src/application/knowledge/service_tests.rs",
+        "span": "L142-L169"
+      },
+      "path": "src/application/knowledge/service_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 158,
+          "text": "Err(AppError::ServiceUnavailable(_))"
+        },
+        {
+          "line": 164,
+          "text": "assert!(matches!(shutdown.await.unwrap(), Err(AppError::Timeout(_))));"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/knowledge/service_tests.rs#knowledge_upload_shutdown_competes_with_preflight_and_refuses_later_model_registration",
+        "name": "knowledge_upload_shutdown_competes_with_preflight_and_refuses_later_model_registration",
+        "kind": "function",
+        "path": "src/application/knowledge/service_tests.rs",
+        "span": "L221-L241"
+      },
+      "path": "src/application/knowledge/service_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 236,
+          "text": "Err(AppError::ServiceUnavailable(_))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/knowledge/service_tests.rs#knowledge_upload_deadline_cancels_the_result_and_retains_permit_until_the_native_batch_stops",
+        "name": "knowledge_upload_deadline_cancels_the_result_and_retains_permit_until_the_native_batch_stops",
+        "kind": "function",
+        "path": "src/application/knowledge/service_tests.rs",
+        "span": "L243-L265"
+      },
+      "path": "src/application/knowledge/service_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 256,
+          "text": "assert!(matches!(request.await.unwrap(), Err(AppError::Timeout(_))));"
+        },
+        {
+          "line": 259,
+          "text": "Err(AppError::ServiceUnavailable(_))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/knowledge/service.rs#upload",
+        "name": "upload",
+        "kind": "function",
+        "path": "src/application/knowledge/service.rs",
+        "span": "L57-L97"
+      },
+      "path": "src/application/knowledge/service.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 66,
+          "text": "AppError::ServiceUnavailable(\"Knowledge indexing is busy; retry shortly\".into())"
+        },
+        {
+          "line": 77,
+          "text": "AppError::ServiceUnavailable(\"Knowledge indexing is unavailable\".into())"
+        },
+        {
+          "line": 87,
+          "text": ".map_err(|_| AppError::Timeout(\"Knowledge indexing exceeded its deadline\".into()))?"
+        },
+        {
+          "line": 89,
+          "text": "AppError::ServiceUnavailable(\"Knowledge indexing could not complete\".into())"
+        },
+        {
+          "line": 94,
+          "text": "_ = cancel.cancelled() => Err(AppError::Timeout(\"Knowledge indexing was canceled\".into())),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/knowledge/service.rs#shutdown",
+        "name": "shutdown",
+        "kind": "function",
+        "path": "src/application/knowledge/service.rs",
+        "span": "L98-L113"
+      },
+      "path": "src/application/knowledge/service.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 101,
+          "text": "AppError::ServiceUnavailable(\"Knowledge indexing shutdown is unavailable\".into())"
+        },
+        {
+          "line": 111,
+          "text": "AppError::Timeout(\"Knowledge indexing did not stop within five seconds\".into())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/user/tests.rs#security_auth_limits_hash_capacity_fails_before_fifth_job",
+        "name": "security_auth_limits_hash_capacity_fails_before_fifth_job",
+        "kind": "function",
+        "path": "src/application/use_cases/user/tests.rs",
+        "span": "L60-L132"
+      },
+      "path": "src/application/use_cases/user/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 122,
+          "text": "Err(AppError::ServiceUnavailable(_))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/authorization_tests.rs#workflow_action_authorization_lookup_timeouts_fail_closed",
+        "name": "workflow_action_authorization_lookup_timeouts_fail_closed",
+        "kind": "function",
+        "path": "src/application/workflow/actions/authorization_tests.rs",
+        "span": "L292-L318"
+      },
+      "path": "src/application/workflow/actions/authorization_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 316,
+          "text": "assert!(matches!(resource, Err(AppError::Timeout(_))));"
+        },
+        {
+          "line": 317,
+          "text": "assert!(matches!(policy, Err(AppError::Timeout(_))));"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/authorization.rs#authorize",
+        "name": "authorize",
+        "kind": "function",
+        "path": "src/application/workflow/actions/authorization.rs",
+        "span": "L58-L94"
+      },
+      "path": "src/application/workflow/actions/authorization.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 78,
+          "text": ".map_err(|_| AppError::Timeout(\"Workflow action resource lookup\".into()))??"
+        },
+        {
+          "line": 91,
+          "text": ".map_err(|_| AppError::Timeout(\"Workflow action policy lookup\".into()))??"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/actions/reconciliation/service.rs#reconcile",
+        "name": "reconcile",
+        "kind": "function",
+        "path": "src/application/workflow/actions/reconciliation/service.rs",
+        "span": "L74-L93"
+      },
+      "path": "src/application/workflow/actions/reconciliation/service.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 82,
+          "text": "return Err(AppError::Timeout(\"Workflow reconciliation budget\".into()));"
+        },
+        {
+          "line": 90,
+          "text": "result.map_err(|_| AppError::Timeout(\"Workflow reconciliation verification\".into()))?"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/knowledge/runtime.rs#timed_out",
+        "name": "timed_out",
+        "kind": "function",
+        "path": "src/application/workflow/knowledge/runtime.rs",
+        "span": "L112-L114"
+      },
+      "path": "src/application/workflow/knowledge/runtime.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 113,
+          "text": "AppError::Timeout(\"Knowledge search was canceled or exceeded its deadline\".into())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/metrics_tests.rs#workflow_metrics",
+        "name": "workflow_metrics",
+        "kind": "function",
+        "path": "src/application/workflow/metrics_tests.rs",
+        "span": "L9-L18"
+      },
+      "path": "src/application/workflow/metrics_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 16,
+          "text": "None => Err(crate::app_error::AppError::Timeout(\"test\".into())),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/storage_tests.rs#retire_tree",
+        "name": "retire_tree",
+        "kind": "function",
+        "path": "src/application/workflow/storage_tests.rs",
+        "span": "L59-L75"
+      },
+      "path": "src/application/workflow/storage_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 67,
+          "text": "1 => Err(AppError::Timeout(\"protected lock\".into())),"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 76,
+    "baselineChars": 949330
+  }
+}

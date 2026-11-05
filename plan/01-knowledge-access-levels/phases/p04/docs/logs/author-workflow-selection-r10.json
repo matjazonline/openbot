@@ -1,0 +1,7 @@
+[
+  "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::ownership::knowledge_search_actual_statement_and_commit_expiry_roll_back_payload_rise_and_proof",
+  "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::ownership::knowledge_search_expired_database_lease_or_deadline_refuses_before_embedding",
+  "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::ownership::knowledge_search_proof_rewrite_delete_and_cross_company_insert_are_rejected",
+  "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::ownership::knowledge_search_real_replacement_claim_replays_original_and_fences_stale_competitor",
+  "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::ownership::knowledge_search_unknown_commit_ack_returns_no_content_then_reconstruction_reads_truth"
+]

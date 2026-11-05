@@ -1,0 +1,9 @@
+{
+  "baseline": "55f44c26564f55a648c04be5cdd50264d3181c83",
+  "files": {
+    "scripts/transport-boundary-check.sh": "f5123c80b02fee3f864b528846297134b42b05fdc5f9de8e2518821ff16aa2e8",
+    "src/adapters/persistence/thread/jsonb_row_context_tests.rs": "8f818e7f5cbd86d8ded0fe9e7ba899e5255bb89be2ab82d8100d2fbc9d7e91f2"
+  },
+  "exit": 1,
+  "disposition": "unchanged p05 test fixture uses test.invalid, strict gate kept intact; required phase06 debt"
+}

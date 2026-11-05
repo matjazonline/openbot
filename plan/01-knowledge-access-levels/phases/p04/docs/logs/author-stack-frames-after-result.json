@@ -1,0 +1,10 @@
+{
+  "command": [
+    "bash",
+    "scripts/stack-frames.sh",
+    "target/debug/open_bots"
+  ],
+  "exit": 0,
+  "seconds": 1.18,
+  "SQLX_OFFLINE": "true"
+}

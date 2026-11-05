@@ -1,0 +1,32 @@
+{
+  "pattern": "is_reserved_tool_name|ProvisioningKind::ALL|workflow_tools",
+  "filesSearched": 65,
+  "totalHits": 1,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/workflow_authoring/tools.rs#workflow_tools_pane",
+        "name": "workflow_tools_pane",
+        "kind": "function",
+        "path": "src/adapters/http/pages/workflow_authoring/tools.rs",
+        "span": "L51-L94"
+      },
+      "path": "src/adapters/http/pages/workflow_authoring/tools.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 51,
+          "text": "pub fn workflow_tools_pane(view: &ToolsView<'_>) -> String {"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 19647
+  }
+}

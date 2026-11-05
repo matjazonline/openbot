@@ -1,0 +1,111 @@
+diff --git a/migrations/20260817000000_init_schema.sql b/migrations/20260817000000_init_schema.sql
+index 8c61d08..fe0bfcf 100644
+--- a/migrations/20260817000000_init_schema.sql
++++ b/migrations/20260817000000_init_schema.sql
+@@ -11876,3 +11876,106 @@ CREATE TABLE public.knowledge_chunks (
+     UNIQUE (document_id,ordinal)
+ );
+ CREATE INDEX knowledge_chunks_search_idx ON public.knowledge_chunks(company_id,embedding_model,access_level);
++
++-- Search saves the canonical harness result and its classification in the same transaction.
++-- Each new/replayed consumption also proves its actual attempt is still live at COMMIT.
++CREATE TABLE public.workflow_knowledge_consumptions (
++    company_id uuid NOT NULL,
++    run_id uuid NOT NULL,
++    execution_id uuid NOT NULL,
++    job_id uuid NOT NULL,
++    attempt_number integer NOT NULL CHECK (attempt_number > 0),
++    execution_generation uuid NOT NULL,
++    worker_id uuid NOT NULL,
++    checkpoint_id uuid NOT NULL,
++    invocation_id uuid NOT NULL,
++    content_level public.access_level NOT NULL,
++    -- jsonb's spacing differs from the compact 65536-byte application result representation.
++    result jsonb NOT NULL CHECK (jsonb_typeof(result)='object' AND octet_length(result::text)<=131072),
++    PRIMARY KEY (company_id,run_id,execution_id,job_id,attempt_number,invocation_id),
++    FOREIGN KEY (company_id,run_id,execution_id)
++        REFERENCES public.workflow_executions(company_id,run_id,id) ON DELETE CASCADE,
++    FOREIGN KEY (company_id,execution_id,job_id)
++        REFERENCES public.background_tasks(company_id,workflow_execution_id,id) ON DELETE CASCADE,
++    FOREIGN KEY (job_id,attempt_number,execution_generation,worker_id)
++        REFERENCES public.task_attempts(task_id,attempt_number,execution_generation,worker_id) ON DELETE CASCADE,
++    FOREIGN KEY (company_id,job_id,checkpoint_id)
++        REFERENCES public.task_harness_runs(company_id,task_id,id) ON DELETE CASCADE
++);
++
++CREATE FUNCTION public.guard_workflow_knowledge_consumption_immutable() RETURNS trigger LANGUAGE plpgsql AS $$
++BEGIN
++    IF TG_OP='UPDATE' AND NEW IS NOT DISTINCT FROM OLD THEN RETURN NEW; END IF;
++    IF TG_OP='DELETE' AND pg_trigger_depth()>1 AND (
++        NOT EXISTS (SELECT 1 FROM public.workflow_runs WHERE company_id=OLD.company_id AND id=OLD.run_id)
++        OR NOT EXISTS (SELECT 1 FROM public.background_tasks WHERE company_id=OLD.company_id AND id=OLD.job_id)
++        OR NOT EXISTS (SELECT 1 FROM public.task_attempts WHERE task_id=OLD.job_id AND attempt_number=OLD.attempt_number)
++        OR NOT EXISTS (SELECT 1 FROM public.task_harness_runs WHERE company_id=OLD.company_id AND id=OLD.checkpoint_id)
++    ) THEN RETURN OLD; END IF;
++    RAISE EXCEPTION 'knowledge consumption proof is immutable'
++        USING ERRCODE='23514', CONSTRAINT='workflow_guard:knowledge_consumption_immutable';
++END $$;
++CREATE TRIGGER workflow_knowledge_consumption_immutable BEFORE UPDATE OR DELETE ON public.workflow_knowledge_consumptions
++    FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_knowledge_consumption_immutable();
++
++CREATE FUNCTION public.guard_workflow_knowledge_consumption_live() RETURNS trigger LANGUAGE plpgsql AS $$
++BEGIN
++    IF NOT EXISTS (
++        SELECT 1 FROM public.background_tasks AS job
++        JOIN public.workflow_executions AS execution ON execution.company_id=job.company_id
++            AND execution.id=job.workflow_execution_id
++        JOIN public.workflow_runs AS run ON run.company_id=execution.company_id AND run.id=execution.run_id
++        JOIN public.task_attempts AS attempt ON attempt.task_id=job.id
++            AND attempt.attempt_number=NEW.attempt_number AND attempt.execution_generation=NEW.execution_generation
++            AND attempt.worker_id=NEW.worker_id AND attempt.status='processing'
++        JOIN public.task_harness_runs AS harness ON harness.company_id=job.company_id AND harness.task_id=job.id
++            AND harness.id=NEW.checkpoint_id AND harness.workflow_run_id=run.id
++            AND harness.workflow_execution_id=execution.id
++        WHERE job.company_id=NEW.company_id AND job.id=NEW.job_id AND execution.id=NEW.execution_id AND run.id=NEW.run_id
++            AND job.status='processing' AND job.worker_id=NEW.worker_id
++            AND job.execution_generation=NEW.execution_generation AND job.attempt_ordinal=NEW.attempt_number
++            AND job.lock_expires_at>clock_timestamp() AND execution.completed_at IS NULL
++            AND run.state IN ('queued','running') AND run.deadline>clock_timestamp()
++            AND run.content_level>=NEW.content_level
++            AND EXISTS (
++                SELECT 1 FROM jsonb_array_elements(harness.checkpoint->'invocations') AS saved(invocation)
++                WHERE invocation->'call'->>'invocation_id'=NEW.invocation_id::text
++                    AND invocation->>'state'='Completed' AND invocation->'result'=NEW.result
++            )
++    ) THEN
++        RAISE EXCEPTION 'knowledge consumption lost live claim or canonical result'
++            USING ERRCODE='23514', CONSTRAINT='workflow_guard:knowledge_consumption_live';
++    END IF;
++    RETURN NEW;
++END $$;
++CREATE CONSTRAINT TRIGGER workflow_knowledge_consumption_live AFTER INSERT OR UPDATE ON public.workflow_knowledge_consumptions
++    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_knowledge_consumption_live();
++
++CREATE FUNCTION public.guard_harness_knowledge_observations() RETURNS trigger LANGUAGE plpgsql AS $$
++DECLARE saved jsonb;
++BEGIN
++    IF NEW.workflow_run_id IS NULL OR jsonb_typeof(NEW.workflow_prepared->'tools') IS DISTINCT FROM 'array'
++        THEN RETURN NEW; END IF;
++    FOR saved IN SELECT invocation FROM jsonb_array_elements(NEW.checkpoint->'invocations') AS calls(invocation)
++        WHERE invocation->>'state'='Completed' AND EXISTS (
++            SELECT 1 FROM jsonb_array_elements(NEW.workflow_prepared->'tools') AS declarations(tool)
++            WHERE tool->'target'->>'kind'='knowledge'
++                AND tool->>'declared'=invocation->'call'->>'tool_id'
++        )
++    LOOP
++        IF NOT EXISTS (
++            SELECT 1 FROM public.workflow_knowledge_consumptions AS proof
++            JOIN public.workflow_runs AS run ON run.company_id=proof.company_id AND run.id=proof.run_id
++            WHERE proof.company_id=NEW.company_id AND proof.run_id=NEW.workflow_run_id
++                AND proof.execution_id=NEW.workflow_execution_id AND proof.job_id=NEW.task_id
++                AND proof.checkpoint_id=NEW.id AND proof.invocation_id::text=saved->'call'->>'invocation_id'
++                AND proof.result=saved->'result' AND run.content_level>=proof.content_level
++        ) THEN
++            RAISE EXCEPTION 'knowledge observation requires matching consumption and classification'
++                USING ERRCODE='23514', CONSTRAINT='workflow_guard:harness_knowledge_observation';
++        END IF;
++    END LOOP;
++    RETURN NEW;
++END $$;
++CREATE CONSTRAINT TRIGGER harness_knowledge_observation AFTER INSERT OR UPDATE ON public.task_harness_runs
++    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.guard_harness_knowledge_observations();

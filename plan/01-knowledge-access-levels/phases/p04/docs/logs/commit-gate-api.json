@@ -1,0 +1,100 @@
+{
+  "pattern": "pub.*Gate|enum Stall|fn resolution_behind",
+  "filesSearched": 400,
+  "totalHits": 5,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/lease_resolution_gate.rs#resolution_behind",
+        "name": "resolution_behind",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/lease_resolution_gate.rs",
+        "span": "L196-L204"
+      },
+      "path": "src/adapters/persistence/workflow/lease_resolution_gate.rs",
+      "inDegree": 16,
+      "hits": [
+        {
+          "line": 196,
+          "text": "pub(in crate::adapters::persistence::workflow) async fn resolution_behind("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_commit_observer_tests.rs#Gate",
+        "name": "Gate",
+        "kind": "struct",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_commit_observer_tests.rs",
+        "span": "L5-L10"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_commit_observer_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 5,
+          "text": "pub(in super::super) struct Gate {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/lease_resolution_gate.rs#GatePool",
+        "name": "GatePool",
+        "kind": "interface",
+        "path": "src/adapters/persistence/workflow/lease_resolution_gate.rs",
+        "span": "L26-L28"
+      },
+      "path": "src/adapters/persistence/workflow/lease_resolution_gate.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 26,
+          "text": "pub(in crate::adapters::persistence::workflow) trait GatePool {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/lease_resolution_gate.rs#Stall",
+        "name": "Stall",
+        "kind": "enum",
+        "path": "src/adapters/persistence/workflow/lease_resolution_gate.rs",
+        "span": "L48-L55"
+      },
+      "path": "src/adapters/persistence/workflow/lease_resolution_gate.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 48,
+          "text": "pub(in crate::adapters::persistence::workflow) enum Stall<'a> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/lease_resolution_gate.rs#Gate",
+        "name": "Gate",
+        "kind": "struct",
+        "path": "src/adapters/persistence/workflow/lease_resolution_gate.rs",
+        "span": "L65-L68"
+      },
+      "path": "src/adapters/persistence/workflow/lease_resolution_gate.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 65,
+          "text": "pub(in crate::adapters::persistence::workflow) struct Gate {"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 2,
+    "baselineChars": 23307
+  }
+}

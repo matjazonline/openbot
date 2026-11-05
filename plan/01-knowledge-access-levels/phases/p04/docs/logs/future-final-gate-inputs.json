@@ -1,0 +1,9 @@
+{
+  "purpose": "read-only final06 handoff inputs; no06 implementation/acceptance",
+  "inputs": {
+    "plan/01-knowledge-access-levels/06-integration-and-verification.md": "55f9164a6ed3670edd0e341bf55abbdbca135227ae669275f5ab60463da51def",
+    ".github/workflows/ci.yml": "dd8cdf737e3127c17a7023184563e2e0ad42ca3dd8fb16873da0181a409a8a40"
+  },
+  "proposed_worktree_exists": false,
+  "proposed_branch_exists": false
+}

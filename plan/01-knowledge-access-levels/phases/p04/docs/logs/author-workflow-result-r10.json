@@ -1,0 +1,15 @@
+{
+  "binary": "/Users/mac02/dev/openbot-recovery/.worktrees/knowledge-p04/target/debug/deps/open_bots-c19a0b960dacdcef",
+  "selected": 5,
+  "test_names": [
+    "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::ownership::knowledge_search_actual_statement_and_commit_expiry_roll_back_payload_rise_and_proof",
+    "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::ownership::knowledge_search_expired_database_lease_or_deadline_refuses_before_embedding",
+    "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::ownership::knowledge_search_proof_rewrite_delete_and_cross_company_insert_are_rejected",
+    "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::ownership::knowledge_search_real_replacement_claim_replays_original_and_fences_stale_competitor",
+    "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::ownership::knowledge_search_unknown_commit_ack_returns_no_content_then_reconstruction_reads_truth"
+  ],
+  "exit": 0,
+  "stack": "stock2MiB",
+  "source_unchanged": true,
+  "tree_sha256": "819b266f1216f2a7832264f8b8dbc80902e04c9a294aa3b1d620dace218e91f3"
+}

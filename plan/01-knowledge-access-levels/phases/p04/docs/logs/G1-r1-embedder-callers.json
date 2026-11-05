@@ -1,0 +1,20 @@
+{
+  "query": "embed_query",
+  "matches": [
+    {
+      "symbol": {
+        "id": "src/application/knowledge/types.rs#embed_query",
+        "name": "embed_query",
+        "kind": "function",
+        "path": "src/application/knowledge/types.rs",
+        "span": "L118-L118"
+      },
+      "hits": [],
+      "note": "  no indexed callers — the graph has no incoming call/reference edges for this symbol as written. Check the name (try the bare symbol, or \"Type.method\"), or find its uses with graft grep \"embed_query\". Fall back to raw grep -rn only for unindexed files"
+    }
+  ],
+  "saved": {
+    "files": 1,
+    "baselineChars": 3885
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "command": [
+    "git",
+    "diff",
+    "--check",
+    "--",
+    ".env.example",
+    "docs/deploy.md",
+    "migrations",
+    "src",
+    ".sqlx"
+  ],
+  "exit": 0,
+  "seconds": 0.03,
+  "SQLX_OFFLINE": "true"
+}

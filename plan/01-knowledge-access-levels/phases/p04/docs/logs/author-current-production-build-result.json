@@ -1,0 +1,11 @@
+{
+  "command": [
+    "cargo",
+    "build",
+    "--locked",
+    "--offline"
+  ],
+  "exit": 0,
+  "seconds": 51.54,
+  "SQLX_OFFLINE": "true"
+}

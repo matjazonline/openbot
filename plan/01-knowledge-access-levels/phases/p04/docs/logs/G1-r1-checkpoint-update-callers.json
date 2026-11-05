@@ -1,0 +1,29 @@
+{
+  "query": "update_on",
+  "matches": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/checkpoint_updates.rs#update_on",
+        "name": "update_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/checkpoint_updates.rs",
+        "span": "L4-L61"
+      },
+      "hits": [
+        {
+          "id": "src/adapters/persistence/workflow/checkpoints.rs#update_workflow_checkpoint",
+          "relation": "calls",
+          "depth": 1,
+          "name": "update_workflow_checkpoint",
+          "kind": "function",
+          "path": "src/adapters/persistence/workflow/checkpoints.rs",
+          "span": "L32-L53"
+        }
+      ]
+    }
+  ],
+  "saved": {
+    "files": 2,
+    "baselineChars": 24661
+  }
+}

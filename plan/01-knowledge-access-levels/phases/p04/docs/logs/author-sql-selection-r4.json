@@ -1,0 +1,5 @@
+[
+  "adapters::persistence::knowledge::tests::search::knowledge_search_sql_filters_company_model_and_ceiling_before_both_ranks",
+  "adapters::persistence::knowledge::tests::search::knowledge_search_sql_simple_exact_terms_and_digit_fallback_work_in_non_english_text",
+  "adapters::persistence::knowledge::tests::search_quota::knowledge_search_company_chunk_cap_competing_writes_override_delete_and_corruption_guard"
+]

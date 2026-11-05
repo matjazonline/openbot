@@ -1,0 +1,13 @@
+{
+  "binary": "/Users/mac02/dev/openbot-recovery/.worktrees/knowledge-p04/target/debug/deps/open_bots-c19a0b960dacdcef",
+  "selected": 3,
+  "test_names": [
+    "adapters::persistence::knowledge::tests::search::knowledge_search_sql_filters_company_model_and_ceiling_before_both_ranks",
+    "adapters::persistence::knowledge::tests::search::knowledge_search_sql_simple_exact_terms_and_digit_fallback_work_in_non_english_text",
+    "adapters::persistence::knowledge::tests::search_quota::knowledge_search_company_chunk_cap_competing_writes_override_delete_and_corruption_guard"
+  ],
+  "exit": 0,
+  "stack": "stock2MiB",
+  "source_unchanged": true,
+  "tree_sha256": "8664c0efe11ecdf1f92c5a6964b324e67eca5998a8c90f3e3b811f757ef91b75"
+}

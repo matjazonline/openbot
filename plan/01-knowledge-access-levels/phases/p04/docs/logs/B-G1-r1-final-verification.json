@@ -1,0 +1,33 @@
+{
+  "round": "KNOW-P04-G1-r1",
+  "note": "KNOW-P04-G1-r1-N1",
+  "result": "PASS",
+  "stage": "complete preimplementation architecture gate only",
+  "checked_at_utc": "2026-11-05T14:16:27.842429+00:00",
+  "phase": "p04",
+  "base": "55f44c26564f55a648c04be5cdd50264d3181c83",
+  "head": "55f44c26564f55a648c04be5cdd50264d3181c83",
+  "source_pristine": true,
+  "exclusions": [
+    "plan/01-knowledge-access-levels/phases/p04/docs"
+  ],
+  "source_tree_sha256": "aad12e695582f28546804bb0b70e6c846dda330a87a3c9fee7b953bed12af054",
+  "files_count": 5321,
+  "installed_digest": "c0145b6451c6b8780afc0e58d7920cff96df6adfe980d0da20fd2c754d845ecf",
+  "authority_revision": 17,
+  "authority_sha256": "88317f591b22edc4a3a21e888710fea9c0464cc41b9892ca1a8fb904c7bf7d23",
+  "decision_id": "KNOW-P04-G1-r1",
+  "decision_sha256": "9b74e9a66e3692950c44d7994bc2263561a372708c1eade7faa0393d9c34efce",
+  "source_start_finish_equal": true,
+  "authority_current_equals_pin": true,
+  "decision_unchanged": true,
+  "snapshot_exact_match": true,
+  "source_diff_empty": true,
+  "reviewer_records": {
+    "REVIEW.md": "f92e555fcbf103d243ba78bde1152caa2bdce78a2f07a8f687b44b829bc4d9d9",
+    "agent-review-notes.md": "33e23fd77cb4d7b5910906c18f58694b8603f4f0b46cd55f3852029d60e71ff0",
+    "agent-review-findings.md": "f5fa20a0c50abcbb936a7457d791bf3661a08c15efe1fa1ed0aaa644ac07911a"
+  },
+  "implementation_tests_run_by_reviewer": false,
+  "limitations": "No code acceptance or full verification; WB1 focused checks and final06/full current CI, Q001 closure, quality calibration remain required."
+}

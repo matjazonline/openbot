@@ -1,0 +1,21 @@
+17 functions at or above 32 KiB in target/debug/open_bots
+
+    65 KiB  open_bots::adapters::embedding::artifacts::check
+    57 KiB  open_bots::adapters::http::routes::workflows::ui::authoring::bindings::save_binding::_{{closure}}
+    43 KiB  open_bots::adapters::persistence::workflow::provisioning::provision_on::_{{closure}}
+    42 KiB  open_bots::adapters::persistence::workflow::decisions::park_on::_{{closure}}
+    40 KiB  open_bots::adapters::persistence::workflow::checkpoints::models::settle_on::_{{closure}}
+    39 KiB  open_bots::adapters::http::routes::webhooks::sendgrid::sendgrid_inbound_webhook::_{{closure}}::_{{closure}}
+    37 KiB  open_bots::adapters::persistence::workflow::checkpoints::models::reserve_on::_{{closure}}
+    36 KiB  open_bots::adapters::http::routes::webhooks::sendgrid::sendgrid_inbound_webhook::_{{closure}}
+    35 KiB  open_bots::adapters::persistence::workflow::message::publish::_<impl open_bots::adapters::persistence::workflow::action_dispatch::PostgresActionDispatch<open_bots::adapters::persistence::workflow::message::MessageActionAuthority,L>>::publish_on::_{{closure}}
+    34 KiB  open_bots::adapters::persistence::workflow::children::park_on::_{{closure}}
+    33 KiB  open_bots::infra::setup::foundation::build::_{{closure}}
+    33 KiB  open_bots::adapters::persistence::workflow::action_reconciliation::settlement::settle::_{{closure}}
+    33 KiB  open_bots::adapters::persistence::workflow::wait_commit::resume_on::_{{closure}}
+    33 KiB  open_bots::serve::_{{closure}}
+    32 KiB  open_bots::adapters::persistence::workflow::waits::park_on::_{{closure}}
+    32 KiB  open_bots::adapters::smtp::server::SmtpServer::finish_data_transaction::_{{closure}}
+    32 KiB  open_bots::application::workflow::provisioning::provisioning_tool_schemas
+
+largest single frame: 65 KiB

@@ -1,0 +1,880 @@
+{
+  "pattern": "ToolKind|AgentToolTarget",
+  "filesSearched": 1259,
+  "totalHits": 98,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/authority.rs#supported_publication",
+        "name": "supported_publication",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/authority.rs",
+        "span": "L115-L164"
+      },
+      "path": "src/adapters/persistence/workflow/authority.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 134,
+          "text": "ToolKind::Message => {"
+        },
+        {
+          "line": 137,
+          "text": "ToolKind::Provisioning => builtin_provisioning_tool(tool)?,"
+        },
+        {
+          "line": 138,
+          "text": "ToolKind::Knowledge => builtin_knowledge_tool(tool)?,"
+        },
+        {
+          "line": 139,
+          "text": "ToolKind::Http => {"
+        },
+        {
+          "line": 142,
+          "text": "ToolKind::Slot(slot) => match resources::slot_kind(definition, slot) {"
+        },
+        {
+          "line": 151,
+          "text": "ToolKind::Workflow(_) => {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/knowledge/builtin.rs#is_trusted_knowledge_snapshot",
+        "name": "is_trusted_knowledge_snapshot",
+        "kind": "function",
+        "path": "src/application/workflow/knowledge/builtin.rs",
+        "span": "L78-L85"
+      },
+      "path": "src/application/workflow/knowledge/builtin.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 79,
+          "text": "if snapshot.kind() != ToolKind::Knowledge {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/message.rs#is_trusted_message_snapshot",
+        "name": "is_trusted_message_snapshot",
+        "kind": "function",
+        "path": "src/application/workflow/message.rs",
+        "span": "L89-L101"
+      },
+      "path": "src/application/workflow/message.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 90,
+          "text": "if snapshot.kind() != crate::application::workflow::publication::ToolKind::Message {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/provisioning.rs#is_trusted_provisioning_snapshot",
+        "name": "is_trusted_provisioning_snapshot",
+        "kind": "function",
+        "path": "src/application/workflow/provisioning.rs",
+        "span": "L229-L239"
+      },
+      "path": "src/application/workflow/provisioning.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 230,
+          "text": "if snapshot.kind() != crate::application::workflow::publication::ToolKind::Provisioning {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/harness/rig/workflow.rs#definitions",
+        "name": "definitions",
+        "kind": "function",
+        "path": "src/adapters/harness/rig/workflow.rs",
+        "span": "L64-L79"
+      },
+      "path": "src/adapters/harness/rig/workflow.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 71,
+          "text": "crate::application::workflow::agent::AgentToolTarget::Knowledge => {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/agent_preparation.rs#targets",
+        "name": "targets",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/agent_preparation.rs",
+        "span": "L114-L166"
+      },
+      "path": "src/adapters/persistence/workflow/agent_preparation.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 119,
+          "text": ") -> AppResult<Vec<AgentToolTarget>> {"
+        },
+        {
+          "line": 123,
+          "text": "ToolKind::Message => {"
+        },
+        {
+          "line": 129,
+          "text": "AgentToolTarget::Message {"
+        },
+        {
+          "line": 135,
+          "text": "ToolKind::Slot(slot) => {"
+        },
+        {
+          "line": 142,
+          "text": "AgentToolTarget::Mcp { slot: slot.clone() }"
+        },
+        {
+          "line": 144,
+          "text": "ToolKind::Provisioning => {"
+        },
+        {
+          "line": 148,
+          "text": "AgentToolTarget::Provisioning {"
+        },
+        {
+          "line": 152,
+          "text": "ToolKind::Knowledge => {"
+        },
+        {
+          "line": 154,
+          "text": "AgentToolTarget::Knowledge"
+        },
+        {
+          "line": 156,
+          "text": "ToolKind::Http => AgentToolTarget::Http {"
+        },
+        {
+          "line": 161,
+          "text": "ToolKind::Workflow(pin) => AgentToolTarget::Workflow { pin: pin.clone() },"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/agent_publication.rs#granted_tool",
+        "name": "granted_tool",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/agent_publication.rs",
+        "span": "L288-L366"
+      },
+      "path": "src/adapters/persistence/workflow/agent_publication.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 315,
+          "text": "(ToolKind::Workflow(frozen), ToolKind::Workflow(current)) if frozen == current => {"
+        },
+        {
+          "line": 325,
+          "text": "ToolKind::Message | ToolKind::Http => true,"
+        },
+        {
+          "line": 326,
+          "text": "ToolKind::Provisioning | ToolKind::Knowledge => false,"
+        },
+        {
+          "line": 327,
+          "text": "ToolKind::Slot(slot) => {"
+        },
+        {
+          "line": 330,
+          "text": "ToolKind::Workflow(_) => false,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/child_publication.rs#capture",
+        "name": "capture",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/child_publication.rs",
+        "span": "L19-L98"
+      },
+      "path": "src/adapters/persistence/workflow/child_publication.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 40,
+          "text": "ToolKind::Workflow(pin) => {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/workflow_agent/mod.rs#invocation",
+        "name": "invocation",
+        "kind": "function",
+        "path": "src/adapters/workflow_agent/mod.rs",
+        "span": "L76-L123"
+      },
+      "path": "src/adapters/workflow_agent/mod.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 82,
+          "text": "AgentToolTarget::Http { connection } => ToolInvocation::Http(Box::new(HttpToolCall {"
+        },
+        {
+          "line": 88,
+          "text": "AgentToolTarget::Mcp { slot } => ToolInvocation::Mcp(Box::new(McpToolCall {"
+        },
+        {
+          "line": 94,
+          "text": "AgentToolTarget::Workflow { pin } => ToolInvocation::Workflow(Box::new(WorkflowToolCall {"
+        },
+        {
+          "line": 103,
+          "text": "AgentToolTarget::Provisioning { .. } => {"
+        },
+        {
+          "line": 112,
+          "text": "AgentToolTarget::Message { .. } => ToolInvocation::Message(Box::new(MessageToolCall {"
+        },
+        {
+          "line": 119,
+          "text": "AgentToolTarget::Knowledge => {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/agent.rs#message_kind",
+        "name": "message_kind",
+        "kind": "function",
+        "path": "src/application/workflow/agent.rs",
+        "span": "L67-L72"
+      },
+      "path": "src/application/workflow/agent.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 69,
+          "text": "AgentToolTarget::Message { name } => MessageKind::parse(name.as_str()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/agent.rs#provisioning_kind",
+        "name": "provisioning_kind",
+        "kind": "function",
+        "path": "src/application/workflow/agent.rs",
+        "span": "L73-L82"
+      },
+      "path": "src/application/workflow/agent.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 77,
+          "text": "AgentToolTarget::Provisioning { name } => {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/agent.rs#prepared_tool",
+        "name": "prepared_tool",
+        "kind": "function",
+        "path": "src/application/workflow/agent.rs",
+        "span": "L262-L285"
+      },
+      "path": "src/application/workflow/agent.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 262,
+          "text": "fn prepared_tool(snapshot: &ToolSnapshot, target: AgentToolTarget) -> AppResult<PreparedTool> {"
+        },
+        {
+          "line": 265,
+          "text": "(AgentToolTarget::Message { name: target }, ToolKind::Message) => target == &name,"
+        },
+        {
+          "line": 266,
+          "text": "(AgentToolTarget::Provisioning { name: target }, ToolKind::Provisioning) => target == &name,"
+        },
+        {
+          "line": 267,
+          "text": "(AgentToolTarget::Knowledge, ToolKind::Knowledge) => {"
+        },
+        {
+          "line": 270,
+          "text": "(AgentToolTarget::Mcp { slot }, ToolKind::Slot(frozen)) => frozen == slot,"
+        },
+        {
+          "line": 271,
+          "text": "(AgentToolTarget::Http { .. }, ToolKind::Http) => true,"
+        },
+        {
+          "line": 272,
+          "text": "(AgentToolTarget::Workflow { pin }, ToolKind::Workflow(frozen)) => frozen == pin,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/knowledge/ports.rs#require_knowledge_invocation",
+        "name": "require_knowledge_invocation",
+        "kind": "function",
+        "path": "src/application/workflow/knowledge/ports.rs",
+        "span": "L96-L151"
+      },
+      "path": "src/application/workflow/knowledge/ports.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 123,
+          "text": "if tool.target != AgentToolTarget::Knowledge"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/dependencies.rs#pinned_versions",
+        "name": "pinned_versions",
+        "kind": "function",
+        "path": "src/application/workflow/publication/dependencies.rs",
+        "span": "L13-L26"
+      },
+      "path": "src/application/workflow/publication/dependencies.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 22,
+          "text": "ToolKind::Workflow(pin) => Some(pin.version_id),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/dependencies.rs#dependency_graph",
+        "name": "dependency_graph",
+        "kind": "function",
+        "path": "src/application/workflow/publication/dependencies.rs",
+        "span": "L181-L242"
+      },
+      "path": "src/application/workflow/publication/dependencies.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 236,
+          "text": "ToolKind::Workflow(pin) => Some(pin.workflow_id),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/sample/tools.rs#tool",
+        "name": "tool",
+        "kind": "function",
+        "path": "src/application/workflow/sample/tools.rs",
+        "span": "L59-L117"
+      },
+      "path": "src/application/workflow/sample/tools.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 70,
+          "text": "ToolKind::Workflow(pin) => {"
+        },
+        {
+          "line": 91,
+          "text": "ToolKind::Message"
+        },
+        {
+          "line": 92,
+          "text": "| ToolKind::Provisioning"
+        },
+        {
+          "line": 93,
+          "text": "| ToolKind::Knowledge"
+        },
+        {
+          "line": 94,
+          "text": "| ToolKind::Slot(_)"
+        },
+        {
+          "line": 95,
+          "text": "| ToolKind::Http => {"
+        },
+        {
+          "line": 103,
+          "text": "ToolKind::Slot(_) => {"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "scripts/workflow-sample-boundary.py",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 22,
+          "text": "'publication::ToolKind', 'publication::ToolSnapshot', 'publication::ActionEffect',"
+        },
+        {
+          "line": 23,
+          "text": "'publication::ToolKind::Workflow', 'publication::ActionEffect::Read', 'publication::ActionEffect::Write',"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/http/pages/workflow_authoring/preview.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 6,
+          "text": "use crate::application::workflow::publication::{PublishedBundle, ToolKind};"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/workflow_authoring/preview.rs#frozen_tools",
+        "name": "frozen_tools",
+        "kind": "function",
+        "path": "src/adapters/http/pages/workflow_authoring/preview.rs",
+        "span": "L220-L254"
+      },
+      "path": "src/adapters/http/pages/workflow_authoring/preview.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 227,
+          "text": "ToolKind::Message => \"built-in message tool\".to_owned(),"
+        },
+        {
+          "line": 228,
+          "text": "ToolKind::Provisioning => \"built-in provisioning tool\".to_owned(),"
+        },
+        {
+          "line": 229,
+          "text": "ToolKind::Knowledge => \"knowledge search\".to_owned(),"
+        },
+        {
+          "line": 230,
+          "text": "ToolKind::Slot(slot) => format!(\"through slot {}\", slot.as_str()),"
+        },
+        {
+          "line": 231,
+          "text": "ToolKind::Http => \"company HTTP operation\".to_owned(),"
+        },
+        {
+          "line": 232,
+          "text": "ToolKind::Workflow(pin) => format!("
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/agent_preparation.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 6,
+          "text": "agent::{AgentLaunch, AgentPreparation, AgentToolTarget, PreparedAgent, PreparedStep},"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/resources.rs#check_readiness",
+        "name": "check_readiness",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/resources.rs",
+        "span": "L44-L116"
+      },
+      "path": "src/adapters/persistence/workflow/resources.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 52,
+          "text": "ToolKind::Message => {"
+        },
+        {
+          "line": 56,
+          "text": "ToolKind::Provisioning => {"
+        },
+        {
+          "line": 60,
+          "text": "ToolKind::Knowledge => {"
+        },
+        {
+          "line": 64,
+          "text": "ToolKind::Http => {"
+        },
+        {
+          "line": 69,
+          "text": "ToolKind::Workflow(_) => {"
+        },
+        {
+          "line": 79,
+          "text": "ToolKind::Slot(slot) => slot,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/workflow_tools.rs#registered_on",
+        "name": "registered_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/workflow_tools.rs",
+        "span": "L62-L86"
+      },
+      "path": "src/adapters/persistence/workflow/workflow_tools.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 68,
+          "text": "let ToolKind::Workflow(pin) = tool.kind() else {"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/workflow_agent/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 14,
+          "text": "agent::{AgentToolDispatch, AgentToolObservation, AgentToolTarget, PreparedTool},"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/agent_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 5,
+          "text": "agent::{AgentToolTarget, PreparedAgent, PreparedStep},"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/agent_tests.rs#http",
+        "name": "http",
+        "kind": "function",
+        "path": "src/application/workflow/agent_tests.rs",
+        "span": "L28-L32"
+      },
+      "path": "src/application/workflow/agent_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 28,
+          "text": "fn http() -> AgentToolTarget {"
+        },
+        {
+          "line": 29,
+          "text": "AgentToolTarget::Http {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/agent_tests.rs#workflow_agent_preparation_refuses_unsupported_or_colliding_bindings",
+        "name": "workflow_agent_preparation_refuses_unsupported_or_colliding_bindings",
+        "kind": "function",
+        "path": "src/application/workflow/agent_tests.rs",
+        "span": "L100-L153"
+      },
+      "path": "src/application/workflow/agent_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 101,
+          "text": "let mcp = AgentToolTarget::Mcp {"
+        },
+        {
+          "line": 120,
+          "text": "let message = AgentToolTarget::Message {"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/agent.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 11,
+          "text": "publication::{ResolvedAgent, ToolKind, ToolSnapshot, WorkflowToolPin},"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/agent.rs#AgentToolTarget",
+        "name": "AgentToolTarget",
+        "kind": "enum",
+        "path": "src/application/workflow/agent.rs",
+        "span": "L35-L55"
+      },
+      "path": "src/application/workflow/agent.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 35,
+          "text": "pub enum AgentToolTarget {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/agent.rs#PreparedTool",
+        "name": "PreparedTool",
+        "kind": "struct",
+        "path": "src/application/workflow/agent.rs",
+        "span": "L59-L65"
+      },
+      "path": "src/application/workflow/agent.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 64,
+          "text": "pub target: AgentToolTarget,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/agent.rs#PreparedStep",
+        "name": "PreparedStep",
+        "kind": "enum",
+        "path": "src/application/workflow/agent.rs",
+        "span": "L89-L93"
+      },
+      "path": "src/application/workflow/agent.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 90,
+          "text": "AgentRun { targets: Vec<AgentToolTarget> },"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/knowledge/builtin_tests.rs#knowledge_search_snapshot_is_reserved_and_exactly_trusted_without_external_targets",
+        "name": "knowledge_search_snapshot_is_reserved_and_exactly_trusted_without_external_targets",
+        "kind": "function",
+        "path": "src/application/workflow/knowledge/builtin_tests.rs",
+        "span": "L45-L57"
+      },
+      "path": "src/application/workflow/knowledge/builtin_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 48,
+          "text": "assert_eq!(snapshot.kind(), ToolKind::Knowledge);"
+        },
+        {
+          "line": 52,
+          "text": "assert!(matches!(external.kind(), ToolKind::Slot(_)));"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/knowledge/builtin.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 4,
+          "text": "publication::{ActionEffect, ActionRecovery, ApprovedActionPolicy, ToolKind, ToolSnapshot},"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/knowledge/ports.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 9,
+          "text": "agent::{AgentToolObservation, AgentToolTarget, PreparedTool},"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/provisioning_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 2,
+          "text": "use crate::application::workflow::publication::ToolKind;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/provisioning_tests.rs#only_the_exact_name_only_built_in_is_trusted",
+        "name": "only_the_exact_name_only_built_in_is_trusted",
+        "kind": "function",
+        "path": "src/application/workflow/provisioning_tests.rs",
+        "span": "L30-L60"
+      },
+      "path": "src/application/workflow/provisioning_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 36,
+          "text": "assert_eq!(trusted.kind(), ToolKind::Provisioning);"
+        },
+        {
+          "line": 50,
+          "text": "assert!(matches!(mcp.kind(), ToolKind::Slot(_)));"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/dependencies.rs#capture",
+        "name": "capture",
+        "kind": "function",
+        "path": "src/application/workflow/publication/dependencies.rs",
+        "span": "L28-L112"
+      },
+      "path": "src/application/workflow/publication/dependencies.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 106,
+          "text": "if let ToolKind::Workflow(pin) = tool.kind() {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/mod.rs#freeze",
+        "name": "freeze",
+        "kind": "function",
+        "path": "src/application/workflow/publication/mod.rs",
+        "span": "L108-L149"
+      },
+      "path": "src/application/workflow/publication/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 125,
+          "text": "ToolKind::Workflow(pin) => Some(pin.workflow_id),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/types.rs#ToolKind",
+        "name": "ToolKind",
+        "kind": "enum",
+        "path": "src/application/workflow/publication/types.rs",
+        "span": "L120-L134"
+      },
+      "path": "src/application/workflow/publication/types.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 120,
+          "text": "pub enum ToolKind<'a> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/types.rs#kind",
+        "name": "kind",
+        "kind": "function",
+        "path": "src/application/workflow/publication/types.rs",
+        "span": "L137-L164"
+      },
+      "path": "src/application/workflow/publication/types.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 137,
+          "text": "pub fn kind(&self) -> ToolKind<'_> {"
+        },
+        {
+          "line": 139,
+          "text": "return ToolKind::Workflow(pin);"
+        },
+        {
+          "line": 144,
+          "text": "return ToolKind::Message;"
+        },
+        {
+          "line": 151,
+          "text": "return ToolKind::Provisioning;"
+        },
+        {
+          "line": 158,
+          "text": "return ToolKind::Knowledge;"
+        },
+        {
+          "line": 161,
+          "text": "Some(slot) => ToolKind::Slot(slot),"
+        },
+        {
+          "line": 162,
+          "text": "None => ToolKind::Http,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/sample/dispatch.rs#step",
+        "name": "step",
+        "kind": "function",
+        "path": "src/application/workflow/sample/dispatch.rs",
+        "span": "L15-L65"
+      },
+      "path": "src/application/workflow/sample/dispatch.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 35,
+          "text": "super::super::publication::ToolKind::Workflow(_)"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/sample/tools.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 3,
+          "text": "use crate::application::workflow::publication::{AgentKey, ToolKind, ToolSnapshot};"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 23,
+    "baselineChars": 213499
+  }
+}
