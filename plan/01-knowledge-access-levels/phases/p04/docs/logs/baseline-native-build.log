@@ -1,0 +1,26 @@
+   Compiling tokio v1.50.0
+   Compiling tokio-util v0.7.19
+   Compiling tower v0.5.2
+   Compiling tokio-rustls v0.26.4
+   Compiling tokio-rustls v0.24.1
+   Compiling hickory-proto v0.24.4
+   Compiling lettre v0.11.23
+   Compiling tower-http v0.6.11
+   Compiling h2 v0.4.15
+   Compiling tokio-stream v0.1.17
+   Compiling sqlx-core v0.8.6
+   Compiling hyper v1.7.0
+   Compiling sqlx-postgres v0.8.6
+   Compiling hickory-resolver v0.24.4
+   Compiling hyper-util v0.1.16
+   Compiling mail-auth v0.6.1
+   Compiling hyper-rustls v0.27.9
+   Compiling axum v0.8.4
+   Compiling reqwest v0.13.4
+   Compiling sqlx v0.8.6
+   Compiling rig-core v0.42.0
+   Compiling rmcp v1.8.0
+   Compiling axum-extra v0.10.1
+   Compiling rig-agent v0.42.0
+   Compiling open_bots v0.1.0 (/Users/mac02/dev/openbot-recovery/.worktrees/knowledge-p04)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1m 06s

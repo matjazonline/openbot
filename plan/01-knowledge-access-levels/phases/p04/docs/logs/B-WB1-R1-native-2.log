@@ -1,0 +1,31 @@
+
+running 26 tests
+test adapters::http::routes::knowledge::tests::knowledge_upload_http_unavailable_or_canceled_writes_require_refresh_instead_of_claiming_no_change ... ok
+test adapters::persistence::knowledge::bounds::tests::knowledge_upload_client_bound_distinguishes_an_unsent_commit_from_an_unknown_acknowledgment ... ok
+test adapters::http::routes::knowledge::tests::multipart_tests::knowledge_upload_multipart_file_count_size_format_and_unknown_fields_are_bounded ... ok
+test adapters::http::routes::knowledge::tests::knowledge_upload_http_delete_revision_unknown_fields_and_cookie_origin_are_enforced ... ok
+test adapters::http::routes::knowledge::tests::knowledge_upload_http_whole_batch_validation_member_ceiling_layers_and_escaped_library ... ok
+test adapters::http::routes::knowledge::tests::knowledge_upload_http_all_six_routes_hide_valid_foreign_company_and_document_ids_before_body_work ... ok
+test application::knowledge::service::tests::knowledge_upload_cancellation_retains_actual_native_permit_and_bounded_shutdown_never_writes ... ok
+test application::knowledge::service::tests::knowledge_upload_deadline_cancels_the_result_and_retains_permit_until_the_native_batch_stops ... ok
+test application::knowledge::service::tests::knowledge_upload_rejects_invalid_files_before_chunking_and_sanitizes_before_hashing ... ok
+test application::knowledge::service::tests::knowledge_upload_shutdown_competes_with_preflight_and_refuses_later_model_registration ... ok
+test application::knowledge::service::tests::knowledge_upload_validates_all_chunks_before_embedding_and_rejects_bad_model_outputs ... ok
+test domain::entities::knowledge::tests::knowledge_upload_existing_newtypes_keep_raw_comparison_and_canonical_helpers ... ok
+test domain::entities::knowledge::tests::knowledge_upload_filename_prefixes_and_case_insensitive_identity_preserve_display ... ok
+test domain::entities::knowledge::tests::knowledge_upload_filename_rejects_missing_prefix_controls_empty_and_overlong ... ok
+test domain::entities::knowledge::tests::knowledge_upload_permission_matrix_requires_team_and_does_not_widen_levels ... ok
+test application::knowledge::admission::tests::knowledge_upload_admission_has_reader_actor_company_and_cache_bounds ... ok
+test adapters::persistence::knowledge::tests::knowledge_upload_company_deletion_cascades_documents_and_chunks_without_deleting_the_uploader ... ok
+test adapters::persistence::knowledge::tests::races::knowledge_upload_demotion_after_preflight_or_before_a_waiting_write_refuses_every_layer ... ok
+test adapters::persistence::knowledge::tests::knowledge_upload_authority_and_resource_ids_are_scoped_and_invalid_vectors_roll_back_every_file ... ok
+test adapters::persistence::knowledge::tests::constraints::knowledge_upload_database_embedding_shape_finiteness_norm_and_tenant_level_matrix ... ok
+test adapters::persistence::knowledge::tests::races::knowledge_upload_competing_replacements_keep_only_the_last_committers_matching_chunks ... ok
+test adapters::persistence::knowledge::tests::races::knowledge_upload_competing_quota_writers_and_duplicate_projection_cannot_exceed_the_company_limit ... ok
+test adapters::persistence::knowledge::tests::knowledge_upload_layers_unicode_separator_override_and_duplicate_batch_have_matching_final_chunks ... ok
+test adapters::persistence::knowledge::tests::races::knowledge_upload_layer_cap_and_hidden_company_quota_return_generic_errors_without_hints ... ok
+test adapters::persistence::knowledge::tests::races::knowledge_upload_waiting_stale_delete_cannot_remove_a_competing_replacement ... ok
+test adapters::persistence::knowledge::tests::constraints::knowledge_upload_unicode16_all_allowed_scalars_and_multilingual_names_match_postgres_identity ... ok
+
+test result: ok. 26 passed; 0 failed; 0 ignored; 0 measured; 2852 filtered out; finished in 9.13s
+

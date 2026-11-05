@@ -1,0 +1,8 @@
+
+running 3 tests
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::knowledge_search_low_ceiling_never_observes_private_exact_content_or_raises ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::knowledge_search_driver_persists_observation_and_classification_before_continuing ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::knowledge_search_replay_uses_the_canonical_result_without_embedding_again ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 2860 filtered out; finished in 1.41s
+

@@ -1,0 +1,121 @@
+
+running 100 tests
+test application::knowledge::search::query::tests::knowledge_search_limit_is_bounded_and_defaults_to_five ... ok
+test application::knowledge::search::ranking::tests::knowledge_search_invalid_vectors_fail_without_fabricating_an_empty_result ... ok
+test application::knowledge::search::ranking::tests::knowledge_search_threshold_drops_weak_matches_and_does_not_raise_empty_results ... ok
+test application::knowledge::search::ranking::tests::knowledge_search_exact_hits_survive_below_the_meaning_threshold ... ok
+test application::knowledge::search::ranking::tests::knowledge_search_rrf_promotes_the_exact_code_when_meaning_is_tied ... ok
+test application::knowledge::search::ranking::tests::knowledge_search_result_omits_levels_ids_and_filename_prefixes ... ok
+test application::knowledge::search::ranking::tests::knowledge_search_discarded_high_passage_does_not_raise_classification ... ok
+test application::knowledge::search::ranking::tests::knowledge_search_top_k_and_score_ties_are_deterministic ... ok
+test application::knowledge::search::query::tests::knowledge_search_input_rejects_levels_unknown_fields_and_invalid_bounds ... ok
+test application::knowledge::service::tests::knowledge_upload_rejects_invalid_files_before_chunking_and_sanitizes_before_hashing ... ok
+test application::knowledge::search::ranking::tests::knowledge_search_result_bound_counts_escaped_json_and_preserves_utf8 ... ok
+test application::knowledge::vectors::tests::knowledge_chunk_vectors_are_finite_nonzero_and_normalized ... ok
+test application::knowledge::service::tests::knowledge_upload_shutdown_competes_with_preflight_and_refuses_later_model_registration ... ok
+test application::knowledge::service::tests::queries::knowledge_search_cancellation_retains_the_actual_shared_native_slot ... ok
+test application::knowledge::service::tests::queries::knowledge_search_query_boundary_rejects_oversized_input_and_invalid_model_outputs ... ok
+test application::knowledge::service::tests::queries::knowledge_search_result_holds_the_slot_through_consumption_and_releases_on_drop ... ok
+test application::knowledge::service::tests::knowledge_upload_deadline_cancels_the_result_and_retains_permit_until_the_native_batch_stops ... ok
+test application::knowledge::service::tests::queries::knowledge_search_registration_competes_with_shutdown_without_late_consumption ... ok
+test application::knowledge::service::tests::knowledge_upload_cancellation_retains_actual_native_permit_and_bounded_shutdown_never_writes ... ok
+test application::knowledge::service::tests::queries::knowledge_search_timeout_is_an_error_and_retains_the_slot_until_native_completion ... ok
+test application::services::harness::runs::tests::malformed_provider_counter_is_rejected_without_partial_settlement ... ok
+test application::services::harness::runs::tests::a_partial_batch_round_trips_without_another_model_request ... ok
+test application::services::harness::runs::tests::hard_usage_overflow_retains_truth_and_prevents_tool_or_model_progression ... ok
+test application::services::harness::runs::tests::terminal_usage_state_cannot_legitimize_over_admitted_reservations ... ok
+test application::services::harness::runs::tests::usage_replaces_each_reservation_once_and_retains_unknown_paid_calls_after_restart ... ok
+test application::services::harness::runs::tests::received_usage_above_reservation_survives_and_charges_future_admission ... ok
+test application::workflow::knowledge::builtin::tests::knowledge_search_description_requires_exact_terms_citations_and_dont_have_that ... ok
+test application::knowledge::service::tests::knowledge_upload_validates_all_chunks_before_embedding_and_rejects_bad_model_outputs ... ok
+test application::workflow::message_admission::knowledge_tests::knowledge_run_level_stamped_trigger_refusal_settles_instead_of_retrying ... ok
+test application::services::harness::runs::tests::maximum_turn_configuration_has_room_for_sixteen_output_reservations ... ok
+test application::workflow::knowledge::builtin::tests::knowledge_search_snapshot_is_reserved_and_exactly_trusted_without_external_targets ... ok
+test application::workflow::provisioning::tests::every_built_in_name_is_reserved ... ok
+test application::services::harness::runs::tests::a_call_that_returned_the_same_result_twice_is_not_started_a_third_time ... ok
+test application::services::harness::runs::tests::malformed_batches_fail_before_any_invocation_is_prepared ... ok
+test application::services::harness::runs::tests::repair_reservations_are_atomic_bounded_and_survive_unknown_responses ... ok
+test application::workflow::publication::storage::tests::workflow_storage_deserialization_preserves_name_invariants ... ok
+test application::services::harness::runs::tests::unknown_usage_and_retries_do_not_restore_allowance ... ok
+test application::workflow::provisioning::tests::only_the_exact_name_only_built_in_is_trusted ... ok
+test application::services::harness::runs::tests::execution_allowances_and_replay_counts_survive_restart_and_cannot_reset ... ok
+test application::services::harness::runs::tests::changing_results_new_arguments_and_new_calls_are_not_repeats ... ok
+test application::workflow::knowledge::builtin::tests::knowledge_search_schema_rejects_level_extra_fields_and_exact_term_bounds ... ok
+test application::services::harness::runs::tests::checkpoint_schema_and_server_ceilings_are_enforced ... ok
+test application::workflow::provisioning::tests::arguments_are_held_to_the_input_contract ... ok
+test application::workflow::publication::tests::capabilities_tests::workflow_capabilities_agent_universe_is_literal_or_finite_parameter_enum ... ok
+test application::workflow::provisioning::tests::custom_steps_are_held_to_the_builder_step_types ... ok
+test application::workflow::publication::tests::capabilities_tests::workflow_capabilities_classify_captures_and_requires_its_agent ... ok
+test application::workflow::publication::tests::capabilities_tests::workflow_capabilities_agent_without_saved_capabilities_receives_none ... ok
+test application::workflow::publication::tests::capabilities_tests::workflow_capabilities_agent_receives_exactly_its_saved_tools_and_skills_in_order ... ok
+test application::workflow::publication::tests::capabilities_tests::workflow_capabilities_refuse_other_company_and_unknown_agent ... ok
+test application::workflow::publication::tests::capabilities_tests::workflow_capabilities_skill_requirement_outside_agent_tools_fails_publication ... ok
+test application::workflow::publication::tests::diagnostic_tests::workflow_publication_duplicate_contracts_identify_the_dependency ... ok
+test application::workflow::provisioning::tests::refusals_and_results_are_both_valid_receipts ... ok
+test application::workflow::publication::tests::diagnostic_tests::workflow_publication_duplicate_selections_identify_the_list_and_member ... ok
+test application::workflow::publication::tests::diagnostic_tests::workflow_publication_invalid_agent_settings_identify_the_field ... ok
+test application::workflow::publication::tests::agent_tests::workflow_agent_preparation_declares_provider_safe_names_and_delimits_context ... ok
+test application::workflow::publication::tests::agent_tests::workflow_model_steps_prepare_tool_free_with_their_response_contracts ... ok
+test application::workflow::publication::tests::capabilities_tests::workflow_capabilities_step_and_workflow_narrowing_inputs_are_rejected ... ok
+test application::workflow::publication::tests::workflow_publication_ambiguous_agent_tool_fails_publication ... ok
+test application::workflow::publication::tests::agent_tests::workflow_agent_preparation_refuses_unsupported_or_colliding_bindings ... ok
+test application::workflow::publication::tests::workflow_publication_rejects_conflicting_transitive_version_content ... ok
+test application::workflow::publication::tests::workflow_publication_children_pin_content_schemas_and_transitive_hashes ... ok
+test application::workflow::provisioning::tests::http_operations_cannot_take_a_built_in_name ... ok
+test application::workflow::publication::tests::workflow_publication_freezes_workflow_tool_pins_like_children ... ok
+test application::workflow::publication::tests::workflow_publication_freezes_agents_skills_and_hashes ... ok
+test application::workflow::publication::tests::workflow_publication_rejects_missing_duplicate_foreign_recursive_and_wrong_child_versions ... ok
+test application::workflow::publication::tests::workflow_publication_requires_and_hashes_trusted_agent_identity ... ok
+test application::workflow::publication::tests::workflow_publication_runtime_agent_selection_uses_only_frozen_catalogue ... ok
+test application::workflow::publication::tests::workflow_publication_rejects_incomplete_foreign_duplicate_and_oversized_dependencies ... ok
+test application::workflow::publication::tests::workflow_publication_validates_skill_requirements_without_granting_tools ... ok
+test application::workflow::publication::storage::tests::workflow_root_budget_storage_roundtrip_and_old_semantics_refusal ... ok
+test application::workflow::publication::tests::workflow_publication_rejects_deep_and_aggregate_schema_facts_before_copying ... ok
+test application::workflow::publication::tests::workflow_publication_bounds_child_depth_and_pins_transitive_content ... ok
+test application::workflow::sample::tests::missing_invalid_unused_and_oversized_scripts_fail_explicitly ... ok
+test application::workflow::sample::tests::pure_and_scripted_routing_share_compiled_validation ... ok
+test application::workflow::sample::tests::jev_tests::jev_box_sample_rejects_tools_tokens_and_invalid_box ... ok
+test application::workflow::publication::storage::tests::workflow_storage_rejects_incompatible_compiler_before_rebuilding ... ok
+test application::workflow::sample::tests::jev_tests::jev_box_sample_uses_only_scripted_answers_and_inert_metadata ... ok
+test application::workflow::sample::tests::tools_tests::direct_agent_tools_and_pinned_workflow_tools_stay_in_sample ... ok
+test domain::entities::access_level::knowledge_tests::knowledge_run_level_audience_is_the_lowest_reader_or_public ... ok
+test domain::entities::access_level::knowledge_tests::knowledge_run_level_domain_keeps_content_within_the_admission_ceiling ... ok
+test domain::entities::access_level::knowledge_tests::knowledge_run_level_release_matrix_never_declassifies ... ok
+test domain::workflow::outcome::tests::knowledge_run_level_refusal_has_no_retry_or_error_route ... ok
+test domain::workflow::recovery::tests::knowledge_run_level_refusal_is_final_but_unknown_effect_still_reconciles ... ok
+
+thread 'infra::config::tests::knowledge_search_config_limit_defaults_to_five_and_rejects_invalid_bounds' (31211474) panicked at src/infra/config.rs:140:14:
+KNOWLEDGE_SEARCH_TOP_K must be an integer from 1 to 8
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test application::workflow::sample::tests::jev_tests::workflow_sample_jev_mixed_thresholds_automatic_and_human_paths ... ok
+test application::workflow::sample::tests::bounded_root_budget_and_external_kinds_never_fall_back ... ok
+test application::workflow::sample::tests::tools_tests::direct_tool_inputs_and_outputs_are_validated ... ok
+test application::workflow::sample::tests::tools_tests::protected_step_workflow_tool_needs_approval_and_executes_child ... ok
+test application::workflow::sample::tests::repeated_human_revision_carries_edited_artifact_feedback_and_captures_reply ... ok
+test infra::workflow::tests::worker_slots_respect_the_pool ... ok
+
+thread 'infra::config::tests::knowledge_search_config_limit_defaults_to_five_and_rejects_invalid_bounds' (31211474) panicked at src/infra/config.rs:140:14:
+KNOWLEDGE_SEARCH_TOP_K must be an integer from 1 to 8
+
+thread 'infra::config::tests::knowledge_search_config_limit_defaults_to_five_and_rejects_invalid_bounds' (31211474) panicked at src/infra/config.rs:140:14:
+KNOWLEDGE_SEARCH_TOP_K must be an integer from 1 to 8
+
+thread 'infra::config::tests::knowledge_search_config_limit_defaults_to_five_and_rejects_invalid_bounds' (31211474) panicked at src/infra/config.rs:140:14:
+KNOWLEDGE_SEARCH_TOP_K must be an integer from 1 to 8
+
+thread 'infra::config::tests::knowledge_search_config_limit_defaults_to_five_and_rejects_invalid_bounds' (31211474) panicked at src/infra/config.rs:140:14:
+KNOWLEDGE_SEARCH_TOP_K must be an integer from 1 to 8
+test infra::config::tests::knowledge_search_config_limit_defaults_to_five_and_rejects_invalid_bounds ... ok
+test infra::workflow::tests::production_handler_covers_every_io_kind_or_refuses_it ... ok
+test application::workflow::publication::storage::tests::workflow_storage_rejects_corruption_and_compiler_drift ... ok
+test application::workflow::publication::tests::workflow_publication_dependency_errors_name_the_problem_and_source_field ... ok
+test application::workflow::sample::tests::tools_tests::direct_mcp_tool_uses_the_production_result_envelope ... ok
+test application::workflow::publication::tests::workflow_publication_mcp_contract_policy_and_resource_are_frozen_together ... ok
+test application::workflow::sample::tests::descendants_cannot_replenish_root_budgets_and_report_size_is_bounded ... ok
+test application::workflow::publication::storage::tests::workflow_storage_restores_all_frozen_fixtures_and_child_identity ... ok
+test infra::workflow::tests::production_admission_refuses_a_child_trigger ... ok
+test infra::workflow::tests::production_publication_refuses_memory_steps_and_captures_children ... ok
+test infra::workflow::tests::production_workers_stop_on_the_shutdown_token ... ok
+
+test result: ok. 100 passed; 0 failed; 0 ignored; 0 measured; 2778 filtered out; finished in 1.24s
+

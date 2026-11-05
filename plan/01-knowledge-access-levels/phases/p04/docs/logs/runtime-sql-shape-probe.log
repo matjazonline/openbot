@@ -1,0 +1,12 @@
+PREPARE
+ id | document_name | heading | body | access_level | embedding | keyword_rank 
+----+---------------+---------+------+--------------+-----------+--------------
+(0 rows)
+
+DEALLOCATE
+PREPARE
+ step_id | frozen_inputs | ceiling 
+---------+---------------+---------
+(0 rows)
+
+DEALLOCATE

@@ -1,0 +1,12 @@
+
+running 5 tests
+observed gated transaction pids=[49918] blocker=49924 elapsed_ms=15
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::ownership::knowledge_search_real_replacement_claim_replays_original_and_fences_stale_competitor ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::ownership::knowledge_search_proof_rewrite_delete_and_cross_company_insert_are_rejected ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::ownership::knowledge_search_expired_database_lease_or_deadline_refuses_before_embedding ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::ownership::knowledge_search_actual_statement_and_commit_expiry_roll_back_payload_rise_and_proof ... ok
+observed gated transaction pids=[49977] blocker=49981 elapsed_ms=15
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::ownership::knowledge_search_unknown_commit_ack_returns_no_content_then_reconstruction_reads_truth ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 2873 filtered out; finished in 5.97s
+

@@ -1,0 +1,25 @@
+
+running 5 tests
+observed gated transaction pids=[46302] blocker=46311 elapsed_ms=15
+
+thread 'adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::ownership::knowledge_search_expired_database_lease_or_deadline_refuses_before_embedding' (31197069) panicked at src/adapters/persistence/workflow/knowledge_search_lease_tests.rs:47:10:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "23514", message: "new row for relation \"background_tasks\" violates check constraint \"background_tasks_lease_check\"", detail: Some("Failing row contains (624c7157-08ba-4399-bd4d-c9da8cebf134, 9d145f55-98ec-41c4-9b4a-d85c737a3bbe, null, null, 342f59b1-a4b4-45f8-9f90-389f87698cb0, processing, 0, 0, 1, 3, a756f3c9-b535-4d07-af0f-98ae0802a36c, 3d84884c-0eae-404d-af6f-cc7c30044dd1, 2026-11-05 16:34:33.378776+00, 2026-11-05 16:34:32.437196+00, 2026-11-05 16:34:33.325565+00, 2026-11-05 16:34:33.325565+00, 2026-11-05 16:34:33.325565+00, 3ada400b-69f4-4f45-b40a-8650b84cafdd)."), hint: None, position: None, where: None, schema: Some("public"), table: Some("background_tasks"), column: None, data_type: None, constraint: Some("background_tasks_lease_check"), file: Some("execMain.c"), line: Some(2081), routine: Some("ExecConstraints") })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::ownership::knowledge_search_real_replacement_claim_replays_original_and_fences_stale_competitor ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::ownership::knowledge_search_expired_database_lease_or_deadline_refuses_before_embedding ... FAILED
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::ownership::knowledge_search_proof_rewrite_delete_and_cross_company_insert_are_rejected ... ok
+
+thread 'adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::ownership::knowledge_search_actual_statement_and_commit_expiry_roll_back_payload_rise_and_proof' (31197068) panicked at src/adapters/persistence/workflow/knowledge_search_lease_tests.rs:127:17:
+Database("error returned from database: new row for relation \"background_tasks\" violates check constraint \"background_tasks_lease_check\"")
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::ownership::knowledge_search_actual_statement_and_commit_expiry_roll_back_payload_rise_and_proof ... FAILED
+observed gated transaction pids=[46372] blocker=46377 elapsed_ms=14
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::ownership::knowledge_search_unknown_commit_ack_returns_no_content_then_reconstruction_reads_truth ... ok
+
+failures:
+
+failures:
+    adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::ownership::knowledge_search_actual_statement_and_commit_expiry_roll_back_payload_rise_and_proof
+    adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::ownership::knowledge_search_expired_database_lease_or_deadline_refuses_before_embedding
+
+test result: FAILED. 3 passed; 2 failed; 0 ignored; 0 measured; 2870 filtered out; finished in 5.98s
+

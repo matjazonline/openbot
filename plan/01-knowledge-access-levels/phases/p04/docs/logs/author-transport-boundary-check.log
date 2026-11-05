@@ -1,0 +1,3 @@
+transport boundary check failed:
+src/adapters/persistence/thread/jsonb_row_context_tests.rs:12:            email_metadata(&format!("<{suffix}-{}@test.invalid>", fixture.suffix)),
+synthetic email identity escaped the email adapter

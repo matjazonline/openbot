@@ -1,0 +1,16 @@
+
+running 11 tests
+test application::knowledge::search::query::tests::knowledge_search_limit_is_bounded_and_defaults_to_five ... ok
+test application::knowledge::search::ranking::tests::knowledge_search_invalid_vectors_fail_without_fabricating_an_empty_result ... ok
+test application::knowledge::search::ranking::tests::knowledge_search_rrf_promotes_the_exact_code_when_meaning_is_tied ... ok
+test application::knowledge::search::ranking::tests::knowledge_search_exact_hits_survive_below_the_meaning_threshold ... ok
+test application::knowledge::search::ranking::tests::knowledge_search_threshold_drops_weak_matches_and_does_not_raise_empty_results ... ok
+test application::knowledge::search::ranking::tests::knowledge_search_top_k_and_score_ties_are_deterministic ... ok
+test application::knowledge::search::ranking::tests::knowledge_search_discarded_high_passage_does_not_raise_classification ... ok
+test application::knowledge::search::query::tests::knowledge_search_input_rejects_levels_unknown_fields_and_invalid_bounds ... ok
+test application::knowledge::search::ranking::tests::knowledge_search_result_omits_levels_ids_and_filename_prefixes ... ok
+test application::knowledge::search::ranking::tests::knowledge_search_result_bound_counts_escaped_json_and_preserves_utf8 ... ok
+test application::knowledge::search::query::tests::knowledge_search_exact_terms_extract_codes_unicode_digits_and_deduplicate ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 2837 filtered out; finished in 0.01s
+

@@ -1,0 +1,10 @@
+
+running 5 tests
+test infra::workflow::tests::worker_slots_respect_the_pool ... ok
+test infra::workflow::tests::production_handler_covers_every_io_kind_or_refuses_it ... ok
+test infra::workflow::tests::production_admission_refuses_a_child_trigger ... ok
+test infra::workflow::tests::production_publication_refuses_memory_steps_and_captures_children ... ok
+test infra::workflow::tests::production_workers_stop_on_the_shutdown_token ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 2873 filtered out; finished in 1.08s
+

@@ -1,0 +1,64 @@
+
+running 41 tests
+test adapters::persistence::knowledge::tests::search::knowledge_search_sql_simple_exact_terms_and_digit_fallback_work_in_non_english_text ... ok
+test adapters::persistence::knowledge::tests::search::knowledge_search_sql_filters_company_model_and_ceiling_before_both_ranks ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::atomic::knowledge_search_empty_corpus_saves_empty_observation_without_classification_rise ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::atomic::knowledge_search_generic_checkpoint_result_cannot_bypass_classification ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::atomic::knowledge_search_forged_fences_and_changed_arguments_fail_before_embedding ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::atomic::knowledge_search_failure_after_result_and_rise_rolls_back_the_entire_observation ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::atomic::knowledge_search_model_token_limit_is_a_saved_tool_error_without_empty_success_or_rise ... ok
+test adapters::persistence::knowledge::tests::search_quota::knowledge_search_company_chunk_cap_competing_writes_override_delete_and_corruption_guard ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::atomic::knowledge_search_current_grant_revocation_blocks_saved_invocation_before_embedding ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::atomic::knowledge_search_busy_model_is_retryable_without_saving_an_empty_observation ... ok
+test application::knowledge::search::query::tests::knowledge_search_exact_terms_extract_codes_unicode_digits_and_deduplicate ... ok
+test application::knowledge::search::query::tests::knowledge_search_input_rejects_levels_unknown_fields_and_invalid_bounds ... ok
+test application::knowledge::search::query::tests::knowledge_search_limit_is_bounded_and_defaults_to_five ... ok
+test application::knowledge::search::ranking::tests::knowledge_search_discarded_high_passage_does_not_raise_classification ... ok
+test application::knowledge::search::ranking::tests::knowledge_search_exact_hits_survive_below_the_meaning_threshold ... ok
+test application::knowledge::search::ranking::tests::knowledge_search_invalid_vectors_fail_without_fabricating_an_empty_result ... ok
+test application::knowledge::search::ranking::tests::knowledge_search_result_bound_counts_escaped_json_and_preserves_utf8 ... ok
+test application::knowledge::search::ranking::tests::knowledge_search_result_omits_levels_ids_and_filename_prefixes ... ok
+test application::knowledge::search::ranking::tests::knowledge_search_rrf_promotes_the_exact_code_when_meaning_is_tied ... ok
+test application::knowledge::search::ranking::tests::knowledge_search_threshold_drops_weak_matches_and_does_not_raise_empty_results ... ok
+test application::knowledge::search::ranking::tests::knowledge_search_top_k_and_score_ties_are_deterministic ... ok
+test application::knowledge::service::tests::queries::knowledge_search_cancellation_retains_the_actual_shared_native_slot ... ok
+test application::knowledge::service::tests::queries::knowledge_search_query_boundary_rejects_oversized_input_and_invalid_model_outputs ... ok
+test application::knowledge::service::tests::queries::knowledge_search_registration_competes_with_shutdown_without_late_consumption ... ok
+test application::knowledge::service::tests::queries::knowledge_search_result_holds_the_slot_through_consumption_and_releases_on_drop ... ok
+test application::knowledge::service::tests::queries::knowledge_search_timeout_is_an_error_and_retains_the_slot_until_native_completion ... ok
+test application::workflow::knowledge::builtin::tests::knowledge_search_description_requires_exact_terms_citations_and_dont_have_that ... ok
+test application::workflow::knowledge::builtin::tests::knowledge_search_schema_rejects_level_extra_fields_and_exact_term_bounds ... ok
+test application::workflow::knowledge::builtin::tests::knowledge_search_snapshot_is_reserved_and_exactly_trusted_without_external_targets ... ok
+
+thread 'infra::config::tests::knowledge_search_config_limit_defaults_to_five_and_rejects_invalid_bounds' (31222483) panicked at src/infra/config.rs:140:14:
+KNOWLEDGE_SEARCH_TOP_K must be an integer from 1 to 8
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'infra::config::tests::knowledge_search_config_limit_defaults_to_five_and_rejects_invalid_bounds' (31222483) panicked at src/infra/config.rs:140:14:
+KNOWLEDGE_SEARCH_TOP_K must be an integer from 1 to 8
+
+thread 'infra::config::tests::knowledge_search_config_limit_defaults_to_five_and_rejects_invalid_bounds' (31222483) panicked at src/infra/config.rs:140:14:
+KNOWLEDGE_SEARCH_TOP_K must be an integer from 1 to 8
+
+thread 'infra::config::tests::knowledge_search_config_limit_defaults_to_five_and_rejects_invalid_bounds' (31222483) panicked at src/infra/config.rs:140:14:
+KNOWLEDGE_SEARCH_TOP_K must be an integer from 1 to 8
+
+thread 'infra::config::tests::knowledge_search_config_limit_defaults_to_five_and_rejects_invalid_bounds' (31222483) panicked at src/infra/config.rs:140:14:
+KNOWLEDGE_SEARCH_TOP_K must be an integer from 1 to 8
+test infra::config::tests::knowledge_search_config_limit_defaults_to_five_and_rejects_invalid_bounds ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::atomic::knowledge_search_level_argument_is_a_saved_tool_error_without_embedding_or_rise ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::atomic::knowledge_search_competing_observers_keep_one_canonical_result_and_its_exact_stamp ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::atomic::knowledge_search_observation_above_actual_immutable_ceiling_cannot_commit ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::knowledge_search_low_ceiling_never_observes_private_exact_content_or_raises ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::knowledge_search_driver_persists_observation_and_classification_before_continuing ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::knowledge_search_replay_uses_the_canonical_result_without_embedding_again ... ok
+observed gated transaction pids=[56242] blocker=56248 elapsed_ms=15
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::ownership::knowledge_search_real_replacement_claim_replays_original_and_fences_stale_competitor ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::ownership::knowledge_search_expired_database_lease_or_deadline_refuses_before_embedding ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::ownership::knowledge_search_proof_rewrite_delete_and_cross_company_insert_are_rejected ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::ownership::knowledge_search_actual_statement_and_commit_expiry_roll_back_payload_rise_and_proof ... ok
+observed gated transaction pids=[56288] blocker=56292 elapsed_ms=16
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::ownership::knowledge_search_unknown_commit_ack_returns_no_content_then_reconstruction_reads_truth ... ok
+
+test result: ok. 41 passed; 0 failed; 0 ignored; 0 measured; 2837 filtered out; finished in 11.92s
+

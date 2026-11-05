@@ -1,0 +1,8 @@
+
+running 3 tests
+test adapters::persistence::knowledge::tests::search::knowledge_search_sql_filters_company_model_and_ceiling_before_both_ranks ... ok
+test adapters::persistence::knowledge::tests::search::knowledge_search_sql_simple_exact_terms_and_digit_fallback_work_in_non_english_text ... ok
+test adapters::persistence::knowledge::tests::search_quota::knowledge_search_company_chunk_cap_competing_writes_override_delete_and_corruption_guard ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 2857 filtered out; finished in 2.65s
+
