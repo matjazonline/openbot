@@ -1,0 +1,204 @@
+==> Auto-updating Homebrew...
+Adjust how often this is run with `$HOMEBREW_AUTO_UPDATE_SECS` or disable with
+`$HOMEBREW_NO_AUTO_UPDATE=1`. Hide these hints with `$HOMEBREW_NO_ENV_HINTS=1` (see `man brew`).
+==> Auto-updated Homebrew!
+==> Updated Homebrew from 7.0.10 (e92663d173) to 7.0.12 (944ccca3ed).
+Updated 3 taps (surrealdb/tap, homebrew/core and homebrew/cask).
+==> New Formulae
+agent-desktop: Native desktop automation CLI for AI agents
+arm-optimized-routines: Optimized implementations of various library functions for Arm processors
+beszel: Lightweight server monitoring with historical data, Docker stats, and alerts
+beszel-agent: Agent for the Beszel lightweight server monitoring platform
+blint: Security linter and SBOM generator for binaries
+calcure: Modern TUI calendar and task manager
+cellpose: Generalist algorithm for cell and nucleus segmentation
+cx: CLI for querying and managing Coralogix observability data
+dep-scan: Security and risk audit tool for project dependencies and container images
+designcraft-cli: Headless DesignCraft CLI and MCP server to script, export and validate layouts
+entire-cli: Capture AI agent sessions in your Git workflow
+gitea-importer: CLI to migrate repositories from GitHub, GitLab and Gitea into Gitea
+godu: Simple golang utility helping to discover large files/folders
+gridcraft-cli: Headless GridCraft CLI and MCP server to inspect, convert and script workbooks
+hoppr: Collects, processes and bundles components listed in CycloneDX SBOMs
+icu4c@79: C/C++ and Java libraries for Unicode and globalization
+kontext: Identity, credentials, and governance for AI agents
+libgovirt: GObject-based library to access oVirt REST API
+libkrunfw: Dynamic library bundling the guest payload consumed by libkrun
+lightcraft-cli: Headless LightCraft CLI and MCP server to develop and export photos
+lovable-oj: Experimental next generation frontend tooling
+nelm@1: Kubernetes deployment tool that manages and deploys Helm Charts
+netbird: Securely connects across any network with one identity-based platform
+ng-log: C++ library for application-level logging
+percona-xtrabackup@8.4: Open source hot backup tool for InnoDB and XtraDB databases
+roborev: Background code review with AI agents
+ryl: Fast YAML linter and formatter written in Rust
+sbom-tools: SBOM multi-tool: diff, quality, compliance, vulnerability tracking, VEXes, etc.
+sbomasm: Tool to assemble and edit SBOMs
+sbomqs: SBOM quality scorer and compliance checker
+slivar: Filter and annotate genetic variants with expressions, for trios and cohorts
+spidermonkey@140: JavaScript-C Engine
+svt-jpegxs: JPEG XS codec
+toit: High-level programming language and SDK
+upki: Implements platform-independent browser-grade certificate infrastructure
+vectorcraft-cli: Headless VectorCraft CLI and MCP server to convert, inspect and script artwork
+wordcraft-cli: Headless WordCraft CLI and MCP server to convert, inspect and script documents
+worldmonitor: Command-line client for the World Monitor global intelligence API
+zmij: Fast floating-point-to-string conversion library for C and C++
+==> New Casks
+anydrag: Move any window by holding a modifier key and dragging anywhere on it
+audioroute: System and per-app audio capture tool
+bambu-studio@beta: 3D model slicing software for 3D printers, maintained by Bambu Lab
+beat-link-trigger: Event trigger and show automation tool for Pioneer CDJs
+codeburn-app: Track AI coding token usage and cost
+deutschlandgpt: Desktop client for the DeutschlandGPT AI assistant
+diri: Terminal workspace for running coding agents in parallel
+emeetlink: Configuration utility for EMEET webcams and speakerphones
+font-agrave-pro
+font-geist-serif
+font-madhuban
+fore-studio-vitals: System monitor with per-app metrics and history
+freellmapi: Local OpenAI-compatible LLM router
+herdr-app: Desktop app for terminals and coding agents
+junie: AI coding agent by JetBrains
+keyboop: Keyboard layout switcher with local voice dictation
+macdirstat: Disk space analyser
+mactoy: Ventoy installer and disk image flasher
+magpie: Model gateway for AI coding agents
+nebius: Command-line interface for Nebius
+notational-velocity: Store and retrieve notes
+nvalt: Note taking app, fork of Notational Velocity
+obelisk: Game launcher for Steam, Epic Games and GOG libraries
+oleafly: LaTeX, Typst and Markdown editor for research writing
+opencodex: Proxy that connects AI coding agents to other LLM providers
+openframe-console: Desktop client for IT management notifications and sessions
+openscreen: Screen recorder and demo video editor
+peel: App uninstaller and disk space cleaner
+prusaslicer@preview: G-code generator for 3D printers (RepRap, Makerbot, Ultimaker etc.)
+qoder: Agentic coding platform
+rencal: Desktop calendar
+screendrop: Screenshot and screen recording tool
+solidcraft: Parametric 3D CAD modeller
+spencer: Window and workspace layout manager across Spaces and displays
+spotify-soloist: Headless Spotify client
+task-manager-tmog: System monitor that identifies resource-heavy processes
+thinkrail: Agentic development environment
+tinycast: Application launcher and productivity tool
+tldv: AI meeting recorder and note taker
+wblock: Ad blocker for Safari
+
+You have 46 outdated formulae and 8 outdated casks installed.
+
+
+The 7.0.12 changelog can be found at:
+  https://github.com/Homebrew/brew/releases/tag/7.0.12
+Warning: node@22 has been deprecated because it is in maintenance and will be end-of-life on 2027-04-30! It will be disabled on 2027-10-30.
+Warning: The following taps are not trusted:
+  surrealdb/tap
+
+Homebrew is currently ignoring formulae, casks and commands
+from these taps because tap trust is required.
+Prefer trusting only the specific formulae, casks or commands you need.
+Trust installed formulae from these taps with:
+  brew trust --formula surrealdb/tap/surreal
+Trust other specific casks and commands with:
+  brew trust --cask <user>/<tap>/<cask>
+  brew trust --command <user>/<tap>/<command>
+Whole-tap trust is broader and includes all current and future formulae,
+casks and commands from the listed taps. Trust whole taps with:
+  brew trust surrealdb/tap
+Untap them with:
+  brew untap surrealdb/tap
+For more information, see:
+  https://docs.brew.sh/Tap-Trust
+
+==> Downloading bottle manifests
+✔︎ Bottle Manifest node@22 (22.23.4_2)
+==> Would install 1 formula:
+node@22 22.23.4_2
+==> Would upgrade 11 dependencies for node@22:
+brotli           1.2.0      -> 1.2.1
+c-ares           1.34.8     -> 1.34.9
+icu4c@78         78.3       -> 78.3_1
+libnghttp2       1.69.0     -> 1.71.0
+libnghttp3       1.17.0     -> 1.19.0
+libuv            1.52.1     -> 1.53.0
+ca-certificates  2026-10-20 -> 2026-11-05
+openssl@3        3.6.3      -> 3.5.9
+simdjson         4.6.4      -> 5.1.1
+sqlite           3.53.3     -> 3.54.1
+lz4              1.10.0     -> 1.11.0
+Warning: icu4c@78 has been deprecated because it is a versioned formula! It will be disabled on 2027-10-30.
+==> Fetching downloads for: node@22
+✔︎ Bottle Manifest c-ares (1.34.9)
+✔︎ Bottle Manifest libnghttp2 (1.71.0)
+✔︎ Bottle Manifest libnghttp3 (1.19.0)
+✔︎ Bottle Manifest brotli (1.2.1)
+✔︎ Bottle Manifest libuv (1.53.0)
+✔︎ Bottle Manifest ca-certificates (2026-11-05)
+✔︎ Bottle Manifest icu4c@78 (78.3_1)
+✔︎ Bottle Manifest openssl@3 (3.5.9)
+✔︎ Bottle Manifest lz4 (1.11.0)
+✔︎ Bottle Manifest sqlite (3.54.1)
+✔︎ Bottle Manifest simdjson (5.1.1)
+✔︎ Bottle brotli (1.2.1)
+✔︎ Bottle ca-certificates (2026-11-05)
+✔︎ Bottle libnghttp3 (1.19.0)
+✔︎ Bottle libnghttp2 (1.71.0)
+✔︎ Bottle c-ares (1.34.9)
+✔︎ Bottle libuv (1.53.0)
+✔︎ Bottle lz4 (1.11.0)
+✔︎ Bottle sqlite (3.54.1)
+✔︎ Bottle simdjson (5.1.1)
+✔︎ Bottle openssl@3 (3.5.9)
+✔︎ Bottle node@22 (22.23.4_2)
+✔︎ Bottle icu4c@78 (78.3_1)
+==> Installing dependencies for node@22: brotli, c-ares, icu4c@78, libnghttp2, libnghttp3, libuv, simdjson and sqlite
+==> Upgrading node@22 dependency: brotli (1.2.0 -> 1.2.1)
+==> Pouring brotli--1.2.1.arm64_sequoia.bottle.tar.gz
+🍺  /opt/homebrew/Cellar/brotli/1.2.1: 33 files, 1.9MB
+==> Upgrading node@22 dependency: c-ares (1.34.8 -> 1.34.9)
+==> Pouring c-ares--1.34.9.arm64_sequoia.bottle.tar.gz
+Warning: icu4c@78 has been deprecated because it is a versioned formula! It will be disabled on 2027-10-30.
+🍺  /opt/homebrew/Cellar/c-ares/1.34.9: 176 files, 1.1MB
+==> Upgrading node@22 dependency: icu4c@78 (78.3 -> 78.3_1)
+==> Pouring icu4c@78--78.3_1.arm64_sequoia.bottle.tar.gz
+🍺  /opt/homebrew/Cellar/icu4c@78/78.3_1: 279 files, 87.5MB
+==> Upgrading node@22 dependency: libnghttp2 (1.69.0 -> 1.71.0)
+==> Pouring libnghttp2--1.71.0.arm64_sequoia.bottle.tar.gz
+🍺  /opt/homebrew/Cellar/libnghttp2/1.71.0: 14 files, 780.2KB
+==> Upgrading node@22 dependency: libnghttp3 (1.17.0 -> 1.19.0)
+==> Pouring libnghttp3--1.19.0.arm64_sequoia.bottle.tar.gz
+🍺  /opt/homebrew/Cellar/libnghttp3/1.19.0: 20 files, 628.9KB
+==> Upgrading node@22 dependency: libuv (1.52.1 -> 1.53.0)
+==> Pouring libuv--1.53.0.arm64_sequoia.bottle.tar.gz
+🍺  /opt/homebrew/Cellar/libuv/1.53.0: 35 files, 1.3MB
+==> Upgrading node@22 dependency: simdjson (4.6.4 -> 5.1.1)
+==> Pouring simdjson--5.1.1.arm64_sequoia.bottle.tar.gz
+🍺  /opt/homebrew/Cellar/simdjson/5.1.1: 19 files, 10.5MB
+==> Upgrading node@22 dependency: sqlite (3.53.3 -> 3.54.1)
+==> Pouring sqlite--3.54.1.arm64_sequoia.bottle.tar.gz
+🍺  /opt/homebrew/Cellar/sqlite/3.54.1: 13 files, 5.4MB
+==> Installing node@22
+==> Pouring node@22--22.23.4_2.arm64_sequoia.bottle.tar.gz
+Warning: node@22 was installed but not linked because node is already linked.
+To link this version, run:
+  brew link node@22
+🍺  /opt/homebrew/Cellar/node@22/22.23.4_2: 2,140 files, 54.7MB
+==> Caveats
+==> node@22
+node@22 is keg-only, which means it was not symlinked into /opt/homebrew,
+because this is an alternate version of another formula.
+
+If you need to have node@22 first in your PATH, run:
+  printf '%s\n' export\ PATH\=/opt/homebrew/opt/node@22/bin:\$PATH >> ~/.zshrc
+
+For compilers to find node@22 you may need to set:
+  export LDFLAGS=-L/opt/homebrew/opt/node@22/lib
+  export CPPFLAGS=-I/opt/homebrew/opt/node@22/include
+
+The following node@22 executables are shadowed by linked node commands in /opt/homebrew/bin:
+node
+Running these by name will not invoke the version provided by this formula.
+Run `brew link node@22` to switch the active version to this keg.
+Disable this behaviour by setting `HOMEBREW_NO_PATH_SHADOW_CHECK=1`.
+Hide these hints with `HOMEBREW_NO_ENV_HINTS=1` (see `man brew`).

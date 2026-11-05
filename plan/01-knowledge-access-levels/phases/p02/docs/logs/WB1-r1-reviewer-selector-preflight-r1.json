@@ -1,0 +1,9 @@
+{
+  "status": "No tests executed; assertion caught zero matched selectors",
+  "incorrect_selectors": [
+    "workflow::agent_runtime_tests::",
+    "workflow::message_agent_tests::",
+    "workflow::mcp_agent_tests::"
+  ],
+  "correction": "Actual native test listing includes tests/http_tests, tests/message_tests/agent_tests and tests/mcp_tests/agent_tests paths"
+}

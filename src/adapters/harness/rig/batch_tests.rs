@@ -3,7 +3,7 @@ use super::{
     test_support::{Reply, check_request, check_tools, lookup, model, response},
 };
 use crate::services::test_support::{ScriptedExchange, ScriptedResponse, scripted_scenario};
-use rig::{agent::AgentBuilder, completion::Prompt};
+use rig_agent::{agent::AgentBuilder, completion::Prompt};
 use serde_json::json;
 use std::sync::{
     Arc,

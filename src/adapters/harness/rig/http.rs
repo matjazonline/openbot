@@ -1,6 +1,6 @@
 //! Bounded completion transport. Provider errors never include URLs, headers, or bodies.
 use bytes::Bytes;
-use rig::http_client::{
+use rig_core::http_client::{
     self, HttpClientExt, LazyBody, MultipartForm, Request, Response, StreamingResponse,
 };
 use secrecy::{ExposeSecret, SecretString};

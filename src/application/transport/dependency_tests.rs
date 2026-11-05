@@ -132,7 +132,7 @@ fn the_application_layer_names_no_agent_runtime() {
         for (number, line) in source.lines().enumerate() {
             let code = line.trim();
             // Prose may name the runtime; a comment compiles to nothing.
-            if code.starts_with("//") || !names_the_rig_crate(code) {
+            if code.starts_with("//") || !names_a_runtime_crate(code) {
                 continue;
             }
             offenders.push(format!("{file}:{}: {code}", number + 1));
@@ -147,13 +147,19 @@ fn the_application_layer_names_no_agent_runtime() {
     );
 }
 
-/// A path rooted at the `rig` crate, not one merely ending in `rig` (`crate::...::rig::`).
-fn names_the_rig_crate(code: &str) -> bool {
-    code.match_indices("rig::").any(|(at, _)| {
-        !code[..at]
-            .chars()
-            .next_back()
-            .is_some_and(|before| before.is_alphanumeric() || before == '_' || before == ':')
+/// External agent/embedding runtime paths, not internal modules merely ending in `rig`.
+fn names_a_runtime_crate(code: &str) -> bool {
+    const CRATES: &[&str] = &["rig", "rig_core", "rig_agent", "fastembed", "ort"];
+    code.split(|character: char| {
+        !character.is_alphanumeric() && character != '_' && character != ':'
+    })
+    .any(|token| {
+        let token = token.strip_prefix("::").unwrap_or(token);
+        CRATES.iter().any(|name| {
+            token
+                .strip_prefix(name)
+                .is_some_and(|suffix| suffix.starts_with("::") || suffix.is_empty())
+        })
     })
 }
 
@@ -207,4 +213,28 @@ fn workflow_and_transport_depend_on_shared_ports_without_reverse_usecase_imports
         "workflow/transport must consume shared ports, not use-case modules: {}",
         unexpected.join("\n")
     );
+}
+
+#[test]
+fn runtime_boundary_scanner_covers_direct_sdk_paths_without_internal_false_positives() {
+    for code in [
+        "use rig::completion::Message;",
+        "rig_core::completion::Message",
+        "use rig_agent::agent::Prompt;",
+        "fastembed::TextEmbedding",
+        "ort::init_from(path)",
+        "use ::rig_core::completion::Message;",
+        "use rig_agent as agent_runtime;",
+        "extern crate fastembed;",
+    ] {
+        assert!(names_a_runtime_crate(code), "{code}");
+    }
+    for code in [
+        "crate::adapters::harness::rig::Harness",
+        "support::helper()",
+        "some_rig_core::Fake",
+        "transport::value",
+    ] {
+        assert!(!names_a_runtime_crate(code), "{code}");
+    }
 }

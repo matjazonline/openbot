@@ -34,6 +34,7 @@ use crate::{
 
 #[derive(Clone)]
 pub struct AppState {
+    pub knowledge: Arc<crate::application::knowledge::KnowledgeLibrary>,
     pub auth_admission: Arc<AuthAdmission>,
     /// Workflow commands and read models, without worker handlers or spawn capability.
     pub workflow: Arc<crate::infra::workflow::WorkflowServices>,

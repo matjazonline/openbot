@@ -1,0 +1,313 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/dev/openbot-recovery/.worktrees/knowledge-p02)
+error[E0603]: function `database` is private
+  --> src/adapters/persistence/knowledge/bounds.rs:34:59
+   |
+34 |             tx.rollback().await.map_err(super::authority::database)?;
+   |                                                           ^^^^^^^^ private function
+   |
+note: the function `database` is defined here
+  --> src/adapters/persistence/company_level_authority.rs:60:1
+   |
+60 | pub(super) fn database(error: sqlx::Error) -> AppError {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0603]: function `database` is private
+  --> src/adapters/persistence/knowledge/bounds.rs:41:84
+   |
+41 |         Err(error) if error.as_database_error().is_some() => Err(super::authority::database(error)),
+   |                                                                                    ^^^^^^^^ private function
+   |
+note: the function `database` is defined here
+  --> src/adapters/persistence/company_level_authority.rs:60:1
+   |
+60 | pub(super) fn database(error: sqlx::Error) -> AppError {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0603]: function `database` is private
+  --> src/adapters/persistence/knowledge/rows.rs:53:33
+   |
+53 |             .map_err(authority::database)?,
+   |                                 ^^^^^^^^ private function
+   |
+note: the function `database` is defined here
+  --> src/adapters/persistence/company_level_authority.rs:60:1
+   |
+60 | pub(super) fn database(error: sqlx::Error) -> AppError {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0603]: function `database` is private
+  --> src/adapters/persistence/knowledge/rows.rs:70:33
+   |
+70 |             .map_err(authority::database)?,
+   |                                 ^^^^^^^^ private function
+   |
+note: the function `database` is defined here
+  --> src/adapters/persistence/company_level_authority.rs:60:1
+   |
+60 | pub(super) fn database(error: sqlx::Error) -> AppError {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0603]: function `database` is private
+  --> src/adapters/persistence/knowledge/rows.rs:87:29
+   |
+87 |         .map_err(authority::database)?
+   |                             ^^^^^^^^ private function
+   |
+note: the function `database` is defined here
+  --> src/adapters/persistence/company_level_authority.rs:60:1
+   |
+60 | pub(super) fn database(error: sqlx::Error) -> AppError {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0603]: function `database` is private
+   --> src/adapters/persistence/knowledge/rows.rs:113:33
+    |
+113 |             .map_err(authority::database)?,
+    |                                 ^^^^^^^^ private function
+    |
+note: the function `database` is defined here
+   --> src/adapters/persistence/company_level_authority.rs:60:1
+    |
+ 60 | pub(super) fn database(error: sqlx::Error) -> AppError {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0603]: function `database` is private
+   --> src/adapters/persistence/knowledge/rows.rs:142:86
+    |
+142 |         .bind(scope.company.as_uuid()).fetch_one(&mut **tx).await.map_err(authority::database)?;
+    |                                                                                      ^^^^^^^^ private function
+    |
+note: the function `database` is defined here
+   --> src/adapters/persistence/company_level_authority.rs:60:1
+    |
+ 60 | pub(super) fn database(error: sqlx::Error) -> AppError {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0603]: function `database` is private
+  --> src/adapters/persistence/knowledge/writes.rs:46:56
+   |
+46 |         .fetch_one(&mut **tx).await.map_err(authority::database)?;
+   |                                                        ^^^^^^^^ private function
+   |
+note: the function `database` is defined here
+  --> src/adapters/persistence/company_level_authority.rs:60:1
+   |
+60 | pub(super) fn database(error: sqlx::Error) -> AppError {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0603]: function `database` is private
+  --> src/adapters/persistence/knowledge/writes.rs:52:29
+   |
+52 |         .map_err(authority::database)?;
+   |                             ^^^^^^^^ private function
+   |
+note: the function `database` is defined here
+  --> src/adapters/persistence/company_level_authority.rs:60:1
+   |
+60 | pub(super) fn database(error: sqlx::Error) -> AppError {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0603]: function `database` is private
+  --> src/adapters/persistence/knowledge/writes.rs:72:33
+   |
+72 |             .map_err(authority::database)?;
+   |                                 ^^^^^^^^ private function
+   |
+note: the function `database` is defined here
+  --> src/adapters/persistence/company_level_authority.rs:60:1
+   |
+60 | pub(super) fn database(error: sqlx::Error) -> AppError {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0603]: function `database` is private
+  --> src/adapters/persistence/knowledge/mod.rs:56:52
+   |
+56 |             tx.rollback().await.map_err(authority::database)?;
+   |                                                    ^^^^^^^^ private function
+   |
+note: the function `database` is defined here
+  --> src/adapters/persistence/company_level_authority.rs:60:1
+   |
+60 | pub(super) fn database(error: sqlx::Error) -> AppError {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0603]: function `database` is private
+  --> src/adapters/persistence/knowledge/mod.rs:71:52
+   |
+71 |             tx.rollback().await.map_err(authority::database)?;
+   |                                                    ^^^^^^^^ private function
+   |
+note: the function `database` is defined here
+  --> src/adapters/persistence/company_level_authority.rs:60:1
+   |
+60 | pub(super) fn database(error: sqlx::Error) -> AppError {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0603]: function `database` is private
+  --> src/adapters/persistence/knowledge/mod.rs:90:52
+   |
+90 |             tx.rollback().await.map_err(authority::database)?;
+   |                                                    ^^^^^^^^ private function
+   |
+note: the function `database` is defined here
+  --> src/adapters/persistence/company_level_authority.rs:60:1
+   |
+60 | pub(super) fn database(error: sqlx::Error) -> AppError {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0603]: function `database` is private
+   --> src/adapters/persistence/knowledge/mod.rs:143:41
+    |
+143 |                     .map_err(authority::database)?;
+    |                                         ^^^^^^^^ private function
+    |
+note: the function `database` is defined here
+   --> src/adapters/persistence/company_level_authority.rs:60:1
+    |
+ 60 | pub(super) fn database(error: sqlx::Error) -> AppError {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `access_level::AccessLevel`
+ --> src/adapters/persistence/knowledge/tests.rs:5:16
+  |
+5 |     entities::{access_level::AccessLevel, user::User},
+  |                ^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+error[E0034]: multiple applicable items in scope
+   --> src/adapters/persistence/knowledge/tests.rs:142:14
+    |
+142 |             .delete(DeleteKnowledgeLayer {
+    |              ^^^^^^ multiple `delete` found
+    |
+note: candidate #1 is defined in an impl of the trait `application::use_cases::company::CompanyPersistence` for the type `persistence::PostgresPersistence`
+   --> src/adapters/persistence/company.rs:137:1
+    |
+137 | #[async_trait]
+    | ^^^^^^^^^^^^^^
+note: candidate #2 is defined in an impl of the trait `application::knowledge::types::KnowledgeDocuments` for the type `persistence::PostgresPersistence`
+   --> src/adapters/persistence/knowledge/mod.rs:49:1
+    |
+ 49 | #[async_trait]
+    | ^^^^^^^^^^^^^^
+help: disambiguate the method for candidate #1
+    |
+141 ~         application::use_cases::company::CompanyPersistence::delete(&f.store, DeleteKnowledgeLayer {
+142 +                 scope: f.member,
+143 +                 document_id: high.id,
+144 +                 expected_revision: 4
+145 +             })
+    |
+help: disambiguate the method for candidate #2
+    |
+141 ~         application::knowledge::types::KnowledgeDocuments::delete(&f.store, DeleteKnowledgeLayer {
+142 +                 scope: f.member,
+143 +                 document_id: high.id,
+144 +                 expected_revision: 4
+145 +             })
+    |
+
+error[E0034]: multiple applicable items in scope
+   --> src/adapters/persistence/knowledge/tests.rs:152:14
+    |
+152 |             .delete(DeleteKnowledgeLayer {
+    |              ^^^^^^ multiple `delete` found
+    |
+note: candidate #1 is defined in an impl of the trait `application::use_cases::company::CompanyPersistence` for the type `persistence::PostgresPersistence`
+   --> src/adapters/persistence/company.rs:137:1
+    |
+137 | #[async_trait]
+    | ^^^^^^^^^^^^^^
+note: candidate #2 is defined in an impl of the trait `application::knowledge::types::KnowledgeDocuments` for the type `persistence::PostgresPersistence`
+   --> src/adapters/persistence/knowledge/mod.rs:49:1
+    |
+ 49 | #[async_trait]
+    | ^^^^^^^^^^^^^^
+help: disambiguate the method for candidate #1
+    |
+151 ~         application::use_cases::company::CompanyPersistence::delete(&f.store, DeleteKnowledgeLayer {
+152 +                 scope: f.owner,
+153 +                 document_id: high.id,
+154 +                 expected_revision: 3
+155 +             })
+    |
+help: disambiguate the method for candidate #2
+    |
+151 ~         application::knowledge::types::KnowledgeDocuments::delete(&f.store, DeleteKnowledgeLayer {
+152 +                 scope: f.owner,
+153 +                 document_id: high.id,
+154 +                 expected_revision: 3
+155 +             })
+    |
+
+error[E0034]: multiple applicable items in scope
+   --> src/adapters/persistence/knowledge/tests.rs:161:10
+    |
+161 |         .delete(DeleteKnowledgeLayer {
+    |          ^^^^^^ multiple `delete` found
+    |
+note: candidate #1 is defined in an impl of the trait `application::use_cases::company::CompanyPersistence` for the type `persistence::PostgresPersistence`
+   --> src/adapters/persistence/company.rs:137:1
+    |
+137 | #[async_trait]
+    | ^^^^^^^^^^^^^^
+note: candidate #2 is defined in an impl of the trait `application::knowledge::types::KnowledgeDocuments` for the type `persistence::PostgresPersistence`
+   --> src/adapters/persistence/knowledge/mod.rs:49:1
+    |
+ 49 | #[async_trait]
+    | ^^^^^^^^^^^^^^
+help: disambiguate the method for candidate #1
+    |
+160 ~     application::use_cases::company::CompanyPersistence::delete(&f.store, DeleteKnowledgeLayer {
+161 +             scope: f.owner,
+162 +             document_id: high.id,
+163 +             expected_revision: 4,
+164 +         })
+    |
+help: disambiguate the method for candidate #2
+    |
+160 ~     application::knowledge::types::KnowledgeDocuments::delete(&f.store, DeleteKnowledgeLayer {
+161 +             scope: f.owner,
+162 +             document_id: high.id,
+163 +             expected_revision: 4,
+164 +         })
+    |
+
+error[E0034]: multiple applicable items in scope
+   --> src/adapters/persistence/knowledge/tests.rs:210:14
+    |
+210 |             .delete(DeleteKnowledgeLayer {
+    |              ^^^^^^ multiple `delete` found
+    |
+note: candidate #1 is defined in an impl of the trait `application::use_cases::company::CompanyPersistence` for the type `persistence::PostgresPersistence`
+   --> src/adapters/persistence/company.rs:137:1
+    |
+137 | #[async_trait]
+    | ^^^^^^^^^^^^^^
+note: candidate #2 is defined in an impl of the trait `application::knowledge::types::KnowledgeDocuments` for the type `persistence::PostgresPersistence`
+   --> src/adapters/persistence/knowledge/mod.rs:49:1
+    |
+ 49 | #[async_trait]
+    | ^^^^^^^^^^^^^^
+help: disambiguate the method for candidate #1
+    |
+209 ~         application::use_cases::company::CompanyPersistence::delete(&f.store, DeleteKnowledgeLayer {
+210 +                 scope: other.owner,
+211 +                 document_id: layer.id,
+212 +                 expected_revision: 1
+213 +             })
+    |
+help: disambiguate the method for candidate #2
+    |
+209 ~         application::knowledge::types::KnowledgeDocuments::delete(&f.store, DeleteKnowledgeLayer {
+210 +                 scope: other.owner,
+211 +                 document_id: layer.id,
+212 +                 expected_revision: 1
+213 +             })
+    |
+
+Some errors have detailed explanations: E0034, E0603.
+For more information about an error, try `rustc --explain E0034`.
+warning: `open_bots` (lib test) generated 1 warning
+error: could not compile `open_bots` (lib test) due to 18 previous errors; 1 warning emitted

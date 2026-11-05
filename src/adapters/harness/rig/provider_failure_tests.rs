@@ -3,7 +3,7 @@ use super::{
     test_support::{KEYS, MODEL, Reply, check_request, model, response},
 };
 use crate::services::test_support::{ScriptedExchange, ScriptedResponse, scripted_scenario};
-use rig::{agent::AgentBuilder, completion::Prompt};
+use rig_agent::{agent::AgentBuilder, completion::Prompt};
 use secrecy::SecretString;
 use serde_json::json;
 use std::{future::IntoFuture, time::Duration};

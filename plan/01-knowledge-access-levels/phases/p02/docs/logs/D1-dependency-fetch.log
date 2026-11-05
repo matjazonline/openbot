@@ -1,0 +1,14 @@
+    Updating crates.io index
+error: failed to select a version for `ort`.
+    ... required by package `fastembed v4.5.0`
+    ... which satisfies dependency `fastembed = "^4.5"` of package `rig-fastembed v0.42.0`
+    ... which satisfies dependency `rig-fastembed = "^0.42.0"` of package `rig v0.42.0`
+    ... which satisfies dependency `rig = "=0.42.0"` of package `open_bots v0.1.0 (/Users/mac02/dev/openbot-recovery/.worktrees/knowledge-p02)`
+versions that meet the requirements `=2.0.0-rc.9` are: 2.0.0-rc.9
+
+all possible versions conflict with previously selected packages.
+
+  previously selected package `ort v2.0.0-rc.13`
+    ... which satisfies dependency `ort = "=2.0.0-rc.13"` of package `open_bots v0.1.0 (/Users/mac02/dev/openbot-recovery/.worktrees/knowledge-p02)`
+
+failed to select a version for `ort` which could resolve this conflict

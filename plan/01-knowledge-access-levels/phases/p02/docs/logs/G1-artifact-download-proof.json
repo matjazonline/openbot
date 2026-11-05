@@ -1,0 +1,221 @@
+{
+  "model_revision": "614241f622f53c4eeff9890bdc4f31cfecc418b3",
+  "model_directory": "/Users/mac02/dev/openbot-recovery/.worktrees/knowledge-tooling/models/multilingual-e5-small-614241f622f53c4eeff9890bdc4f31cfecc418b3",
+  "files": [
+    {
+      "path": "onnx/model.onnx",
+      "url": "https://huggingface.co/intfloat/multilingual-e5-small/resolve/614241f622f53c4eeff9890bdc4f31cfecc418b3/onnx/model.onnx",
+      "size": 470268510,
+      "sha256": "ca456c06b3a9505ddfd9131408916dd79290368331e7d76bb621f1cba6bc8665",
+      "upstream_git_blob": null
+    },
+    {
+      "path": "tokenizer.json",
+      "url": "https://huggingface.co/intfloat/multilingual-e5-small/resolve/614241f622f53c4eeff9890bdc4f31cfecc418b3/tokenizer.json",
+      "size": 17082730,
+      "sha256": "0b44a9d7b51c3c62626640cda0e2c2f70fdacdc25bbbd68038369d14ebdf4c39",
+      "upstream_git_blob": null
+    },
+    {
+      "path": "config.json",
+      "url": "https://huggingface.co/intfloat/multilingual-e5-small/resolve/614241f622f53c4eeff9890bdc4f31cfecc418b3/config.json",
+      "size": 655,
+      "sha256": "69137736cab8b8903a07fe8afaafdda25aac55415a12a55d1bffa9f581abf959",
+      "upstream_git_blob": "60a2a84020f1d74cc53ea9e8c4e91cf4af6c2b68"
+    },
+    {
+      "path": "special_tokens_map.json",
+      "url": "https://huggingface.co/intfloat/multilingual-e5-small/resolve/614241f622f53c4eeff9890bdc4f31cfecc418b3/special_tokens_map.json",
+      "size": 167,
+      "sha256": "d05497f1da52c5e09554c0cd874037a083e1dc1b9cfd48034d1c717f1afc07a7",
+      "upstream_git_blob": "e0b1d18ecd0ae4ff1d47bd297d910c0cf83e504b"
+    },
+    {
+      "path": "tokenizer_config.json",
+      "url": "https://huggingface.co/intfloat/multilingual-e5-small/resolve/614241f622f53c4eeff9890bdc4f31cfecc418b3/tokenizer_config.json",
+      "size": 443,
+      "sha256": "a1d6bc8734a6f635dc158508bef000f8e2e5a759c7d92f984b2c86e5ff53425b",
+      "upstream_git_blob": "059214673d9d6d2ee319411e2ffec8c024b816d5"
+    }
+  ],
+  "runtimes": [
+    {
+      "platform": "linux-aarch64",
+      "version": "1.24.4",
+      "archive_url": "https://github.com/microsoft/onnxruntime/releases/download/v1.24.4/onnxruntime-linux-aarch64-1.24.4.tgz",
+      "archive_size": 7181958,
+      "archive_sha256": "866109a9248d057671a039b9d725be4bd86888e3754140e6701ec621be9d4d7e",
+      "files": [
+        {
+          "path": "ThirdPartyNotices.txt",
+          "size": 325054,
+          "sha256": "0e07b95f3a8d6230037707c5c4a2b554d12c4cb67369669ac255635528ffcee2"
+        },
+        {
+          "path": "LICENSE",
+          "size": 1073,
+          "sha256": "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c"
+        },
+        {
+          "path": "lib/cmake/onnxruntime/onnxruntimeTargets.cmake",
+          "size": 4173,
+          "sha256": "0b84a062f97cfdb408a8eb17e5a2cc72df2bb171521785ff2f67aae39310da2a"
+        },
+        {
+          "path": "lib/cmake/onnxruntime/onnxruntimeConfigVersion.cmake",
+          "size": 2765,
+          "sha256": "7ad8c514b2bb6729f05e96a8c83b571a1b413853c00f60102beeb3a43445ece2"
+        },
+        {
+          "path": "lib/cmake/onnxruntime/onnxruntimeTargets-release.cmake",
+          "size": 921,
+          "sha256": "3461b458611e7287675f371e599c3117eff6e8177d7e1495e09eaf5da6e84852"
+        },
+        {
+          "path": "lib/cmake/onnxruntime/onnxruntimeConfig.cmake",
+          "size": 939,
+          "sha256": "880b8c3ceae1ac013b7442b852ae4f7674a439803a2f8dcb875f5043913e62bc"
+        },
+        {
+          "path": "lib/libonnxruntime.so.1.24.4",
+          "size": 18625376,
+          "sha256": "52b2a0e75e79468404284fec38ad5ee1a7a996232274f5e1b84f3e793fb07554"
+        },
+        {
+          "path": "lib/pkgconfig/libonnxruntime.pc",
+          "size": 332,
+          "sha256": "23dbe912d6eaac2977b1bdff06c2743d15d1b92d78c5b9ee1bf35ac21f068969"
+        },
+        {
+          "path": "lib/libonnxruntime_providers_shared.so",
+          "size": 198792,
+          "sha256": "3b6be288fbfb7dff8770d08a23defdde18e8f7e0f5a2b344a0e5e238c999ea88"
+        }
+      ]
+    },
+    {
+      "platform": "linux-x64",
+      "version": "1.24.4",
+      "archive_url": "https://github.com/microsoft/onnxruntime/releases/download/v1.24.4/onnxruntime-linux-x64-1.24.4.tgz",
+      "archive_size": 8155822,
+      "archive_sha256": "3a211fbea252c1e66290658f1b735b772056149f28321e71c308942cdb54b747",
+      "files": [
+        {
+          "path": "LICENSE",
+          "size": 1073,
+          "sha256": "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c"
+        },
+        {
+          "path": "lib/cmake/onnxruntime/onnxruntimeTargets.cmake",
+          "size": 4173,
+          "sha256": "0b84a062f97cfdb408a8eb17e5a2cc72df2bb171521785ff2f67aae39310da2a"
+        },
+        {
+          "path": "lib/cmake/onnxruntime/onnxruntimeConfigVersion.cmake",
+          "size": 2765,
+          "sha256": "7ad8c514b2bb6729f05e96a8c83b571a1b413853c00f60102beeb3a43445ece2"
+        },
+        {
+          "path": "lib/cmake/onnxruntime/onnxruntimeTargets-release.cmake",
+          "size": 921,
+          "sha256": "3461b458611e7287675f371e599c3117eff6e8177d7e1495e09eaf5da6e84852"
+        },
+        {
+          "path": "lib/cmake/onnxruntime/onnxruntimeConfig.cmake",
+          "size": 939,
+          "sha256": "880b8c3ceae1ac013b7442b852ae4f7674a439803a2f8dcb875f5043913e62bc"
+        },
+        {
+          "path": "lib/libonnxruntime_providers_shared.so",
+          "size": 14632,
+          "sha256": "086ec1d5388f64153d9c63470d126693db9a182c8ce236d3a1119068471b8a0d"
+        },
+        {
+          "path": "lib/pkgconfig/libonnxruntime.pc",
+          "size": 332,
+          "sha256": "23dbe912d6eaac2977b1bdff06c2743d15d1b92d78c5b9ee1bf35ac21f068969"
+        },
+        {
+          "path": "lib/libonnxruntime.so.1.24.4",
+          "size": 22159232,
+          "sha256": "d132535d051344ff5c64c9c200004150559049a81ed330eb4422c1962fb6b7e4"
+        },
+        {
+          "path": "ThirdPartyNotices.txt",
+          "size": 325054,
+          "sha256": "0e07b95f3a8d6230037707c5c4a2b554d12c4cb67369669ac255635528ffcee2"
+        }
+      ]
+    },
+    {
+      "platform": "osx-arm64",
+      "version": "1.24.4",
+      "archive_url": "https://github.com/microsoft/onnxruntime/releases/download/v1.24.4/onnxruntime-osx-arm64-1.24.4.tgz",
+      "archive_size": 30937282,
+      "archive_sha256": "93787795f47e1eee369182e43ed51b9e5da0878ab0346aecf4258979b8bba989",
+      "files": [
+        {
+          "path": "ThirdPartyNotices.txt",
+          "size": 325054,
+          "sha256": "0e07b95f3a8d6230037707c5c4a2b554d12c4cb67369669ac255635528ffcee2"
+        },
+        {
+          "path": "LICENSE",
+          "size": 1073,
+          "sha256": "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c"
+        },
+        {
+          "path": "lib/libonnxruntime.dylib",
+          "size": 35418600,
+          "sha256": "872533f130f1839a5bc01788ddb4f75c83a189763441ba1178788ed965449289"
+        },
+        {
+          "path": "lib/libonnxruntime.1.24.4.dylib",
+          "size": 35418600,
+          "sha256": "872533f130f1839a5bc01788ddb4f75c83a189763441ba1178788ed965449289"
+        },
+        {
+          "path": "lib/libonnxruntime.1.24.4.dylib.dSYM/Contents/Info.plist",
+          "size": 656,
+          "sha256": "a3fb91e0467c65537c2c571560632aa87abaebdd7abccf890edbe3b99ff8917b"
+        },
+        {
+          "path": "lib/libonnxruntime.1.24.4.dylib.dSYM/Contents/Resources/DWARF/libonnxruntime.1.24.4.dylib",
+          "size": 51814579,
+          "sha256": "bd0f4ec2875443398ed0f9342326ac532f64ba56084f8e473c30760b63022e3a"
+        },
+        {
+          "path": "lib/libonnxruntime.1.24.4.dylib.dSYM/Contents/Resources/Relocations/aarch64/libonnxruntime.1.24.4.dylib.yml",
+          "size": 1709501,
+          "sha256": "867bb446f393038760961defbf58d3a23f03fd5e15c09ea8e5800ef36066ecbe"
+        },
+        {
+          "path": "lib/cmake/onnxruntime/onnxruntimeTargets.cmake",
+          "size": 4173,
+          "sha256": "0b84a062f97cfdb408a8eb17e5a2cc72df2bb171521785ff2f67aae39310da2a"
+        },
+        {
+          "path": "lib/cmake/onnxruntime/onnxruntimeConfig.cmake",
+          "size": 939,
+          "sha256": "880b8c3ceae1ac013b7442b852ae4f7674a439803a2f8dcb875f5043913e62bc"
+        },
+        {
+          "path": "lib/cmake/onnxruntime/onnxruntimeConfigVersion.cmake",
+          "size": 2765,
+          "sha256": "7ad8c514b2bb6729f05e96a8c83b571a1b413853c00f60102beeb3a43445ece2"
+        },
+        {
+          "path": "lib/cmake/onnxruntime/onnxruntimeTargets-release.cmake",
+          "size": 938,
+          "sha256": "d30b3bc428b5b6870cbdb23dfdc2b1d6f717de1f61c7c7518338f4b4f36695be"
+        },
+        {
+          "path": "lib/pkgconfig/libonnxruntime.pc",
+          "size": 330,
+          "sha256": "0c021d806f9eec3ccf78e01c3db1e2770d7195f6ca89475c3fab79cfcebdb1e5"
+        }
+      ]
+    }
+  ],
+  "loaded_model": false
+}

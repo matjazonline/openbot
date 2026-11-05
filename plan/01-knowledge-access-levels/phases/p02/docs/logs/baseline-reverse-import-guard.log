@@ -1,0 +1,18 @@
+
+running 1 test
+test application::transport::dependency_tests::workflow_and_transport_depend_on_shared_ports_without_reverse_usecase_imports ... FAILED
+
+failures:
+
+---- application::transport::dependency_tests::workflow_and_transport_depend_on_shared_ports_without_reverse_usecase_imports stdout ----
+
+thread 'application::transport::dependency_tests::workflow_and_transport_depend_on_shared_ports_without_reverse_usecase_imports' (30734274) panicked at src/application/transport/dependency_tests.rs:205:5:
+workflow/transport must consume shared ports, not use-case modules: workflow/http.rs:123: command: crate::use_cases::connection_level::ConnectionLevelCommand,
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    application::transport::dependency_tests::workflow_and_transport_depend_on_shared_ports_without_reverse_usecase_imports
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 2783 filtered out; finished in 0.12s
+

@@ -1,0 +1,16 @@
+TAP version 13
+# Subtest: library native forms validate before showing progress, prevent duplicate writes, and keep both themes readable
+ok 1 - library native forms validate before showing progress, prevent duplicate writes, and keep both themes readable
+  ---
+  duration_ms: 796.673875
+  type: 'test'
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 1
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1116.918792

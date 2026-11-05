@@ -1,5 +1,5 @@
 use super::providers::*;
-use rig::tool::{DynamicTool, ToolOutput};
+use rig_agent::tool::{DynamicTool, ToolOutput};
 use secrecy::SecretString;
 use serde_json::json;
 use std::sync::{
@@ -16,7 +16,7 @@ pub(super) fn model(
     provider: &str,
     secret: &str,
     endpoint: &str,
-) -> rig::agent::ModelHandle {
+) -> rig_agent::agent::ModelHandle {
     registry
         .model(&ResolvedModelRequest {
             provider: &provider.into(),

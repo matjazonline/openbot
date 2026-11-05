@@ -4,7 +4,7 @@
 //! the credential the caller resolved.
 
 use async_trait::async_trait;
-use rig::completion::{AssistantContent, CompletionRequest, Message};
+use rig_core::completion::{AssistantContent, CompletionRequest, Message};
 use secrecy::SecretString;
 
 use super::providers::{ProviderRegistry, ResolvedModelRequest, complete};

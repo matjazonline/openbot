@@ -1,0 +1,40 @@
+TAP version 13
+# Subtest: library native forms validate before showing progress, prevent duplicate writes, and keep both themes readable
+not ok 1 - library native forms validate before showing progress, prevent duplicate writes, and keep both themes readable
+  ---
+  duration_ms: 5297.057292
+  type: 'test'
+  location: '/Users/mac02/dev/openbot-recovery/.worktrees/knowledge-p02/scripts/tests/knowledge-browser.mjs:13:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    expect(locator).toHaveAttribute(expected) failed
+    
+    Locator: locator('form[enctype="multipart/form-data"]')
+    Expected string: "true"
+    Received string: ""
+    Timeout: 5000ms
+    
+    Call log:
+    [2m  - Expect "to.have.attribute.value" with timeout 5000ms[22m
+    [2m  - waiting for locator('form[enctype="multipart/form-data"]')[22m
+    [2m    - waiting for navigation to finish...[22m
+    
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    Proxy.<anonymous> (/Users/mac02/dev/openbot-recovery/.worktrees/knowledge-p02/node_modules/playwright/lib/matchers/expect.js:221:24)
+    TestContext.<anonymous> (file:///Users/mac02/dev/openbot-recovery/.worktrees/knowledge-p02/scripts/tests/knowledge-browser.mjs:66:26)
+    runNextTicks (node:internal/process/task_queues:64:5)
+    process.processImmediate (node:internal/timers:452:9)
+    process.callbackTrampoline (node:internal/async_hooks:130:17)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 0
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 5527.48525

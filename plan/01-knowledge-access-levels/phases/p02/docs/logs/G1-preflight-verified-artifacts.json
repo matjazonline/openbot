@@ -1,0 +1,55 @@
+{
+  "ort": {
+    "version": "2.0.0-rc.13",
+    "sha256": "4336a1e2b38848325241c72889086886004e589b7c74f335e60a8e8db5138a0b"
+  },
+  "icu_casemap": {
+    "version": "2.0.0",
+    "sha256": "6dc5e74b3c9d7b63e0d7c5fd54ee8c135705df2ea2aa558082dd555dc9747a97"
+  },
+  "icu_casemap_data": {
+    "version": "2.0.0",
+    "sha256": "f7584067558ab4c60c95d1ac2abd1588689cb4bcd4e099507f62dae86ae8d2c0"
+  },
+  "runtime": {
+    "tag": "v1.24.4",
+    "published_at": "2026-03-17T23:08:09Z",
+    "assets": [
+      {
+        "name": "onnxruntime-linux-aarch64-1.24.4.tgz",
+        "url": "https://github.com/microsoft/onnxruntime/releases/download/v1.24.4/onnxruntime-linux-aarch64-1.24.4.tgz",
+        "size": 7181958,
+        "digest": "sha256:866109a9248d057671a039b9d725be4bd86888e3754140e6701ec621be9d4d7e"
+      },
+      {
+        "name": "onnxruntime-linux-x64-1.24.4.tgz",
+        "url": "https://github.com/microsoft/onnxruntime/releases/download/v1.24.4/onnxruntime-linux-x64-1.24.4.tgz",
+        "size": 8155822,
+        "digest": "sha256:3a211fbea252c1e66290658f1b735b772056149f28321e71c308942cdb54b747"
+      },
+      {
+        "name": "onnxruntime-osx-arm64-1.24.4.tgz",
+        "url": "https://github.com/microsoft/onnxruntime/releases/download/v1.24.4/onnxruntime-osx-arm64-1.24.4.tgz",
+        "size": 30937282,
+        "digest": "sha256:93787795f47e1eee369182e43ed51b9e5da0878ab0346aecf4258979b8bba989"
+      }
+    ]
+  },
+  "model": {
+    "revision": "614241f622f53c4eeff9890bdc4f31cfecc418b3",
+    "onnx": [
+      {
+        "type": "file",
+        "oid": "f9c7ec44162ecb2ae1340185b24a43d83d606a00",
+        "size": 470268510,
+        "lfs": {
+          "oid": "ca456c06b3a9505ddfd9131408916dd79290368331e7d76bb621f1cba6bc8665",
+          "size": 470268510,
+          "pointerSize": 134
+        },
+        "xetHash": "cdcc2007f06ae8bf8fa4fab3a9f30853db998fa26d9d22da75bcd7e7f294c6ea",
+        "path": "onnx/model.onnx"
+      }
+    ]
+  }
+}

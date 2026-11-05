@@ -1,0 +1,55 @@
+{
+  "review_id": "KNOW-P02-G1-R1",
+  "stage": "whole02A\u2013C architecture gate",
+  "start": "bc516908a075b9c7ea1d39bac94b93b9d916e1a8",
+  "base": "bc516908a075b9c7ea1d39bac94b93b9d916e1a8",
+  "head": "bc516908a075b9c7ea1d39bac94b93b9d916e1a8",
+  "installed_digest": "cc9eba720c532477014a738132465fe14511b6402c7c70750a7e372613e02ec7",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "tree_sha256": "345e57a248a17112aeac38931fdce40255198b6e1823dbbd59254aad39f3310c",
+  "files_count": 3021,
+  "exclusions": [
+    "plan/01-knowledge-access-levels/phases/p02/docs/"
+  ],
+  "installed_exclusion_args": [
+    "plan/01-knowledge-access-levels/phases/p02/docs"
+  ],
+  "decision_path": "plan/01-knowledge-access-levels/phases/p02/docs/logs/G1-r1-decisions.md",
+  "decision_sha256": "11862cda79fec74a0391d8bd378d3831d1552e418fe35ffb4d6d7702b3027e59",
+  "authority_path": "/Users/mac02/dev/openbot-recovery/plan/01-knowledge-access-levels/COORDINATION.md",
+  "authority_revision": 10,
+  "authority_sha256": "5dd0856d242114d043cafaf3d16c93d3268516ea6e8c86738951d8df588fcb42",
+  "applicable": [
+    "KNOW-I001/r1",
+    "KNOW-I002/r1",
+    "KNOW-I003/r1",
+    "KNOW-I004/r1",
+    "KNOW-I005/r1",
+    "KNOW-C001/r1",
+    "KNOW-C002/r1"
+  ],
+  "status": "source pristine, not implemented; decision review only",
+  "reviewer": "/root/knowledge_p02_reviewer",
+  "review_note_id": "KNOW-P02-G1-R1-N1",
+  "verdict": "PASS architecture only",
+  "source_before_after_identical": true,
+  "installed_snapshot_matches": true,
+  "decision_matches": true,
+  "authority_fresh_and_pin_matches": true,
+  "producer_ancestry_matches": true,
+  "pg_probe": "G1-r1-reviewer-pg-probe.txt",
+  "checks_run": "Identity checks and rollback-only PG18.6 casefold feasibility probe; no p02 implementation tests or real model execution",
+  "external_source_hashes": {
+    "../knowledge-tooling/ort-2.0.0-rc.13/src__lib.rs": "31b3d2c2e6afef1fed42df51a2f0280bfc53711e5a0db20a8d95c2a4b68e01fb",
+    "../knowledge-tooling/ort-2.0.0-rc.13/Cargo.toml.orig": "a40c55d1a15a62e5e32203bf86286abeb4c9b538494730c0186e679f6642e7a7",
+    "../knowledge-tooling/ort-2.0.0-rc.13/src__environment.rs": "1070d6f91e3de0e59511f6dfd6a27ce8553c04431dcadb1260db8d815a1250e2",
+    "../knowledge-tooling/icu_casemap_data-2.0.0/Cargo.toml.orig": "0d2106b42f67f80771a348e10565fedac9368e93695c0631c3be5d2eb815b608",
+    "../knowledge-tooling/icu_casemap-2.0.0/src__casemapper.rs": "83622ab0774f59b93102bd1ae90024915f4da39a7954e00461ab65dc5a3a6ec9",
+    "../knowledge-tooling/icu_casemap-2.0.0/Cargo.toml.orig": "d18eff881fafbea3596b6f9e49ed977bb0e2eb6d47d4efaea5ae7ca334f6740c",
+    "../knowledge-tooling/fastembed-7.1.1/src__models__text_embedding.rs": "d2d2aac51928c2d31574d798d2216dafb09f012765a09ea03c03cc5168d9909b",
+    "../knowledge-tooling/fastembed-7.1.1/src__common.rs": "1cdb88c188a894e64bbf7a6d6ba9a5b1722afbfe828edc295dd187e10ac17a7e",
+    "../knowledge-tooling/fastembed-7.1.1/Cargo.toml.orig": "57ed5b0c1ed97f94f5e98f726561746db0b9237ed13530dd1158fa6b7195ff94",
+    "../knowledge-tooling/fastembed-7.1.1/src__text_embedding__impl.rs": "1e19d600821ad5dfe95f7e636fb0f08d04145280d1493ebdbd1569d07ee4940c",
+    "../knowledge-tooling/fastembed-7.1.1/src__text_embedding__init.rs": "88104148ae5d14f018a0f19f46974de9147559f645fb249abd597855c823adf7"
+  }
+}

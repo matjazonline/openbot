@@ -1,0 +1,9 @@
+{
+  "base": "bc516908a075b9c7ea1d39bac94b93b9d916e1a8",
+  "source": "src/application/workflow/http.rs",
+  "identical_base_current": true,
+  "sha256": "a378db798c1581529cbf521eeb793147e72868c9d2c762ac6cd9790903e11d7f",
+  "binary": "/Users/mac02/dev/openbot-recovery/.worktrees/knowledge-p03/target/debug/deps/open_bots-7b3508cbfb62bd10",
+  "test": "application::transport::dependency_tests::workflow_and_transport_depend_on_shared_ports_without_reverse_usecase_imports",
+  "exit_code": 101
+}

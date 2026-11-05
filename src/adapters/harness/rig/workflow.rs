@@ -31,7 +31,7 @@ use crate::{
     services::harness::{AgentExecutionOutput, runs::*},
 };
 use async_trait::async_trait;
-use rig::completion::ToolDefinition;
+use rig_core::completion::ToolDefinition;
 use secrecy::ExposeSecret;
 use serde_json::json;
 use sha2::{Digest, Sha256};

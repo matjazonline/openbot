@@ -1,0 +1,15 @@
+     Locking 10 packages to latest Rust 1.95.0 compatible versions
+    Updating daachorse v2.1.1 -> v3.0.3
+    Updating fastembed v4.9.1 -> v7.1.1
+      Adding icu_casemap v2.0.0 (available: v2.4.0)
+      Adding icu_casemap_data v2.0.0 (available: v2.4.0)
+      Adding libloading v0.9.0
+    Updating ndarray v0.16.1 -> v0.17.2
+    Updating ort v2.0.0-rc.9 -> v2.0.0-rc.13
+    Updating ort-sys v2.0.0-rc.9 -> v2.0.0-rc.13
+      Adding safetensors v0.8.0
+    Updating tokenizers v0.21.4 -> v0.23.2
+error: failed to download `daachorse v3.0.3`
+
+Caused by:
+  attempting to make an HTTP request, but --offline was specified

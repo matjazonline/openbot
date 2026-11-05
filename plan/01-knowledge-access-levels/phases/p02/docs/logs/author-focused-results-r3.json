@@ -1,0 +1,12 @@
+[
+  {
+    "kind": "lib",
+    "exit_code": 0,
+    "elapsed_seconds": 25.573555166999995
+  },
+  {
+    "kind": "bin",
+    "exit_code": 0,
+    "elapsed_seconds": 0.18700225000000614
+  }
+]

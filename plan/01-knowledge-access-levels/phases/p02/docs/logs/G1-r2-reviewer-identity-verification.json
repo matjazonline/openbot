@@ -1,0 +1,31 @@
+{
+  "review_id": "KNOW-P02-G1-R2",
+  "stage": "reopened combined architecture gate, SDK-resolution correction only; reuse unchangedG1r1",
+  "decision_sha256": "6f4f71b93a0e56bba48717993ad1a4c410fb317c4506d6c9de133613e9a66948",
+  "decision_path": "plan/01-knowledge-access-levels/phases/p02/docs/logs/G1-r2-decisions.md",
+  "installed_digest": "d1458e7f0df9a6e8631801b61b396cde5eadf206276a8406f995d80a8e9fd87f",
+  "source": {
+    "base": "bc516908a075b9c7ea1d39bac94b93b9d916e1a8",
+    "head": "bc516908a075b9c7ea1d39bac94b93b9d916e1a8",
+    "exclusions": [
+      "plan/01-knowledge-access-levels/phases/p02/docs/"
+    ],
+    "diff_sha256": "595233d2474f8b4e424b6d9ed52564ad247c32fd45cb2db7898e787222458076",
+    "tree_sha256": "d64b5c554ed94c08ae0935c6417063b327538a9b7faffce31c2c605e765d02a9",
+    "files_count": 3023
+  },
+  "authority_revision": 11,
+  "authority_sha256": "fff04abf9c996a72e76e9fd67b8eb3d457dbc897943997daf90085348643aedb",
+  "authority_pin": "plan/01-knowledge-access-levels/phases/p02/docs/logs/COORDINATION-r11-implementation.md",
+  "previous_decision_sha256": "11862cda79fec74a0391d8bd378d3831d1552e418fe35ffb4d6d7702b3027e59",
+  "reviewer": "/root/knowledge_p02_reviewer",
+  "note_id": "KNOW-P02-G1-R2-N1",
+  "verdict": "PASS architecture decision only",
+  "source_before_after_identical": true,
+  "installed_snapshot_matches": true,
+  "decision_and_prior_revision_match": true,
+  "authority_fresh_and_pin_matches": true,
+  "dependency_evidence": "G1-r2-reviewer-dependency-evidence.json",
+  "metadata_status": "version resolution completed; metadata failed on missing offline daachorse3.0.3 cache, no compilation",
+  "scope": "Changed D4 SDK dependency choice; reused unchanged R1 architecture. D1 source not code-reviewed."
+}

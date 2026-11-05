@@ -71,6 +71,7 @@ fn parse_smtp_allow_plaintext_local(value: Option<&str>) -> bool {
 }
 
 pub struct AppConfig {
+    pub knowledge_model_dir: std::path::PathBuf,
     pub jwt_secret: String,
     pub auth_attempt_secret: crate::use_cases::user::AuthAttemptSecret,
     pub refresh_token_ttl: Duration,
@@ -579,6 +580,7 @@ impl AppConfig {
         let gcs = GcsConfig::from_env(&app_domain_name);
 
         Self {
+            knowledge_model_dir: crate::adapters::embedding::model_directory_from_env(),
             jwt_secret,
             auth_attempt_secret,
             refresh_token_ttl: Duration::days(refresh_token_ttl_days),
@@ -661,6 +663,7 @@ impl AppConfig {
     /// twenty-seven-file change; `..AppConfig::for_test()` keeps the next one to this function.
     pub fn for_test() -> Self {
         Self {
+            knowledge_model_dir: std::path::PathBuf::from("/test/no-model-required"),
             jwt_secret: "a-test-secret-long-enough-to-sign-with-01".to_string(),
             auth_attempt_secret: "a-distinct-auth-attempt-test-secret-02".into(),
             refresh_token_ttl: Duration::days(30),

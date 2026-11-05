@@ -1,4 +1,5 @@
 pub mod crypto;
+pub mod embedding;
 pub mod harness;
 pub mod http;
 pub mod mcp;

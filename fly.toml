@@ -72,4 +72,6 @@ kill_timeout = "30s"
 
 [[vm]]
   size = "shared-cpu-1x"
-  memory = "1gb"
+  # The FP32 local model cold-load image peak is ~1452 MiB. Required CI fails
+  # at 1536 MiB under a hard 2048 MiB container limit (check-knowledge-image.py).
+  memory = "2gb"

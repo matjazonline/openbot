@@ -1,0 +1,8 @@
+{
+  "decision_sha256": "6f4f71b93a0e56bba48717993ad1a4c410fb317c4506d6c9de133613e9a66948",
+  "note": "KNOW-P02-G1-R2-N1",
+  "source_tree": "d64b5c554ed94c08ae0935c6417063b327538a9b7faffce31c2c605e765d02a9",
+  "source_digest": "d1458e7f0df9a6e8631801b61b396cde5eadf206276a8406f995d80a8e9fd87f",
+  "authority_sha256": "fff04abf9c996a72e76e9fd67b8eb3d457dbc897943997daf90085348643aedb",
+  "status": "DECISION ACCEPTED; no code acceptance"
+}

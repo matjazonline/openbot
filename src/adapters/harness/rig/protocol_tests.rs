@@ -7,7 +7,7 @@ use crate::{
     entities::harness::HarnessKind,
     services::test_support::{ScriptedExchange, ScriptedResponse, scripted_scenario},
 };
-use rig::completion::{CompletionModel, CompletionRequest, ToolDefinition};
+use rig_core::completion::{CompletionModel, CompletionRequest, ToolDefinition};
 use serde_json::json;
 use uuid::Uuid;
 

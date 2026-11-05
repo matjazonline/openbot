@@ -1,0 +1,5 @@
+{
+  "returncode": 101,
+  "command": "cargo metadata --offline --format-version 1 --manifest-path <reviewer probe>/Cargo.toml",
+  "scope": "copy of full current manifest/lock, ONLY proposed rig substitution plus explicit existing lib target; no compilation"
+}

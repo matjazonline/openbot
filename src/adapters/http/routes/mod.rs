@@ -12,6 +12,7 @@ pub mod company;
 pub mod company_invite;
 mod connection_levels;
 pub mod health;
+mod knowledge;
 mod live_updates;
 pub mod mcp;
 mod model_usage;
@@ -84,6 +85,7 @@ pub fn router(sessions: Arc<SessionAuthority>) -> Router<AppState> {
         .merge(company::router())
         .merge(mcp::router())
         .merge(connection_levels::router())
+        .merge(knowledge::router())
         .merge(ui_mcp::router())
         .merge(company_invite::router())
         .merge(channel::router())

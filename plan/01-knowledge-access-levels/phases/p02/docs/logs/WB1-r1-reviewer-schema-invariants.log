@@ -1,0 +1,8 @@
+
+running 3 tests
+test adapters::persistence::tests::every_timestamp_column_carries_a_timezone ... ok
+test adapters::persistence::tests::clean_schema_contains_only_the_canonical_message_spine ... ok
+test adapters::persistence::tests::no_two_indexes_share_a_definition ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 2817 filtered out; finished in 0.13s
+

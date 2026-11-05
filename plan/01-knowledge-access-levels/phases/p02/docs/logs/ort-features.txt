@@ -1,0 +1,32 @@
+ort v2.0.0-rc.13
+├── ort feature "api-17"
+│   └── ort feature "api-18"
+│       └── ort feature "api-19"
+│           └── ort feature "api-20"
+│               └── ort feature "api-21"
+│                   └── ort feature "api-22"
+│                       └── ort feature "api-23"
+│                           └── ort feature "api-24"
+│                               ├── fastembed v7.1.1
+│                               │   └── fastembed feature "ort-load-dynamic"
+│                               │       └── open_bots v0.1.0 (/Users/mac02/dev/openbot-recovery/.worktrees/knowledge-p02)
+│                               │           └── open_bots feature "default" (command-line)
+│                               └── open_bots v0.1.0 (/Users/mac02/dev/openbot-recovery/.worktrees/knowledge-p02) (*)
+├── ort feature "api-18" (*)
+├── ort feature "api-19" (*)
+├── ort feature "api-20" (*)
+├── ort feature "api-21" (*)
+├── ort feature "api-22" (*)
+├── ort feature "api-23" (*)
+├── ort feature "api-24" (*)
+├── ort feature "load-dynamic"
+│   └── open_bots v0.1.0 (/Users/mac02/dev/openbot-recovery/.worktrees/knowledge-p02) (*)
+│   └── fastembed feature "ort-load-dynamic" (*)
+├── ort feature "ndarray"
+│   └── fastembed v7.1.1 (*)
+├── ort feature "preload-dylibs"
+│   └── ort feature "load-dynamic" (*)
+└── ort feature "std"
+    ├── fastembed v7.1.1 (*)
+    └── open_bots v0.1.0 (/Users/mac02/dev/openbot-recovery/.worktrees/knowledge-p02) (*)
+    └── ort feature "load-dynamic" (*)

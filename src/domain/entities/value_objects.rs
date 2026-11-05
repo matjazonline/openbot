@@ -9,6 +9,92 @@ use std::ops::Deref;
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64_STANDARD};
 use serde::{Deserialize, Serialize};
 
+macro_rules! string_newtype_storage {
+    ($name:ident) => {
+        impl $name {
+            pub fn new(value: impl Into<String>) -> Self {
+                Self(value.into())
+            }
+            pub fn as_str(&self) -> &str {
+                &self.0
+            }
+            pub fn into_string(self) -> String {
+                self.0
+            }
+        }
+        impl Deref for $name {
+            type Target = str;
+            fn deref(&self) -> &str {
+                &self.0
+            }
+        }
+        impl AsRef<str> for $name {
+            fn as_ref(&self) -> &str {
+                &self.0
+            }
+        }
+        impl fmt::Display for $name {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                fmt::Display::fmt(&self.0, f)
+            }
+        }
+        impl From<String> for $name {
+            fn from(value: String) -> Self {
+                Self(value)
+            }
+        }
+        impl From<&str> for $name {
+            fn from(value: &str) -> Self {
+                Self(value.to_string())
+            }
+        }
+        impl From<$name> for String {
+            fn from(value: $name) -> Self {
+                value.0
+            }
+        }
+    };
+}
+macro_rules! string_newtype_insensitive_traits {
+    ($name:ident, $fold:path) => {
+        impl PartialEq for $name {
+            fn eq(&self, other: &Self) -> bool {
+                $fold(self.as_str()) == $fold(other.as_str())
+            }
+        }
+        impl Eq for $name {}
+        impl std::hash::Hash for $name {
+            fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+                std::hash::Hash::hash(&$fold(self.as_str()), state);
+            }
+        }
+        impl Ord for $name {
+            fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+                $fold(self.as_str()).cmp(&$fold(other.as_str()))
+            }
+        }
+        impl PartialOrd for $name {
+            fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+                Some(self.cmp(other))
+            }
+        }
+        impl PartialEq<str> for $name {
+            fn eq(&self, other: &str) -> bool {
+                $fold(self.as_str()) == $fold(other)
+            }
+        }
+        impl PartialEq<&str> for $name {
+            fn eq(&self, other: &&str) -> bool {
+                $fold(self.as_str()) == $fold(other)
+            }
+        }
+        impl PartialEq<String> for $name {
+            fn eq(&self, other: &String) -> bool {
+                $fold(self.as_str()) == $fold(other)
+            }
+        }
+    };
+}
 macro_rules! string_newtype {
     ($name:ident) => {
         #[derive(
@@ -16,83 +102,54 @@ macro_rules! string_newtype {
         )]
         #[serde(transparent)]
         pub struct $name(pub String);
-
-        impl $name {
-            pub fn new(value: impl Into<String>) -> Self {
-                Self(value.into())
-            }
-
-            pub fn as_str(&self) -> &str {
-                &self.0
-            }
-
-            pub fn into_string(self) -> String {
-                self.0
-            }
-        }
-
-        impl Deref for $name {
-            type Target = str;
-
-            fn deref(&self) -> &str {
-                &self.0
-            }
-        }
-
+        string_newtype_storage!($name);
         impl Borrow<str> for $name {
             fn borrow(&self) -> &str {
                 &self.0
             }
         }
-
-        impl AsRef<str> for $name {
-            fn as_ref(&self) -> &str {
-                &self.0
-            }
-        }
-
-        impl fmt::Display for $name {
-            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                fmt::Display::fmt(&self.0, f)
-            }
-        }
-
-        impl From<String> for $name {
-            fn from(value: String) -> Self {
-                Self(value)
-            }
-        }
-
-        impl From<&str> for $name {
-            fn from(value: &str) -> Self {
-                Self(value.to_string())
-            }
-        }
-
-        impl From<$name> for String {
-            fn from(value: $name) -> Self {
-                value.0
-            }
-        }
-
         impl PartialEq<str> for $name {
             fn eq(&self, other: &str) -> bool {
                 self.0 == other
             }
         }
-
         impl PartialEq<&str> for $name {
             fn eq(&self, other: &&str) -> bool {
                 self.0 == *other
             }
         }
-
         impl PartialEq<String> for $name {
             fn eq(&self, other: &String) -> bool {
                 &self.0 == other
             }
         }
     };
+    ($name:ident, case_insensitive = $fold:path) => {
+        #[derive(Debug, Default, Clone, Serialize, Deserialize)]
+        #[serde(transparent)]
+        pub struct $name(pub String);
+        string_newtype_storage!($name);
+        // Borrow<str> would disagree with the case-insensitive Eq/Hash contract.
+        string_newtype_insensitive_traits!($name, $fold);
+    };
+}
+
+/// Matches the PostgreSQL18 pg_unicode_fast generated document key (Unicode16).
+pub fn fold_knowledge_name(value: &str) -> String {
+    icu_casemap::CaseMapper::new()
+        .fold_string(value.trim())
+        .into_owned()
+}
+string_newtype!(
+    KnowledgeDocumentName,
+    case_insensitive = fold_knowledge_name
+);
+string_newtype!(KnowledgeDocumentKey);
+string_newtype!(EmbeddingModelId);
+impl KnowledgeDocumentName {
+    pub fn key(&self) -> KnowledgeDocumentKey {
+        fold_knowledge_name(self.as_str()).into()
+    }
 }
 
 // A company's URL slug, e.g. the `acme` in `support@acme.mailagents.com`.

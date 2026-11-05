@@ -3,11 +3,11 @@ use super::test_support::{
     KEYS, MODEL, Reply, check_request, check_result, check_tools, lookup, model, response,
 };
 use crate::services::test_support::{ScriptedExchange, ScriptedResponse, scripted_scenario};
-use rig::agent::{
+use rig_agent::agent::{
     AgentBuilder,
     hook::{AgentHook, HookContext, ToolCall, ToolCallAction},
 };
-use rig::completion::Prompt;
+use rig_agent::completion::Prompt;
 use secrecy::SecretString;
 use serde_json::json;
 use std::future::IntoFuture;

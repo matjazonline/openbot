@@ -1,0 +1,10 @@
+{
+  "revision": 12,
+  "sha256": "b5e05aaaf511b19a1703104bb3806c5491c04244597a43f6023b343e6f72b1e5",
+  "unchanged_applicable_contracts": [
+    "I001\u2013I005/r1",
+    "C001/r1",
+    "C002/r1"
+  ],
+  "new_notice": "Q001/r1 confirmed baseline guard debt, p02 explicit unaffected-scope disposition; p05/p06 required closure"
+}

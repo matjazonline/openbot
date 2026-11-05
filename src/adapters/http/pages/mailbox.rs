@@ -33,6 +33,7 @@ impl MailboxUser<'_> {
 /// Every workspace renders through [`ui_shell`], which uses this to highlight its rail icon.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UiSection {
+    Knowledge,
     Mailbox,
     Dashboard,
     Channels,
@@ -1535,6 +1536,40 @@ pub fn account_chip(user: &MailboxUser<'_>, swap: FragmentSwap) -> String {
 /// The workspace the response belongs to is lit, so the rail says where you are as well as where
 /// you can go.
 fn icon_rail(user: &MailboxUser<'_>, company: &Company, section: UiSection) -> String {
+    let destinations = rail_destinations();
+
+    let links: String = destinations
+        .iter()
+        .filter(|destination| rail_section_visible(user, destination.section))
+        .map(|destination| {
+            let lit = section == destination.section;
+            format!(
+                r##"<a href="{href}" class="btn btn-square btn-md {style}" title="{title}" aria-label="{title}" data-action="navigate-workspace"{current}>{glyph}<span class="rail-label">{title}</span></a>"##,
+                href = destination.href(company.id),
+                style = if lit { "btn-primary" } else { "btn-ghost" },
+                current = if lit { r##" aria-current="page""## } else { "" },
+                title = destination.title,
+                glyph = icon(destination.glyph, RAIL_ICON),
+            )
+        })
+        .collect();
+
+    format!(
+        r##"
+        <nav id="app-rail" class="app-rail flex w-16 shrink-0 flex-col items-center gap-1.5 overflow-y-auto border-r border-base-300 px-2 py-3" aria-label="Primary navigation">
+            {links}
+            {company_badge}
+        </nav>
+        "##,
+        company_badge = if user.company_membership.is_team() {
+            rail_company_badge(company, FragmentSwap::Inline)
+        } else {
+            Default::default()
+        },
+    )
+}
+
+fn rail_destinations() -> [RailDestination; 11] {
     let destination = |section, path, query, glyph, title| RailDestination {
         section,
         path,
@@ -1542,7 +1577,7 @@ fn icon_rail(user: &MailboxUser<'_>, company: &Company, section: UiSection) -> S
         glyph,
         title,
     };
-    let destinations = [
+    [
         destination(UiSection::Mailbox, "/ui", &[], Icon::Mail, "Mailbox"),
         destination(
             UiSection::Channels,
@@ -1550,6 +1585,13 @@ fn icon_rail(user: &MailboxUser<'_>, company: &Company, section: UiSection) -> S
             &[],
             Icon::Hash,
             "Channels",
+        ),
+        destination(
+            UiSection::Knowledge,
+            "/ui/knowledge",
+            &[],
+            Icon::Search,
+            "Knowledge",
         ),
         destination(UiSection::Agents, "/ui/agents", &[], Icon::Hubot, "Agents"),
         destination(
@@ -1595,37 +1637,7 @@ fn icon_rail(user: &MailboxUser<'_>, company: &Company, section: UiSection) -> S
             Icon::Organization,
             "Companies",
         ),
-    ];
-
-    let links: String = destinations
-        .iter()
-        .filter(|destination| rail_section_visible(user, destination.section))
-        .map(|destination| {
-            let lit = section == destination.section;
-            format!(
-                r##"<a href="{href}" class="btn btn-square btn-md {style}" title="{title}" aria-label="{title}" data-action="navigate-workspace"{current}>{glyph}<span class="rail-label">{title}</span></a>"##,
-                href = destination.href(company.id),
-                style = if lit { "btn-primary" } else { "btn-ghost" },
-                current = if lit { r##" aria-current="page""## } else { "" },
-                title = destination.title,
-                glyph = icon(destination.glyph, RAIL_ICON),
-            )
-        })
-        .collect();
-
-    format!(
-        r##"
-        <nav id="app-rail" class="app-rail flex w-16 shrink-0 flex-col items-center gap-1.5 overflow-y-auto border-r border-base-300 px-2 py-3" aria-label="Primary navigation">
-            {links}
-            {company_badge}
-        </nav>
-        "##,
-        company_badge = if user.company_membership.is_team() {
-            rail_company_badge(company, FragmentSwap::Inline)
-        } else {
-            Default::default()
-        },
-    )
+    ]
 }
 
 /// One rail entry: the workspace it lights, where it goes, and how it looks.
@@ -1654,7 +1666,7 @@ impl RailDestination {
 /// The rail mirrors route authorization instead of advertising workspaces the caller cannot open.
 fn rail_section_visible(user: &MailboxUser<'_>, section: UiSection) -> bool {
     match section {
-        UiSection::Mailbox | UiSection::Work => user.company_membership.is_team(),
+        UiSection::Mailbox | UiSection::Knowledge | UiSection::Work => user.company_membership.is_team(),
         UiSection::Channels
         | UiSection::Agents
         | UiSection::Workflows

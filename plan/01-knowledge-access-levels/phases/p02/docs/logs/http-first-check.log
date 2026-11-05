@@ -1,0 +1,159 @@
+    Checking bitflags v2.13.1
+    Checking potential_utf v0.1.2
+    Checking icu_locale_core v2.0.0
+    Checking crossbeam-utils v0.8.21
+    Checking either v1.15.0
+   Compiling fnv v1.0.7
+    Checking errno v0.3.14
+    Checking nom v7.1.3
+   Compiling concurrent-queue v2.5.0
+   Compiling crossbeam-queue v0.3.12
+   Compiling onig_sys v69.9.3
+    Checking foldhash v0.2.0
+   Compiling darling_core v0.20.11
+    Checking icu_collections v2.0.0
+    Checking system-configuration v0.6.1
+    Checking rustix v1.1.4
+    Checking security-framework v3.7.0
+    Checking hashbrown v0.16.1
+   Compiling event-listener v5.4.1
+    Checking crossbeam-epoch v0.9.21
+    Checking hyper-util v0.1.16
+   Compiling sqlx-core v0.8.6
+    Checking rand_core v0.9.5
+    Checking crossbeam-deque v0.8.8
+    Checking rawpointer v0.2.1
+    Checking matrixmultiply v0.3.11
+    Checking rand_chacha v0.9.0
+    Checking rayon-core v1.13.0
+    Checking icu_provider v2.0.0
+    Checking itertools v0.14.0
+    Checking castaway v0.2.4
+    Checking rayon v1.12.0
+    Checking base64 v0.13.1
+    Checking unicode-segmentation v1.13.3
+    Checking icu_properties v2.0.1
+    Checking icu_normalizer v2.0.0
+    Checking static_assertions v1.1.0
+    Checking rustls-platform-verifier v0.7.0
+    Checking macro_rules_attribute v0.2.3
+    Checking compact_str v0.9.1
+    Checking gethostname v1.1.0
+    Checking tempfile v3.27.0
+    Checking monostate v0.1.18
+    Checking ndarray v0.17.2
+    Checking esaxx-rs v0.1.10
+    Checking ort-sys v2.0.0-rc.13
+    Checking rand v0.9.5
+    Checking eventsource-stream v0.2.3
+    Checking spm_precompiled v0.1.4
+    Checking unicode-normalization-alignments v0.1.12
+    Checking dary_heap v0.3.9
+    Checking libloading v0.9.0
+    Checking idna_adapter v1.2.1
+    Checking idna v1.1.0
+    Checking unicode_categories v0.1.1
+    Checking daachorse v3.0.3
+    Checking png v0.18.1
+    Checking safetensors v0.8.0
+    Checking icu_casemap_data v2.0.0
+    Checking mail-builder v0.4.4
+    Checking url v2.5.8
+    Checking quick_cache v0.6.24
+    Checking hyper-rustls v0.27.9
+    Checking axum v0.8.4
+    Checking pulldown-cmark v0.13.4
+    Checking jsonschema v0.33.0
+    Checking icu_casemap v2.0.0
+    Checking tower-http v0.6.11
+    Checking hickory-proto v0.24.4
+    Checking image v0.25.10
+   Compiling darling_macro v0.20.11
+    Checking rayon-cond v0.4.0
+    Checking lettre v0.11.23
+    Checking ammonia v4.1.4
+    Checking reqwest v0.13.4
+   Compiling darling v0.20.11
+   Compiling derive_builder_core v0.20.2
+   Compiling sqlx-postgres v0.8.6
+    Checking rig-core v0.42.0
+    Checking rmcp v1.8.0
+   Compiling derive_builder_macro v0.20.2
+    Checking derive_builder v0.20.2
+    Checking ort v2.0.0-rc.13
+    Checking hickory-resolver v0.24.4
+    Checking axum-extra v0.10.1
+    Checking onig v6.5.3
+    Checking tokenizers v0.23.2
+    Checking mail-auth v0.6.1
+   Compiling sqlx-macros-core v0.8.6
+   Compiling sqlx-macros v0.8.6
+    Checking fastembed v7.1.1
+    Checking sqlx v0.8.6
+    Checking rig-agent v0.42.0
+    Checking open_bots v0.1.0 (/Users/mac02/dev/openbot-recovery/.worktrees/knowledge-p02)
+error[E0599]: no variant or associated item named `Book` found for enum `adapters::http::pages::icon::Icon` in the current scope
+    --> src/adapters/http/pages/mailbox.rs:1559:19
+     |
+1559 |             Icon::Book,
+     |                   ^^^^ variant or associated item not found in `adapters::http::pages::icon::Icon`
+     |
+    ::: src/adapters/http/pages/icon.rs:18:1
+     |
+  18 | pub enum Icon {
+     | ------------- variant or associated item `Book` not found for this enum
+
+error[E0063]: missing field `knowledge_model_dir` in initializer of `infra::config::AppConfig`
+   --> src/adapters/http/routes/ui_stream_tests.rs:142:14
+    |
+142 |     Arc::new(AppConfig {
+    |              ^^^^^^^^^ missing `knowledge_model_dir`
+
+error[E0609]: no field `content` on type `(std::string::String, std::string::String)`
+  --> src/adapters/persistence/knowledge/tests/races.rs:24:20
+   |
+24 |     assert_eq!(row.content, row.body);
+   |                    ^^^^^^^ unknown field
+   |
+   = note: available fields are: `0`, `1`
+
+error[E0609]: no field `body` on type `(std::string::String, std::string::String)`
+  --> src/adapters/persistence/knowledge/tests/races.rs:24:33
+   |
+24 |     assert_eq!(row.content, row.body);
+   |                                 ^^^^ unknown field
+   |
+   = note: available fields are: `0`, `1`
+
+error[E0609]: no field `content` on type `(std::string::String, std::string::String)`
+  --> src/adapters/persistence/knowledge/tests/races.rs:25:47
+   |
+25 |     assert!(["first", "second"].contains(&row.content.as_str()));
+   |                                               ^^^^^^^ unknown field
+   |
+   = note: available fields are: `0`, `1`
+
+For more information about this error, try `rustc --explain E0599`.
+error: could not compile `open_bots` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error[E0063]: missing field `knowledge_model_dir` in initializer of `infra::config::AppConfig`
+    --> src/adapters/smtp/server.rs:1187:31
+     |
+1187 |         let config = Arc::new(AppConfig {
+     |                               ^^^^^^^^^ missing `knowledge_model_dir`
+
+error[E0063]: missing field `knowledge_model_dir` in initializer of `infra::config::AppConfig`
+    --> src/adapters/smtp/server.rs:1406:31
+     |
+1406 |         let config = Arc::new(AppConfig {
+     |                               ^^^^^^^^^ missing `knowledge_model_dir`
+
+error[E0063]: missing field `knowledge_model_dir` in initializer of `infra::config::AppConfig`
+    --> src/adapters/smtp/server.rs:1527:31
+     |
+1527 |         let config = Arc::new(AppConfig {
+     |                               ^^^^^^^^^ missing `knowledge_model_dir`
+
+Some errors have detailed explanations: E0063, E0599, E0609.
+For more information about an error, try `rustc --explain E0063`.
+error: could not compile `open_bots` (lib test) due to 8 previous errors

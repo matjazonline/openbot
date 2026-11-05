@@ -1,0 +1,24 @@
+{
+  "image": "openbot-knowledge-p02:probe-r2",
+  "image_id": "sha256:126aea890ec9e7697b1a17840b357f83a5f9b47dc94ae2240f5502d1b0fc06e4",
+  "docker_reported_image_size_bytes": 350122601,
+  "installed_app_bytes": 576896249,
+  "user": "mailagents",
+  "network": "none",
+  "read_only": true,
+  "container_memory_mib": 2048,
+  "peak_rss_budget_mib": 1536,
+  "probe": {
+    "model_id": "intfloat/multilingual-e5-small@614241f622f53c4eeff9890bdc4f31cfecc418b3/fp32/mean/384",
+    "dimensions": 384,
+    "norm": 1.0000000162263665,
+    "translation_score": 0.8418708013514999,
+    "unrelated_score": 0.7169436551792845,
+    "load_ms": 2277,
+    "probe_ms": 1390,
+    "peak_rss_bytes": 1522024448,
+    "batch_size": 4,
+    "batch_tokens": 512
+  },
+  "missing_and_tampered_model_check_and_serve": "PASS"
+}

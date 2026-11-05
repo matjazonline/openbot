@@ -1,0 +1,9 @@
+base:   bc516908a075b9c7ea1d39bac94b93b9d916e1a8
+digest: d1458e7f0df9a6e8631801b61b396cde5eadf206276a8406f995d80a8e9fd87f
+files:
+  Cargo.toml
+  migrations/20260817000000_init_schema.sql
+  src/domain/entities/knowledge.rs
+  src/domain/entities/knowledge_tests.rs
+  src/domain/entities/mod.rs
+  src/domain/entities/value_objects.rs

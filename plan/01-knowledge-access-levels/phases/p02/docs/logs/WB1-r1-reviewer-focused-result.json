@@ -1,0 +1,20 @@
+{
+  "filters": {
+    "knowledge_upload_": 26,
+    "knowledge_chunk_": 7,
+    "knowledge_model_": 1,
+    "adapters::harness::rig::": 22,
+    "value_objects::": 8,
+    "access_level_": 24,
+    "the_application_layer_names_no_agent_runtime": 1,
+    "runtime_boundary_scanner_covers_direct_sdk_paths": 1,
+    "::agent_runtime_tests::": 33,
+    "::message_tests::agent_tests::": 1,
+    "::mcp_tests::agent_tests::": 1
+  },
+  "unique_selected": 125,
+  "exit_code": 0,
+  "elapsed_seconds": 16.556837125,
+  "RUST_MIN_STACK": "unset; native libtest stock stack",
+  "database": "private PG18.6 loopback55502/open_bots_test"
+}

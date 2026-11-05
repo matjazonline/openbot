@@ -1,0 +1,23 @@
+{
+  "image": "openbot-knowledge-p02:probe-r1",
+  "image_id": "sha256:366f7ab4c2be9ee6d13501bf22ae8aed50537eb8eb5c84ce985da98dbed47ad6",
+  "image_size_bytes": 375464705,
+  "user": "mailagents",
+  "network": "none",
+  "read_only": true,
+  "container_memory_mib": 2048,
+  "peak_rss_budget_mib": 1536,
+  "probe": {
+    "model_id": "intfloat/multilingual-e5-small@614241f622f53c4eeff9890bdc4f31cfecc418b3/fp32/mean/384",
+    "dimensions": 384,
+    "norm": 1.0000000162263665,
+    "translation_score": 0.8418708013514999,
+    "unrelated_score": 0.7169436551792845,
+    "load_ms": 2314,
+    "probe_ms": 1392,
+    "peak_rss_bytes": 1522278400,
+    "batch_size": 4,
+    "batch_tokens": 512
+  },
+  "missing_and_tampered_model_check_and_serve": "PASS"
+}

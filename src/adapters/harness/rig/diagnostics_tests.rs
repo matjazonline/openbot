@@ -3,7 +3,7 @@ use crate::services::{
     harness::runs::*,
     test_support::{ScriptedExchange, ScriptedResponse, scripted_scenario},
 };
-use rig::completion::{CompletionRequest, Message};
+use rig_core::completion::{CompletionRequest, Message};
 use serde_json::json;
 use std::sync::{Arc, Mutex};
 use tracing::instrument::WithSubscriber;

@@ -1,0 +1,43 @@
+{
+  "stage": "whole batch review",
+  "round": "KNOW-P02-WB1-R1",
+  "worktree": "/Users/mac02/dev/openbot-recovery/.worktrees/knowledge-p02",
+  "branch": "knowledge/p02",
+  "start_commit": "bc516908a075b9c7ea1d39bac94b93b9d916e1a8",
+  "review_base": "bc516908a075b9c7ea1d39bac94b93b9d916e1a8",
+  "head": "bc516908a075b9c7ea1d39bac94b93b9d916e1a8",
+  "digest": "0e336135a0355baa89e20ef75a53a2afe379519e45062f3c65bbb3b205a4c0f2",
+  "tree_sha256": "5b976a69098aeeb1c80c81113d36257dd49a258f1b04aa36c48e4493b56b841e",
+  "diff_sha256": "1c1aef6812d824c1de502991855584e5276315866c57b7692cb5e1aa255fc0d5",
+  "files_count": 3055,
+  "snapshot_exclusion": "plan/01-knowledge-access-levels/phases/p02/docs",
+  "authority": "/Users/mac02/dev/openbot-recovery/plan/01-knowledge-access-levels/COORDINATION.md",
+  "authority_revision": 12,
+  "authority_sha256": "b5e05aaaf511b19a1703104bb3806c5491c04244597a43f6023b343e6f72b1e5",
+  "pinned_authority": "logs/COORDINATION-r12-implementation.md",
+  "notices": [
+    "I001\u2013I005/r1",
+    "C001/r1",
+    "C002/r1",
+    "Q001/r1 explicit confirmed unrelated baseline debt; final06 closure required"
+  ],
+  "decision_sha256": "6f4f71b93a0e56bba48717993ad1a4c410fb317c4506d6c9de133613e9a66948",
+  "gates": [
+    "KNOW-P02-G1-R1/PASS/N1",
+    "KNOW-P02-G1-R2/PASS/N1"
+  ],
+  "implementation_scope": "All original02A\u2013C, 75 changed source/deliverable files; schema/domain/app/indexing/persistence/libraryHTTPUI/offline model+image/startup/SDK split/CI+docs+focusedtests. No preserved pre-existing edits in assigned worktree; primary coordination files excluded from commits by ownership, not by snapshot extra exclusions.",
+  "author_checks": [
+    "author-focused-results-r3.json:174lib+5binPASS;10selectorsnonzero, one independently proven pre-existing reverse-import guard excluded perQ001",
+    "browser-wb1.log:actualproductionHTML/JS, nativevalidation/progress/dedup/escaping andcomputedstylesboth themesPASS",
+    "model-image-gate-wb1.json:currentproductionimageoffline/nonroot/read-only/hash/missing/tamper/Serve-beforeDB/384norm/semantic/max4x512/token-awarechunks/inputrefusals/memoryPASS",
+    "clippy-wb1.log:alltargetslockedoffline-DwarningsPASS",
+    "sqlx-prepare-r1.log+sqlx-prepare-check-wb1.log:livealltarget/cachePASS",
+    "fmt-wb1.log+source-diff-check-wb1.log:PASS",
+    "model-prepare-tests-r4.log+deploy-tests.log+css-check-wb1.log:PASS",
+    "license-git-byte-proof.json:exactupstreamCRLF working/index/manifest bytes preserved",
+    "lockfile-change-audit.json:changedembeddingversions/removalunusedfacadepackages;selectedRigcore/agent0.42unchanged"
+  ],
+  "verification_limits": "No full suite claim; confirmed pre-existing reverse-import guard retained/fails on accepted producer nativebinary. Whole final06 currentCI inclnoexclusions mandatory. Actual imageprobe Linuxaarch64 and native model macOSarm64; Linuxx64 release artifacts checksum-verified, currentCI measures its own image.",
+  "resource_ownership": "PrivatePG18.6 55502/mac02/open_bots+open_bots_test; own target and disposable databases; root no checks running when B starts. Plan-ownedDockerColimaopenbot-knowledge, explicitsocket/config; nativeScriptedmodelnormaltests, realmodelprobesexplicitonly. No resets elsewhere/deploy/push."
+}

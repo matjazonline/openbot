@@ -1,0 +1,13 @@
+Traceback (most recent call last):
+  File "/Users/mac02/dev/openbot-recovery/.worktrees/knowledge-p02/scripts/check-knowledge-image.py", line 79, in <module>
+    main()
+  File "/Users/mac02/dev/openbot-recovery/.worktrees/knowledge-p02/scripts/check-knowledge-image.py", line 75, in main
+    print(json.dumps(check(args.image), indent=2))
+  File "/Users/mac02/dev/openbot-recovery/.worktrees/knowledge-p02/scripts/check-knowledge-image.py", line 66, in check
+    failed_startup(image, empty, MODEL)
+  File "/Users/mac02/dev/openbot-recovery/.worktrees/knowledge-p02/scripts/check-knowledge-image.py", line 37, in failed_startup
+    raise RuntimeError("Missing/tampered artifact did not fail at the model boundary: " + output[-4096:])
+RuntimeError: Missing/tampered artifact did not fail at the model boundary: docker: Error response from daemon: invalid mount config for type "bind": bind source path does not exist: /var/folders/qc/f8s9x42x5sz6vbh79sb0cfth0000gn/T/knowledge-image-y9v2ukqp/empty
+
+Run 'docker run --help' for more information
+

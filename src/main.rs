@@ -37,6 +37,7 @@ enum ProcessCommand {
     Serve,
     CredentialStatus { required_version: Option<u32> },
     CredentialRotate,
+    KnowledgeModelCheck,
     Help,
 }
 
@@ -46,11 +47,15 @@ fn main() -> anyhow::Result<()> {
     dotenv().ok();
     init_tracing();
     match parse_process_command(std::env::args().skip(1))? {
-        ProcessCommand::Serve => tokio::runtime::Builder::new_multi_thread()
-            .enable_all()
-            .thread_stack_size(runtime_thread_stack_bytes_from_env())
-            .build()?
-            .block_on(serve()),
+        ProcessCommand::Serve => serve_runtime(),
+        ProcessCommand::KnowledgeModelCheck => {
+            let directory = open_bots::adapters::embedding::model_directory_from_env();
+            println!(
+                "{}",
+                serde_json::to_string(&open_bots::adapters::embedding::model_check(&directory)?)?
+            );
+            Ok(())
+        }
         ProcessCommand::CredentialStatus { required_version } => {
             operational_runtime()?.block_on(run_credential_status(required_version))
         }
@@ -62,6 +67,17 @@ fn main() -> anyhow::Result<()> {
             Ok(())
         }
     }
+}
+
+fn serve_runtime() -> anyhow::Result<()> {
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .thread_stack_size(runtime_thread_stack_bytes_from_env())
+        .build()?;
+    let result = runtime.block_on(serve());
+    // A native call can outlive cooperative cancellation; Runtime::drop must not wait forever.
+    runtime.shutdown_timeout(Duration::from_secs(1));
+    result
 }
 
 fn operational_runtime() -> anyhow::Result<tokio::runtime::Runtime> {
@@ -90,6 +106,9 @@ fn parse_process_command(args: impl IntoIterator<Item = String>) -> anyhow::Resu
                 required_version: Some(required_version),
             })
         }
+        [knowledge, check] if knowledge == "knowledge" && check == "model-check" => {
+            Ok(ProcessCommand::KnowledgeModelCheck)
+        }
         [credentials, rotate] if credentials == "credentials" && rotate == "rotate" => {
             Ok(ProcessCommand::CredentialRotate)
         }
@@ -108,7 +127,7 @@ fn parse_required_version(value: &str) -> anyhow::Result<u32> {
 }
 
 fn command_usage() -> &'static str {
-    "Usage:\n  open_bots\n  open_bots credentials status [--require-version <N>]\n  open_bots credentials rotate"
+    "Usage:\n  open_bots\n  open_bots credentials status [--require-version <N>]\n  open_bots credentials rotate\n  open_bots knowledge model-check"
 }
 
 async fn run_credential_status(required_version: Option<u32>) -> anyhow::Result<()> {
@@ -266,6 +285,8 @@ async fn serve() -> anyhow::Result<()> {
             token.cancel();
         })
     };
+    let mut knowledge_shutdown_handle =
+        supervise_knowledge_shutdown(app_state.knowledge.clone(), shutdown_tx.subscribe());
     let mut workflow_handles = workflow.spawn(&workflow_shutdown);
 
     // The runtime panel samples the workflow worker slots and the jobs they hold (p08 D4.8).
@@ -350,6 +371,7 @@ async fn serve() -> anyhow::Result<()> {
     let mut smtp_handle = smtp_handle;
     let mut mailbox_listener_handle = mailbox_listener_handle;
     tokio::join!(
+        join_background("knowledge indexing", &mut knowledge_shutdown_handle),
         join_background("runtime metric sampler", &mut runtime_sampler_handle),
         join_background("session cleanup", &mut session_cleanup_handle),
         join_background("inbound event worker", &mut inbound_event_worker_handle),
@@ -366,6 +388,18 @@ async fn serve() -> anyhow::Result<()> {
     );
 
     Ok(())
+}
+
+fn supervise_knowledge_shutdown(
+    knowledge: Arc<open_bots::application::knowledge::KnowledgeLibrary>,
+    mut stop: tokio::sync::broadcast::Receiver<()>,
+) -> tokio::task::JoinHandle<()> {
+    tokio::spawn(async move {
+        let _ = stop.recv().await;
+        if let Err(error) = knowledge.shutdown().await {
+            warn!(error=%error,"Knowledge indexing shutdown failed");
+        }
+    })
 }
 
 async fn join_background(name: &str, handle: &mut tokio::task::JoinHandle<()>) {
@@ -445,6 +479,10 @@ mod tests {
 
     #[test]
     fn operational_commands_are_parsed_before_server_startup() {
+        assert_eq!(
+            parse_process_command(["knowledge", "model-check"].map(str::to_owned)).unwrap(),
+            ProcessCommand::KnowledgeModelCheck
+        );
         assert_eq!(
             parse_process_command(["credentials".into(), "status".into()]).unwrap(),
             ProcessCommand::CredentialStatus {

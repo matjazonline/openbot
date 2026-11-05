@@ -1,0 +1,78 @@
+2026-11-05T08:50:01.644Z pw:install downloading Chromium 140.0.7339.186 (playwright build v1193) - attempt #1
+Downloading Chromium 140.0.7339.186 (playwright build v1193)[2m from https://cdn.playwright.dev/dbazure/download/playwright/builds/chromium/1193/chromium-mac-arm64.zip[22m
+2026-11-05T08:50:01.648Z pw:install running download:
+2026-11-05T08:50:01.648Z pw:install -- from url: https://cdn.playwright.dev/dbazure/download/playwright/builds/chromium/1193/chromium-mac-arm64.zip
+2026-11-05T08:50:01.648Z pw:install -- to location: /var/folders/qc/f8s9x42x5sz6vbh79sb0cfth0000gn/T/playwright-download-chromium-mac15-arm64-1193.zip
+2026-11-05T08:50:02.100Z pw:install -- response status code: 200
+2026-11-05T08:50:02.101Z pw:install -- total bytes: 135564706
+|                                                                                |   0% of 129.3 MiB
+|■■■■■■■■                                                                        |  10% of 129.3 MiB
+|■■■■■■■■■■■■■■■■                                                                |  20% of 129.3 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■                                                        |  30% of 129.3 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                                                |  40% of 129.3 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                                        |  50% of 129.3 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                                |  60% of 129.3 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                        |  70% of 129.3 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                |  80% of 129.3 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■        |  90% of 129.3 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■| 100% of 129.3 MiB
+2026-11-05T08:50:18.967Z pw:install -- download complete, size: 135564706
+2026-11-05T08:50:18.967Z pw:install SUCCESS downloading Chromium 140.0.7339.186 (playwright build v1193)
+2026-11-05T08:50:18.968Z pw:install extracting archive
+2026-11-05T08:50:19.880Z pw:install fixing permissions at /Users/mac02/dev/openbot-recovery/.worktrees/knowledge-tooling/playwright/chromium-1193/chrome-mac/Chromium.app/Contents/MacOS/Chromium
+2026-11-05T08:50:19.883Z pw:install SUCCESS installing Chromium 140.0.7339.186 (playwright build v1193)
+Chromium 140.0.7339.186 (playwright build v1193) downloaded to /Users/mac02/dev/openbot-recovery/.worktrees/knowledge-tooling/playwright/chromium-1193
+2026-11-05T08:50:19.885Z pw:install downloading FFMPEG playwright build v1011 - attempt #1
+Downloading FFMPEG playwright build v1011[2m from https://cdn.playwright.dev/dbazure/download/playwright/builds/ffmpeg/1011/ffmpeg-mac-arm64.zip[22m
+2026-11-05T08:50:19.886Z pw:install running download:
+2026-11-05T08:50:19.886Z pw:install -- from url: https://cdn.playwright.dev/dbazure/download/playwright/builds/ffmpeg/1011/ffmpeg-mac-arm64.zip
+2026-11-05T08:50:19.886Z pw:install -- to location: /var/folders/qc/f8s9x42x5sz6vbh79sb0cfth0000gn/T/playwright-download-ffmpeg-mac15-arm64-1011.zip
+2026-11-05T08:50:20.149Z pw:install -- response status code: 200
+2026-11-05T08:50:20.149Z pw:install -- total bytes: 1097141
+|                                                                                |   1% of 1 MiB
+|■■■■■■■■                                                                        |  10% of 1 MiB
+|■■■■■■■■■■■■■■■■                                                                |  20% of 1 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■                                                        |  30% of 1 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                                                |  40% of 1 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                                        |  50% of 1 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                                |  60% of 1 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                        |  71% of 1 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                |  80% of 1 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■        |  90% of 1 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■| 100% of 1 MiB
+2026-11-05T08:50:20.331Z pw:install -- download complete, size: 1097141
+2026-11-05T08:50:20.332Z pw:install SUCCESS downloading FFMPEG playwright build v1011
+2026-11-05T08:50:20.332Z pw:install extracting archive
+2026-11-05T08:50:20.364Z pw:install fixing permissions at /Users/mac02/dev/openbot-recovery/.worktrees/knowledge-tooling/playwright/ffmpeg-1011/ffmpeg-mac
+2026-11-05T08:50:20.367Z pw:install SUCCESS installing FFMPEG playwright build v1011
+FFMPEG playwright build v1011 downloaded to /Users/mac02/dev/openbot-recovery/.worktrees/knowledge-tooling/playwright/ffmpeg-1011
+2026-11-05T08:50:20.367Z pw:install downloading Chromium Headless Shell 140.0.7339.186 (playwright build v1193) - attempt #1
+Downloading Chromium Headless Shell 140.0.7339.186 (playwright build v1193)[2m from https://cdn.playwright.dev/dbazure/download/playwright/builds/chromium/1193/chromium-headless-shell-mac-arm64.zip[22m
+2026-11-05T08:50:20.368Z pw:install running download:
+2026-11-05T08:50:20.368Z pw:install -- from url: https://cdn.playwright.dev/dbazure/download/playwright/builds/chromium/1193/chromium-headless-shell-mac-arm64.zip
+2026-11-05T08:50:20.368Z pw:install -- to location: /var/folders/qc/f8s9x42x5sz6vbh79sb0cfth0000gn/T/playwright-download-chromium-headless-shell-mac15-arm64-1193.zip
+2026-11-05T08:50:20.735Z pw:install -- response status code: 200
+2026-11-05T08:50:20.736Z pw:install -- total bytes: 85528521
+|                                                                                |   0% of 81.6 MiB
+|■■■■■■■■                                                                        |  10% of 81.6 MiB
+|■■■■■■■■■■■■■■■■                                                                |  20% of 81.6 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■                                                        |  30% of 81.6 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                                                |  40% of 81.6 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                                        |  50% of 81.6 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                                |  60% of 81.6 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                        |  70% of 81.6 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                |  80% of 81.6 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■        |  90% of 81.6 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■| 100% of 81.6 MiB
+2026-11-05T08:50:31.441Z pw:install -- download complete, size: 85528521
+2026-11-05T08:50:31.442Z pw:install SUCCESS downloading Chromium Headless Shell 140.0.7339.186 (playwright build v1193)
+2026-11-05T08:50:31.442Z pw:install extracting archive
+2026-11-05T08:50:31.974Z pw:install fixing permissions at /Users/mac02/dev/openbot-recovery/.worktrees/knowledge-tooling/playwright/chromium_headless_shell-1193/chrome-mac/headless_shell
+2026-11-05T08:50:31.977Z pw:install SUCCESS installing Chromium Headless Shell 140.0.7339.186 (playwright build v1193)
+Chromium Headless Shell 140.0.7339.186 (playwright build v1193) downloaded to /Users/mac02/dev/openbot-recovery/.worktrees/knowledge-tooling/playwright/chromium_headless_shell-1193
+2026-11-05T08:50:31.979Z pw:install validating host requirements for "chromium"
+2026-11-05T08:50:31.979Z pw:install validation passed for chromium
+2026-11-05T08:50:31.979Z pw:install validating host requirements for "ffmpeg"
+2026-11-05T08:50:31.979Z pw:install validation passed for ffmpeg
+2026-11-05T08:50:31.979Z pw:install validating host requirements for "chromium-headless-shell"
+2026-11-05T08:50:31.979Z pw:install validation passed for chromium-headless-shell

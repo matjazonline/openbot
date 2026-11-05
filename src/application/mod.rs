@@ -1,5 +1,6 @@
 pub mod app_error;
 pub mod attention;
+pub mod knowledge;
 pub mod message_outcomes;
 pub mod model_providers;
 pub mod notification;

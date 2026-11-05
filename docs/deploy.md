@@ -43,6 +43,52 @@ env -u DATABASE_URL SQLX_OFFLINE=true cargo check --locked
 
 If this fails, `fly deploy` will fail the same way.
 
+## Local knowledge model and memory
+
+The image includes the FP32 `intfloat/multilingual-e5-small` model at revision
+`614241f622f53c4eeff9890bdc4f31cfecc418b3` and ONNX Runtime 1.24.4. The build-only
+`scripts/prepare-knowledge-model.py` checks exact sizes/SHA256 values from
+`assets/knowledge/model-manifest.json`, safely extracts the selected runtime, and retains MIT
+licenses and third-party notices. Rust dependencies and touched base images are pinned. The final
+image runs as `mailagents`; model files remain root-owned and readable.
+
+For local serving on Linux x86_64/aarch64 or macOS arm64:
+
+```sh
+python3 scripts/prepare-knowledge-model.py
+export KNOWLEDGE_MODEL_DIR="$PWD/target/knowledge-model"
+cargo run --locked --offline -- knowledge model-check
+```
+
+`KNOWLEDGE_MODEL_DIR` is the directory the application reads, defaulting to
+`/app/models/multilingual-e5-small`. Startup hashes every required local model/tokenizer/runtime
+file, loads one shared CPU model, and checks a normalized 384-dimensional output **before** opening
+the database or starting workers. Missing, changed or unsupported artifacts stop startup and name
+the expected path. There is no runtime download, fallback model or first-request load. The
+`knowledge model-check` command uses the same loader without database credentials and reports only
+public-fixture quality, shape, timing and peak resident-memory measurements. Normal unit/database
+tests use an explicit fake embedder.
+
+The Linux/aarch64 image probe with two CPUs measured about **1452 MiB cold peak RSS**, including
+four 512-token passages. `fly.toml` therefore provisions **2 GiB**. CI requires
+`scripts/check-knowledge-image.py --image <built-image>` to pass under a **hard 2048 MiB container
+limit** and fail early above **1536 MiB peak RSS**. That check also runs with no network, a read-only
+filesystem and the non-root image user; it verifies multilingual relevance and that both
+`model-check` and `serve` reject missing/tampered artifacts before an intentionally unreachable
+database. Its output records Docker's reported image size and installed `/app` bytes. These
+measurements are platform-specific; every CI build measures its own image. macOS development
+cold-load memory can be higher (~2.0 GiB in the first native probe). If the early budget fails,
+reduce working memory before changing a resource limit, and retain an early CI failure signal.
+
+The library accepts UTF-8 `.txt`/`.md` files named with a single level digit and `_` or `-`, for
+example `0_sales.md`. Any current teammate can upload/delete up to their current level. Up to ten
+files of 1 MiB each, 10 MiB stored text and 4096 layers per company are allowed. Names compare with
+Unicode 16 full case folding (PostgreSQL 18 is required), while display spelling is preserved.
+Sections are bounded to 4096 chunks per file and 8192 per upload, with bounded heading paths.
+Indexing runs outside the short database transaction; all files/chunks commit together after fresh
+authority/quota checks. A timeout after an unacknowledged COMMIT asks the user to refresh rather
+than claiming no change happened.
+
 ## First deploy
 
 `scripts/deploy.sh --bootstrap` automates both apps' first-time setup (app

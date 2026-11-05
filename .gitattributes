@@ -1,0 +1,2 @@
+# Preserve the exact upstream license bytes verified by the model artifact manifest.
+assets/knowledge/MODEL-LICENSE.txt -text whitespace=cr-at-eol

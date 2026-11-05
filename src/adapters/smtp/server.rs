@@ -1185,6 +1185,7 @@ mod tests {
         let thread_persistence = Arc::new(InMemoryThreads::new());
 
         let config = Arc::new(AppConfig {
+            knowledge_model_dir: std::path::PathBuf::from("/test/no-model-required"),
             auth_attempt_secret: "a-distinct-auth-attempt-test-secret-02".into(),
             jwt_secret: "secret".to_string(),
             sendgrid_inbound: None,
@@ -1404,6 +1405,7 @@ regis";
         let thread_persistence = Arc::new(InMemoryThreads::new());
 
         let config = Arc::new(AppConfig {
+            knowledge_model_dir: std::path::PathBuf::from("/test/no-model-required"),
             auth_attempt_secret: "a-distinct-auth-attempt-test-secret-02".into(),
             jwt_secret: "secret".to_string(),
             sendgrid_inbound: None,
@@ -1525,6 +1527,7 @@ Message-ID: <CAGj=2VKEn_MHfovWkBCqn4sp3AXPR=ZTLMso=mPjWtnMDStiRw@mail.gmail.com>
         });
         let thread_persistence = Arc::new(InMemoryThreads::new());
         let config = Arc::new(AppConfig {
+            knowledge_model_dir: std::path::PathBuf::from("/test/no-model-required"),
             auth_attempt_secret: "a-distinct-auth-attempt-test-secret-02".into(),
             jwt_secret: "secret".to_string(),
             sendgrid_inbound: None,
@@ -1615,6 +1618,7 @@ Message-ID: <CAGj=2VKEn_MHfovWkBCqn4sp3AXPR=ZTLMso=mPjWtnMDStiRw@mail.gmail.com>
     async fn smtp_sender_trust_lookup_failure_is_logged_and_scanned() {
         use tracing::instrument::WithSubscriber;
         let config = Arc::new(AppConfig {
+            knowledge_model_dir: std::path::PathBuf::from("/test/no-model-required"),
             app_domain_name: "mailagents.com".into(),
             ..AppConfig::for_test()
         });
@@ -1697,6 +1701,7 @@ Message-ID: <CAGj=2VKEn_MHfovWkBCqn4sp3AXPR=ZTLMso=mPjWtnMDStiRw@mail.gmail.com>
         .await
         .unwrap();
         let config = Arc::new(AppConfig {
+            knowledge_model_dir: std::path::PathBuf::from("/test/no-model-required"),
             app_domain_name: "mailagents.com".into(),
             ..AppConfig::for_test()
         });

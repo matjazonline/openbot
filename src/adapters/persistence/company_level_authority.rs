@@ -5,9 +5,9 @@ use crate::use_cases::company_invite::level_error;
 use sqlx::{PgPool, Postgres, Transaction};
 
 #[derive(Clone, Copy)]
-pub(super) struct TeamScope {
-    pub actor_id: Uuid,
-    pub company_id: Uuid,
+pub(in crate::adapters::persistence) struct TeamScope {
+    pub(in crate::adapters::persistence) actor_id: Uuid,
+    pub(in crate::adapters::persistence) company_id: Uuid,
 }
 #[derive(sqlx::FromRow)]
 pub(super) struct LockedMember {
@@ -36,9 +36,9 @@ impl LockedMember {
         })
     }
 }
-pub(super) struct TeamAuthority {
-    pub owner_id: Uuid,
-    pub actor: LevelActor,
+pub(in crate::adapters::persistence) struct TeamAuthority {
+    pub(in crate::adapters::persistence) owner_id: Uuid,
+    pub(in crate::adapters::persistence) actor: LevelActor,
     members: Vec<LockedMember>,
 }
 impl TeamAuthority {
@@ -57,7 +57,7 @@ impl TeamAuthority {
         may_assign_level(self.actor, current, requested).map_err(level_error)
     }
 }
-pub(super) fn database(error: sqlx::Error) -> AppError {
+pub(in crate::adapters::persistence) fn database(error: sqlx::Error) -> AppError {
     if error
         .as_database_error()
         .and_then(|e| e.code())
@@ -68,7 +68,10 @@ pub(super) fn database(error: sqlx::Error) -> AppError {
     }
     AppError::from(error)
 }
-pub(super) async fn start(pool: &PgPool, scope: TeamScope) -> AppResult<Transaction<'_, Postgres>> {
+pub(in crate::adapters::persistence) async fn start(
+    pool: &PgPool,
+    scope: TeamScope,
+) -> AppResult<Transaction<'_, Postgres>> {
     let mut transaction = pool.begin().await.map_err(database)?;
     sqlx::query("SELECT set_config('lock_timeout','1000ms',true),set_config('statement_timeout','5000ms',true)")
         .execute(&mut *transaction).await.map_err(database)?;
@@ -82,7 +85,7 @@ pub(super) async fn start(pool: &PgPool, scope: TeamScope) -> AppResult<Transact
     }
     Ok(transaction)
 }
-pub(super) async fn lock_team(
+pub(in crate::adapters::persistence) async fn lock_team(
     tx: &mut Transaction<'_, Postgres>,
     scope: TeamScope,
     target: Option<Uuid>,

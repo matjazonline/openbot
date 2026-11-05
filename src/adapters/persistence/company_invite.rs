@@ -19,7 +19,7 @@ use crate::{
 };
 
 #[path = "company_level_authority.rs"]
-mod authority;
+pub(super) mod authority;
 use authority::{InviteTarget, TeamScope};
 
 #[derive(sqlx::FromRow, Debug, Serialize)]

@@ -7,7 +7,8 @@ use crate::{
     app_error::{AppError, AppResult},
     services::harness::{AgentExecutionOutput, runs::*, sanitize_text},
 };
-use rig::{agent::ModelHandle, completion::CompletionRequest};
+use rig_agent::agent::ModelHandle;
+use rig_core::completion::CompletionRequest;
 use sha2::{Digest, Sha256};
 
 pub(super) fn invalid(message: &str) -> AppError {

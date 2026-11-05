@@ -1,0 +1,6 @@
+{
+  "cause": "Node22 Homebrew install moved simdjson opt from existing4.6.4 to5.1.1, breaking oldNode26.5 dynamiclink. Restore original global link; use explicit privateDYLD_LIBRARY_PATH for ownedNode22 checks.",
+  "before": "../Cellar/simdjson/5.1.1",
+  "after": "../Cellar/simdjson/4.6.4",
+  "node22_library_path": "/opt/homebrew/Cellar/simdjson/5.1.1/lib"
+}

@@ -1,0 +1,7 @@
+multilingual-e5-small, Microsoft / intfloat, MIT license.
+Model source: https://huggingface.co/intfloat/multilingual-e5-small/tree/614241f622f53c4eeff9890bdc4f31cfecc418b3
+Upstream E5 source: https://github.com/microsoft/unilm/tree/0e31c7c09737df491e7ff74ded19614b884c52b4/e5
+License source: https://raw.githubusercontent.com/microsoft/unilm/0e31c7c09737df491e7ff74ded19614b884c52b4/LICENSE
+License SHA256: 904dc4d8749877f1dba1cda48200d2462dccbeb7c134d5e4ef6fa75e0198c8fe
+ONNX Runtime 1.24.4: Microsoft, MIT; runtime/LICENSE and ThirdPartyNotices.txt retained.
+All model and runtime files are pinned by assets/knowledge/model-manifest.json.

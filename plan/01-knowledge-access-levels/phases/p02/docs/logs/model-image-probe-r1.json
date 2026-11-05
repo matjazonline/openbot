@@ -1,0 +1,1 @@
+{"model_id":"intfloat/multilingual-e5-small@614241f622f53c4eeff9890bdc4f31cfecc418b3/fp32/mean/384","dimensions":384,"norm":1.0000000162263665,"translation_score":0.8418708013514999,"unrelated_score":0.7169436551792845,"load_ms":2378,"probe_ms":1404,"peak_rss_bytes":1522192384,"batch_size":4,"batch_tokens":512}

@@ -140,6 +140,7 @@ impl Frames {
 /// A deployment with no spam scanning, which is all these streams need.
 pub(in crate::adapters::http::routes) fn test_config() -> Arc<AppConfig> {
     Arc::new(AppConfig {
+        knowledge_model_dir: std::path::PathBuf::from("/test/no-model-required"),
         auth_attempt_secret: "a-distinct-auth-attempt-test-secret-02".into(),
         jwt_secret: "secret".to_string(),
         sendgrid_inbound: None,

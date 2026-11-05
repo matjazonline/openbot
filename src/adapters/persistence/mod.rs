@@ -20,6 +20,7 @@ pub mod database_query_health;
 pub mod delivery;
 pub mod inbound_event;
 pub mod integration;
+pub mod knowledge;
 pub(crate) mod model_usage;
 pub mod notification;
 pub mod onboarding;

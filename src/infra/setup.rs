@@ -108,6 +108,7 @@ struct HttpComponents {
 fn http_state(f: foundation::Foundation, c: HttpComponents) -> anyhow::Result<AppState> {
     let p = f.persistence;
     Ok(AppState {
+        knowledge: f.knowledge,
         auth_admission: Arc::new(crate::adapters::http::auth_admission::AuthAdmission::from_env()?),
         workflow: c.workflow,
         model_usage: p.clone(),

@@ -1,0 +1,8 @@
+{
+  "base": "bc516908a075b9c7ea1d39bac94b93b9d916e1a8",
+  "unchanged_source": "src/application/workflow/http.rs",
+  "source_sha256": "a378db798c1581529cbf521eeb793147e72868c9d2c762ac6cd9790903e11d7f",
+  "cause": "Workflow http port names crate::use_cases::connection_level::ConnectionLevelCommand, violating pre-existing reverse-usecase-import guard; not caused by P02 directSDK guard expansion.",
+  "baseline_binary": "/Users/mac02/dev/openbot-recovery/.worktrees/knowledge-p03/target/debug/deps/open_bots-7b3508cbfb62bd10",
+  "baseline_guard_exit": 101
+}

@@ -2,7 +2,8 @@
 use super::http::ProviderHttp;
 use std::{collections::HashMap, time::Duration};
 
-use rig::{agent::ModelHandle, client::CompletionClient, providers};
+use rig_agent::agent::ModelHandle;
+use rig_core::{client::CompletionClient, providers};
 use secrecy::{ExposeSecret, SecretString};
 
 use crate::entities::value_objects::{ModelName, ModelProvider};
@@ -173,9 +174,9 @@ factory!(xai, xai);
 /// diagnostics count the normalized usage; the surrounding application trace keeps its IDs.
 pub(super) async fn complete(
     model: &ModelHandle,
-    mut request: rig::completion::CompletionRequest,
-) -> crate::app_error::AppResult<rig::completion::CompletionResponse> {
-    use rig::completion::CompletionModel;
+    mut request: rig_core::completion::CompletionRequest,
+) -> crate::app_error::AppResult<rig_core::completion::CompletionResponse> {
+    use rig_core::completion::CompletionModel;
     use tracing::instrument::WithSubscriber;
     request.record_telemetry_content = false;
     model
@@ -185,8 +186,8 @@ pub(super) async fn complete(
         .map_err(completion_error)
 }
 
-fn completion_error(error: rig::completion::CompletionError) -> crate::app_error::AppError {
-    use rig::{completion::CompletionError, http_client::Error};
+fn completion_error(error: rig_core::completion::CompletionError) -> crate::app_error::AppError {
+    use rig_core::{completion::CompletionError, http_client::Error};
     if matches!(&error, CompletionError::HttpError(Error::Instance(source))
         if source.is::<super::http::ProviderTimeout>())
     {
@@ -200,7 +201,7 @@ fn completion_error(error: rig::completion::CompletionError) -> crate::app_error
 mod timeout_tests {
     use super::*;
     use crate::services::test_support::{ScriptedExchange, ScriptedResponse, scripted_scenario};
-    use rig::completion::{CompletionRequest, Message};
+    use rig_core::completion::{CompletionRequest, Message};
 
     #[tokio::test]
     async fn a_stalled_provider_returns_a_typed_timeout_without_url_or_credentials() {

@@ -1,0 +1,47 @@
+{
+  "resolved_packages": [
+    {
+      "name": "fastembed",
+      "version": "7.1.1",
+      "checksum": "ca64ada7d0ad74737f45609542930cd5813fcb453b3f72ecb4255d8bd6fe4604"
+    },
+    {
+      "name": "ort",
+      "version": "2.0.0-rc.13",
+      "checksum": "4336a1e2b38848325241c72889086886004e589b7c74f335e60a8e8db5138a0b"
+    },
+    {
+      "name": "ort-sys",
+      "version": "2.0.0-rc.13",
+      "checksum": "cf211e3776eea6aec988552fa118dd746d70e1b1e5e244058d1c98015f3e5872"
+    },
+    {
+      "name": "rig-agent",
+      "version": "0.42.0",
+      "checksum": "b66477c0d0a786358d078e7e3541a73089dd9009100d6e2b3fe3b0d730e8550f"
+    },
+    {
+      "name": "rig-core",
+      "version": "0.42.0",
+      "checksum": "432d83e0facf16749f91fe729cbffca84437e8062d2f4e92f4f12e903693922d"
+    }
+  ],
+  "resolver_succeeded_but_metadata_download_failed_offline": "daachorse3.0.3 absent; no compilation or runtime checks",
+  "crate_source_hashes": {
+    "/Users/mac02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rig-0.42.0/Cargo.toml": "149e8ceaf5676c7eeadfd86a44639a9c11f0e7485faf9d4b69f02eefe4b45a00",
+    "/Users/mac02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rig-0.42.0/src/lib.rs": "9a7c08fc9ffc82eac1dcb4d564b9f364972ca2596cfb98244bbcde585f59738d",
+    "/Users/mac02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rig-core-0.42.0/Cargo.toml": "129ea66cbea72b53266e5565f584359d90eb6025597d02ed1031503a7e94ffae",
+    "/Users/mac02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rig-core-0.42.0/src/lib.rs": "ac96edf595d5ef4e37abbcae5057fdfa2c16e4a107bd754dc7086c6968f496ee",
+    "/Users/mac02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rig-agent-0.42.0/Cargo.toml": "b03747d2cf73be9c9991dcd92db64313e94aa60427f22ced19fd02579f4b4505",
+    "/Users/mac02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rig-agent-0.42.0/src/lib.rs": "ddc53439917061c53b09ba459f0afb7ecd6e81d448d8a25de1e9e3e025c14c16"
+  },
+  "package_mapping": {
+    "rig::agent::*": "rig_agent::agent::*",
+    "rig::completion::Prompt": "rig_agent::completion::Prompt",
+    "rig::completion::{messages,request,response,model,error,usage}": "rig_core::completion::*",
+    "rig::tool::DynamicTool": "rig_agent::tool::DynamicTool",
+    "rig::tool::ToolOutput": "rig_core::tool::ToolOutput",
+    "rig::{client::CompletionClient,providers,http_client}": "rig_core same paths"
+  },
+  "source": "actual cached rig0.42 facade declarations and selected baseline lock versions; no inferred API equivalence"
+}

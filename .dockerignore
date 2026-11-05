@@ -13,3 +13,6 @@ scripts
 fly.toml
 Dockerfile
 .dockerignore
+!scripts/
+scripts/*
+!scripts/prepare-knowledge-model.py

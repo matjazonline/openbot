@@ -1,0 +1,9 @@
+{
+  "tests": [
+    "adapters::persistence::tests::clean_schema_contains_only_the_canonical_message_spine",
+    "adapters::persistence::tests::every_timestamp_column_carries_a_timezone",
+    "adapters::persistence::tests::no_two_indexes_share_a_definition"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 0.137071667
+}

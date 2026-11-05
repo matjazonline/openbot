@@ -1,0 +1,26 @@
+TAP version 13
+# Subtest: library native forms validate before showing progress, prevent duplicate writes, and keep both themes readable
+not ok 1 - library native forms validate before showing progress, prevent duplicate writes, and keep both themes readable
+  ---
+  duration_ms: 6823.46725
+  type: 'test'
+  location: '/Users/mac02/dev/openbot-recovery/.worktrees/knowledge-p02/scripts/tests/knowledge-browser.mjs:13:1'
+  failureType: 'unhandledRejection'
+  error: |-
+    page.waitForNavigation: net::ERR_ABORTED; maybe frame was detached?
+    =========================== logs ===========================
+    waiting for navigation until "load"
+    ============================================================
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    TestContext.<anonymous> (/Users/mac02/dev/openbot-recovery/.worktrees/knowledge-p02/scripts/tests/knowledge-browser.mjs:62:29)
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 0
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 7067.410917

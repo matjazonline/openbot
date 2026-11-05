@@ -1,0 +1,34 @@
+{
+  "round": "KNOW-P02-WB1-R1",
+  "checked_at_utc": "2026-11-05T09:59:49.679156+00:00",
+  "worktree": "/Users/mac02/dev/openbot-recovery/.worktrees/knowledge-p02",
+  "branch": "knowledge/p02",
+  "review_base": "bc516908a075b9c7ea1d39bac94b93b9d916e1a8",
+  "head": "bc516908a075b9c7ea1d39bac94b93b9d916e1a8",
+  "installed_digest": "0e336135a0355baa89e20ef75a53a2afe379519e45062f3c65bbb3b205a4c0f2",
+  "tree_sha256": "5b976a69098aeeb1c80c81113d36257dd49a258f1b04aa36c48e4493b56b841e",
+  "diff_sha256": "1c1aef6812d824c1de502991855584e5276315866c57b7692cb5e1aa255fc0d5",
+  "files_count": 3055,
+  "exclusions": [
+    "plan/01-knowledge-access-levels/phases/p02/docs/"
+  ],
+  "installed_before_after_equal": true,
+  "full_manifest_before_after_equal": true,
+  "authority": "/Users/mac02/dev/openbot-recovery/plan/01-knowledge-access-levels/COORDINATION.md",
+  "authority_revision": 12,
+  "authority_sha256": "b5e05aaaf511b19a1703104bb3806c5491c04244597a43f6023b343e6f72b1e5",
+  "authority_pin_equal": true,
+  "decision_sha256": "6f4f71b93a0e56bba48717993ad1a4c410fb317c4506d6c9de133613e9a66948",
+  "notices": [
+    "I001/r1",
+    "I002/r1",
+    "I003/r1",
+    "I004/r1",
+    "I005/r1",
+    "C001/r1",
+    "C002/r1",
+    "Q001/r1"
+  ],
+  "final_review_records_saved": true,
+  "schema_invariants_supplement_passed": true
+}

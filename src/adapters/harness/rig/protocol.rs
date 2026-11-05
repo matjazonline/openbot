@@ -3,7 +3,7 @@ use crate::{
     app_error::{AppError, AppResult},
     services::harness::runs::*,
 };
-use rig::completion::{
+use rig_core::completion::{
     CompletionResponse,
     message::{
         AssistantContent, Message, ProviderCallId, Reasoning, ReasoningContent, Text, ToolCall,
@@ -102,7 +102,10 @@ struct CapturedUsage {
     output_tokens: u64,
 }
 
-fn captured_usage(usage: &rig::completion::Usage, reservation: &ModelReservation) -> CapturedUsage {
+fn captured_usage(
+    usage: &rig_core::completion::Usage,
+    reservation: &ModelReservation,
+) -> CapturedUsage {
     // Rig normalizes missing provider counters to zero. Treat each absent side explicitly;
     // reservations are conservative upper estimates and remain stable after candidate redaction.
     let input_reported = usage.input_tokens > 0;
@@ -172,7 +175,7 @@ fn assistant(calls: &[SavedToolCall], blocks: &[ContinuationBlock]) -> AppResult
                     text: text.clone(),
                     additional_params: parameters
                         .clone()
-                        .map(rig::completion::message::AdditionalParams::try_from_value)
+                        .map(rig_core::completion::message::AdditionalParams::try_from_value)
                         .transpose()
                         .map_err(|_| invalid())?
                         .flatten(),

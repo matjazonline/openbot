@@ -1,0 +1,7 @@
+{
+  "binary": "target/debug/deps/open_bots-2b3e2576f848da7e",
+  "sha256": "4d9dbec14fd0deb783274beb55c0939745d535e4fd04e671fb76bec5c76c8972",
+  "exit_code": 0,
+  "elapsed_seconds": 0.009064332999999999,
+  "RUST_MIN_STACK": "unset"
+}

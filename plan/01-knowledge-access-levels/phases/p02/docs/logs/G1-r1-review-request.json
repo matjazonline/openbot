@@ -1,0 +1,32 @@
+{
+  "review_id": "KNOW-P02-G1-R1",
+  "stage": "whole02A\u2013C architecture gate",
+  "start": "bc516908a075b9c7ea1d39bac94b93b9d916e1a8",
+  "base": "bc516908a075b9c7ea1d39bac94b93b9d916e1a8",
+  "head": "bc516908a075b9c7ea1d39bac94b93b9d916e1a8",
+  "installed_digest": "cc9eba720c532477014a738132465fe14511b6402c7c70750a7e372613e02ec7",
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "tree_sha256": "345e57a248a17112aeac38931fdce40255198b6e1823dbbd59254aad39f3310c",
+  "files_count": 3021,
+  "exclusions": [
+    "plan/01-knowledge-access-levels/phases/p02/docs/"
+  ],
+  "installed_exclusion_args": [
+    "plan/01-knowledge-access-levels/phases/p02/docs"
+  ],
+  "decision_path": "plan/01-knowledge-access-levels/phases/p02/docs/logs/G1-r1-decisions.md",
+  "decision_sha256": "11862cda79fec74a0391d8bd378d3831d1552e418fe35ffb4d6d7702b3027e59",
+  "authority_path": "/Users/mac02/dev/openbot-recovery/plan/01-knowledge-access-levels/COORDINATION.md",
+  "authority_revision": 10,
+  "authority_sha256": "5dd0856d242114d043cafaf3d16c93d3268516ea6e8c86738951d8df588fcb42",
+  "applicable": [
+    "KNOW-I001/r1",
+    "KNOW-I002/r1",
+    "KNOW-I003/r1",
+    "KNOW-I004/r1",
+    "KNOW-I005/r1",
+    "KNOW-C001/r1",
+    "KNOW-C002/r1"
+  ],
+  "status": "source pristine, not implemented; decision review only"
+}

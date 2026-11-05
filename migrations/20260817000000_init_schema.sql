@@ -11817,3 +11817,52 @@ BEGIN
 END $$;
 CREATE CONSTRAINT TRIGGER workflow_history_consumption_live AFTER INSERT OR UPDATE ON public.workflow_history_consumptions
     DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_history_consumption_live();
+
+
+-- Library identity uses one Unicode16 fold, independent of the host's libc locale.
+-- The Rust ICU4X2.0 fold is checked against every allowed Unicode scalar in native CI.
+CREATE TABLE public.knowledge_documents (
+    id uuid PRIMARY KEY,
+    company_id uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
+    name text NOT NULL CHECK (char_length(name) BETWEEN 1 AND 253),
+    name_key text COLLATE "C" GENERATED ALWAYS AS (casefold(name COLLATE pg_unicode_fast)) STORED,
+    access_level public.access_level NOT NULL,
+    content text NOT NULL CHECK (octet_length(content) <= 1048576),
+    content_sha256 bytea NOT NULL CHECK (octet_length(content_sha256)=32 AND content_sha256=sha256(convert_to(content,'UTF8'))),
+    uploaded_by uuid NOT NULL REFERENCES public.users(id),
+    revision bigint NOT NULL DEFAULT 1 CHECK (revision>0),
+    created_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (company_id,name_key,access_level),
+    UNIQUE (company_id,id,access_level)
+);
+
+CREATE FUNCTION public.knowledge_embedding_is_valid(vector real[]) RETURNS boolean
+    LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE
+    AS $$
+    SELECT CASE WHEN array_ndims(vector)=1 AND array_lower(vector,1)=1 AND cardinality(vector)=384 THEN
+        array_position(vector,NULL) IS NULL
+        AND NOT vector && ARRAY['NaN'::real,'Infinity'::real,'-Infinity'::real]
+        AND (SELECT abs(sum(value::double precision*value::double precision)-1.0)<=0.001
+             FROM unnest(vector) AS element(value))
+        ELSE false END
+    $$;
+
+CREATE TABLE public.knowledge_chunks (
+    id uuid PRIMARY KEY,
+    company_id uuid NOT NULL,
+    document_id uuid NOT NULL,
+    access_level public.access_level NOT NULL,
+    ordinal integer NOT NULL CHECK (ordinal>=0 AND ordinal<4096),
+    heading text CHECK (octet_length(heading)<=2048),
+    body text NOT NULL CHECK (octet_length(body)<=1048576),
+    embedding_model text NOT NULL CHECK (octet_length(embedding_model) BETWEEN 1 AND 256),
+    embedding real[] NOT NULL CHECK (public.knowledge_embedding_is_valid(embedding)),
+    search_text tsvector GENERATED ALWAYS AS
+        (to_tsvector('simple',coalesce(heading,'') || ' ' || body)) STORED,
+    FOREIGN KEY (company_id,document_id,access_level)
+        REFERENCES public.knowledge_documents(company_id,id,access_level)
+        ON UPDATE CASCADE ON DELETE CASCADE,
+    UNIQUE (document_id,ordinal)
+);
+CREATE INDEX knowledge_chunks_search_idx ON public.knowledge_chunks(company_id,embedding_model,access_level);

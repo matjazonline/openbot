@@ -48,6 +48,12 @@ jobs:
         run: |
           scripts/tests/deploy.sh
           scripts/tests/credential-key-rotation.sh
+      - name: Knowledge artifact preparation tests
+        run: python3 scripts/tests/knowledge-model-prepare.py
+      - name: Knowledge model production image and early memory budget
+        run: |
+          docker build --tag openbot-knowledge-ci .
+          python3 scripts/check-knowledge-image.py --image openbot-knowledge-ci
       - name: Formatting
         run: cargo fmt --all -- --check
       - name: Patch whitespace
@@ -109,6 +115,12 @@ jobs:
         run: |
           cargo test --locked --offline --lib dump_html_injection_browser_fixtures -- --ignored
           node --test scripts/tests/team-autocomplete-browser.mjs scripts/tests/html-injection-browser.mjs
+      - name: Knowledge library native form browser protocol
+        env:
+          KNOWLEDGE_BROWSER_FIXTURES: /tmp/knowledge-browser
+        run: |
+          cargo test --locked --offline --lib dump_knowledge_browser_fixtures -- --ignored
+          node --test scripts/tests/knowledge-browser.mjs
       - name: Session revocation browser protocol
         env:
           SESSION_REVOCATION_BROWSER_FIXTURES: /tmp/session-revocation-browser
