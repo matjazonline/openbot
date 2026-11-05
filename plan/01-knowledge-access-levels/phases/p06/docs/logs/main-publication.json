@@ -1,0 +1,12 @@
+{
+  "published_main": "411a95ef7f52e43a9f60fddb9370c1f00e50a468",
+  "origin_main_verified": "411a95ef7f52e43a9f60fddb9370c1f00e50a468",
+  "whole_plan_complete": true,
+  "all_six_phases_independently_accepted": true,
+  "authority_revision": 24,
+  "authority_sha256": "adcb7e538bb0f63433e72244c8e447cf051699325435626d52d7e5eaadca9fcd",
+  "user_verification_preference": "targeted only persists",
+  "next_authorized_plan": "plan/02-autonomous-agent",
+  "source_commit": "0d5197191c4cafc584dffc378bde90a88acda7b3",
+  "accepted_source_tree": "bf18a25b1a286ed8a58518f483dc38a6a63ba85fa6ba301cdf9082409abf7b54"
+}
