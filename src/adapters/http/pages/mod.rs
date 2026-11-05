@@ -196,3 +196,5 @@ pub mod company_typesafe;
 
 #[cfg(test)]
 mod team_level_tests;
+
+pub(crate) mod connection_levels;

@@ -448,7 +448,7 @@ pub(crate) async fn workflow_delivery_admission_on(
             .await?;
     let actor = WorkflowActor::authenticated(actor)?;
     match super::super::authority::authorize_company(db, company, actor).await {
-        Ok(()) => {}
+        Ok(_) => {}
         Err(AppError::NotFound(_)) => {
             return Ok(WorkflowDeliveryAdmission::Refuse(
                 DeliveryCancellationReason::WorkflowRevoked,

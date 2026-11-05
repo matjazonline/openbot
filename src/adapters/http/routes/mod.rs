@@ -10,6 +10,7 @@ pub mod attention;
 pub mod channel;
 pub mod company;
 pub mod company_invite;
+mod connection_levels;
 pub mod health;
 mod live_updates;
 pub mod mcp;
@@ -82,6 +83,7 @@ pub fn router(sessions: Arc<SessionAuthority>) -> Router<AppState> {
         .merge(apple_auth::protected_router())
         .merge(company::router())
         .merge(mcp::router())
+        .merge(connection_levels::router())
         .merge(ui_mcp::router())
         .merge(company_invite::router())
         .merge(channel::router())

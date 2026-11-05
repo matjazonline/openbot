@@ -22,8 +22,14 @@ impl ActionIntents for PostgresPersistence {
         let mut tx = self.pool().begin().await?;
         sqlx::query("SELECT set_config('lock_timeout','5s',true), set_config('statement_timeout','5s',true)")
             .execute(&mut *tx).await?;
-        // The run is always locked first, matching cancellation/progression and future dispatch.
         let scope = action.scope();
+        // Authority before run, matching dispatch and company/member writers. Existing immutable
+        // intents can replay even after closure; only a new freeze needs current authority.
+        if read(&mut tx, action).await?.is_none() {
+            super::action_authority::prelock_on(&mut tx, scope)
+                .await?
+                .ok_or_else(missing)?;
+        }
         let active: bool = sqlx::query_scalar(
             "SELECT state IN ('queued','running') AND deadline > clock_timestamp() FROM workflow_runs \
              WHERE company_id=$1 AND id=$2 FOR UPDATE",
@@ -58,19 +64,25 @@ async fn read(db: &mut PgConnection, action: &FrozenAction) -> AppResult<Option<
 
 async fn insert(db: &mut PgConnection, action: &FrozenAction) -> AppResult<IntentRow> {
     let scope = action.scope();
+    let levels = super::knowledge_release::evaluate_on(
+        db,
+        action,
+        super::knowledge_release::MessageRecipients::Current,
+    )
+    .await?;
     let decision = match action.decision() {
         ActionPolicyDecision::Unevaluated => "unevaluated",
         ActionPolicyDecision::ApprovalRequired => "approval_required",
     };
     Ok(sqlx::query_as::<_, IntentRow>(
         "INSERT INTO workflow_action_intents \
-         (company_id,run_id,execution_id,id,operation_key,operation_digest,argument_digest,idempotency_key,operation,policy_decision) \
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) \
+         (company_id,run_id,execution_id,id,operation_key,operation_digest,argument_digest,idempotency_key,operation,policy_decision,content_level_at_freeze,destination_level_at_freeze) \
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::smallint,$12::smallint) \
          RETURNING id,operation,argument_digest,idempotency_key,policy_decision",
     ).bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid())
         .bind(Uuid::new_v4()).bind(action.operation_key().as_str()).bind(action.operation_digest().as_str())
         .bind(action.argument_digest().as_str()).bind(action.idempotency_key().as_str())
-        .bind(action.saved_operation()).bind(decision).fetch_one(db).await?)
+        .bind(action.saved_operation()).bind(decision).bind(levels.content.as_i16()).bind(levels.destination.as_i16()).fetch_one(db).await?)
 }
 
 fn restore(action: &FrozenAction, row: IntentRow, replayed: bool) -> AppResult<ActionIntent> {

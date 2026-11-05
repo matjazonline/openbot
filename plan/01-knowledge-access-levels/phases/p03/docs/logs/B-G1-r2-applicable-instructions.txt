@@ -1,0 +1,863 @@
+These rules apply across the repository. More specific guides under `src/` add source-level and
+subsystem rules.
+
+# No backward compatibility
+
+We don't need backward compatibility and will reset the database when needed. Do not add data
+backfills, dual reads/writes, legacy decoders, compatibility shims, or staged rollouts for existing
+data; when a schema or payload change does not apply cleanly to existing rows, reset the database.
+Every plan under `plan/` carries this note, and new plans must too. `serve` logs it as a warning
+at startup, listing every file that carries it (`NO_BACKWARD_COMPATIBILITY_NOTES` in
+`src/main.rs`); add a new plan's path there as well.
+
+# Keep builds and deployment secure and reproducible
+
+Run the production image as a non-root user unless a narrowly documented capability is required
+for a privileged port. Prefer capability-based port binding or an outer proxy over running the
+whole application as root.
+
+Pin git dependencies by revision or tag in addition to committing the lockfile. Production
+documentation and examples must name configuration keys the application actually reads and must
+not promise validation that startup does not perform.
+
+CI must exercise formatting, offline compilation, migrations, and the database-backed test suite.
+When adding or changing a concurrency protocol, include a test with competing claimants rather
+than relying only on sequential mocks.
+
+# Keep verification focused during implementation
+
+- During implementation, run the smallest meaningful set of tests covering each changed behavior
+  and its affected interfaces. Use focused unit tests and relevant database-backed tests for
+  individual plan steps or batches; do not rerun the full suite after every batch.
+- Run the full verification suite once the entire task is implemented, before declaring
+  completion, including formatting, offline compilation, migrations, and database-backed tests.
+  Documentation-only changes do not require the Rust or database-backed suites.
+- Run broader checks earlier when changes affect shared infrastructure or cross-cutting behavior.
+  After final-verification fixes, rerun affected checks; repeat the full suite when the impact
+  warrants it.
+- Implementation plans must specify per-batch focused checks and a final full-suite gate. Record
+  commands and results, explicitly report unavailable checks, and do not claim full verification
+  when required checks could not run.
+
+# A raised limit must leave something that fails when it is approached again
+
+Raising a bound to clear a failure also removes the signal that the bound was being approached, and
+the next report of it is a crash rather than a red build. So when you raise one, say what now
+fails early instead, and keep that in CI.
+
+The worked example is stack size. `.cargo/config.toml` gives test threads 16 MiB so the agent chain
+cannot overflow them — which on its own would let that chain grow twelvefold unnoticed, and it had
+already grown silently once. `scripts/stack-budget.sh` re-runs the suite at the stock 2 MiB and is
+the thing that actually catches it. When it fails, shrink the chain before raising
+`STACK_BUDGET_KIB`, and record the reason either way. Its threshold is calibrated per platform, so
+treat a first failure on new hardware as calibration, not regression.
+
+Settings that bound the same resource for different threads move together:
+`RUNTIME_THREAD_STACK_BYTES` covers the threads the process spawns, `RUST_MIN_STACK` covers the
+ones libtest spawns, and neither covers the other.
+
+<!-- graft:start -->
+## Graft — repo context graph
+
+This repo is indexed in `graft/`: small linked markdown nodes that explain each
+system and carry exact file:line spans, kept in sync with the code through git.
+
+For ANY task here — understanding how something works, finding where code lives,
+or scoping a change — get context from the graph before grepping or opening
+source files. Re-ask freely (it's cheap) and reuse literal identifiers you
+already have (symbol, error string, file name) as the query. New to this repo?
+Run `graft map` first — a token-budgeted orientation (dir clusters, hubs,
+hotspots), no LLM, no key.
+
+- Run `graft ask "<your question>" --source` → ranked nodes with the relevant
+  code spans inlined (each hit's ≤8-line crux by default; `--full` for whole
+  definitions when the crux isn't enough). Match the tool to the task shape:
+  for understanding or editing, the top node IS the answer — cite its
+  `covers:` file:line spans and edit straight from `--source`. For
+  exhaustive tasks ("every occurrence / every caller of this pattern"), ranked
+  results are top-N, not complete — run `graft grep "<literal>"` instead
+  (exhaustive over indexed files, grouped by enclosing symbol), falling back
+  to raw `grep -rn` only for unindexed files.
+- `graft skeleton <file>` → every definition's signature + span, ~10× cheaper
+  than reading the file; use it to skim an API surface.
+- `graft callers <symbol>` gives precomputed, exact edges — who calls this.
+  Add `--direction out` for what it calls, or `--depth N` to walk
+  transitively for the full blast radius. For structural questions, skip
+  ranking and use this directly.
+- Or browse: `graft/INDEX.md` lists every node; follow the links.
+- Monorepos and folders of multiple repos rank fairly across sub-projects —
+  hits carry `[scope/]` labels naming which one they're from. Narrow with
+  `graft ask "<task>" --in <scope>/` once you know where you're working.
+
+If a returned span is truncated ("+N more lines"), open the file at that exact
+range before finalizing. Only open source files when a node genuinely lacks a
+needed detail, and then at the exact file:line the node points to — never
+re-read whole files.
+
+After big code changes, refresh the graph with `graft build` (deterministic,
+no API key, $0).
+<!-- graft:end -->
+These rules apply to code you write *and* to code you touch. When you edit a function that
+already breaks one of them, don't extend the violation — extract the part you're changing into a
+well-shaped helper and leave the rest alone. Do not treat the longest function nearby as the house
+style: `ingest_normalized_message_with_source` and `execute_agent_and_dispatch_inner` in
+`src/application/use_cases/thread.rs` are the anti-examples these rules were written from. Both are
+gone — `thread/ingest/` is what the first one became — but the rules they earned are not.
+
+# Newtypes over bare `String`
+
+When a value is a `String`/`&str` that represents a specific domain concept — and especially
+when two such strings of *different* meaning are ever passed around together (as sibling struct
+fields, or as adjacent function parameters) — wrap it in a newtype instead of leaving it as a bare
+`String`. A bare `String` lets the compiler accept a swapped argument order or a value from the
+wrong context silently; a newtype turns that mistake into a compile error.
+
+Reach for this especially when:
+- Two `String`-typed values of different meaning are passed positionally to the same function
+  (e.g. a company slug and a channel slug to the same lookup call) — the classic argument-swap bug.
+- A value is used as a `HashMap`/cache key alongside other unrelated strings built the same way
+  (e.g. `.trim().to_lowercase()`), where it's easy to build the key from the wrong source field.
+- A value has real parsing/comparison rules of its own (e.g. case-insensitive email matching)
+  that currently get re-implemented ad hoc at every call site instead of living on the type.
+
+Existing newtypes live in `src/domain/entities/value_objects.rs`
+(`CompanySlug`, `ChannelSlug`, `EmailAddress`, `MessageId`, `ThreadIndex`), built on a shared
+`string_newtype!` macro. Each one derefs to `str` (so `.trim()`, `.eq_ignore_ascii_case()`, etc.
+keep working unchanged) and implements `Display`/`From<String>`/`From<&str>`, so introducing a new
+one is a small, low-risk addition — prefer extending that module over hand-rolling a wrapper.
+
+Don't reach for a newtype for a `String` field that's genuinely generic free text (names,
+subjects, message bodies) or that never travels alongside a same-typed sibling — that's needless
+ceremony, not safety.
+
+Statuses that arrive as strings are the same problem one level up. A field compared with
+`eq_ignore_ascii_case("fail")` at three call sites (`spf_status`, `dkim_status`, `dmarc_status`)
+should be parsed into an enum once at the adapter boundary, so the *match* is exhaustive and a
+new variant is a compile error rather than a silently-passing check.
+
+# Split a function along the phases it already has
+
+Trigger to act, not to debate: a function past **~80 lines**, past **3 levels of nesting**, or
+carrying more than **~6 live `let mut` accumulators**. Any of those means it should be split now,
+while you're in it.
+
+The seam is almost always already marked. `ingest_normalized_message_with_source` contained
+`// Global SPF / DKIM / DMARC ...`, `// Inter-channel hop limit check`, `// ACL & Participant
+Restriction Check`, `// Thread Resolution`, `// Thread Turn Limit Check` — each of those comments
+was a function that had not been extracted, and each is now one (`guard_ingress`,
+`resolve_addresses`, `authorize_channel`, `resolve_thread`, `exceeds_turn_limit`). **A section
+comment inside a function body is a naming opportunity: turn it into a `fn` name and delete the
+comment.**
+
+The decomposition that fits this codebase, in order:
+
+1. **Guard phase first.** Cheap rejections that need no I/O (auth headers, hop count, auto-reply)
+   move into one `fn` returning `Option<InboundIngestResult>` — or better, a small
+   `Result<(), RejectReason>`. The caller becomes a handful of `?`-style early returns.
+2. **One iteration, one helper.** A `for` loop whose body is 200 lines is a helper taking one item
+   and returning an *outcome enum* (`Matched(..) / Skip / Bounce(..) / Reject(..)`), with the loop
+   reduced to a `match` that pushes into the right accumulator. Return an enum, not a bool plus
+   three out-params.
+3. **Pure decisions, separately.** Anything that takes already-loaded data and returns a verdict —
+   "is this sender authorized for this channel", "which recipients are third parties", "does this
+   spam score pass" — is a free function or a method on the domain entity with no `async`, no
+   `self`, no persistence. Those get unit tests with no mocks at all.
+
+Prefer `let ... else` and early `continue` over another `if let` nesting level. If you're at
+column 30, the fix is an extraction, not a rustfmt reflow.
+
+# Keep `async fn` chains shallow
+
+An unoptimized `async fn` poll frame materialises the child future it constructs, so every level of
+`await` nesting costs real stack. `process_claimed_task_until_shutdown` was one line —
+`self.process_claimed_task_inner(task, Some(shutdown)).await` — and cost **200 KiB**. The
+task-worker → dispatch → agent-runner chain reached 1,997 KiB of a 2,080 KiB thread stack and
+aborted the process inside serde_yaml, parsing an agent config that was nothing unusual. Optimized
+builds cost several times less, so this is a rule about the builds tests and development run on —
+which is where it will bite you.
+
+**This qualifies the rule above: splitting one `async fn` into two that call each other adds a
+level and makes the stack worse.** What actually reduces it, in order:
+
+1. **Extract a synchronous helper.** A non-`async fn` contributes no future and no frame at all —
+   the "pure decisions, separately" rule paying off a second way. `build_agent` went 292 KiB → 174
+   KiB by moving everything but its two `await`s into `builder_with_provider` and
+   `build_with_tools`.
+2. **Delete a level.** An `async fn` that only forwards, or only adapts an argument, is pure cost;
+   never add one.
+3. **`Box::pin` the seam.** At a call descending into the agent, a provider, or any external
+   runtime, the parent then holds a pointer rather than the whole state machine. Say why in a
+   comment — these read as noise and get tidied away otherwise.
+
+For enums crossing an async phase boundary, box every payload large enough to dominate the enum;
+boxing only the currently largest variant can merely make the next variant oversized. Keep
+`clippy::large_enum_variant` enabled as the early failure signal.
+
+The chain above is now 336 KiB. `scripts/stack-frames.sh` prints what each frame costs: measure
+before and after rather than reasoning about it.
+
+# One decision, one place
+
+Before writing a lookup or derivation, grep the file for it — this codebase's large functions
+re-implement the same three things repeatedly:
+
+- building the `Vec<MessageId>` lookup key from `in_reply_to` + `references` (4+ copies),
+- deciding `is_trusted_participant` from `channel.participant_emails` + `@public` + team
+  membership (3+ copies, in two different functions),
+- the memoize-in-a-local-`HashMap` dance for company / channel / membership lookups.
+
+Each copy is a place where a rule can drift out of sync with the others, and the participant one
+is an *authorization* rule. Extract to a named helper the first time you'd write the second copy;
+when the logic belongs to an entity (participant rules → `Channel`, thread references →
+`ParsedEmail`), put it there rather than in a free function in the use case.
+
+Inline memoization specifically: `if let Some(cached) = cache.get(&k) { .. } else { let loaded =
+...; cache.insert(k, loaded.clone()); loaded }` should never appear twice. Give it a small struct
+(e.g. a `LookupCache` holding the persistence handles and its maps) with `async fn company(&mut
+self, slug) -> Option<Company>` methods. That also stops the "which of my five `HashMap`s does
+this key belong to" class of bug.
+
+# Name your tuples
+
+`Vec<(Company, Channel, RecipientRole, usize, usize)>` and `Vec<(&ChannelMatch, String,
+Option<String>, Option<serde_json::Value>)>` are unreadable at the point of use and force
+`|(company, _, _, _, _)|` patterns that break on every field addition. Any tuple with **3+
+elements**, or with two same-typed elements (`usize, usize` — step index and total steps, in that
+order, hopefully), becomes a struct with named fields. `ChannelMatch` in this same file is the
+model to copy.
+
+# No flag parameters
+
+`execute_agent_and_dispatch_inner(&ingest, send_email, task_already_claimed,
+Some(worker_id))` is unreadable at the call site and couples two behaviours in one body. When a
+bool parameter selects *behaviour* rather than carrying data:
+
+- if the variants share little, keep them as separate public functions with the shared middle
+  extracted — not a private `_inner` with a bool matrix;
+- if they share a lot, pass one enum (`TaskClaim::AlreadyClaimed(worker_id) |
+  TaskClaim::ClaimHere`) that makes illegal combinations unrepresentable — `task_already_claimed:
+  false` with `claimed_worker_id: Some(..)` currently compiles fine and means nothing.
+
+Never add a fourth positional parameter to a function that already takes two bools.
+
+# Don't collapse errors into defaults on authorization paths
+
+`.await.ok().flatten()` and `.await.unwrap_or(false)` turn a database outage into a *decision*.
+`is_company_team_member(...).await.unwrap_or(false)` reads "on error, treat the sender as an
+outsider", and the sibling `get_by_slug(...).ok().flatten()` reads "on error, this company does
+not exist" — one of those fails closed by luck and the other silently bounces legitimate mail.
+
+Rule: any fallible call whose result feeds an authorization, authentication, or dedup decision
+propagates with `?`. Use `.unwrap_or_default()` only for genuinely optional enrichment (display
+names, suggestion lists, telemetry). If you deliberately want a fallback, write the `match` with
+an explicit `Err(e) => { warn!(...); <fallback> }` arm so the choice is visible and logged.
+
+# Keep the file and its test module navigable
+
+A 5,000-line module is a merge-conflict magnet and blows past what can be held in context at once.
+When a file crosses **~1,000 lines**, split it into a directory module (`thread/mod.rs` +
+`thread/ingest/` + `thread/message_write.rs`) along the phase boundaries above.
+
+Inline `#[cfg(test)] mod tests` is the convention here — keep it. But when the test module itself
+crosses **~500 lines**, move it to a sibling file (`#[cfg(test)] #[path = "thread_tests.rs"] mod
+tests;`), and hoist hand-written mocks (`MockCompanyPersistence`, `MockThreadPersistence`, …) into
+one shared `test_support` module instead of re-declaring them per file, as
+`use_cases/thread/test_support.rs` does. Most of a mock's size is decision logic that isn't pure —
+following the extraction rule above deletes most of the need for it.
+
+A test that wants a real database takes one from `adapters::persistence::test_support`, wherever in
+the tree it lives: `test_pool` for the shared test database, `own_database` for a migrated database
+of its own — required for any test that calls an unscoped claim or sweep, or asserts on whole-table
+state. `src/adapters/persistence/AGENTS.md` has the rules either choice commits you to.
+
+# Regenerate sqlx query metadata after touching SQL
+
+**Whenever you add or change a SQL query, regenerate it and commit the result:**
+
+```sh
+DATABASE_URL="postgres://$(whoami)@localhost:5432/open_bots" \
+  cargo sqlx prepare -- --all-targets
+```
+
+This refreshes the `.sqlx/` offline query cache that `cargo build` relies on in environments
+without a live `DATABASE_URL` (Fly.io deploy included — see `docs/deploy.md`). A stale `.sqlx/`
+cache after a query edit either fails the build there or, worse, silently keeps building against
+the old query shape. Requires `sqlx-cli` (`cargo install sqlx-cli --no-default-features --features
+postgres,rustls`) and a local Postgres reachable at that URL.
+
+# Bound work at every external boundary
+
+Anything driven by a client, peer, provider, queue row, or stored payload needs an explicit bound.
+Choose and enforce the bound at the boundary: body/message and line size, recipient/item count,
+connection and worker concurrency, operation and idle timeout, retry/attempt count, prompt-token
+budget, pagination, and data retention. Advertising or documenting a limit without rejecting input
+that exceeds it is not enforcement.
+
+Make overload produce a controlled rejection, backoff, or terminal state. Do not let the default
+failure mode be unbounded allocation, an immortal task, a hot retry loop, or one tenant consuming
+the entire worker pool. Defaults exposed on public listeners must be safe for production rather
+than relying on every deployment to override them.
+
+# Own background work through shutdown
+
+Do not detach correctness-critical work with an untracked `tokio::spawn`. Keep its `JoinHandle` (or
+put it in a supervised `JoinSet`), propagate cancellation into the actual work, and await it during
+bounded graceful shutdown. Dropping a `JoinHandle` does not cancel the task it represents.
+
+When shutdown or lease loss interrupts durable work, either release ownership safely or leave a
+short, recoverable lease whose expiry consumes an attempt. A deploy must not silently discard a
+notification, keep making side effects after ownership is lost, or strand work for a full lease
+period without retry accounting.
+
+# Preserve dependency direction
+
+The domain remains independent of application and adapters. The application layer describes the
+ports it needs; adapters implement them. Application code must not import transport, framework, or
+database implementation types such as `lettre`, `axum`, or `sqlx`, and an abstraction must not live
+inside the outer adapter it is intended to abstract.
+
+When touching an inverted dependency, move or introduce the port in the consuming inner layer and
+adapt the implementation rather than adding another upward import. Port traits must not use
+silently-successful default methods for correctness operations such as authorization, lease
+renewal, completion, or durable writes; require every implementation and test double to state its
+behavior.
+
+# Make operations traceable without leaking data
+
+Initialize structured tracing before configuration validation, migrations, storage checks, or any
+other fallible startup work. Accept or create one correlation id at ingress, echo it where the
+protocol permits, and carry it as structured data through the message, task, agent, and delivery
+stages. Log identifiers and state transitions as fields, not as opaque interpolated sentences.
+
+Never record secrets, credentials, session or approval tokens, raw authorization headers, full
+request structs, or full message bodies in spans. Log addresses and other PII only where the
+operational need is explicit and the configured level is appropriate. Metrics needed for alerts
+must distinguish retries, terminal failures, lease loss, and stuck work; in-process counters alone
+are not durable or multi-instance observability.
+These rules govern orchestration in `src/application/` in addition to `src/AGENTS.md`. Application
+code coordinates domain decisions through ports; it does not become a transport or persistence
+adapter.
+
+# Define ports where they are consumed
+
+Persistence, mail delivery, storage, clocks, and provider calls used by application services are
+traits owned by the application (or by the domain when genuinely domain-level). Their concrete
+SQLx, lettre, Axum, cloud, and network implementations live under `src/adapters/` or `src/infra/`.
+Do not import an adapter merely to reach the trait it defines; relocate the port and have the
+adapter implement it.
+
+Keep ports cohesive. Split a broad trait instead of adding optional methods with safe-looking
+defaults. Lease renewal, authorization, durable writes, and state transitions have no default
+implementation: every production adapter and mock must implement them explicitly.
+
+# Durable effects form one logical commit
+
+If a response requires an outbox row, a stored thread message, and a task payload transition, make
+those changes agree in one transaction exposed through a purpose-specific port method. A crash
+must not leave an email delivered without the corresponding durable state or cause a retry to pay
+for a second provider call whose output can no longer be stored.
+
+Every retryable workflow uses a stable idempotency key derived from the logical operation, not the
+attempt. Document unavoidable at-least-once delivery and preserve the stable outbound Message-ID.
+Fire-and-forget is not acceptable for bounces, stop notices, confirmation messages, or any other
+notification whose loss changes user-visible behavior; enqueue it durably.
+
+# Losing ownership cancels the real work
+
+Wrap the work itself in cancellation. Do not spawn an inner agent future and then lease only the
+outer `JoinHandle`: dropping that handle leaves the agent running. On lease loss or task
+suspension, cancel and await the inner operation before another worker may begin, and make every
+side-effecting step re-check current ownership immediately before committing.
+
+Lease expiry and abnormal worker death consume an attempt. Cap retries, apply backoff, and move a
+poison task to an observable terminal state. Completion after lease expiry must not leave a row in
+an endlessly reclaimable state.
+
+# Bound execution and distribute capacity
+
+Agent/provider execution has a wall-clock deadline in addition to lease heartbeats. Bound tool
+rounds, prompt history by tokens rather than message count, and fetched history to the columns the
+prompt uses. Load shared history once per logical thread rather than inside a per-channel loop.
+
+Use a bounded worker pool with explicit global and per-tenant concurrency or fairness. A stuck run
+must not block all task processing, and one tenant's burst must not starve every other tenant.
+Token counters are not budgets by themselves: enforce configured spend/rate limits before invoking
+the provider.
+
+# Keep failure states distinct from replies
+
+An execution error is task state, not customer-authored response text. Do not save or email raw
+provider errors as an agent reply, and do not detect retry state by matching a message prefix.
+Classify errors explicitly as retryable, terminal, suspended, or successfully replied; only the
+last category enters the outbound response path.
+
+Any parked state such as approval, quorum, or scheduled materialization needs a deadline, a
+sweeper, and a terminal transition. Pending queries must claim with a lease/backoff or exclude
+failed rows so a fixed set of poison records cannot monopolize a batch and hot-spin the poll loop.
+
+A full claim batch justifies the worker's `MoreWaiting`/zero-delay decision only when persistence
+has transitioned those rows out of the claimable set. Failed or unchanged rows are not evidence of
+additional backlog. For every retryable worker queue, add a poison-batch regression test: fill one
+batch with failures, run two consecutive iterations without advancing time, and prove the second
+iteration does not reclaim the same rows.
+
+# Treat prompt input as untrusted data
+
+Delimit inbound content from system instructions and label it as untrusted. Tool approval remains
+the security boundary: select an approver by an explicit deterministic policy, propagate directory
+lookup errors, and fail closed on malformed approval configuration. A phrase blocklist or optional
+LLM guardrail may be defense in depth, never the authorization decision.
+These rules apply whenever you change the **model**: adding, renaming, retyping or removing a field
+on a persisted domain entity (`src/domain/entities/*`), or changing the table behind one. They are
+in addition to `src/AGENTS.md`, which still governs style — read the sqlx section there too. The
+last section here, on SQL style, applies to any query you touch in this directory, model change or
+not.
+
+A one-field change is never one edit. It lands in seven places, and the compiler only finds five of
+them. Work the list in order; the two it cannot find are steps 2 and 7.
+
+# No backward compatibility
+
+We don't need backward compatibility and will reset the database when needed (see the root
+`AGENTS.md`). Where the sections below call for backfills, legacy-row handling, staged or
+additive compatibility rollouts, legacy credential reads, or `#[serde(default)]` to keep old
+payloads decodable, skip that work and reset the database instead. Constraints, fallible decoding,
+lease fencing, and the database-backed tests still apply.
+
+# Preserve invariants at the database boundary
+
+Application checks are useful error messages, not substitutes for constraints. If a relationship
+is tenant-scoped, the tenant identifier must participate in the foreign key. Do not model two facts
+such as `(company_id -> companies)` and `(channel_id -> channels)` when the real invariant is
+`(company_id, channel_id) -> channels(company_id, id)`. The same applies to join tables: every side
+must be proven to belong to the same tenant, rather than independently referencing valid rows.
+
+Before adding a composite foreign key:
+
+- query for existing mismatches and decide how they will be repaired;
+- add the required composite `UNIQUE` key on the referenced table when necessary;
+- pre-release, edit the constraint in the init schema and verify it on a freshly migrated schema
+  (once compatibility is required: an additive migration, validated before weaker constraints are
+  removed); and
+- add a rollback-only or transaction-scoped database test that demonstrates the invalid
+  cross-tenant row is rejected.
+
+Keep tenant identifiers in writes even when they appear derivable. They make scoping explicit and
+support composite constraints; derivability alone is not a reason to drop them.
+
+# Carry the discriminator; never re-assert it as a literal
+
+The same rule one column over. The memory tables (removed in p08; the lesson stands) were keyed on
+a discriminator plus an id: `(company_id, provider)` on `memory_provider_connections`,
+`(provider, remote_database_id)` on `memory_remote_resource_lifecycles` and `memory_cleanup_jobs`.
+A query that already has the discriminator in scope — returned by a CTE, read off the job row, held
+in `companies.memory_provider` — and then filters on the literal `'hydradb'` instead compiles,
+passes every test, and is wrong the moment a second value exists.
+
+Three shapes, all found in one sweep:
+
+- **The wrong row is updated.** `complete_provisioning` matched the lifecycle on
+  `completed_job.provider`, dropped it from `RETURNING`, then updated `... AND connection.provider
+  = 'hydradb'`. A second provider's job would flip the first provider's connection to `ready`.
+- **A no-op is misread as a lost lease.** That same predicate matching nothing returns no row,
+  which the worker reads as "another execution owns this" — so the job retries until its budget is
+  gone.
+- **Teardown is silently skipped.** `delete_company_with_cleanup` selected lifecycles `WHERE
+  provider = 'hydradb'`, so a company holding any other provider's remote data would be deleted
+  with no lifecycle retirement and no cleanup job. The remote data is orphaned and nothing left
+  behind records that it exists.
+
+A discriminator in a `WHERE`, a `RETURNING`, or a `.bind()` comes from the row you just read or
+from a parameter. A literal is acceptable only when you are deliberately scoping to one value, and
+then say why in a comment. When a CTE matches on a discriminator, return it and join the outer
+statement on it rather than restating the value.
+
+A single-variant enum makes all of this unverifiable. While `MemoryProviderKind` had only
+`Hydradb`, every one of these sites was a tautology and the suite was green. Treat "this enum has
+one variant today" as a reason for more care in the query, not less, and do not expect a test to
+catch you.
+
+# Multi-step work needs a durable unit of execution
+
+Advancing a cursor, disabling a one-off schedule, creating domain rows, and enqueueing work in
+separate transactions is not a reliable workflow. An ordinary `Err` cleanup cannot recover from a
+process crash between commits. For work that crosses transactions:
+
+- create a durable run/idempotency record in the same transaction that claims or advances the
+  source record;
+- give each logical occurrence a stable unique key (for schedules, the schedule plus logical
+  slot), not a fresh key generated on every retry;
+- make every materialization step resumable and idempotent from that record; and
+- treat partial thread/message/task creation as recoverable state, not as something a best-effort
+  release function can undo.
+
+When the state changes truly must agree, keep them in one transaction. When they cannot fit in one
+transaction, persist the workflow state and resume it.
+
+# Fence leases to an execution, not merely a row
+
+Any claimed/reclaimable operation must prevent a stale worker from completing the replacement
+worker's execution. Store a claim generation or execution UUID and require it in every renewal,
+completion, failure, and attempt-ledger update. A task id plus attempt number is insufficient when
+an expired attempt row can be reopened; worker id alone is also insufficient if worker ids may be
+reused.
+
+Preserve the existing atomic claim shape: one `UPDATE ... FROM` selection using `FOR UPDATE SKIP
+LOCKED`, deterministic ordering, and a bounded limit. Queue claims are intentionally global rather
+than tenant-scoped. Do not add tenant filtering to worker claims unless the worker architecture is
+being deliberately redesigned.
+
+For remote resources, the execution fence must survive deletion of its owning row. Transactionally
+set durable desired state to `absent`, detach the lifecycle row, and enqueue reconciliation before
+deleting the owner. Provisioning completion must match the current generation and desired state;
+cleanup may accept `404` only after the bounded provider-operation quiescence deadline has passed.
+
+# Encode queue state machines as constraints
+
+Status and lease columns are one state machine. Add database checks that make incoherent states
+impossible: an in-flight row has an owner and expiry, while pending/terminal rows do not retain
+lease data. Recovery and dashboard queries must classify an in-flight row with missing lease data
+as stalled; a predicate such as `lock_expires_at <= CURRENT_TIMESTAMP` does not match `NULL`.
+
+Audit and repair existing rows before validating a new constraint. Mirror the strongest existing
+queue constraint rather than inventing subtly different semantics for each queue.
+
+When a domain decision is implemented in both Rust and SQL, keep one generated definition or add a
+database-backed equivalence matrix that exercises every case. A `debug_assert!` only checks the
+path and build modes that happen to execute it, so it is not a sufficient drift guard.
+
+Audited state transitions carry typed reason and actor data explicitly. Never recover an audit
+reason by parsing free-text errors or silently substitute a specific reason when none is known;
+unclassified transitions remain observably unknown. Notification triggers fire only for material
+state changes, not for writes that leave the notified state unchanged.
+
+# Preserve the existing correctness guards
+
+Do not weaken these patterns while refactoring adjacent persistence code:
+
+- completion, failure, payload replacement, and lease renewal stay conditional on the current
+  worker owning a live lease;
+- approval consumption stays atomic, status-checked, and expiry-checked;
+- workflow run, job, decision and delivery changes that must agree stay transactionally grouped;
+- message deduplication verifies the canonical content hash before reusing an existing message id;
+- dynamic list filters remain bound parameters (for example through `QueryBuilder`), never string
+  interpolation; and
+- password and confirmation material remains one-way hashed.
+
+When a proposed simplification removes one of these predicates or transaction boundaries, assume
+it changes correctness until a concurrency or adversarial database test proves otherwise.
+
+# Treat persisted JSON as untrusted, versioned input
+
+Never `expect` a JSONB value from the database to deserialize. Manual SQL, older application
+versions, and imports can all create shapes the current Rust type does not accept. Convert
+fallibly, attach row/type context to the `AppError`, and let the caller decide whether one bad row
+should fail a request or be quarantined.
+
+Inventory existing shapes before adding a JSON constraint. If the format is stable enough to
+constrain, include an explicit version/discriminator and roll the constraint out compatibly. This
+is separate from the `#[serde(default)]` rule below: defaults preserve old valid payloads; fallible
+decoding protects the process from invalid ones.
+
+# Secrets need their own persistence boundary
+
+Provider credentials must not be ordinary plaintext fields selected into general-purpose domain
+entities. New secret storage must use application-boundary envelope encryption (or the project's
+designated KMS), record a key version, and expose narrow credential-specific reads. List/detail
+projections should omit ciphertext as well as plaintext unless the caller explicitly needs the
+secret.
+
+Pre-release, a credential schema change edits the init schema and resets the data instead of
+staging legacy reads or backfills; rotate the external credentials where the change exposes them.
+Once compatibility is required, a credential migration requires staged compatibility: support
+legacy reads, backfill encrypted values, switch writers/readers, remove plaintext, and rotate the
+external credentials. Do not log,
+serialize into durable task payloads, derive debug output from, or return secret material in broad
+entities.
+
+# Change performance only from production evidence
+
+Do not add an index or rewrite pagination solely because a query looks expensive on fixtures.
+Collect representative `EXPLAIN (ANALYZE, BUFFERS)` output plus table and index statistics first.
+Pay particular attention to correlated subqueries per result row, expressions with the parameter
+on the left side of `LIKE`, time-window filters unsupported by index prefixes, and large offset
+pagination. Record the before/after plan with the change.
+
+Keep cursor ordering deterministic with a unique tie-breaker (normally timestamp plus UUID). Offset
+pagination is acceptable for bounded administrative pages; replace it only when observed offsets
+and plans justify the API change.
+
+A bounded result set does not imply bounded database work. Apply time and status eligibility meant
+to prune retained history before aggregation or large joins, then verify the pruning with
+representative `EXPLAIN` output. Replace per-parent query loops with bounded batch reads.
+Operational views must cap their working set and visibly report truncation rather than silently
+returning partial data.
+
+When an optimization is deliberately deferred pending production evidence, add a named duration or
+working-set metric, or a threshold log, that can supply the evidence needed to revisit it.
+
+# 1. Migration
+
+Pre-release (remove before the first production deploy, together with the startup warning in
+`src/main.rs`): nothing is deployed and existing data is not preserved.
+`migrations/20260817000000_init_schema.sql` is the only migration and holds the whole schema: a
+schema change edits it in place, and the development and test databases are dropped and recreated
+rather than upgraded. Do not add follow-up migrations, backfills, compatibility shims or
+populated-upgrade tests; verify against a freshly migrated schema. State a column's `DEFAULT` in SQL
+when queries that predate the change read it.
+
+Once compatibility is required, the init schema is frozen: every later change is a new timestamped
+follow-up migration, and a `NOT NULL` column then needs a `DEFAULT` or a backfill so existing rows
+come out valid.
+
+Reset locally **before** step 7 (an edited init schema no longer matches the recorded checksum):
+
+```sh
+./scripts/reset-db.sh --all
+```
+
+Then confirm the shape you think you wrote is the shape that exists: `psql "$DATABASE_URL" -c '\d <table>'`.
+
+# 2. Nothing but identifiers goes into a durable payload
+
+`background_tasks.payload` used to hold whole `Company`, `Channel`, `Thread` and `Message` values,
+read back with `serde_json::from_value::<InboundIngestResult>`. That made every queued row a
+snapshot of the domain model: a field added without a serde default made every already-queued task
+undeserializable — silently, since the task did not error, it simply stopped re-hydrating — and a
+task that *did* re-hydrate replayed configuration as it was hours earlier.
+
+It now carries `InboundTaskPayloadV1`: company, channel, thread, source message, correlation, and
+the three delivery facts no row holds (hop count, traced channels, reply-delivery choice). The
+worker reloads everything else with tenant-scoped queries. The version tag is structural, so a
+payload written by a deployment this process does not know fails to decode rather than being read
+as V1 with defaulted fields.
+
+**So: do not add an entity, a parsed provider message, or raw provider content to a payload.** If a
+worker needs a fact, either store it on a row and reload it, or state why it is a property of the
+delivery rather than of the message and add it to the versioned payload deliberately.
+
+# 3. Row struct and queries move together
+
+For the table's file in this directory, all five of these change or the column is silently dropped:
+
+- the `*Db` struct (`ChannelDb`, `ThreadDb`, `AgentDb`, …) — `sqlx::FromRow`, DB-shaped types
+  (`String`, `Vec<String>`), not the newtypes;
+- the `From<*Db> for <Entity>` impl, which is where newtype conversion belongs;
+- the shared `SELECT` const where one exists (`CHANNEL_SELECT`, `THREAD_SELECT`, `MESSAGE_SELECT`) —
+  every read path `format!`s a `WHERE` onto it, so one edit fixes all of them;
+- the `INSERT` column list, and
+- the `UPDATE` `SET` list.
+
+The runtime-query files bind positionally. The column list order and the `.bind()` chain order are
+one fact expressed twice, and adding a column in the middle renumbers every `$n` after it. Append
+rather than insert, and re-read the whole statement after editing — a swapped pair of same-typed
+binds compiles, passes a green `cargo test`, and writes the wrong data.
+
+# 4. Don't grow the positional parameter list — pass a struct
+
+A persistence `create`/`update` that already takes six-plus arguments does not get a seventh. Convert
+it to one named params struct; `ChannelWrite` in `src/application/use_cases/channel.rs` is the model
+to copy, and it also carries the normalization (`ChannelWrite::normalize`) so every entry point
+stores the same shape.
+
+This is the `src/AGENTS.md` "No flag parameters" / "Name your tuples" rule at the persistence
+boundary. Adding a bool beside an existing bool is the specific mistake: `create(.., true, false)`
+compiles with the arguments swapped.
+
+# 5. Trait impls live outside this directory
+
+Changing a `*Persistence` trait signature breaks every impl, and most of them are hand-written mocks
+in test modules elsewhere. Find them before you start, so the size of the change is not a surprise:
+
+```sh
+grep -rn "impl ChannelPersistence for" src/
+```
+
+`ChannelPersistence` has five, `CompanyPersistence` seven. Besides the Postgres ones they are in
+`adapters/smtp/server.rs`, `application/services/test_support.rs` and the various `mod tests`.
+
+# 6. Struct literals in fixtures
+
+A new entity field breaks every `Entity { .. }` literal — one `Channel` field hit 44 of them across
+14 files. The compiler enumerates these, so drive the edit off `cargo check --all-targets`; they are
+mechanical. If a fixture repeats more than a couple of times, hoist it into a helper rather than
+adding the field 44 times again next release.
+
+# 7. Regenerate the sqlx cache — and know whether it can tell you anything
+
+```sh
+DATABASE_URL="postgres://$(whoami)@localhost:5432/open_bots" \
+  cargo sqlx prepare -- --all-targets
+```
+
+Run it after any SQL change and commit the result, per `src/AGENTS.md`. But know what it does and
+does not verify here, because this directory is split:
+
+- **Compile-time macros** (`query!`, `query_as!`, `query_scalar!`) — `agent.rs`,
+  `company_invite.rs`, `user.rs`. These are checked against the live schema, produce `.sqlx/`
+  entries, and will fail the build on a stale cache.
+- **Runtime queries** (`sqlx::query`, `sqlx::query_as::<_, T>`) — everything else, `channel.rs`,
+  `thread/` and `workflow/` included. These are **plain strings**. Nothing checks them at compile
+  time, they generate no `.sqlx/` entries, and a wrong column name is a runtime error only.
+
+So an empty `.sqlx/` diff after touching `channel.rs` or `workflow/` is expected and proves nothing.
+Run the command anyway — the macro files share the database and a stale cache there either fails the
+Fly.io build or, worse, keeps building the old query shape.
+
+# Verifying against a real database
+
+The DB-backed tests in this directory open with:
+
+```rust
+let Some(pool) = test_pool().await else { return };
+```
+
+`test_pool` (`test_support.rs`) resolves `TEST_DATABASE_URL`, or else redirects `DATABASE_URL` onto
+its `_test` sibling, and applies the migrations once per test binary. **Never point these tests at
+the development database.** The queue operations they exercise are unscoped on purpose —
+`claim_pending_tasks` and `claim_deliveries` sweep every row, because that is what a worker does —
+so against your dev database a test run competes with any `cargo run` server polling the same queues
+twice a second, and `reap_expired_deliveries` can charge real deliveries an attempt.
+
+Create the database once:
+
+```sh
+createdb open_bots_test
+```
+
+Then every model change must be run as:
+
+```sh
+DATABASE_URL="postgres://$(whoami)@localhost:5432/open_bots" cargo test --lib
+```
+
+The command is unchanged; it now lands on `open_bots_test`. **Run it with the variable set.**
+`cargo test` does not read `.env` — only `main.rs` does, at runtime — so an unexported `DATABASE_URL`
+is the normal accident, not an exotic one.
+
+Both ways of getting it wrong now fail loudly rather than skipping:
+
+| `DATABASE_URL` | Result |
+|---|---|
+| set, reachable | the DB-backed tests run |
+| set, unreachable | panic naming the fix |
+| unset | panic naming the fix |
+| unset, with `ALLOW_MISSING_DATABASE_URL=1` | skip, deliberately |
+
+The skip used to be the default, on the reasoning that it let CI run without a database. There is no
+CI here, and the silence cost real bugs: the three `thread.rs` tests below that named columns no
+migration creates, plus a content-hash mismatch that broke every internal delegation hop and a
+`WHERE id = $9` placeholder collision, all sitting behind a green suite. A skipped test is *counted
+as passing* and the suite reports the same total either way, so nothing about the output reveals it.
+Use `ALLOW_MISSING_DATABASE_URL=1` when you genuinely want the non-DB tests only.
+
+**A test that sweeps the whole database gets a database of its own.** `test_pool` hands every test
+the same `open_bots_test`; `own_database` (also `test_support.rs`) creates a uniquely named
+database, migrates it, and drops it when the handle falls out of scope — panic or not:
+
+```rust
+let Some(database) = own_database().await else { return };
+let pool = database.pool.clone();
+```
+
+Hold the handle for the length of the test: dropping it drops the database. Reach for it when the
+test **calls an unscoped operation** — `claim_pending_tasks`, `claim_deliveries`,
+`claim_provisioning_job`, `reap_expired_deliveries`, anything that sweeps a table with no company
+filter — or when it needs to **assert on whole-table state**, the totals and still-`pending` checks
+the rules below forbid. On a database with nothing else in it, a test states every row that exists
+and asserts the exact set a claim returned, instead of backdating rows by three centuries to outrank
+its neighbours and deleting its companies on the way out. `task/claim_tests.rs` is the worked
+example, and `thread/test_support.rs` exposes the choice as `Fixture::new` versus
+`Fixture::isolated`.
+
+It is not the default, because the isolation costs one migration run per test rather than per binary
+— moving the ~60 unscoped tests onto it took the suite from 7 s to ~17 s — and its pools are capped
+at five connections so parallel isolated tests stay clear of the server's `max_connections`. A test
+that only reads and writes its own company's rows should keep `test_pool`.
+
+The rest of the suite still shares one database, so a new DB-backed test on `test_pool` has to be
+written to tolerate that — and this runs parallel and should stay that way:
+
+- **Suffix every database-wide unique value** — company slugs, usernames, emails — with
+  `Uuid::new_v4().simple()`. Channel slugs are unique per company, so those may stay fixed. A
+  `duplicate key value violates unique constraint` failure that vanishes on rerun is a fixture that
+  skipped this.
+- **Never assert on a global query's totals.** `claim_pending_tasks` polls the entire
+  `background_tasks` queue with no company filter, because that is what a real worker does. Assert
+  that *your* row was claimed exactly once (filter by id), not that the queue returned one row, and
+  keep the claim limit small so the test steals as little as possible from whatever else is running.
+  If the totals are the property under test, take `own_database` instead and assert the exact set.
+- **Do not assert that your row is still `pending`, or still unclaimed.** That asserts no unscoped
+  claim ran in between, which is not a property this code has. Either drop the status from the
+  assertion — `approval_lookup_is_scoped_and_token_is_consumed_once` counts its notification by
+  `idempotency_key` alone — or put the row out of reach first: `claim_deliveries` only takes rows
+  whose `available_at` has arrived, so pushing that forward excludes it from every claim set without
+  touching the columns under test.
+- **If you must call a real claim, make it deterministic and give back what is not yours.** Both
+  claims order by their due column, so backdating your own row sorts it ahead of every neighbour and
+  a `LIMIT 1` then takes precisely it. Where a claim can still catch a foreign row —
+  `two_claimants_never_own_the_same_delivery` runs two concurrent claims, so the second is
+  guaranteed to — release it back to `pending` with its worker and lease cleared. The delivery
+  tests keep `claim_mine` and `release_foreign` for exactly this. A test that leaves a
+  five-minute lease on someone else's row makes *their* test fail, several files away.
+- **Leave no claimable residue.** A test that creates a globally claimable queue row must complete
+  it, delete its owner when safe, or move it beyond the claim horizon before releasing the test
+  guard. A passing assertion is insufficient if the test leaves due work that another test can
+  claim. Deterministically sort the test row first, verify its stable identifier after claiming,
+  and return any accidentally claimed foreign row to its prior claimable state.
+- **Establish the baseline before calling a failure pre-existing.** Because the fixtures share one
+  database, a test that leaves residue fails *other* tests, in other files, on later runs. The
+  symptom — a different set failing each run, with the occasional clean one — is indistinguishable
+  from inherited flake, and "this suite is just flaky" is the wrong conclusion almost every time.
+  `git stash` and run the same filter three or four times before attributing anything to anyone.
+  A deterministic green baseline means the flake is yours, and the cause is usually the residue
+  rule above: a new test left one `pending` `memory_provisioning_jobs` row (a table since removed),
+  `claim_provisioning_job` was table-wide, and three unrelated tests failed intermittently because
+  of it.
+
+A test that cannot be written to any of these rules is the case `own_database` exists for; prefer it
+over `--test-threads=1`, and if a test still cannot be isolated, run just that test rather than
+serialising the whole suite — that hides the next isolation bug instead of surfacing it.
+
+This blind spot is not hypothetical: a thread test (since removed with the outreach tables) had
+three INSERTs naming columns that no migration created (`task_outreaches.target_count`, the
+outbox's `channel_id`, `task_outreach_targets.id`) and failed unnoticed because CI never set
+`DATABASE_URL`.
+
+Finally, extend the round-trip assertion rather than only adding the field. A model change is not
+done until a test writes the new value, reads it back, and asserts it survived — create, then update,
+then re-read, as `postgres_channel_persistence_works` does for `enabled`. A field that is bound on
+`INSERT` but forgotten in `UPDATE` passes every other check.
+
+# Write SQL for the reader, not for the character count
+
+The runtime queries in step 7 have no compile-time check, so the *reader* is the type system.
+Optional syntax that a human has to reconstruct is not worth the keystrokes it saves.
+
+**Always write `AS` for a table alias.** `UPDATE email_outbox outbox` read as two table names
+before it read as one aliased one; `UPDATE background_tasks AS task` — the same query shape, three
+hundred lines away — does not. Same rule for `FROM` and `JOIN` targets
+and for CTE column lists. Column aliases in the `SELECT` list already use `AS` throughout
+(`em.sender::text AS sender`, `CASE ch.access_mode ... END AS participant_emails`); table aliases get
+the same treatment.
+
+**Alias to a word, not an initial.** `FROM threads t` / `JOIN email_messages em ON em.id =
+tm.email_message_id` forces the reader to hold a decoder ring for the length of the query, and the
+ring is per-query. The anti-examples are `ch`/`cs` (`CHANNEL_SELECT` in `channel.rs`) and
+`i`/`a`/`m` (`company_invite.rs`). The model to copy is `workflow/message_intents.rs`:
+`workflow_bindings AS binding`, `workflow_binding_revisions AS configuration`,
+`workflow_message_intents AS intent`.
+
+These aliases leak. The shared `SELECT` consts from step 3 are `format!`ed into a `WHERE`/`JOIN`
+clause at thirteen call sites that spell the alias themselves —
+`format!("{CHANNEL_SELECT} WHERE ch.id = $1")` — so renaming one is a cross-file edit. Do it when
+you're already changing that query, not as a sweep.
+
+**Name the columns instead of `SELECT *`.** A `SELECT *` feeding a `query_as::<_, RowDb>` (the
+removed `approval.rs` had four) couples the row struct and the table by column name and order with
+nothing stating either. A shared column const is the fix — `agent.rs` does this with
+`AGENT_COLUMNS`, and step 3 makes that const the one place you edit per model change.
+
+None of this is licence to reformat a query you aren't otherwise touching, and it is not an argument
+against genuinely dense SQL: a `CASE` expression or a window function that carries real logic stays.
+The target is syntax that is optional *and* load-bearing for comprehension.

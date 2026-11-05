@@ -1,0 +1,104 @@
+diff --git a/src/adapters/persistence/workflow/recovery.rs b/src/adapters/persistence/workflow/recovery.rs
+index c9abc79..e123c68 100644
+--- a/src/adapters/persistence/workflow/recovery.rs
++++ b/src/adapters/persistence/workflow/recovery.rs
+@@ -45,6 +45,7 @@ pub(super) async fn retire_on(
+         Retirement::BudgetExhausted | Retirement::Interrupted(LeaseReleaseCause::ActivationLimit)
+     );
+     if let Some(code) = token_gate.failure_code()
++        && !report.failure.fails_run()
+         && (!hard_limit || matches!(token_gate, token_budget::Progression::Refused(_)))
+     {
+         report.failure = StepFailure::new(
+diff --git a/src/application/app_error.rs b/src/application/app_error.rs
+index cec26c3..4eae0c7 100644
+--- a/src/application/app_error.rs
++++ b/src/application/app_error.rs
+@@ -146,7 +146,7 @@ impl std::fmt::Display for WorkflowGuardViolation {
+ }
+ 
+ pub const KNOWLEDGE_TRIGGER_ABOVE_CEILING: &str = "knowledge.trigger_above_ceiling";
+-pub const KNOWLEDGE_AUDIENCE_BELOW_CONTENT: &str = "knowledge.audience_below_content";
++pub use crate::domain::workflow::KNOWLEDGE_AUDIENCE_BELOW_CONTENT;
+ 
+ impl AppError {
+     pub fn knowledge_code(&self) -> Option<&'static str> {
+diff --git a/src/domain/workflow/outcome.rs b/src/domain/workflow/outcome.rs
+index 9a45916..d873b22 100644
+--- a/src/domain/workflow/outcome.rs
++++ b/src/domain/workflow/outcome.rs
+@@ -8,6 +8,9 @@ use thiserror::Error;
+ 
+ const MAX_DIAGNOSTIC_BYTES: usize = 4096;
+ 
++/// A new pre-effect knowledge refusal terminates the run, including configured error routes.
++pub const KNOWLEDGE_AUDIENCE_BELOW_CONTENT: &str = "knowledge.audience_below_content";
++
+ #[derive(Debug, Clone, PartialEq, Eq)]
+ pub enum CompletionRoute {
+     Success,
+@@ -123,6 +126,11 @@ impl StepFailure {
+         &self.code
+     }
+ 
++    /// This reserved policy failure cannot be recovered by workflow-authored branches.
++    pub fn fails_run(&self) -> bool {
++        self.code.as_str() == KNOWLEDGE_AUDIENCE_BELOW_CONTENT
++    }
++
+     pub fn diagnostic(&self) -> Option<&str> {
+         self.diagnostic.as_deref()
+     }
+@@ -209,6 +217,10 @@ pub fn resolve_outcome<'a>(
+             }
+             Ok(EngineDisposition::Park { request })
+         }
++        StepOutcome::Failed(failure) if failure.fails_run() => Ok(EngineDisposition::Terminal {
++            failure,
++            target: None,
++        }),
+         StepOutcome::Failed(failure)
+             if failure.class() == FailureClass::Retryable
+                 && retry == RetryEligibility::Available =>
+@@ -353,6 +365,27 @@ mod tests {
+         ));
+     }
+ 
++    #[test]
++    fn knowledge_run_level_refusal_has_no_retry_or_error_route() {
++        let graph = graph();
++        for class in [FailureClass::Terminal, FailureClass::Retryable] {
++            let failed = StepOutcome::Failed(
++                StepFailure::new(
++                    class,
++                    FailureCode::parse(KNOWLEDGE_AUDIENCE_BELOW_CONTENT).unwrap(),
++                    None,
++                )
++                .unwrap(),
++            );
++            for retry in [RetryEligibility::Available, RetryEligibility::Exhausted] {
++                assert!(matches!(
++                    resolve_outcome(&graph, &id("a"), &failed, retry, Utc::now()).unwrap(),
++                    EngineDisposition::Terminal { target: None, .. }
++                ));
++            }
++        }
++    }
++
+     #[test]
+     fn wait_requires_future_deadline_and_has_no_successor() {
+         let graph = graph();
+diff --git a/src/domain/workflow/recovery.rs b/src/domain/workflow/recovery.rs
+index 9a0033a..5c88238 100644
+--- a/src/domain/workflow/recovery.rs
++++ b/src/domain/workflow/recovery.rs
+@@ -95,7 +95,8 @@ impl RecoveryPolicy {
+         if snapshot.work_budget == RetryEligibility::Exhausted {
+             return RecoveryDecision::FailRun(RecoveryLimit::WorkBudget);
+         }
+-        if failure.class() == FailureClass::Terminal
++        if failure.fails_run()
++            || failure.class() == FailureClass::Terminal
+             || snapshot.attempts.consumed == snapshot.attempts.limit
+         {
+             return RecoveryDecision::FinalError;

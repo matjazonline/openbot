@@ -81,6 +81,7 @@ impl AuthorView {
 /// read [`MessageAuditView`] instead.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ThreadMessageView {
+    pub access_level: super::access_level::AccessLevel,
     /// Saved structured output contract, independent of subsequent agent edits.
     pub response_contract: Option<super::response_contract::ResponseContract>,
     /// `thread_messages.id` -- this message *in this thread*, and what the live stream resumes on.
@@ -126,6 +127,7 @@ impl ThreadMessageView {
 /// it any would put provider strings inside the prompt fence for no gain.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AgentHistoryMessage {
+    pub access_level: super::access_level::AccessLevel,
     pub role: MessageRole,
     pub audience: MessageAudience,
     pub entry_kind: ThreadEntryKind,
@@ -160,6 +162,7 @@ pub struct EmailReplyContext {
 /// and no ordinary read path can reach one by accident.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MessageAuditView {
+    pub access_level: super::access_level::AccessLevel,
     pub id: Uuid,
     pub canonical_id: CanonicalMessageId,
     pub company_id: Uuid,

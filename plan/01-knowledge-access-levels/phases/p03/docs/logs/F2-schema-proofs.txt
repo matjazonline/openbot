@@ -1,0 +1,37 @@
+1446:        RAISE EXCEPTION 'binding_audit_events is append-only' USING ERRCODE = '23514';
+1900:        RAISE EXCEPTION 'workflow reconciliation actor audit is append-only' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_action_audit_immutable';
+2371:    RAISE EXCEPTION 'workflow action effect fact is append-only' USING CONSTRAINT='workflow_guard:workflow_action_fact_immutable';
+4537:    CONSTRAINT workflow_action_knowledge_bounds CHECK (content_level_at_freeze <= destination_level_at_freeze)
+5631:    knowledge_ceiling public.access_level NOT NULL,
+5681:    CONSTRAINT workflow_runs_knowledge_bounds CHECK (content_level <= knowledge_ceiling)
+5824:    ADD CONSTRAINT background_tasks_company_id_id_key UNIQUE (company_id, id);
+5832:    ADD CONSTRAINT background_tasks_pkey PRIMARY KEY (id);
+7144:    ADD CONSTRAINT workflow_executions_company_id_run_id_id_key UNIQUE (company_id, run_id, id);
+7152:    ADD CONSTRAINT workflow_executions_company_id_run_id_step_id_activation_key UNIQUE (company_id, run_id, step_id, activation);
+7160:    ADD CONSTRAINT workflow_executions_pkey PRIMARY KEY (company_id, id);
+8233:-- Name: binding_audit_events binding_audit_events_append_only; Type: TRIGGER; Schema: public; Owner: -
+8236:CREATE TRIGGER binding_audit_events_append_only BEFORE DELETE OR UPDATE ON public.binding_audit_events FOR EACH ROW EXECUTE FUNCTION public.reject_binding_audit_rewrite();
+9226:    ADD CONSTRAINT background_tasks_channel_fk FOREIGN KEY (company_id, channel_id) REFERENCES public.channels(company_id, id) ON DELETE CASCADE;
+9234:    ADD CONSTRAINT background_tasks_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+9242:    ADD CONSTRAINT background_tasks_thread_fk FOREIGN KEY (company_id, channel_id, thread_id) REFERENCES public.threads(company_id, channel_id, id) ON DELETE SET NULL (thread_id);
+9250:    ADD CONSTRAINT background_tasks_workflow_execution_fk FOREIGN KEY (company_id, workflow_execution_id) REFERENCES public.workflow_executions(company_id, id);
+9847:    ADD CONSTRAINT task_attempts_task_id_fkey FOREIGN KEY (task_id) REFERENCES public.background_tasks(id) ON DELETE CASCADE;
+9863:    ADD CONSTRAINT task_harness_runs_company_id_task_id_fkey FOREIGN KEY (company_id, task_id) REFERENCES public.background_tasks(company_id, id) ON DELETE CASCADE;
+9967:    ADD CONSTRAINT workflow_action_claim_episode_company_id_execution_id_job__fkey FOREIGN KEY (company_id, execution_id, job_id) REFERENCES public.background_tasks(company_id, workflow_execution_id, id) ON DELETE CASCADE;
+9983:    ADD CONSTRAINT workflow_action_claim_episodes_job_id_retired_attempt_fkey FOREIGN KEY (job_id, retired_attempt) REFERENCES public.task_attempts(task_id, attempt_number) ON DELETE CASCADE;
+10019:    ADD CONSTRAINT workflow_action_dispatches_company_id_execution_id_job_id_fkey FOREIGN KEY (company_id, execution_id, job_id) REFERENCES public.background_tasks(company_id, workflow_execution_id, id) ON DELETE CASCADE;
+10035:    ADD CONSTRAINT workflow_action_dispatches_job_id_attempt_number_execution_fkey FOREIGN KEY (job_id, attempt_number, execution_generation, worker_id) REFERENCES public.task_attempts(task_id, attempt_number, execution_generation, worker_id) ON DELETE CASCADE;
+10051:    ADD CONSTRAINT workflow_action_evidence_comm_company_id_execution_id_sche_fkey FOREIGN KEY (company_id, execution_id, scheduled_job_id) REFERENCES public.background_tasks(company_id, workflow_execution_id, id) ON DELETE CASCADE;
+10323:    ADD CONSTRAINT workflow_action_remote_entrie_company_id_execution_id_job__fkey FOREIGN KEY (company_id, execution_id, job_id) REFERENCES public.background_tasks(company_id, workflow_execution_id, id) ON DELETE CASCADE;
+10339:    ADD CONSTRAINT workflow_action_remote_entrie_job_id_attempt_number_execut_fkey FOREIGN KEY (job_id, attempt_number, execution_generation, worker_id) REFERENCES public.task_attempts(task_id, attempt_number, execution_generation, worker_id) ON DELETE CASCADE;
+10347:    ADD CONSTRAINT workflow_action_schedule_witn_company_id_execution_id_job__fkey FOREIGN KEY (company_id, execution_id, job_id) REFERENCES public.background_tasks(company_id, workflow_execution_id, id) ON DELETE CASCADE;
+10363:    ADD CONSTRAINT workflow_action_schedule_witnesses_job_id_retired_attempt_fkey FOREIGN KEY (job_id, retired_attempt) REFERENCES public.task_attempts(task_id, attempt_number) ON DELETE CASCADE;
+11094:    FOREIGN KEY(company_id, task_id) REFERENCES public.background_tasks(company_id,id) ON DELETE CASCADE,
+11197:        RAISE EXCEPTION 'workflow approval audit is append-only' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_approval_audit_guard';
+11524:    created_at, parent_run_id, parent_execution_id, rerun_of_run_id, delivery_policy, knowledge_ceiling
+11737:CREATE FUNCTION public.guard_workflow_run_knowledge() RETURNS trigger LANGUAGE plpgsql AS $$
+11739:    IF NEW.knowledge_ceiling IS DISTINCT FROM OLD.knowledge_ceiling
+11743:        RAISE EXCEPTION 'workflow knowledge facts cannot be lowered or rewritten'
+11744:            USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_run_knowledge';
+11748:CREATE TRIGGER workflow_run_knowledge BEFORE UPDATE OF knowledge_ceiling,content_level ON public.workflow_runs
+11749:    FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_run_knowledge();

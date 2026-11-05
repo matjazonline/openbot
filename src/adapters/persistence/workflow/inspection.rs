@@ -4,6 +4,8 @@ use serde_json::Value;
 
 #[derive(sqlx::FromRow)]
 pub(super) struct HeadRow {
+    pub knowledge_ceiling: i16,
+    pub content_level: i16,
     pub company_id: Uuid,
     pub id: Uuid,
     pub workflow_id: Uuid,
@@ -19,7 +21,7 @@ pub(super) struct HeadRow {
     pub rerun_of_run_id: Option<Uuid>,
 }
 
-pub(super) const HEAD: &str = "SELECT run.company_id,run.id,run.workflow_id,run.version_id,run.channel_id,run.thread_id,run.trigger_id,run.correlation_id,run.state,run.waiting_reason,run.revision,admission.source_key,run.rerun_of_run_id FROM workflow_runs AS run JOIN workflow_admissions AS admission ON admission.company_id=run.company_id AND admission.run_id=run.id WHERE run.company_id=$1 AND run.id=$2";
+pub(super) const HEAD: &str = "SELECT run.company_id,run.id,run.workflow_id,run.version_id,run.channel_id,run.thread_id,run.trigger_id,run.correlation_id,run.state,run.waiting_reason,run.revision,admission.source_key,run.rerun_of_run_id,run.knowledge_ceiling::smallint AS knowledge_ceiling,run.content_level::smallint AS content_level FROM workflow_runs AS run JOIN workflow_admissions AS admission ON admission.company_id=run.company_id AND admission.run_id=run.id WHERE run.company_id=$1 AND run.id=$2";
 
 #[async_trait]
 impl WorkflowInspection for PostgresPersistence {
@@ -46,6 +48,7 @@ impl HeadRow {
         let state = run_state(&self.state, self.waiting_reason.as_deref())?;
         let association = binding_rows::association_from_columns(self.channel_id, self.thread_id)?;
         Ok(RunHead {
+            knowledge: super::knowledge::stored_levels(self.knowledge_ceiling, self.content_level)?,
             causality: RunCausality::new(
                 RunId::new(self.id),
                 trigger,

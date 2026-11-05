@@ -97,6 +97,10 @@ pub trait McpCredentialPersistence: Send + Sync {
 
 #[async_trait]
 pub trait McpPersistence: Send + Sync {
+    async fn set_mcp_level(
+        &self,
+        command: super::connection_level::ConnectionLevelCommand,
+    ) -> AppResult<CompanyMcpConnection>;
     async fn list_mcp_connections(&self, company_id: Uuid) -> AppResult<Vec<CompanyMcpConnection>>;
     async fn create_mcp_connection(
         &self,
@@ -140,6 +144,21 @@ impl McpUseCases {
             client,
         }
     }
+    pub async fn level_actor(
+        &self,
+        user: Uuid,
+        company: Uuid,
+    ) -> AppResult<crate::entities::access_level::LevelActor> {
+        let access =
+            super::company::readable_company(self.companies.as_ref(), user, company).await?;
+        if !access.membership.manages_company_operations() {
+            return Err(AppError::NotFound("Company connection".into()));
+        }
+        Ok(crate::entities::access_level::LevelActor {
+            membership: access.membership,
+            access_level: access.access_level,
+        })
+    }
     pub async fn list(&self, user: Uuid, company: Uuid) -> AppResult<Vec<CompanyMcpConnection>> {
         super::company::managed_company(self.companies.as_ref(), user, company).await?;
         self.catalog.list_mcp_connections(company).await
@@ -170,6 +189,18 @@ impl McpUseCases {
         self.catalog
             .update_mcp_connection(current.company_id, current.id, current.revision, write)
             .await
+    }
+    pub async fn set_level(
+        &self,
+        command: super::connection_level::ConnectionLevelCommand,
+    ) -> AppResult<CompanyMcpConnection> {
+        super::company::managed_company(
+            self.companies.as_ref(),
+            command.actor.user_id(),
+            command.company.as_uuid(),
+        )
+        .await?;
+        self.catalog.set_mcp_level(command).await
     }
     pub async fn delete(&self, user: Uuid, current: &CompanyMcpConnection) -> AppResult<()> {
         super::company::managed_company(self.companies.as_ref(), user, current.company_id).await?;

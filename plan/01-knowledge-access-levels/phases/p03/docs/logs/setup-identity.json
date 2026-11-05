@@ -1,0 +1,15 @@
+{
+  "phase": "p03",
+  "worktree": "/Users/mac02/dev/openbot-recovery/.worktrees/knowledge-p03",
+  "branch": "knowledge/p03",
+  "base": "ef12dc51e24609cad75ab1a354b81c8588578fca",
+  "data_directory": "/Users/mac02/dev/openbot-recovery/.worktrees/pg-knowledge-p03",
+  "port": 55503,
+  "role": "mac02",
+  "databases": [
+    "open_bots",
+    "open_bots_test"
+  ],
+  "target": "fresh worktree-owned target; no shared mutable cache",
+  "status": "private PG initialized/started, migrations and baseline pending"
+}

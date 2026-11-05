@@ -23,17 +23,18 @@ pub(super) async fn capture(db: &mut PgConnection, command: &PreparedAdmission) 
     }
     // One statement gives the count and bounded member rows the same MVCC view.
     sqlx::query(
-        "WITH counts AS ( \
-           SELECT count(*)::bigint AS eligible FROM thread_messages AS member \
-            WHERE member.company_id=$1 AND member.channel_id=$3 AND member.thread_id=$4 \
-              AND NOT EXISTS (SELECT 1 FROM internal_notes AS note \
-                   WHERE note.company_id=member.company_id AND note.message_id=member.message_id) \
+        "WITH eligible AS ( \
+           SELECT member.message_id,member.created_at,member.id FROM thread_messages AS member \
+           JOIN messages AS message ON (message.company_id,message.id)=(member.company_id,member.message_id) \
+           JOIN workflow_runs AS run ON run.company_id=message.company_id AND run.id=$2 \
+           WHERE member.company_id=$1 AND member.channel_id=$3 AND member.thread_id=$4 \
+             AND message.access_level<=run.knowledge_ceiling \
+             AND NOT EXISTS (SELECT 1 FROM internal_notes AS note \
+                 WHERE note.company_id=member.company_id AND note.message_id=member.message_id) \
+         ), counts AS ( SELECT count(*)::bigint AS eligible FROM eligible \
          ), newest AS ( \
-           SELECT member.message_id, member.created_at, member.id FROM thread_messages AS member \
-            WHERE member.company_id=$1 AND member.channel_id=$3 AND member.thread_id=$4 \
-              AND NOT EXISTS (SELECT 1 FROM internal_notes AS note \
-                   WHERE note.company_id=member.company_id AND note.message_id=member.message_id) \
-            ORDER BY member.created_at DESC, member.id DESC LIMIT $5 \
+           SELECT message_id,created_at,id FROM eligible \
+           ORDER BY created_at DESC,id DESC LIMIT $5 \
          ), stored_members AS ( \
            INSERT INTO workflow_history_members (company_id,run_id,channel_id,thread_id,message_id,ordinal) \
            SELECT $1,$2,$3,$4,message_id,row_number() OVER (ORDER BY created_at,id)::integer \

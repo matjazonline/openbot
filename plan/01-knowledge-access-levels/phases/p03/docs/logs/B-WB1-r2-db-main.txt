@@ -1,0 +1,1 @@
+open_bots|PostgreSQL 18.6 (Homebrew) on aarch64-apple-darwin24.6.0, compiled by Apple clang version 17.0.0 (clang-1700.6.4.2), 64-bit|a00bc52820c1a07edb438ef4d534267cfa1de6ddb8fc11244a51da854ae8eb7400ccb1a81188cece278c06c5b785e7d8|workflow_history_consumptions

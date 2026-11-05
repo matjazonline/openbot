@@ -1,0 +1,34 @@
+{
+  "review": "KNOW-P01-WB1-R2",
+  "review_note": "KNOW-P01-WB1-R2-N1",
+  "finding": "KNOW-P01-WB1-F1 closed by B",
+  "g1": "KNOW-P01-G1-R1 accepted",
+  "source": {
+    "base": "73799dc6ac685008d5c97f154e861d11ae15bfa0",
+    "head": "73799dc6ac685008d5c97f154e861d11ae15bfa0",
+    "exclusions": [
+      "plan/01-knowledge-access-levels/phases/p01/docs/"
+    ],
+    "diff_sha256": "a99d4f5447f43e04e2346f283bdf587f86043ae9b70d1040ee6c8d3a9762deea",
+    "tree_sha256": "1fadfc702fd6508d7c10e6a1c355e3a25123c37487de42784fbea8284682a62b",
+    "files_count": 2531
+  },
+  "installed_digest": "2474cb464ac7b4e31e09102c4b37f551f5cc7ab8514ba13a899031e6c58515ac",
+  "authority_revision": 3,
+  "notices": "KNOW-I001\u2013I005/r1 unchanged acknowledged",
+  "evidence_hashes_verified": true,
+  "native_result": {
+    "passed": 179,
+    "failed": 0,
+    "ignored": 0,
+    "selectors": 14,
+    "access_level_prefix": 24
+  },
+  "required_phase_checks": "PASS",
+  "status": "root accepted in phase; commit/local integration pending; whole knowledge plan and final06 gates not complete",
+  "review_records_sha256": {
+    "REVIEW.md": "863a1f9e3e996d9aa351f70ccf0efdb3be7d136d938646d60e911d3bd8e967c4",
+    "agent-review-notes.md": "3eaee33c1a479620e0402b391e98e69ee5ded28a8c08de7d42c2c638e51f2d18",
+    "agent-review-findings.md": "e24fde706c0a411b5e11f60a9b3f44d613806eabd1f4728b3aca59d6ec160581"
+  }
+}

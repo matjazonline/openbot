@@ -213,7 +213,7 @@ async fn authorize_requester(
     requester: WorkflowActor,
 ) -> AppResult<Provisioned<()>> {
     match super::authority::authorize_company(tx, company, requester).await {
-        Ok(()) => Ok(Ok(())),
+        Ok(_) => Ok(Ok(())),
         Err(AppError::NotFound(_)) => Ok(Err(ProvisioningRefusal::Forbidden)),
         Err(error) => Err(error),
     }

@@ -13,6 +13,7 @@ use uuid::Uuid;
 
 #[derive(sqlx::FromRow)]
 struct ConnectionRow {
+    access_level: i16,
     company_id: Uuid,
     id: Uuid,
     slug: String,
@@ -25,7 +26,7 @@ struct ConnectionRow {
     secret_set: bool,
     tool_grants: Vec<String>,
 }
-const CONNECTION_SELECT: &str = "SELECT connection.company_id, connection.id, connection.slug,
+const CONNECTION_SELECT: &str = "SELECT connection.company_id, connection.id, connection.access_level::smallint AS access_level, connection.slug,
     connection.endpoint_url, connection.enabled, connection.auth_type, connection.revision,
     connection.credential_revision, connection.discovery_json,
     EXISTS(SELECT 1 FROM company_mcp_credentials AS credential WHERE credential.company_id = connection.company_id AND credential.connection_id = connection.id) AS secret_set,
@@ -58,6 +59,8 @@ impl TryFrom<ConnectionRow> for CompanyMcpConnection {
                 "Stored MCP discovery was quarantined"),
         }
         Ok(Self {
+            access_level: crate::entities::access_level::AccessLevel::try_from(row.access_level)
+                .map_err(|_| invalid("Invalid connection access level"))?,
             company_id: row.company_id,
             id: row.id,
             slug: write.slug,
@@ -141,6 +144,32 @@ async fn replace_grants(
 }
 #[async_trait]
 impl McpPersistence for PostgresPersistence {
+    async fn set_mcp_level(
+        &self,
+        command: crate::use_cases::connection_level::ConnectionLevelCommand,
+    ) -> AppResult<CompanyMcpConnection> {
+        use crate::entities::access_level::{LevelTarget, may_assign_level};
+        let mut tx = super::workflow::http::begin_http(self).await?;
+        let actor =
+            super::workflow::authority::authorize_company(&mut tx, command.company, command.actor)
+                .await?;
+        let old = get_connection(&mut tx, command.company.as_uuid(), command.connection).await?;
+        if old.revision != command.expected_revision {
+            return Err(conflict());
+        }
+        may_assign_level(
+            actor,
+            LevelTarget::Assignable(old.access_level),
+            command.access_level,
+        )
+        .map_err(|e| invalid(&e.to_string()))?;
+        sqlx::query("UPDATE company_mcp_connections SET access_level=$3::smallint,revision=revision+1 WHERE company_id=$1 AND id=$2 AND deleted_at IS NULL")
+            .bind(command.company.as_uuid()).bind(command.connection).bind(command.access_level.as_i16()).execute(&mut *tx).await?;
+        let result = get_connection(&mut tx, command.company.as_uuid(), command.connection).await?;
+        tx.commit().await?;
+        Ok(result)
+    }
+
     async fn list_mcp_connections(&self, company_id: Uuid) -> AppResult<Vec<CompanyMcpConnection>> {
         let rows = sqlx::query_as::<_, ConnectionRow>(&format!("{CONNECTION_SELECT} WHERE connection.company_id = $1 AND connection.deleted_at IS NULL ORDER BY connection.slug LIMIT 65"))
             .bind(company_id).fetch_all(&self.pool).await?;

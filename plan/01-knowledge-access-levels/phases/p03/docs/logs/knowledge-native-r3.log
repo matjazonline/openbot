@@ -1,0 +1,49 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/dev/openbot-recovery/.worktrees/knowledge-p03)
+warning: unused import: `children::WorkflowChildren`
+   --> src/adapters/persistence/workflow/knowledge_admission_tests.rs:143:9
+    |
+143 |         children::WorkflowChildren,
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+error[E0599]: no method named `advance_pure` found for reference `&persistence::PostgresPersistence` in the current scope
+   --> src/adapters/persistence/workflow/knowledge_admission_tests.rs:174:7
+    |
+174 |     p.advance_pure(
+    |     --^^^^^^^^^^^^ method not found in `&persistence::PostgresPersistence`
+    |
+    = help: items from traits can only be used if the trait is in scope
+help: trait `WorkflowBatch` which provides `advance_pure` is implemented but not in scope; perhaps you want to import it
+    |
+  2 + use crate::application::workflow::batch::WorkflowBatch;
+    |
+
+error[E0063]: missing field `knowledge` in initializer of `application::workflow::contracts::RunHead`
+   --> src/application/workflow/tests.rs:404:61
+    |
+404 |             state.runs.get(&(company_id, run_id)).map(|run| RunHead {
+    |                                                             ^^^^^^^ missing `knowledge`
+
+error[E0063]: missing field `knowledge` in initializer of `application::workflow::contracts::RunHead`
+   --> src/application/workflow/tests/cases.rs:229:54
+    |
+229 |     store.state.lock().unwrap().returned_head = Some(RunHead {
+    |                                                      ^^^^^^^ missing `knowledge`
+
+error[E0063]: missing field `knowledge` in initializer of `application::workflow::contracts::RunHead`
+   --> src/application/workflow/tests/cases.rs:249:54
+    |
+249 |     store.state.lock().unwrap().returned_head = Some(RunHead {
+    |                                                      ^^^^^^^ missing `knowledge`
+
+error[E0063]: missing field `knowledge` in initializer of `application::workflow::contracts::RunHead`
+   --> src/application/workflow/tests/cases.rs:278:54
+    |
+278 |     store.state.lock().unwrap().returned_head = Some(RunHead {
+    |                                                      ^^^^^^^ missing `knowledge`
+
+Some errors have detailed explanations: E0063, E0599.
+For more information about an error, try `rustc --explain E0063`.
+warning: `open_bots` (lib test) generated 1 warning
+error: could not compile `open_bots` (lib test) due to 5 previous errors; 1 warning emitted

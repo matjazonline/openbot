@@ -50,6 +50,8 @@ mod history_reader;
 pub mod http;
 pub mod jev;
 mod jev_assets;
+pub(crate) mod knowledge;
+mod knowledge_release;
 mod lease;
 mod lease_claim;
 pub mod mcp;

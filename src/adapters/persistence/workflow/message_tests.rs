@@ -589,3 +589,6 @@ async fn workflow_message_wait_deadline_supersedes_unsent_deliveries() {
         ("failed", Some("expired"))
     );
 }
+
+#[path = "knowledge_message_tests.rs"]
+mod knowledge_message_tests;

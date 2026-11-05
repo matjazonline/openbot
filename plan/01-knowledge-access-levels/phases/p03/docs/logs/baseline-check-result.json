@@ -1,0 +1,17 @@
+{
+  "command": [
+    "cargo",
+    "check",
+    "--locked",
+    "--offline",
+    "--all-targets"
+  ],
+  "exit_code": 0,
+  "environment": {
+    "CARGO_INCREMENTAL": "0",
+    "SQLX_OFFLINE": "true",
+    "DATABASE_URL": "postgres://mac02@127.0.0.1:55503/open_bots",
+    "TEST_DATABASE_URL": "postgres://mac02@127.0.0.1:55503/open_bots_test"
+  },
+  "init_sha384": "932f7aac14a0921ea16e687da373957da1e0e94876d30173b3fa4bec9be73febd9566158b798c9793a3ec12a4ed5f409"
+}

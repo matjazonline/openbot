@@ -450,3 +450,15 @@ async fn workflow_control_head_restores_real_message_and_schedule_causality() {
         assert_eq!(saved.association, head.association);
     }
 }
+
+#[tokio::test]
+async fn knowledge_run_level_schedule_uses_configured_run_as_ceiling() {
+    let f = AdmissionFixture::new().await;
+    let c = Conversation::new(&f).await;
+    let occurrence = Occurrence::new(&f, f.binding.target.company, c.channel).await;
+    let command = f.prepare(occurrence.request(&f, "scheduled-level")).await;
+    f.persistence().admit(&command).await.unwrap();
+    let knowledge:serde_json::Value=sqlx::query_scalar("SELECT jsonb_build_object('ceiling',knowledge_ceiling,'content',content_level) FROM workflow_runs WHERE company_id=$1 AND id=$2")
+        .bind(command.company_id().as_uuid()).bind(command.proposed_run_id().as_uuid()).fetch_one(f.persistence().pool()).await.unwrap();
+    assert_eq!(knowledge, json!({"ceiling":9,"content":0}));
+}

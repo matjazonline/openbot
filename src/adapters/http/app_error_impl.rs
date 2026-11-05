@@ -9,6 +9,8 @@ impl IntoResponse for AppError {
         // Error messages can contain provider responses, request URLs, or caller text. The
         // request span and response event supply correlation/status; log only a fixed category.
         let error_kind = match &self {
+            AppError::KnowledgeTrigger { .. } => "knowledge_trigger",
+            AppError::KnowledgeRelease { .. } => "knowledge_release",
             AppError::Execution(_) => "execution",
             AppError::Database(_) => "database",
             AppError::DatabaseTimeout(_) => "database_timeout",
@@ -25,7 +27,16 @@ impl IntoResponse for AppError {
         };
         tracing::error!(error_kind, "Request failed");
 
+        let knowledge_code = self.knowledge_code();
         match self {
+            AppError::KnowledgeTrigger { .. } => (
+                StatusCode::BAD_REQUEST,
+                axum::Json(serde_json::json!({"code":knowledge_code,"error":"The triggering message exceeds this audience's access level"})),
+            ).into_response(),
+            AppError::KnowledgeRelease { .. } => (
+                StatusCode::FORBIDDEN,
+                axum::Json(serde_json::json!({"code":knowledge_code,"error":"The destination cannot receive this run's content"})),
+            ).into_response(),
             AppError::Execution(_) => {
                 (StatusCode::UNPROCESSABLE_ENTITY, "Execution stopped").into_response()
             }

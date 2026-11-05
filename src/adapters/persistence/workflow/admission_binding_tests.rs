@@ -39,7 +39,7 @@ async fn seed_saved(f: &BindingFixture, key: &str, trigger: &TriggerRef) -> Uuid
     )
     .await
     .unwrap();
-    sqlx::query("INSERT INTO workflow_runs (company_id, id, binding_id, binding_revision, workflow_id, version_id, actor_id, trigger_id, correlation_id, bundle_digest, input, params, resources, max_steps, max_context_bytes, deadline) SELECT company_id, $2, $3, 1, workflow_id, id, actor_id, $4, $5, sha256(bundle), '{}'::jsonb, $6, '{}'::jsonb, 100, 1048576, CURRENT_TIMESTAMP + interval '1 hour' FROM workflow_versions WHERE company_id = $1 AND id = $7")
+    sqlx::query("INSERT INTO workflow_runs (company_id, id, binding_id, binding_revision, workflow_id, version_id, actor_id, trigger_id, correlation_id, bundle_digest, input, params, resources, max_steps, max_context_bytes, deadline, knowledge_ceiling) SELECT company_id, $2, $3, 1, workflow_id, id, actor_id, $4, $5, sha256(bundle), '{}'::jsonb, $6, '{}'::jsonb, 100, 1048576, CURRENT_TIMESTAMP + interval '1 hour', 9 FROM workflow_versions WHERE company_id = $1 AND id = $7")
         .bind(f.target.company.as_uuid()).bind(run).bind(f.target.binding.as_uuid())
         .bind(trigger.trigger_id().as_uuid()).bind(Uuid::new_v4()).bind(json!({"saved": 7}))
         .bind(f.request(None).version.as_uuid()).execute(&mut *tx).await.unwrap();

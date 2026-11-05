@@ -1,0 +1,56 @@
+
+running 51 tests
+test adapters::persistence::workflow::knowledge::tests::knowledge_run_level_reader_facts_exclude_nonreaders_and_reject_malformed_authority ... ok
+test adapters::http::routes::connection_levels::tests::knowledge_run_level_connection_payloads_are_strict_bounded_and_forms_keep_progress ... ok
+test adapters::http::routes::connection_levels::tests::knowledge_run_level_connection_form_parses_integer_strings_and_rejects_injected_fields ... ok
+test adapters::http::routes::connection_levels::tests::knowledge_run_level_connection_commands_enforce_caps_and_preserve_other_settings ... ok
+test adapters::http::routes::connection_levels::tests::knowledge_run_level_http_new_read_routes_hide_valid_foreign_company_and_resource_ids ... ok
+test adapters::persistence::workflow::tests::admission_tests::history_reader_tests::knowledge_history_lease_tests::knowledge_run_level_history_consumption_rejects_foreign_scope_and_rewritten_proof ... ok
+test adapters::persistence::workflow::tests::admission_tests::admission_source_tests::knowledge_run_level_schedule_uses_configured_run_as_ceiling ... ok
+test adapters::http::routes::connection_levels::tests::knowledge_run_level_race_connection_revision_writers_have_one_winner ... ok
+test adapters::persistence::workflow::tests::admission_tests::history_reader_tests::knowledge_history_lease_tests::knowledge_run_level_history_real_replacement_claim_fences_old_reader_and_replays_once ... ok
+test adapters::http::routes::connection_levels::tests::knowledge_run_level_all_four_connection_level_write_routes_scope_valid_foreign_resources ... ok
+test adapters::http::routes::connection_levels::tests::knowledge_run_level_race_live_admin_demotion_precedes_connection_level_write ... ok
+test adapters::persistence::workflow::tests::admission_tests::history_reader_tests::knowledge_history_tests::knowledge_run_level_history_filters_before_count_and_raises_returned_content ... ok
+test adapters::persistence::workflow::tests::admission_tests::history_reader_tests::knowledge_history_tests::knowledge_run_level_raise_rolls_back_with_its_read_transaction ... ok
+test adapters::persistence::workflow::tests::admission_tests::knowledge_admission_tests::knowledge_run_level_child_inherits_and_competing_result_consumers_raise_parent_once ... ok
+test adapters::persistence::workflow::tests::admission_tests::knowledge_admission_tests::knowledge_run_level_manual_and_replay_keep_admitted_ceiling ... ok
+test adapters::persistence::workflow::tests::admission_tests::history_reader_tests::knowledge_history_lease_tests::knowledge_run_level_history_expired_database_lease_or_deadline_returns_no_output_or_rise ... ok
+test adapters::persistence::workflow::tests::admission_tests::knowledge_admission_tests::knowledge_run_level_manual_uses_actual_admin_starter_and_keeps_member_refused ... ok
+test adapters::persistence::workflow::tests::admission_tests::knowledge_admission_tests::knowledge_run_level_message_empty_owner_and_mixed_cc_audiences ... ok
+test adapters::persistence::workflow::tests::admission_tests::knowledge_admission_tests::knowledge_run_level_schema_rejects_ceiling_changes_lowering_and_out_of_range ... ok
+test adapters::persistence::workflow::tests::admission_tests::knowledge_admission_tests::knowledge_run_level_stamped_trigger_taints_or_refuses_without_partial_admission ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::knowledge_provisioning_tests::knowledge_run_level_provisioning_rechecks_pending_intent_before_any_local_effect ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::recovery_tests::workflow_failure_unknown_effect_suspends_even_with_final_error ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_run_level_model_continues_after_refused_http_tool_without_egress ... ok
+test adapters::persistence::workflow::tests::http_tests::knowledge_http_tests::knowledge_run_level_completed_remote_receipt_replays_after_taint_without_reentry ... ok
+test adapters::persistence::workflow::tests::http_tests::knowledge_http_tests::knowledge_run_level_http_current_connection_level_allows_classified_dispatch ... ok
+test adapters::persistence::workflow::tests::http_tests::knowledge_http_tests::knowledge_run_level_remote_possible_marker_stays_uncertain_after_taint ... ok
+test adapters::persistence::workflow::tests::mcp_tests::knowledge_mcp_tests::knowledge_run_level_mcp_level_change_preserves_operation_and_credentials ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::scheduling::knowledge_run_level_refusal_survives_real_token_allowance_and_refusal_retirement ... ok
+test adapters::persistence::workflow::tests::mcp_tests::knowledge_mcp_tests::knowledge_run_level_mcp_step_and_tool_refuse_without_provider_entry ... ok
+test adapters::persistence::workflow::tests::message_tests::knowledge_message_tests::knowledge_run_level_internal_message_stamps_current_content_and_completed_replay_retains_stamp ... ok
+test adapters::persistence::workflow::tests::message_tests::knowledge_message_tests::knowledge_run_level_pending_public_intent_cannot_send_after_content_rises ... ok
+test adapters::persistence::workflow::tests::message_tests::knowledge_message_tests::knowledge_run_level_race_verified_address_change_cannot_authorize_a_frozen_retired_recipient ... ok
+test adapters::persistence::workflow::tests::message_tests::knowledge_message_tests::knowledge_run_level_refused_message_cannot_recover_into_success ... ok
+test adapters::persistence::workflow::tests::http_tests::knowledge_http_tests::knowledge_run_level_http_step_and_direct_tool_refuse_before_network ... ok
+test application::workflow::message_admission::knowledge_tests::knowledge_run_level_stamped_trigger_refusal_settles_instead_of_retrying ... ok
+test domain::entities::access_level::knowledge_tests::knowledge_run_level_audience_is_the_lowest_reader_or_public ... ok
+test domain::entities::access_level::knowledge_tests::knowledge_run_level_domain_keeps_content_within_the_admission_ceiling ... ok
+test domain::entities::access_level::knowledge_tests::knowledge_run_level_release_matrix_never_declassifies ... ok
+test domain::workflow::outcome::tests::knowledge_run_level_refusal_has_no_retry_or_error_route ... ok
+test domain::workflow::recovery::tests::knowledge_run_level_refusal_is_final_but_unknown_effect_still_reconciles ... ok
+test adapters::persistence::workflow::tests::message_tests::knowledge_message_tests::knowledge_run_level_sql_freeze_constraint_matches_pure_release_matrix ... ok
+test adapters::persistence::workflow::tests::admission_tests::history_reader_tests::knowledge_history_lease_tests::knowledge_run_level_history_expiry_during_statement_and_commit_rolls_back_taint_and_proof ... ok
+test adapters::persistence::workflow::tests::message_tests::knowledge_message_tests::knowledge_run_level_tool_refusal_is_typed_and_contains_no_content ... ok
+test adapters::persistence::workflow::tests::message_tests::knowledge_message_tests::knowledge_run_level_verified_member_email_uses_current_member_level ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::recovery_tests::workflow_failure_terminal_routes_or_fails_without_reexecuting ... ok
+test adapters::persistence::workflow::tests::message_tests::thread_tests::knowledge_reply_tests::knowledge_run_level_race_cc_commit_after_destination_snapshot_is_ordered_after_that_freeze ... ok
+test adapters::persistence::workflow::tests::message_tests::thread_tests::knowledge_reply_tests::knowledge_run_level_reply_cc_added_after_intent_refuses_publication_without_partial_effect ... ok
+test adapters::persistence::workflow::tests::message_tests::thread_tests::knowledge_reply_tests::knowledge_run_level_reply_unverified_historical_address_stays_public ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::knowledge_run_level_workflow_tool_child_and_saved_result_replay_taint_parent_atomically ... ok
+test adapters::persistence::workflow::tests::message_tests::knowledge_message_tests::knowledge_run_level_step_email_and_fanout_refuse_before_any_effect ... ok
+test adapters::persistence::workflow::tests::admission_tests::history_reader_tests::knowledge_history_race_tests::knowledge_run_level_race_history_read_and_email_freeze_record_consistent_consumption ... ok
+
+test result: ok. 51 passed; 0 failed; 0 ignored; 0 measured; 2733 filtered out; finished in 19.67s
+

@@ -1775,6 +1775,7 @@ fn mailbox_message(thread_id: Uuid, body: &str) -> ThreadMessageView {
 /// schedule prompt and an in-app reply share.
 fn mailbox_message_view(thread_id: Uuid, body: &str) -> ThreadMessageView {
     ThreadMessageView {
+        access_level: crate::entities::access_level::AccessLevel::PUBLIC,
         response_contract: None,
         id: Uuid::new_v4(),
         canonical_id: CanonicalMessageId::random(),
@@ -2643,6 +2644,7 @@ fn a_thread_page_links_to_the_diagnostic_pane_rather_than_rendering_provider_key
 #[test]
 fn the_diagnostic_pane_qualifies_every_provider_key_by_its_interface() {
     let audit = MessageAuditView {
+        access_level: crate::entities::access_level::AccessLevel::PUBLIC,
         id: Uuid::new_v4(),
         canonical_id: CanonicalMessageId::random(),
         company_id: Uuid::new_v4(),
@@ -2678,6 +2680,7 @@ fn the_diagnostic_pane_qualifies_every_provider_key_by_its_interface() {
 #[test]
 fn the_diagnostic_pane_says_when_no_transport_carried_a_message() {
     let audit = MessageAuditView {
+        access_level: crate::entities::access_level::AccessLevel::PUBLIC,
         id: Uuid::new_v4(),
         canonical_id: CanonicalMessageId::random(),
         company_id: Uuid::new_v4(),

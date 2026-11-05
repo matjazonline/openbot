@@ -1,0 +1,57 @@
+{
+  "expected_sha384": "a00bc52820c1a07edb438ef4d534267cfa1de6ddb8fc11244a51da854ae8eb7400ccb1a81188cece278c06c5b785e7d8",
+  "databases": [
+    {
+      "proof": "workflow_history_consumptions",
+      "server": "18.6 (Homebrew)",
+      "checksum": "a00bc52820c1a07edb438ef4d534267cfa1de6ddb8fc11244a51da854ae8eb7400ccb1a81188cece278c06c5b785e7d8",
+      "triggers": [
+        "CREATE TRIGGER workflow_history_consumption_immutable BEFORE DELETE OR UPDATE ON public.workflow_history_consumptions FOR EACH ROW EXECUTE FUNCTION guard_workflow_history_consumption_immutable()",
+        "CREATE CONSTRAINT TRIGGER workflow_history_consumption_live AFTER INSERT OR UPDATE ON public.workflow_history_consumptions DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION guard_workflow_history_consumption_live()"
+      ],
+      "constraints": [
+        "TRIGGER DEFERRABLE INITIALLY DEFERRED",
+        "CHECK ((attempt_number > 0))",
+        "NOT NULL attempt_number",
+        "FOREIGN KEY (company_id, execution_id, job_id) REFERENCES background_tasks(company_id, workflow_execution_id, id) ON DELETE CASCADE",
+        "NOT NULL company_id",
+        "FOREIGN KEY (company_id, run_id, execution_id) REFERENCES workflow_executions(company_id, run_id, id) ON DELETE CASCADE",
+        "NOT NULL content_level",
+        "NOT NULL execution_generation",
+        "NOT NULL execution_id",
+        "FOREIGN KEY (job_id, attempt_number, execution_generation, worker_id) REFERENCES task_attempts(task_id, attempt_number, execution_generation, worker_id) ON DELETE CASCADE",
+        "NOT NULL job_id",
+        "PRIMARY KEY (company_id, run_id, execution_id, job_id, attempt_number)",
+        "NOT NULL run_id",
+        "NOT NULL worker_id"
+      ],
+      "database": "open_bots"
+    },
+    {
+      "proof": "workflow_history_consumptions",
+      "server": "18.6 (Homebrew)",
+      "checksum": "a00bc52820c1a07edb438ef4d534267cfa1de6ddb8fc11244a51da854ae8eb7400ccb1a81188cece278c06c5b785e7d8",
+      "triggers": [
+        "CREATE TRIGGER workflow_history_consumption_immutable BEFORE DELETE OR UPDATE ON public.workflow_history_consumptions FOR EACH ROW EXECUTE FUNCTION guard_workflow_history_consumption_immutable()",
+        "CREATE CONSTRAINT TRIGGER workflow_history_consumption_live AFTER INSERT OR UPDATE ON public.workflow_history_consumptions DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION guard_workflow_history_consumption_live()"
+      ],
+      "constraints": [
+        "TRIGGER DEFERRABLE INITIALLY DEFERRED",
+        "CHECK ((attempt_number > 0))",
+        "NOT NULL attempt_number",
+        "FOREIGN KEY (company_id, execution_id, job_id) REFERENCES background_tasks(company_id, workflow_execution_id, id) ON DELETE CASCADE",
+        "NOT NULL company_id",
+        "FOREIGN KEY (company_id, run_id, execution_id) REFERENCES workflow_executions(company_id, run_id, id) ON DELETE CASCADE",
+        "NOT NULL content_level",
+        "NOT NULL execution_generation",
+        "NOT NULL execution_id",
+        "FOREIGN KEY (job_id, attempt_number, execution_generation, worker_id) REFERENCES task_attempts(task_id, attempt_number, execution_generation, worker_id) ON DELETE CASCADE",
+        "NOT NULL job_id",
+        "PRIMARY KEY (company_id, run_id, execution_id, job_id, attempt_number)",
+        "NOT NULL run_id",
+        "NOT NULL worker_id"
+      ],
+      "database": "open_bots_test"
+    }
+  ]
+}

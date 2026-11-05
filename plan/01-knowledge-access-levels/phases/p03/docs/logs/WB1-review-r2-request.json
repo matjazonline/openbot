@@ -1,0 +1,87 @@
+{
+  "review_id": "KNOW-P03-WB1-R2",
+  "phase": "p03",
+  "stage": "combined correction recheck",
+  "scope": "Original knowledge03A\u2013D in one whole WB1",
+  "start": "ef12dc51e24609cad75ab1a354b81c8588578fca",
+  "review_base": "ef12dc51e24609cad75ab1a354b81c8588578fca",
+  "head": "ef12dc51e24609cad75ab1a354b81c8588578fca",
+  "installed_digest": "6c1c22b53202a22db87f5384f4290129c46e8bbcedc1607adfa261deac8578dc",
+  "source_manifest": "plan/01-knowledge-access-levels/phases/p03/docs/logs/WB1-review-r2-source-manifest.json",
+  "diff_sha256": "154aef92d65652504c57ee74f206c23710328e9820232ff8ac3ba33fcec55501",
+  "tree_sha256": "5814560962264ec3c568ea3d5c7ab31e449b641856d2d9b9597ce4ceec10fad2",
+  "files_count": 2703,
+  "exclusions": [
+    "plan/01-knowledge-access-levels/phases/p03/docs/"
+  ],
+  "installed_exclusion_args": [
+    "plan/01-knowledge-access-levels/phases/p03/docs"
+  ],
+  "authority": {
+    "path": "/Users/mac02/dev/openbot-recovery/plan/01-knowledge-access-levels/COORDINATION.md",
+    "file_revision": 7,
+    "pin": "plan/01-knowledge-access-levels/phases/p03/docs/logs/COORDINATION-r7-WB1-R2.md",
+    "sha256": "37fd5389cc7621d96ecf9b0d4f9cc86e337ca5d3c4069150fc5083f8144002c6",
+    "instructions": [
+      "KNOW-I001/r1",
+      "KNOW-I002/r1",
+      "KNOW-I003/r1",
+      "KNOW-I004/r1",
+      "KNOW-I005/r1"
+    ],
+    "notices": [
+      "KNOW-C001/r1"
+    ],
+    "disposition": "acknowledged; implemented and author-verified, root satisfaction pending independent acceptance"
+  },
+  "gated_decision": {
+    "id": "KNOW-P03-G1-R3",
+    "revision": 3,
+    "sha256": "4e447c7e1cf163ab4d5f0e5e7382c37b9012d49ed35ecb0fe184334e3682264e",
+    "actual_pass_note": "KNOW-P03-G1-R3-N1",
+    "original_r1_retained": true
+  },
+  "verification": {
+    "correction_r2_native": 51,
+    "current_r3_native": 818,
+    "current_native_failed": 0,
+    "current_native_ignored": 0,
+    "knowledge_prefix": 49,
+    "selectors_all_nonzero": 23,
+    "compiler_all_pass": true,
+    "schema_checksum_sha384": "a00bc52820c1a07edb438ef4d534267cfa1de6ddb8fc11244a51da854ae8eb7400ccb1a81188cece278c06c5b785e7d8",
+    "logs": [
+      "WB1-correction-r2-native-focused.log",
+      "WB1-correction-r3-native-focused.log",
+      "WB1-correction-compiler-checks-result.json",
+      "WB1-correction-schema-result.json"
+    ],
+    "full_final06_pending": true
+  },
+  "preserved_preexisting_source_changes": [],
+  "author": "/root (user-confirmed Sol6.1/xhigh)",
+  "reviewer": "/root/knowledge_p03_reviewer (Astra/high, independent original context)",
+  "correction": {
+    "finding_ids": [
+      "KNOW-P03-WB1-F1",
+      "KNOW-P03-WB1-F2"
+    ],
+    "changed_sources": [
+      "migrations/20260817000000_init_schema.sql",
+      "src/adapters/persistence/workflow/harness_token_scheduling_tests.rs",
+      "src/adapters/persistence/workflow/history_reader.rs",
+      "src/adapters/persistence/workflow/history_reader_tests.rs",
+      "src/adapters/persistence/workflow/knowledge_history_lease_tests.rs",
+      "src/adapters/persistence/workflow/knowledge_message_tests.rs",
+      "src/adapters/persistence/workflow/recovery.rs",
+      "src/application/app_error.rs",
+      "src/domain/workflow/mod.rs",
+      "src/domain/workflow/outcome.rs",
+      "src/domain/workflow/recovery.rs",
+      "src/domain/workflow/recovery_tests.rs"
+    ],
+    "verified_r1_source": "plan/01-knowledge-access-levels/phases/p03/docs/logs/WB1-reviewed-r1-source",
+    "old_source_recovery_proof": "plan/01-knowledge-access-levels/phases/p03/docs/logs/WB1-correction-r1-object-recovery.json",
+    "delta": "plan/01-knowledge-access-levels/phases/p03/docs/logs/WB1-correction-reviewed-r1-to-r2.diff"
+  }
+}

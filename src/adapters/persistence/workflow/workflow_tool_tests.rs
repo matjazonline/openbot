@@ -464,3 +464,72 @@ async fn workflow_tool_parent_cancel_cascades_and_a_restarted_worker_resumes_the
     assert_eq!(llm.finish().await.unwrap(), 2);
     assert_eq!(children(p, scope.run).await, 1);
 }
+
+#[tokio::test]
+async fn knowledge_run_level_workflow_tool_child_and_saved_result_replay_taint_parent_atomically() {
+    use crate::adapters::persistence::workflow::knowledge;
+    use crate::entities::access_level::AccessLevel;
+    let setup = Box::pin(ToolSetup::new(echo_child())).await;
+    let p = setup.persistence();
+    let claim = setup.claim("classified-child").await;
+    let scope = claim.fence.scope;
+    let mut tx = p.pool().begin().await.unwrap();
+    knowledge::raise_content_level_on(&mut tx, scope.company, scope.run, AccessLevel::L3)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    let llm = scripted_llm(vec![
+        LlmTurn::tool_call(DECLARED, json!({"question":"Classified question"})),
+        LlmTurn::text("\"continued\""),
+    ])
+    .await;
+    register_scripted_agent_base_url(setup.agent, &llm.base_url);
+    let runtime = setup.runtime();
+    assert!(matches!(
+        Box::pin(runtime.execute(&kind(), &claim)).await,
+        WorkflowHandlerOutcome::Suspended(_)
+    ));
+    let child = setup.child_of(scope).await;
+    let child_head = p.head(child.company, child.run).await.unwrap().unwrap();
+    assert_eq!(child_head.knowledge.ceiling(), AccessLevel::MAX);
+    assert_eq!(child_head.knowledge.content(), AccessLevel::L3);
+    let mut tx = p.pool().begin().await.unwrap();
+    knowledge::raise_content_level_on(&mut tx, child.company, child.run, AccessLevel::L5)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    p.advance_pure(child, budget()).await.unwrap();
+    assert!(matches!(
+        p.resume_wait(scope).await.unwrap(),
+        WaitProgress::Continued
+    ));
+    assert_eq!(
+        p.head(scope.company, scope.run)
+            .await
+            .unwrap()
+            .unwrap()
+            .knowledge
+            .content(),
+        AccessLevel::L5
+    );
+    let continued = p
+        .claim_io(scope, WorkflowWorkerId(Uuid::new_v4()), lease())
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(matches!(
+        Box::pin(runtime.execute(&kind(), &continued)).await,
+        WorkflowHandlerOutcome::Completed(Ok(_))
+    ));
+    assert_eq!(
+        p.head(scope.company, scope.run)
+            .await
+            .unwrap()
+            .unwrap()
+            .knowledge
+            .content(),
+        AccessLevel::L5
+    );
+    assert_eq!(call_parked(p, scope).await.children, 1);
+    assert_eq!(llm.finish().await.unwrap(), 2);
+}

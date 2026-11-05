@@ -1,0 +1,32 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/dev/openbot-recovery/.worktrees/knowledge-p03)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 45s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-7b3508cbfb62bd10)
+
+running 14 tests
+test domain::entities::access_level::knowledge_tests::knowledge_run_level_audience_is_the_lowest_reader_or_public ... ok
+test domain::entities::access_level::knowledge_tests::knowledge_run_level_domain_keeps_content_within_the_admission_ceiling ... ok
+test domain::entities::access_level::knowledge_tests::knowledge_run_level_release_matrix_never_declassifies ... ok
+test adapters::persistence::workflow::tests::admission_tests::knowledge_admission_tests::knowledge_run_level_schema_rejects_ceiling_changes_lowering_and_out_of_range ... ok
+test adapters::persistence::workflow::tests::message_tests::knowledge_message_tests::knowledge_run_level_verified_member_email_uses_current_member_level ... ok
+test adapters::persistence::workflow::tests::message_tests::knowledge_message_tests::knowledge_run_level_internal_message_stamps_current_content_and_completed_replay_retains_stamp ... ok
+test adapters::persistence::workflow::tests::message_tests::knowledge_message_tests::knowledge_run_level_tool_refusal_is_typed_and_contains_no_content ... ok
+test adapters::persistence::workflow::tests::admission_tests::history_reader_tests::knowledge_history_tests::knowledge_run_level_raise_rolls_back_with_its_read_transaction ... ok
+test adapters::persistence::workflow::tests::admission_tests::knowledge_admission_tests::knowledge_run_level_stamped_trigger_taints_or_refuses_without_partial_admission ... ok
+test adapters::persistence::workflow::tests::admission_tests::knowledge_admission_tests::knowledge_run_level_message_empty_owner_and_mixed_cc_audiences ... ok
+test adapters::persistence::workflow::tests::admission_tests::knowledge_admission_tests::knowledge_run_level_manual_and_replay_keep_admitted_ceiling ... ok
+
+thread 'adapters::persistence::workflow::tests::admission_tests::history_reader_tests::knowledge_history_tests::knowledge_run_level_history_filters_before_count_and_raises_returned_content' (30346909) panicked at src/adapters/persistence/workflow/history_reader_tests.rs:99:9:
+context.history completes
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::persistence::workflow::tests::message_tests::knowledge_message_tests::knowledge_run_level_pending_public_intent_cannot_send_after_content_rises ... ok
+test adapters::persistence::workflow::tests::admission_tests::history_reader_tests::knowledge_history_tests::knowledge_run_level_history_filters_before_count_and_raises_returned_content ... FAILED
+test adapters::persistence::workflow::tests::message_tests::knowledge_message_tests::knowledge_run_level_step_email_and_fanout_refuse_before_any_effect ... ok
+
+failures:
+
+failures:
+    adapters::persistence::workflow::tests::admission_tests::history_reader_tests::knowledge_history_tests::knowledge_run_level_history_filters_before_count_and_raises_returned_content
+
+test result: FAILED. 13 passed; 1 failed; 0 ignored; 0 measured; 2735 filtered out; finished in 4.04s
+
+error: test failed, to rerun pass `--lib`

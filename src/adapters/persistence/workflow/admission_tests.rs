@@ -454,3 +454,6 @@ async fn workflow_run_triggers_notify_a_threadless_run_on_insert_and_state_chang
         .unwrap();
     super::assert_silent_until_marker(&pool, &mut listener).await;
 }
+
+#[path = "knowledge_admission_tests.rs"]
+mod knowledge_admission_tests;

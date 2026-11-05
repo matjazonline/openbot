@@ -1,0 +1,29 @@
+{
+  "build_command": [
+    "cargo",
+    "test",
+    "--locked",
+    "--offline",
+    "--lib",
+    "--no-run",
+    "--message-format=json"
+  ],
+  "command": [
+    "/Users/mac02/dev/openbot-recovery/.worktrees/knowledge-p03/target/debug/deps/open_bots-7b3508cbfb62bd10",
+    "workflow_admit_",
+    "workflow_context_history_",
+    "workflow_action_",
+    "workflow_call_",
+    "workflow_message_",
+    "workflow_http_",
+    "workflow_mcp_",
+    "provisioning_"
+  ],
+  "exit_code": 0,
+  "environment": {
+    "CARGO_INCREMENTAL": "0",
+    "SQLX_OFFLINE": "true",
+    "DATABASE_URL": "postgres://mac02@127.0.0.1:55503/open_bots",
+    "TEST_DATABASE_URL": "postgres://mac02@127.0.0.1:55503/open_bots_test"
+  }
+}

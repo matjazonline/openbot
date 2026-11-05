@@ -1,0 +1,49 @@
+{
+  "recovered": {
+    "src/adapters/persistence/workflow/history_reader_tests.rs": {
+      "sha256": "4ac65027e69382fe50a078dcc1cb77d63950a6393b44b269a659f9bbcf97552b",
+      "git_blob": "8c14e6317144bb113614acbb2cdd3372c12623db"
+    },
+    "src/adapters/persistence/workflow/history_reader.rs": {
+      "sha256": "1be41a9f1b2344b2d5cef44b2efee5f9865282cebebe775958fceed49d8b9fba",
+      "git_blob": "dc14271ec77dadc593212ced0141001eee159a4b"
+    },
+    "src/application/app_error.rs": {
+      "sha256": "7c63ec5eee427591f5c1e58a57444293e4ae1f574c07f3efad3eec19d762b614",
+      "git_blob": "cec26c3fcc644f0435ad8d4f759765ca112cdcb3"
+    },
+    "migrations/20260817000000_init_schema.sql": {
+      "sha256": "197148c409c9c2c2f6e512ccf7e18b7ad5852f8def39d0cc7d944d2e5e0c4819",
+      "git_blob": "53779f4ae29f802e7ba7b07481d02db816d0f5fc"
+    },
+    "src/adapters/persistence/workflow/knowledge_message_tests.rs": {
+      "sha256": "af01d6226d5146ad1da54bf225f32e4111cd58499e1d4c284ea013b75b0dfa78",
+      "git_blob": "c57e2958d37be9d287aab62ae1582ba481bb5101"
+    },
+    "src/adapters/persistence/workflow/harness_token_scheduling_tests.rs": {
+      "sha256": "d4427751797753ba8688007c34d77c73459b5014dcb8dbea056e074f314112d0",
+      "source_commit": "ef12dc51e24609cad75ab1a354b81c8588578fca"
+    },
+    "src/adapters/persistence/workflow/recovery.rs": {
+      "sha256": "08b68262af20745d54998f1cc9faf6557be3631d674f745eed59cccb45bdcc5a",
+      "source_commit": "ef12dc51e24609cad75ab1a354b81c8588578fca"
+    },
+    "src/domain/workflow/mod.rs": {
+      "sha256": "0b4a11f3fdf13de745101f699523b6600c98f68cacc0da91477e1100a63efb17",
+      "source_commit": "ef12dc51e24609cad75ab1a354b81c8588578fca"
+    },
+    "src/domain/workflow/outcome.rs": {
+      "sha256": "cf2b87b7aa22b973b49be812344856708ee9119654197fc1f9d35659eee59b51",
+      "source_commit": "ef12dc51e24609cad75ab1a354b81c8588578fca"
+    },
+    "src/domain/workflow/recovery.rs": {
+      "sha256": "d8fbff382644b17a38b1302aa3e4245876df16325ac6136f6ca8ac342d9adc05",
+      "source_commit": "ef12dc51e24609cad75ab1a354b81c8588578fca"
+    },
+    "src/domain/workflow/recovery_tests.rs": {
+      "sha256": "b61323ac4c58debe1b2495e81a540d8b636af39fce04943ac2479a37b3ecc804",
+      "source_commit": "ef12dc51e24609cad75ab1a354b81c8588578fca"
+    }
+  },
+  "missing": []
+}

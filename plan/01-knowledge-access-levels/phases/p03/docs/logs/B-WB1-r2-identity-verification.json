@@ -1,0 +1,32 @@
+{
+  "status": "PASS",
+  "before_after_equal": true,
+  "branch": "knowledge/p03",
+  "head": "ef12dc51e24609cad75ab1a354b81c8588578fca",
+  "installed_digest": "6c1c22b53202a22db87f5384f4290129c46e8bbcedc1607adfa261deac8578dc",
+  "diff_sha256": "154aef92d65652504c57ee74f206c23710328e9820232ff8ac3ba33fcec55501",
+  "tree_sha256": "5814560962264ec3c568ea3d5c7ab31e449b641856d2d9b9597ce4ceec10fad2",
+  "files_count": 2703,
+  "exclusions": [
+    "plan/01-knowledge-access-levels/phases/p03/docs/"
+  ],
+  "authority_current_equals_r7_pin": true,
+  "authority_sha256": "37fd5389cc7621d96ecf9b0d4f9cc86e337ca5d3c4069150fc5083f8144002c6",
+  "decision_sha256": "4e447c7e1cf163ab4d5f0e5e7382c37b9012d49ed35ecb0fe184334e3682264e",
+  "both_private_db_migration_checksums": "a00bc52820c1a07edb438ef4d534267cfa1de6ddb8fc11244a51da854ae8eb7400ccb1a81188cece278c06c5b785e7d8",
+  "verified_delta_files": [
+    "migrations/20260817000000_init_schema.sql",
+    "src/adapters/persistence/workflow/harness_token_scheduling_tests.rs",
+    "src/adapters/persistence/workflow/history_reader.rs",
+    "src/adapters/persistence/workflow/history_reader_tests.rs",
+    "src/adapters/persistence/workflow/knowledge_history_lease_tests.rs",
+    "src/adapters/persistence/workflow/knowledge_message_tests.rs",
+    "src/adapters/persistence/workflow/recovery.rs",
+    "src/application/app_error.rs",
+    "src/domain/workflow/mod.rs",
+    "src/domain/workflow/outcome.rs",
+    "src/domain/workflow/recovery.rs",
+    "src/domain/workflow/recovery_tests.rs"
+  ],
+  "recovered_r1_blobs_match_B_manifest": true
+}

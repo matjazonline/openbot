@@ -1,0 +1,32 @@
+{
+  "owned_profile": "openbot-knowledge",
+  "cpus": 2,
+  "memory_gib": 6,
+  "disk_gib": 60,
+  "environment": {
+    "DOCKER_CONFIG": "/Users/mac02/dev/openbot-recovery/.worktrees/docker-knowledge",
+    "DOCKER_HOST": "unix:///Users/mac02/.colima/openbot-knowledge/docker.sock"
+  },
+  "default_context_activated": false,
+  "checks": [
+    {
+      "command": [
+        "docker",
+        "info",
+        "--format",
+        "{{.ServerVersion}} {{.OSType}} {{.Architecture}}"
+      ],
+      "exit_code": 0,
+      "output": "29.5.2 linux aarch64"
+    },
+    {
+      "command": [
+        "docker",
+        "buildx",
+        "version"
+      ],
+      "exit_code": 0,
+      "output": "github.com/docker/buildx v0.38.2 Homebrew"
+    }
+  ]
+}

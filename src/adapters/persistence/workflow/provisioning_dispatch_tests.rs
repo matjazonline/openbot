@@ -855,3 +855,6 @@ async fn provisioning_grants_capture_the_built_in_or_refuse_an_ambiguous_capture
         "{refused:?}"
     );
 }
+
+#[path = "knowledge_provisioning_tests.rs"]
+mod knowledge_provisioning_tests;

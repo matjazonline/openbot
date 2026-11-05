@@ -103,6 +103,20 @@ pub fn action_step_failure(
     {
         return guard_step_failure(family.prefix(), violation);
     }
+    if let Preparation(AppError::KnowledgeRelease { .. })
+    | Dispatch(AppError::KnowledgeRelease { .. }) = outcome
+    {
+        return WorkflowFailure {
+            failure: StepFailure::new(
+                Terminal,
+                FailureCode::parse(crate::app_error::KNOWLEDGE_AUDIENCE_BELOW_CONTENT)
+                    .expect("static knowledge failure code"),
+                None,
+            )
+            .expect("bounded knowledge failure"),
+            safety: RetrySafety::SafeToRetry,
+        };
+    }
     let (class, suffix) = match outcome {
         Preparation(
             AppError::NotFound(_) | AppError::BadRequest(_) | AppError::InvalidCredentials,

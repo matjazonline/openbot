@@ -258,6 +258,7 @@ impl InMemoryThreads {
             .iter()
             .find(|canonical| canonical.id == association.message_id)?;
         Some(Message {
+            access_level: crate::entities::access_level::AccessLevel::PUBLIC,
             response_contract: None,
             id: association.id,
             canonical_id: canonical.id,
@@ -774,6 +775,7 @@ impl ThreadPersistence for InMemoryThreads {
         Ok(messages
             .iter()
             .map(|message| AgentHistoryMessage {
+                access_level: message.access_level,
                 role: message.role,
                 audience: message.audience,
                 entry_kind: message.entry_kind,
@@ -1006,6 +1008,7 @@ impl ThreadPersistence for InMemoryThreads {
 /// The email-shaped stored message projected the way the SQL reads project it.
 fn thread_message_view(message: &Message) -> ThreadMessageView {
     ThreadMessageView {
+        access_level: message.access_level,
         response_contract: message.response_contract.clone(),
         id: message.id,
         canonical_id: message.canonical_id,
@@ -1145,6 +1148,7 @@ pub fn stored_email(draft: EmailMessageDraft) -> Message {
     }
 
     Message {
+        access_level: crate::entities::access_level::AccessLevel::PUBLIC,
         response_contract: None,
         id: draft.id,
         canonical_id: CanonicalMessageId::random(),

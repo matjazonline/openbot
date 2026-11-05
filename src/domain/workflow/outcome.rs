@@ -8,6 +8,9 @@ use thiserror::Error;
 
 const MAX_DIAGNOSTIC_BYTES: usize = 4096;
 
+/// A new pre-effect knowledge refusal terminates the run, including configured error routes.
+pub const KNOWLEDGE_AUDIENCE_BELOW_CONTENT: &str = "knowledge.audience_below_content";
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CompletionRoute {
     Success,
@@ -123,6 +126,11 @@ impl StepFailure {
         &self.code
     }
 
+    /// This reserved policy failure cannot be recovered by workflow-authored branches.
+    pub fn fails_run(&self) -> bool {
+        self.code.as_str() == KNOWLEDGE_AUDIENCE_BELOW_CONTENT
+    }
+
     pub fn diagnostic(&self) -> Option<&str> {
         self.diagnostic.as_deref()
     }
@@ -209,6 +217,10 @@ pub fn resolve_outcome<'a>(
             }
             Ok(EngineDisposition::Park { request })
         }
+        StepOutcome::Failed(failure) if failure.fails_run() => Ok(EngineDisposition::Terminal {
+            failure,
+            target: None,
+        }),
         StepOutcome::Failed(failure)
             if failure.class() == FailureClass::Retryable
                 && retry == RetryEligibility::Available =>
@@ -351,6 +363,27 @@ mod tests {
             resolve_outcome(&graph, &id("a"), &missing, RetryEligibility::Available, now),
             Err(OutcomeError::Route(RouteError::UnknownChoice { .. }))
         ));
+    }
+
+    #[test]
+    fn knowledge_run_level_refusal_has_no_retry_or_error_route() {
+        let graph = graph();
+        for class in [FailureClass::Terminal, FailureClass::Retryable] {
+            let failed = StepOutcome::Failed(
+                StepFailure::new(
+                    class,
+                    FailureCode::parse(KNOWLEDGE_AUDIENCE_BELOW_CONTENT).unwrap(),
+                    None,
+                )
+                .unwrap(),
+            );
+            for retry in [RetryEligibility::Available, RetryEligibility::Exhausted] {
+                assert!(matches!(
+                    resolve_outcome(&graph, &id("a"), &failed, retry, Utc::now()).unwrap(),
+                    EngineDisposition::Terminal { target: None, .. }
+                ));
+            }
+        }
     }
 
     #[test]

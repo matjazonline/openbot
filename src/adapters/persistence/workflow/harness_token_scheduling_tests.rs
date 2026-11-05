@@ -396,3 +396,69 @@ async fn workflow_harness_token_pause_cannot_replace_hard_model_budget_failure()
     );
     assert_eq!(job(&f, child).await["status"], "failed");
 }
+
+#[tokio::test]
+async fn knowledge_run_level_refusal_survives_real_token_allowance_and_refusal_retirement() {
+    use crate::application::workflow::actions::{
+        ActionFamily, ActionStepOutcome, action_step_failure,
+    };
+    use crate::entities::access_level::AccessLevel;
+    for gate in ["awaiting", "refused"] {
+        let f = Box::pin(configured()).await;
+        let p = f.model.native.fixture.persistence();
+        let child = refusal::child(&f, f.model.write.fence.scope).await;
+        let policy = f.model.write.lease_policy;
+        let claim = p
+            .settled()
+            .claim_io(child, worker(), policy)
+            .await
+            .unwrap()
+            .unwrap();
+        exceed(&f).await;
+        if gate == "refused" {
+            p.submit_decision(command(p, f.model.write.fence.scope, f.reviewer, "reject").await)
+                .await
+                .unwrap();
+        }
+        let mut tx = p.pool().begin().await.unwrap();
+        let actual =
+            crate::adapters::persistence::workflow::token_budget::progression_on(&mut tx, child)
+                .await
+                .unwrap();
+        assert_eq!(
+            actual.failure_code(),
+            Some(if gate == "awaiting" {
+                "workflow.tokens_awaiting_approval"
+            } else {
+                "workflow.tokens_rejected"
+            })
+        );
+        tx.rollback().await.unwrap();
+        let report = action_step_failure(
+            ActionFamily::Http,
+            ActionStepOutcome::Preparation(&AppError::KnowledgeRelease {
+                content: AccessLevel::L5,
+                destination: AccessLevel::PUBLIC,
+            }),
+        );
+        assert!(
+            p.settled()
+                .release_io(claim.fence, policy, LeaseReleaseCause::Classified(report))
+                .await
+                .unwrap()
+        );
+        let saved: Value = sqlx::query_scalar("SELECT jsonb_build_object('state',run.state,'code',attempt.workflow_failure_code,
+            'job',job.status) FROM workflow_runs AS run
+            JOIN workflow_executions AS execution ON execution.company_id=run.company_id AND execution.run_id=run.id
+            JOIN background_tasks AS job ON job.company_id=execution.company_id AND job.workflow_execution_id=execution.id
+            JOIN task_attempts AS attempt ON attempt.task_id=job.id AND attempt.attempt_number=$3
+            WHERE run.company_id=$1 AND run.id=$2")
+            .bind(child.company.as_uuid()).bind(child.run.as_uuid()).bind(claim.fence.attempt.0)
+            .fetch_one(p.pool()).await.unwrap();
+        assert_eq!(
+            saved,
+            json!({"state":"failed","job":"failed","code":crate::app_error::KNOWLEDGE_AUDIENCE_BELOW_CONTENT}),
+            "{gate}"
+        );
+    }
+}

@@ -232,6 +232,7 @@ impl<A: SqlActionAuthority, L: SqlLocalAction> ActionDispatch for PostgresAction
                         None => LocalDispatchResult::PossibleDispatchExists,
                     }));
                 }
+                super::knowledge_release::evaluate_on(&mut tx, &action, super::knowledge_release::MessageRecipients::Current).await?;
                 let marker = Uuid::new_v4();
                 Self::insert(&mut tx, request, marker, "local", policy).await?;
                 // Box the local adapter seam to keep debug/test stacks bounded.
@@ -476,6 +477,24 @@ impl<A: SqlActionAuthority, L: SqlLocalAction> PostgresActionDispatch<A, L> {
         let window = lease::live_window(tx, request.fence, bound.started())
             .await?
             .ok_or_else(conflict)?;
+        if let Err(error) = super::knowledge_release::evaluate_on(
+            tx,
+            &action,
+            super::knowledge_release::MessageRecipients::Current,
+        )
+        .await
+        {
+            // A prior marker may already have had an effect. Retain that uncertainty while
+            // preventing a new provider entry under this now-refused classification.
+            if matches!(error, AppError::KnowledgeRelease { .. })
+                && Self::existing(tx, request).await?
+            {
+                return Ok(End::Rollback(Reserving::Refused(
+                    RemoteReservationResult::PossibleDispatchExists,
+                )));
+            }
+            return Err(error);
+        }
         let provider = self.provider_on(tx, request, &action, contract).await?;
         policy["provider_replay"] = provider.proof()?;
         let Some(marker) = self

@@ -617,10 +617,13 @@ async fn store_canonical(
     let message_id = message::insert_canonical_message(
         tx,
         request.company_id,
-        write,
-        &author,
-        attachments.as_ref(),
-        &content_hash,
+        message::CanonicalMessageInsert {
+            write,
+            author: &author,
+            attachments: attachments.as_ref(),
+            content_hash: &content_hash,
+            stamp: message::MessageStampSource::Public,
+        },
     )
     .await?;
     message::insert_participants(tx, request.company_id, message_id, &participants).await?;

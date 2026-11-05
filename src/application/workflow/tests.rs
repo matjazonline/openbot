@@ -402,6 +402,11 @@ impl WorkflowInspection for MemoryStore {
         }
         Ok(state.returned_head.clone().or_else(|| {
             state.runs.get(&(company_id, run_id)).map(|run| RunHead {
+                knowledge: crate::entities::access_level::RunKnowledge::new(
+                    crate::entities::access_level::AccessLevel::MAX,
+                    crate::entities::access_level::AccessLevel::PUBLIC,
+                )
+                .unwrap(),
                 causality: run.causality.clone(),
                 workflow_id: run.workflow_id,
                 version_id: run.version_id,

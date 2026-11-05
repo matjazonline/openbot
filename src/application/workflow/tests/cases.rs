@@ -227,6 +227,11 @@ async fn cancellation_checks_scope_and_expected_revision() {
         panic!("expected created")
     };
     store.state.lock().unwrap().returned_head = Some(RunHead {
+        knowledge: crate::entities::access_level::RunKnowledge::new(
+            crate::entities::access_level::AccessLevel::MAX,
+            crate::entities::access_level::AccessLevel::PUBLIC,
+        )
+        .unwrap(),
         causality: test_causality(company(), run_id),
         workflow_id: WorkflowId::new(Uuid::nil()),
         version_id,
@@ -247,6 +252,11 @@ async fn cancellation_checks_scope_and_expected_revision() {
         Err(AppError::Internal(_))
     ));
     store.state.lock().unwrap().returned_head = Some(RunHead {
+        knowledge: crate::entities::access_level::RunKnowledge::new(
+            crate::entities::access_level::AccessLevel::MAX,
+            crate::entities::access_level::AccessLevel::PUBLIC,
+        )
+        .unwrap(),
         causality: test_causality(company_id, RunId::new(Uuid::new_v4())),
         workflow_id: WorkflowId::new(Uuid::nil()),
         version_id,
@@ -276,6 +286,11 @@ async fn cancellation_checks_scope_and_expected_revision() {
         .unwrap()
         .revision = RunRevision(2);
     store.state.lock().unwrap().returned_head = Some(RunHead {
+        knowledge: crate::entities::access_level::RunKnowledge::new(
+            crate::entities::access_level::AccessLevel::MAX,
+            crate::entities::access_level::AccessLevel::PUBLIC,
+        )
+        .unwrap(),
         causality: test_causality(company_id, run_id),
         workflow_id: WorkflowId::new(Uuid::nil()),
         version_id,

@@ -1,0 +1,30 @@
+{
+  "review": "KNOW-P03-G1-R1",
+  "stage": "architecture gate for whole03A-D",
+  "decision": "G1-r1-decisions.md",
+  "decision_sha256": "371e79a206f5c4678c977cdf6c521b8ba6c553426aa2ce8a06d2706c82a6fbca",
+  "source": {
+    "base": "ef12dc51e24609cad75ab1a354b81c8588578fca",
+    "head": "ef12dc51e24609cad75ab1a354b81c8588578fca",
+    "exclusions": [
+      "plan/01-knowledge-access-levels/phases/p03/docs/"
+    ],
+    "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "tree_sha256": "e942ee8c7f39d87dec1eb2982cb2320cfe94a59b25b46e9806313b54fee8aa3c",
+    "files_count": 2686
+  },
+  "installed_digest": "7748b9ecfec9126d48371a44bb1aaf8ccabcce8c0f247625cf65c9a249b2d696",
+  "installed_exclude_argument": "plan/01-knowledge-access-levels/phases/p03/docs",
+  "authority_revision": 6,
+  "notices": [
+    "KNOW-I001/r1",
+    "KNOW-I002/r1",
+    "KNOW-I003/r1",
+    "KNOW-I004/r1",
+    "KNOW-I005/r1",
+    "KNOW-C001/r1"
+  ],
+  "authority_pin": "COORDINATION-r6-G1.md",
+  "baseline": "both private55503migrations/resourcecheck/offlinealltargets+525focusednativePASS0fail0ignored,all8nonzerofilters",
+  "status": "source pristine; architecture review pending; no dependent implementation"
+}

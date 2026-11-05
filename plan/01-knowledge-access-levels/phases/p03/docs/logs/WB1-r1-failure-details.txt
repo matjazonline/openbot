@@ -1,0 +1,93 @@
+failures:
+
+---- adapters::persistence::thread::tests::unreadable_stored_json_surfaces_as_an_application_error stdout ----
+
+thread 'adapters::persistence::thread::tests::unreadable_stored_json_surfaces_as_an_application_error' (30360626) panicked at src/adapters/persistence/thread/tests.rs:843:5:
+expected an application error, got Err(Database("no column found for name: response_contract"))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::persistence::thread::view_tests::a_message_no_transport_carried_reads_back_through_every_projection stdout ----
+
+thread 'adapters::persistence::thread::view_tests::a_message_no_transport_carried_reads_back_through_every_projection' (30360632) panicked at src/adapters/persistence/thread/view_tests.rs:61:10:
+called `Result::unwrap()` on an `Err` value: Database("no column found for name: response_contract")
+
+---- adapters::persistence::thread::view_tests::history_keeps_role_and_order_within_a_bounded_newest_window stdout ----
+
+thread 'adapters::persistence::thread::view_tests::history_keeps_role_and_order_within_a_bounded_newest_window' (30360638) panicked at src/adapters/persistence/thread/view_tests.rs:280:10:
+called `Result::unwrap()` on an `Err` value: Database("no column found for name: response_contract")
+
+---- adapters::persistence::thread::tests::jsonb_row_context_tests::jsonb_row_context_thread_contract_is_optional_per_message stdout ----
+
+thread 'adapters::persistence::thread::tests::jsonb_row_context_tests::jsonb_row_context_thread_contract_is_optional_per_message' (30360580) panicked at src/adapters/persistence/thread/jsonb_row_context_tests.rs:52:14:
+called `Result::unwrap()` on an `Err` value: Database("no column found for name: response_contract")
+
+---- adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::control_serialization_tests::workflow_action_reconciliation_control_serialization_cancel_before_command stdout ----
+probe run=79842299-d1d7-4bcd-a813-beb755d16dbb company=ff2c2661-0f68-46d2-9010-33cfd8c03a92 phase=query_and_drain elapsed_us=0
+probe run=79842299-d1d7-4bcd-a813-beb755d16dbb company=ff2c2661-0f68-46d2-9010-33cfd8c03a92 phase=done elapsed_us=559 sqlstate=None
+observed lock wait statement="SELECT id FROM workflow_executions" blocker=94202 pid=94204 elapsed_ms=9 hang_guard=10s
+held probe run=79842299-d1d7-4bcd-a813-beb755d16dbb company=ff2c2661-0f68-46d2-9010-33cfd8c03a92 first_pid=94204 gate_pid=94202 observer_pid=94203
+probe run=79842299-d1d7-4bcd-a813-beb755d16dbb company=ff2c2661-0f68-46d2-9010-33cfd8c03a92 phase=query_and_drain elapsed_us=0
+probe run=79842299-d1d7-4bcd-a813-beb755d16dbb company=ff2c2661-0f68-46d2-9010-33cfd8c03a92 phase=done elapsed_us=181 sqlstate=None
+
+thread 'adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::control_serialization_tests::workflow_action_reconciliation_control_serialization_cancel_before_command' (30362478) panicked at src/adapters/persistence/workflow/action_reconciliation_control_serialization_tests.rs:58:18:
+called `Result::unwrap()` on an `Err` value: DatabaseTimeout("error returned from database: canceling statement due to statement timeout")
+
+---- adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::control_serialization_tests::workflow_action_reconciliation_control_serialization_command_before_cancel stdout ----
+probe run=34d93260-d6d0-4f0e-b579-b0d2b43b4870 company=23c9b581-451e-43f0-a760-8dfc52d84412 phase=query_and_drain elapsed_us=0
+probe run=34d93260-d6d0-4f0e-b579-b0d2b43b4870 company=23c9b581-451e-43f0-a760-8dfc52d84412 phase=done elapsed_us=357 sqlstate=None
+observed lock wait statement="SELECT id FROM workflow_executions" blocker=94209 pid=94208 elapsed_ms=1 hang_guard=10s
+held probe run=34d93260-d6d0-4f0e-b579-b0d2b43b4870 company=23c9b581-451e-43f0-a760-8dfc52d84412 first_pid=94208 gate_pid=94209 observer_pid=94207
+probe run=34d93260-d6d0-4f0e-b579-b0d2b43b4870 company=23c9b581-451e-43f0-a760-8dfc52d84412 phase=query_and_drain elapsed_us=0
+probe run=34d93260-d6d0-4f0e-b579-b0d2b43b4870 company=23c9b581-451e-43f0-a760-8dfc52d84412 phase=done elapsed_us=159 sqlstate=None
+
+thread 'adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::control_serialization_tests::workflow_action_reconciliation_control_serialization_command_before_cancel' (30362485) panicked at src/adapters/persistence/workflow/action_reconciliation_control_serialization_tests.rs:58:18:
+called `Result::unwrap()` on an `Err` value: DatabaseTimeout("error returned from database: canceling statement due to statement timeout")
+
+---- adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::control_serialization_tests::workflow_action_reconciliation_control_serialization_expire_before_command stdout ----
+probe run=da4e8b31-370a-45c9-ad17-70d2c75f2eb8 company=5e1a8ad7-128f-4f00-9f28-596312018560 phase=query_and_drain elapsed_us=0
+probe run=da4e8b31-370a-45c9-ad17-70d2c75f2eb8 company=5e1a8ad7-128f-4f00-9f28-596312018560 phase=done elapsed_us=356 sqlstate=None
+observed lock wait statement="SELECT id FROM workflow_executions" blocker=94242 pid=94176 elapsed_ms=8 hang_guard=10s
+held probe run=da4e8b31-370a-45c9-ad17-70d2c75f2eb8 company=5e1a8ad7-128f-4f00-9f28-596312018560 first_pid=94176 gate_pid=94242 observer_pid=94243
+probe run=da4e8b31-370a-45c9-ad17-70d2c75f2eb8 company=5e1a8ad7-128f-4f00-9f28-596312018560 phase=query_and_drain elapsed_us=0
+probe run=da4e8b31-370a-45c9-ad17-70d2c75f2eb8 company=5e1a8ad7-128f-4f00-9f28-596312018560 phase=done elapsed_us=173 sqlstate=None
+
+thread 'adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::control_serialization_tests::workflow_action_reconciliation_control_serialization_expire_before_command' (30362530) panicked at src/adapters/persistence/workflow/action_reconciliation_control_serialization_tests.rs:64:18:
+called `Result::unwrap()` on an `Err` value: DatabaseTimeout("error returned from database: canceling statement due to statement timeout")
+
+---- adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::candidate_tests::workflow_action_reconciliation_claim_sql_multiple_applicable_candidates stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::candidate_tests::workflow_action_reconciliation_claim_sql_multiple_applicable_candidates' (30363123) panicked at src/adapters/persistence/workflow/action_reconciliation_claim_sql_candidate_support.rs:107:5:
+assertion `left == right` failed
+  left: ["guard_workflow_run_transition", "workflow_action_capture_claim_retirement", "workflow_action_capture_state_witness", "workflow_allocate_wakeup", "workflow_parent_immutable", "workflow_run_finished", "workflow_run_knowledge", "workflow_run_revision", "workflow_run_snapshot_immutable", "workflow_runs_preserve_association"]
+ right: ["guard_workflow_run_transition", "workflow_action_capture_claim_retirement", "workflow_action_capture_state_witness", "workflow_allocate_wakeup", "workflow_parent_immutable", "workflow_run_finished", "workflow_run_revision", "workflow_run_snapshot_immutable", "workflow_runs_preserve_association"]
+
+---- adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::abort_tests::cancellation_tests::workflow_action_reconciliation_claim_cancellation_claim_first stdout ----
+observed lock wait statement="SELECT usage.root_run_id FROM workflow_root_budget_usage" blocker=94604 pid=94551 elapsed_ms=11 hang_guard=10s
+observed lock wait statement="SELECT usage.root_run_id FROM workflow_root_budget_usage" blocker=94708 pid=94643 elapsed_ms=17 hang_guard=10s
+observed lock wait statement="SELECT usage.root_run_id FROM workflow_root_budget_usage" blocker=94796 pid=94746 elapsed_ms=7 hang_guard=10s
+
+thread 'adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::abort_tests::cancellation_tests::workflow_action_reconciliation_claim_cancellation_claim_first' (30363066) panicked at src/adapters/persistence/workflow/action_reconciliation_claim_cancellation_tests.rs:209:5:
+every claim_first attempt was void
+
+---- adapters::persistence::workflow::tests::message_tests::thread_tests::workflow_message_thread_reply_refuses_sources_it_cannot_answer stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::thread_tests::workflow_message_thread_reply_refuses_sources_it_cannot_answer' (30370841) panicked at src/adapters/persistence/workflow/message_thread_tests.rs:471:9:
+assertion `left == right` failed
+  left: "message.unresolved"
+ right: "message.rejected"
+
+
+failures:
+    adapters::persistence::thread::tests::jsonb_row_context_tests::jsonb_row_context_thread_contract_is_optional_per_message
+    adapters::persistence::thread::tests::unreadable_stored_json_surfaces_as_an_application_error
+    adapters::persistence::thread::view_tests::a_message_no_transport_carried_reads_back_through_every_projection
+    adapters::persistence::thread::view_tests::history_keeps_role_and_order_within_a_bounded_newest_window
+    adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::control_serialization_tests::workflow_action_reconciliation_control_serialization_cancel_before_command
+    adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::control_serialization_tests::workflow_action_reconciliation_control_serialization_command_before_cancel
+    adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::control_serialization_tests::workflow_action_reconciliation_control_serialization_expire_before_command
+    adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::abort_tests::cancellation_tests::workflow_action_reconciliation_claim_cancellation_claim_first
+    adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::candidate_tests::workflow_action_reconciliation_claim_sql_multiple_applicable_candidates
+    adapters::persistence::workflow::tests::message_tests::thread_tests::workflow_message_thread_reply_refuses_sources_it_cannot_answer
+
+test result: FAILED. 684 passed; 10 failed; 0 ignored; 0 measured; 2080 filtered out; finished in 240.81s
+

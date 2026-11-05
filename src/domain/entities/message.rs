@@ -300,6 +300,7 @@ impl MessageAuthor {
 /// canonical row and three of these. [`Message::canonical_id`] is the payload the three share.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Message {
+    pub access_level: super::access_level::AccessLevel,
     /// `thread_messages.id`. The identity the UI and the message cursor name.
     pub id: Uuid,
     /// `messages.id`. The payload every thread association of this message shares.

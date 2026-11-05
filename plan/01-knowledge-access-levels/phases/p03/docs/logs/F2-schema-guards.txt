@@ -1,0 +1,30 @@
+2214:-- Name: workflow_action_consumption_commit_guard(); Type: FUNCTION; Schema: public; Owner: -
+2217:CREATE FUNCTION public.workflow_action_consumption_commit_guard() RETURNS trigger
+2227:    THEN RAISE EXCEPTION 'workflow action final proof cannot be consumed' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_action_consumption_commit_guard'; END IF;
+2233:-- Name: workflow_action_dispatch_commit_guard(); Type: FUNCTION; Schema: public; Owner: -
+2236:CREATE FUNCTION public.workflow_action_dispatch_commit_guard() RETURNS trigger
+2254:        THEN RAISE EXCEPTION 'workflow message dispatch requires its linkage' USING CONSTRAINT='workflow_guard:workflow_action_dispatch_commit_guard'; END IF;
+2272:            THEN RAISE EXCEPTION 'workflow message park lost its fence' USING CONSTRAINT='workflow_guard:workflow_action_dispatch_commit_guard'; END IF;
+2276:            RAISE EXCEPTION 'workflow message with deliveries must park' USING CONSTRAINT='workflow_guard:workflow_action_dispatch_commit_guard';
+2281:        THEN RAISE EXCEPTION 'in-app workflow message requires atomic receipt' USING CONSTRAINT='workflow_guard:workflow_action_dispatch_commit_guard'; END IF;
+2296:    ) THEN RAISE EXCEPTION 'workflow action dispatch lost live fence' USING CONSTRAINT='workflow_guard:workflow_action_dispatch_commit_guard'; END IF;
+2301:    ) THEN RAISE EXCEPTION 'local workflow action requires atomic receipt' USING CONSTRAINT='workflow_guard:workflow_action_dispatch_commit_guard'; END IF;
+2308:-- Name: workflow_action_evidence_commit_guard(); Type: FUNCTION; Schema: public; Owner: -
+2311:CREATE FUNCTION public.workflow_action_evidence_commit_guard() RETURNS trigger
+2327:    THEN RAISE EXCEPTION 'invalid workflow action evidence provenance' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_action_evidence_commit_guard'; END IF;
+2335:        THEN RAISE EXCEPTION 'invalid workflow message evidence provenance' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_action_evidence_commit_guard'; END IF;
+2351:    THEN RAISE EXCEPTION 'invalid workflow action evidence provenance' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_action_evidence_commit_guard'; END IF;
+2652:-- Name: workflow_action_remote_entry_commit_guard(); Type: FUNCTION; Schema: public; Owner: -
+2655:CREATE FUNCTION public.workflow_action_remote_entry_commit_guard() RETURNS trigger
+2676:    THEN RAISE EXCEPTION 'workflow action remote entry lost live fence' USING CONSTRAINT='workflow_guard:workflow_action_remote_entry_commit_guard'; END IF;
+2692:    THEN RAISE EXCEPTION 'workflow action remote entry lacks supported replay' USING CONSTRAINT='workflow_guard:workflow_action_remote_entry_commit_guard'; END IF;
+8470:-- Name: workflow_action_claim_budget_refusals workflow_action_claim_budget_refusal_commit_guard; Type: TRIGGER; Schema: public; Owner: -
+8473:CREATE CONSTRAINT TRIGGER workflow_action_claim_budget_refusal_commit_guard AFTER INSERT ON public.workflow_action_claim_budget_refusals DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.workflow_action_claim_budget_refusal_guard();
+8547:-- Name: workflow_action_evidence_consumptions workflow_action_consumption_commit_guard; Type: TRIGGER; Schema: public; Owner: -
+8550:CREATE CONSTRAINT TRIGGER workflow_action_consumption_commit_guard AFTER INSERT ON public.workflow_action_evidence_consumptions DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.workflow_action_consumption_commit_guard();
+8561:-- Name: workflow_action_dispatches workflow_action_dispatch_commit_guard; Type: TRIGGER; Schema: public; Owner: -
+8564:CREATE CONSTRAINT TRIGGER workflow_action_dispatch_commit_guard AFTER INSERT ON public.workflow_action_dispatches DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.workflow_action_dispatch_commit_guard();
+8589:-- Name: workflow_action_evidence workflow_action_evidence_commit_guard; Type: TRIGGER; Schema: public; Owner: -
+8592:CREATE CONSTRAINT TRIGGER workflow_action_evidence_commit_guard AFTER INSERT ON public.workflow_action_evidence DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.workflow_action_evidence_commit_guard();
+8694:-- Name: workflow_action_remote_entries workflow_action_remote_entry_commit_guard; Type: TRIGGER; Schema: public; Owner: -
+8697:CREATE CONSTRAINT TRIGGER workflow_action_remote_entry_commit_guard AFTER INSERT ON public.workflow_action_remote_entries DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.workflow_action_remote_entry_commit_guard();

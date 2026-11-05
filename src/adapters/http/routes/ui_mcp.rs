@@ -106,13 +106,25 @@ async fn detail_page(
     message: Option<&str>,
 ) -> AppResult<Html<String>> {
     let current = s.get(user, company, id).await?;
+    let actor = s.level_actor(user, company).await?;
+    let classification = super::super::pages::connection_levels::level_form(
+        &format!("/ui/companies/{company}/mcp-connections/{id}/access-level"),
+        current.revision,
+        current.access_level,
+        actor,
+        None,
+    );
     Ok(Html(mcp::shell(
         "MCP server",
         company,
-        &mcp::detail(
-            company,
-            &current,
-            draft.unwrap_or(&DefinitionDraft::stored(&current)),
+        &format!(
+            "{}{}",
+            mcp::detail(
+                company,
+                &current,
+                draft.unwrap_or(&DefinitionDraft::stored(&current)),
+            ),
+            classification
         ),
         message,
     )))

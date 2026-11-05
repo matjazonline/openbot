@@ -1,0 +1,13 @@
+{
+  "exit_code": 0,
+  "passed": 130,
+  "failed": 0,
+  "ignored": 0,
+  "elapsed_seconds": 41.02,
+  "environment": {
+    "CARGO_INCREMENTAL": "0",
+    "SQLX_OFFLINE": "true",
+    "DATABASE_URL": "postgres://mac02@127.0.0.1:55503/open_bots",
+    "TEST_DATABASE_URL": "postgres://mac02@127.0.0.1:55503/open_bots_test"
+  }
+}

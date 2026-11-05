@@ -1,0 +1,10 @@
+246:                    AND (decision.subject_kind<>'token_allowance' OR NOT EXISTS(SELECT 1 FROM workflow_run_budgets AS link JOIN workflow_root_budget_usage AS usage USING(company_id,root_run_id) WHERE link.company_id=decision.company_id AND link.run_id=decision.run_id AND usage.token_refusal IS NOT NULL))
+1178:        IF NEW.activations<>0 OR NEW.model_calls<>0 OR NEW.repetitions<>0 OR NEW.authorized_tokens<>0 OR NEW.token_refusal IS NOT NULL THEN
+1192:        OR (OLD.token_refusal IS NOT NULL AND NEW.token_refusal IS DISTINCT FROM OLD.token_refusal)
+5481:    token_refusal text CHECK (token_refusal IN ('rejected','expired')),
+5533:    CONSTRAINT workflow_root_token_policy_check CHECK (token_policy IS NULL OR public.valid_workflow_token_policy(token_policy)),
+11252:            WHERE company_id=NEW.company_id AND root_run_id=root AND token_refusal IS NULL;
+11255:        UPDATE workflow_root_budget_usage SET token_refusal=COALESCE(token_refusal,'rejected') WHERE company_id=NEW.company_id AND root_run_id=root;
+11268:        UPDATE workflow_root_budget_usage AS usage SET token_refusal=COALESCE(usage.token_refusal,'expired')
+11325:    SELECT usage.root_run_id,budget.token_policy,GREATEST(usage.authorized_tokens,(budget.token_policy->>'max_tokens')::bigint),usage.token_refusal
+11415:    SELECT usage.token_refusal,GREATEST(usage.authorized_tokens,(budget.token_policy->>'max_tokens')::bigint)

@@ -45,6 +45,7 @@ pub(super) async fn retire_on(
         Retirement::BudgetExhausted | Retirement::Interrupted(LeaseReleaseCause::ActivationLimit)
     );
     if let Some(code) = token_gate.failure_code()
+        && !report.failure.fails_run()
         && (!hard_limit || matches!(token_gate, token_budget::Progression::Refused(_)))
     {
         report.failure = StepFailure::new(

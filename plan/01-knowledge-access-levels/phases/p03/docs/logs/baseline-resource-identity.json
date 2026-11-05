@@ -1,0 +1,19 @@
+{
+  "init_sha384": "932f7aac14a0921ea16e687da373957da1e0e94876d30173b3fa4bec9be73febd9566158b798c9793a3ec12a4ed5f409",
+  "databases": [
+    {
+      "database": "open_bots",
+      "port": "55503",
+      "data_directory": "/Users/mac02/dev/openbot-recovery/.worktrees/pg-knowledge-p03",
+      "checksum": "932f7aac14a0921ea16e687da373957da1e0e94876d30173b3fa4bec9be73febd9566158b798c9793a3ec12a4ed5f409",
+      "level_columns": 2
+    },
+    {
+      "database": "open_bots_test",
+      "port": "55503",
+      "data_directory": "/Users/mac02/dev/openbot-recovery/.worktrees/pg-knowledge-p03",
+      "checksum": "932f7aac14a0921ea16e687da373957da1e0e94876d30173b3fa4bec9be73febd9566158b798c9793a3ec12a4ed5f409",
+      "level_columns": 2
+    }
+  ]
+}

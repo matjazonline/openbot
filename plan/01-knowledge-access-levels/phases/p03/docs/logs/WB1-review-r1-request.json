@@ -1,0 +1,56 @@
+{
+  "review_id": "KNOW-P03-WB1-R1",
+  "phase": "p03",
+  "stage": "whole batch review",
+  "scope": "Original knowledge03A\u2013D in one whole WB1",
+  "start": "ef12dc51e24609cad75ab1a354b81c8588578fca",
+  "review_base": "ef12dc51e24609cad75ab1a354b81c8588578fca",
+  "head": "ef12dc51e24609cad75ab1a354b81c8588578fca",
+  "installed_digest": "b2f313aad27635a90b809648050d8825eee21d1f0b8350ac4dca9f9fef824b3e",
+  "source_manifest": "plan/01-knowledge-access-levels/phases/p03/docs/logs/WB1-review-r1-source-manifest.json",
+  "diff_sha256": "d30073c7ab5f97f4468ec75754dd5c59347f6c1a8c5fb0a35745f801172637fc",
+  "tree_sha256": "4c9f2035860c0edb443a5088c2de2b3961e97703033adde491c678628864a765",
+  "files_count": 2702,
+  "exclusions": [
+    "plan/01-knowledge-access-levels/phases/p03/docs/"
+  ],
+  "installed_exclusion_args": [
+    "plan/01-knowledge-access-levels/phases/p03/docs"
+  ],
+  "authority": {
+    "path": "/Users/mac02/dev/openbot-recovery/plan/01-knowledge-access-levels/COORDINATION.md",
+    "file_revision": 7,
+    "pin": "plan/01-knowledge-access-levels/phases/p03/docs/logs/COORDINATION-r7-WB1.md",
+    "sha256": "37fd5389cc7621d96ecf9b0d4f9cc86e337ca5d3c4069150fc5083f8144002c6",
+    "instructions": [
+      "KNOW-I001/r1",
+      "KNOW-I002/r1",
+      "KNOW-I003/r1",
+      "KNOW-I004/r1",
+      "KNOW-I005/r1"
+    ],
+    "notices": [
+      "KNOW-C001/r1"
+    ],
+    "disposition": "acknowledged; implemented and author-verified, root satisfaction pending independent acceptance"
+  },
+  "gated_decision": {
+    "id": "KNOW-P03-G1-R1",
+    "revision": 1,
+    "sha256": "371e79a206f5c4678c977cdf6c521b8ba6c553426aa2ce8a06d2706c82a6fbca",
+    "actual_pass_note": "KNOW-P03-G1-R1-N1"
+  },
+  "verification": {
+    "native_selected": 741,
+    "native_passed": 741,
+    "native_failed": 0,
+    "native_ignored": 0,
+    "knowledge_prefix_selected": 41,
+    "latest_affected_route_checks": 7,
+    "compiler_all_pass": true,
+    "notes": "After native741 PASS, test-only path/owner-phase helpers preserve every assertion; final current-source native build+7 route checks+Clippy/fmt/diff PASS. No production changes after741. SQLx regenerated/checked and offline alltarget PASS. Full plan06 CI gate remains later."
+  },
+  "preserved_preexisting_source_changes": [],
+  "author": "/root (user-confirmed Sol6.1/xhigh)",
+  "reviewer": "/root/knowledge_p03_reviewer (Astra/high, independent original context)"
+}

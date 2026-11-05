@@ -1,0 +1,13 @@
+{
+  "accepted_code_commit": "4bc57b3688777260d2d55280faa21b4b0473aa5f",
+  "evidence_commit": "16ea8cefc1093a39c8caa47374ce754c9a59f719",
+  "local_main_fast_forward_to": "16ea8cefc1093a39c8caa47374ce754c9a59f719",
+  "accepted_review": "KNOW-P01-WB1-R2",
+  "source_identical_to_accepted_code": true,
+  "no_new_combined_implementation_effect": "fast-forward only; metadata differences under sole phase records directory",
+  "preserved_primary_local_coordination_changes": [
+    " M plan/fix-app/COORDINATION.md",
+    "?? plan/01-knowledge-access-levels/COORDINATION.md"
+  ],
+  "remote_main_not_pushed": "73799dc6ac685008d5c97f154e861d11ae15bfa0"
+}

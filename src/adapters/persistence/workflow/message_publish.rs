@@ -229,7 +229,15 @@ async fn write_destinations_on(
                 .await?;
             }
         }
-        let inserted = insert_message_on(tx, &destination.message).await?;
+        let inserted = insert_message_on(
+            tx,
+            &destination.message,
+            crate::adapters::persistence::thread::MessageStampSource::Workflow {
+                company: scope.company,
+                run: scope.run,
+            },
+        )
+        .await?;
         if inserted.canonical_id != destination.message.id {
             return Err(AppError::Conflict(
                 "Workflow message identity already belongs to another message".into(),
@@ -390,6 +398,18 @@ impl<L: SqlLocalAction> PostgresActionDispatch<MessageActionAuthority, L> {
             ));
         }
         if let Err(error) = recheck_routes_on(tx, request.scope().company, plan).await {
+            return Self::rejected_on(tx, request, error)
+                .await
+                .map(End::Rollback);
+        }
+        let recipients = super::super::knowledge_release::publication_recipients(plan)?;
+        if let Err(error) = super::super::knowledge_release::evaluate_on(
+            tx,
+            &action,
+            super::super::knowledge_release::MessageRecipients::Frozen(&recipients),
+        )
+        .await
+        {
             return Self::rejected_on(tx, request, error)
                 .await
                 .map(End::Rollback);

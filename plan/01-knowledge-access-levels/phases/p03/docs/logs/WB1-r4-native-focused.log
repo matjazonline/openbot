@@ -1,0 +1,831 @@
+
+running 741 tests
+test adapters::http::routes::company_invite::levels::tests::access_level_json_is_numeric_bounded_and_rejects_role_injection ... ok
+test adapters::http::pages::team_level_tests::access_level_ui_admin_caps_and_owner_fixed_controls_match_the_domain ... ok
+test adapters::http::routes::connection_levels::tests::knowledge_run_level_connection_payloads_are_strict_bounded_and_forms_keep_progress ... ok
+test adapters::http::routes::connection_levels::tests::knowledge_run_level_connection_form_parses_integer_strings_and_rejects_injected_fields ... ok
+test adapters::http::routes::company_invite::levels::tests::access_level_browser_form_accepts_integer_strings_and_rejects_extra_fields ... ok
+test adapters::http::pages::team_level_tests::access_level_both_team_pages_give_admins_only_level_controls ... ok
+test adapters::http::routes::model_usage::tests::model_usage_http_query_bounds ... ok
+test adapters::http::routes::model_usage::tests::model_usage_http_projection_escaping_foreign_ids_and_price_errors ... ok
+test adapters::http::routes::model_usage::tests::model_usage_cookie_price_mutation_requires_same_origin ... ok
+test adapters::http::routes::ui_team::authorization_tests::access_level_browser_self_demotion_refreshes_caps_and_foreign_targets_are_hidden ... ok
+test adapters::mcp::policy::tests::workflow_http_connector_uses_pinned_addresses_without_resolving_hostname_again ... ok
+test adapters::mcp::policy::tests::workflow_http_resolved_dns_rejects_any_prohibited_answer_and_rebinding ... ok
+test adapters::http::routes::company_invite::levels::route_tests::access_level_json_member_route_enforces_actor_scope_and_caps ... ok
+test adapters::http::routes::company_invite::levels::route_tests::access_level_legacy_html_member_route_enforces_actor_scope_and_caps ... ok
+test adapters::http::routes::company_invite::levels::route_tests::access_level_json_invite_route_enforces_actor_scope_and_caps ... ok
+test adapters::http::routes::company_invite::levels::route_tests::access_level_legacy_html_invite_route_enforces_actor_scope_and_caps ... ok
+test adapters::persistence::company_invite::access_level_tests::access_level_sql_domain_owner_and_defaults_are_enforced ... ok
+test adapters::persistence::company_invite::access_level_tests::access_level_joint_readers_external_observed_and_former_members_are_public ... ok
+test adapters::persistence::company_invite::access_level_tests::access_level_native_writers_apply_caps_scope_and_owner_only_role_powers ... ok
+test adapters::persistence::company_invite::access_level_tests::access_level_invite_copies_new_grants_and_never_restores_existing_grants ... ok
+test adapters::http::routes::connection_levels::tests::knowledge_run_level_race_live_admin_demotion_precedes_connection_level_write ... ok
+test adapters::persistence::credential_rotation::tests::http_tests::workflow_http_rotation_inventory_preserves_context_and_is_idempotent ... ok
+test adapters::http::routes::connection_levels::tests::knowledge_run_level_race_connection_revision_writers_have_one_winner ... ok
+test adapters::persistence::thread::external::tests::an_identical_redelivery_returns_the_message_already_stored ... ok
+test adapters::persistence::thread::external::tests::changed_content_under_a_used_key_is_a_collision_naming_what_it_hit ... ok
+test adapters::http::routes::connection_levels::tests::knowledge_run_level_connection_commands_enforce_caps_and_preserve_other_settings ... ok
+test adapters::http::routes::workflows::tests::tool_tests::workflow_tool_routes_register_revoke_and_grant ... ok
+test adapters::persistence::credential_rotation::tests::http_tests::workflow_http_rotation_stale_ciphertext_cannot_overwrite_normal_writer ... ok
+test adapters::persistence::thread::inbound_tests::a_commit_that_fails_at_the_threads_writes_nothing_either ... ok
+test adapters::persistence::thread::inbound_tests::a_commit_that_fails_at_the_intent_leaves_no_thread_message_or_mapping ... ok
+test adapters::persistence::thread::inbound_tests::a_redelivery_returns_the_first_delivery_and_enqueues_nothing_further ... ok
+test adapters::persistence::thread::inbound_tests::a_message_addressed_to_two_channels_is_stored_once_and_mapped_on_each_binding ... ok
+test adapters::persistence::thread::inbound_tests::a_repeated_key_with_changed_content_is_a_collision_rather_than_a_rewrite ... ok
+test adapters::persistence::thread::inbound_tests::a_reply_observed_before_its_root_wins_the_provider_thread_mapping ... ok
+test adapters::persistence::thread::inbound_tests::a_stored_event_key_reused_with_a_different_body_is_a_collision ... ok
+test adapters::http::routes::connection_levels::tests::knowledge_run_level_all_four_connection_level_write_routes_scope_valid_foreign_resources ... ok
+test adapters::persistence::thread::inbound_tests::an_accepted_message_lands_with_its_mapping_thread_and_intent_at_once ... ok
+test adapters::persistence::thread::inbound_tests::an_association_through_another_channels_binding_names_the_first_bad_pair ... ok
+test adapters::persistence::thread::inbound_tests::authored_identity_cannot_belong_to_a_different_author_principal ... ok
+test adapters::persistence::thread::inbound_tests::concurrent_different_messages_sharing_a_new_thread_key_open_one_thread ... ok
+test adapters::persistence::thread::inbound_tests::a_commit_queued_behind_a_settings_edit_is_refused_with_nothing_stored ... ok
+test adapters::persistence::thread::inbound_tests::inconsistent_multi_binding_message_mappings_are_a_typed_collision ... ok
+test adapters::persistence::thread::inbound_tests::multi_task_tests::an_intent_records_disposition_policy_origin_and_relay_trace ... ok
+test adapters::persistence::thread::inbound_tests::multi_task_tests::each_association_gets_one_intent_and_redelivery_adds_none ... ok
+test adapters::persistence::thread::inbound_tests::a_settings_edit_queued_behind_a_commit_applies_after_it ... ok
+test adapters::persistence::thread::inbound_tests::multi_task_tests::intent_rows_cannot_reach_across_tenants ... ok
+test adapters::persistence::thread::inbound_tests::slack_participant_intents_persist_with_explicit_roles_and_no_email_projection ... ok
+test adapters::persistence::thread::message::tests::a_differently_stripped_body_is_the_same_provider_payload ... ok
+test adapters::http::routes::connection_levels::tests::knowledge_run_level_http_new_read_routes_hide_valid_foreign_company_and_resource_ids ... ok
+test adapters::persistence::thread::message::tests::changed_provider_content_changes_the_hash ... ok
+test adapters::persistence::thread::message::tests::equal_provider_subjects_in_different_namespaces_hash_differently ... ok
+test adapters::persistence::thread::message::tests::unreadable_stored_json_is_an_application_error ... ok
+test adapters::persistence::thread::message::tests::attachments_round_trip_through_their_stored_envelope ... ok
+test adapters::persistence::thread::read_tests::a_thread_records_its_parties_as_principals_and_projects_their_addresses ... ok
+test adapters::persistence::thread::inbound_tests::two_concurrent_deliveries_of_one_message_produce_one_of_everything ... ok
+test adapters::persistence::thread::read_tests::invalid_thread_index_returns_before_database_access ... ok
+test adapters::persistence::thread::read_tests::committing_a_message_notifies_listeners ... ok
+test adapters::persistence::thread::read_tests::list_threads_updated_after_reads_forward_from_a_cursor ... ok
+test adapters::persistence::thread::read_tests::thread_message_views_break_timestamp_ties_by_id ... ok
+test adapters::persistence::thread::read_tests::thread_index_lookup_uses_binary_ancestors_and_channel_scope ... ok
+test adapters::persistence::thread::tests::a_deleted_association_takes_an_orphaned_payload_with_it ... ok
+test adapters::persistence::thread::read_tests::thread_message_views_read_forward_from_a_cursor ... ok
+test adapters::persistence::thread::tests::a_message_no_transport_carried_needs_no_email_fields ... ok
+test adapters::persistence::thread::tests::a_message_records_its_author_as_a_principal_and_projects_its_recipients ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::sample_tests::sample_direct_workflow_tool_child_and_message_have_zero_production_effects ... ok
+test adapters::persistence::thread::tests::a_reply_arriving_before_its_root_creates_the_thread_the_root_joins ... ok
+test adapters::persistence::thread::tests::channel_path_fk_external_thread_stays_on_its_binding_channel ... ok
+test adapters::persistence::thread::tests::derived_attachments_cannot_publish_a_private_source ... ok
+test adapters::persistence::thread::tests::find_outbound_reply_after_sees_answers_and_ignores_relayed_mail ... ok
+test adapters::persistence::thread::tests::identical_redelivery_is_reused_and_changed_content_collides ... ok
+test adapters::persistence::thread::tests::channel_path_fk_external_threads_and_notes_leave_with_channel_and_company ... ok
+test adapters::persistence::thread::tests::internal_notes_are_idempotent_immutable_and_auditable ... ok
+test adapters::persistence::thread::tests::one_message_joins_several_threads_but_never_a_foreign_one ... ok
+test adapters::persistence::thread::tests::one_thread_is_reachable_through_several_bindings ... ok
+test adapters::persistence::company_invite::access_level_tests::races::access_level_acceptance_and_own_invite_assignment_do_not_deadlock_or_restore_levels ... ok
+test adapters::persistence::thread::tests::participants_keep_their_order_within_each_role_and_a_repeated_handle_lands_once ... ok
+test adapters::persistence::thread::tests::private_messages_cannot_enter_the_external_delivery_queue ... ok
+test adapters::persistence::thread::tests::schema_constraint_messages_require_declared_audience ... ok
+test adapters::persistence::thread::tests::provider_message_keys_collide_only_inside_one_binding ... ok
+test adapters::persistence::thread::tests::unreadable_stored_json_surfaces_as_an_application_error ... ok
+test adapters::persistence::thread::view_tests::a_message_is_not_readable_through_a_thread_that_does_not_hold_it ... ok
+test adapters::persistence::thread::view_tests::find_thread_for_message_resolves_thread_and_scopes_by_channel ... ok
+test adapters::persistence::thread::view_tests::a_message_no_transport_carried_reads_back_through_every_projection ... ok
+test adapters::persistence::company_invite::access_level_tests::races::access_level_assignment_committed_first_finishes_before_later_demotion ... ok
+test adapters::persistence::thread::view_tests::latest_thread_rfc_message_id_reaches_past_turns_without_headers ... ok
+test adapters::persistence::thread::view_tests::the_audit_view_qualifies_provider_keys_by_their_interface ... ok
+test adapters::persistence::thread::view_tests::the_audit_view_refuses_a_valid_id_read_under_another_company ... ok
+test adapters::persistence::workflow::knowledge::tests::knowledge_run_level_reader_facts_exclude_nonreaders_and_reject_malformed_authority ... ok
+test adapters::persistence::thread::view_tests::the_reply_context_carries_the_headers_mail_arrived_with ... ok
+test adapters::persistence::thread::view_tests::history_keeps_role_and_order_within_a_bounded_newest_window ... ok
+test adapters::persistence::thread::read_tests::a_rolled_back_message_is_not_announced ... ok
+test adapters::persistence::company_invite::access_level_tests::races::access_level_owner_loss_is_rechecked_after_a_waiting_invite_write ... ok
+test adapters::persistence::company_invite::access_level_tests::races::access_level_demotion_committed_first_refuses_a_waiting_assignment ... ok
+test adapters::persistence::thread::inbound_tests::a_crash_at_any_inbox_phase_recovers_without_a_duplicate_canonical_message ... ok
+test adapters::persistence::company_invite::access_level_tests::races::access_level_busy_authority_returns_a_bounded_conflict_without_a_write ... ok
+test adapters::persistence::thread::inbound_tests::canonical_rows_and_inbox_completion_commit_together ... ok
+test adapters::persistence::thread::inbound_tests::lease_loss_at_final_commit_rolls_back_every_canonical_effect ... ok
+test adapters::persistence::thread::tests::message_thread_fk_internal_note_message_is_filed_in_its_own_thread ... ok
+test adapters::persistence::thread::tests::jsonb_row_context_tests::jsonb_row_context_thread_contract_is_optional_per_message ... ok
+test adapters::persistence::workflow::tests::admission_tests::activation_tests::action_tests::workflow_action_authority_revocation_contender_blocks_then_rechecks ... ok
+test adapters::persistence::workflow::tests::admission_tests::activation_tests::action_tests::workflow_action_authority_sql_scope_actor_and_current_membership ... ok
+test adapters::persistence::workflow::tests::admission_tests::activation_tests::action_tests::workflow_action_authority_run_lock_wait_cannot_cross_deadline ... ok
+test adapters::persistence::workflow::tests::admission_tests::activation_tests::action_tests::workflow_action_changed_arguments_need_new_call_and_context_changes_conflict ... ok
+test adapters::persistence::workflow::tests::admission_tests::activation_tests::action_tests::workflow_action_competing_step_and_tool_prepare_one_intent_restart_replays ... ok
+test adapters::persistence::workflow::tests::admission_tests::activation_tests::action_tests::workflow_action_numeric_jsonb_roundtrip_preserves_digest_and_replay ... ok
+test adapters::persistence::workflow::tests::admission_tests::activation_tests::action_tests::workflow_action_schema_fk_immutable_and_cancelled_new_intent_fail_closed ... ok
+test adapters::persistence::workflow::tests::admission_tests::admission_authority_tests::workflow_admit_sql_deactivated_replay_uses_saved_resources_not_current_head ... ok
+test adapters::persistence::workflow::tests::admission_tests::admission_authority_tests::workflow_admit_sql_message_membership_revocation_is_observed ... ok
+test adapters::persistence::workflow::tests::admission_tests::admission_history_tests::workflow_admit_sql_binding_scope_narrowing_matrix ... ok
+test adapters::persistence::workflow::tests::admission_tests::admission_history_tests::workflow_admit_sql_history_excludes_older_uncommitted_membership ... ok
+test adapters::persistence::workflow::tests::admission_tests::admission_history_tests::workflow_admit_sql_message_alias_equivalence_and_independent_runs ... ok
+test adapters::persistence::workflow::tests::admission_tests::admission_history_tests::workflow_admit_sql_replay_rejects_changed_association_for_command_and_alias ... ok
+test adapters::persistence::workflow::tests::admission_tests::admission_history_tests::workflow_admit_without_history_step_skips_snapshot ... ok
+test adapters::persistence::workflow::tests::admission_tests::admission_history_tests::workflow_admit_sql_long_history_retains_only_newest_256 ... ok
+test adapters::persistence::workflow::tests::admission_tests::admission_source_tests::knowledge_run_level_schedule_uses_configured_run_as_ceiling ... ok
+test adapters::persistence::workflow::tests::admission_tests::admission_source_tests::workflow_admit_sql_message_source_rejects_missing_foreign_and_wrong_membership ... ok
+test adapters::persistence::workflow::tests::admission_tests::admission_source_tests::workflow_admit_sql_schedule_source_checks_occurrence_owner_and_association ... ok
+test adapters::persistence::workflow::tests::admission_tests::admission_token_tests::workflow_admit_token_reviewer_removal_competes_before_commit ... ok
+test adapters::persistence::workflow::tests::admission_tests::admission_token_tests::workflow_admit_token_reviewer_requires_current_person_identity ... ok
+test adapters::persistence::workflow::tests::admission_tests::admission_token_tests::workflow_admit_token_reviewers_current_authority_and_saved_replay ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::child_configuration_tests::workflow_child_gets_its_frozen_params_and_only_its_own_resource_slots ... ok
+test adapters::persistence::workflow::tests::admission_tests::admission_authority_tests::workflow_admit_sql_actor_revocation_blocks_new_replay_and_alias ... ok
+test adapters::persistence::workflow::tests::admission_tests::admission_authority_tests::workflow_admit_sql_channel_revocation_blocks_new_replay_and_alias ... ok
+test adapters::persistence::workflow::tests::admission_tests::admission_source_tests::workflow_admit_refuses_every_child_trigger_and_schema_checks_runtime_child_keys ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::child_configuration_tests::workflow_child_parameters_the_child_refuses_fail_activation_without_a_child ... ok
+test adapters::persistence::workflow::tests::admission_tests::admission_authority_tests::workflow_admit_sql_saved_resource_revocation_blocks_new_replay_and_alias ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::child_output_tests::workflow_call_child_output_the_parent_cannot_complete_with_fails_the_wait ... ok
+test adapters::persistence::workflow::tests::admission_tests::admission_token_tests::workflow_admit_token_child_admission_refused_and_runtime_child_shares_root_policy ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::child_output_tests::workflow_call_stored_child_output_outside_the_pinned_schema_fails_the_wait ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::child_runtime_tests::workflow_call_child_limits_reject_input_at_park_and_route_it ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::child_runtime_tests::workflow_call_competing_parkers_create_one_child_and_replay_its_wait ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::child_runtime_tests::workflow_call_injected_failure_rolls_back_child_and_wait_and_never_hot_polls ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::child_runtime_tests::workflow_call_runs_through_the_worker_and_fair_poll ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::child_runtime_tests::workflow_call_success_completes_parent_once_with_child_output ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::child_runtime_tests::workflow_child_history_is_empty_and_later_messages_stay_invisible ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::child_runtime_tests::workflow_child_timeout_fails_child_and_reaches_parent_error_route ... ok
+test adapters::persistence::workflow::tests::admission_tests::admission_source_tests::workflow_admit_sql_schedule_source_revocation_blocks_new_replay_and_alias ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::child_runtime_tests::workflow_child_wait_resumes_after_restart ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::child_schema_tests::workflow_child_schema_requires_the_parent_wait_of_the_same_execution ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::child_runtime_tests::workflow_call_child_failure_and_cancellation_route_or_fail_never_succeed ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::child_runtime_tests::workflow_call_child_inherits_the_parents_delivery_policy ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::wakeup_tests::budget_schema_tests::root_budget_admission_raw_root_without_budget_is_refused ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::wakeup_tests::guard_tests::parent_link_tests::workflow_wakeup_parent_link_requires_exact_committed_owner ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::wakeup_tests::guard_tests::parent_link_tests::workflow_wakeup_parent_link_rolls_back_with_failed_run_insert ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::wakeup_tests::guard_tests::workflow_wakeup_actual_wait_expiry_produces_failed_fact ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::wakeup_tests::guard_tests::workflow_wakeup_parent_composite_fk_rejects_valid_foreign_parent ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::wakeup_tests::guard_tests::workflow_wakeup_parent_composite_fk_rejects_wrong_run_execution_pair ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::wakeup_tests::guard_tests::workflow_wakeup_rejects_forged_duplicate_and_overridden_transition_facts ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::wakeup_tests::guard_tests::workflow_wakeup_sibling_progress_and_cursors_are_independent ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::wakeup_tests::workflow_wakeup_completion_has_no_parent_run_or_execution_lock ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::wakeup_tests::workflow_wakeup_real_child_completion_and_parent_cancel_contenders ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::wakeup_tests::workflow_wakeup_scope_bounds_and_parent_identity_guards ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::wakeup_tests::guard_tests::parent_link_tests::workflow_wakeup_parent_link_is_immutable_and_owner_cascades ... ok
+test adapters::persistence::workflow::tests::admission_tests::history_reader_tests::knowledge_history_tests::knowledge_run_level_history_filters_before_count_and_raises_returned_content ... ok
+test adapters::persistence::workflow::tests::admission_tests::history_reader_tests::knowledge_history_tests::knowledge_run_level_raise_rolls_back_with_its_read_transaction ... ok
+test adapters::persistence::workflow::tests::admission_tests::history_reader_tests::workflow_context_history_is_empty_without_a_thread_and_never_crosses_runs ... ok
+test adapters::persistence::workflow::tests::admission_tests::history_reader_tests::workflow_context_history_returns_the_admission_snapshot_with_boundaries ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::wakeup_tests::workflow_wakeup_fenced_io_and_timer_completion_use_same_fact ... ok
+test adapters::persistence::workflow::tests::admission_tests::knowledge_admission_tests::knowledge_run_level_child_inherits_and_competing_result_consumers_raise_parent_once ... ok
+test adapters::persistence::workflow::tests::admission_tests::knowledge_admission_tests::knowledge_run_level_manual_and_replay_keep_admitted_ceiling ... ok
+test adapters::persistence::workflow::tests::admission_tests::knowledge_admission_tests::knowledge_run_level_manual_uses_actual_admin_starter_and_keeps_member_refused ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::wakeup_tests::workflow_wakeup_terminal_transitions_are_immutable_and_noops_do_not_repeat ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::wakeup_tests::workflow_wakeup_write_and_commit_failures_rollback_progression ... ok
+test adapters::persistence::workflow::tests::admission_tests::knowledge_admission_tests::knowledge_run_level_message_empty_owner_and_mixed_cc_audiences ... ok
+test adapters::persistence::workflow::tests::admission_tests::knowledge_admission_tests::knowledge_run_level_schema_rejects_ceiling_changes_lowering_and_out_of_range ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::cancellation_boundary_tests::completion_tests::workflow_action_cancellation_completion_ordinary_oracle_discriminates_attempt_paths ... ok
+test adapters::persistence::workflow::tests::admission_tests::history_reader_tests::workflow_context_history_is_bounded_by_tokens_and_the_result_cap ... ok
+test adapters::persistence::workflow::tests::admission_tests::knowledge_admission_tests::knowledge_run_level_stamped_trigger_taints_or_refuses_without_partial_admission ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_evidence_binding_tests::workflow_action_evidence_remote_entry_transaction_identity_cannot_be_spoofed ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_evidence_binding_tests::workflow_action_evidence_witness_rejects_direct_caller_insert ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::acceptance_tests::workflow_action_receipt_actual_result_precedes_shared_completion_writer ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::cancellation_boundary_tests::receipt_tests::workflow_action_cancellation_receipt_ordinary_oracle_discriminates_attempt_paths ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::acceptance_tests::workflow_action_receipt_committed_ambiguous_ack_restart_zero_io ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::acceptance_tests::workflow_action_receipt_reclaimed_attempt_rechecks_current_registration_and_access ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::acceptance_tests::workflow_action_receipt_resolved_reconcile_retires_safe_and_reclaims_zero_io ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_evidence_binding_tests::workflow_action_evidence_state_witness_keeps_first_state_and_reason ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::cancellation_boundary_tests::receipt_tests::workflow_action_cancellation_observed_result_token_settles_then_interrupts ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::cancellation_boundary_tests::workflow_action_cancellation_pending_oracle_discriminates_interruption_causes ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::cancellation_boundary_tests::receipt_tests::workflow_action_cancellation_receipt_race_cancel_first ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::cancellation_boundary_tests::receipt_tests::workflow_action_cancellation_receipt_race_receipt_first ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::cancellation_boundary_tests::receipt_tests::workflow_action_cancellation_receipt_without_cancel_commits ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::cancellation_boundary_tests::completion_tests::workflow_action_cancellation_completion_race_resolved_commit_fails_ordinary_oracle ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::cancellation_boundary_tests::completion_tests::workflow_action_cancellation_completion_race_cancel_first ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::cancellation_boundary_tests::completion_tests::workflow_action_cancellation_completion_race_completion_first ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::cancellation_boundary_tests::receipt_tests::workflow_action_cancellation_receipt_race_late_release_fails_ordinary_oracle ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::cancellation_boundary_tests::workflow_action_cancellation_after_reservation_refuses_entry_zero_polls ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::cancellation_boundary_tests::workflow_action_cancellation_rollback_keeps_accepted_effect_settleable ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::cancellation_boundary_tests::workflow_action_cancellation_rollback_keeps_prepared_work_usable ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::cancellation_boundary_tests::workflow_action_cancellation_token_after_entry_suppresses_first_poll ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::cancellation_boundary_tests::workflow_action_cancellation_token_pending_drop_keeps_ownership ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::cancellation_boundary_tests::workflow_action_cancellation_token_precancelled_never_reserves ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::cancellation_boundary_tests::workflow_action_cancellation_pending_oracle_rejects_deadline_only_interruption ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::history_tests::workflow_action_history_direct_sql_forged_safe_retirement_rejected ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::acceptance_tests::workflow_action_receipt_return_authority_errors_propagate_after_commit ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::history_tests::workflow_action_history_direct_sql_reopen_rechecks_current_retention ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::history_tests::workflow_action_history_matrix_shared_predicate_and_actual_rust_retirement ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::history_tests::workflow_action_history_numeric_subject_and_u64_revision_domain ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::history_tests::workflow_action_history_remote_entry_append_only_and_receipt_requires_entry ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::cancellation_boundary_tests::workflow_action_cancellation_pending_provider_dropped_by_ownership_supervision ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::history_tests::workflow_action_history_remote_entry_exact_provenance_and_deferred_fence ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::cancellation_boundary_tests::completion_tests::workflow_action_cancellation_replay_contract_cannot_override_terminal ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::history_tests::workflow_action_history_unsafe_sibling_and_129_fact_overflow ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::uncertainty_tests::acceptance_tests::workflow_action_uncertainty_cancel_records_all_unresolved_before_any_audit ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::uncertainty_tests::acceptance_tests::workflow_action_uncertainty_deadline_records_all_unresolved_before_any_audit ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::resolution_tests::workflow_action_receipt_resolution_commit_waits_out_exhausted_pool_after_effect ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::uncertainty_tests::acceptance_tests::workflow_action_uncertainty_sql_nonremote_link_has_no_receipt_mask ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::uncertainty_tests::acceptance_tests::workflow_action_uncertainty_sql_provenance_isolated_from_other_guards ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::uncertainty_tests::workflow_action_uncertainty_deferred_commit_failure_rolls_back_retirement ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::cancellation_boundary_tests::workflow_action_cancellation_prepared_and_protected_refuse_after_command ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::uncertainty_tests::workflow_action_uncertainty_root_budget_overrides_read_handler_default ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::workflow_action_receipt_deferred_rollback_returns_no_success ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::uncertainty_tests::acceptance_tests::workflow_action_uncertainty_sql_remote_receipt_guard_and_append_only ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::workflow_action_receipt_refused_return_releases_run_before_returning ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::uncertainty_tests::workflow_action_uncertainty_parked_deadline_cancel_and_late_receipt_truth ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::workflow_action_receipt_restart_model_link_no_registration_and_current_access ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::audit_tests::workflow_action_audit_competing_commands_and_exact_replay ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::resolution_tests::workflow_action_receipt_resolution_stalled_commit_against_completion ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::audit_tests::workflow_action_audit_sql_exact_actor_kind_and_unique_command_reference ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::workflow_action_receipt_late_cancel_and_stale_truth_without_advancement ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::workflow_action_receipt_lost_actual_effect_supported_reclaim_and_competing_replay ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::audit_tests::workflow_action_audit_sql_orphan_immutability_and_other_kind_policy ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::commit_conflict::workflow_action_reconciliation_commit_conflict_native_chronology ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::commit_conflict::workflow_action_reconciliation_commit_conflict_observer_calibration ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::commit_conflict::workflow_action_reconciliation_commit_conflict_positive ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::attribution_tests::workflow_action_reconciliation_attribution_consumed_new_entry_is_legitimate ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::append_only_tests::workflow_action_reconciliation_append_only_mutation_delete_upsert_and_owner_lifecycle ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::attribution_tests::workflow_action_reconciliation_attribution_covered_old_entry_breaches_finality ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::attribution_tests::workflow_action_reconciliation_attribution_unattributed_preserves_unresolved_provenance ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::association_tests::workflow_action_reconciliation_paused_association_revocation_reauthorizes_replay ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::association_tests::workflow_action_reconciliation_valid_foreign_associations_and_scopes_refuse ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::attribution_tests::workflow_action_reconciliation_attribution_zero_entry_marker_breaches_finality ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::control_serialization_tests::contention::workflow_action_reconciliation_control_serialization_probe_negative_controls ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::clock_tests::workflow_action_reconciliation_proof_expiry_while_settlement_waits_for_run_lock ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::control_serialization_tests::hung_reconciliation_tests::workflow_action_cancellation_applied_then_hung_history_reconciles_after_cancel ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::uncertainty_tests::workflow_action_uncertainty_pending_failures_consult_expired_action_proof ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::late_truth_tests::conflict_immutable_tests::workflow_action_reconciliation_conflict_row_rejects_update_and_delete ... ok
+PROVEN scenario=completion_race order=Receipt attempt=1
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::late_truth_tests::live_boundary_tests::completion_race_tests::workflow_action_reconciliation_completion_race_actual_receipt_first ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::uncertainty_tests::workflow_action_uncertainty_actual_effect_errors_and_exact_retirement ... ok
+PROVEN scenario=completion_race order=Completion attempt=1
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::clock_tests::workflow_action_reconciliation_proof_expiry_reservation_enter_and_successful_replay ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::late_truth_tests::live_boundary_tests::completion_race_tests::workflow_action_reconciliation_completion_race_completion_first ... ok
+PHASE scenario=live_conflict phase=entered elapsed_ms=48 owner=true attempt=2 lease_remaining_ms=2942 run_remaining_ms=86399729 db_now=2026-11-05 04:50:51.3992+00
+PHASE scenario=live_conflict phase=before_snapshot elapsed_ms=74 owner=true attempt=2 lease_remaining_ms=2917 run_remaining_ms=86399703 db_now=2026-11-05 04:50:51.425054+00
+PHASE scenario=live_conflict phase=conflicted elapsed_ms=118 owner=true attempt=2 lease_remaining_ms=2874 run_remaining_ms=86399660 db_now=2026-11-05 04:50:51.468194+00
+PHASE scenario=live_conflict phase=finished elapsed_ms=142 owner=true attempt=2 lease_remaining_ms=2850 run_remaining_ms=86399637 db_now=2026-11-05 04:50:51.491703+00
+PHASE scenario=live_conflict phase=returned_snapshot elapsed_ms=151 owner=true attempt=2 lease_remaining_ms=2841 run_remaining_ms=86399628 db_now=2026-11-05 04:50:51.500595+00
+PHASE scenario=live_conflict phase=before_retire elapsed_ms=152 owner=true attempt=2 lease_remaining_ms=2840 run_remaining_ms=86399626 db_now=2026-11-05 04:50:51.502187+00
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::late_truth_tests::live_boundary_tests::workflow_action_reconciliation_live_remote_heartbeat_drops_pending_provider_on_conflict ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::late_truth_tests::live_boundary_tests::workflow_action_reconciliation_live_return_conflict_vetoes_genuine_new_result ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::late_truth_tests::live_boundary_tests::workflow_action_reconciliation_live_return_without_conflict_commits ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::late_truth_tests::workflow_action_reconciliation_late_truth_cancelled_retains_conflicting_actual_receipt ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::control_serialization_tests::workflow_action_reconciliation_control_serialization_cancel_before_command ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::control_serialization_tests::workflow_action_reconciliation_control_serialization_command_before_cancel ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::late_truth_tests::workflow_action_reconciliation_late_truth_expired_retains_conflicting_actual_receipt ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::late_truth_tests::workflow_action_reconciliation_late_truth_pending_after_consumption ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::control_serialization_tests::workflow_action_reconciliation_control_serialization_command_before_expire ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::control_serialization_tests::workflow_action_reconciliation_control_serialization_expire_before_command ... ok
+test adapters::persistence::workflow::tests::admission_tests::history_reader_tests::knowledge_history_race_tests::knowledge_run_level_race_history_read_and_email_freeze_record_consistent_consumption ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::late_truth_tests::workflow_action_reconciliation_late_truth_pending_before_consumption ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::commit_final_tests::injected::workflow_action_reconciliation_commit_final_injected_audit ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::commit_final_tests::injected::workflow_action_reconciliation_commit_final_injected_command ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::commit_final_tests::injected::workflow_action_reconciliation_commit_final_injected_evidence ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::commit_final_tests::injected::workflow_action_reconciliation_commit_final_injected_reopen ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::commit_final_tests::workflow_action_reconciliation_commit_final_native_revision ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::commit_final_tests::workflow_action_reconciliation_commit_final_observer_calibration ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::commit_final_tests::workflow_action_reconciliation_commit_final_positive ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::clock_tests::workflow_action_reconciliation_proof_verifier_budget_ceiling_cancel_and_drop_are_owned ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_fairness_tests::workflow_action_reconciliation_claim_fairness_descendant_first_claim_with_ancestors_locked ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_race_tests::workflow_action_reconciliation_claim_race_claim_first_dispatches_once ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_race_tests::workflow_action_reconciliation_claim_race_debit_first_refuses_both_claimants ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_fairness_tests::child_policy_tests::workflow_action_reconciliation_claim_fairness_child_policy_records_proof_without_schedule ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::boundary_tests::workflow_action_reconciliation_siblings_128_and_129_snapshot_and_actual_recovery_never_truncate ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_race_tests::workflow_action_reconciliation_claim_race_rolled_back_debit_preserves_allowance ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::abort_tests::cancellation_tests::workflow_action_reconciliation_claim_cancellation_cancel_first ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::bounds_tests::workflow_action_reconciliation_bounds_exclusion_requires_exact_consumption ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::abort_tests::cancellation_tests::workflow_action_reconciliation_claim_cancellation_claim_first ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::bounds_tests::workflow_action_reconciliation_bounds_paused_128_to_129_settlement_refuses ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::bounds_tests::workflow_action_reconciliation_bounds_sibling_overflow_before_proof_enter_refuses ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::bounds_tests::workflow_action_reconciliation_bounds_sibling_overflow_before_proof_reserve_refuses ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::abort_tests::workflow_action_reconciliation_claim_abort_deferred_candidate ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::abort_tests::workflow_action_reconciliation_claim_abort_deferred_refusal ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::abort_tests::cancellation_tests::workflow_action_reconciliation_claim_cancellation_aborted_task_usage_wait ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::claim_boundary_tests::claim_recovery_tests::workflow_action_reconciliation_claim_recovery_returned_result_completes_after_exhaustion ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::abort_tests::cancellation_tests::workflow_action_reconciliation_claim_cancellation_dropped_usage_wait ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::claim_boundary_tests::workflow_action_reconciliation_claim_boundary_activation_repetition_equality ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::claim_boundary_tests::workflow_action_reconciliation_claim_boundary_roots_and_companies_same_database ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::deferred_tests::workflow_action_reconciliation_claim_sql_deferred_greater_attempt_refusal ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::boundary_tests::workflow_action_reconciliation_siblings_existing_job_reopen_gates_preserve_history ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::candidate_tests::workflow_action_reconciliation_claim_sql_multiple_applicable_candidates ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::episode_lifecycle_tests::workflow_action_reconciliation_episode_lifecycle_consumed_allows_saved_retry ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::episode_lifecycle_tests::workflow_action_reconciliation_episode_lifecycle_later_schedule_is_distinct ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::episode_lifecycle_tests::workflow_action_reconciliation_episode_lifecycle_revision_keeps_binding ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::claim_boundary_tests::workflow_action_reconciliation_claim_boundary_receipt_only_model_headroom ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::episode_tests::witness_tests::workflow_action_reconciliation_claim_sql_layered_historical_witness_pair ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::episode_tests::workflow_action_reconciliation_claim_sql_episode_wrong_retired_ordinal ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::episode_tests::workflow_action_reconciliation_claim_sql_episode_wrong_scoped_command ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::episode_tests::workflow_action_reconciliation_claim_sql_historical_genuine_retirement_current_xid ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::historical_tests::workflow_action_reconciliation_claim_sql_historical_audit_with_current_retirement ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::claim_boundary_tests::claim_recovery_tests::workflow_action_reconciliation_claim_recovery_late_receipt_after_exhaustion ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::workflow_action_reconciliation_claim_sql_actual_refusal_later_audit_protection ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::workflow_action_reconciliation_claim_sql_consumed_episode_refusal ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::workflow_action_reconciliation_claim_sql_eligible_and_caller_labelled_refusals ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::workflow_action_reconciliation_claim_sql_historical_audit_without_current_retirement ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::claim_boundary_tests::claim_recovery_tests::workflow_action_reconciliation_claim_recovery_lost_response_automatic_saved_retry ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::abort_tests::workflow_action_reconciliation_claim_abort_usage_deadline_and_timeout ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::workflow_action_reconciliation_claim_sql_wrong_kind_with_current_retirement ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::workflow_action_reconciliation_claim_sql_same_transaction_audit_protection ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::wrong_execution_tests::workflow_action_reconciliation_claim_sql_wrong_execution_with_current_retirement ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::remaining_tests::history_tests::terminal_revision_tests::workflow_action_reconciliation_revision_failed_receipt_applied_replay_and_stale_refusal ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::remaining_tests::history_tests::terminal_revision_tests::workflow_action_reconciliation_revision_failed_receipt_unknown_is_audit_only ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::remaining_tests::history_tests::terminal_revision_tests::workflow_action_reconciliation_revision_failed_unconsumed_final_replay_and_stale_refusal ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::remaining_tests::history_tests::terminal_revision_tests::workflow_action_reconciliation_revision_succeeded_applied_replay_and_stale_refusal ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::remaining_tests::history_tests::terminal_revision_tests::workflow_action_reconciliation_revision_succeeded_unknown_is_audit_only ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::remaining_tests::invariant_tests::workflow_action_reconciliation_eligibility_activation_immutable ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::owner_lifecycle_tests::workflow_action_reconciliation_owner_lifecycle_scheduled_and_refused ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::remaining_tests::workflow_action_reconciliation_eligibility_failed_lease_fields_are_schema_rejected ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::remaining_tests::history_tests::workflow_action_reconciliation_eligibility_adversarial_max_steps_projection_blocks ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::workflow_action_reconciliation_eligibility_claim_rechecks_shared_root_budget ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::remaining_tests::invariant_tests::workflow_action_reconciliation_eligibility_coupled_output_route_shapes ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::remaining_tests::history_tests::workflow_action_reconciliation_eligibility_completed_route_successor_history_is_retained ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::remaining_tests::invariant_tests::workflow_action_reconciliation_eligibility_exhausted_pending_has_no_retired_attempt ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::workflow_action_reconciliation_eligibility_root_model_budget_blocks_schedule ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::remaining_tests::invariant_tests::workflow_action_reconciliation_eligibility_unactivated_has_no_scoped_action ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::remaining_tests::workflow_action_reconciliation_eligibility_extra_pending_sibling_records_truth_only ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::receipt_sql_tests::company_tests::command_probe_tests::audit_execution_tests::workflow_action_reconciliation_audit_execution_positive ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::receipt_sql_tests::company_tests::command_probe_tests::audit_sql_tests::refusal_sql_tests::workflow_action_reconciliation_audit_sql_actual_refusal_linkage ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::receipt_sql_tests::company_tests::command_probe_tests::audit_sql_tests::workflow_action_reconciliation_audit_sql_genuine_foreign_company ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::receipt_sql_tests::company_tests::command_probe_tests::audit_sql_tests::workflow_action_reconciliation_audit_sql_genuine_foreign_run ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::receipt_sql_tests::company_tests::command_probe_tests::other_audit_tests::workflow_action_reconciliation_other_audit_genuine_final_positive ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::receipt_sql_tests::company_tests::command_probe_tests::other_audit_tests::workflow_action_reconciliation_other_audit_genuine_unique_rollback ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::receipt_sql_tests::company_tests::command_probe_tests::reopen_tests::state_witness_tests::workflow_action_reconciliation_first_old_cancelled ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::receipt_sql_tests::company_tests::command_probe_tests::negative_tests::workflow_action_reconciliation_command_probe_native_negatives_and_controls ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::receipt_sql_tests::company_tests::command_probe_tests::reopen_tests::state_witness_tests::workflow_action_reconciliation_first_old_failed ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::receipt_sql_tests::company_tests::command_probe_tests::reopen_tests::state_witness_tests::workflow_action_reconciliation_first_old_human_reason ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::receipt_sql_tests::company_tests::workflow_action_reconciliation_receipt_sql_authentic_foreign_company_guard ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::receipt_sql_tests::company_tests::command_probe_tests::workflow_action_reconciliation_command_probe_positive_calibration ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::receipt_sql_tests::company_tests::command_probe_tests::audit_execution_tests::workflow_action_reconciliation_audit_execution_native_and_transport_controls ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::remaining_tests::workflow_action_reconciliation_eligibility_genuine_root_reservation_exhaustion_blocks ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::receipt_sql_tests::workflow_action_reconciliation_receipt_sql_authentic_foreign_bindings ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::receipt_sql_tests::workflow_action_reconciliation_receipt_sql_local_has_neither_source ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::receipt_sql_tests::workflow_action_reconciliation_receipt_sql_non_applied_evidence ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::receipt_sql_tests::company_tests::command_probe_tests::reopen_tests::workflow_action_reconciliation_reopen_matching_final_positives ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::receipt_sql_tests::workflow_action_reconciliation_receipt_sql_remote_source_xor ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::runtime_tests::conflict_tests::workflow_action_reconciliation_runtime_completion_before_conflict_preserves_committed_history ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::runtime_tests::conflict_tests::workflow_action_reconciliation_runtime_conflict_after_return_before_completion_retires_exact_attempt ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::runtime_tests::conflict_tests::workflow_action_reconciliation_runtime_conflicted_sibling_vetoes_all_receipt_continuation ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::revision_overflow_tests::workflow_action_reconciliation_revision_overflow_recovered_applied_later_reopen_rolls_back ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::poison_tests::workflow_action_reconciliation_eligibility_poison_codes_preserve_history ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::runtime_tests::mixed_tests::truth_tests::retained_truth_tests::workflow_action_reconciliation_retained_unknown_after_applied_without_result ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::runtime_tests::consumption_identity_tests::workflow_action_reconciliation_consumption_historical_xid_spoof ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::runtime_tests::mixed_tests::truth_tests::retained_truth_tests::workflow_action_reconciliation_retained_unknown_after_final_proof ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::revision_tests::workflow_action_reconciliation_revision_cancelled_truth_is_audit_only ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::revision_tests::workflow_action_reconciliation_revision_expired_truth_is_audit_only ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::revision_tests::workflow_action_reconciliation_revision_waiting_truth_is_audit_only ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::runtime_tests::mixed_tests::truth_tests::retained_truth_tests::workflow_action_reconciliation_retained_unknown_after_receipt ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::receipt_sql_tests::company_tests::command_probe_tests::reopen_tests::workflow_action_reconciliation_reopen_native_and_transport_controls ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::runtime_tests::mixed_tests::truth_tests::retained_truth_tests::workflow_action_reconciliation_retained_verified_valid_output_conflict ... ok
+PHASE scenario=mixed phase=claimed_snapshot elapsed_ms=6 owner=true attempt=2 lease_remaining_ms=2985 run_remaining_ms=86399304 db_now=2026-11-05 04:51:44.185907+00
+PHASE scenario=mixed phase=live_recovery elapsed_ms=47 owner=true attempt=2 lease_remaining_ms=2944 run_remaining_ms=86399263 db_now=2026-11-05 04:51:44.226347+00
+PHASE scenario=mixed phase=receipt_only_dispatches:renew elapsed_ms=47 owner=true attempt=2 lease_remaining_ms=2944 run_remaining_ms=86399263 db_now=2026-11-05 04:51:44.226977+00
+PHASE scenario=mixed phase=receipt_only_dispatches:renewed elapsed_ms=50 owner=true attempt=2 lease_remaining_ms=2999 run_remaining_ms=86399259 db_now=2026-11-05 04:51:44.23047+00
+PHASE scenario=mixed phase=receipt_only_dispatches elapsed_ms=69 owner=true attempt=2 lease_remaining_ms=2981 run_remaining_ms=86399241 db_now=2026-11-05 04:51:44.248364+00
+PHASE scenario=mixed phase=receipt_only_snapshot elapsed_ms=75 owner=true attempt=2 lease_remaining_ms=2974 run_remaining_ms=86399234 db_now=2026-11-05 04:51:44.255082+00
+PHASE scenario=mixed phase=supported_dispatch:renew elapsed_ms=76 owner=true attempt=2 lease_remaining_ms=2974 run_remaining_ms=86399234 db_now=2026-11-05 04:51:44.255636+00
+PHASE scenario=mixed phase=supported_dispatch:renewed elapsed_ms=79 owner=true attempt=2 lease_remaining_ms=2999 run_remaining_ms=86399231 db_now=2026-11-05 04:51:44.258664+00
+PHASE scenario=mixed phase=supported_dispatch elapsed_ms=119 owner=true attempt=2 lease_remaining_ms=2959 run_remaining_ms=86399191 db_now=2026-11-05 04:51:44.298626+00
+PHASE scenario=mixed phase=applied_snapshot elapsed_ms=127 owner=true attempt=2 lease_remaining_ms=2951 run_remaining_ms=86399182 db_now=2026-11-05 04:51:44.307156+00
+PHASE scenario=mixed phase=completion:renew elapsed_ms=128 owner=true attempt=2 lease_remaining_ms=2950 run_remaining_ms=86399182 db_now=2026-11-05 04:51:44.307522+00
+PHASE scenario=mixed phase=completion:renewed elapsed_ms=132 owner=true attempt=2 lease_remaining_ms=2998 run_remaining_ms=86399178 db_now=2026-11-05 04:51:44.31179+00
+PHASE scenario=mixed phase=before_completion elapsed_ms=133 owner=true attempt=2 lease_remaining_ms=2997 run_remaining_ms=86399177 db_now=2026-11-05 04:51:44.312803+00
+PHASE scenario=mixed phase=completed elapsed_ms=144 owner=false attempt=2 lease_remaining_ms=0 run_remaining_ms=86399165 db_now=2026-11-05 04:51:44.324251+00
+PHASE scenario=mixed phase=claimed_snapshot elapsed_ms=7 owner=true attempt=2 lease_remaining_ms=2982 run_remaining_ms=86399297 db_now=2026-11-05 04:51:44.479712+00
+PHASE scenario=mixed phase=live_recovery elapsed_ms=60 owner=true attempt=2 lease_remaining_ms=2930 run_remaining_ms=86399245 db_now=2026-11-05 04:51:44.532333+00
+PHASE scenario=mixed phase=receipt_only_dispatches:renew elapsed_ms=61 owner=true attempt=2 lease_remaining_ms=2929 run_remaining_ms=86399244 db_now=2026-11-05 04:51:44.533042+00
+PHASE scenario=mixed phase=receipt_only_dispatches:renewed elapsed_ms=65 owner=true attempt=2 lease_remaining_ms=2998 run_remaining_ms=86399239 db_now=2026-11-05 04:51:44.537998+00
+PHASE scenario=mixed phase=receipt_only_dispatches elapsed_ms=88 owner=true attempt=2 lease_remaining_ms=2975 run_remaining_ms=86399217 db_now=2026-11-05 04:51:44.560405+00
+PHASE scenario=mixed phase=receipt_only_snapshot elapsed_ms=98 owner=true attempt=2 lease_remaining_ms=2966 run_remaining_ms=86399207 db_now=2026-11-05 04:51:44.56987+00
+PHASE scenario=mixed phase=supported_dispatch:renew elapsed_ms=98 owner=true attempt=2 lease_remaining_ms=2965 run_remaining_ms=86399206 db_now=2026-11-05 04:51:44.570693+00
+PHASE scenario=mixed phase=supported_dispatch:renewed elapsed_ms=102 owner=true attempt=2 lease_remaining_ms=2999 run_remaining_ms=86399203 db_now=2026-11-05 04:51:44.574054+00
+PHASE scenario=mixed phase=supported_dispatch elapsed_ms=139 owner=true attempt=2 lease_remaining_ms=2962 run_remaining_ms=86399166 db_now=2026-11-05 04:51:44.611062+00
+PHASE scenario=mixed phase=applied_snapshot elapsed_ms=146 owner=true attempt=2 lease_remaining_ms=2955 run_remaining_ms=86399159 db_now=2026-11-05 04:51:44.618164+00
+PHASE scenario=mixed phase=completion:renew elapsed_ms=147 owner=true attempt=2 lease_remaining_ms=2955 run_remaining_ms=86399158 db_now=2026-11-05 04:51:44.618502+00
+PHASE scenario=mixed phase=completion:renewed elapsed_ms=150 owner=true attempt=2 lease_remaining_ms=2998 run_remaining_ms=86399155 db_now=2026-11-05 04:51:44.621584+00
+PHASE scenario=mixed phase=before_completion elapsed_ms=151 owner=true attempt=2 lease_remaining_ms=2998 run_remaining_ms=86399155 db_now=2026-11-05 04:51:44.622447+00
+PHASE scenario=mixed phase=completed elapsed_ms=161 owner=false attempt=2 lease_remaining_ms=0 run_remaining_ms=86399144 db_now=2026-11-05 04:51:44.63324+00
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::runtime_tests::mixed_tests::truth_tests::workflow_action_reconciliation_runtime_mixed_invalid_then_same_genuine_result ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::runtime_tests::consumption_identity_tests::workflow_action_reconciliation_consumption_historical_retrofit ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::runtime_tests::mixed_tests::truth_tests::workflow_action_reconciliation_runtime_mixed_missing_then_same_genuine_result ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::runtime_tests::mixed_tests::workflow_action_reconciliation_runtime_receipt_final_supported_siblings_continue_exactly ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::receipt_sql_tests::company_tests::command_probe_tests::reopen_tests::state_witness_tests::workflow_action_reconciliation_first_old_controls ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::workflow_action_reconciliation_siblings_later_valid_result_resolves_positive_truth ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::runtime_tests::workflow_action_reconciliation_runtime_supported_positive_veto_then_genuine_valid_receipt ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::snapshot_binding_tests::receipt_tests::workflow_action_reconciliation_snapshot_binding_late_actual_receipt_same_coverage_revision ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::snapshot_binding_tests::workflow_action_reconciliation_snapshot_binding_under_bound_entry_change_refuses ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::validation_tests::native_bounds_tests::native_evidence_tests::native_diagnostic_tests::native_attribution_tests::native_coverage_tests::workflow_action_reconciliation_native_coverage_marker_nonempty ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::bounds_tests::prior_bounds_tests::workflow_action_reconciliation_bounds_128_prior_consuming_129_total_then_lost_refuses has been running for over 60 seconds
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::workflow_action_reconciliation_siblings_all_receipts_all_proofs_and_mixed_continue_individually ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::workflow_action_reconciliation_siblings_unknown_and_applied_without_output_keep_all_parked ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::validation_tests::native_bounds_tests::native_evidence_tests::native_diagnostic_tests::native_attribution_tests::native_coverage_tests::workflow_action_reconciliation_native_coverage_applied_membership ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::validation_tests::native_bounds_tests::native_evidence_tests::native_diagnostic_tests::native_attribution_tests::native_coverage_tests::workflow_action_reconciliation_native_coverage_unknown_missing ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::validation_tests::native_bounds_tests::native_evidence_tests::native_diagnostic_tests::native_attribution_tests::workflow_action_reconciliation_native_attribution_scope_and_before ... ok
+PHASE scenario=high_bounds phase=source_ready elapsed_ms=0 owner=true attempt=130 lease_remaining_ms=2990 run_remaining_ms=86378850 db_now=2026-11-05 04:52:00.390595+00
+PHASE scenario=high_bounds phase=catalog elapsed_ms=5 owner=true attempt=130 lease_remaining_ms=2985 run_remaining_ms=86378844 db_now=2026-11-05 04:52:00.396025+00
+PHASE scenario=high_bounds phase=before_snapshot elapsed_ms=71 owner=true attempt=130 lease_remaining_ms=2918 run_remaining_ms=86378777 db_now=2026-11-05 04:52:00.46305+00
+PHASE scenario=high_bounds phase=invalid_exclusions:renew elapsed_ms=73 owner=true attempt=130 lease_remaining_ms=2916 run_remaining_ms=86378775 db_now=2026-11-05 04:52:00.464978+00
+PHASE scenario=high_bounds phase=invalid_exclusions:renewed elapsed_ms=82 owner=true attempt=130 lease_remaining_ms=2998 run_remaining_ms=86378767 db_now=2026-11-05 04:52:00.473177+00
+PHASE scenario=high_bounds phase=invalid_exclusions elapsed_ms=236 owner=true attempt=130 lease_remaining_ms=2843 run_remaining_ms=86378611 db_now=2026-11-05 04:52:00.628768+00
+PHASE scenario=high_bounds phase=reject_candidate:renew elapsed_ms=239 owner=true attempt=130 lease_remaining_ms=2841 run_remaining_ms=86378610 db_now=2026-11-05 04:52:00.630371+00
+PHASE scenario=high_bounds phase=reject_candidate:renewed elapsed_ms=249 owner=true attempt=130 lease_remaining_ms=2998 run_remaining_ms=86378600 db_now=2026-11-05 04:52:00.640225+00
+PHASE scenario=high_bounds phase=reject_candidate elapsed_ms=268 owner=true attempt=130 lease_remaining_ms=2980 run_remaining_ms=86378582 db_now=2026-11-05 04:52:00.658362+00
+PHASE scenario=high_bounds phase=unchanged elapsed_ms=338 owner=true attempt=130 lease_remaining_ms=2909 run_remaining_ms=86378511 db_now=2026-11-05 04:52:00.728753+00
+PHASE scenario=high_bounds phase=reject_candidate:renew elapsed_ms=340 owner=true attempt=130 lease_remaining_ms=2908 run_remaining_ms=86378510 db_now=2026-11-05 04:52:00.730299+00
+PHASE scenario=high_bounds phase=reject_candidate:renewed elapsed_ms=343 owner=true attempt=130 lease_remaining_ms=2999 run_remaining_ms=86378506 db_now=2026-11-05 04:52:00.73389+00
+PHASE scenario=high_bounds phase=reject_candidate elapsed_ms=359 owner=true attempt=130 lease_remaining_ms=2983 run_remaining_ms=86378490 db_now=2026-11-05 04:52:00.74968+00
+PHASE scenario=high_bounds phase=unchanged elapsed_ms=427 owner=true attempt=130 lease_remaining_ms=2914 run_remaining_ms=86378422 db_now=2026-11-05 04:52:00.818606+00
+PHASE scenario=high_bounds phase=reject_historical:renew elapsed_ms=430 owner=true attempt=130 lease_remaining_ms=2911 run_remaining_ms=86378419 db_now=2026-11-05 04:52:00.821277+00
+PHASE scenario=high_bounds phase=reject_historical:renewed elapsed_ms=436 owner=true attempt=130 lease_remaining_ms=2999 run_remaining_ms=86378414 db_now=2026-11-05 04:52:00.826471+00
+PHASE scenario=high_bounds phase=reject_historical elapsed_ms=442 owner=true attempt=130 lease_remaining_ms=2992 run_remaining_ms=86378407 db_now=2026-11-05 04:52:00.83279+00
+PHASE scenario=high_bounds phase=unchanged elapsed_ms=495 owner=true attempt=130 lease_remaining_ms=2940 run_remaining_ms=86378354 db_now=2026-11-05 04:52:00.885681+00
+PHASE scenario=high_bounds phase=reject_historical:renew elapsed_ms=498 owner=true attempt=130 lease_remaining_ms=2937 run_remaining_ms=86378352 db_now=2026-11-05 04:52:00.88794+00
+PHASE scenario=high_bounds phase=reject_historical:renewed elapsed_ms=500 owner=true attempt=130 lease_remaining_ms=2999 run_remaining_ms=86378350 db_now=2026-11-05 04:52:00.890147+00
+PHASE scenario=high_bounds phase=reject_historical elapsed_ms=506 owner=true attempt=130 lease_remaining_ms=2993 run_remaining_ms=86378344 db_now=2026-11-05 04:52:00.896539+00
+PHASE scenario=high_bounds phase=unchanged elapsed_ms=556 owner=true attempt=130 lease_remaining_ms=2944 run_remaining_ms=86378294 db_now=2026-11-05 04:52:00.945787+00
+PHASE scenario=high_bounds phase=supported_positive:renew elapsed_ms=557 owner=true attempt=130 lease_remaining_ms=2943 run_remaining_ms=86378293 db_now=2026-11-05 04:52:00.946746+00
+PHASE scenario=high_bounds phase=supported_positive:renewed elapsed_ms=558 owner=true attempt=130 lease_remaining_ms=2999 run_remaining_ms=86378292 db_now=2026-11-05 04:52:00.948217+00
+PHASE scenario=high_bounds phase=supported_clean elapsed_ms=560 owner=true attempt=130 lease_remaining_ms=2998 run_remaining_ms=86378290 db_now=2026-11-05 04:52:00.94995+00
+PHASE scenario=high_bounds phase=supported_before_snapshot elapsed_ms=602 owner=true attempt=130 lease_remaining_ms=2955 run_remaining_ms=86378248 db_now=2026-11-05 04:52:00.99228+00
+PHASE scenario=high_bounds phase=supported_reserve:renew elapsed_ms=602 owner=true attempt=130 lease_remaining_ms=2955 run_remaining_ms=86378248 db_now=2026-11-05 04:52:00.992478+00
+PHASE scenario=high_bounds phase=supported_reserve:renewed elapsed_ms=606 owner=true attempt=130 lease_remaining_ms=2999 run_remaining_ms=86378244 db_now=2026-11-05 04:52:00.996142+00
+PHASE scenario=high_bounds phase=supported_reserved elapsed_ms=657 owner=true attempt=130 lease_remaining_ms=2946 run_remaining_ms=86378191 db_now=2026-11-05 04:52:01.048835+00
+PHASE scenario=high_bounds phase=supported_entered elapsed_ms=672 owner=true attempt=130 lease_remaining_ms=2929 run_remaining_ms=86378175 db_now=2026-11-05 04:52:01.065532+00
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::runtime_tests::high_bounds_tests::workflow_action_reconciliation_high_bounds_native_owners_and_supported_entry ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::validation_tests::native_bounds_tests::native_evidence_tests::native_diagnostic_tests::native_attribution_tests::workflow_action_reconciliation_native_attribution_accepted_calibrations ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::validation_tests::native_bounds_tests::native_evidence_tests::native_diagnostic_tests::native_object_tests::native_chronology_tests::workflow_action_reconciliation_native_chronology_entry_committed ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::validation_tests::native_bounds_tests::native_evidence_tests::native_diagnostic_tests::native_command_tests::workflow_action_reconciliation_native_command_audit ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::validation_tests::native_bounds_tests::native_evidence_tests::native_diagnostic_tests::native_command_tests::workflow_action_reconciliation_native_command_dispatch ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::validation_tests::native_bounds_tests::native_evidence_tests::native_diagnostic_tests::native_command_tests::workflow_action_reconciliation_native_command_job ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::validation_tests::native_bounds_tests::native_evidence_tests::native_diagnostic_tests::native_command_tests::workflow_action_reconciliation_native_command_nullable_calibrations ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::validation_tests::native_bounds_tests::native_evidence_tests::native_diagnostic_tests::native_fk_tests::workflow_action_reconciliation_native_fk_coverage_entry ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::validation_tests::native_bounds_tests::native_evidence_tests::native_diagnostic_tests::native_fk_tests::workflow_action_reconciliation_native_fk_coverage_evidence ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::validation_tests::native_bounds_tests::native_evidence_tests::native_diagnostic_tests::native_attribution_tests::workflow_action_reconciliation_native_attribution_shape ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::validation_tests::native_bounds_tests::native_evidence_tests::native_diagnostic_tests::native_object_tests::native_chronology_tests::workflow_action_reconciliation_native_chronology_marker_rejected ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::validation_tests::native_bounds_tests::native_evidence_tests::native_diagnostic_tests::native_object_tests::native_coherence_tests::workflow_action_reconciliation_native_coherence_grant_scope ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::validation_tests::native_bounds_tests::native_evidence_tests::native_diagnostic_tests::native_object_tests::native_coherence_tests::workflow_action_reconciliation_native_coherence_unregistered_presence ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::validation_tests::native_bounds_tests::native_evidence_tests::native_diagnostic_tests::native_fk_tests::workflow_action_reconciliation_native_fk_dispatch ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::validation_tests::native_bounds_tests::native_evidence_tests::native_diagnostic_tests::native_command_tests::workflow_action_reconciliation_native_command_scheduled_check ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::validation_tests::native_bounds_tests::native_evidence_tests::native_diagnostic_tests::native_object_tests::native_constraint_tests::workflow_action_reconciliation_native_constraint_command_key ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::validation_tests::native_bounds_tests::native_evidence_tests::native_diagnostic_tests::native_object_tests::native_coherence_tests::workflow_action_reconciliation_native_coherence_time_order ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::validation_tests::native_bounds_tests::native_evidence_tests::native_diagnostic_tests::native_object_tests::native_grammar_tests::workflow_action_reconciliation_native_grammar_authoritative_reference ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::validation_tests::native_bounds_tests::native_evidence_tests::native_diagnostic_tests::native_object_tests::native_constraint_tests::workflow_action_reconciliation_native_constraint_disposition ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::validation_tests::native_bounds_tests::native_evidence_tests::native_diagnostic_tests::native_object_tests::native_grammar_tests::workflow_action_reconciliation_native_grammar_provider ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::validation_tests::native_bounds_tests::native_evidence_tests::native_diagnostic_tests::native_object_tests::native_grammar_tests::workflow_action_reconciliation_native_grammar_registration ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::validation_tests::native_bounds_tests::native_evidence_tests::native_diagnostic_tests::native_object_tests::native_validity_tests::workflow_action_reconciliation_native_validity_registered_bounds_committed ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::validation_tests::native_bounds_tests::native_evidence_tests::native_diagnostic_tests::native_object_tests::native_constraint_tests::workflow_action_reconciliation_native_constraint_coverage_digest ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::validation_tests::native_bounds_tests::native_evidence_tests::native_diagnostic_tests::native_object_tests::native_coherence_tests::workflow_action_reconciliation_native_coherence_registered_presence ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::validation_tests::native_bounds_tests::native_evidence_tests::native_diagnostic_tests::native_object_tests::native_grammar_tests::workflow_action_reconciliation_native_grammar_verifier_version ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::validation_tests::native_bounds_tests::native_evidence_tests::native_diagnostic_tests::native_object_tests::native_constraint_tests::workflow_action_reconciliation_native_constraint_operation_signature ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::validation_tests::native_bounds_tests::native_evidence_tests::native_diagnostic_tests::native_object_tests::native_constraint_tests::workflow_action_reconciliation_native_constraint_request_digest ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::validation_tests::native_bounds_tests::native_evidence_tests::native_projection_tests::workflow_action_reconciliation_native_projection_diagnostic_is_not_read ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::validation_tests::native_bounds_tests::native_evidence_tests::native_projection_tests::workflow_action_reconciliation_native_projection_stores_only_closed_diagnostic ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::validation_tests::native_bounds_tests::native_evidence_tests::workflow_action_reconciliation_native_evidence_registered_unknown_commits ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::validation_tests::native_bounds_tests::native_evidence_tests::native_diagnostic_tests::native_object_tests::workflow_action_reconciliation_native_diagnostic_array_and_corrected_object ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::validation_tests::native_bounds_tests::workflow_action_reconciliation_native_bounds_actual_results ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::validation_tests::native_bounds_tests::workflow_action_reconciliation_native_bounds_command_shape_and_bytes ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::validation_tests::native_bounds_tests::native_evidence_tests::native_diagnostic_tests::native_object_tests::native_validity_tests::workflow_action_reconciliation_native_validity_registered_bounds_rejected ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::validation_tests::workflow_action_reconciliation_validation_malformed_stored_outcomes ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::validation_tests::workflow_action_reconciliation_validation_observation_before_real_entry ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::workflow_action_reconciliation_all_tables_matches_per_relation_reads ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::workflow_action_reconciliation_proof_competing_commands_claimants_loss_and_fresh_coverage ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::workflow_action_reconciliation_proof_new_consumed_entry_applied_recovery_is_legitimate ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::validation_tests::native_bounds_tests::native_evidence_tests::native_diagnostic_tests::native_object_tests::workflow_action_reconciliation_native_diagnostic_jsonb_text_bytes ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::validation_tests::workflow_action_reconciliation_validation_installed_source_mismatches ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::support::directory_tests::workflow_action_reconciliation_directory_preflight_error_is_not_access_refusal ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::support::directory_tests::workflow_action_reconciliation_directory_settlement_error_cannot_commit_final_proof ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::validation_tests::native_bounds_tests::native_evidence_tests::native_diagnostic_tests::workflow_action_reconciliation_native_diagnostic_scalar_and_controls ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::support::directory_tests::workflow_action_reconciliation_directory_transactional_snapshot_error_propagates ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::workflow_action_reconciliation_admin_truth_cannot_replace_dispatch_actor ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::workflow_action_reconciliation_proof_admin_cannot_authorize_revoked_original_new_call ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::workflow_action_reconciliation_current_owner_admin_and_denied_principals ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::workflow_action_reconciliation_forged_scope_and_subject_never_verify ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::workflow_action_reconciliation_paused_owner_deletion_refuses_without_resurrection ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::workflow_action_reconciliation_unknown_restart_replay_conflict_and_ordinary_retry ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::workflow_action_reconciliation_verified_unknown_restart_and_retry ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::commit_tests::injected::workflow_action_reconciliation_commit_applied_injected_audit ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::commit_tests::injected::workflow_action_reconciliation_commit_applied_injected_command ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::commit_tests::injected::workflow_action_reconciliation_commit_applied_injected_evidence ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::commit_tests::injected::workflow_action_reconciliation_commit_applied_injected_receipt ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::workflow_action_reconciliation_proof_provider_barrier_competes_with_delayed_effect ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::commit_tests::injected::workflow_action_reconciliation_commit_applied_injected_reopen ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::commit_tests::workflow_action_reconciliation_commit_applied_native_chronology ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::workflow_action_reconciliation_paused_verifier_cancel_and_deadline_preserve_terminal ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::commit_tests::workflow_action_reconciliation_commit_applied_observer_calibration ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::commit_tests::workflow_action_reconciliation_commit_applied_positive ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::workflow_action_reconciliation_live_db_observation_and_future_timestamp_settlement ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::workflow_action_reconciliation_provider_lost_applied_restart_without_io ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::workflow_action_reconciliation_old_actual_after_recovered_receipt_retains_first_result ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::workflow_action_reconciliation_sql_actual_receipt_conflict_and_audit_guards ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::remote_tests::workflow_action_dispatch_expired_entry_oracle_rejects_polled_provider ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::workflow_action_reconciliation_paused_verifier_rechecks_revocation_and_revision ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_snapshot_tests::workflow_action_reconciliation_snapshot_revision_refusal_replay_reauthorizes_resource ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::cancellation_order_tests::workflow_action_cancellation_return_lost_owner_precedes_denied_authority ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::workflow_action_reconciliation_provider_active_is_unknown_until_actual_effect_or_barrier ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::remote_tests::workflow_action_dispatch_committed_marker_ambiguous_ack_retry_restart_reclaim_never_send ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::workflow_action_reconciliation_provider_applied_without_usable_output_never_downgrades ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::remote_tests::workflow_action_dispatch_delayed_first_poll_checks_monotonic_window ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_snapshot_tests::workflow_action_reconciliation_snapshot_restores_terminal_and_parked_full_provenance ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::replay_tests::workflow_action_replay_delayed_lock_cannot_shorten_retention_horizon ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::remote_tests::workflow_action_dispatch_pending_run_deadline_oracle_rejects_lease_limited_entry ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::replay_tests::workflow_action_replay_approved_first_dispatch_stable_key_competing_tool_and_restart ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::workflow_action_reconciliation_old_actual_after_new_receipt_keeps_same_and_different_truth ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::replay_tests::workflow_action_replay_metadata_headers_and_changed_arguments_cannot_grant_retry ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::replay_tests::workflow_action_replay_unsupported_or_mismatched_contract_never_marks_or_polls ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::replay_tests::workflow_action_replay_first_proof_crash_and_tampered_entry_stay_conservative ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::replay_tests::workflow_action_replay_frozen_policy_alone_does_not_register_provider_safety ... ok
+PROVEN scenario=(q) fence loss=expiry attempt=1 branch=adopted_then_refused
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::remote_tests::workflow_action_dispatch_service_post_marker_revoke_cancel_zero_provider_polls ... ok
+PROVEN scenario=(r) applies=true early=true attempt=1 branch=resolved_adopted
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::sql_tests::workflow_action_dispatch_saved_model_tool_and_step_share_effect_wrong_digest_refused ... ok
+PROVEN scenario=(s) cancel=true attempt=1 branch=lapsed
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::sql_tests::workflow_action_dispatch_sql_deferred_run_deadline_rejects_effect_and_receipt ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::remote_tests::workflow_action_dispatch_pending_actual_provider_dropped_on_loss_cancel_deadline ... ok
+PROVEN scenario=(q) applies=true attempt=1 branch=adopted
+PROVEN scenario=(q) fence loss=cancel attempt=1 branch=adopted_then_refused
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::resolution_tests::workflow_action_dispatch_resolution_adopted_reservation_refused_after_fence_loss ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::resolution_tests::workflow_action_dispatch_resolution_stalled_local_effect_once ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::sql_tests::workflow_action_dispatch_sql_provenance_foreign_keys_and_receipt_linkage ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::workflow_action_dispatch_competing_local_and_restart_receipt ... ok
+PROVEN scenario=(r) applies=true early=false attempt=1 branch=resolved_adopted
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::sql_tests::workflow_action_dispatch_revokers_wait_for_local_effect_and_receipt_commit ... ok
+PROVEN scenario=(s) cancel=false attempt=1 branch=lapsed
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::resolution_tests::workflow_action_dispatch_resolution_lapsed_reservation_stays_unknown ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::workflow_action_dispatch_sql_commit_expiry_and_append_only_facts ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::workflow_action_dispatch_stale_fences_scopes_protection_and_errors ... ok
+PROVEN scenario=(q) applies=false attempt=1 branch=not_applied
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::resolution_tests::workflow_action_dispatch_resolution_stalled_reservation_adopted ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::storage_checkpoint_tests::run_retention_native_checkpoint_and_model_usage_delete_with_only_owned_jobs ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::storage_checkpoint_tests::run_retention_native_checkpoint_model_usage_and_tree_rollback_then_retry ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::assistant_channel_command_replays_by_key_and_refuses_a_changed_request ... ok
+PROVEN scenario=(r) applies=false early=true attempt=1 branch=resolved_not_applied
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::assistant_channel_commands_race_to_one_assistant ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::replay_tests::workflow_action_replay_ambiguous_observations_never_issue_second_permit ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::knowledge_provisioning_tests::knowledge_run_level_provisioning_rechecks_pending_intent_before_any_local_effect ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::workflow_action_dispatch_remote_marker_crash_response_and_no_replay ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_grants_capture_the_built_in_or_refuse_an_ambiguous_capture ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_competing_claimants_create_one_assistant ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_in_a_child_run_acts_for_the_roots_requester ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::cancellation_order_tests::workflow_action_cancellation_company_before_run_all_callers ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_lists_agents_and_models ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::workflow_action_dispatch_waiting_revokers_recheck_current_authority ... ok
+PROVEN scenario=(r) applies=false early=false attempt=1 branch=resolved_not_applied
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::resolution_tests::workflow_action_dispatch_resolution_competing_reservers_one_dispatch ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_losing_an_address_race_is_a_conflict_refusal ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_lists_an_oversized_directory_within_its_bound ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_stale_fences_write_nothing ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::workflow_action_dispatch_local_faults_rollback_every_write ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_refusals_commit_a_receipt_and_no_effect ... ok
+PHASE scenario=prior_bounds phase=competitor_started elapsed_ms=34 owner=false attempt=128 lease_remaining_ms=0 run_remaining_ms=86270441 db_now=2026-11-05 04:53:04.685293+00
+PHASE scenario=prior_bounds phase=claimed_129 elapsed_ms=54 owner=true attempt=129 lease_remaining_ms=2990 run_remaining_ms=86270420 db_now=2026-11-05 04:53:04.70638+00
+PHASE scenario=prior_bounds phase=claimed_snapshot elapsed_ms=130 owner=true attempt=129 lease_remaining_ms=2928 run_remaining_ms=86270346 db_now=2026-11-05 04:53:04.780353+00
+PHASE scenario=prior_bounds phase=consumed_129 elapsed_ms=168 owner=true attempt=129 lease_remaining_ms=2890 run_remaining_ms=86270308 db_now=2026-11-05 04:53:04.817832+00
+PHASE scenario=prior_bounds phase=consumed_snapshot elapsed_ms=243 owner=true attempt=129 lease_remaining_ms=2814 run_remaining_ms=86270231 db_now=2026-11-05 04:53:04.894753+00
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_transient_fault_leaves_no_marker_receipt_or_effect ... ok
+test adapters::persistence::workflow::tests::admission_tests::model_usage_tests::agent_retire_with_usage_rows_reports_run_history ... ok
+PHASE scenario=prior_bounds phase=parked elapsed_ms=450 owner=false attempt=129 lease_remaining_ms=0 run_remaining_ms=86270024 db_now=2026-11-05 04:53:05.101822+00
+PHASE scenario=prior_bounds phase=pre_settlement_snapshot elapsed_ms=586 owner=false attempt=129 lease_remaining_ms=0 run_remaining_ms=86269889 db_now=2026-11-05 04:53:05.236955+00
+TIMELINE prior_bounds verifier_entered_ms=32 verifier_ready_ms=34 release_ms=587 verifier_returned_ms=587 settle_entered_ms=587 settle_returned_ms=601 command_ended_ms=601 result=Ok(Blocked { reason: BoundExceeded })
+test adapters::persistence::workflow::tests::admission_tests::model_usage_tests::model_usage_workflow_exact_provenance_and_grouping ... ok
+test adapters::persistence::workflow::tests::admission_tests::model_usage_tests::schema_constraint_live_usage_requires_run_and_history_has_no_runtime_owners ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::workflow_action_dispatch_post_marker_revocation_cancel_and_expiry_refuse_entry ... ok
+test adapters::persistence::workflow::tests::admission_tests::workflow_admit_sql_competing_same_key_and_canonical_source ... ok
+test adapters::persistence::workflow::tests::admission_tests::workflow_admit_sql_exact_snapshot_job_and_replay_preserves_deadline ... ok
+test adapters::persistence::workflow::tests::admission_tests::workflow_admit_sql_final_and_deferred_failure_roll_back_all_records ... ok
+test adapters::persistence::workflow::tests::admission_tests::workflow_admit_sql_stale_selection_conflicts_and_saved_replay_survives_removal ... ok
+test adapters::persistence::workflow::tests::child_publication_tests::workflow_child_publication_bounds_pins_and_bytes_before_reading_bundles ... ok
+test adapters::persistence::workflow::tests::child_publication_tests::workflow_child_publication_captures_only_selectable_children_of_the_company ... ok
+test adapters::persistence::workflow::tests::child_publication_tests::workflow_child_publication_publishes_the_shipped_revision_template_end_to_end ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::driver::workflow_agent_run_protected_tool_waits_for_approval_and_dispatches_once ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::driver::workflow_agent_run_refuses_model_invented_tool_without_dispatch ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::driver::workflow_agent_run_refuses_rebound_tool_target ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::driver::workflow_agent_run_repairs_invalid_output_once ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::driver::workflow_agent_run_token_pause_resumes_with_the_saved_request ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_run_level_model_continues_after_refused_http_tool_without_egress ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::driver::workflow_agent_run_two_approval_cycles_dispatch_each_call_once ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::recovery::workflow_agent_run_crash_during_effect_is_indeterminate_and_reconciled ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::recovery::workflow_agent_run_dynamic_selection_runs_the_bound_agent ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::bounds_tests::prior_bounds_tests::workflow_action_reconciliation_bounds_128_prior_consuming_129_total_then_lost_refuses ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::recovery::workflow_agent_run_invalid_output_after_repairs_is_terminal ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::recovery::workflow_agent_run_reservation_without_provider_io_retries_with_a_new_request ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::recovery::workflow_agent_run_restart_after_provider_entry_charges_a_new_request ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::recovery::workflow_agent_run_restart_after_receipt_reuses_the_saved_effect ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::recovery::workflow_agent_run_token_denial_never_enters_the_provider ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::recovery::workflow_agent_run_settlement_pause_and_second_pause_resume_exact_requests ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::recovery::workflow_agent_run_unanswered_effect_is_terminal_and_reconciled ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::workflow_agent_capability_sql_shape_matches_type_names ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::workflow_agent_capability_writers_preserve_unsupplied_lists ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::workflow_agent_capture_refuses_slot_bound_http_grant ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::workflow_agent_capture_refuses_unrunnable_agents ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::workflow_agent_publication_refuses_forged_snapshot_and_keeps_frozen_version ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::workflow_agent_publish_competing_agent_edit_fails_publication ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::workflow_agent_run_refuses_removed_tool_grant_before_provider_entry ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::workflow_agent_run_competing_revocation_refuses_admission ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::workflow_agent_run_refuses_revoked_model_connection_before_provider_entry ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::workflow_agent_run_saves_tool_call_dispatches_once_and_replays_final_output ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::workflow_agent_run_refuses_unlinked_skill_before_provider_entry ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::continuation_tests::workflow_action_approval_continuation_counter_and_history_cannot_be_forged ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::continuation_tests::workflow_action_approval_failure_retry_after_continuation_uses_failure_allowance ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::continuation_tests::workflow_action_approval_later_submission_competes_with_cancellation ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::continuation_tests::workflow_action_approval_multiple_effects_resume_without_failure_debit_or_old_approval_reuse ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::continuation_tests::workflow_action_approval_old_comment_cannot_attach_to_later_wait ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::review_tests::workflow_action_approval_audit_kind_binding_preserves_ordinary_uniqueness ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::review_tests::workflow_action_approval_identical_operation_new_call_id_reuses_one_receipt ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::review_tests::workflow_action_approval_operator_retry_preserves_nonzero_continuation_witness ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::continuation_tests::workflow_action_approval_continuation_ceiling_refuses_without_resetting_failures ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::review_tests::workflow_action_approval_replay_preserves_result_after_later_successor ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::continuation_tests::workflow_action_approval_later_expiry_and_rejection_preserve_first_decision ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::sql_tests::workflow_action_approval_digest_cannot_authorize_changed_arguments ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::sql_tests::workflow_action_approval_digest_fk_rejects_each_mismatch ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::sql_tests::workflow_action_approval_invalid_choice_data_and_digest_leave_open ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::continuation_tests::workflow_action_approval_orphan_wait_and_foreign_audit_are_rejected ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::sql_tests::workflow_action_approval_unprovable_notice_key_fails_without_park ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::workflow_action_approval_competing_reviewers_settle_once ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::review_tests::workflow_action_approval_same_arguments_different_target_or_operation_need_new_approval ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::workflow_action_approval_expiry_fails_without_dispatch ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::workflow_action_approval_last_failure_attempt_can_park_and_resume ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::workflow_action_approval_park_with_sixteen_approvers_commits_within_bound ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::workflow_action_approval_reject_registered_operation_has_http_failure ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::workflow_action_approval_reopen_without_submission_is_rejected ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::workflow_action_approval_submit_competes_with_expiry ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::workflow_action_approval_admin_demotion_refuses_park_and_submission ... ok
+test adapters::persistence::workflow::tests::http_tests::authority_tests::workflow_http_admission_rechecks_bound_operation_after_activation ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::workflow_action_approval_dispatch_claims_next_attempt_and_dispatches_once ... ok
+test adapters::persistence::workflow::tests::http_tests::authority_tests::workflow_http_binding_checks_exact_selected_connection_contract ... ok
+test adapters::persistence::workflow::tests::http_tests::knowledge_http_tests::knowledge_run_level_completed_remote_receipt_replays_after_taint_without_reentry ... ok
+test adapters::persistence::workflow::tests::http_tests::knowledge_http_tests::knowledge_run_level_http_current_connection_level_allows_classified_dispatch ... ok
+test adapters::persistence::workflow::tests::http_tests::knowledge_http_tests::knowledge_run_level_remote_possible_marker_stays_uncertain_after_taint ... ok
+test adapters::persistence::workflow::tests::http_tests::workflow_http_foreign_credential_fk_and_nonadmin_authority_fail_closed ... ok
+test adapters::persistence::workflow::tests::http_tests::workflow_http_publication_rejects_forged_policy_and_registration_revocation ... ok
+test adapters::persistence::workflow::tests::http_tests::workflow_http_real_publication_admission_receipt_restart_and_competitors ... ok
+test adapters::persistence::workflow::tests::http_tests::workflow_http_registered_tool_and_direct_model_call_share_receipt ... ok
+test adapters::persistence::workflow::tests::http_tests::workflow_http_remote_failure_remains_unknown_without_second_entry ... ok
+test adapters::persistence::workflow::tests::http_tests::workflow_http_secret_is_encrypted_scoped_and_revision_competitors_have_one_winner ... ok
+test adapters::persistence::workflow::tests::http_tests::knowledge_http_tests::knowledge_run_level_http_step_and_direct_tool_refuse_before_network ... ok
+test adapters::persistence::workflow::tests::mcp_tests::agent_tests::workflow_agent_mcp_tool_dispatches_once_through_the_bound_slot ... ok
+test adapters::persistence::workflow::tests::http_tests::workflow_http_crash_before_marker_retries_and_after_marker_reconciles ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::sql_tests::workflow_action_approval_reopen_checks_transaction_choice_and_accounting ... ok
+test adapters::persistence::workflow::tests::mcp_tests::approval_tests::workflow_action_approval_mcp_never_opens_before_approval_then_calls_once ... ok
+test adapters::persistence::workflow::tests::mcp_tests::catalog_tests::workflow_mcp_binding_rejects_foreign_and_wrong_kind_resources ... ok
+test adapters::persistence::workflow::tests::mcp_tests::approval_tests::workflow_action_approval_not_applied_proof_never_grants_second_entry ... ok
+test adapters::persistence::workflow::tests::mcp_tests::catalog_tests::workflow_mcp_operation_cas_cascades_and_tenant_constraints ... ok
+test adapters::persistence::workflow::tests::mcp_tests::knowledge_mcp_tests::knowledge_run_level_mcp_level_change_preserves_operation_and_credentials ... ok
+test adapters::persistence::workflow::tests::mcp_tests::knowledge_mcp_tests::knowledge_run_level_mcp_step_and_tool_refuse_without_provider_entry ... ok
+test adapters::persistence::workflow::tests::mcp_tests::reconciliation_tests::workflow_mcp_unknown_note_through_the_production_composition ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::resolution_tests::workflow_action_approval_race_lost_commit_ack_resolves_exact_park ... ok
+test adapters::persistence::workflow::tests::mcp_tests::recovery_tests::workflow_mcp_stale_worker_during_eager_open_retries_then_calls_once ... ok
+test adapters::persistence::workflow::tests::mcp_tests::workflow_mcp_competitors_restart_and_direct_tool_share_one_call ... ok
+test adapters::persistence::workflow::tests::mcp_tests::reconciliation_tests::workflow_mcp_verified_not_applied_retries_lazily_and_checks_live_drift ... ok
+test adapters::persistence::workflow::tests::mcp_tests::recovery_tests::workflow_mcp_cancellation_and_dropped_worker_cancel_and_close_without_second_call ... ok
+test adapters::persistence::workflow::tests::mcp_tests::recovery_tests::workflow_mcp_revocation_and_rotation_racing_dispatch_never_call ... ok
+test adapters::persistence::workflow::tests::mcp_tests::catalog_tests::workflow_mcp_registration_competes_with_grant_removal_refresh_and_delete ... ok
+test adapters::persistence::workflow::tests::mcp_tests::recovery_tests::workflow_mcp_post_entry_failures_and_session_expiry_park_without_reinitialize ... ok
+test adapters::persistence::workflow::tests::mcp_tests::workflow_mcp_drift_and_missing_tool_fail_before_any_marker ... ok
+test adapters::persistence::workflow::tests::mcp_tests::workflow_mcp_json_and_sse_run_end_to_end_with_typed_refs ... ok
+test adapters::persistence::workflow::tests::mcp_tests::workflow_mcp_tool_error_commits_receipt_and_takes_final_error ... ok
+test adapters::persistence::workflow::tests::mcp_tests::recovery_tests::workflow_mcp_permit_timeout_retires_safely_then_retries_once ... ok
+test adapters::persistence::workflow::tests::mcp_tests::workflow_mcp_unavailable_before_marker_retries_and_dispatches_once ... ok
+test adapters::persistence::workflow::tests::http_tests::workflow_http_current_revocation_and_protection_prevent_network ... ok
+test adapters::persistence::workflow::tests::message_tests::agent_tests::workflow_agent_message_tool_parks_on_delivery_and_continues_with_its_receipt ... ok
+test adapters::persistence::workflow::tests::message_tests::approval_tests::workflow_action_approval_message_then_effect_wait_preserves_both_histories ... ok
+test adapters::persistence::workflow::tests::mcp_tests::workflow_mcp_output_violation_and_oversize_stay_unknown_without_second_call ... ok
+test adapters::persistence::workflow::tests::mcp_tests::workflow_mcp_resource_links_stay_inert_and_echoed_secrets_are_redacted ... ok
+test adapters::persistence::workflow::tests::message_tests::authority_tests::workflow_message_publish_revocation_after_a_marker_stays_retryable ... ok
+test adapters::persistence::workflow::tests::message_tests::delivery_tests::workflow_message_delivery_begin_part_refuses_a_recipient_no_longer_a_member ... ok
+test adapters::persistence::workflow::tests::message_tests::delivery_tests::workflow_message_delivery_begin_part_refuses_a_revoked_actor ... ok
+test adapters::persistence::workflow::tests::message_tests::delivery_tests::workflow_message_delivery_begin_part_refuses_a_run_past_its_deadline ... ok
+test adapters::persistence::workflow::tests::message_tests::delivery_tests::workflow_message_delivery_duplicate_callback_adds_no_event ... ok
+test adapters::persistence::workflow::tests::message_tests::delivery_tests::workflow_message_delivery_reaper_locks_parents_and_marks_started_requests_unknown ... ok
+test adapters::persistence::workflow::tests::message_tests::delivery_tests::workflow_message_race_paused_producer_then_consumer_sees_both_events ... ok
+test adapters::persistence::workflow::tests::message_tests::knowledge_message_tests::knowledge_run_level_internal_message_stamps_current_content_and_completed_replay_retains_stamp ... ok
+test adapters::persistence::workflow::tests::message_tests::knowledge_message_tests::knowledge_run_level_pending_public_intent_cannot_send_after_content_rises ... ok
+test adapters::persistence::workflow::tests::message_tests::knowledge_message_tests::knowledge_run_level_race_verified_address_change_cannot_authorize_a_frozen_retired_recipient ... ok
+test adapters::persistence::workflow::tests::message_tests::knowledge_message_tests::knowledge_run_level_sql_freeze_constraint_matches_pure_release_matrix ... ok
+test adapters::persistence::workflow::tests::message_tests::approval_tests::workflow_action_approval_race_message_lost_ack_resolves_park ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::builder_stops_a_listing_loop_once_its_result_repeats ... ok
+test adapters::persistence::workflow::tests::message_tests::knowledge_message_tests::knowledge_run_level_tool_refusal_is_typed_and_contains_no_content ... ok
+test adapters::persistence::workflow::tests::message_tests::authority_tests::workflow_message_publish_revoked_authority_is_terminal_rejected_before_any_marker ... ok
+test adapters::persistence::workflow::tests::message_tests::knowledge_message_tests::knowledge_run_level_verified_member_email_uses_current_member_level ... ok
+test adapters::persistence::workflow::tests::message_tests::knowledge_message_tests::knowledge_run_level_step_email_and_fanout_refuse_before_any_effect ... ok
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::race_tests::workflow_message_race_competing_settlements_reopen_once ... ok
+test adapters::persistence::workflow::tests::mcp_tests::workflow_mcp_refusals_and_protection_are_terminal_without_network ... ok
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::race_tests::workflow_message_race_settle_and_consumer_compete_for_one_action ... ok
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::race_tests::workflow_message_race_settle_consumer_and_begin_part_compete ... ok
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::race_tests::workflow_message_race_settle_racing_workflow_cancellation_supersedes ... ok
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::veto_tests::workflow_message_reconcile_model_tool_delivery_reopen_never_reopens_the_job ... ok
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::veto_tests::workflow_message_reconcile_wrong_association_actor_is_refused ... ok
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_applied_on_a_live_run_resumes_after_every_destination ... ok
+test adapters::persistence::workflow::tests::message_tests::race_tests::workflow_message_race_delayed_commit_past_fence_expiry_or_deadline_rolls_back ... ok
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::veto_tests::workflow_message_reconcile_finality_breach_then_every_destination_final_vetoes_the_receipt ... ok
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_applied_on_a_terminal_run_records_truth_only ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::builder_provisions_an_assistant_for_a_signed_in_admin ... ok
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_conflicted_execution_reopens_nothing ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::builder_refuses_members_and_emailed_requests ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::builder_sees_the_conversation_so_far ... ok
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_expired_proof_is_refused_without_a_grant ... ok
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_finality_breach_vetoes_resume_and_reopen ... ok
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::veto_tests::workflow_message_reconcile_sql_reopen_refuses_expired_non_final_and_foreign_evidence ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::reviewed_assistants_park_their_answer_until_the_run_deadline ... ok
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_not_applied_reopens_only_the_subject ... ok
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_expired_proof_before_begin_part_returns_to_unknown ... ok
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_stale_snapshot_is_refused_without_a_grant ... ok
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_unknown_and_refusals_change_nothing ... ok
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_sql_evidence_attribution_shape_rejects_forgeries ... ok
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_unknown_note_through_the_production_composition ... ok
+test adapters::persistence::workflow::tests::message_tests::recovery_tests::workflow_message_model_tool_failed_delivery_continues_the_agent_job ... ok
+test adapters::persistence::workflow::tests::message_tests::recovery_tests::workflow_message_publish_competing_dispatchers_publish_once ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::builder_adds_custom_steps_to_the_new_agents_workflow ... ok
+test adapters::persistence::workflow::tests::message_tests::recovery_tests::workflow_message_recovery_control_retry_replays_the_failed_receipt ... ok
+test adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_publish_admission_admits_128_and_refuses_129 ... ok
+test adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_publish_step_at_the_limit_is_a_terminal_action_limit ... ok
+test adapters::persistence::workflow::tests::message_tests::race_tests::workflow_message_race_ambiguous_publication_commit_resolves_three_ways ... ok
+test adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_sql_destination_links_reject_foreign_rows ... ok
+test adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_sql_admission_backstop_serializes_competing_writers ... ok
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_not_applied_exhausted_or_ended_never_resends ... ok
+test adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_sql_effect_wait_must_match_its_run_and_action ... ok
+test adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_sql_fence_capture_and_close_identity_reject_forgeries ... ok
+test adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_sql_park_requires_the_effect_parked_close_cause ... ok
+test adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_sql_step_execution_keeps_one_effect_wait ... ok
+test adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_sql_delivery_provenance_rejects_unproven_exits ... ok
+test adapters::persistence::workflow::tests::message_tests::thread_tests::knowledge_reply_tests::knowledge_run_level_race_cc_commit_after_destination_snapshot_is_ordered_after_that_freeze ... ok
+test adapters::persistence::workflow::tests::message_tests::thread_tests::correlation_tests::workflow_message_stores_anchored_rendered_headers_without_rederiving_them ... ok
+test adapters::persistence::workflow::tests::message_tests::thread_tests::knowledge_reply_tests::knowledge_run_level_reply_cc_added_after_intent_refuses_publication_without_partial_effect ... ok
+test adapters::persistence::workflow::tests::message_tests::thread_tests::knowledge_reply_tests::knowledge_run_level_reply_unverified_historical_address_stays_public ... ok
+test adapters::persistence::workflow::tests::message_tests::thread_tests::workflow_message_thread_external_reply_answers_its_own_source ... ok
+test adapters::persistence::workflow::tests::message_tests::recovery_tests::workflow_message_recovery_existing_marker_is_never_republished ... ok
+test adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_sql_receipt_and_state_guards_reject_forgeries ... ok
+test adapters::persistence::workflow::tests::message_tests::thread_tests::workflow_message_thread_in_app_reply_stays_in_the_source_thread ... ok
+test adapters::persistence::workflow::tests::message_tests::thread_tests::workflow_message_thread_inbound_reply_resolves_each_recipients_copy ... ok
+test adapters::persistence::workflow::tests::message_tests::thread_tests::workflow_message_thread_internal_reply_note_leaves_guards_unchanged ... ok
+test adapters::persistence::workflow::tests::message_tests::thread_tests::workflow_message_thread_send_never_joins_the_customer_thread ... ok
+test adapters::persistence::workflow::tests::message_tests::thread_tests::workflow_message_thread_external_reply_continues_the_source_relay_trace ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_message_publish_in_app_channel_commits_receipt_atomically ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_message_receipt_failed_delivery_takes_final_error_and_never_resends ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_message_model_tool_deliveries_park_and_continue_sequentially ... ok
+test adapters::persistence::workflow::tests::message_tests::recovery_tests::workflow_message_recovery_rolled_back_publication_retries_and_publishes_once ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_message_receipt_poison_backs_off_and_stalls_at_five ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_message_receipt_unknown_is_uncertain_until_the_deadline ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_message_wait_cancel_supersedes_unsent_and_records_late_truth ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_message_wait_deadline_supersedes_unsent_deliveries ... ok
+test adapters::persistence::workflow::tests::message_tests::thread_tests::workflow_message_thread_user_send_opens_a_thread_the_member_takes_part_in ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_message_wait_user_email_parks_then_resumes_on_accepted_receipt ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_race_tests::workflow_tool_cancel_and_continuation_settle_the_call_once ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_race_tests::workflow_tool_cancel_and_dispatch_never_leave_a_live_child_under_a_cancelled_run ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_race_tests::workflow_tool_reopened_attempt_lost_before_saving_replays_the_same_result ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_race_tests::workflow_tool_dispatch_after_or_during_lease_expiry_starts_nothing ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_registration_tests::workflow_tool_pins_and_grants_stay_within_the_agents_company ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_race_tests::workflow_tool_schema_guards_refuse_parks_reopens_and_lineage_written_by_hand ... ok
+test adapters::persistence::workflow::tests::message_tests::thread_tests::correlation_tests::workflow_message_invalid_frozen_correlation_creates_no_message_or_delivery ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_registration_tests::workflow_tool_publication_freezes_the_child_contract_and_refuses_conflicts ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_registration_tests::workflow_tool_registration_commands_keep_revisions_authority_and_bounds ... ok
+test adapters::workflow_http::tests::workflow_http_default_denies_special_addresses_and_operator_scope_is_exact ... ok
+test adapters::workflow_http::tests::workflow_http_origin_and_request_authority_cannot_be_replaced ... ok
+test adapters::workflow_http::tests::workflow_http_pending_actual_request_is_dropped_on_cancellation ... ok
+test adapters::workflow_http::tests::workflow_http_redirect_errors_and_oversize_never_produce_receipts ... ok
+test adapters::workflow_http::tests::workflow_http_response_redacts_secret_and_sensitive_headers_before_output ... ok
+test adapters::workflow_http::tests::workflow_http_scalar_secret_echoes_are_redacted ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_revocation_tests::workflow_tool_repin_and_archive_leave_published_workflows_on_their_frozen_version ... ok
+test application::services::model_usage::aggregate::tests::model_usage_confidence_partial_prices_and_small_costs_survive_grouping ... ok
+test application::services::model_usage::aggregate::tests::model_usage_cost_at_all_supported_bounds_is_exact ... ok
+test application::services::model_usage::aggregate::tests::model_usage_group_bound_and_filters_are_explicit ... ok
+test application::services::model_usage::tests::prices_are_exact_bounded_decimals ... ok
+test application::use_cases::builtin_agent_library::tests::agent_builder_is_granted_the_provisioning_tools_and_told_their_rules ... ok
+test application::use_cases::thread::tests::access_level_dmarc_failure_rejects_a_known_member_address ... ok
+test application::workflow::actions::authorization_tests::workflow_action_authorization_current_revocation_errors_policy_and_approval ... ok
+test application::workflow::actions::authorization_tests::workflow_action_authorization_exact_frozen_connection_slot ... ok
+test application::workflow::actions::authorization_tests::workflow_action_authorization_frozen_provenance_ceiling_and_binding ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_revocation_tests::workflow_tool_stored_children_keep_their_frozen_pin_until_the_tool_is_revoked ... ok
+test application::workflow::actions::failure::tests::workflow_action_failure_mapping_is_shared_and_never_claims_unknown ... ok
+test application::workflow::actions::failure::tests::workflow_action_marker_owned_kinds_are_exactly_the_action_service_owners ... ok
+test application::workflow::actions::reconciliation::service_tests::workflow_action_reconciliation_denial_precedes_any_scope_read ... ok
+test application::workflow::actions::reconciliation::service_tests::workflow_action_reconciliation_resource_error_preserves_operational_failure ... ok
+test application::workflow::actions::reconciliation::service_tests::workflow_action_reconciliation_uninstalled_matching_source_never_settles ... ok
+test application::workflow::actions::reconciliation::tests::boundary_tests::workflow_action_reconciliation_boundary_attestation_diagnostic_is_closed ... ok
+test application::workflow::actions::reconciliation::tests::boundary_tests::workflow_action_reconciliation_boundary_canonical_exact_bytes ... ok
+test application::workflow::actions::reconciliation::tests::boundary_tests::workflow_action_reconciliation_boundary_max_envelope_literal_bytes ... ok
+test application::workflow::actions::reconciliation::tests::boundary_tests::workflow_action_reconciliation_boundary_observation_covers_entry_time ... ok
+test application::workflow::actions::reconciliation::tests::boundary_tests::workflow_action_reconciliation_boundary_recovered_result_exact_bytes ... ok
+test application::workflow::actions::reconciliation::tests::boundary_tests::workflow_action_reconciliation_boundary_validity_and_verification_window ... ok
+test application::workflow::actions::reconciliation::tests::workflow_action_reconciliation_applied_request_must_belong_to_exact_snapshot ... ok
+test application::workflow::actions::reconciliation::tests::workflow_action_reconciliation_applied_result_validation_preserves_positive_truth ... ok
+test application::workflow::actions::reconciliation::tests::workflow_action_reconciliation_coverage_binds_marker_and_all_request_provenance ... ok
+test application::workflow::actions::reconciliation::tests::workflow_action_reconciliation_input_cannot_carry_authority_and_bounds_are_bytes ... ok
+test application::workflow::actions::reconciliation::tests::workflow_action_reconciliation_request_identity_binds_every_command_component ... ok
+test application::workflow::actions::reconciliation::tests::workflow_action_reconciliation_unknown_claim_is_never_final_absence ... ok
+test application::workflow::actions::reconciliation::tests::workflow_action_reconciliation_verifier_binding_and_times_fail_closed ... ok
+test application::workflow::actions::tests::workflow_action_freeze_canonical_identity_binds_operation_target_and_contract ... ok
+test application::workflow::actions::tests::workflow_action_freeze_object_order_is_canonical_and_array_order_is_significant ... ok
+test application::workflow::actions::tests::workflow_action_freeze_rejects_schema_scope_depth_bytes_and_untrusted_restore ... ok
+test application::workflow::mcp::tests::workflow_mcp_discovery_must_offer_exactly_the_frozen_schemas ... ok
+test application::workflow::mcp::tests::workflow_mcp_error_envelope_classification ... ok
+test application::workflow::mcp::tests::workflow_mcp_operation_requires_grant_review_and_reconcile_recovery ... ok
+test application::workflow::message_admission::knowledge_tests::knowledge_run_level_stamped_trigger_refusal_settles_instead_of_retrying ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::knowledge_run_level_workflow_tool_child_and_saved_result_replay_taint_parent_atomically ... ok
+test application::workflow::publication::tests::agent_tests::workflow_agent_preparation_declares_provider_safe_names_and_delimits_context ... ok
+test application::workflow::publication::tests::agent_tests::workflow_agent_preparation_refuses_unsupported_or_colliding_bindings ... ok
+test application::workflow::publication::tests::workflow_publication_freezes_workflow_tool_pins_like_children ... ok
+test application::workflow::registry::message_tests::provisioning_names_are_not_step_tools ... ok
+test application::workflow::supervise::tests::workflow_message_wait_supervisor_confirms_suspension_and_never_releases ... ok
+test domain::entities::access_level::knowledge_tests::knowledge_run_level_audience_is_the_lowest_reader_or_public ... ok
+test domain::entities::access_level::knowledge_tests::knowledge_run_level_domain_keeps_content_within_the_admission_ceiling ... ok
+test domain::entities::access_level::knowledge_tests::knowledge_run_level_release_matrix_never_declassifies ... ok
+test domain::entities::access_level::tests::access_level_assignment_admin_matrix_checks_both_current_and_requested ... ok
+test domain::entities::access_level::tests::access_level_assignment_owner_fixed_and_nonadministrators_refused ... ok
+test domain::entities::access_level::tests::access_level_lowest_is_public_for_no_readers_and_orders_every_level ... ok
+test domain::entities::access_level::tests::access_level_numeric_range_and_serde_are_exact ... ok
+test domain::entities::company_invite::tests::access_level_invite_payload_requires_current_fields ... ok
+test application::workflow::sample::tests::tools_tests::protected_step_workflow_tool_needs_approval_and_executes_child ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_revocation_tests::workflow_tool_revocation_refuses_new_runs_and_calls_while_parked_calls_deliver ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::workflow_tool_child_output_outside_the_pinned_schema_fails_the_parent_wait ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::workflow_tool_dispatch_starts_one_child_per_call_and_one_resumer_continues ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::workflow_tool_child_failure_limit_and_result_bound_are_typed_errors ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::workflow_tool_parent_cancel_cascades_and_a_restarted_worker_resumes_the_call ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::workflow_tool_resumes_the_pending_call_after_a_child_human_decision ... ok
+test adapters::persistence::workflow::tests::message_tests::thread_tests::workflow_message_thread_reply_refuses_sources_it_cannot_answer ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::workflow_tool_typed_errors_reach_the_model_without_fabricated_success ... ok
+test application::workflow::actions::authorization_tests::workflow_action_authorization_lookup_timeouts_fail_closed ... ok
+test adapters::workflow_http::tests::workflow_http_stalled_body_hits_read_deadline ... ok
+
+test result: ok. 741 passed; 0 failed; 0 ignored; 0 measured; 2035 filtered out; finished in 274.63s
+

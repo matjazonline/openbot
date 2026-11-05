@@ -156,7 +156,8 @@ pub(super) async fn create_internal_note(
         actor_role,
         CorrelationId::new(),
     );
-    let inserted = insert_message_on(&mut tx, &write).await?;
+    let inserted =
+        insert_message_on(&mut tx, &write, super::message::MessageStampSource::Public).await?;
     let note_id = Uuid::new_v4();
     sqlx::query(
         r#"INSERT INTO internal_notes (

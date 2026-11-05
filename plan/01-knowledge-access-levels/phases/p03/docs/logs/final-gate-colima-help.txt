@@ -1,0 +1,70 @@
+Start Colima with the specified container runtime and optional kubernetes.
+
+Colima can also be configured with a YAML file.
+Run 'colima template' to set the default configurations or 'colima start --edit' to customize before startup.
+
+Usage:
+  colima start [profile] [flags]
+
+Examples:
+  colima start
+  colima start --edit
+  colima start --foreground
+  colima start --runtime containerd
+  colima start --kubernetes
+  colima start --runtime containerd --kubernetes
+  colima start --cpu 4 --memory 8 --disk 100
+  colima start --arch aarch64
+  colima start --dns 1.1.1.1 --dns 8.8.8.8
+  colima start --dns-host example.com=1.2.3.4
+  colima start --gateway-address 192.168.6.2
+  colima start --kubernetes --k3s-arg='"--disable=coredns,servicelb,traefik,local-storage,metrics-server"'
+
+Flags:
+      --activate                    set as active Docker/Kubernetes/Incus context on startup (default true)
+  -a, --arch string                 architecture (aarch64, x86_64) (default "aarch64")
+      --binfmt                      use binfmt for foreign architecture emulation (no-op if Rosetta is enabled) (default true)
+      --cpu-type string             the CPU type, options can be checked with 'qemu-system-aarch64 -cpu help'
+  -c, --cpus int                    number of CPUs (default 2)
+  -d, --disk int                    disk size in GiB (default 100)
+  -i, --disk-image string           file path to a custom disk image
+  -n, --dns ipSlice                 DNS resolvers for the VM (default [])
+      --dns-host strings            custom DNS names to provide to resolver
+      --downloader string           downloader to use (native, curl) (default "native")
+  -e, --edit                        edit the configuration file before starting
+      --editor string               editor to use for edit e.g. vim, nano, code (default "$EDITOR" env var)
+      --env stringToString          environment variables for the VM (default [])
+      --force-disk-image            load unsupported disk image
+  -f, --foreground                  Keep colima in the foreground
+      --gateway-address ip          gateway address (default 192.168.5.2)
+  -h, --help                        help for start
+      --hostname string             custom hostname for the virtual machine
+      --k3s-arg strings             additional args to pass to k3s (default [--disable=traefik])
+      --k3s-listen-port int         k3s server listen port
+  -k, --kubernetes                  start with Kubernetes
+      --kubernetes-version string   must match a k3s version https://github.com/k3s-io/k3s/releases (default "v1.35.0+k3s1")
+  -m, --memory float32              memory in GiB (default 2)
+      --model-runner string         AI model runner (docker, ramalama) (default "docker")
+  -V, --mount strings               directories to mount, suffix ':w' for writable, disable with 'none'
+      --mount-inotify               propagate inotify file events to the VM
+      --mount-type string           volume driver for the mount (sshfs, 9p, virtiofs) (default "virtiofs")
+      --network-address             assign reachable IP address to the VM
+      --network-host-addresses      support port forwarding to specific host IP addresses
+      --network-interface string    host network interface to use for bridged mode (default "en0")
+      --network-mode string         network mode (shared, bridged) (default "shared")
+      --network-preferred-route     use the assigned IP address as the preferred route for the VM (implies --network-address)
+      --port-forwarder string       port forwarder to use (ssh, grpc, none) (default "ssh")
+      --root-disk int               disk size in GiB for the root filesystem (default 20)
+  -r, --runtime string              container runtime (containerd, docker, incus) (default "docker")
+      --save-config                 persist and overwrite config file with (newly) specified flags (default true)
+  -s, --ssh-agent                   forward SSH agent to the VM
+      --ssh-config                  generate SSH config in ~/.ssh/config (default true)
+      --ssh-port int                SSH server port
+      --template                    use the template file for initial configuration (default true)
+  -t, --vm-type string              virtual machine type (qemu, vz, krunkit) (default "vz")
+      --vz-rosetta                  enable Rosetta for amd64 emulation
+
+Global Flags:
+  -p, --profile string   profile name, for multiple instances (default "default")
+  -v, --verbose          enable verbose log
+      --very-verbose     enable more verbose log

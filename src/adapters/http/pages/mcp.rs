@@ -39,7 +39,7 @@ pub fn shell(title: &str, company: Uuid, body: &str, message: Option<&str>) -> S
     super::mailbox::ui_layout(
         title,
         &format!(
-            r#"<main class="h-full overflow-auto p-6 mx-auto max-w-4xl space-y-4"><a class="link" href="/ui/companies?company_id={company}">Company settings</a><h1 class="text-2xl font-bold">{title}</h1>{message}{body}</main>"#
+            r#"<main class="h-full overflow-auto p-6 mx-auto max-w-4xl space-y-4"><a class="link" href="/ui/companies?company_id={company}">Company settings</a><nav aria-label="Connection settings"><a class="link" href="/ui/companies/{company}/mcp-connections">MCP servers</a> · <a class="link" href="/ui/companies/{company}/http-connections">HTTP connections</a></nav><h1 class="text-2xl font-bold">{title}</h1>{message}{body}</main>"#
         ),
     )
 }

@@ -920,3 +920,6 @@ async fn message_thread_fk_destination_names_a_message_of_its_own_thread() {
 
 #[path = "message_correlation_tests.rs"]
 mod correlation_tests;
+
+#[path = "knowledge_reply_tests.rs"]
+mod knowledge_reply_tests;

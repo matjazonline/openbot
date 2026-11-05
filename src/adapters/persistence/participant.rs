@@ -475,8 +475,8 @@ struct UserAccessRow {
     membership: String,
     access_level: i16,
 }
-fn reader_level(
-    principal: Uuid,
+pub(super) fn reader_level(
+    principal: impl std::fmt::Display,
     membership: CompanyMembership,
     stored: Option<i16>,
 ) -> AppResult<crate::entities::access_level::AccessLevel> {

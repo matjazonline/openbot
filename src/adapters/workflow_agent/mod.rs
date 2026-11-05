@@ -56,6 +56,59 @@ impl AgentActionTools {
     }
 }
 
+// Box each owned call payload so adding a tool does not grow the async dispatch frame.
+enum ToolInvocation {
+    Http(Box<HttpToolCall>),
+    Mcp(Box<McpToolCall>),
+    Workflow(Box<WorkflowToolCall>),
+    Provisioning(Box<ProvisioningToolCall>),
+    Message(Box<MessageToolCall>),
+}
+fn invocation(
+    tool: &PreparedTool,
+    call: ModelToolCallId,
+    arguments: Value,
+) -> AppResult<ToolInvocation> {
+    Ok(match &tool.target {
+        AgentToolTarget::Http { connection } => ToolInvocation::Http(Box::new(HttpToolCall {
+            connection: *connection,
+            operation: tool.name.clone(),
+            arguments,
+            call,
+        })),
+        AgentToolTarget::Mcp { slot } => ToolInvocation::Mcp(Box::new(McpToolCall {
+            slot: slot.clone(),
+            tool: tool.name.clone(),
+            arguments,
+            call,
+        })),
+        AgentToolTarget::Workflow { pin } => ToolInvocation::Workflow(Box::new(WorkflowToolCall {
+            name: tool.name.clone(),
+            pin: pin.clone(),
+            call: ToolCallId::new(
+                uuid::Uuid::parse_str(call.as_str())
+                    .map_err(|_| AppError::BadRequest("Invalid tool call".into()))?,
+            ),
+            arguments,
+        })),
+        AgentToolTarget::Provisioning { .. } => {
+            ToolInvocation::Provisioning(Box::new(ProvisioningToolCall {
+                kind: tool
+                    .provisioning_kind()
+                    .ok_or_else(|| AppError::BadRequest("Unknown provisioning tool".into()))?,
+                arguments,
+                call,
+            }))
+        }
+        AgentToolTarget::Message { .. } => ToolInvocation::Message(Box::new(MessageToolCall {
+            kind: tool
+                .message_kind()
+                .ok_or_else(|| AppError::BadRequest("Unknown message tool".into()))?,
+            arguments,
+            call,
+        })),
+    })
+}
 #[async_trait]
 impl AgentToolDispatch for AgentActionTools {
     async fn dispatch(
@@ -65,93 +118,46 @@ impl AgentToolDispatch for AgentActionTools {
         call: ModelToolCallId,
         arguments: Value,
     ) -> AppResult<AgentToolObservation> {
-        // Dropping the handler future is the cancellation path; no detached work.
+        // Dropping the handler future cancels the real work; external seams stay boxed.
         let cancel = CancellationToken::new();
-        match &tool.target {
-            AgentToolTarget::Http { connection } => remote(
-                Box::pin(self.http.call_tool(
-                    fence,
-                    HttpToolCall {
-                        connection: *connection,
-                        operation: tool.name.clone(),
-                        arguments,
-                        call,
-                    },
-                    &cancel,
-                ))
-                .await?,
-            ),
-            AgentToolTarget::Mcp { slot } => remote(
-                Box::pin(self.mcp.call_tool(
-                    fence,
-                    McpToolCall {
-                        slot: slot.clone(),
-                        tool: tool.name.clone(),
-                        arguments,
-                        call,
-                    },
-                    &cancel,
-                ))
-                .await?,
-            ),
-            // The child, its wait and the park commit together; never uncertain (07-D2 §D2.3a).
-            AgentToolTarget::Workflow { pin } => {
-                let workflow = self.workflow.as_ref().ok_or_else(|| {
-                    AppError::BadRequest("Workflow tools are not available to this worker".into())
-                })?;
-                Box::pin(workflow.call_workflow_tool(
-                    fence,
-                    WorkflowToolCall {
-                        name: tool.name.clone(),
-                        pin: pin.clone(),
-                        call:
-                            ToolCallId::new(
-                                uuid::Uuid::parse_str(call.as_str()).map_err(|_| {
-                                    AppError::BadRequest("Invalid tool call".into())
-                                })?,
-                            ),
-                        arguments,
-                    },
-                ))
-                .await
-            }
-            // The effect, its marker and its receipt commit together (p08 D2.2).
-            AgentToolTarget::Provisioning { .. } => {
-                let provisioning = self.provisioning.as_ref().ok_or_else(|| {
-                    AppError::BadRequest(
-                        "Provisioning tools are not available to this worker".into(),
-                    )
-                })?;
-                let kind = tool
-                    .provisioning_kind()
-                    .ok_or_else(|| AppError::BadRequest("Unknown provisioning tool".into()))?;
-                Box::pin(provisioning.call_tool(
-                    fence,
-                    ProvisioningToolCall {
-                        kind,
-                        arguments,
-                        call,
-                    },
-                ))
-                .await
-            }
-            AgentToolTarget::Message { .. } => {
-                let kind = tool
-                    .message_kind()
-                    .ok_or_else(|| AppError::BadRequest("Unknown message tool".into()))?;
-                message(
-                    self.message
-                        .call_tool(
-                            fence,
-                            MessageToolCall {
-                                kind,
-                                arguments,
-                                call,
-                            },
+        let outcome = async {
+            match invocation(tool, call, arguments)? {
+                ToolInvocation::Http(call) => {
+                    remote(Box::pin(self.http.call_tool(fence, *call, &cancel)).await?)
+                }
+                ToolInvocation::Mcp(call) => {
+                    remote(Box::pin(self.mcp.call_tool(fence, *call, &cancel)).await?)
+                }
+                ToolInvocation::Workflow(call) => {
+                    let workflow = self.workflow.as_ref().ok_or_else(|| {
+                        AppError::BadRequest(
+                            "Workflow tools are not available to this worker".into(),
                         )
-                        .await?,
-                )
+                    })?;
+                    Box::pin(workflow.call_workflow_tool(fence, *call)).await
+                }
+                ToolInvocation::Provisioning(call) => {
+                    let provisioning = self.provisioning.as_ref().ok_or_else(|| {
+                        AppError::BadRequest(
+                            "Provisioning tools are not available to this worker".into(),
+                        )
+                    })?;
+                    Box::pin(provisioning.call_tool(fence, *call)).await
+                }
+                ToolInvocation::Message(call) => {
+                    message(Box::pin(self.message.call_tool(fence, *call)).await?)
+                }
             }
+        }
+        .await;
+        match outcome {
+            Err(AppError::KnowledgeRelease { .. }) => {
+                Ok(AgentToolObservation::Completed(tool_error(
+                    crate::app_error::KNOWLEDGE_AUDIENCE_BELOW_CONTENT,
+                    "The destination cannot receive this run's content",
+                )))
+            }
+            other => other,
         }
     }
 }

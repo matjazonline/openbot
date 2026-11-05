@@ -1,0 +1,862 @@
+--- WB1-R1/migrations/20260817000000_init_schema.sql
++++ WB1-R2/migrations/20260817000000_init_schema.sql
+@@ -11758,3 +11758,62 @@
+ END $$;
+ CREATE TRIGGER message_access_level_immutable BEFORE UPDATE OF access_level ON public.messages
+     FOR EACH ROW EXECUTE FUNCTION public.guard_message_access_level();
++
++
++-- One bounded history-consumption proof per actual claim; no message content is duplicated.
++CREATE TABLE public.workflow_history_consumptions (
++    company_id uuid NOT NULL,
++    run_id uuid NOT NULL,
++    execution_id uuid NOT NULL,
++    job_id uuid NOT NULL,
++    attempt_number integer NOT NULL CHECK (attempt_number > 0),
++    execution_generation uuid NOT NULL,
++    worker_id uuid NOT NULL,
++    content_level public.access_level NOT NULL,
++    PRIMARY KEY (company_id,run_id,execution_id,job_id,attempt_number),
++    FOREIGN KEY (company_id,run_id,execution_id)
++        REFERENCES public.workflow_executions(company_id,run_id,id) ON DELETE CASCADE,
++    FOREIGN KEY (company_id,execution_id,job_id)
++        REFERENCES public.background_tasks(company_id,workflow_execution_id,id) ON DELETE CASCADE,
++    FOREIGN KEY (job_id,attempt_number,execution_generation,worker_id)
++        REFERENCES public.task_attempts(task_id,attempt_number,execution_generation,worker_id) ON DELETE CASCADE
++);
++
++CREATE FUNCTION public.guard_workflow_history_consumption_immutable() RETURNS trigger LANGUAGE plpgsql AS $$
++BEGIN
++    IF TG_OP='UPDATE' AND NEW IS NOT DISTINCT FROM OLD THEN RETURN NEW; END IF;
++    IF TG_OP='DELETE' AND pg_trigger_depth()>1 AND (
++        NOT EXISTS (SELECT 1 FROM public.workflow_runs WHERE company_id=OLD.company_id AND id=OLD.run_id)
++        OR NOT EXISTS (SELECT 1 FROM public.background_tasks WHERE company_id=OLD.company_id AND id=OLD.job_id)
++        OR NOT EXISTS (SELECT 1 FROM public.task_attempts WHERE task_id=OLD.job_id AND attempt_number=OLD.attempt_number)
++    ) THEN RETURN OLD; END IF;
++    RAISE EXCEPTION 'workflow history consumption proof is immutable'
++        USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_history_consumption_immutable';
++END $$;
++CREATE TRIGGER workflow_history_consumption_immutable BEFORE UPDATE OR DELETE ON public.workflow_history_consumptions
++    FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_history_consumption_immutable();
++
++CREATE FUNCTION public.guard_workflow_history_consumption_live() RETURNS trigger LANGUAGE plpgsql AS $$
++BEGIN
++    IF NOT EXISTS (
++        SELECT 1 FROM public.background_tasks AS job
++        JOIN public.workflow_executions AS execution ON execution.company_id=job.company_id
++            AND execution.id=job.workflow_execution_id
++        JOIN public.workflow_runs AS run ON run.company_id=execution.company_id AND run.id=execution.run_id
++        JOIN public.task_attempts AS attempt ON attempt.task_id=job.id
++            AND attempt.attempt_number=NEW.attempt_number AND attempt.execution_generation=NEW.execution_generation
++            AND attempt.worker_id=NEW.worker_id AND attempt.status='processing'
++        WHERE job.company_id=NEW.company_id AND job.id=NEW.job_id AND execution.id=NEW.execution_id AND run.id=NEW.run_id
++            AND job.status='processing' AND job.worker_id=NEW.worker_id
++            AND job.execution_generation=NEW.execution_generation AND job.attempt_ordinal=NEW.attempt_number
++            AND job.lock_expires_at>clock_timestamp() AND execution.completed_at IS NULL
++            AND run.state IN ('queued','running') AND run.deadline>clock_timestamp()
++            AND run.content_level>=NEW.content_level
++    ) THEN
++        RAISE EXCEPTION 'workflow history consumption lost live fence'
++            USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_history_consumption_live';
++    END IF;
++    RETURN NEW;
++END $$;
++CREATE CONSTRAINT TRIGGER workflow_history_consumption_live AFTER INSERT OR UPDATE ON public.workflow_history_consumptions
++    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_history_consumption_live();
+--- WB1-R1/src/adapters/persistence/workflow/harness_token_scheduling_tests.rs
++++ WB1-R2/src/adapters/persistence/workflow/harness_token_scheduling_tests.rs
+@@ -396,3 +396,69 @@
+     );
+     assert_eq!(job(&f, child).await["status"], "failed");
+ }
++
++#[tokio::test]
++async fn knowledge_run_level_refusal_survives_real_token_allowance_and_refusal_retirement() {
++    use crate::application::workflow::actions::{
++        ActionFamily, ActionStepOutcome, action_step_failure,
++    };
++    use crate::entities::access_level::AccessLevel;
++    for gate in ["awaiting", "refused"] {
++        let f = Box::pin(configured()).await;
++        let p = f.model.native.fixture.persistence();
++        let child = refusal::child(&f, f.model.write.fence.scope).await;
++        let policy = f.model.write.lease_policy;
++        let claim = p
++            .settled()
++            .claim_io(child, worker(), policy)
++            .await
++            .unwrap()
++            .unwrap();
++        exceed(&f).await;
++        if gate == "refused" {
++            p.submit_decision(command(p, f.model.write.fence.scope, f.reviewer, "reject").await)
++                .await
++                .unwrap();
++        }
++        let mut tx = p.pool().begin().await.unwrap();
++        let actual =
++            crate::adapters::persistence::workflow::token_budget::progression_on(&mut tx, child)
++                .await
++                .unwrap();
++        assert_eq!(
++            actual.failure_code(),
++            Some(if gate == "awaiting" {
++                "workflow.tokens_awaiting_approval"
++            } else {
++                "workflow.tokens_rejected"
++            })
++        );
++        tx.rollback().await.unwrap();
++        let report = action_step_failure(
++            ActionFamily::Http,
++            ActionStepOutcome::Preparation(&AppError::KnowledgeRelease {
++                content: AccessLevel::L5,
++                destination: AccessLevel::PUBLIC,
++            }),
++        );
++        assert!(
++            p.settled()
++                .release_io(claim.fence, policy, LeaseReleaseCause::Classified(report))
++                .await
++                .unwrap()
++        );
++        let saved: Value = sqlx::query_scalar("SELECT jsonb_build_object('state',run.state,'code',attempt.workflow_failure_code,
++            'job',job.status) FROM workflow_runs AS run
++            JOIN workflow_executions AS execution ON execution.company_id=run.company_id AND execution.run_id=run.id
++            JOIN background_tasks AS job ON job.company_id=execution.company_id AND job.workflow_execution_id=execution.id
++            JOIN task_attempts AS attempt ON attempt.task_id=job.id AND attempt.attempt_number=$3
++            WHERE run.company_id=$1 AND run.id=$2")
++            .bind(child.company.as_uuid()).bind(child.run.as_uuid()).bind(claim.fence.attempt.0)
++            .fetch_one(p.pool()).await.unwrap();
++        assert_eq!(
++            saved,
++            json!({"state":"failed","job":"failed","code":crate::app_error::KNOWLEDGE_AUDIENCE_BELOW_CONTENT}),
++            "{gate}"
++        );
++    }
++}
+--- WB1-R1/src/adapters/persistence/workflow/history_reader.rs
++++ WB1-R2/src/adapters/persistence/workflow/history_reader.rs
+@@ -2,12 +2,13 @@
+ //! the claim's transaction: the admission snapshot (`workflow_history_members`), with
+ //! internal notes excluded at capture; only the newest 256 members join their messages,
+ //! so a long thread never materializes bodies it cannot return.
+-use super::http::{begin_http, runtime};
++use super::http::runtime;
++use super::persistence_bound::{Attempt, End, WriteBound};
+ use super::*;
+ use crate::application::workflow::{
+     actions::ActionScope,
+     history::{FrozenHistory, HistoryMessage, KIND, MAX_HISTORY_ITEMS, MAX_HISTORY_TEXT},
+-    lease::ClaimedWorkflow,
++    lease::{ClaimedWorkflow, LeasePolicy},
+     polling::WorkflowStepKind,
+ };
+ use crate::entities::message::{MessageAudience, MessageRole, ThreadEntryKind};
+@@ -52,30 +53,92 @@
+ #[async_trait]
+ impl crate::application::workflow::history::WorkflowHistory for PostgresPersistence {
+     async fn frozen_history(&self, claim: &ClaimedWorkflow) -> AppResult<FrozenHistory> {
+-        let scope = claim.fence.scope;
+-        let mut tx = begin_http(self).await?;
+-        let facts = runtime::facts(
+-            &mut tx,
+-            ActionScope {
+-                company: scope.company,
+-                run: scope.run,
+-                execution: scope.execution,
+-            },
+-        )
+-        .await?;
+-        let inputs =
+-            runtime::frozen_inputs(&mut tx, &facts, claim, &WorkflowStepKind(KIND.into())).await?;
+-        let max_tokens = inputs
+-            .get("max_tokens")
+-            .and_then(Value::as_u64)
+-            .ok_or_else(invalid)?;
+-        // Texts are cut one character past the bound so the handler can mark truncation
+-        // without reading an unbounded body.
+-        let eligible: i64 = sqlx::query_scalar(
+-            "SELECT eligible_count FROM workflow_history_snapshots WHERE company_id=$1 AND run_id=$2",
+-        ).bind(scope.company.as_uuid()).bind(scope.run.as_uuid())
+-            .fetch_optional(&mut *tx).await?.unwrap_or(0);
+-        let rows: Vec<HistoryRow> = sqlx::query_as(
++        let policy = LeasePolicy::new(std::time::Duration::from_secs(6))?;
++        let bound = WriteBound::within(
++            "history.consume",
++            policy,
++            claim.window.expires.min(claim.window.run_deadline),
++        );
++        let attempt = bound
++            .attempt(Box::pin(async {
++                let mut conn = bound.acquire(&self.pool).await?;
++                let mut tx = bound.begin(&mut conn).await?;
++                let result = consume_on(&mut tx, claim, &bound).await.map(End::Commit);
++                bound.end(tx, result).await
++            }))
++            .await;
++        match attempt {
++            Attempt::Done(history) => Ok(history),
++            Attempt::Failed(error) => Err(error),
++            // A possibly committed rise grants neither history nor downstream execution.
++            Attempt::Ambiguous => Err(bound.unresolved()),
++        }
++    }
++}
++
++async fn consume_on(
++    tx: &mut Transaction<'_, Postgres>,
++    claim: &ClaimedWorkflow,
++    bound: &WriteBound,
++) -> AppResult<FrozenHistory> {
++    let scope = claim.fence.scope;
++    let facts = runtime::facts(
++        tx,
++        ActionScope {
++            company: scope.company,
++            run: scope.run,
++            execution: scope.execution,
++        },
++    )
++    .await?;
++    if !lease::lock_fence(tx, claim.fence, bound.server_timeout()).await? {
++        return Err(ownership_lost());
++    }
++    live(tx, claim, bound).await?;
++    let inputs = runtime::frozen_inputs(tx, &facts, claim, &WorkflowStepKind(KIND.into())).await?;
++    let max_tokens = inputs
++        .get("max_tokens")
++        .and_then(Value::as_u64)
++        .ok_or_else(invalid)?;
++    let eligible: i64 = sqlx::query_scalar(
++        "SELECT eligible_count FROM workflow_history_snapshots WHERE company_id=$1 AND run_id=$2",
++    )
++    .bind(scope.company.as_uuid())
++    .bind(scope.run.as_uuid())
++    .fetch_optional(&mut **tx)
++    .await?
++    .unwrap_or(0);
++    let rows = read_rows(tx, scope).await?;
++    let highest = rows
++        .iter()
++        .map(|row| {
++            crate::entities::access_level::AccessLevel::try_from(row.access_level)
++                .map_err(|_| invalid())
++        })
++        .collect::<AppResult<Vec<_>>>()?
++        .into_iter()
++        .max()
++        .unwrap_or(crate::entities::access_level::AccessLevel::PUBLIC);
++    let history = FrozenHistory {
++        max_tokens,
++        eligible: u64::try_from(eligible).map_err(|_| invalid())?,
++        newest: rows
++            .into_iter()
++            .map(HistoryRow::message)
++            .collect::<AppResult<_>>()?,
++    };
++    super::knowledge::raise_content_level_on(tx, scope.company, scope.run, highest).await?;
++    record_consumption(tx, claim, highest).await?;
++    live(tx, claim, bound).await?;
++    Ok(history)
++}
++
++async fn read_rows(
++    tx: &mut Transaction<'_, Postgres>,
++    scope: crate::application::workflow::activation::ActivationRequest,
++) -> AppResult<Vec<HistoryRow>> {
++    // Cut one character past the bound to mark truncation without unbounded bodies.
++    let rows = sqlx::query_as(
+             "SELECT newest.message_id, message.access_level::smallint AS access_level, association.created_at AS at, message.role, message.audience, \
+                     association.entry_kind, author.display_label AS author_label, \
+                     author_identity.subject AS author_subject, \
+@@ -97,29 +160,40 @@
+         .bind(scope.run.as_uuid())
+         .bind(MAX_HISTORY_TEXT as i32 + 1)
+         .bind(MAX_HISTORY_ITEMS as i64)
+-        .fetch_all(&mut *tx)
++        .fetch_all(&mut **tx)
+         .await?;
+-        let highest = rows
+-            .iter()
+-            .map(|row| {
+-                crate::entities::access_level::AccessLevel::try_from(row.access_level)
+-                    .map_err(|_| invalid())
+-            })
+-            .collect::<AppResult<Vec<_>>>()?
+-            .into_iter()
+-            .max()
+-            .unwrap_or(crate::entities::access_level::AccessLevel::PUBLIC);
+-        let newest = rows
+-            .into_iter()
+-            .map(HistoryRow::message)
+-            .collect::<AppResult<_>>()?;
+-        super::knowledge::raise_content_level_on(&mut tx, scope.company, scope.run, highest)
+-            .await?;
+-        tx.commit().await?;
+-        Ok(FrozenHistory {
+-            max_tokens,
+-            eligible: u64::try_from(eligible).map_err(|_| invalid())?,
+-            newest,
+-        })
++    Ok(rows)
++}
++
++async fn live(tx: &mut PgConnection, claim: &ClaimedWorkflow, bound: &WriteBound) -> AppResult<()> {
++    if lease::live_window(tx, claim.fence, bound.started())
++        .await?
++        .is_none()
++    {
++        return Err(ownership_lost());
+     }
++    Ok(())
+ }
++
++fn ownership_lost() -> AppError {
++    AppError::Execution(crate::app_error::ExecutionFailure::OwnershipLost)
++}
++
++async fn record_consumption(
++    tx: &mut PgConnection,
++    claim: &ClaimedWorkflow,
++    highest: crate::entities::access_level::AccessLevel,
++) -> AppResult<()> {
++    let fence = claim.fence;
++    let scope = fence.scope;
++    // An identical replay still schedules the deferred live-fence check at COMMIT.
++    sqlx::query("INSERT INTO workflow_history_consumptions
++        (company_id,run_id,execution_id,job_id,attempt_number,execution_generation,worker_id,content_level)
++        VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
++        ON CONFLICT (company_id,run_id,execution_id,job_id,attempt_number)
++        DO UPDATE SET content_level=EXCLUDED.content_level")
++        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid())
++        .bind(scope.job.0).bind(fence.attempt.0).bind(fence.generation.0).bind(fence.worker.0)
++        .bind(highest.as_i16()).execute(tx).await?;
++    Ok(())
++}
+--- WB1-R1/src/adapters/persistence/workflow/history_reader_tests.rs
++++ WB1-R2/src/adapters/persistence/workflow/history_reader_tests.rs
+@@ -280,3 +280,6 @@
+ 
+ #[path = "knowledge_history_race_tests.rs"]
+ mod knowledge_history_race_tests;
++
++#[path = "knowledge_history_lease_tests.rs"]
++mod knowledge_history_lease_tests;
+--- WB1-R1/src/adapters/persistence/workflow/knowledge_history_lease_tests.rs
++++ WB1-R2/src/adapters/persistence/workflow/knowledge_history_lease_tests.rs
+@@ -0,0 +1,254 @@
++//! Real claim replacement and statement/COMMIT expiry at the new history mutation seam.
++use super::*;
++use crate::application::workflow::{history::WorkflowHistory, lease::*};
++use std::time::Duration;
++
++struct OwnedHistory {
++    fixture: AdmissionFixture,
++    claim: ClaimedWorkflow,
++}
++async fn setup() -> OwnedHistory {
++    let f =
++        AdmissionFixture::with_binding(BindingFixture::from_source(source(131_072, 65_536)).await)
++            .await;
++    let c = Conversation::new(&f).await;
++    sqlx::query(
++        "INSERT INTO thread_principals(company_id,channel_id,thread_id,principal_id,role)
++        SELECT $1,$2,$3,id,'participant' FROM principals WHERE company_id=$1 AND user_id=$4",
++    )
++    .bind(f.binding.target.company.as_uuid())
++    .bind(c.channel)
++    .bind(c.thread)
++    .bind(f.binding.target.actor.user_id())
++    .execute(f.persistence().pool())
++    .await
++    .unwrap();
++    super::super::knowledge_admission_tests::stamped(
++        &f,
++        &c,
++        crate::entities::access_level::AccessLevel::L5,
++    )
++    .await;
++    let claim = claimed(&f, &c, "history-owned").await;
++    OwnedHistory { fixture: f, claim }
++}
++async fn snapshot(f: &OwnedHistory) -> Value {
++    let scope = f.claim.fence.scope;
++    sqlx::query_scalar("SELECT jsonb_build_object('content',run.content_level,'revision',run.revision,
++        'proofs',(SELECT COALESCE(jsonb_agg(to_jsonb(proof) ORDER BY proof.attempt_number),'[]'::jsonb)
++            FROM workflow_history_consumptions AS proof WHERE proof.company_id=run.company_id AND proof.run_id=run.id))
++        FROM workflow_runs AS run WHERE run.company_id=$1 AND run.id=$2")
++        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).fetch_one(f.fixture.persistence().pool()).await.unwrap()
++}
++async fn shorten(f: &OwnedHistory, boundary: &str, duration: &str) {
++    let statement = match boundary {
++        "lease" => {
++            "UPDATE background_tasks SET lock_expires_at=clock_timestamp()+$2::interval WHERE id=$1"
++        }
++        "deadline" => {
++            "UPDATE workflow_runs SET deadline=clock_timestamp()+$2::interval WHERE id=$1"
++        }
++        _ => unreachable!(),
++    };
++    let id = if boundary == "lease" {
++        f.claim.fence.scope.job.0
++    } else {
++        f.claim.fence.scope.run.as_uuid()
++    };
++    sqlx::query(statement)
++        .bind(id)
++        .bind(duration)
++        .execute(f.fixture.persistence().pool())
++        .await
++        .unwrap();
++}
++
++async fn competing_read(
++    f: &OwnedHistory,
++    current: &ClaimedWorkflow,
++) -> crate::application::workflow::history::FrozenHistory {
++    let barrier = tokio::sync::Barrier::new(2);
++    let p = f.fixture.persistence();
++    let (old, new) = tokio::join!(
++        async {
++            barrier.wait().await;
++            p.frozen_history(&f.claim).await
++        },
++        async {
++            barrier.wait().await;
++            p.frozen_history(current).await
++        },
++    );
++    assert!(matches!(
++        old,
++        Err(AppError::Execution(
++            crate::app_error::ExecutionFailure::OwnershipLost
++        ))
++    ));
++    new.unwrap()
++}
++
++#[tokio::test]
++async fn knowledge_run_level_history_real_replacement_claim_fences_old_reader_and_replays_once() {
++    let f = Box::pin(setup()).await;
++    let old = f.claim.clone();
++    let p = f.fixture.persistence();
++    let policy = LeasePolicy::new(Duration::from_secs(30)).unwrap();
++    assert!(
++        p.release_io(old.fence, policy, LeaseReleaseCause::LocalInterruption)
++            .await
++            .unwrap()
++    );
++    sqlx::query(
++        "UPDATE background_tasks SET run_at=clock_timestamp()-interval '1 second' WHERE id=$1",
++    )
++    .bind(old.fence.scope.job.0)
++    .execute(p.pool())
++    .await
++    .unwrap();
++    let current = p
++        .claim_io(old.fence.scope, WorkflowWorkerId(Uuid::new_v4()), policy)
++        .await
++        .unwrap()
++        .unwrap();
++    assert_ne!(old.fence.generation, current.fence.generation);
++    assert!(
++        tokio::time::Instant::now() < old.window.expires,
++        "stale cached lease has not elapsed"
++    );
++    assert_eq!(old.activation, current.activation);
++    let before = snapshot(&f).await;
++    assert!(matches!(
++        p.frozen_history(&old).await,
++        Err(AppError::Execution(
++            crate::app_error::ExecutionFailure::OwnershipLost
++        ))
++    ));
++    assert_eq!(
++        snapshot(&f).await,
++        before,
++        "stale caller leaves no durable rise or revision"
++    );
++    let history = competing_read(&f, &current).await;
++    assert_eq!(history.newest.len(), 2);
++    let consumed = snapshot(&f).await;
++    assert_eq!(consumed["content"], 5);
++    assert_eq!(consumed["proofs"].as_array().unwrap().len(), 1);
++    assert_eq!(
++        consumed["proofs"][0]["execution_generation"],
++        json!(current.fence.generation.0)
++    );
++    p.frozen_history(&current).await.unwrap();
++    assert_eq!(
++        snapshot(&f).await,
++        consumed,
++        "same live claim is idempotent"
++    );
++}
++
++#[tokio::test]
++async fn knowledge_run_level_history_expired_database_lease_or_deadline_returns_no_output_or_rise()
++{
++    for boundary in ["lease", "deadline"] {
++        let f = Box::pin(setup()).await;
++        shorten(&f, boundary, "-1 millisecond").await;
++        let before = snapshot(&f).await;
++        assert!(
++            f.fixture
++                .persistence()
++                .frozen_history(&f.claim)
++                .await
++                .is_err(),
++            "{boundary}"
++        );
++        assert_eq!(snapshot(&f).await, before, "{boundary}");
++    }
++}
++
++async fn pause(f: &OwnedHistory, phase: &str) {
++    let pool = f.fixture.persistence().pool();
++    sqlx::raw_sql("CREATE SEQUENCE history_pause_entered; CREATE FUNCTION history_pause() RETURNS trigger LANGUAGE plpgsql AS $$
++        BEGIN PERFORM nextval('history_pause_entered'); PERFORM pg_sleep(0.6); RETURN NEW; END $$")
++        .execute(pool).await.unwrap();
++    let trigger = match phase {
++        "statement" => "CREATE TRIGGER history_pause BEFORE UPDATE OF content_level ON workflow_runs
++            FOR EACH ROW WHEN (NEW.content_level>OLD.content_level) EXECUTE FUNCTION history_pause()",
++        "commit" => "CREATE CONSTRAINT TRIGGER aa_history_pause AFTER INSERT ON workflow_history_consumptions
++            DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION history_pause()",
++        _ => unreachable!(),
++    };
++    sqlx::raw_sql(trigger).execute(pool).await.unwrap();
++}
++
++#[tokio::test]
++async fn knowledge_run_level_history_expiry_during_statement_and_commit_rolls_back_taint_and_proof()
++{
++    for phase in ["statement", "commit"] {
++        for boundary in ["lease", "deadline"] {
++            let f = Box::pin(setup()).await;
++            pause(&f, phase).await;
++            shorten(&f, boundary, "400 milliseconds").await;
++            let before = snapshot(&f).await;
++            let Err(error) = f.fixture.persistence().frozen_history(&f.claim).await else {
++                panic!("expired history must not return content")
++            };
++            let entered: bool = sqlx::query_scalar("SELECT is_called FROM history_pause_entered")
++                .fetch_one(f.fixture.persistence().pool())
++                .await
++                .unwrap();
++            assert!(
++                entered,
++                "{phase}/{boundary}: actual transaction reached pause"
++            );
++            if phase == "commit" {
++                assert!(matches!(error, AppError::WorkflowGuard(_)), "{error:?}");
++                assert!(
++                    error
++                        .to_string()
++                        .contains("workflow_history_consumption_live"),
++                    "{error:?}"
++                );
++            }
++            assert_eq!(
++                snapshot(&f).await,
++                before,
++                "{phase}/{boundary}: entire consumption rolled back"
++            );
++        }
++    }
++}
++
++#[tokio::test]
++async fn knowledge_run_level_history_consumption_rejects_foreign_scope_and_rewritten_proof() {
++    let f = Box::pin(setup()).await;
++    let p = f.fixture.persistence();
++    p.frozen_history(&f.claim).await.unwrap();
++    let before = snapshot(&f).await;
++    for statement in [
++        "UPDATE workflow_history_consumptions SET content_level=6 WHERE job_id=$1",
++        "DELETE FROM workflow_history_consumptions WHERE job_id=$1",
++    ] {
++        assert!(
++            sqlx::query(statement)
++                .bind(f.claim.fence.scope.job.0)
++                .execute(p.pool())
++                .await
++                .is_err()
++        );
++        assert_eq!(snapshot(&f).await, before);
++    }
++    let foreign = AdmissionFixture::new().await;
++    let error = sqlx::query("INSERT INTO workflow_history_consumptions SELECT $2,run_id,execution_id,job_id,attempt_number,
++        execution_generation,worker_id,content_level FROM workflow_history_consumptions WHERE job_id=$1")
++        .bind(f.claim.fence.scope.job.0).bind(foreign.binding.target.company.as_uuid())
++        .execute(p.pool()).await.unwrap_err();
++    assert_eq!(
++        error.as_database_error().unwrap().code().as_deref(),
++        Some("23503")
++    );
++    assert_eq!(
++        snapshot(&f).await,
++        before,
++        "valid foreign company cannot own this execution"
++    );
++}
+--- WB1-R1/src/adapters/persistence/workflow/knowledge_message_tests.rs
++++ WB1-R2/src/adapters/persistence/workflow/knowledge_message_tests.rs
+@@ -267,3 +267,122 @@
+     assert_eq!(counts.deliveries, 0);
+     assert_eq!(counts.messages, 0);
+ }
++
++async fn recovery_setup() -> Setup {
++    let fixture = Fixture::new().await;
++    let channel = new_channel(&fixture, "runs").await;
++    let other = new_channel(&fixture, "notices").await;
++    let user = member(&fixture, "member").await;
++    let owner = fixture.target.actor.user_id();
++    let mut source: Value =
++        serde_json::from_str(&registry::example("message.send").unwrap().source).unwrap();
++    source["steps"]["start"]["with"] = json!({"content":{"literal":{"body":"restricted body"}},
++        "destinations":{"literal":[{"kind":"user","id":user}]}});
++    source["steps"]["start"]["routes"]["error"] = json!("recover");
++    source["steps"]["recover"] = json!({"type":"data.map","with":{"value":{"literal":42},
++        "output_schema":{"literal":{"type":"integer"}}},"routes":{"success":"$end"}});
++    let directory = message::MessagePublicationDirectory {
++        persistence: fixture.persistence.clone(),
++    };
++    let definitions = DefinitionService::new(
++        Preflight,
++        fixture.persistence.clone(),
++        WorkflowSourceDecoder,
++        directory,
++    );
++    let mut draft = fixture.save(None);
++    draft.content.source = source.to_string();
++    definitions.save(draft).await.unwrap();
++    let publication = fixture.publish();
++    definitions.publish(publication.clone()).await.unwrap();
++    let target = Box::pin(bound(&fixture, publication.version)).await;
++    let claim = Box::pin(claimed(&fixture, target, channel)).await;
++    Setup {
++        fixture,
++        channel,
++        other,
++        user,
++        owner,
++        claim,
++        kind: crate::application::workflow::polling::WorkflowStepKind("message.send".into()),
++    }
++}
++
++async fn assert_failed_attention(setup: &Setup) {
++    use crate::application::attention::AttentionPersistence;
++    use crate::entities::attention::{AttentionQuery, AttentionSourceKind, AttentionView};
++    use crate::entities::transport::PrincipalId;
++    let scope = setup.scope();
++    let principal: Uuid =
++        sqlx::query_scalar("SELECT id FROM principals WHERE company_id=$1 AND user_id=$2")
++            .bind(scope.company.as_uuid())
++            .bind(setup.owner)
++            .fetch_one(setup.pool())
++            .await
++            .unwrap();
++    let items = setup
++        .fixture
++        .persistence
++        .list_attention(AttentionQuery {
++            company_id: scope.company.as_uuid(),
++            principal_id: PrincipalId::new(principal),
++            visible_channel_ids: &[setup.channel],
++            manager: true,
++            view: AttentionView::MyWork,
++            cursor: None,
++            limit: 100,
++        })
++        .await
++        .unwrap()
++        .items;
++    assert!(
++        items
++            .iter()
++            .any(|item| item.source_kind == AttentionSourceKind::RunFailure
++                && item.run_id == Some(scope.run.as_uuid()))
++    );
++    let state: Value = sqlx::query_scalar("SELECT jsonb_build_object('state',run.state,'terminal',run.terminal_execution_id,
++        'executions',(SELECT count(*) FROM workflow_executions WHERE company_id=run.company_id AND run_id=run.id),
++        'code',(SELECT workflow_failure_code FROM task_attempts WHERE task_id=$3 AND attempt_number=$4))
++        FROM workflow_runs AS run WHERE run.company_id=$1 AND run.id=$2")
++        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.job.0).bind(setup.claim.fence.attempt.0)
++        .fetch_one(setup.pool()).await.unwrap();
++    assert_eq!(
++        state,
++        json!({"state":"failed","terminal":scope.execution.as_uuid(),"executions":1,
++        "code":crate::app_error::KNOWLEDGE_AUDIENCE_BELOW_CONTENT})
++    );
++    let effects = rows(setup.pool(), scope.run).await;
++    assert_eq!(effects.markers, 0);
++    assert_eq!(effects.messages, 0);
++    assert_eq!(effects.receipts, 0);
++    assert_eq!(effects.deliveries, 0);
++}
++
++#[tokio::test]
++async fn knowledge_run_level_refused_message_cannot_recover_into_success() {
++    let setup = Box::pin(recovery_setup()).await;
++    raise(&setup, AccessLevel::L5).await;
++    let WorkflowHandlerOutcome::Completed(Err(report)) =
++        setup.runtime().execute(&setup.kind, &setup.claim).await
++    else {
++        panic!("real message action must refuse")
++    };
++    assert_eq!(
++        report.failure.code().as_str(),
++        crate::app_error::KNOWLEDGE_AUDIENCE_BELOW_CONTENT
++    );
++    assert!(
++        setup
++            .fixture
++            .persistence
++            .release_io(
++                setup.claim.fence,
++                lease(),
++                LeaseReleaseCause::Classified(report)
++            )
++            .await
++            .unwrap()
++    );
++    assert_failed_attention(&setup).await;
++}
+--- WB1-R1/src/adapters/persistence/workflow/recovery.rs
++++ WB1-R2/src/adapters/persistence/workflow/recovery.rs
+@@ -45,6 +45,7 @@
+         Retirement::BudgetExhausted | Retirement::Interrupted(LeaseReleaseCause::ActivationLimit)
+     );
+     if let Some(code) = token_gate.failure_code()
++        && !report.failure.fails_run()
+         && (!hard_limit || matches!(token_gate, token_budget::Progression::Refused(_)))
+     {
+         report.failure = StepFailure::new(
+--- WB1-R1/src/application/app_error.rs
++++ WB1-R2/src/application/app_error.rs
+@@ -146,7 +146,7 @@
+ }
+ 
+ pub const KNOWLEDGE_TRIGGER_ABOVE_CEILING: &str = "knowledge.trigger_above_ceiling";
+-pub const KNOWLEDGE_AUDIENCE_BELOW_CONTENT: &str = "knowledge.audience_below_content";
++pub use crate::domain::workflow::KNOWLEDGE_AUDIENCE_BELOW_CONTENT;
+ 
+ impl AppError {
+     pub fn knowledge_code(&self) -> Option<&'static str> {
+--- WB1-R1/src/domain/workflow/mod.rs
++++ WB1-R2/src/domain/workflow/mod.rs
+@@ -44,7 +44,8 @@
+ };
+ pub use outcome::{
+     CompletedStep, CompletionRoute, DurableWaitRequest, EngineDisposition, FailureClass,
+-    OutcomeError, RetryEligibility, StepFailure, StepOutcome, resolve_outcome,
++    KNOWLEDGE_AUDIENCE_BELOW_CONTENT, OutcomeError, RetryEligibility, StepFailure, StepOutcome,
++    resolve_outcome,
+ };
+ pub use recovery::{
+     AttemptBudget, RecoveryDecision, RecoveryLimit, RecoveryPolicy, RecoveryPolicyError,
+--- WB1-R1/src/domain/workflow/outcome.rs
++++ WB1-R2/src/domain/workflow/outcome.rs
+@@ -7,6 +7,9 @@
+ use thiserror::Error;
+ 
+ const MAX_DIAGNOSTIC_BYTES: usize = 4096;
++
++/// A new pre-effect knowledge refusal terminates the run, including configured error routes.
++pub const KNOWLEDGE_AUDIENCE_BELOW_CONTENT: &str = "knowledge.audience_below_content";
+ 
+ #[derive(Debug, Clone, PartialEq, Eq)]
+ pub enum CompletionRoute {
+@@ -121,6 +124,11 @@
+ 
+     pub fn code(&self) -> &FailureCode {
+         &self.code
++    }
++
++    /// This reserved policy failure cannot be recovered by workflow-authored branches.
++    pub fn fails_run(&self) -> bool {
++        self.code.as_str() == KNOWLEDGE_AUDIENCE_BELOW_CONTENT
+     }
+ 
+     pub fn diagnostic(&self) -> Option<&str> {
+@@ -209,6 +217,10 @@
+             }
+             Ok(EngineDisposition::Park { request })
+         }
++        StepOutcome::Failed(failure) if failure.fails_run() => Ok(EngineDisposition::Terminal {
++            failure,
++            target: None,
++        }),
+         StepOutcome::Failed(failure)
+             if failure.class() == FailureClass::Retryable
+                 && retry == RetryEligibility::Available =>
+@@ -354,6 +366,27 @@
+     }
+ 
+     #[test]
++    fn knowledge_run_level_refusal_has_no_retry_or_error_route() {
++        let graph = graph();
++        for class in [FailureClass::Terminal, FailureClass::Retryable] {
++            let failed = StepOutcome::Failed(
++                StepFailure::new(
++                    class,
++                    FailureCode::parse(KNOWLEDGE_AUDIENCE_BELOW_CONTENT).unwrap(),
++                    None,
++                )
++                .unwrap(),
++            );
++            for retry in [RetryEligibility::Available, RetryEligibility::Exhausted] {
++                assert!(matches!(
++                    resolve_outcome(&graph, &id("a"), &failed, retry, Utc::now()).unwrap(),
++                    EngineDisposition::Terminal { target: None, .. }
++                ));
++            }
++        }
++    }
++
++    #[test]
+     fn wait_requires_future_deadline_and_has_no_successor() {
+         let graph = graph();
+         let now = Utc::now();
+--- WB1-R1/src/domain/workflow/recovery.rs
++++ WB1-R2/src/domain/workflow/recovery.rs
+@@ -95,7 +95,8 @@
+         if snapshot.work_budget == RetryEligibility::Exhausted {
+             return RecoveryDecision::FailRun(RecoveryLimit::WorkBudget);
+         }
+-        if failure.class() == FailureClass::Terminal
++        if failure.fails_run()
++            || failure.class() == FailureClass::Terminal
+             || snapshot.attempts.consumed == snapshot.attempts.limit
+         {
+             return RecoveryDecision::FinalError;
+--- WB1-R1/src/domain/workflow/recovery_tests.rs
++++ WB1-R2/src/domain/workflow/recovery_tests.rs
+@@ -175,3 +175,24 @@
+         );
+     }
+ }
++
++#[test]
++fn knowledge_run_level_refusal_is_final_but_unknown_effect_still_reconciles() {
++    let policy = RecoveryPolicy::default();
++    for class in [FailureClass::Terminal, FailureClass::Retryable] {
++        let failed = StepFailure::new(
++            class,
++            FailureCode::parse(crate::domain::workflow::KNOWLEDGE_AUDIENCE_BELOW_CONTENT).unwrap(),
++            None,
++        )
++        .unwrap();
++        assert_eq!(
++            policy.decide(&failed, RetrySafety::SafeToRetry, snapshot(1, 3)),
++            RecoveryDecision::FinalError
++        );
++        assert_eq!(
++            policy.decide(&failed, RetrySafety::EffectOutcomeUnknown, snapshot(1, 3)),
++            RecoveryDecision::Reconcile
++        );
++    }
++}

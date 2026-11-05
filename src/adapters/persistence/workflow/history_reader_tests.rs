@@ -274,3 +274,12 @@ async fn workflow_context_history_is_empty_without_a_thread_and_never_crosses_ru
     assert_eq!(ids(&output), vec![other.message]);
     assert!(!ids(&output).contains(&one.message));
 }
+
+#[path = "knowledge_history_tests.rs"]
+mod knowledge_history_tests;
+
+#[path = "knowledge_history_race_tests.rs"]
+mod knowledge_history_race_tests;
+
+#[path = "knowledge_history_lease_tests.rs"]
+mod knowledge_history_lease_tests;

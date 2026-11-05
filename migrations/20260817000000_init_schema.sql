@@ -3542,6 +3542,7 @@ CREATE TABLE public.company_invites (
 --
 
 CREATE TABLE public.company_mcp_connections (
+    access_level public.access_level DEFAULT 0 NOT NULL,
     company_id uuid NOT NULL,
     id uuid NOT NULL,
     slug text NOT NULL,
@@ -3916,6 +3917,7 @@ CREATE TABLE public.message_participants (
 --
 
 CREATE TABLE public.messages (
+    access_level public.access_level DEFAULT 0 NOT NULL,
     id uuid NOT NULL,
     company_id uuid NOT NULL,
     author_principal_id uuid NOT NULL,
@@ -3936,7 +3938,8 @@ CREATE TABLE public.messages (
     CONSTRAINT messages_direction_check CHECK ((direction = ANY (ARRAY['inbound'::text, 'outbound'::text]))),
     CONSTRAINT messages_role_check CHECK ((role = ANY (ARRAY['human'::text, 'agent'::text, 'system'::text]))),
     CONSTRAINT messages_structured_response_body CHECK (((structured_response IS NULL) OR COALESCE(((jsonb_typeof(structured_response) = 'object'::text) AND ((structured_response ->> 'body'::text) = clean_text_body) AND (((structured_response -> 'contract'::text) ->> 'version'::text) = '1'::text) AND (length((structured_response ->> 'fingerprint'::text)) = 64)), false))),
-    CONSTRAINT messages_subject_check CHECK ((octet_length(subject) <= 2048))
+    CONSTRAINT messages_subject_check CHECK ((octet_length(subject) <= 2048)),
+    CONSTRAINT messages_human_public CHECK (role <> 'human' OR access_level = 0)
 );
 
 
@@ -4512,6 +4515,8 @@ CREATE TABLE public.workflow_action_evidence (
 --
 
 CREATE TABLE public.workflow_action_intents (
+    content_level_at_freeze public.access_level NOT NULL,
+    destination_level_at_freeze public.access_level NOT NULL,
     company_id uuid NOT NULL,
     run_id uuid NOT NULL,
     execution_id uuid NOT NULL,
@@ -4528,7 +4533,8 @@ CREATE TABLE public.workflow_action_intents (
     CONSTRAINT workflow_action_intents_operation_check CHECK (((jsonb_typeof(operation) = 'object'::text) AND (octet_length((operation)::text) <= 524288))),
     CONSTRAINT workflow_action_intents_operation_digest_check CHECK ((operation_digest ~ '^[0-9a-f]{64}$'::text)),
     CONSTRAINT workflow_action_intents_operation_key_check CHECK (((octet_length(operation_key) >= 1) AND (octet_length(operation_key) <= 128))),
-    CONSTRAINT workflow_action_intents_policy_decision_check CHECK ((policy_decision = ANY (ARRAY['unevaluated'::text, 'approval_required'::text])))
+    CONSTRAINT workflow_action_intents_policy_decision_check CHECK ((policy_decision = ANY (ARRAY['unevaluated'::text, 'approval_required'::text]))),
+    CONSTRAINT workflow_action_knowledge_bounds CHECK (content_level_at_freeze <= destination_level_at_freeze)
 );
 
 
@@ -5182,6 +5188,7 @@ CREATE TABLE public.workflow_history_members (
 --
 
 CREATE TABLE public.workflow_http_connections (
+    access_level public.access_level DEFAULT 0 NOT NULL,
     company_id uuid NOT NULL,
     id uuid NOT NULL,
     origin text NOT NULL,
@@ -5621,6 +5628,8 @@ CREATE TRIGGER workflow_bundle_immutable BEFORE UPDATE OR DELETE ON public.workf
     FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_bundle();
 
 CREATE TABLE public.workflow_runs (
+    knowledge_ceiling public.access_level NOT NULL,
+    content_level public.access_level DEFAULT 0 NOT NULL,
     company_id uuid NOT NULL,
     id uuid NOT NULL,
     binding_id uuid NOT NULL,
@@ -5668,7 +5677,8 @@ CREATE TABLE public.workflow_runs (
     CONSTRAINT workflow_runs_params_check CHECK ((octet_length((params)::text) <= 4194304)),
     CONSTRAINT workflow_runs_resources_check CHECK (((jsonb_typeof(resources) = 'object'::text) AND (octet_length((resources)::text) <= 262144))),
     CONSTRAINT workflow_runs_revision_check CHECK ((revision > 0)),
-    CONSTRAINT workflow_runs_terminal_wakeup_sequence_check CHECK ((terminal_wakeup_sequence > 0))
+    CONSTRAINT workflow_runs_terminal_wakeup_sequence_check CHECK ((terminal_wakeup_sequence > 0)),
+    CONSTRAINT workflow_runs_knowledge_bounds CHECK (content_level <= knowledge_ceiling)
 );
 CREATE INDEX workflow_runs_by_bundle ON public.workflow_runs(company_id,bundle_digest);
 
@@ -11501,9 +11511,9 @@ CREATE TABLE public.workflow_history_snapshots (
 CREATE FUNCTION public.guard_workflow_run_snapshot() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
     IF (to_jsonb(NEW) - ARRAY['state','waiting_reason','terminal_execution_id',
-        'terminal_wakeup_sequence','revision','finished_at']) IS DISTINCT FROM
+        'terminal_wakeup_sequence','revision','finished_at','content_level']) IS DISTINCT FROM
        (to_jsonb(OLD) - ARRAY['state','waiting_reason','terminal_execution_id',
-        'terminal_wakeup_sequence','revision','finished_at']) THEN
+        'terminal_wakeup_sequence','revision','finished_at','content_level']) THEN
         RAISE EXCEPTION 'workflow run snapshot is immutable' USING ERRCODE='23514', CONSTRAINT='workflow_guard:guard_workflow_run_snapshot';
     END IF;
     RETURN NEW;
@@ -11511,7 +11521,7 @@ END $$;
 CREATE TRIGGER workflow_run_snapshot_immutable BEFORE UPDATE OF company_id, id, binding_id,
     binding_revision, workflow_id, version_id, channel_id, thread_id, actor_id, trigger_id,
     correlation_id, bundle_digest, input, params, resources, max_steps, max_context_bytes, deadline,
-    created_at, parent_run_id, parent_execution_id, rerun_of_run_id, delivery_policy
+    created_at, parent_run_id, parent_execution_id, rerun_of_run_id, delivery_policy, knowledge_ceiling
     ON public.workflow_runs
     FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_run_snapshot();
 
@@ -11721,3 +11731,89 @@ CREATE CONSTRAINT TRIGGER model_usage_history_single_source AFTER INSERT ON publ
     DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.guard_model_usage_single_source();
 CREATE CONSTRAINT TRIGGER model_usage_live_single_source AFTER INSERT ON public.model_usage_calls
     DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.guard_model_usage_single_source();
+
+
+-- The watermark and terminal child facts cannot be rewritten by a later checkpoint.
+CREATE FUNCTION public.guard_workflow_run_knowledge() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF NEW.knowledge_ceiling IS DISTINCT FROM OLD.knowledge_ceiling
+       OR NEW.content_level < OLD.content_level
+       OR (OLD.state IN ('succeeded','failed','cancelled') AND NEW.content_level IS DISTINCT FROM OLD.content_level)
+    THEN
+        RAISE EXCEPTION 'workflow knowledge facts cannot be lowered or rewritten'
+            USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_run_knowledge';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER workflow_run_knowledge BEFORE UPDATE OF knowledge_ceiling,content_level ON public.workflow_runs
+    FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_run_knowledge();
+
+CREATE FUNCTION public.guard_message_access_level() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF NEW.access_level IS DISTINCT FROM OLD.access_level THEN
+        RAISE EXCEPTION 'message access level is immutable'
+            USING ERRCODE='23514', CONSTRAINT='workflow_guard:message_access_level';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER message_access_level_immutable BEFORE UPDATE OF access_level ON public.messages
+    FOR EACH ROW EXECUTE FUNCTION public.guard_message_access_level();
+
+
+-- One bounded history-consumption proof per actual claim; no message content is duplicated.
+CREATE TABLE public.workflow_history_consumptions (
+    company_id uuid NOT NULL,
+    run_id uuid NOT NULL,
+    execution_id uuid NOT NULL,
+    job_id uuid NOT NULL,
+    attempt_number integer NOT NULL CHECK (attempt_number > 0),
+    execution_generation uuid NOT NULL,
+    worker_id uuid NOT NULL,
+    content_level public.access_level NOT NULL,
+    PRIMARY KEY (company_id,run_id,execution_id,job_id,attempt_number),
+    FOREIGN KEY (company_id,run_id,execution_id)
+        REFERENCES public.workflow_executions(company_id,run_id,id) ON DELETE CASCADE,
+    FOREIGN KEY (company_id,execution_id,job_id)
+        REFERENCES public.background_tasks(company_id,workflow_execution_id,id) ON DELETE CASCADE,
+    FOREIGN KEY (job_id,attempt_number,execution_generation,worker_id)
+        REFERENCES public.task_attempts(task_id,attempt_number,execution_generation,worker_id) ON DELETE CASCADE
+);
+
+CREATE FUNCTION public.guard_workflow_history_consumption_immutable() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP='UPDATE' AND NEW IS NOT DISTINCT FROM OLD THEN RETURN NEW; END IF;
+    IF TG_OP='DELETE' AND pg_trigger_depth()>1 AND (
+        NOT EXISTS (SELECT 1 FROM public.workflow_runs WHERE company_id=OLD.company_id AND id=OLD.run_id)
+        OR NOT EXISTS (SELECT 1 FROM public.background_tasks WHERE company_id=OLD.company_id AND id=OLD.job_id)
+        OR NOT EXISTS (SELECT 1 FROM public.task_attempts WHERE task_id=OLD.job_id AND attempt_number=OLD.attempt_number)
+    ) THEN RETURN OLD; END IF;
+    RAISE EXCEPTION 'workflow history consumption proof is immutable'
+        USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_history_consumption_immutable';
+END $$;
+CREATE TRIGGER workflow_history_consumption_immutable BEFORE UPDATE OR DELETE ON public.workflow_history_consumptions
+    FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_history_consumption_immutable();
+
+CREATE FUNCTION public.guard_workflow_history_consumption_live() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM public.background_tasks AS job
+        JOIN public.workflow_executions AS execution ON execution.company_id=job.company_id
+            AND execution.id=job.workflow_execution_id
+        JOIN public.workflow_runs AS run ON run.company_id=execution.company_id AND run.id=execution.run_id
+        JOIN public.task_attempts AS attempt ON attempt.task_id=job.id
+            AND attempt.attempt_number=NEW.attempt_number AND attempt.execution_generation=NEW.execution_generation
+            AND attempt.worker_id=NEW.worker_id AND attempt.status='processing'
+        WHERE job.company_id=NEW.company_id AND job.id=NEW.job_id AND execution.id=NEW.execution_id AND run.id=NEW.run_id
+            AND job.status='processing' AND job.worker_id=NEW.worker_id
+            AND job.execution_generation=NEW.execution_generation AND job.attempt_ordinal=NEW.attempt_number
+            AND job.lock_expires_at>clock_timestamp() AND execution.completed_at IS NULL
+            AND run.state IN ('queued','running') AND run.deadline>clock_timestamp()
+            AND run.content_level>=NEW.content_level
+    ) THEN
+        RAISE EXCEPTION 'workflow history consumption lost live fence'
+            USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_history_consumption_live';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE CONSTRAINT TRIGGER workflow_history_consumption_live AFTER INSERT OR UPDATE ON public.workflow_history_consumptions
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_history_consumption_live();

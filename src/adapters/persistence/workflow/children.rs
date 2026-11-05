@@ -205,6 +205,8 @@ pub(super) struct ChildStart<'a> {
 
 #[derive(sqlx::FromRow)]
 struct ParentRun {
+    knowledge_ceiling: i16,
+    content_level: i16,
     actor_id: Uuid,
     channel_id: Option<Uuid>,
     thread_id: Option<Uuid>,
@@ -222,7 +224,7 @@ pub(super) async fn create_on(
     start: &ChildStart<'_>,
 ) -> AppResult<ParkedWorkflow> {
     let parent = sqlx::query_as::<_, ParentRun>(
-        "SELECT actor_id, channel_id, thread_id, correlation_id, delivery_policy FROM workflow_runs \
+        "SELECT actor_id, channel_id, thread_id, correlation_id, delivery_policy, knowledge_ceiling::smallint AS knowledge_ceiling, content_level::smallint AS content_level FROM workflow_runs \
          WHERE company_id=$1 AND id=$2",
     )
     .bind(scope.company.as_uuid())
@@ -263,6 +265,10 @@ pub(super) async fn create_on(
         db,
         &RunRow {
             company: scope.company,
+            knowledge: super::knowledge::stored_levels(
+                parent.knowledge_ceiling,
+                parent.content_level,
+            )?,
             run: child,
             binding: start.binding,
             association,

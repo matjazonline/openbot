@@ -9,10 +9,12 @@ pub(super) async fn create(
     command: &PreparedAdmission,
     source: &SourceKey,
 ) -> AppResult<()> {
+    let knowledge = super::knowledge::admission_levels_on(tx, command).await?;
     insert_run(
         tx,
         &RunRow {
             company: command.company_id(),
+            knowledge,
             run: command.proposed_run_id(),
             binding: command.binding(),
             association: command.association(),
@@ -76,6 +78,7 @@ pub(super) struct ParentLink {
 /// The configured binding supplies the frozen bundle, parameters and resources; its binding
 /// identity is the admitting binding, or the parent's for a child (provenance only).
 pub(super) struct RunRow<'a> {
+    pub knowledge: crate::entities::access_level::RunKnowledge,
     pub company: CompanyId,
     pub run: RunId,
     pub binding: &'a ConfiguredBinding,
@@ -132,9 +135,9 @@ pub(super) async fn insert_run(db: &mut PgConnection, row: &RunRow<'_>) -> AppRe
         "INSERT INTO workflow_runs (company_id, id, binding_id, binding_revision, workflow_id, version_id, \
          channel_id, thread_id, actor_id, trigger_id, correlation_id, bundle_digest, input, params, resources, \
          max_steps, max_context_bytes, deadline, parent_run_id, parent_execution_id, rerun_of_run_id, \
-         delivery_policy) \
+         delivery_policy, knowledge_ceiling, content_level) \
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17, \
-         COALESCE($18, CURRENT_TIMESTAMP + make_interval(secs => $19)), $20, $21, $22, $23)",
+         COALESCE($18, CURRENT_TIMESTAMP + make_interval(secs => $19)), $20, $21, $22, $23, $24::smallint, $25::smallint)",
     ).bind(row.company.as_uuid()).bind(row.run.as_uuid())
         .bind(row.binding.id().as_uuid()).bind(revision(row.binding.revision().get())?)
         .bind(definition.workflow_id.as_uuid()).bind(definition.version_id.as_uuid()).bind(channel).bind(thread)
@@ -148,7 +151,7 @@ pub(super) async fn insert_run(db: &mut PgConnection, row: &RunRow<'_>) -> AppRe
         .bind(row.parent.map(|parent| parent.run.as_uuid()))
         .bind(row.parent.map(|parent| parent.execution.as_uuid()))
         .bind(row.rerun_of.map(|original| original.as_uuid()))
-        .bind(row.delivery_policy.as_str()).execute(db).await?;
+        .bind(row.delivery_policy.as_str()).bind(row.knowledge.ceiling().as_i16()).bind(row.knowledge.content().as_i16()).execute(db).await?;
     Ok(())
 }
 

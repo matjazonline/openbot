@@ -101,6 +101,10 @@ impl WorkflowServices {
         &self.persistence
     }
 
+    pub fn http_connections(&self) -> &dyn crate::application::workflow::http::HttpConnections {
+        &self.persistence
+    }
+
     pub fn jev_connections(&self) -> &dyn crate::application::workflow::jev::JevConnections {
         &self.persistence
     }

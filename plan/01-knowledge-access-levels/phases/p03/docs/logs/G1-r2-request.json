@@ -1,0 +1,12 @@
+{
+  "stage": "KNOW-P03-G1-R2",
+  "decision_sha256": "da4f77abd6bf3f520050cd599c1ff2e7ff91ac0fa9eedbc7204720f1cee38dcb",
+  "decision_path": "plan/01-knowledge-access-levels/phases/p03/docs/logs/G1-r2-correction-decisions.md",
+  "source_installed_digest": "b2f313aad27635a90b809648050d8825eee21d1f0b8350ac4dca9f9fef824b3e",
+  "source_tree": "4c9f2035860c0edb443a5088c2de2b3961e97703033adde491c678628864a765",
+  "authority_revision": 7,
+  "findings": [
+    "KNOW-P03-WB1-F1",
+    "KNOW-P03-WB1-F2"
+  ]
+}

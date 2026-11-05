@@ -1,0 +1,4 @@
+    Checking open_bots v0.1.0 (/Users/mac02/dev/openbot-recovery/.worktrees/knowledge-p03)
+error: could not compile `open_bots` (lib) due to 3 previous errors; 1 warning emitted
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `open_bots` (lib test) due to 3 previous errors; 1 warning emitted

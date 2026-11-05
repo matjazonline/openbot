@@ -11,7 +11,7 @@ use secrecy::SecretString;
 use serde_json::Value;
 use std::collections::BTreeSet;
 
-pub(super) async fn begin_http(
+pub(in crate::adapters::persistence) async fn begin_http(
     persistence: &PostgresPersistence,
 ) -> AppResult<Transaction<'_, Postgres>> {
     let mut tx = persistence.pool.begin().await?;
@@ -60,6 +60,7 @@ struct ConnectionRow {
     bearer: bool,
     secret_set: bool,
     revision: i64,
+    access_level: i16,
 }
 impl ConnectionRow {
     fn decode(self) -> AppResult<HttpConnection> {
@@ -71,6 +72,8 @@ impl ConnectionRow {
             bearer: self.bearer,
             secret_set: self.secret_set,
             revision: self.revision,
+            access_level: crate::entities::access_level::AccessLevel::try_from(self.access_level)
+                .map_err(|_| invalid())?,
         })
     }
 }
@@ -79,7 +82,7 @@ pub(super) async fn connection_on(
     company: CompanyId,
     id: Uuid,
 ) -> AppResult<Option<HttpConnection>> {
-    sqlx::query_as::<_, ConnectionRow>("SELECT connection.company_id, connection.id, connection.origin, connection.enabled, connection.bearer, connection.revision, EXISTS(SELECT 1 FROM workflow_http_credentials AS credential WHERE credential.company_id=connection.company_id AND credential.connection_id=connection.id) AS secret_set FROM workflow_http_connections AS connection WHERE connection.company_id=$1 AND connection.id=$2 FOR SHARE OF connection")
+    sqlx::query_as::<_, ConnectionRow>("SELECT connection.company_id, connection.id, connection.origin, connection.enabled, connection.bearer, connection.revision, connection.access_level::smallint AS access_level, EXISTS(SELECT 1 FROM workflow_http_credentials AS credential WHERE credential.company_id=connection.company_id AND credential.connection_id=connection.id) AS secret_set FROM workflow_http_connections AS connection WHERE connection.company_id=$1 AND connection.id=$2 FOR SHARE OF connection")
         .bind(company.as_uuid()).bind(id).fetch_optional(&mut **tx).await?.map(ConnectionRow::decode).transpose()
 }
 async fn edit_on(
@@ -90,6 +93,14 @@ async fn edit_on(
     revision: i64,
 ) -> AppResult<HttpConnection> {
     authority::authorize_company(tx, company, actor).await?;
+    lock_edit_on(tx, company, id, revision).await
+}
+async fn lock_edit_on(
+    tx: &mut Transaction<'_, Postgres>,
+    company: CompanyId,
+    id: Uuid,
+    revision: i64,
+) -> AppResult<HttpConnection> {
     sqlx::query(
         "SELECT id FROM workflow_http_connections WHERE company_id=$1 AND id=$2 FOR UPDATE",
     )
@@ -115,6 +126,56 @@ async fn revised(
 
 #[async_trait]
 impl HttpConnections for PostgresPersistence {
+    async fn list_http(
+        &self,
+        company: CompanyId,
+        actor: WorkflowActor,
+    ) -> AppResult<Vec<HttpConnection>> {
+        let mut tx = begin_http(self).await?;
+        authority::authorize_company(&mut tx, company, actor).await?;
+        let rows=sqlx::query_as::<_,ConnectionRow>("SELECT connection.company_id,connection.id,connection.origin,connection.enabled,connection.bearer,connection.revision,connection.access_level::smallint AS access_level, EXISTS(SELECT 1 FROM workflow_http_credentials AS credential WHERE credential.company_id=connection.company_id AND credential.connection_id=connection.id) AS secret_set FROM workflow_http_connections AS connection WHERE connection.company_id=$1 ORDER BY connection.id LIMIT 257")
+            .bind(company.as_uuid()).fetch_all(&mut *tx).await?;
+        if rows.len() > 256 {
+            return Err(AppError::BadRequest(
+                "At most 256 HTTP connections are supported".into(),
+            ));
+        }
+        let result = rows
+            .into_iter()
+            .map(ConnectionRow::decode)
+            .collect::<AppResult<_>>()?;
+        tx.commit().await?;
+        Ok(result)
+    }
+    async fn set_http_level(
+        &self,
+        command: crate::use_cases::connection_level::ConnectionLevelCommand,
+    ) -> AppResult<HttpConnection> {
+        use crate::entities::access_level::{LevelTarget, may_assign_level};
+        let mut tx = begin_http(self).await?;
+        let actor = authority::authorize_company(&mut tx, command.company, command.actor).await?;
+        let current = lock_edit_on(
+            &mut tx,
+            command.company,
+            command.connection,
+            command.expected_revision,
+        )
+        .await?;
+        may_assign_level(
+            actor,
+            LevelTarget::Assignable(current.access_level),
+            command.access_level,
+        )
+        .map_err(|e| AppError::BadRequest(e.to_string()))?;
+        sqlx::query("UPDATE workflow_http_connections SET access_level=$3::smallint,revision=revision+1 WHERE company_id=$1 AND id=$2")
+            .bind(command.company.as_uuid()).bind(command.connection).bind(command.access_level.as_i16()).execute(&mut *tx).await?;
+        let result = connection_on(&mut tx, command.company, command.connection)
+            .await?
+            .ok_or_else(missing)?;
+        tx.commit().await?;
+        Ok(result)
+    }
+
     async fn create_http(
         &self,
         company: CompanyId,

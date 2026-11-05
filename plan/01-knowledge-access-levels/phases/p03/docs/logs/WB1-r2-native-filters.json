@@ -1,0 +1,22 @@
+{
+  "filters": {
+    "workflow_admit_": 23,
+    "workflow_context_history_": 3,
+    "workflow_action_": 365,
+    "workflow_call_": 9,
+    "workflow_message_": 64,
+    "workflow_http_": 21,
+    "workflow_mcp_": 21,
+    "provisioning_": 20,
+    "knowledge_run_level_": 39,
+    "workflow_agent_": 30,
+    "model_usage": 12,
+    "access_level_": 24,
+    "adapters::persistence::thread::": 64,
+    "workflow_tool_": 21,
+    "workflow_child_": 9,
+    "workflow_wakeup_": 14,
+    "root_budget_admission_raw_root_without_budget_is_refused": 1
+  },
+  "selected_unique": 739
+}

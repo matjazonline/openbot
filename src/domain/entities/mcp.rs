@@ -98,6 +98,7 @@ pub struct McpToolRef {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CompanyMcpConnection {
+    pub access_level: super::access_level::AccessLevel,
     pub id: Uuid,
     pub company_id: Uuid,
     pub slug: crate::entities::value_objects::McpConnectionSlug,

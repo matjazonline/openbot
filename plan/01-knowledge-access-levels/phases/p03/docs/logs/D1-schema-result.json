@@ -1,0 +1,10 @@
+{
+  "private_data_directory": "/Users/mac02/dev/openbot-recovery/.worktrees/pg-knowledge-p03",
+  "port": 55503,
+  "databases": [
+    "open_bots",
+    "open_bots_test"
+  ],
+  "migrations": "PASS",
+  "init_sha384": "0d99eb84b845ba5015ad12f892112b22c5886b08c9e9532f09d6327525e8ff3f1bf8d386d2245f85799072eec7a3da11"
+}

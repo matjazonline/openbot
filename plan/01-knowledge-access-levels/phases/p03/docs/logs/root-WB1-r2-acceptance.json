@@ -1,0 +1,49 @@
+{
+  "status": "ACCEPTED IN PHASE",
+  "review": "KNOW-P03-WB1-R2",
+  "note": "KNOW-P03-WB1-R2-N1",
+  "findings": {
+    "KNOW-P03-WB1-F1": "FIXED/CLOSED",
+    "KNOW-P03-WB1-F2": "FIXED/CLOSED"
+  },
+  "start": "ef12dc51e24609cad75ab1a354b81c8588578fca",
+  "base": "ef12dc51e24609cad75ab1a354b81c8588578fca",
+  "head": "ef12dc51e24609cad75ab1a354b81c8588578fca",
+  "installed_digest": "6c1c22b53202a22db87f5384f4290129c46e8bbcedc1607adfa261deac8578dc",
+  "diff_sha256": "154aef92d65652504c57ee74f206c23710328e9820232ff8ac3ba33fcec55501",
+  "tree_sha256": "5814560962264ec3c568ea3d5c7ab31e449b641856d2d9b9597ce4ceec10fad2",
+  "files_count": 2703,
+  "exclusions": [
+    "plan/01-knowledge-access-levels/phases/p03/docs/"
+  ],
+  "authority": {
+    "path": "/Users/mac02/dev/openbot-recovery/plan/01-knowledge-access-levels/COORDINATION.md",
+    "file_revision": 7,
+    "pin": "plan/01-knowledge-access-levels/phases/p03/docs/logs/COORDINATION-r7-WB1-R2.md",
+    "sha256": "37fd5389cc7621d96ecf9b0d4f9cc86e337ca5d3c4069150fc5083f8144002c6",
+    "instructions": [
+      "KNOW-I001/r1",
+      "KNOW-I002/r1",
+      "KNOW-I003/r1",
+      "KNOW-I004/r1",
+      "KNOW-I005/r1"
+    ],
+    "notices": [
+      "KNOW-C001/r1"
+    ],
+    "disposition": "acknowledged; implemented and author-verified, root satisfaction pending independent acceptance"
+  },
+  "decision": {
+    "id": "KNOW-P03-G1-R3",
+    "revision": 3,
+    "sha256": "4e447c7e1cf163ab4d5f0e5e7382c37b9012d49ed35ecb0fe184334e3682264e",
+    "actual_pass_note": "KNOW-P03-G1-R3-N1",
+    "original_r1_retained": true
+  },
+  "author_tests": 818,
+  "independent_tests": 130,
+  "required_phase_checks": "all PASS",
+  "notice_C001_r1": "SATISFIED",
+  "whole_plan_final06": "PENDING",
+  "integrated": false
+}

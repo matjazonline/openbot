@@ -91,6 +91,7 @@ fn transport_kind(value: &str) -> AppResult<TransportKind> {
 
 #[derive(sqlx::FromRow, Debug)]
 struct ThreadMessageDb {
+    access_level: i16,
     response_contract: Option<Value>,
     id: Uuid,
     canonical_id: Uuid,
@@ -139,6 +140,8 @@ impl ThreadMessageDb {
             }
         };
         Ok(ThreadMessageView {
+            access_level: crate::entities::access_level::AccessLevel::try_from(self.access_level)
+                .map_err(|e| AppError::Internal(e.into()))?,
             response_contract: decode_response_contract(
                 CanonicalMessageId::new(self.canonical_id),
                 self.response_contract,
@@ -252,6 +255,7 @@ fn thread_message_select() -> String {
            message.direction,
            message.role,
            message.audience,
+           message.access_level::smallint AS access_level,
            association.entry_kind,
            association.created_at,
            note.id AS note_id,
@@ -281,12 +285,19 @@ pub(super) async fn list_thread_messages(
 ) -> AppResult<Vec<ThreadMessageView>> {
     let select = thread_message_select();
     let query = format!(
-        r#"SELECT * FROM (
+        r#"SELECT recent.response_contract, recent.id, recent.canonical_id, recent.company_id,
+                   recent.thread_id, recent.author_principal_id, recent.author_label,
+                   recent.author_transport, recent.author_subject, recent.subject,
+                   recent.clean_text_body, recent.attachments, recent.direction, recent.role,
+                   recent.audience, recent.access_level, recent.entry_kind, recent.created_at,
+                   recent.note_id, recent.note_author_principal_id, recent.note_provenance,
+                   recent.supersedes_note_id, recent.superseded_by_note_id, recent.tombstoned_at
+            FROM (
                {select}
                WHERE association.thread_id = $1
                ORDER BY association.created_at DESC, association.id DESC
                LIMIT $2
-           ) recent
+           ) AS recent
            ORDER BY recent.created_at ASC, recent.id ASC"#
     );
     let rows = sqlx::query_as::<_, ThreadMessageDb>(&query)
@@ -384,6 +395,7 @@ pub(super) async fn get_thread_message(
 
 #[derive(sqlx::FromRow, Debug)]
 struct AgentHistoryDb {
+    access_level: i16,
     role: String,
     audience: String,
     entry_kind: String,
@@ -402,9 +414,12 @@ pub(super) async fn list_agent_history(
     thread_id: Uuid,
 ) -> AppResult<Vec<AgentHistoryMessage>> {
     let rows = sqlx::query_as::<_, AgentHistoryDb>(
-        r#"SELECT * FROM (
+        r#"SELECT recent.role, recent.audience, recent.access_level, recent.entry_kind,
+                  recent.author_label, recent.author_subject, recent.subject, recent.clean_text_body
+             FROM (
                SELECT message.role,
                       message.audience,
+                      message.access_level::smallint AS access_level,
                       association.entry_kind,
                       author.display_label AS author_label,
                       author_identity.subject AS author_subject,
@@ -430,7 +445,7 @@ pub(super) async fn list_agent_history(
                   )
                 ORDER BY association.created_at DESC, association.id DESC
                 LIMIT $2
-           ) recent
+           ) AS recent
            ORDER BY recent.created_at ASC, recent.id ASC"#,
     )
     .bind(thread_id)
@@ -442,6 +457,10 @@ pub(super) async fn list_agent_history(
     rows.into_iter()
         .map(|row| {
             Ok(AgentHistoryMessage {
+                access_level: crate::entities::access_level::AccessLevel::try_from(
+                    row.access_level,
+                )
+                .map_err(|e| AppError::Internal(e.into()))?,
                 role: MessageRole::from_str(&row.role)
                     .map_err(|error| AppError::Internal(error.to_string()))?,
                 audience: MessageAudience::from_str(&row.audience)
@@ -616,6 +635,7 @@ pub(super) async fn latest_thread_rfc_message_id(
 
 #[derive(sqlx::FromRow, Debug)]
 struct MessageAuditDb {
+    access_level: i16,
     id: Uuid,
     canonical_id: Uuid,
     company_id: Uuid,
@@ -660,6 +680,7 @@ pub(super) async fn get_message_audit(
            message.direction,
            message.role,
            message.audience,
+           message.access_level::smallint AS access_level,
            association.entry_kind,
            message.correlation_id,
            association.created_at,
@@ -706,6 +727,8 @@ pub(super) async fn get_message_audit(
     }
 
     Ok(Some(MessageAuditView {
+        access_level: crate::entities::access_level::AccessLevel::try_from(db.access_level)
+            .map_err(|e| AppError::Internal(e.into()))?,
         id: db.id,
         canonical_id: CanonicalMessageId::new(db.canonical_id),
         company_id: db.company_id,

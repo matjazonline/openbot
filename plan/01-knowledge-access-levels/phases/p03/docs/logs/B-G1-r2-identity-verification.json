@@ -1,0 +1,15 @@
+{
+  "status": "PASS",
+  "before_after_equal": true,
+  "installed_digest": "b2f313aad27635a90b809648050d8825eee21d1f0b8350ac4dca9f9fef824b3e",
+  "head": "ef12dc51e24609cad75ab1a354b81c8588578fca",
+  "diff_sha256": "d30073c7ab5f97f4468ec75754dd5c59347f6c1a8c5fb0a35745f801172637fc",
+  "tree_sha256": "4c9f2035860c0edb443a5088c2de2b3961e97703033adde491c678628864a765",
+  "files_count": 2702,
+  "exclusions": [
+    "plan/01-knowledge-access-levels/phases/p03/docs/"
+  ],
+  "current_authority_equals_r7_pin": true,
+  "authority_sha256": "37fd5389cc7621d96ecf9b0d4f9cc86e337ca5d3c4069150fc5083f8144002c6",
+  "decision_sha256": "da4f77abd6bf3f520050cd599c1ff2e7ff91ac0fa9eedbc7204720f1cee38dcb"
+}

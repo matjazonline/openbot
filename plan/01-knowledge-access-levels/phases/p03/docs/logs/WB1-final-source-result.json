@@ -1,0 +1,61 @@
+[
+  {
+    "name": "build",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "--no-run",
+      "--message-format=json"
+    ],
+    "exit_code": 0,
+    "artifact_fresh": false
+  },
+  {
+    "name": "route-tests",
+    "command": [
+      "/Users/mac02/dev/openbot-recovery/.worktrees/knowledge-p03/target/debug/deps/open_bots-7b3508cbfb62bd10",
+      "adapters::http::routes::connection_levels::tests"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 3.71
+  },
+  {
+    "name": "clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "--offline",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 76.58
+  },
+  {
+    "name": "fmt",
+    "command": [
+      "cargo",
+      "fmt",
+      "--",
+      "--check"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 2.11
+  },
+  {
+    "name": "diff",
+    "command": [
+      "git",
+      "diff",
+      "--check"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.01
+  }
+]

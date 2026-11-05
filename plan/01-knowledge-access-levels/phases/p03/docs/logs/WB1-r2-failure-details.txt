@@ -1,0 +1,32 @@
+failures:
+
+---- adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::control_serialization_tests::workflow_action_reconciliation_control_serialization_cancel_before_command stdout ----
+probe run=842b5ebd-1753-4d80-9bf8-c65d250d91f3 company=6fb7edff-e18b-4e09-a131-799d11e4eb43 phase=query_and_drain elapsed_us=0
+probe run=842b5ebd-1753-4d80-9bf8-c65d250d91f3 company=6fb7edff-e18b-4e09-a131-799d11e4eb43 phase=done elapsed_us=331 sqlstate=None
+observed lock wait statement="SELECT id FROM workflow_executions" blocker=2536 pid=2535 elapsed_ms=9 hang_guard=10s
+held probe run=842b5ebd-1753-4d80-9bf8-c65d250d91f3 company=6fb7edff-e18b-4e09-a131-799d11e4eb43 first_pid=2535 gate_pid=2536 observer_pid=2537
+probe run=842b5ebd-1753-4d80-9bf8-c65d250d91f3 company=6fb7edff-e18b-4e09-a131-799d11e4eb43 phase=query_and_drain elapsed_us=0
+probe run=842b5ebd-1753-4d80-9bf8-c65d250d91f3 company=6fb7edff-e18b-4e09-a131-799d11e4eb43 phase=done elapsed_us=162 sqlstate=None
+
+thread 'adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::control_serialization_tests::workflow_action_reconciliation_control_serialization_cancel_before_command' (30377510) panicked at src/adapters/persistence/workflow/action_reconciliation_control_serialization_tests.rs:58:18:
+called `Result::unwrap()` on an `Err` value: DatabaseTimeout("error returned from database: canceling statement due to statement timeout")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::control_serialization_tests::workflow_action_reconciliation_control_serialization_command_before_cancel stdout ----
+probe run=fb9ce866-5c51-4b98-a1d7-bc0bd5494e24 company=6afb6211-e241-4e82-aaca-663cc70217f6 phase=query_and_drain elapsed_us=0
+probe run=fb9ce866-5c51-4b98-a1d7-bc0bd5494e24 company=6afb6211-e241-4e82-aaca-663cc70217f6 phase=done elapsed_us=388 sqlstate=None
+observed lock wait statement="SELECT id FROM workflow_executions" blocker=2546 pid=2547 elapsed_ms=1 hang_guard=10s
+held probe run=fb9ce866-5c51-4b98-a1d7-bc0bd5494e24 company=6afb6211-e241-4e82-aaca-663cc70217f6 first_pid=2547 gate_pid=2546 observer_pid=2545
+probe run=fb9ce866-5c51-4b98-a1d7-bc0bd5494e24 company=6afb6211-e241-4e82-aaca-663cc70217f6 phase=query_and_drain elapsed_us=0
+probe run=fb9ce866-5c51-4b98-a1d7-bc0bd5494e24 company=6afb6211-e241-4e82-aaca-663cc70217f6 phase=done elapsed_us=174 sqlstate=None
+
+thread 'adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::control_serialization_tests::workflow_action_reconciliation_control_serialization_command_before_cancel' (30377529) panicked at src/adapters/persistence/workflow/action_reconciliation_control_serialization_tests.rs:58:18:
+called `Result::unwrap()` on an `Err` value: DatabaseTimeout("error returned from database: canceling statement due to statement timeout")
+
+
+failures:
+    adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::control_serialization_tests::workflow_action_reconciliation_control_serialization_cancel_before_command
+    adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::control_serialization_tests::workflow_action_reconciliation_control_serialization_command_before_cancel
+
+test result: FAILED. 737 passed; 2 failed; 0 ignored; 0 measured; 2035 filtered out; finished in 262.26s
+

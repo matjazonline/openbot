@@ -50,6 +50,7 @@ use crate::entities::transport::TransportKind;
 /// per-message cost at one round trip rather than four.
 #[derive(sqlx::FromRow, Debug)]
 pub(super) struct MessageDb {
+    pub access_level: i16,
     pub id: Uuid,
     pub canonical_id: Uuid,
     pub company_id: Uuid,
@@ -105,6 +106,7 @@ pub(super) const MESSAGE_SELECT: &str = r#"
            message.direction,
            message.role,
            message.audience,
+           message.access_level::smallint AS access_level,
            association.entry_kind,
            message.correlation_id,
            COALESCE((
@@ -148,6 +150,8 @@ impl TryFrom<MessageDb> for Message {
             .map_err(|error| AppError::Internal(error.to_string()))?;
 
         Ok(Message {
+            access_level: crate::entities::access_level::AccessLevel::try_from(db.access_level)
+                .map_err(|e| AppError::Internal(e.into()))?,
             id: db.id,
             canonical_id: CanonicalMessageId::new(db.canonical_id),
             company_id: db.company_id,
@@ -455,9 +459,42 @@ pub(super) fn canonical_message_hash(
 /// this thread. Callers need different ones -- a reader loads by association, a caller attaching
 /// the same message to further threads needs the canonical id -- and deriving either from the
 /// other would be a second query.
+#[derive(Clone, Copy)]
+pub(crate) enum MessageStampSource {
+    Public,
+    Workflow {
+        company: crate::domain::workflow::CompanyId,
+        run: crate::domain::workflow::RunId,
+    },
+}
+impl MessageStampSource {
+    async fn level_on(
+        self,
+        db: &mut sqlx::PgConnection,
+        company: Uuid,
+    ) -> AppResult<crate::entities::access_level::AccessLevel> {
+        use crate::entities::access_level::AccessLevel;
+        let Self::Workflow {
+            company: scoped,
+            run,
+        } = self
+        else {
+            return Ok(AccessLevel::PUBLIC);
+        };
+        if scoped.as_uuid() != company {
+            return Err(AppError::NotFound("Workflow message scope".into()));
+        }
+        let level: i16=sqlx::query_scalar("SELECT content_level::smallint FROM workflow_runs WHERE company_id=$1 AND id=$2 FOR SHARE")
+            .bind(company).bind(run.as_uuid()).fetch_optional(db).await?
+            .ok_or_else(|| AppError::NotFound("Workflow message scope".into()))?;
+        AccessLevel::try_from(level).map_err(|e| AppError::Internal(e.into()))
+    }
+}
+
 pub(crate) async fn insert_message_on(
     connection: &mut sqlx::PgConnection,
     write: &MessageWrite,
+    stamp: MessageStampSource,
 ) -> AppResult<InsertedMessage> {
     let scope = thread_scope(connection, write.thread_id).await?;
     validate_attachment_sources(connection, scope.company_id, write).await?;
@@ -477,6 +514,7 @@ pub(crate) async fn insert_message_on(
                     participants: &participants,
                     attachments: attachments.as_ref(),
                     content_hash: &content_hash,
+                    stamp,
                 },
                 metadata,
             )
@@ -486,10 +524,13 @@ pub(crate) async fn insert_message_on(
             let canonical_id = insert_canonical_message(
                 connection,
                 scope.company_id,
-                write,
-                &author,
-                attachments.as_ref(),
-                &content_hash,
+                CanonicalMessageInsert {
+                    write,
+                    author: &author,
+                    attachments: attachments.as_ref(),
+                    content_hash: &content_hash,
+                    stamp,
+                },
             )
             .await?;
             insert_participants(connection, scope.company_id, canonical_id, &participants).await?;
@@ -632,6 +673,7 @@ pub(super) struct StoredPayload<'a> {
     pub participants: &'a [ResolvedParticipant],
     pub attachments: Option<&'a Value>,
     pub content_hash: &'a [u8],
+    pub stamp: MessageStampSource,
 }
 
 /// Store a message mail carried, and bind the conversation it belongs to.
@@ -659,10 +701,13 @@ async fn store_email_correlated(
                 let canonical_id = insert_canonical_message(
                     connection,
                     scope.company_id,
-                    payload.write,
-                    payload.author,
-                    payload.attachments,
-                    payload.content_hash,
+                    CanonicalMessageInsert {
+                        write: payload.write,
+                        author: payload.author,
+                        attachments: payload.attachments,
+                        content_hash: payload.content_hash,
+                        stamp: payload.stamp,
+                    },
                 )
                 .await?;
                 insert_participants(
@@ -717,27 +762,39 @@ pub(super) fn bounded_thread_key(value: &str) -> AppResult<ExternalThreadKey> {
         .map_err(|error| AppError::BadRequest(format!("Unusable provider thread key: {error}")))
 }
 
+pub(super) struct CanonicalMessageInsert<'a> {
+    pub write: &'a MessageWrite,
+    pub author: &'a ResolvedAuthor,
+    pub attachments: Option<&'a Value>,
+    pub content_hash: &'a [u8],
+    pub stamp: MessageStampSource,
+}
 pub(super) async fn insert_canonical_message(
     connection: &mut sqlx::PgConnection,
     company_id: Uuid,
-    write: &MessageWrite,
-    author: &ResolvedAuthor,
-    attachments: Option<&Value>,
-    content_hash: &[u8],
+    payload: CanonicalMessageInsert<'_>,
 ) -> AppResult<CanonicalMessageId> {
+    let CanonicalMessageInsert {
+        write,
+        author,
+        attachments,
+        content_hash,
+        stamp,
+    } = payload;
     if let Some(structured) = &write.structured {
         structured.verify(
             &write.clean_text_body,
             &crate::adapters::response_schema::JsonResponseValidator,
         )?;
     }
+    let level = stamp.level_on(connection, company_id).await?;
     let id = write.id;
     sqlx::query(
         r#"INSERT INTO messages (
                 id, company_id, author_principal_id, authored_identity_id, subject,
                 clean_text_body, attachments, direction, role, correlation_id, content_hash,
-                created_at, audience, structured_response
-           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)"#,
+                created_at, audience, structured_response, access_level
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15::smallint)"#,
     )
     .bind(id.as_uuid())
     .bind(company_id)
@@ -753,6 +810,7 @@ pub(super) async fn insert_canonical_message(
     .bind(write.created_at)
     .bind(write.audience.as_str())
     .bind(write.structured.as_ref().map(sqlx::types::Json))
+    .bind(level.as_i16())
     .execute(&mut *connection)
     .await
     .map_err(AppError::from)?;

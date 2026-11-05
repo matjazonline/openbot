@@ -1,0 +1,8 @@
+{
+  "accepted_installed_digest": "6c1c22b53202a22db87f5384f4290129c46e8bbcedc1607adfa261deac8578dc",
+  "archive": "plan/01-knowledge-access-levels/phases/p03/docs/logs/WB1-reviewed-r1-source.tar.gz",
+  "archive_sha256": "7fe8019edc6bb4999962921c4babc27eb1e69c8a87ca269141def7cb84694677",
+  "content": "all11 exact original R1 changed files, original relative names and verified bytes retained",
+  "r1_proof": "WB1-correction-r1-object-recovery.json",
+  "reason": "Retain old review source without indexing it as production Rust/Python definitions in future graft builds."
+}

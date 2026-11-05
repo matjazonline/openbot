@@ -50,7 +50,7 @@ impl<'de> Deserialize<'de> for HttpOrigin {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize)]
 pub struct HttpConnection {
     pub company: CompanyId,
     pub id: Uuid,
@@ -59,6 +59,7 @@ pub struct HttpConnection {
     pub bearer: bool,
     pub secret_set: bool,
     pub revision: i64,
+    pub access_level: crate::entities::access_level::AccessLevel,
 }
 
 pub struct HttpConnectionWrite {
@@ -112,6 +113,15 @@ impl HttpOperation {
 
 #[async_trait]
 pub trait HttpConnections: Send + Sync {
+    async fn list_http(
+        &self,
+        company: CompanyId,
+        actor: WorkflowActor,
+    ) -> AppResult<Vec<HttpConnection>>;
+    async fn set_http_level(
+        &self,
+        command: crate::use_cases::connection_level::ConnectionLevelCommand,
+    ) -> AppResult<HttpConnection>;
     async fn create_http(
         &self,
         company: CompanyId,

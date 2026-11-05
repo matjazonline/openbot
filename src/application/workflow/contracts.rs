@@ -277,6 +277,7 @@ pub struct RunRevision(pub u64);
 /// The scope is a lookup boundary, not proof of caller authorization.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RunHead {
+    pub knowledge: crate::entities::access_level::RunKnowledge,
     pub causality: RunCausality,
     pub workflow_id: WorkflowId,
     pub version_id: VersionId,

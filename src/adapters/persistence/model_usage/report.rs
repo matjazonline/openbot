@@ -55,6 +55,7 @@ async fn authorize(tx: &mut PgConnection, scope: UsageScope) -> AppResult<()> {
         WorkflowActor::authenticated(scope.actor)?,
     )
     .await
+    .map(|_| ())
 }
 
 #[async_trait]

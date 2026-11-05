@@ -374,6 +374,7 @@ async fn a_rolled_back_message_is_not_announced() {
     let inserted = insert_message_on(
         &mut tx,
         &streamed_message(fixture.thread.id, "rolled back", Utc::now()),
+        super::message::MessageStampSource::Public,
     )
     .await
     .unwrap();

@@ -1,0 +1,32 @@
+{
+  "recovered": {
+    "src/adapters/persistence/workflow/history_reader_tests.rs": {
+      "sha256": "4ac65027e69382fe50a078dcc1cb77d63950a6393b44b269a659f9bbcf97552b",
+      "git_blob": "8c14e6317144bb113614acbb2cdd3372c12623db"
+    },
+    "src/adapters/persistence/workflow/history_reader.rs": {
+      "sha256": "1be41a9f1b2344b2d5cef44b2efee5f9865282cebebe775958fceed49d8b9fba",
+      "git_blob": "dc14271ec77dadc593212ced0141001eee159a4b"
+    },
+    "src/application/app_error.rs": {
+      "sha256": "7c63ec5eee427591f5c1e58a57444293e4ae1f574c07f3efad3eec19d762b614",
+      "git_blob": "cec26c3fcc644f0435ad8d4f759765ca112cdcb3"
+    },
+    "migrations/20260817000000_init_schema.sql": {
+      "sha256": "197148c409c9c2c2f6e512ccf7e18b7ad5852f8def39d0cc7d944d2e5e0c4819",
+      "git_blob": "53779f4ae29f802e7ba7b07481d02db816d0f5fc"
+    },
+    "src/adapters/persistence/workflow/knowledge_message_tests.rs": {
+      "sha256": "af01d6226d5146ad1da54bf225f32e4111cd58499e1d4c284ea013b75b0dfa78",
+      "git_blob": "c57e2958d37be9d287aab62ae1582ba481bb5101"
+    }
+  },
+  "missing": [
+    "src/adapters/persistence/workflow/harness_token_scheduling_tests.rs",
+    "src/adapters/persistence/workflow/recovery.rs",
+    "src/domain/workflow/mod.rs",
+    "src/domain/workflow/outcome.rs",
+    "src/domain/workflow/recovery.rs",
+    "src/domain/workflow/recovery_tests.rs"
+  ]
+}

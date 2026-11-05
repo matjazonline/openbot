@@ -177,6 +177,7 @@ pub(super) enum CallResult {
 
 #[derive(sqlx::FromRow)]
 struct ChildOutcome {
+    content_level: i16,
     version_id: Uuid,
     terminal_state: Option<String>,
     terminal_execution_id: Option<Uuid>,
@@ -190,7 +191,7 @@ pub(super) async fn call_result(
     child: Uuid,
 ) -> AppResult<CallResult> {
     let outcome = sqlx::query_as::<_, ChildOutcome>(
-        "SELECT child.version_id, event.terminal_state, event.terminal_execution_id \
+        "SELECT child.version_id, child.content_level::smallint AS content_level, event.terminal_state, event.terminal_execution_id \
          FROM workflow_runs AS child \
          LEFT JOIN workflow_run_events AS event ON event.company_id = child.company_id \
            AND event.run_id = child.id AND event.sequence = child.terminal_wakeup_sequence \
@@ -202,6 +203,12 @@ pub(super) async fn call_result(
     .bind(scope.run.as_uuid())
     .fetch_one(&mut *db)
     .await?;
+    if outcome.terminal_state.is_none() {
+        return Err(invalid());
+    }
+    let level = crate::entities::access_level::AccessLevel::try_from(outcome.content_level)
+        .map_err(|_| invalid())?;
+    super::knowledge::raise_content_level_on(db, scope.company, scope.run, level).await?;
     let message = |state: &str| format!("Workflow tool child run {child} {state}");
     let result = match outcome.terminal_state.as_deref() {
         Some("succeeded") => {

@@ -95,7 +95,8 @@ impl RecoveryPolicy {
         if snapshot.work_budget == RetryEligibility::Exhausted {
             return RecoveryDecision::FailRun(RecoveryLimit::WorkBudget);
         }
-        if failure.class() == FailureClass::Terminal
+        if failure.fails_run()
+            || failure.class() == FailureClass::Terminal
             || snapshot.attempts.consumed == snapshot.attempts.limit
         {
             return RecoveryDecision::FinalError;

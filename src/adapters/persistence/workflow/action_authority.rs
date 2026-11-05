@@ -45,7 +45,7 @@ pub(super) async fn prelock_on(
     let Some(actor) = actor else { return Ok(None) };
     let actor = WorkflowActor::authenticated(actor)?;
     match authority::authorize_company(tx, scope.company, actor).await {
-        Ok(()) => Ok(Some(actor)),
+        Ok(_) => Ok(Some(actor)),
         Err(AppError::NotFound(_)) => Ok(None),
         Err(error) => Err(error),
     }

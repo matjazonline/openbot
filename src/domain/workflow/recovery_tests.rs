@@ -175,3 +175,24 @@ fn workflow_recovery_configuration_and_attempt_boundaries() {
         );
     }
 }
+
+#[test]
+fn knowledge_run_level_refusal_is_final_but_unknown_effect_still_reconciles() {
+    let policy = RecoveryPolicy::default();
+    for class in [FailureClass::Terminal, FailureClass::Retryable] {
+        let failed = StepFailure::new(
+            class,
+            FailureCode::parse(crate::domain::workflow::KNOWLEDGE_AUDIENCE_BELOW_CONTENT).unwrap(),
+            None,
+        )
+        .unwrap();
+        assert_eq!(
+            policy.decide(&failed, RetrySafety::SafeToRetry, snapshot(1, 3)),
+            RecoveryDecision::FinalError
+        );
+        assert_eq!(
+            policy.decide(&failed, RetrySafety::EffectOutcomeUnknown, snapshot(1, 3)),
+            RecoveryDecision::Reconcile
+        );
+    }
+}

@@ -1,0 +1,8 @@
+{
+  "source_before_after_exact": true,
+  "request_identity_match": true,
+  "installed_digest": "7748b9ecfec9126d48371a44bb1aaf8ccabcce8c0f247625cf65c9a249b2d696",
+  "decision_sha256": "371e79a206f5c4678c977cdf6c521b8ba6c553426aa2ce8a06d2706c82a6fbca",
+  "authority_revision": 6,
+  "authority_sha256": "deb32cda2ab771fd5ddab7d2662bfc08c1dbbad5937286963cf9533ee162969c"
+}

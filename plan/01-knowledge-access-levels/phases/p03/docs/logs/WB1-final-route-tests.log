@@ -1,0 +1,16 @@
+    Blocking waiting for file lock on artifact directory
+   Compiling open_bots v0.1.0 (/Users/mac02/dev/openbot-recovery/.worktrees/knowledge-p03)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2m 23s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-7b3508cbfb62bd10)
+
+running 7 tests
+test adapters::http::routes::connection_levels::tests::knowledge_run_level_connection_payloads_are_strict_bounded_and_forms_keep_progress ... ok
+test adapters::http::routes::connection_levels::tests::knowledge_run_level_connection_form_parses_integer_strings_and_rejects_injected_fields ... ok
+test adapters::http::routes::connection_levels::tests::knowledge_run_level_connection_commands_enforce_caps_and_preserve_other_settings ... ok
+test adapters::http::routes::connection_levels::tests::knowledge_run_level_http_new_read_routes_hide_valid_foreign_company_and_resource_ids ... ok
+test adapters::http::routes::connection_levels::tests::knowledge_run_level_race_connection_revision_writers_have_one_winner ... ok
+test adapters::http::routes::connection_levels::tests::knowledge_run_level_all_four_connection_level_write_routes_scope_valid_foreign_resources ... ok
+test adapters::http::routes::connection_levels::tests::knowledge_run_level_race_live_admin_demotion_precedes_connection_level_write ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 2769 filtered out; finished in 1.84s
+

@@ -1,0 +1,5 @@
+{
+  "pid": 7121,
+  "state": "resumed",
+  "reason": "Allow child compilation, queue native fixture execution until r2 has fully completed"
+}

@@ -496,3 +496,6 @@ mod recovery_tests;
 
 #[path = "action_approval_mcp_tests.rs"]
 mod approval_tests;
+
+#[path = "knowledge_mcp_tests.rs"]
+mod knowledge_mcp_tests;

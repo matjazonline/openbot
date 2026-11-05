@@ -4,6 +4,16 @@ use thiserror::Error;
 /// out a successful one. See `services::dashboard_snapshot`.
 #[derive(Error, Debug, Clone)]
 pub enum AppError {
+    #[error("The triggering message exceeds this audience's access level")]
+    KnowledgeTrigger {
+        content: crate::entities::access_level::AccessLevel,
+        ceiling: crate::entities::access_level::AccessLevel,
+    },
+    #[error("The destination cannot receive this run's content")]
+    KnowledgeRelease {
+        content: crate::entities::access_level::AccessLevel,
+        destination: crate::entities::access_level::AccessLevel,
+    },
     #[error("Execution stopped: {0}")]
     Execution(ExecutionFailure),
     #[error("Database error: {0}")]
@@ -132,5 +142,18 @@ impl WorkflowGuardViolation {
 impl std::fmt::Display for WorkflowGuardViolation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}: {}", self.guard(), self.message)
+    }
+}
+
+pub const KNOWLEDGE_TRIGGER_ABOVE_CEILING: &str = "knowledge.trigger_above_ceiling";
+pub use crate::domain::workflow::KNOWLEDGE_AUDIENCE_BELOW_CONTENT;
+
+impl AppError {
+    pub fn knowledge_code(&self) -> Option<&'static str> {
+        match self {
+            Self::KnowledgeTrigger { .. } => Some(KNOWLEDGE_TRIGGER_ABOVE_CEILING),
+            Self::KnowledgeRelease { .. } => Some(KNOWLEDGE_AUDIENCE_BELOW_CONTENT),
+            _ => None,
+        }
     }
 }

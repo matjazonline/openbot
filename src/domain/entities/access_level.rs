@@ -149,3 +149,44 @@ pub(crate) fn fixture_level(membership: CompanyMembership) -> AccessLevel {
         AccessLevel::PUBLIC
     }
 }
+
+/// The least cleared reader determines the clearance of a shared audience.
+pub fn audience_level(readers: impl IntoIterator<Item = AccessLevel>) -> AccessLevel {
+    AccessLevel::lowest(readers)
+}
+
+/// A release never lowers the classification of the content it carries.
+pub const fn may_release(content: AccessLevel, destination: AccessLevel) -> bool {
+    content.as_i16() <= destination.as_i16()
+}
+
+/// Immutable admission ceiling and the monotone classification of data already consumed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub struct RunKnowledge {
+    knowledge_ceiling: AccessLevel,
+    content_level: AccessLevel,
+}
+impl RunKnowledge {
+    pub fn new(
+        knowledge_ceiling: AccessLevel,
+        content_level: AccessLevel,
+    ) -> Result<Self, &'static str> {
+        if content_level > knowledge_ceiling {
+            return Err("Run content exceeds its knowledge ceiling");
+        }
+        Ok(Self {
+            knowledge_ceiling,
+            content_level,
+        })
+    }
+    pub const fn ceiling(self) -> AccessLevel {
+        self.knowledge_ceiling
+    }
+    pub const fn content(self) -> AccessLevel {
+        self.content_level
+    }
+}
+
+#[cfg(test)]
+#[path = "knowledge_level_tests.rs"]
+mod knowledge_tests;

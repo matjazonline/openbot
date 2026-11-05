@@ -105,7 +105,7 @@ pub fn revision(current: &CompanyMcpConnection, expected: i64) -> AppResult<()> 
 }
 pub fn projection(c: &CompanyMcpConnection) -> serde_json::Value {
     serde_json::json!({"id":c.id,"slug":c.slug,"endpoint_url":c.endpoint,"transport":"streamable_http","enabled":c.enabled,
-        "auth":{"type":c.auth,"secret_set":c.secret_set},"revision":c.revision,
+        "auth":{"type":c.auth,"secret_set":c.secret_set},"revision":c.revision,"access_level":c.access_level,
         "tool_grants":c.tool_grants.iter().map(|name| Grant{name:name.clone()}).collect::<Vec<_>>(),
         "discovered_tools":c.discovered_tools.iter().map(|tool| serde_json::json!({"name":tool.name,"description":tool.description,"input_schema":tool.input_schema,"schema_fingerprint":schema_fingerprint(&tool.input_schema)})).collect::<Vec<_>>()})
 }

@@ -33,7 +33,7 @@ mod inbound_tests;
 #[path = "view_tests.rs"]
 mod view_tests;
 
-pub(crate) use message::{associate_message_on, insert_message_on};
+pub(crate) use message::{MessageStampSource, associate_message_on, insert_message_on};
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -547,7 +547,8 @@ impl ThreadPersistence for PostgresPersistence {
 
     async fn create_message(&self, write: &MessageWrite) -> AppResult<Message> {
         let mut tx = self.pool.begin().await.map_err(AppError::from)?;
-        let inserted = insert_message_on(&mut tx, write).await?;
+        let inserted =
+            insert_message_on(&mut tx, write, message::MessageStampSource::Public).await?;
         tx.commit().await.map_err(AppError::from)?;
         load_message(&self.pool, inserted.association_id).await
     }

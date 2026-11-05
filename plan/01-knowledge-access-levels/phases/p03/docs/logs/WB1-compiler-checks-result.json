@@ -1,0 +1,68 @@
+[
+  {
+    "name": "fmt",
+    "command": [
+      "cargo",
+      "fmt",
+      "--",
+      "--check"
+    ],
+    "sqlx_offline": "true",
+    "exit_code": 0,
+    "elapsed_seconds": 2.46
+  },
+  {
+    "name": "diff",
+    "command": [
+      "git",
+      "diff",
+      "--check"
+    ],
+    "sqlx_offline": "true",
+    "exit_code": 0,
+    "elapsed_seconds": 0.08
+  },
+  {
+    "name": "sqlx-check",
+    "command": [
+      "cargo",
+      "sqlx",
+      "prepare",
+      "--check",
+      "--",
+      "--all-targets"
+    ],
+    "sqlx_offline": "false",
+    "exit_code": 0,
+    "elapsed_seconds": 65.92
+  },
+  {
+    "name": "offline",
+    "command": [
+      "cargo",
+      "check",
+      "--locked",
+      "--offline",
+      "--all-targets"
+    ],
+    "sqlx_offline": "true",
+    "exit_code": 0,
+    "elapsed_seconds": 0.84
+  },
+  {
+    "name": "clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "--offline",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "sqlx_offline": "true",
+    "exit_code": 0,
+    "elapsed_seconds": 69.33
+  }
+]

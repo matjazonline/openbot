@@ -156,7 +156,7 @@ async fn cloned_intent(
         "{:x}",
         Sha256::digest(cloned.subject.invocation.as_uuid().as_bytes())
     );
-    sqlx::query("INSERT INTO workflow_action_intents (company_id,run_id,execution_id,id,operation_key,operation_digest,argument_digest,idempotency_key,operation,policy_decision) SELECT company_id,run_id,execution_id,$2,operation_key,$3,argument_digest,'workflow-action:v1:' || $3,$4,policy_decision FROM workflow_action_intents WHERE id=$1")
+    sqlx::query("INSERT INTO workflow_action_intents (company_id,run_id,execution_id,id,operation_key,operation_digest,argument_digest,idempotency_key,operation,policy_decision,content_level_at_freeze,destination_level_at_freeze) SELECT company_id,run_id,execution_id,$2,operation_key,$3,argument_digest,'workflow-action:v1:' || $3,$4,policy_decision,content_level_at_freeze,destination_level_at_freeze FROM workflow_action_intents WHERE id=$1")
         .bind(request.subject.invocation.as_uuid()).bind(cloned.subject.invocation.as_uuid())
         .bind(digest).bind(operation).execute(&mut **tx).await.unwrap();
     cloned

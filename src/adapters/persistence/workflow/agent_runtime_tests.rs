@@ -771,3 +771,53 @@ mod recovery;
 
 #[path = "agent_model_step_tests.rs"]
 mod model_steps;
+
+#[tokio::test]
+async fn knowledge_run_level_model_continues_after_refused_http_tool_without_egress() {
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let origin = format!("http://{}", listener.local_addr().unwrap());
+    let setup = Box::pin(agent_setup(&origin)).await;
+    let p = &setup.fixture.persistence;
+    let scope = setup.claim.fence.scope;
+    let mut tx = p.pool().begin().await.unwrap();
+    crate::adapters::persistence::workflow::knowledge::raise_content_level_on(
+        &mut tx,
+        scope.company,
+        scope.run,
+        crate::entities::access_level::AccessLevel::L5,
+    )
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    let mut llm=scripted_llm(vec![LlmTurn::tool_call("registered__request",json!({"method":"POST","path":"/messages","body":{"message":"withheld private content"}})),LlmTurn::text("\"continued safely\"")]).await;
+    register_scripted_agent_base_url(setup.agent, &llm.base_url);
+    let result = Box::pin(
+        agent_runtime(&setup).execute(&WorkflowStepKind("agent.run".into()), &setup.claim),
+    )
+    .await;
+    assert_eq!(
+        result.completed_result().unwrap(),
+        json!("continued safely")
+    );
+    let requests = llm.observed();
+    assert_eq!(requests.len(), 2);
+    assert!(
+        requests[1]["messages"]
+            .to_string()
+            .contains(crate::app_error::KNOWLEDGE_AUDIENCE_BELOW_CONTENT)
+    );
+    assert_eq!(llm.finish().await.unwrap(), 2);
+    assert!(
+        tokio::time::timeout(Duration::from_millis(40), listener.accept())
+            .await
+            .is_err()
+    );
+    assert_eq!(
+        action_counts(&setup.fixture).await,
+        ActionCounts {
+            dispatches: 0,
+            entries: 0,
+            receipts: 0
+        }
+    );
+}

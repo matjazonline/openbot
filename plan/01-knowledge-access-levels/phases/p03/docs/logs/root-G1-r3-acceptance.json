@@ -1,0 +1,7 @@
+{
+  "accepted_decision_sha256": "4e447c7e1cf163ab4d5f0e5e7382c37b9012d49ed35ecb0fe184334e3682264e",
+  "note": "KNOW-P03-G1-R3-N1",
+  "source_tree": "4c9f2035860c0edb443a5088c2de2b3961e97703033adde491c678628864a765",
+  "authority_sha256": "37fd5389cc7621d96ecf9b0d4f9cc86e337ca5d3c4069150fc5083f8144002c6",
+  "findings_status": "F1/F2 OPEN; design accepted only"
+}

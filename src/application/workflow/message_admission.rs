@@ -457,6 +457,17 @@ pub(super) fn classify(result: AppResult<AdmissionResult>) -> Classified {
         Err(AppError::BadRequest(_)) => {
             Classified::Settled(BindingOutcome::Refused("input_rejected"))
         }
+        Err(AppError::KnowledgeTrigger { content, ceiling }) => {
+            tracing::warn!(
+                content_level = content.as_i16(),
+                knowledge_ceiling = ceiling.as_i16(),
+                code = crate::app_error::KNOWLEDGE_TRIGGER_ABOVE_CEILING,
+                "Workflow message admission refused"
+            );
+            Classified::Settled(BindingOutcome::Refused(
+                crate::app_error::KNOWLEDGE_TRIGGER_ABOVE_CEILING,
+            ))
+        }
         Err(_) => Classified::Transient,
     }
 }
@@ -587,6 +598,24 @@ mod tests {
         assert!(matches!(
             classify(Err(AppError::Database("down".into()))),
             Classified::Transient
+        ));
+    }
+}
+
+#[cfg(test)]
+mod knowledge_tests {
+    use super::*;
+    #[test]
+    fn knowledge_run_level_stamped_trigger_refusal_settles_instead_of_retrying() {
+        use crate::entities::access_level::AccessLevel;
+        assert!(matches!(
+            classify(Err(AppError::KnowledgeTrigger {
+                content: AccessLevel::L5,
+                ceiling: AccessLevel::PUBLIC
+            })),
+            Classified::Settled(BindingOutcome::Refused(
+                crate::app_error::KNOWLEDGE_TRIGGER_ABOVE_CEILING
+            ))
         ));
     }
 }

@@ -3,6 +3,7 @@ use super::*;
 fn mcp_detail_escapes_drafts_and_keeps_tokens_write_only() {
     let company = Uuid::new_v4();
     let c = CompanyMcpConnection {
+        access_level: crate::entities::access_level::AccessLevel::PUBLIC,
         id: Uuid::new_v4(),
         company_id: company,
         slug: "crm".into(),

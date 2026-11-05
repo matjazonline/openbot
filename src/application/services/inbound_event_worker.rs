@@ -657,7 +657,9 @@ fn validate_commit_request(
 
 fn classify_commit_error(error: &AppError) -> (InboundEventErrorClass, bool) {
     match error {
-        AppError::Execution(_)
+        AppError::KnowledgeTrigger { .. }
+        | AppError::KnowledgeRelease { .. }
+        | AppError::Execution(_)
         | AppError::BadRequest(_)
         | AppError::NotFound(_)
         | AppError::Forbidden(_)

@@ -1,0 +1,32 @@
+{
+  "command": [
+    "target/debug/deps/open_bots-7b3508cbfb62bd10",
+    "knowledge_run_level_",
+    "workflow_context_history_",
+    "workflow_failure_",
+    "workflow_recovery_",
+    "workflow_io_",
+    "workflow_completion_",
+    "workflow_harness_token",
+    "run_retention_complete_tree_jobs_usage_and_idempotent_retry",
+    "run_retention_rollback_after_runs_before_jobs_preserves_every_owner",
+    "run_retention_competing_collectors_delete_exactly_once",
+    "domain::workflow::outcome::",
+    "domain::workflow::recovery::"
+  ],
+  "filters": {
+    "knowledge_run_level_": 49,
+    "workflow_context_history_": 3,
+    "workflow_failure_": 8,
+    "workflow_recovery_": 5,
+    "workflow_io_": 19,
+    "workflow_completion_": 14,
+    "workflow_harness_token": 22,
+    "run_retention_complete_tree_jobs_usage_and_idempotent_retry": 1,
+    "run_retention_rollback_after_runs_before_jobs_preserves_every_owner": 1,
+    "run_retention_competing_collectors_delete_exactly_once": 1,
+    "domain::workflow::outcome::": 8,
+    "domain::workflow::recovery::": 6
+  },
+  "selected_unique": 130
+}
