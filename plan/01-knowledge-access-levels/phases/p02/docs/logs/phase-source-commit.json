@@ -1,0 +1,13 @@
+{
+  "source_commit": "6298ce36844569114bacffa10024c9055627cce3",
+  "accepted_installed_digest": "0e336135a0355baa89e20ef75a53a2afe379519e45062f3c65bbb3b205a4c0f2",
+  "accepted_tree_sha256": "5b976a69098aeeb1c80c81113d36257dd49a258f1b04aa36c48e4493b56b841e",
+  "committed_tree_sha256": "5b976a69098aeeb1c80c81113d36257dd49a258f1b04aa36c48e4493b56b841e",
+  "source_and_diff_unchanged": true,
+  "source_files": 75,
+  "total_source_and_record_files": 263,
+  "license_committed_bytes_match": true,
+  "phase_status": "accepted and committed; local main integration next",
+  "whole_plan_complete": false,
+  "remote_push": "not authorized until remaining05/04/06 andfullfinalgatecomplete"
+}
