@@ -1,0 +1,14 @@
+{
+  "source_commit": "cd80cc47863474ca0c73c8a0e1e726143ddfe967",
+  "evidence_commit": "340310bf7e742dfc037cb7d240d56396c823760c",
+  "raw_evidence_commit": "0cb3b2033278c404b08893a781cdc62708580264",
+  "primary_main_integrated": "0cb3b2033278c404b08893a781cdc62708580264",
+  "accepted_tree_sha256": "819b266f1216f2a7832264f8b8dbc80902e04c9a294aa3b1d620dace218e91f3",
+  "authority_revision": 20,
+  "authority_sha256": "93638781b3279340f9ffd5975c230c012467e63d45f75d9e7b217f4b5cf7441c",
+  "producer_notice": "C006/r1",
+  "phase_accepted": true,
+  "integrated": true,
+  "pushed": false,
+  "whole_plan_complete": false
+}
