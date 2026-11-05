@@ -1,0 +1,15 @@
+{
+  "source_commit": "0d5197191c4cafc584dffc378bde90a88acda7b3",
+  "evidence_commit": "6626297e011d8c31c42d5e60343553a58474db6a",
+  "primary_main_integrated": "6626297e011d8c31c42d5e60343553a58474db6a",
+  "whole_knowledge_accepted": true,
+  "all_six_phases_accepted": true,
+  "authority_revision": 23,
+  "authority_sha256": "f481c89ffbcc33c90451f2ac46d73d933da1994a42414d5ffd8847aa12dc7cb9",
+  "targeted_only_user_policy": true,
+  "debts_closed": [
+    "Q001/r1",
+    "Q002/r1"
+  ],
+  "pushed": false
+}
