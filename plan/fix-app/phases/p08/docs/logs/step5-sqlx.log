@@ -1,0 +1,54 @@
+    Checking open_bots v0.1.0 (/Users/mac02/dev/openbot-recovery/.worktrees/fix-app-p08)
+error[E0061]: this function takes 2 arguments but 1 argument was supplied
+  --> src/adapters/persistence/workflow/checkpoint_models.rs:27:19
+   |
+27 |     let current = decode(saved.checkpoint.clone())?;
+   |                   ^^^^^^ ------------------------ argument #1 of type `uuid::Uuid` is missing
+   |
+note: function defined here
+  --> src/adapters/persistence/harness_checkpoint.rs:7:15
+   |
+ 7 | pub(super) fn decode(run_id: uuid::Uuid, value: serde_json::Value) -> AppResult<RunCheckpoint> {
+   |               ^^^^^^ ------------------
+help: provide the argument
+   |
+27 |     let current = decode(/* uuid::Uuid */, saved.checkpoint.clone())?;
+   |                          +++++++++++++++++
+
+error[E0061]: this function takes 2 arguments but 1 argument was supplied
+   --> src/adapters/persistence/workflow/checkpoint_models.rs:158:19
+    |
+158 |     let current = decode(saved.checkpoint.clone())?;
+    |                   ^^^^^^ ------------------------ argument #1 of type `uuid::Uuid` is missing
+    |
+note: function defined here
+   --> src/adapters/persistence/harness_checkpoint.rs:7:15
+    |
+  7 | pub(super) fn decode(run_id: uuid::Uuid, value: serde_json::Value) -> AppResult<RunCheckpoint> {
+    |               ^^^^^^ ------------------
+help: provide the argument
+    |
+158 |     let current = decode(/* uuid::Uuid */, saved.checkpoint.clone())?;
+    |                          +++++++++++++++++
+
+error[E0061]: this function takes 2 arguments but 1 argument was supplied
+  --> src/adapters/persistence/workflow/checkpoint_updates.rs:19:19
+   |
+19 |     let current = decode(saved.checkpoint.clone())?;
+   |                   ^^^^^^ ------------------------ argument #1 of type `uuid::Uuid` is missing
+   |
+note: function defined here
+  --> src/adapters/persistence/harness_checkpoint.rs:7:15
+   |
+ 7 | pub(super) fn decode(run_id: uuid::Uuid, value: serde_json::Value) -> AppResult<RunCheckpoint> {
+   |               ^^^^^^ ------------------
+help: provide the argument
+   |
+19 |     let current = decode(/* uuid::Uuid */, saved.checkpoint.clone())?;
+   |                          +++++++++++++++++
+
+For more information about this error, try `rustc --explain E0061`.
+error: could not compile `open_bots` (lib) due to 3 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `open_bots` (lib test) due to 3 previous errors
+error: `cargo check` failed with status: exit status: 101

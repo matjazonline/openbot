@@ -298,3 +298,63 @@ async fn workflow_harness_owner_store_deferred_failure_rolls_back_open_and_debit
     );
     assert_eq!(reloaded, original);
 }
+
+#[tokio::test]
+async fn jsonb_row_context_checkpoint_reports_persisted_id_and_preserves_neighbor() {
+    use crate::application::workflow::checkpoints::WorkflowCheckpointStore;
+    let NativeFixture {
+        fixture: f,
+        fence,
+        mut row,
+    } = native_row().await;
+    let policy = LeasePolicy::new(Duration::from_secs(60)).unwrap();
+    let mut spec = specification(&row);
+    let command = f
+        .prepare(f.request("valid-json-neighbor", f.manual()))
+        .await;
+    f.persistence().admit(&command).await.unwrap();
+    let job = sqlx::query_scalar("SELECT id FROM background_tasks WHERE workflow_execution_id=$1")
+        .bind(command.first_execution_id().as_uuid())
+        .fetch_one(f.persistence().pool())
+        .await
+        .unwrap();
+    let scope = ActivationRequest {
+        company: command.company_id(),
+        run: command.proposed_run_id(),
+        execution: command.first_execution_id(),
+        job: WorkflowJobId(job),
+    };
+    let neighbor = f
+        .persistence()
+        .settled()
+        .claim_io(scope, worker(), policy)
+        .await
+        .unwrap()
+        .unwrap();
+    spec.identity.task_id = job;
+    let good = checkpoint(
+        f.persistence()
+            .open_workflow_checkpoint(neighbor.fence, &spec, policy)
+            .await
+            .unwrap(),
+    );
+    row["checkpoint"]["messages"][0] = json!(42);
+    let mut tx = f.persistence().pool().begin().await.unwrap();
+    insert(&mut tx, &row).await.unwrap();
+    tx.commit().await.unwrap();
+    let error = f
+        .persistence()
+        .load_workflow_checkpoint(fence, policy)
+        .await
+        .unwrap_err();
+    assert!(matches!(error, AppError::Internal(_)));
+    assert!(error.to_string().contains(row["id"].as_str().unwrap()));
+    assert!(error.to_string().contains("invalid type"));
+    let loaded = checkpoint(
+        f.persistence()
+            .load_workflow_checkpoint(neighbor.fence, policy)
+            .await
+            .unwrap(),
+    );
+    assert_eq!(loaded, good);
+}

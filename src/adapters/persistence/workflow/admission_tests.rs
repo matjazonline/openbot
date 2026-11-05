@@ -135,7 +135,7 @@ impl AdmissionFixture {
             "SELECT jsonb_build_object( \
              'runs',(SELECT count(*) FROM workflow_runs), \
              'executions',(SELECT count(*) FROM workflow_executions), \
-             'jobs',(SELECT count(*) FROM background_tasks WHERE queue_kind = 'workflow'), \
+             'jobs',(SELECT count(*) FROM background_tasks ), \
              'admissions',(SELECT count(*) FROM workflow_admissions), \
              'commands',(SELECT count(*) FROM workflow_admission_commands), \
              'events',(SELECT count(*) FROM workflow_run_events), \
@@ -262,16 +262,14 @@ async fn workflow_admit_sql_exact_snapshot_job_and_replay_preserves_deadline() {
         .await
         .unwrap();
     assert_eq!(bytes, store_bundle(command.binding().bundle()).unwrap());
-    let job: Value =
-        sqlx::query_scalar("SELECT payload FROM background_tasks WHERE workflow_execution_id=$1")
-            .bind(command.first_execution_id().as_uuid())
-            .fetch_one(p.pool())
-            .await
-            .unwrap();
-    assert_eq!(
-        job,
-        json!({"version":1,"execution_id":command.first_execution_id().as_uuid()})
-    );
+    let job: Uuid = sqlx::query_scalar(
+        "SELECT workflow_execution_id FROM background_tasks WHERE workflow_execution_id=$1",
+    )
+    .bind(command.first_execution_id().as_uuid())
+    .fetch_one(p.pool())
+    .await
+    .unwrap();
+    assert_eq!(job, command.first_execution_id().as_uuid());
     let replay = f.prepare(f.request("original", trigger)).await;
     assert_ne!(replay.proposed_run_id(), command.proposed_run_id());
     assert_eq!(

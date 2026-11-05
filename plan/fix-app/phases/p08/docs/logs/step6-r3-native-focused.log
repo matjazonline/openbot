@@ -1,0 +1,26 @@
+
+running 21 tests
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::workflow_batch_output_schema_failure_preserves_progress_and_settles ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::workflow_batch_real_competitors_make_one_progression ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::workflow_batch_elapsed_budget_yields_and_deadline_rolls_back ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::recovery_tests::workflow_batch_first_successor_link_enforces_run_and_company_scope ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::workflow_batch_invalid_scope_lease_due_state_and_bounds_fail_closed ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::recovery_tests::workflow_batch_rule_replay_ignores_new_available_predecessor ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::recovery_tests::workflow_batch_hard_transaction_timeout_releases_run_wait ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::workflow_batch_nonpure_boundary_is_unactivated_pending ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::recovery_tests::workflow_batch_deferred_deadline_and_lost_ack_are_atomic ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::workflow_batch_records_map_rule_end_and_null_output ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::workflow_batch_run_lock_contention_cannot_cross_deadline_or_timeout ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::workflow_batch_sql_rejects_mutated_choice_route_successor_and_duplicate_job ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::workflow_batch_yield_replay_and_resume_once ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::workflow_batch_frozen_rule_choice_and_default_survive_replay ... ok
+test adapters::persistence::workflow::tests::admission_tests::history_reader_tests::workflow_context_history_is_empty_without_a_thread_and_never_crosses_runs ... ok
+test adapters::persistence::workflow::tests::admission_tests::history_reader_tests::workflow_context_history_returns_the_admission_snapshot_with_boundaries ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::workflow_control_competing_retry_preserves_identity_facts_and_remaining_allowance ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::workflow_agent_capture_refuses_unrunnable_agents ... ok
+test adapters::persistence::workflow::tests::admission_tests::history_reader_tests::workflow_context_history_is_bounded_by_tokens_and_the_result_cap ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::workflow_batch_failures_rollback_at_each_write_boundary ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::builder_stops_a_listing_loop_once_its_result_repeats ... ok
+
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 2692 filtered out; finished in 9.44s
+

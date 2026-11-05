@@ -87,8 +87,9 @@ This is the largest diff of the plan for the least behaviour, so take it last.
 
 - **`model_usage_calls` run and execution ids** (`:10861`). Five are nullable, but a CHECK requires
   all five, and Rust reads them as `Option` (`report.rs:39`). Make them `NOT NULL`, drop the CHECK,
-  and drop the redundant `run_id IS NOT NULL` from its index and guard trigger. If 06 decided to
-  keep usage rows after their runs are deleted, skip this item and record why.
+  and drop the redundant `run_id IS NOT NULL` from its index and guard trigger. Phase 06 retains
+  usage in separate immutable `model_usage_history`, without run/execution/root/job references;
+  this tightening applies to live calls and must not be skipped (coordination C010).
 - **`task_harness_runs` workflow columns** (`:4181`). Same pattern; same change.
 - **`users.password_hash`.** It holds a sentinel such as `google-only:<id>` for OAuth-only users
   (`src/adapters/persistence/user.rs:415`), repeating what `user_login_methods` already records.

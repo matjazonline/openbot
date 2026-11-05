@@ -533,10 +533,13 @@ async fn workflow_agent_capture_refuses_unrunnable_agents() {
         }
     };
     for (key, change) in [
-        ("no-model", "UPDATE agents SET model=NULL WHERE id=$1"),
+        (
+            "no-model",
+            "UPDATE agents SET provider=NULL,model=NULL WHERE id=$1",
+        ),
         (
             "unregistered",
-            "UPDATE agents SET model='gpt-4o-mini', workflow_tools='{missing.tool}' WHERE id=$1",
+            "UPDATE agents SET provider='openai',model='gpt-4o-mini', workflow_tools='{missing.tool}' WHERE id=$1",
         ),
     ] {
         sqlx::query(change)

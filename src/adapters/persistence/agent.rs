@@ -633,3 +633,7 @@ mod tests {
 #[cfg(test)]
 #[path = "agent_retire_tests.rs"]
 mod retire_tests;
+
+#[cfg(test)]
+#[path = "agent_constraint_tests.rs"]
+mod constraint_tests;

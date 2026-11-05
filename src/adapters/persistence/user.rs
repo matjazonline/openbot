@@ -28,7 +28,7 @@ pub struct UserDb {
     pub username: String,
     pub email: String,
     pub email_verified_at: Option<DateTime<Utc>>,
-    pub password_hash: String,
+    pub password_hash: Option<String>,
     pub avatar_url: Option<String>,
     pub created_at: DateTime<Utc>,
 }
@@ -423,18 +423,15 @@ impl UserPersistence for PostgresPersistence {
         let id = Uuid::new_v4();
         let base = external_username(identity.display_name, identity.email.as_str());
         let username = format!("{}-{}", base, &id.simple().to_string()[..8]);
-        // Not an Argon2 hash, and password authentication checks the method table before parsing.
-        let password_hash = format!("{}-only:{id}", identity.provider.as_str());
         let mut transaction = self.pool.begin().await.map_err(AppError::from)?;
         let user = sqlx::query_as::<_, UserDb>(
             r#"INSERT INTO users (id, username, email, password_hash, email_verified_at)
-               VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
+               VALUES ($1, $2, $3, NULL, CURRENT_TIMESTAMP)
                RETURNING id, username, email, password_hash, avatar_url, email_verified_at, auth_revision, created_at"#,
         )
         .bind(id)
         .bind(username)
         .bind(identity.email.as_str())
-        .bind(password_hash)
         .fetch_one(&mut *transaction)
         .await
         .map_err(external_account_conflict)?;
@@ -1438,7 +1435,7 @@ mod tests {
                 .expect("a lookup")
                 .expect("the account")
                 .password_hash,
-            "hash",
+            Some("hash".to_owned()),
             "neither refusal may write the new password"
         );
     }

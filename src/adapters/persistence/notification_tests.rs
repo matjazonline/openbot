@@ -265,6 +265,13 @@ async fn notification_stale_last_attempt_is_dead_lettered() {
 
     let (status, attempts, _) = event_state(&persistence, events[0]).await;
     assert_eq!((status.as_str(), attempts), ("dead_letter", 10));
+    let class: String =
+        sqlx::query_scalar("SELECT last_error_class FROM notification_events WHERE id=$1")
+            .bind(events[0])
+            .fetch_one(persistence.pool())
+            .await
+            .unwrap();
+    assert_eq!(class, "stale_projection");
     assert!(claim_batch(&persistence).await.is_empty());
 }
 
@@ -335,4 +342,44 @@ async fn notification_stale_poison_batch_is_not_reclaimed_by_the_next_iteration(
             ("pending", 1, true)
         );
     }
+}
+
+#[tokio::test]
+async fn schema_constraint_notification_failure_requires_class_and_bounded_detail() {
+    let database = own_database()
+        .await
+        .expect("native notification constraints");
+    let p = PostgresPersistence::new(database.pool.clone());
+    let fixture = make_fixture(&p).await;
+    let event = insert_events(&p, fixture.company_id, 1, 0).await[0];
+    struct FailureRow {
+        status: &'static str,
+        class: Option<&'static str>,
+        detail: Option<String>,
+    }
+    for row in [
+        FailureRow {
+            status: "dead_letter",
+            class: None,
+            detail: None,
+        },
+        FailureRow {
+            status: "pending",
+            class: None,
+            detail: Some("detail without class".into()),
+        },
+        FailureRow {
+            status: "pending",
+            class: Some("internal"),
+            detail: Some("é".repeat(257)),
+        },
+    ] {
+        let error = sqlx::query("UPDATE notification_events SET status=$2,last_error_class=$3,last_error_detail=$4 WHERE id=$1")
+            .bind(event).bind(row.status).bind(row.class).bind(row.detail).execute(p.pool()).await.unwrap_err();
+        let error = error.as_database_error().unwrap();
+        assert_eq!(error.code().as_deref(), Some("23514"));
+        assert_eq!(error.constraint(), Some("notification_events_error_check"));
+    }
+    sqlx::query("UPDATE notification_events SET last_error_class='internal',last_error_detail=$2 WHERE id=$1")
+        .bind(event).bind("é".repeat(256)).execute(p.pool()).await.unwrap();
 }

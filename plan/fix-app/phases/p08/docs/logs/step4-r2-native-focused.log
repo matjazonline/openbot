@@ -1,0 +1,36 @@
+
+running 31 tests
+test adapters::http::routes::model_usage::tests::model_usage_http_query_bounds ... ok
+test adapters::http::routes::model_usage::tests::model_usage_cookie_price_mutation_requires_same_origin ... ok
+test adapters::http::routes::model_usage::tests::model_usage_http_projection_escaping_foreign_ids_and_price_errors ... ok
+test adapters::persistence::agent::constraint_tests::schema_constraint_agent_provider_and_model_are_one_pair ... ok
+test adapters::persistence::mcp_tests::schema_constraint_deleted_mcp_slug_is_reusable_and_live_creators_compete ... ok
+test adapters::persistence::thread::tests::schema_constraint_messages_require_declared_audience ... ok
+test adapters::persistence::notification::tests::schema_constraint_notification_failure_requires_class_and_bounded_detail ... ok
+test adapters::persistence::workflow::tests::admission_tests::admission_source_tests::workflow_admit_sql_message_source_rejects_missing_foreign_and_wrong_membership ... ok
+test adapters::persistence::workflow::tests::admission_tests::admission_source_tests::workflow_admit_sql_schedule_source_checks_occurrence_owner_and_association ... ok
+test adapters::persistence::delivery::tests::schema_constraint_delivery_failure_requires_class_and_bounded_detail ... ok
+test adapters::persistence::auth_key_rotation_tests::schema_constraint_password_login_requires_hash_and_registered_method ... ok
+test adapters::persistence::delivery::tests::schema_constraint_retired_delivery_purposes_and_identity_status_are_refused ... ok
+test adapters::persistence::auth_key_rotation_tests::schema_constraint_oauth_account_stores_null_and_rejects_passwords ... ok
+test adapters::persistence::workflow::tests::admission_tests::admission_source_tests::workflow_control_head_restores_real_message_and_schedule_causality ... ok
+test adapters::persistence::auth_key_rotation_tests::auth_key_rotation_pending_codes_survive_jwt_rotation_with_the_independent_key ... ok
+test application::services::model_usage::aggregate::tests::model_usage_confidence_partial_prices_and_small_costs_survive_grouping ... ok
+test application::services::model_usage::aggregate::tests::model_usage_cost_at_all_supported_bounds_is_exact ... ok
+test application::services::model_usage::aggregate::tests::model_usage_group_bound_and_filters_are_explicit ... ok
+test application::services::model_usage::tests::prices_are_exact_bounded_decimals ... ok
+test application::use_cases::user::tests::passwordless_login_refuses_even_if_dummy_verification_returns_true ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::storage_checkpoint_tests::run_retention_native_checkpoint_and_model_usage_delete_with_only_owned_jobs ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::storage_checkpoint_tests::run_retention_native_checkpoint_model_usage_and_tree_rollback_then_retry ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::schema_constraint_tests::schema_constraint_attempt_stop_reason_matrix ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::schema_constraint_tests::schema_constraint_attempt_finish_stamp_matches_status ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::schema_constraint_tests::schema_constraint_competing_claimants_leave_one_processing_attempt ... ok
+test adapters::persistence::workflow::tests::admission_tests::admission_source_tests::workflow_admit_refuses_every_child_trigger_and_schema_checks_runtime_child_keys ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::schema_constraint_tests::schema_constraint_workflow_retry_count_cannot_exceed_budget ... ok
+test adapters::persistence::workflow::tests::admission_tests::model_usage_tests::agent_retire_with_usage_rows_reports_run_history ... ok
+test adapters::persistence::workflow::tests::admission_tests::model_usage_tests::model_usage_workflow_exact_provenance_and_grouping ... ok
+test adapters::persistence::workflow::tests::admission_tests::model_usage_tests::schema_constraint_live_usage_requires_run_and_history_has_no_runtime_owners ... ok
+test adapters::persistence::workflow::tests::admission_tests::admission_source_tests::workflow_admit_sql_schedule_source_revocation_blocks_new_replay_and_alias ... ok
+
+test result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 2679 filtered out; finished in 6.77s
+

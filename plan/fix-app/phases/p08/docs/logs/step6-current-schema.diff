@@ -1,0 +1,572 @@
+diff --git a/migrations/20260817000000_init_schema.sql b/migrations/20260817000000_init_schema.sql
+index c5c0d55..221e1ee 100644
+--- a/migrations/20260817000000_init_schema.sql
++++ b/migrations/20260817000000_init_schema.sql
+@@ -54,7 +54,6 @@ BEGIN
+         RETURN NULL;
+     END IF;
+     IF TG_TABLE_NAME='background_tasks' THEN
+-        IF NEW.queue_kind<>'workflow' THEN RETURN NULL; END IF;
+         SELECT company_id,run_id INTO owner_company,owner_run FROM workflow_executions
+             WHERE company_id=NEW.company_id AND id=NEW.workflow_execution_id;
+     ELSE
+@@ -123,7 +122,7 @@ CREATE FUNCTION public.check_workflow_control_retry() RETURNS trigger
+     AS $$
+ DECLARE owner workflow_runs%ROWTYPE; ordinary boolean; reconciled boolean;
+ BEGIN
+-    IF OLD.queue_kind='workflow' AND OLD.status='failed' AND NEW.status='pending' THEN
++    IF OLD.status='failed' AND NEW.status='pending' THEN
+         SELECT run.* INTO owner FROM workflow_runs AS run JOIN workflow_executions AS execution
+             ON execution.company_id=run.company_id AND execution.run_id=run.id
+             WHERE execution.company_id=NEW.company_id AND execution.id=NEW.workflow_execution_id;
+@@ -164,7 +163,7 @@ CREATE FUNCTION public.check_workflow_fenced_completion() RETURNS trigger
+     LANGUAGE plpgsql
+     AS $$
+ BEGIN
+-    IF OLD.queue_kind = 'workflow' AND OLD.status = 'processing' AND NEW.status = 'completed' THEN
++    IF OLD.status = 'processing' AND NEW.status = 'completed' THEN
+         IF NEW.retry_count<>OLD.retry_count OR NEW.continuation_count<>OLD.continuation_count
+             OR OLD.lock_expires_at IS NULL OR OLD.lock_expires_at <= clock_timestamp()
+             OR NOT EXISTS (
+@@ -207,7 +206,7 @@ BEGIN
+             RAISE EXCEPTION 'workflow completion lost ownership before commit' USING ERRCODE = '23514', CONSTRAINT='workflow_guard:check_workflow_fenced_completion';
+         END IF;
+     END IF;
+-    IF OLD.queue_kind='workflow' AND OLD.status='completed' AND NEW.status='pending' THEN
++    IF OLD.status='completed' AND NEW.status='pending' THEN
+         IF NEW.retry_count <> OLD.retry_count OR NEW.max_retries <> OLD.max_retries
+             OR NEW.continuation_count <> OLD.continuation_count + 1
+             OR NEW.continuation_count > workflow_job_continuation_limit()
+@@ -280,7 +279,7 @@ CREATE FUNCTION public.check_workflow_fenced_retirement() RETURNS trigger
+     AS $$
+ DECLARE retirement task_attempts%ROWTYPE;
+ BEGIN
+-    IF OLD.queue_kind='workflow' AND OLD.status='processing' AND NEW.status IN ('pending','failed') THEN
++    IF OLD.status='processing' AND NEW.status IN ('pending','failed') THEN
+         SELECT * INTO retirement FROM task_attempts WHERE task_id=OLD.id
+             AND attempt_number=OLD.attempt_ordinal AND execution_generation=OLD.execution_generation
+             AND worker_id=OLD.worker_id AND status='failed';
+@@ -1092,8 +1091,7 @@ CREATE FUNCTION public.preserve_background_task_queue_identity() RETURNS trigger
+     LANGUAGE plpgsql
+     AS $$
+ BEGIN
+-    IF (NEW.queue_kind, NEW.workflow_execution_id) IS DISTINCT FROM
+-       (OLD.queue_kind, OLD.workflow_execution_id) THEN
++    IF NEW.workflow_execution_id IS DISTINCT FROM OLD.workflow_execution_id THEN
+         RAISE EXCEPTION 'background task queue identity is immutable' USING ERRCODE = '23514';
+     END IF;
+     RETURN NEW;
+@@ -1469,16 +1467,13 @@ $$;
+ CREATE FUNCTION public.require_harness_owner() RETURNS trigger LANGUAGE plpgsql AS $$
+ BEGIN
+     IF TG_OP = 'UPDATE' AND
+-        ROW(NEW.id,NEW.company_id,NEW.task_id,NEW.agent_id,NEW.owner_kind,NEW.workflow_run_id,
++        ROW(NEW.id,NEW.company_id,NEW.task_id,NEW.agent_id,NEW.workflow_run_id,
+             NEW.workflow_execution_id,NEW.workflow_prepared)
+         IS DISTINCT FROM
+-        ROW(OLD.id,OLD.company_id,OLD.task_id,OLD.agent_id,OLD.owner_kind,OLD.workflow_run_id,
++        ROW(OLD.id,OLD.company_id,OLD.task_id,OLD.agent_id,OLD.workflow_run_id,
+             OLD.workflow_execution_id,OLD.workflow_prepared) THEN
+         RAISE EXCEPTION 'harness owner and prepared inputs are immutable' USING ERRCODE='23514';
+     END IF;
+-    IF NEW.owner_kind <> 'workflow' THEN
+-        RAISE EXCEPTION 'unknown harness owner' USING ERRCODE='23514';
+-    END IF;
+     IF NEW.checkpoint->>'run_id' IS DISTINCT FROM NEW.id::text
+         OR NEW.checkpoint->'identity'->>'company_id' IS DISTINCT FROM NEW.company_id::text
+         OR NEW.checkpoint->'identity'->>'task_id' IS DISTINCT FROM NEW.task_id::text
+@@ -1501,7 +1496,7 @@ BEGIN
+             AND attempt.attempt_number=NEW.workflow_attempt
+             AND attempt.execution_generation=NEW.workflow_generation
+             AND attempt.worker_id=NEW.workflow_worker_id AND attempt.status='processing'
+-        WHERE job.company_id=NEW.company_id AND job.id=NEW.task_id AND job.queue_kind='workflow'
++        WHERE job.company_id=NEW.company_id AND job.id=NEW.task_id 
+             AND execution.id=NEW.workflow_execution_id AND run.id=NEW.workflow_run_id
+             AND job.status='processing' AND job.worker_id=NEW.workflow_worker_id
+             AND job.execution_generation=NEW.workflow_generation AND job.attempt_ordinal=NEW.workflow_attempt
+@@ -1517,7 +1512,6 @@ $$;
+ -- Model ownership is separate from the most recent checkpoint writer.
+ CREATE FUNCTION public.guard_harness_model_owner() RETURNS trigger LANGUAGE plpgsql AS $$
+ BEGIN
+-    IF NEW.owner_kind<>'workflow' THEN RETURN NEW; END IF;
+     IF TG_OP='INSERT' AND (jsonb_array_length(NEW.checkpoint->'reservations')<>0
+         OR jsonb_array_length(NEW.checkpoint->'turns')<>0 OR NEW.model_request_id IS NOT NULL) THEN
+         RAISE EXCEPTION 'native checkpoint must begin without model work' USING ERRCODE='23514';
+@@ -1976,7 +1970,7 @@ CREATE FUNCTION public.workflow_action_capture_schedule() RETURNS trigger
+     AS $$
+ DECLARE run uuid;
+ BEGIN
+-    IF OLD.queue_kind='workflow' AND OLD.status='failed' AND NEW.status='pending' THEN
++    IF OLD.status='failed' AND NEW.status='pending' THEN
+         SELECT execution.run_id INTO run FROM workflow_executions AS execution
+             WHERE execution.company_id=OLD.company_id AND execution.id=OLD.workflow_execution_id;
+         INSERT INTO workflow_action_schedule_witnesses(company_id,run_id,execution_id,job_id,retired_attempt,transaction_id)
+@@ -2032,7 +2026,7 @@ BEGIN
+                     AND workflow_action_retry_safe(NEW.company_id,NEW.execution_id) IS DISTINCT FROM false)
+                     OR (owner.state='waiting' AND owner.waiting_reason='reconciliation' AND owner.terminal_execution_id IS NULL
+                         AND workflow_action_retry_safe(NEW.company_id,NEW.execution_id) IS FALSE))
+-                AND job.status='failed' AND job.queue_kind='workflow' AND job.workflow_execution_id=NEW.execution_id AND job.attempt_ordinal-1=NEW.retired_attempt
++                AND job.status='failed'  AND job.workflow_execution_id=NEW.execution_id AND job.attempt_ordinal-1=NEW.retired_attempt
+                 AND job.worker_id IS NULL AND job.execution_generation IS NULL AND job.lock_expires_at IS NULL
+                 AND step.activated_at IS NOT NULL AND step.completed_at IS NULL
+                 AND audit.execution_id=NEW.execution_id AND audit.event_kind='workflow.root_budget_exhausted'
+@@ -2173,7 +2167,7 @@ CREATE FUNCTION public.workflow_action_confirm_claim_retirement() RETURNS trigge
+     LANGUAGE plpgsql
+     AS $$
+ BEGIN
+-    IF OLD.queue_kind='workflow' AND OLD.status='pending' AND NEW.status='failed'
++    IF OLD.status='pending' AND NEW.status='failed'
+         AND OLD.worker_id IS NULL AND OLD.execution_generation IS NULL AND OLD.lock_expires_at IS NULL
+         AND NEW.worker_id IS NULL AND NEW.execution_generation IS NULL AND NEW.lock_expires_at IS NULL
+         AND NEW.retry_count=OLD.retry_count AND NEW.workflow_execution_id=OLD.workflow_execution_id THEN
+@@ -2202,7 +2196,7 @@ BEGIN
+     THEN RETURN NULL; END IF;
+     UPDATE background_tasks SET status='failed',updated_at=clock_timestamp()
+         WHERE company_id=NEW.company_id AND workflow_execution_id=NEW.execution_id
+-            AND queue_kind='workflow' AND status='pending';
++             AND status='pending';
+     UPDATE workflow_runs SET state='waiting',waiting_reason='reconciliation'
+         WHERE company_id=NEW.company_id AND id=NEW.run_id AND state IN ('queued','running')
+             AND NOT EXISTS(SELECT 1 FROM background_tasks WHERE company_id=NEW.company_id
+@@ -2267,7 +2261,7 @@ BEGIN
+                       AND run.state='waiting' AND run.waiting_reason='effect' AND run.deadline>clock_timestamp()
+                       AND wait.id=action.wait_id AND wait.execution_id=NEW.execution_id
+                       AND wait.reason='effect' AND wait.state='waiting' AND wait.deadline=run.deadline
+-                      AND job.queue_kind='workflow' AND job.status<>'processing'
++                       AND job.status<>'processing'
+                       AND attempt.worker_id=NEW.worker_id AND attempt.execution_generation=NEW.execution_generation
+                       AND attempt.status='completed' AND attempt.stop_reason='effect_parked')
+             THEN RAISE EXCEPTION 'workflow message park lost its fence' USING CONSTRAINT='workflow_guard:workflow_action_dispatch_commit_guard'; END IF;
+@@ -2289,7 +2283,7 @@ BEGIN
+         WHERE run.company_id=NEW.company_id AND run.id=NEW.run_id
+           AND run.state IN ('queued','running') AND run.deadline>clock_timestamp()
+           AND execution.id=NEW.execution_id AND execution.completed_at IS NULL
+-          AND job.id=NEW.job_id AND job.queue_kind='workflow' AND job.status='processing'
++          AND job.id=NEW.job_id  AND job.status='processing'
+           AND job.worker_id=NEW.worker_id AND job.execution_generation=NEW.execution_generation
+           AND job.attempt_ordinal=NEW.attempt_number AND job.lock_expires_at>clock_timestamp()
+           AND attempt.attempt_number=NEW.attempt_number AND attempt.worker_id=NEW.worker_id
+@@ -2495,7 +2489,7 @@ CREATE FUNCTION public.workflow_action_pending_claim_episode(company uuid, run u
+         JOIN background_tasks AS task ON task.company_id=episode.company_id AND task.id=episode.job_id
+         JOIN workflow_executions AS step ON step.company_id=episode.company_id AND step.run_id=episode.run_id AND step.id=episode.execution_id
+         WHERE episode.company_id=company AND episode.run_id=run AND episode.execution_id=execution AND episode.job_id=job
+-            AND task.queue_kind='workflow' AND task.status='pending' AND task.attempt_ordinal-1=episode.retired_attempt
++             AND task.status='pending' AND task.attempt_ordinal-1=episode.retired_attempt
+             AND task.worker_id IS NULL AND task.execution_generation IS NULL AND task.lock_expires_at IS NULL
+             AND step.activated_at IS NOT NULL AND step.completed_at IS NULL
+             AND NOT EXISTS(SELECT 1 FROM task_attempts AS later WHERE later.task_id=job AND later.attempt_number>episode.retired_attempt)
+@@ -2628,7 +2622,7 @@ CREATE FUNCTION public.workflow_action_reconciliation_reopen_safe(company uuid,
+         JOIN background_tasks AS task ON task.company_id=execution.company_id AND task.workflow_execution_id=execution.id
+         JOIN task_attempts AS attempt ON attempt.task_id=task.id AND attempt.attempt_number=task.attempt_ordinal-1
+         JOIN workflow_admissions AS admission ON admission.company_id=owner.company_id AND admission.run_id=owner.id
+-        WHERE owner.company_id=company AND owner.id=run AND task.id=job AND task.queue_kind='workflow'
++        WHERE owner.company_id=company AND owner.id=run AND task.id=job 
+             AND owner.deadline>clock_timestamp() AND execution.activation<=owner.max_steps
+             AND execution.activated_at IS NOT NULL AND execution.completed_at IS NULL
+             AND execution.committed_output IS NULL AND execution.committed_route IS NULL AND execution.successor_execution_id IS NULL
+@@ -2644,7 +2638,7 @@ CREATE FUNCTION public.workflow_action_reconciliation_reopen_safe(company uuid,
+             AND (substring(admission.source_key FROM 4)::jsonb->>0)<>'child'
+             AND NOT EXISTS(SELECT 1 FROM workflow_executions AS sibling
+                 JOIN background_tasks AS other ON other.company_id=sibling.company_id AND other.workflow_execution_id=sibling.id
+-                WHERE sibling.company_id=company AND sibling.run_id=run AND other.queue_kind='workflow'
++                WHERE sibling.company_id=company AND sibling.run_id=run 
+                     AND other.id<>job AND other.status IN ('pending','processing')))
+ $$;
+ 
+@@ -2669,7 +2663,7 @@ BEGIN
+         WHERE owner.company_id=NEW.company_id AND owner.id=NEW.run_id
+             AND owner.state IN ('queued','running') AND owner.deadline>clock_timestamp()
+             AND execution.id=NEW.execution_id AND execution.completed_at IS NULL
+-            AND job.id=NEW.job_id AND job.queue_kind='workflow' AND job.status='processing'
++            AND job.id=NEW.job_id  AND job.status='processing'
+             AND job.worker_id=NEW.worker_id AND job.execution_generation=NEW.execution_generation
+             AND job.attempt_ordinal=NEW.attempt_number AND job.lock_expires_at>clock_timestamp()
+             AND attempt.attempt_number=NEW.attempt_number AND attempt.worker_id=NEW.worker_id
+@@ -2828,7 +2822,7 @@ CREATE FUNCTION public.workflow_control_retry_safe(company uuid, run uuid, job u
+         JOIN background_tasks AS task ON task.company_id=execution.company_id AND task.workflow_execution_id=execution.id
+         JOIN task_attempts AS attempt ON attempt.task_id=task.id AND attempt.attempt_number=task.attempt_ordinal-1
+         JOIN workflow_admissions AS admission ON admission.company_id=owner.company_id AND admission.run_id=owner.id
+-        WHERE owner.company_id=company AND owner.id=run AND task.id=job AND task.queue_kind='workflow'
++        WHERE owner.company_id=company AND owner.id=run AND task.id=job 
+             AND owner.deadline>clock_timestamp() AND execution.activation<=owner.max_steps
+             AND execution.activated_at IS NOT NULL AND execution.completed_at IS NULL
+             AND execution.committed_output IS NULL AND execution.committed_route IS NULL
+@@ -2848,7 +2842,7 @@ CREATE FUNCTION public.workflow_control_retry_safe(company uuid, run uuid, job u
+             AND (substring(admission.source_key FROM 4)::jsonb->>0)<>'child'
+             AND NOT EXISTS (SELECT 1 FROM workflow_executions AS sibling
+                 JOIN background_tasks AS other ON other.company_id=sibling.company_id AND other.workflow_execution_id=sibling.id
+-                WHERE sibling.company_id=company AND sibling.run_id=run AND other.queue_kind='workflow'
++                WHERE sibling.company_id=company AND sibling.run_id=run 
+                     AND other.id<>job AND other.status IN ('pending','processing'))
+             -- A run failed by a confirmed guard violation would only trip it again (fix-app 03).
+             AND NOT EXISTS (SELECT 1 FROM workflow_run_events AS audit
+@@ -3359,6 +3353,8 @@ CREATE TABLE public.agents (
+     workflow_tools text[] DEFAULT '{}'::text[] NOT NULL CONSTRAINT agents_workflow_tools_shape CHECK (public.valid_workflow_type_names(workflow_tools)),
+     CONSTRAINT agents_avatar_url_scheme_check CHECK (((avatar_url IS NULL) OR (avatar_url ~ '^https?://'::text))),
+     CONSTRAINT agents_created_by_shape_check CHECK (public.valid_creation_provenance(created_by)),
++    CONSTRAINT agents_model_pair_check CHECK ((provider IS NULL) = (model IS NULL)),
++    CONSTRAINT agents_provider_check CHECK (provider IS NULL OR provider IN ('google','openai','anthropic','groq')),
+     CONSTRAINT agents_name_not_blank CHECK ((btrim(name) <> ''::text)),
+     CONSTRAINT agents_slug_format CHECK ((((slug)::text = lower((slug)::text)) AND ((slug)::text ~ '^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$'::text)))
+ );
+@@ -3374,14 +3370,11 @@ CREATE TABLE public.background_tasks (
+     channel_id uuid,
+     thread_id uuid,
+     correlation_id uuid NOT NULL,
+-    task_type text NOT NULL,
+     status text DEFAULT 'pending'::text NOT NULL,
+-    payload jsonb DEFAULT '{}'::jsonb NOT NULL,
+     retry_count integer DEFAULT 0 NOT NULL,
+     continuation_count smallint DEFAULT 0 NOT NULL,
+     attempt_ordinal integer GENERATED ALWAYS AS (retry_count + continuation_count + 1) STORED,
+     max_retries integer DEFAULT 3 NOT NULL,
+-    last_error text,
+     worker_id uuid,
+     execution_generation uuid,
+     locked_at timestamp with time zone,
+@@ -3389,16 +3382,12 @@ CREATE TABLE public.background_tasks (
+     run_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+-    queue_kind text DEFAULT 'workflow'::text NOT NULL,
+-    workflow_execution_id uuid,
++    workflow_execution_id uuid NOT NULL,
+     CONSTRAINT background_tasks_lease_check CHECK ((((status = 'processing'::text) AND (worker_id IS NOT NULL) AND (execution_generation IS NOT NULL) AND (locked_at IS NOT NULL) AND (lock_expires_at IS NOT NULL) AND (lock_expires_at > locked_at)) OR ((status <> 'processing'::text) AND (worker_id IS NULL) AND (execution_generation IS NULL) AND (locked_at IS NULL) AND (lock_expires_at IS NULL)))),
+     CONSTRAINT background_tasks_max_retries_check CHECK ((max_retries > 0)),
+-    CONSTRAINT background_tasks_payload_object_check CHECK ((jsonb_typeof(payload) = 'object'::text)),
+-    CONSTRAINT background_tasks_queue_kind_check CHECK ((queue_kind = 'workflow'::text)),
+-    CONSTRAINT background_tasks_retry_count_check CHECK ((retry_count >= 0)),
++    CONSTRAINT background_tasks_retry_count_check CHECK (retry_count BETWEEN 0 AND max_retries),
+     CONSTRAINT background_tasks_continuation_count_check CHECK (continuation_count BETWEEN 0 AND public.workflow_job_continuation_limit()),
+-    CONSTRAINT background_tasks_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'processing'::text, 'completed'::text, 'failed'::text]))),
+-    CONSTRAINT background_tasks_workflow_shape_check CHECK (((workflow_execution_id IS NOT NULL) AND (task_type = 'workflow_execution'::text) AND (payload = jsonb_build_object('version', 1, 'execution_id', (workflow_execution_id)::text))))
++    CONSTRAINT background_tasks_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'processing'::text, 'completed'::text, 'failed'::text])))
+ );
+ 
+ 
+@@ -3559,6 +3548,7 @@ CREATE TABLE public.company_mcp_connections (
+     discovery_json jsonb DEFAULT '[]'::jsonb NOT NULL,
+     deleted_at timestamp with time zone,
+     CONSTRAINT company_mcp_connections_auth_type_check CHECK ((auth_type = ANY (ARRAY['none'::text, 'bearer'::text]))),
++    CONSTRAINT company_mcp_connections_deleted_check CHECK (deleted_at IS NULL OR NOT enabled),
+     CONSTRAINT company_mcp_connections_credential_revision_check CHECK ((credential_revision > 0)),
+     CONSTRAINT company_mcp_connections_discovery_json_check CHECK (((jsonb_typeof(discovery_json) = 'array'::text) AND (jsonb_array_length(discovery_json) <= 100) AND (octet_length((discovery_json)::text) <= 1048576))),
+     CONSTRAINT company_mcp_connections_endpoint_url_check CHECK (((octet_length(endpoint_url) >= 1) AND (octet_length(endpoint_url) <= 2048))),
+@@ -3661,7 +3651,6 @@ CREATE TABLE public.external_messages (
+     binding_id uuid NOT NULL,
+     external_message_key text NOT NULL,
+     message_id uuid NOT NULL,
+-    delivery_part_id uuid,
+     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+     CONSTRAINT external_messages_key_check CHECK (((btrim(external_message_key) <> ''::text) AND (octet_length(external_message_key) <= 998)))
+@@ -3852,13 +3841,16 @@ CREATE TABLE public.message_deliveries (
+     CONSTRAINT message_deliveries_attribution_check CHECK ((((channel_id IS NOT NULL) AND (message_id IS NOT NULL) AND (source_binding_id IS NOT NULL) AND (destination_binding_id IS NOT NULL)) OR ((channel_id IS NULL) AND (message_id IS NULL) AND (source_binding_id IS NULL) AND (destination_binding_id IS NULL) AND (depends_on_delivery_id IS NULL) AND (external_destination IS NOT NULL) AND (purpose = 'notification'::text)))),
+     CONSTRAINT message_deliveries_cancellation_check CHECK ((((cancellation_requested_at IS NULL) = (cancellation_reason IS NULL)) AND ((cancellation_reason IS NULL) OR (cancellation_reason = ANY (ARRAY['workflow_cancelled'::text, 'workflow_expired'::text, 'workflow_revoked'::text, 'recipient_revoked'::text, 'evidence_conflict'::text]))) AND ((cancellation_requested_at IS NULL) OR (status <> ALL (ARRAY['pending'::text, 'retryable'::text]))))),
+     CONSTRAINT message_deliveries_delivered_at_check CHECK (((status = 'delivered'::text) = (delivered_at IS NOT NULL))),
+-    CONSTRAINT message_deliveries_error_check CHECK ((((last_error_class IS NULL) OR public.valid_delivery_failure_class(last_error_class)) AND ((last_error_detail IS NULL) OR (octet_length(last_error_detail) <= 512)) AND ((last_error_detail IS NULL) OR (last_error_class IS NOT NULL)))),
++    CONSTRAINT message_deliveries_error_check CHECK (
++        (last_error_class IS NULL OR public.valid_delivery_failure_class(last_error_class))
++        AND (last_error_detail IS NULL OR (octet_length(last_error_detail) <= 512 AND last_error_class IS NOT NULL))
++        AND (status NOT IN ('retryable','dead_letter') OR last_error_class IS NOT NULL)),
+     CONSTRAINT message_deliveries_external_destination_check CHECK (((external_destination IS NULL) OR ((btrim(external_destination) <> ''::text) AND (octet_length(external_destination) <= 998)))),
+     CONSTRAINT message_deliveries_idempotency_key_check CHECK (((btrim(idempotency_key) <> ''::text) AND (octet_length(idempotency_key) <= 512))),
+     CONSTRAINT message_deliveries_lease_check CHECK ((((status = 'sending'::text) AND (execution_id IS NOT NULL) AND (owner_worker_id IS NOT NULL) AND (locked_at IS NOT NULL) AND (lock_expires_at IS NOT NULL) AND (lock_expires_at > locked_at)) OR ((status <> 'sending'::text) AND (execution_id IS NULL) AND (owner_worker_id IS NULL) AND (locked_at IS NULL) AND (lock_expires_at IS NULL)))),
+     CONSTRAINT message_deliveries_message_audience_check CHECK ((((message_id IS NULL) AND (message_audience IS NULL)) OR ((message_id IS NOT NULL) AND (message_audience = 'external_conversation'::text)))),
+     CONSTRAINT message_deliveries_no_self_dependency_check CHECK (((depends_on_delivery_id IS NULL) OR (depends_on_delivery_id <> id))),
+-    CONSTRAINT message_deliveries_purpose_check CHECK ((purpose = ANY (ARRAY['reply'::text, 'mirror'::text, 'outreach'::text, 'notification'::text, 'workflow_send'::text, 'workflow_reply'::text]))),
++    CONSTRAINT message_deliveries_purpose_check CHECK ((purpose = ANY (ARRAY['notification'::text, 'workflow_send'::text, 'workflow_reply'::text]))),
+     CONSTRAINT message_deliveries_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'sending'::text, 'retryable'::text, 'delivered'::text, 'outcome_unknown'::text, 'dead_letter'::text]))),
+     CONSTRAINT message_deliveries_transport_check CHECK ((transport = ANY (ARRAY['email'::text, 'slack'::text])))
+ );
+@@ -3930,10 +3922,10 @@ CREATE TABLE public.messages (
+     correlation_id uuid NOT NULL,
+     content_hash bytea NOT NULL,
+     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+-    audience text DEFAULT 'legacy_unclassified'::text NOT NULL,
++    audience text NOT NULL,
+     structured_response jsonb,
+     CONSTRAINT messages_attachments_check CHECK (((attachments IS NULL) OR ((jsonb_typeof(attachments) = 'object'::text) AND ((attachments -> 'version'::text) = '"1"'::jsonb) AND (jsonb_typeof((attachments -> 'items'::text)) = 'array'::text) AND (octet_length((attachments)::text) <= 262144)))),
+-    CONSTRAINT messages_audience_check CHECK ((audience = ANY (ARRAY['external_conversation'::text, 'internal_only'::text, 'legacy_unclassified'::text]))),
++    CONSTRAINT messages_audience_check CHECK ((audience = ANY (ARRAY['external_conversation'::text, 'internal_only'::text]))),
+     CONSTRAINT messages_content_hash_check CHECK ((octet_length(content_hash) = 32)),
+     CONSTRAINT messages_direction_check CHECK ((direction = ANY (ARRAY['inbound'::text, 'outbound'::text]))),
+     CONSTRAINT messages_role_check CHECK ((role = ANY (ARRAY['human'::text, 'agent'::text, 'system'::text]))),
+@@ -3969,7 +3961,10 @@ CREATE TABLE public.notification_events (
+     projected_at timestamp with time zone,
+     CONSTRAINT notification_events_action_kind_check CHECK ((action_kind = 'delivery_failure'::text)),
+     CONSTRAINT notification_events_attempt_check CHECK (((attempt_count >= 0) AND (max_attempts > 0) AND (attempt_count <= max_attempts))),
+-    CONSTRAINT notification_events_error_check CHECK (((last_error_class IS NULL) OR (last_error_class = ANY (ARRAY['database'::text, 'composition'::text, 'invalid_source'::text, 'lease_expired'::text, 'internal'::text])))),
++    CONSTRAINT notification_events_error_check CHECK (
++        (last_error_class IS NULL OR last_error_class IN ('database','composition','invalid_source','lease_expired','internal','stale_projection'))
++        AND (last_error_detail IS NULL OR (octet_length(last_error_detail) <= 512 AND last_error_class IS NOT NULL))
++        AND (status <> 'dead_letter' OR last_error_class IS NOT NULL)),
+     CONSTRAINT notification_events_lease_check CHECK ((((status = 'processing'::text) AND (execution_id IS NOT NULL) AND (owner_worker_id IS NOT NULL) AND (locked_at IS NOT NULL) AND (lock_expires_at IS NOT NULL) AND (lock_expires_at > locked_at)) OR ((status <> 'processing'::text) AND (execution_id IS NULL) AND (owner_worker_id IS NULL) AND (locked_at IS NULL) AND (lock_expires_at IS NULL)))),
+     CONSTRAINT notification_events_projection_check CHECK (((status = 'projected'::text) = (projected_at IS NOT NULL))),
+     CONSTRAINT notification_events_source_generation_check CHECK ((source_generation > 0)),
+@@ -4027,7 +4022,7 @@ CREATE TABLE public.participant_identities (
+     CONSTRAINT participant_identities_display_label_check CHECK (((display_label IS NULL) OR (octet_length(display_label) <= 255))),
+     CONSTRAINT participant_identities_namespace_check CHECK (((btrim(namespace) <> ''::text) AND (octet_length(namespace) <= 255))),
+     CONSTRAINT participant_identities_provenance_check CHECK ((provenance = ANY (ARRAY['account'::text, 'agent'::text, 'channel_allowlist'::text, 'transport_ingress'::text, 'provider_profile_claim'::text, 'system'::text]))),
+-    CONSTRAINT participant_identities_status_check CHECK ((status = ANY (ARRAY['observed'::text, 'verified'::text, 'disabled'::text]))),
++    CONSTRAINT participant_identities_status_check CHECK ((status = ANY (ARRAY['observed'::text, 'verified'::text]))),
+     CONSTRAINT participant_identities_subject_check CHECK (((btrim(subject) <> ''::text) AND (octet_length(subject) <= 320))),
+     CONSTRAINT participant_identities_transport_check CHECK ((transport = ANY (ARRAY['email'::text, 'slack'::text])))
+ );
+@@ -4193,19 +4188,25 @@ CREATE TABLE public.task_attempts (
+     finished_at timestamp with time zone,
+     execution_generation uuid NOT NULL,
+     worker_id uuid NOT NULL,
+-    machine_id text NOT NULL,
+-    machine_region text,
+     workflow_failure_class text,
+     workflow_failure_code text,
+     workflow_retry_safety text,
+     workflow_retirement text,
+-    CONSTRAINT task_attempts_machine_id_check CHECK ((length(TRIM(BOTH FROM machine_id)) > 0)),
+     CONSTRAINT task_attempts_status_check CHECK ((status = ANY (ARRAY['processing'::text, 'completed'::text, 'failed'::text]))),
+-    CONSTRAINT task_attempts_stop_reason_check CHECK ((stop_reason = ANY (ARRAY['completed'::text, 'timed_out'::text, 'lease_lost'::text, 'effect_parked'::text, 'approval_parked'::text, 'child_parked'::text]))),
++    CONSTRAINT task_attempts_finished_check CHECK ((status = 'processing') = (finished_at IS NULL)),
++    CONSTRAINT task_attempts_stop_reason_check CHECK (CASE status
++        WHEN 'processing' THEN stop_reason IS NULL
++        WHEN 'completed' THEN stop_reason IS NOT NULL AND stop_reason IN ('completed','effect_parked','approval_parked','child_parked')
++        WHEN 'failed' THEN stop_reason IS NULL OR stop_reason IN ('timed_out','lease_lost')
++        ELSE false END),
+     CONSTRAINT workflow_attempt_failure_shape CHECK ((((workflow_failure_class IS NULL) AND (workflow_failure_code IS NULL) AND (workflow_retry_safety IS NULL) AND (workflow_retirement IS NULL)) OR ((status = 'failed'::text) AND (finished_at IS NOT NULL) AND (workflow_failure_class IS NOT NULL) AND (workflow_failure_class = ANY (ARRAY['retryable'::text, 'terminal'::text])) AND (workflow_failure_code IS NOT NULL) AND ((octet_length(workflow_failure_code) >= 1) AND (octet_length(workflow_failure_code) <= 128)) AND (workflow_retry_safety IS NOT NULL) AND (workflow_retry_safety = ANY (ARRAY['safe'::text, 'unknown'::text])) AND (workflow_retirement IS NOT NULL) AND (workflow_retirement = ANY (ARRAY['live'::text, 'expired'::text, 'deadline'::text, 'cancel'::text, 'guard'::text])))))
+ );
+ 
+ 
++-- A job has at most one active lease episode, even if attempt numbers differ.
++CREATE UNIQUE INDEX task_attempts_one_processing ON public.task_attempts(task_id) WHERE status = 'processing';
++
++
+ --
+ -- Name: task_harness_runs; Type: TABLE; Schema: public; Owner: -
+ --
+@@ -4215,13 +4216,12 @@ CREATE TABLE public.task_harness_runs (
+     company_id uuid NOT NULL,
+     task_id uuid NOT NULL,
+     agent_id uuid NOT NULL,
+-    owner_kind text NOT NULL DEFAULT 'workflow',
+-    workflow_run_id uuid,
+-    workflow_execution_id uuid,
+-    workflow_generation uuid,
+-    workflow_worker_id uuid,
+-    workflow_attempt integer,
+-    workflow_prepared jsonb,
++    workflow_run_id uuid NOT NULL,
++    workflow_execution_id uuid NOT NULL,
++    workflow_generation uuid NOT NULL,
++    workflow_worker_id uuid NOT NULL,
++    workflow_attempt integer NOT NULL,
++    workflow_prepared jsonb NOT NULL,
+     model_blocked_decision uuid,
+     model_request_id uuid,
+     model_generation uuid,
+@@ -4233,18 +4233,12 @@ CREATE TABLE public.task_harness_runs (
+     checkpoint jsonb NOT NULL,
+     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+-    final_output_consumed_at timestamp with time zone,
+-    CONSTRAINT task_harness_runs_token_owner CHECK (model_blocked_decision IS NULL OR owner_kind='workflow'),
+     CONSTRAINT task_harness_runs_model_owner_shape CHECK (
+         num_nonnulls(model_request_id,model_generation,model_worker_id,model_attempt)=0
+-        OR (owner_kind='workflow'
+-            AND num_nonnulls(model_request_id,model_generation,model_worker_id,model_attempt)=4
++        OR (num_nonnulls(model_request_id,model_generation,model_worker_id,model_attempt)=4
+             AND model_attempt>0)),
+     CONSTRAINT task_harness_runs_owner_shape CHECK (
+-        owner_kind = 'workflow'
+-            AND num_nonnulls(workflow_run_id,workflow_execution_id,workflow_generation,
+-                workflow_worker_id,workflow_attempt,workflow_prepared) = 6
+-            AND workflow_attempt > 0 AND final_output_consumed_at IS NULL
++        workflow_attempt > 0
+             AND jsonb_typeof(workflow_prepared) = 'object'
+             AND octet_length(workflow_prepared::text) <= 2097152),
+     CONSTRAINT task_harness_runs_check CHECK ((((checkpoint ->> 'schema_version'::text))::integer = schema_version)),
+@@ -4352,7 +4346,7 @@ CREATE TABLE public.users (
+     username public.citext NOT NULL,
+     email public.citext NOT NULL,
+     email_verified_at timestamp with time zone,
+-    password_hash text NOT NULL,
++    password_hash text,
+     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+     avatar_url text,
+     CONSTRAINT users_avatar_url_scheme_check CHECK (((avatar_url IS NULL) OR (avatar_url ~ '^https?://'::text))),
+@@ -5102,8 +5096,7 @@ CREATE TABLE public.workflow_dispatch_demand (
+     run_id uuid NOT NULL,
+     execution_id uuid NOT NULL,
+     job_id uuid NOT NULL,
+-    opportunity_until timestamp with time zone,
+-    registered_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL
++    opportunity_until timestamp with time zone
+ );
+ 
+ 
+@@ -5951,11 +5944,11 @@ ALTER TABLE ONLY public.company_invites
+ 
+ 
+ --
+--- Name: company_mcp_connections company_mcp_connections_company_id_slug_key; Type: CONSTRAINT; Schema: public; Owner: -
++-- Name: company_mcp_connections_company_id_slug_key; Type: INDEX; Schema: public; Owner: -
+ --
+ 
+-ALTER TABLE ONLY public.company_mcp_connections
+-    ADD CONSTRAINT company_mcp_connections_company_id_slug_key UNIQUE (company_id, slug);
++CREATE UNIQUE INDEX company_mcp_connections_company_id_slug_key
++    ON public.company_mcp_connections(company_id, slug) WHERE deleted_at IS NULL;
+ 
+ 
+ --
+@@ -7786,13 +7779,6 @@ CREATE INDEX email_message_metadata_in_reply_to_idx ON public.email_message_meta
+ CREATE INDEX email_message_metadata_thread_index_idx ON public.email_message_metadata USING btree (company_id, thread_index) WHERE (thread_index IS NOT NULL);
+ 
+ 
+---
+--- Name: external_messages_delivery_part_idx; Type: INDEX; Schema: public; Owner: -
+---
+-
+-CREATE INDEX external_messages_delivery_part_idx ON public.external_messages USING btree (delivery_part_id) WHERE (delivery_part_id IS NOT NULL);
+-
+-
+ --
+ -- Name: external_messages_message_idx; Type: INDEX; Schema: public; Owner: -
+ --
+@@ -8173,7 +8159,7 @@ CREATE INDEX workflow_message_intent_bindings_binding ON public.workflow_message
+ -- Name: workflow_one_execution_job; Type: INDEX; Schema: public; Owner: -
+ --
+ 
+-CREATE UNIQUE INDEX workflow_one_execution_job ON public.background_tasks USING btree (company_id, workflow_execution_id) WHERE (queue_kind = 'workflow'::text);
++CREATE UNIQUE INDEX workflow_one_execution_job ON public.background_tasks USING btree (company_id, workflow_execution_id);
+ 
+ 
+ --
+@@ -8217,14 +8203,14 @@ CREATE TRIGGER agent_skills_scope_check BEFORE INSERT OR UPDATE ON public.agent_
+ -- Name: background_tasks background_tasks_preserve_queue_identity; Type: TRIGGER; Schema: public; Owner: -
+ --
+ 
+-CREATE TRIGGER background_tasks_preserve_queue_identity BEFORE UPDATE OF queue_kind, workflow_execution_id ON public.background_tasks FOR EACH ROW EXECUTE FUNCTION public.preserve_background_task_queue_identity();
++CREATE TRIGGER background_tasks_preserve_queue_identity BEFORE UPDATE OF workflow_execution_id ON public.background_tasks FOR EACH ROW EXECUTE FUNCTION public.preserve_background_task_queue_identity();
+ 
+ 
+ --
+ -- Name: background_tasks background_tasks_validate_workflow_association; Type: TRIGGER; Schema: public; Owner: -
+ --
+ 
+-CREATE TRIGGER background_tasks_validate_workflow_association BEFORE INSERT OR UPDATE OF company_id, channel_id, thread_id, workflow_execution_id, queue_kind ON public.background_tasks FOR EACH ROW WHEN ((new.queue_kind = 'workflow'::text)) EXECUTE FUNCTION public.validate_workflow_job_association();
++CREATE TRIGGER background_tasks_validate_workflow_association BEFORE INSERT OR UPDATE OF company_id, channel_id, thread_id, workflow_execution_id ON public.background_tasks FOR EACH ROW EXECUTE FUNCTION public.validate_workflow_job_association();
+ 
+ 
+ --
+@@ -9030,7 +9016,7 @@ BEGIN
+                 JOIN workflow_executions AS execution
+                   ON execution.company_id=job.company_id AND execution.id=job.workflow_execution_id
+                 WHERE execution.company_id=OLD.company_id AND execution.run_id=OLD.id
+-                  AND execution.id=OLD.terminal_execution_id AND job.queue_kind='workflow'
++                  AND execution.id=OLD.terminal_execution_id 
+                   AND job.status='pending' AND workflow_control_retry_safe(OLD.company_id,OLD.id,job.id))
+         ELSE false
+     END;
+@@ -9433,14 +9419,6 @@ ALTER TABLE ONLY public.external_messages
+     ADD CONSTRAINT external_messages_binding_fk FOREIGN KEY (company_id, binding_id) REFERENCES public.channel_bindings(company_id, id) ON DELETE CASCADE;
+ 
+ 
+---
+--- Name: external_messages external_messages_delivery_part_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+---
+-
+-ALTER TABLE ONLY public.external_messages
+-    ADD CONSTRAINT external_messages_delivery_part_fk FOREIGN KEY (company_id, delivery_part_id) REFERENCES public.message_delivery_parts(company_id, id) ON DELETE SET NULL (delivery_part_id);
+-
+-
+ --
+ -- Name: external_messages external_messages_message_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+ --
+@@ -11077,11 +11055,11 @@ CREATE TABLE public.model_usage_calls (
+     request_id uuid NOT NULL,
+     task_id uuid NOT NULL,
+     agent_id uuid,
+-    workflow_id uuid,
+-    version_id uuid,
+-    run_id uuid,
+-    execution_id uuid,
+-    root_run_id uuid,
++    workflow_id uuid NOT NULL,
++    version_id uuid NOT NULL,
++    run_id uuid NOT NULL,
++    execution_id uuid NOT NULL,
++    root_run_id uuid NOT NULL,
+     provider text NOT NULL CHECK (octet_length(provider) BETWEEN 1 AND 128 AND provider = lower(btrim(provider))),
+     model text NOT NULL CHECK (octet_length(model) BETWEEN 1 AND 256 AND model = btrim(model)),
+     requested_at timestamptz NOT NULL DEFAULT statement_timestamp(),
+@@ -11097,7 +11075,6 @@ CREATE TABLE public.model_usage_calls (
+         OR (input_tokens IS NOT NULL AND output_tokens IS NOT NULL AND usage_source IS NOT NULL AND settled_at IS NOT NULL)),
+     CHECK (settled_at IS NULL OR settled_at >= requested_at),
+     -- Every model call belongs to a workflow run (p08 D4.8).
+-    CHECK (num_nonnulls(workflow_id, version_id, run_id, execution_id, root_run_id) = 5),
+     FOREIGN KEY(company_id, task_id) REFERENCES public.background_tasks(company_id,id) ON DELETE CASCADE,
+     FOREIGN KEY(company_id, agent_id) REFERENCES public.agents(company_id,id) DEFERRABLE INITIALLY DEFERRED,
+     FOREIGN KEY(company_id, run_id, workflow_id, version_id)
+@@ -11111,7 +11088,7 @@ CREATE TABLE public.model_usage_calls (
+ );
+ CREATE INDEX model_usage_company_time ON public.model_usage_calls(company_id,requested_at,request_id);
+ -- A run's calls, for the simulation's per-run usage (p08 D4.6) and the run delete cascade.
+-CREATE INDEX model_usage_calls_run ON public.model_usage_calls(company_id,run_id) WHERE run_id IS NOT NULL;
++CREATE INDEX model_usage_calls_run ON public.model_usage_calls(company_id,run_id);
+ CREATE FUNCTION public.guard_model_usage_update() RETURNS trigger LANGUAGE plpgsql AS $$
+ BEGIN
+     IF (to_jsonb(NEW) - ARRAY['input_tokens','output_tokens','usage_source','settled_at'])
+@@ -11140,7 +11117,7 @@ CREATE FUNCTION public.guard_model_usage_task() RETURNS trigger LANGUAGE plpgsql
+ BEGIN
+     IF NOT EXISTS (SELECT 1 FROM public.background_tasks AS task
+         WHERE task.company_id=NEW.company_id AND task.id=NEW.task_id
+-          AND NEW.run_id IS NOT NULL AND task.workflow_execution_id=NEW.execution_id) THEN
++          AND task.workflow_execution_id=NEW.execution_id) THEN
+         RAISE EXCEPTION 'model usage requires exact task provenance' USING ERRCODE='23514';
+     END IF;
+     RETURN NEW;
+@@ -11174,8 +11151,7 @@ BEGIN
+             RAISE EXCEPTION 'workflow continuation must begin at zero' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_continuation_counter_guard';
+         END IF;
+     ELSIF NEW.continuation_count<>OLD.continuation_count AND NOT (
+-        OLD.queue_kind='workflow' AND NEW.queue_kind='workflow'
+-        AND OLD.status='completed' AND NEW.status='pending'
++        OLD.status='completed' AND NEW.status='pending'
+         AND NEW.continuation_count=OLD.continuation_count+1
+         AND NEW.retry_count=OLD.retry_count) THEN
+         RAISE EXCEPTION 'workflow continuation requires an approval reopen' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_continuation_counter_guard';
+@@ -11231,7 +11207,7 @@ CREATE CONSTRAINT TRIGGER workflow_decision_wait_delete_guard AFTER DELETE ON pu
+ 
+ -- Native checkpoint owner relationships are exact, tenant-scoped and retained across claims.
+ CREATE UNIQUE INDEX task_harness_runs_workflow_execution
+-    ON public.task_harness_runs(company_id,workflow_execution_id) WHERE owner_kind='workflow';
++    ON public.task_harness_runs(company_id,workflow_execution_id);
+ ALTER TABLE public.task_harness_runs
+     ADD FOREIGN KEY(company_id,workflow_run_id,workflow_execution_id)
+         REFERENCES public.workflow_executions(company_id,run_id,id) ON DELETE CASCADE,
+@@ -11369,7 +11345,6 @@ CREATE TRIGGER guard_workflow_token_proposal BEFORE INSERT ON public.workflow_de
+ CREATE FUNCTION public.guard_harness_token_pause() RETURNS trigger LANGUAGE plpgsql AS $$
+ DECLARE prior public.workflow_decisions%ROWTYPE; next_decision public.workflow_decisions%ROWTYPE;
+ BEGIN
+-    IF NEW.owner_kind<>'workflow' THEN RETURN NEW; END IF;
+     IF TG_OP='INSERT' THEN
+         IF NEW.model_blocked_decision IS NOT NULL THEN
+             RAISE EXCEPTION 'new checkpoint cannot inherit token approval' USING ERRCODE='23514';
+@@ -11463,7 +11438,7 @@ BEGIN
+     RETURN NEW;
+ END $$;
+ CREATE TRIGGER guard_harness_token_admission BEFORE UPDATE OF model_request_id ON public.task_harness_runs
+-    FOR EACH ROW WHEN (NEW.owner_kind='workflow' AND OLD.model_request_id IS NULL AND NEW.model_request_id IS NOT NULL)
++    FOR EACH ROW WHEN (OLD.model_request_id IS NULL AND NEW.model_request_id IS NOT NULL)
+     EXECUTE FUNCTION public.guard_harness_token_admission();
+ 
+ CREATE FUNCTION public.guard_harness_workflow_progression() RETURNS trigger LANGUAGE plpgsql AS $$
+@@ -11489,7 +11464,7 @@ BEGIN
+     RETURN NEW;
+ END $$;
+ CREATE TRIGGER guard_harness_workflow_progression BEFORE UPDATE ON public.task_harness_runs
+-    FOR EACH ROW WHEN (NEW.owner_kind='workflow')
++    FOR EACH ROW
+     EXECUTE FUNCTION public.guard_harness_workflow_progression();
+ 
+ CREATE FUNCTION public.guard_workflow_token_reopen() RETURNS trigger LANGUAGE plpgsql AS $$

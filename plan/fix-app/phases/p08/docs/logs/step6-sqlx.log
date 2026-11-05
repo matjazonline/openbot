@@ -1,0 +1,49 @@
+    Checking open_bots v0.1.0 (/Users/mac02/dev/openbot-recovery/.worktrees/fix-app-p08)
+warning: unused import: `serde_json::Value`
+ --> src/adapters/persistence/workflow/batch.rs:3:5
+  |
+3 | use serde_json::Value;
+  |     ^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `serde_json::Value`
+ --> src/adapters/persistence/workflow/lease.rs:5:5
+  |
+5 | use serde_json::Value;
+  |     ^^^^^^^^^^^^^^^^^
+
+warning: `open_bots` (lib) generated 2 warnings (run `cargo fix --lib -p open_bots` to apply 2 suggestions)
+error[E0599]: no method named `payload` found for struct `job_schema_tests::JobFixture` in the current scope
+   --> src/adapters/persistence/workflow/job_association_tests.rs:234:43
+    |
+234 |         let job = f.insert(&mut writer, f.payload()).await.unwrap();
+    |                                           ^^^^^^^ method not found in `job_schema_tests::JobFixture`
+    |
+   ::: src/adapters/persistence/workflow/job_schema_tests.rs:11:1
+    |
+ 11 | struct JobFixture {
+    | ----------------- method `payload` not found for this struct
+
+error[E0061]: this method takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/workflow/job_association_tests.rs:234:21
+    |
+234 |         let job = f.insert(&mut writer, f.payload()).await.unwrap();
+    |                     ^^^^^^              ----------- unexpected argument #2
+    |
+note: method defined here
+   --> src/adapters/persistence/workflow/job_schema_tests.rs:62:14
+    |
+ 62 |     async fn insert(&self, db: &mut PgConnection) -> Result<Uuid, sqlx::Error> {
+    |              ^^^^^^
+help: remove the extra argument
+    |
+234 -         let job = f.insert(&mut writer, f.payload()).await.unwrap();
+234 +         let job = f.insert(&mut writer).await.unwrap();
+    |
+
+Some errors have detailed explanations: E0061, E0599.
+For more information about an error, try `rustc --explain E0061`.
+warning: `open_bots` (lib test) generated 2 warnings (2 duplicates)
+error: could not compile `open_bots` (lib test) due to 2 previous errors; 2 warnings emitted
+error: `cargo check` failed with status: exit status: 101

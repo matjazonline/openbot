@@ -180,7 +180,7 @@ async fn workflow_decision_notices_are_atomic_private_and_never_settle() {
     assert!(!parts.contains("secret-comment-05"));
     assert!(parts.contains(&view.decision.0.to_string()));
     let deliveries: Vec<Uuid> = sqlx::query_scalar("SELECT notice_delivery_id FROM workflow_decision_reviewers WHERE decision_id=$1 ORDER BY ordinal").bind(view.decision.0).fetch_all(f.persistence().pool()).await.unwrap();
-    sqlx::query("UPDATE message_deliveries SET status='dead_letter' WHERE id=$1")
+    sqlx::query("UPDATE message_deliveries SET status='dead_letter',last_error_class='invalid_payload' WHERE id=$1")
         .bind(deliveries[0])
         .execute(f.persistence().pool())
         .await

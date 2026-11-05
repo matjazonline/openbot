@@ -176,7 +176,7 @@ async fn workflow_decision_notice_rejects_non_notification_independently() {
     .execute(&mut *tx)
     .await
     .unwrap();
-    sqlx::query("UPDATE message_deliveries SET purpose='reply' WHERE id=$1")
+    sqlx::query("UPDATE message_deliveries SET purpose='workflow_reply' WHERE id=$1")
         .bind(row.notice_delivery_id)
         .execute(&mut *tx)
         .await

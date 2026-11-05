@@ -14,7 +14,7 @@ pub struct User {
     /// Proof of control of the current address; a signed session is not this proof.
     pub email_verified_at: Option<chrono::DateTime<chrono::Utc>>,
     #[serde(skip_serializing)]
-    pub password_hash: String,
+    pub password_hash: Option<String>,
     /// The profile picture shown wherever the account is; `None` renders as a letter bubble.
     pub avatar_url: Option<AvatarUrl>,
     pub created_at: chrono::DateTime<chrono::Utc>,

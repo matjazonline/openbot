@@ -1,0 +1,20 @@
+{
+  "filters": {
+    "application::use_cases::user::": 23,
+    "adapters::persistence::user::": 12,
+    "adapters::persistence::auth_attempts::": 10,
+    "adapters::persistence::auth_key_rotation_tests::": 2,
+    "passwordless_login_refuses_even_if_dummy_verification_returns_true": 1,
+    "schema_constraint_": 12,
+    "model_usage": 12,
+    "run_retention_complete_tree_jobs_usage_and_idempotent_retry": 1,
+    "run_retention_rollback_after_runs_before_jobs_preserves_every_owner": 1,
+    "run_retention_archive_guards_refuse_forgery_duplicates_and_mutation": 1,
+    "adapters::http::routes::user": 20,
+    "session": 36,
+    "adapters::http::routes::ui_profile": 4,
+    "metrics_require_deployment_operator": 1,
+    "adapters::http::pages::tests::": 120
+  },
+  "selected_unique": 239
+}

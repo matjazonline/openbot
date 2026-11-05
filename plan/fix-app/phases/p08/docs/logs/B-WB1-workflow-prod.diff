@@ -1,0 +1,858 @@
+diff --git a/src/adapters/persistence/workflow/action_reconciliation/mod.rs b/src/adapters/persistence/workflow/action_reconciliation/mod.rs
+index 18b2109..f8b41a7 100644
+--- a/src/adapters/persistence/workflow/action_reconciliation/mod.rs
++++ b/src/adapters/persistence/workflow/action_reconciliation/mod.rs
+@@ -210,7 +210,7 @@ async fn restore_on(
+     .fetch_optional(&mut **tx)
+     .await?
+     .ok_or_else(missing)?;
+-    sqlx::query_scalar::<_, Uuid>("SELECT id FROM background_tasks WHERE company_id=$1 AND workflow_execution_id=$2 AND queue_kind='workflow' FOR UPDATE")
++    sqlx::query_scalar::<_, Uuid>("SELECT id FROM background_tasks WHERE company_id=$1 AND workflow_execution_id=$2  FOR UPDATE")
+         .bind(command.scope.company.as_uuid()).bind(command.scope.execution.as_uuid()).fetch_optional(&mut **tx).await?.ok_or_else(missing)?;
+     let operation: Value = sqlx::query_scalar("SELECT operation FROM workflow_action_intents WHERE company_id=$1 AND run_id=$2 AND execution_id=$3 AND id=$4 AND argument_digest=$5 FOR SHARE")
+         .bind(command.scope.company.as_uuid()).bind(command.scope.run.as_uuid()).bind(command.scope.execution.as_uuid())
+diff --git a/src/adapters/persistence/workflow/action_reconciliation/settlement.rs b/src/adapters/persistence/workflow/action_reconciliation/settlement.rs
+index b9e77f1..1e3258d 100644
+--- a/src/adapters/persistence/workflow/action_reconciliation/settlement.rs
++++ b/src/adapters/persistence/workflow/action_reconciliation/settlement.rs
+@@ -187,7 +187,7 @@ async fn continue_on(
+     if head.state != RunState::Waiting(WaitingReason::Reconciliation) {
+         return Ok((outcome, None));
+     }
+-    let job: Option<Uuid> = sqlx::query_scalar("SELECT id FROM background_tasks WHERE company_id=$1 AND workflow_execution_id=$2 AND queue_kind='workflow' AND status='failed'")
++    let job: Option<Uuid> = sqlx::query_scalar("SELECT id FROM background_tasks WHERE company_id=$1 AND workflow_execution_id=$2  AND status='failed'")
+         .bind(command.scope.company.as_uuid()).bind(command.scope.execution.as_uuid()).fetch_optional(&mut **tx).await?;
+     let Some(job) = job else {
+         return Ok((
+diff --git a/src/adapters/persistence/workflow/action_reconciliation_state_witness_validate.sql b/src/adapters/persistence/workflow/action_reconciliation_state_witness_validate.sql
+index 6882a50..d2d8df6 100644
+--- a/src/adapters/persistence/workflow/action_reconciliation_state_witness_validate.sql
++++ b/src/adapters/persistence/workflow/action_reconciliation_state_witness_validate.sql
+@@ -125,7 +125,7 @@ BEGIN
+         'execution_scope',execution.company_id=owner.company_id AND execution.run_id=owner.id AND execution.id=config.execution_id,
+         'job_scope',task.company_id=execution.company_id AND task.workflow_execution_id=execution.id AND task.id=config.job_id,
+         'admission_scope',admission.company_id=owner.company_id AND admission.run_id=owner.id,
+-        'workflow_queue',task.queue_kind='workflow','future_deadline',owner.deadline>clock_timestamp(),'activation_bound',execution.activation<=owner.max_steps,
++        'future_deadline',owner.deadline>clock_timestamp(),'activation_bound',execution.activation<=owner.max_steps,
+         'activated',execution.activated_at IS NOT NULL,'uncompleted',execution.completed_at IS NULL,'no_output',execution.committed_output IS NULL,
+         'no_route',execution.committed_route IS NULL,'no_successor',execution.successor_execution_id IS NULL,'positive_attempt',task.retry_count>0,
+         'remaining_attempts',task.retry_count<task.max_retries,'no_worker',task.worker_id IS NULL,'no_generation',task.execution_generation IS NULL,'no_lease',task.lock_expires_at IS NULL,
+@@ -139,7 +139,7 @@ BEGIN
+         'no_exhausted_receipt',NOT EXISTS(SELECT 1 FROM workflow_budget_receipts WHERE company_id=config.company_id AND run_id=config.run_id AND disposition='exhausted'),
+         'no_refusal',NOT EXISTS(SELECT 1 FROM workflow_action_claim_budget_refusals WHERE company_id=config.company_id AND run_id=config.run_id AND execution_id=config.execution_id AND job_id=config.job_id),
+         'non_child',(substring(admission.source_key FROM 4)::jsonb->>0)<>'child',
+-        'no_runnable_sibling',NOT EXISTS(SELECT 1 FROM workflow_executions AS sibling JOIN background_tasks AS other ON other.company_id=sibling.company_id AND other.workflow_execution_id=sibling.id WHERE sibling.company_id=config.company_id AND sibling.run_id=config.run_id AND other.queue_kind='workflow' AND other.id<>config.job_id AND other.status IN ('pending','processing')),
++        'no_runnable_sibling',NOT EXISTS(SELECT 1 FROM workflow_executions AS sibling JOIN background_tasks AS other ON other.company_id=sibling.company_id AND other.workflow_execution_id=sibling.id WHERE sibling.company_id=config.company_id AND sibling.run_id=config.run_id AND other.id<>config.job_id AND other.status IN ('pending','processing')),
+         'latest_attempt',NOT EXISTS(SELECT 1 FROM task_attempts AS later WHERE later.task_id=task.id AND later.attempt_number>task.attempt_ordinal-1),
+         'running',owner.state='running','no_terminal_pointer',owner.terminal_execution_id IS NULL,
+         'pending',task.status='pending','reopen_safe',workflow_action_reconciliation_reopen_safe(config.company_id,config.run_id,config.job_id)) INTO predicates
+diff --git a/src/adapters/persistence/workflow/activation.rs b/src/adapters/persistence/workflow/activation.rs
+index 5e852b0..942e0ad 100644
+--- a/src/adapters/persistence/workflow/activation.rs
++++ b/src/adapters/persistence/workflow/activation.rs
+@@ -111,9 +111,9 @@ pub(super) async fn activate_on(
+ }
+ 
+ async fn validate_job(db: &mut PgConnection, request: ActivationRequest) -> AppResult<()> {
+-    let payload: Value = sqlx::query_scalar(
+-        "SELECT payload FROM background_tasks WHERE company_id = $1 AND id = $2 \
+-         AND workflow_execution_id = $3 AND queue_kind = 'workflow' FOR SHARE",
++    let _: Uuid = sqlx::query_scalar(
++        "SELECT workflow_execution_id FROM background_tasks WHERE company_id = $1 AND id = $2 \
++         AND workflow_execution_id = $3  FOR SHARE",
+     )
+     .bind(request.company.as_uuid())
+     .bind(request.job.0)
+@@ -121,9 +121,6 @@ async fn validate_job(db: &mut PgConnection, request: ActivationRequest) -> AppR
+     .fetch_optional(db)
+     .await?
+     .ok_or_else(missing)?;
+-    if decode_job_payload(payload)? != request.execution {
+-        return Err(invalid());
+-    }
+     Ok(())
+ }
+ 
+diff --git a/src/adapters/persistence/workflow/admission_write.rs b/src/adapters/persistence/workflow/admission_write.rs
+index 6edacb6..21997da 100644
+--- a/src/adapters/persistence/workflow/admission_write.rs
++++ b/src/adapters/persistence/workflow/admission_write.rs
+@@ -169,11 +169,9 @@ pub(super) async fn insert_first_job(db: &mut PgConnection, job: &FirstJob<'_>)
+         .bind(job.entry.as_str()).execute(&mut *db).await?;
+     let (channel, thread) = binding_rows::association_columns(job.association);
+     sqlx::query(
+-        "INSERT INTO background_tasks (id, company_id, channel_id, thread_id, correlation_id, task_type, \
+-         payload, queue_kind, workflow_execution_id) VALUES ($1,$2,$3,$4,$5,'workflow_execution',$6,'workflow',$7)",
++        "INSERT INTO background_tasks (id, company_id, channel_id, thread_id, correlation_id, workflow_execution_id) VALUES ($1,$2,$3,$4,$5,$6)",
+     ).bind(Uuid::new_v4()).bind(job.company.as_uuid()).bind(channel).bind(thread)
+         .bind(job.correlation)
+-        .bind(crate::application::workflow::activation::job_payload(job.execution))
+         .bind(job.execution.as_uuid()).execute(db).await?;
+     Ok(())
+ }
+diff --git a/src/adapters/persistence/workflow/batch.rs b/src/adapters/persistence/workflow/batch.rs
+index f1b4910..d620a53 100644
+--- a/src/adapters/persistence/workflow/batch.rs
++++ b/src/adapters/persistence/workflow/batch.rs
+@@ -1,6 +1,5 @@
+ use super::*;
+ use crate::application::workflow::{activation::*, batch::*};
+-use serde_json::Value;
+ use std::time::Instant;
+ 
+ #[derive(sqlx::FromRow)]
+@@ -20,7 +19,6 @@ struct BatchExecution {
+ }
+ #[derive(sqlx::FromRow)]
+ struct BatchJob {
+-    payload: Value,
+     status: String,
+     eligible: bool,
+ }
+@@ -190,15 +188,12 @@ async fn lock_execution(
+     .await?
+     .ok_or_else(missing)?;
+     let job = sqlx::query_as::<_, BatchJob>(
+-        "SELECT payload, status, (status = 'pending' AND retry_count < max_retries AND run_at <= clock_timestamp() \
++        "SELECT status, (status = 'pending' AND retry_count < max_retries AND run_at <= clock_timestamp() \
+          AND worker_id IS NULL AND execution_generation IS NULL AND locked_at IS NULL AND lock_expires_at IS NULL) AS eligible \
+          FROM background_tasks WHERE company_id = $1 AND id = $2 AND workflow_execution_id = $3 \
+-         AND queue_kind = 'workflow' FOR UPDATE",
++          FOR UPDATE",
+     ).bind(request.company.as_uuid()).bind(request.job.0).bind(request.execution.as_uuid())
+         .fetch_optional(db).await?.ok_or_else(missing)?;
+-    if decode_job_payload(job.payload)? != request.execution {
+-        return Err(invalid());
+-    }
+     if row.completed_at.is_some() {
+         if job.status != "completed"
+             && !(job.status == "failed" && row.committed_route.as_deref() == Some("final_error"))
+@@ -220,8 +215,13 @@ async fn replay(
+         return Err(invalid());
+     }
+     let continuation = if let Some(execution) = row.successor_execution_id {
+-        let job = sqlx::query_scalar("SELECT id FROM background_tasks WHERE company_id = $1 AND workflow_execution_id = $2 AND queue_kind = 'workflow'")
+-            .bind(request.company.as_uuid()).bind(execution).fetch_one(db).await?;
++        let job = sqlx::query_scalar(
++            "SELECT id FROM background_tasks WHERE company_id = $1 AND workflow_execution_id = $2 ",
++        )
++        .bind(request.company.as_uuid())
++        .bind(execution)
++        .fetch_one(db)
++        .await?;
+         Some(ActivationRequest {
+             execution: ExecutionId::new(execution),
+             job: WorkflowJobId(job),
+diff --git a/src/adapters/persistence/workflow/batch_commit.rs b/src/adapters/persistence/workflow/batch_commit.rs
+index 59be26a..9ed8b40 100644
+--- a/src/adapters/persistence/workflow/batch_commit.rs
++++ b/src/adapters/persistence/workflow/batch_commit.rs
+@@ -81,10 +81,10 @@ async fn successor(
+         .bind(request.company.as_uuid()).bind(request.run.as_uuid()).bind(next.execution.as_uuid()).bind(step.as_str())
+         .bind(i64::try_from(ordinal).map_err(|_| invalid())?).execute(&mut *db).await?;
+     sqlx::query(
+-        "INSERT INTO background_tasks (id,company_id,channel_id,thread_id,correlation_id,task_type,payload,queue_kind,workflow_execution_id) \
+-         SELECT $3,run.company_id,run.channel_id,run.thread_id,run.correlation_id,'workflow_execution',$4,'workflow',$5 \
++        "INSERT INTO background_tasks (id,company_id,channel_id,thread_id,correlation_id,workflow_execution_id) \
++         SELECT $3,run.company_id,run.channel_id,run.thread_id,run.correlation_id,$4 \
+          FROM workflow_runs AS run WHERE run.company_id = $1 AND run.id = $2",
+-    ).bind(request.company.as_uuid()).bind(request.run.as_uuid()).bind(next.job.0).bind(job_payload(next.execution))
++    ).bind(request.company.as_uuid()).bind(request.run.as_uuid()).bind(next.job.0)
+         .bind(next.execution.as_uuid()).execute(db).await?;
+     Ok(next)
+ }
+diff --git a/src/adapters/persistence/workflow/budget.rs b/src/adapters/persistence/workflow/budget.rs
+index 4dd52f3..da97cc9 100644
+--- a/src/adapters/persistence/workflow/budget.rs
++++ b/src/adapters/persistence/workflow/budget.rs
+@@ -75,7 +75,7 @@ pub(super) async fn reserve_on(
+ 
+ async fn lock_run(db: &mut PgConnection, request: &BudgetReservation) -> AppResult<Option<Uuid>> {
+     let scope = request.fence.scope;
+-    let scoped: Option<Uuid> = sqlx::query_scalar("SELECT run.id FROM workflow_runs AS run WHERE run.company_id=$1 AND run.id=$2 AND EXISTS (SELECT 1 FROM workflow_executions AS execution JOIN background_tasks AS job ON job.company_id=execution.company_id AND job.workflow_execution_id=execution.id WHERE execution.company_id=run.company_id AND execution.run_id=run.id AND execution.id=$3 AND job.id=$4 AND job.queue_kind='workflow') FOR UPDATE")
++    let scoped: Option<Uuid> = sqlx::query_scalar("SELECT run.id FROM workflow_runs AS run WHERE run.company_id=$1 AND run.id=$2 AND EXISTS (SELECT 1 FROM workflow_executions AS execution JOIN background_tasks AS job ON job.company_id=execution.company_id AND job.workflow_execution_id=execution.id WHERE execution.company_id=run.company_id AND execution.run_id=run.id AND execution.id=$3 AND job.id=$4 ) FOR UPDATE")
+         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(scope.job.0).fetch_optional(&mut *db).await?;
+     Ok(scoped)
+ }
+@@ -169,7 +169,7 @@ pub(super) async fn activate(
+     db: &mut PgConnection,
+     scope: crate::application::workflow::activation::ActivationRequest,
+ ) -> AppResult<bool> {
+-    let pending: bool = sqlx::query_scalar("SELECT status='pending' AND worker_id IS NULL AND execution_generation IS NULL AND lock_expires_at IS NULL FROM background_tasks WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 AND queue_kind='workflow'")
++    let pending: bool = sqlx::query_scalar("SELECT status='pending' AND worker_id IS NULL AND execution_generation IS NULL AND lock_expires_at IS NULL FROM background_tasks WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 ")
+         .bind(scope.company.as_uuid()).bind(scope.job.0).bind(scope.execution.as_uuid()).fetch_one(&mut *db).await?;
+     if !pending {
+         return Err(AppError::Conflict(
+diff --git a/src/adapters/persistence/workflow/capacity.rs b/src/adapters/persistence/workflow/capacity.rs
+index d31b2db..429e7f6 100644
+--- a/src/adapters/persistence/workflow/capacity.rs
++++ b/src/adapters/persistence/workflow/capacity.rs
+@@ -57,7 +57,7 @@ pub(super) const LIVE_COMPANIES_SQL: &str = r#"
+       ON execution.company_id=job.company_id AND execution.id=job.workflow_execution_id
+     JOIN workflow_runs AS run
+       ON run.company_id=execution.company_id AND run.id=execution.run_id
+-    WHERE job.queue_kind='workflow' AND job.status='processing'
++    WHERE job.status='processing'
+       AND job.lock_expires_at > clock_timestamp() AND execution.completed_at IS NULL
+       AND run.state IN ('queued','running') AND run.deadline > clock_timestamp()
+     LIMIT $1
+diff --git a/src/adapters/persistence/workflow/checkpoint_models.rs b/src/adapters/persistence/workflow/checkpoint_models.rs
+index adabc35..15ccf9f 100644
+--- a/src/adapters/persistence/workflow/checkpoint_models.rs
++++ b/src/adapters/persistence/workflow/checkpoint_models.rs
+@@ -24,7 +24,7 @@ pub(super) async fn reserve_on(
+         return Ok(End::Rollback(Admission::OwnershipLost));
+     }
+     let saved = load_on(tx, write.fence).await?.ok_or_else(missing)?;
+-    let current = decode(saved.checkpoint.clone())?;
++    let current = decode(saved.id, saved.checkpoint.clone())?;
+     live(tx, write.fence, bound).await?;
+     if let Some(result) = admission_replay(&saved, &current, write, &request.reservation)? {
+         return Ok(End::Rollback(result));
+@@ -155,7 +155,7 @@ pub(super) async fn settle_on(
+         )));
+     }
+     let saved = load_on(tx, write.fence).await?.ok_or_else(missing)?;
+-    let current = decode(saved.checkpoint.clone())?;
++    let current = decode(saved.id, saved.checkpoint.clone())?;
+     live(tx, write.fence, bound).await?;
+     if let Some(result) = settlement_replay(&saved, &current, write, turn)? {
+         let result = replay_policy(tx, write.fence, result).await?;
+diff --git a/src/adapters/persistence/workflow/checkpoint_updates.rs b/src/adapters/persistence/workflow/checkpoint_updates.rs
+index fb3dc4e..f08e1e5 100644
+--- a/src/adapters/persistence/workflow/checkpoint_updates.rs
++++ b/src/adapters/persistence/workflow/checkpoint_updates.rs
+@@ -16,7 +16,7 @@ pub(super) async fn update_on(
+         return Ok(End::Rollback(WriteOutcome::OwnershipLost));
+     }
+     let saved = load_on(tx, write.fence).await?.ok_or_else(missing)?;
+-    let current = decode(saved.checkpoint.clone())?;
++    let current = decode(saved.id, saved.checkpoint.clone())?;
+     live(tx, write.fence, bound).await?;
+     if current.run_id != write.checkpoint {
+         return Ok(End::Rollback(WriteOutcome::OwnershipLost));
+diff --git a/src/adapters/persistence/workflow/checkpoints.rs b/src/adapters/persistence/workflow/checkpoints.rs
+index 861b0ae..bcbeed9 100644
+--- a/src/adapters/persistence/workflow/checkpoints.rs
++++ b/src/adapters/persistence/workflow/checkpoints.rs
+@@ -17,6 +17,7 @@ type Outcome = WriteOutcome<RunCheckpoint>;
+ 
+ #[derive(sqlx::FromRow)]
+ struct Saved {
++    id: Uuid,
+     checkpoint: Value,
+     workflow_prepared: Value,
+     model_blocked_decision: Option<Uuid>,
+@@ -113,7 +114,7 @@ impl WorkflowCheckpointStore for PostgresPersistence {
+                         return Ok(WriteOutcome::OwnershipLost);
+                     }
+                     let run = load_on(&mut tx, fence).await?.ok_or_else(missing)?;
+-                    let run = decode(run.checkpoint)?;
++                    let run = decode(run.id, run.checkpoint)?;
+                     live(&mut tx, fence, &bound).await?;
+                     Ok(WriteOutcome::AlreadyApplied(run))
+                 }
+@@ -225,7 +226,7 @@ impl WorkflowCheckpointStore for PostgresPersistence {
+                         "SELECT decision.token_proposal->'request'->'reservation' FROM task_harness_runs AS checkpoint
+                          JOIN workflow_decisions AS decision ON decision.company_id=checkpoint.company_id
+                           AND decision.id=checkpoint.model_blocked_decision AND decision.token_stage='reservation'
+-                         WHERE checkpoint.owner_kind='workflow' AND checkpoint.company_id=$1 AND checkpoint.workflow_run_id=$2
++                         WHERE checkpoint.company_id=$1 AND checkpoint.workflow_run_id=$2
+                            AND checkpoint.workflow_execution_id=$3 AND checkpoint.task_id=$4",
+                     )
+                     .bind(fence.scope.company.as_uuid())
+@@ -308,7 +309,7 @@ async fn live(tx: &mut PgConnection, fence: WorkflowFence, bound: &WriteBound) -
+ /// authority class before any local workflow lock. Missing preparation fails closed.
+ async fn authorize_on(tx: &mut PgConnection, fence: WorkflowFence) -> AppResult<()> {
+     let prepared: Value = sqlx::query_scalar(
+-        "SELECT workflow_prepared FROM task_harness_runs WHERE owner_kind='workflow' AND company_id=$1
++        "SELECT workflow_prepared FROM task_harness_runs WHERE company_id=$1
+           AND workflow_run_id=$2 AND workflow_execution_id=$3 AND task_id=$4",
+     )
+     .bind(fence.scope.company.as_uuid())
+@@ -323,8 +324,8 @@ async fn authorize_on(tx: &mut PgConnection, fence: WorkflowFence) -> AppResult<
+ 
+ async fn load_on(tx: &mut PgConnection, fence: WorkflowFence) -> AppResult<Option<Saved>> {
+     sqlx::query_as(
+-        "SELECT checkpoint,workflow_prepared,model_blocked_decision,model_request_id,model_generation,model_worker_id,model_attempt FROM task_harness_runs
+-        WHERE owner_kind='workflow' AND company_id=$1 AND workflow_run_id=$2
++        "SELECT id,checkpoint,workflow_prepared,model_blocked_decision,model_request_id,model_generation,model_worker_id,model_attempt FROM task_harness_runs
++        WHERE company_id=$1 AND workflow_run_id=$2
+           AND workflow_execution_id=$3 AND task_id=$4 FOR UPDATE",
+     )
+     .bind(fence.scope.company.as_uuid())
+@@ -337,7 +338,7 @@ async fn load_on(tx: &mut PgConnection, fence: WorkflowFence) -> AppResult<Optio
+ }
+ 
+ fn matching(saved: Saved, spec: &WorkflowCheckpointSpec) -> AppResult<RunCheckpoint> {
+-    let run = decode(saved.checkpoint)?;
++    let run = decode(saved.id, saved.checkpoint)?;
+     if run.identity != spec.identity
+         || run.policy != spec.policy
+         || saved.workflow_prepared != spec.prepared
+@@ -380,9 +381,8 @@ async fn open_on(
+         return Ok(End::Rollback(WriteOutcome::AlreadyApplied(run)));
+     }
+     sqlx::query("INSERT INTO task_harness_runs
+-        (id,company_id,task_id,agent_id,owner_kind,workflow_run_id,workflow_execution_id,
+-         workflow_generation,workflow_worker_id,workflow_attempt,workflow_prepared,schema_version,revision,state,checkpoint)
+-        VALUES ($1,$2,$3,$4,'workflow',$5,$6,$7,$8,$9,$10,1,0,'active',$11)")
++        (id, company_id, task_id, agent_id, workflow_run_id, workflow_execution_id, workflow_generation, workflow_worker_id, workflow_attempt, workflow_prepared, schema_version, revision, state, checkpoint)
++        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 1, 0, 'active', $11)")
+         .bind(proposed.run_id.0).bind(fence.scope.company.as_uuid()).bind(fence.scope.job.0).bind(spec.identity.agent_id)
+         .bind(fence.scope.run.as_uuid()).bind(fence.scope.execution.as_uuid()).bind(fence.generation.0)
+         .bind(fence.worker.0).bind(fence.attempt.0).bind(&spec.prepared).bind(serde_json::to_value(proposed).map_err(|_| invalid())?)
+@@ -401,7 +401,7 @@ async fn execution_on(
+         return Ok(End::Rollback(WriteOutcome::OwnershipLost));
+     }
+     let saved = load_on(tx, write.fence).await?.ok_or_else(missing)?;
+-    let current = decode(saved.checkpoint)?;
++    let current = decode(saved.id, saved.checkpoint)?;
+     live(tx, write.fence, bound).await?;
+     if current.run_id != write.checkpoint {
+         return Ok(End::Rollback(WriteOutcome::OwnershipLost));
+@@ -473,7 +473,7 @@ pub(super) async fn persist_on(
+         model_attempt=CASE WHEN $11='execution' AND model_generation=$8 THEN model_attempt WHEN $12::uuid IS NOT NULL THEN $10 ELSE NULL END,
+         model_generation=CASE WHEN $11='execution' AND model_generation=$8 THEN model_generation WHEN $12::uuid IS NOT NULL THEN $8 ELSE NULL END,
+         model_blocked_decision=CASE WHEN $11='execution' THEN model_blocked_decision ELSE $13 END
+-        WHERE owner_kind='workflow' AND company_id=$1 AND workflow_run_id=$2 AND workflow_execution_id=$3 AND id=$4")
++        WHERE company_id=$1 AND workflow_run_id=$2 AND workflow_execution_id=$3 AND id=$4")
+         .bind(fence.scope.company.as_uuid()).bind(fence.scope.run.as_uuid()).bind(fence.scope.execution.as_uuid())
+         .bind(run.run_id.0).bind(revision(run.revision.0)?).bind(state_name(&run.state))
+         .bind(serde_json::to_value(run).map_err(|_| invalid())?).bind(fence.generation.0).bind(fence.worker.0).bind(fence.attempt.0)
+@@ -496,7 +496,7 @@ async fn execution_evidence(
+     let saved = load_on(tx, write.fence)
+         .await?
+         .ok_or_else(|| bound.unresolved())?;
+-    let run = decode(saved.checkpoint)?;
++    let run = decode(saved.id, saved.checkpoint)?;
+     if run.run_id != write.checkpoint {
+         return Err(bound.unresolved());
+     }
+diff --git a/src/adapters/persistence/workflow/child_waits.rs b/src/adapters/persistence/workflow/child_waits.rs
+index 6c742df..ae7a5ee 100644
+--- a/src/adapters/persistence/workflow/child_waits.rs
++++ b/src/adapters/persistence/workflow/child_waits.rs
+@@ -261,7 +261,7 @@ async fn budget_exhausted(
+     scope: ActivationRequest,
+ ) -> AppResult<WaitProgress> {
+     let progress = wait_commit::fail(db, scope, WaitFailureReason::RootBudgetExhausted).await?;
+-    let closed = sqlx::query("UPDATE background_tasks SET status='failed',updated_at=clock_timestamp() WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 AND queue_kind='workflow' AND status='completed'")
++    let closed = sqlx::query("UPDATE background_tasks SET status='failed',updated_at=clock_timestamp() WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3  AND status='completed'")
+         .bind(scope.company.as_uuid()).bind(scope.job.0).bind(scope.execution.as_uuid()).execute(&mut *db).await?;
+     if closed.rows_affected() != 1 {
+         return Err(invalid());
+diff --git a/src/adapters/persistence/workflow/completion.rs b/src/adapters/persistence/workflow/completion.rs
+index bbf18ed..3b4bbf3 100644
+--- a/src/adapters/persistence/workflow/completion.rs
++++ b/src/adapters/persistence/workflow/completion.rs
+@@ -232,15 +232,12 @@ async fn lock_job(
+     row: &CompletionExecution,
+ ) -> AppResult<bool> {
+     let scope = fence.scope;
+-    let payload: Option<Value> = sqlx::query_scalar("SELECT payload FROM background_tasks WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 AND queue_kind='workflow' AND status=$4 FOR UPDATE")
++    let execution: Option<Uuid> = sqlx::query_scalar("SELECT workflow_execution_id FROM background_tasks WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3  AND status=$4 FOR UPDATE")
+         .bind(scope.company.as_uuid()).bind(scope.job.0).bind(scope.execution.as_uuid())
+         .bind(if row.completed_at.is_some() { "completed" } else { "processing" }).fetch_optional(&mut *db).await?;
+-    let Some(payload) = payload else {
++    let Some(_) = execution else {
+         return Ok(false);
+     };
+-    if decode_job_payload(payload)? != scope.execution {
+-        return Ok(false);
+-    }
+     let attempt: Option<Uuid> = sqlx::query_scalar("SELECT id FROM task_attempts WHERE task_id=$1 AND attempt_number=$2 AND worker_id=$3 AND execution_generation=$4 AND status=$5 FOR UPDATE")
+         .bind(scope.job.0).bind(fence.attempt.0).bind(fence.worker.0).bind(fence.generation.0)
+         .bind(if row.completed_at.is_some() { "completed" } else { "processing" }).fetch_optional(db).await?;
+@@ -269,7 +266,7 @@ async fn replay(
+     };
+     let scope = result.fence.scope;
+     let successor = if let Some(execution) = row.successor_execution_id {
+-        let job = sqlx::query_scalar("SELECT job.id FROM background_tasks AS job JOIN workflow_executions AS execution ON execution.company_id=job.company_id AND execution.id=job.workflow_execution_id WHERE job.company_id=$1 AND execution.run_id=$2 AND execution.id=$3 AND job.queue_kind='workflow'")
++        let job = sqlx::query_scalar("SELECT job.id FROM background_tasks AS job JOIN workflow_executions AS execution ON execution.company_id=job.company_id AND execution.id=job.workflow_execution_id WHERE job.company_id=$1 AND execution.run_id=$2 AND execution.id=$3 ")
+             .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(execution).fetch_one(db).await?;
+         Some(ActivationRequest {
+             execution: ExecutionId::new(execution),
+diff --git a/src/adapters/persistence/workflow/completion_job.rs b/src/adapters/persistence/workflow/completion_job.rs
+index 95f55e9..5d85c9d 100644
+--- a/src/adapters/persistence/workflow/completion_job.rs
++++ b/src/adapters/persistence/workflow/completion_job.rs
+@@ -27,7 +27,7 @@ pub(super) async fn finish(
+     match owner {
+         CompletionOwner::Parked | CompletionOwner::Recovered => Ok(()),
+         CompletionOwner::Pure => {
+-            let changed = sqlx::query("UPDATE background_tasks SET status='completed',updated_at=clock_timestamp() WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 AND queue_kind='workflow' AND status='pending' AND worker_id IS NULL AND execution_generation IS NULL AND lock_expires_at IS NULL")
++            let changed = sqlx::query("UPDATE background_tasks SET status='completed',updated_at=clock_timestamp() WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3  AND status='pending' AND worker_id IS NULL AND execution_generation IS NULL AND lock_expires_at IS NULL")
+                 .bind(scope.company.as_uuid()).bind(scope.job.0).bind(scope.execution.as_uuid()).execute(db).await?;
+             if changed.rows_affected() != 1 {
+                 return Err(invalid());
+@@ -54,7 +54,7 @@ async fn finish_fenced(db: &mut PgConnection, fence: WorkflowFence) -> AppResult
+     .bind(scope.job.0)
+     .fetch_one(&mut *db)
+     .await?;
+-    let closed = sqlx::query("UPDATE background_tasks SET status='completed',updated_at=clock_timestamp(),worker_id=NULL,execution_generation=NULL,locked_at=NULL,lock_expires_at=NULL WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 AND queue_kind='workflow' AND status='processing' AND worker_id=$4 AND execution_generation=$5 AND attempt_ordinal=$6 AND lock_expires_at>clock_timestamp() AND EXISTS (SELECT 1 FROM workflow_runs AS run WHERE run.company_id=$1 AND run.id=$7 AND run.deadline>clock_timestamp())")
++    let closed = sqlx::query("UPDATE background_tasks SET status='completed',updated_at=clock_timestamp(),worker_id=NULL,execution_generation=NULL,locked_at=NULL,lock_expires_at=NULL WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3  AND status='processing' AND worker_id=$4 AND execution_generation=$5 AND attempt_ordinal=$6 AND lock_expires_at>clock_timestamp() AND EXISTS (SELECT 1 FROM workflow_runs AS run WHERE run.company_id=$1 AND run.id=$7 AND run.deadline>clock_timestamp())")
+         .bind(scope.company.as_uuid()).bind(scope.job.0).bind(scope.execution.as_uuid()).bind(fence.worker.0).bind(fence.generation.0).bind(fence.attempt.0).bind(scope.run.as_uuid()).execute(&mut *db).await?;
+     let timely: bool = sqlx::query_scalar("SELECT $3>clock_timestamp() AND deadline>clock_timestamp() FROM workflow_runs WHERE company_id=$1 AND id=$2")
+         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(expiry).fetch_one(db).await?;
+diff --git a/src/adapters/persistence/workflow/control_retry.rs b/src/adapters/persistence/workflow/control_retry.rs
+index 800944e..98b1afa 100644
+--- a/src/adapters/persistence/workflow/control_retry.rs
++++ b/src/adapters/persistence/workflow/control_retry.rs
+@@ -21,7 +21,7 @@ pub(super) async fn retry_on(
+     let Some(execution) = execution else {
+         return Ok(false);
+     };
+-    let job: Option<Uuid> = sqlx::query_scalar("SELECT id FROM background_tasks WHERE company_id=$1 AND workflow_execution_id=$2 AND queue_kind='workflow' AND status='failed' FOR UPDATE")
++    let job: Option<Uuid> = sqlx::query_scalar("SELECT id FROM background_tasks WHERE company_id=$1 AND workflow_execution_id=$2  AND status='failed' FOR UPDATE")
+         .bind(command.company_id.as_uuid()).bind(execution).fetch_optional(&mut *db).await?;
+     let Some(job) = job else {
+         return Ok(false);
+diff --git a/src/adapters/persistence/workflow/controls.rs b/src/adapters/persistence/workflow/controls.rs
+index ba7e774..f5bef1b 100644
+--- a/src/adapters/persistence/workflow/controls.rs
++++ b/src/adapters/persistence/workflow/controls.rs
+@@ -211,7 +211,7 @@ pub(super) async fn cancel_children_on(
+ async fn cancel_run_on(db: &mut PgConnection, company: CompanyId, run: RunId) -> AppResult<()> {
+     sqlx::query("SELECT id FROM workflow_executions WHERE company_id=$1 AND run_id=$2 ORDER BY id FOR UPDATE")
+         .bind(company.as_uuid()).bind(run.as_uuid()).execute(&mut *db).await?;
+-    sqlx::query("SELECT job.id FROM background_tasks AS job JOIN workflow_executions AS execution ON execution.company_id=job.company_id AND execution.id=job.workflow_execution_id WHERE execution.company_id=$1 AND execution.run_id=$2 AND job.queue_kind='workflow' ORDER BY job.id FOR UPDATE OF job")
++    sqlx::query("SELECT job.id FROM background_tasks AS job JOIN workflow_executions AS execution ON execution.company_id=job.company_id AND execution.id=job.workflow_execution_id WHERE execution.company_id=$1 AND execution.run_id=$2  ORDER BY job.id FOR UPDATE OF job")
+         .bind(company.as_uuid()).bind(run.as_uuid()).execute(&mut *db).await?;
+     maintenance::retire_jobs(db, company, run, maintenance::RetirementCause::Cancel).await?;
+     sqlx::query("UPDATE workflow_waits SET state='cancelled',settled_at=clock_timestamp() WHERE company_id=$1 AND run_id=$2 AND state='waiting'")
+diff --git a/src/adapters/persistence/workflow/decision_approvals.rs b/src/adapters/persistence/workflow/decision_approvals.rs
+index 73d7b55..bf598b4 100644
+--- a/src/adapters/persistence/workflow/decision_approvals.rs
++++ b/src/adapters/persistence/workflow/decision_approvals.rs
+@@ -123,7 +123,7 @@ pub(super) async fn close_attempt(db: &mut PgConnection, fence: WorkflowFence) -
+     let scope = fence.scope;
+     let closed = sqlx::query("UPDATE task_attempts SET status='completed',stop_reason='approval_parked',finished_at=clock_timestamp() WHERE task_id=$1 AND attempt_number=$2 AND worker_id=$3 AND execution_generation=$4 AND status='processing'")
+         .bind(scope.job.0).bind(fence.attempt.0).bind(fence.worker.0).bind(fence.generation.0).execute(&mut *db).await?;
+-    let job = sqlx::query("UPDATE background_tasks SET status='completed',updated_at=clock_timestamp(),worker_id=NULL,execution_generation=NULL,locked_at=NULL,lock_expires_at=NULL WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 AND queue_kind='workflow' AND status='processing' AND worker_id=$4 AND execution_generation=$5 AND attempt_ordinal=$6 AND continuation_count<workflow_job_continuation_limit() AND lock_expires_at>clock_timestamp()")
++    let job = sqlx::query("UPDATE background_tasks SET status='completed',updated_at=clock_timestamp(),worker_id=NULL,execution_generation=NULL,locked_at=NULL,lock_expires_at=NULL WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3  AND status='processing' AND worker_id=$4 AND execution_generation=$5 AND attempt_ordinal=$6 AND continuation_count<workflow_job_continuation_limit() AND lock_expires_at>clock_timestamp()")
+         .bind(scope.company.as_uuid()).bind(scope.job.0).bind(scope.execution.as_uuid()).bind(fence.worker.0).bind(fence.generation.0).bind(fence.attempt.0).execute(&mut *db).await?;
+     if closed.rows_affected() != 1 || job.rows_affected() != 1 {
+         return Err(closed_error());
+diff --git a/src/adapters/persistence/workflow/decision_tokens.rs b/src/adapters/persistence/workflow/decision_tokens.rs
+index e8b92e5..525f533 100644
+--- a/src/adapters/persistence/workflow/decision_tokens.rs
++++ b/src/adapters/persistence/workflow/decision_tokens.rs
+@@ -159,7 +159,7 @@ pub(in crate::adapters::persistence::workflow) async fn fail(
+     // No error route and no automatic successor can bypass a root token refusal.
+     sqlx::query("UPDATE workflow_runs SET state='failed',waiting_reason=NULL,terminal_execution_id=$3 WHERE company_id=$1 AND id=$2")
+         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).execute(&mut *db).await?;
+-    let changed=sqlx::query("UPDATE background_tasks SET status='failed',updated_at=clock_timestamp() WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 AND queue_kind='workflow' AND status='completed'")
++    let changed=sqlx::query("UPDATE background_tasks SET status='failed',updated_at=clock_timestamp() WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3  AND status='completed'")
+         .bind(scope.company.as_uuid()).bind(scope.job.0).bind(scope.execution.as_uuid()).execute(&mut *db).await?.rows_affected();
+     if changed != 1 {
+         return Err(closed());
+diff --git a/src/adapters/persistence/workflow/decisions.rs b/src/adapters/persistence/workflow/decisions.rs
+index 95e96f8..73cb2bc 100644
+--- a/src/adapters/persistence/workflow/decisions.rs
++++ b/src/adapters/persistence/workflow/decisions.rs
+@@ -366,8 +366,14 @@ async fn lock_decision(
+     .await?
+     .ok_or_else(missing)?;
+     let reviewer = authority::authorize_reviewer_on(tx, company, actor).await?;
+-    let job: Uuid = sqlx::query_scalar("SELECT id FROM background_tasks WHERE company_id=$1 AND workflow_execution_id=$2 AND queue_kind='workflow'")
+-        .bind(company.as_uuid()).bind(head.execution_id).fetch_optional(&mut **tx).await?.ok_or_else(missing)?;
++    let job: Uuid = sqlx::query_scalar(
++        "SELECT id FROM background_tasks WHERE company_id=$1 AND workflow_execution_id=$2 ",
++    )
++    .bind(company.as_uuid())
++    .bind(head.execution_id)
++    .fetch_optional(&mut **tx)
++    .await?
++    .ok_or_else(missing)?;
+     let scope = ActivationRequest {
+         company,
+         run: RunId::new(head.run_id),
+@@ -562,8 +568,13 @@ async fn successor_of(
+     let Some(Some(next)) = next else {
+         return Ok(None);
+     };
+-    let job: Uuid = sqlx::query_scalar("SELECT id FROM background_tasks WHERE company_id=$1 AND workflow_execution_id=$2 AND queue_kind='workflow'")
+-        .bind(scope.company.as_uuid()).bind(next).fetch_one(db).await?;
++    let job: Uuid = sqlx::query_scalar(
++        "SELECT id FROM background_tasks WHERE company_id=$1 AND workflow_execution_id=$2 ",
++    )
++    .bind(scope.company.as_uuid())
++    .bind(next)
++    .fetch_one(db)
++    .await?;
+     Ok(Some(ActivationRequest {
+         execution: ExecutionId::new(next),
+         job: WorkflowJobId(job),
+diff --git a/src/adapters/persistence/workflow/fairness.rs b/src/adapters/persistence/workflow/fairness.rs
+index c2fa65f..35dc236 100644
+--- a/src/adapters/persistence/workflow/fairness.rs
++++ b/src/adapters/persistence/workflow/fairness.rs
+@@ -78,7 +78,7 @@ pub(super) const VALID_HINT: &str = r#"
+         ON run.company_id=execution.company_id AND run.id=execution.run_id
+       WHERE job.company_id=demand.company_id AND job.id=demand.job_id
+         AND execution.id=demand.execution_id AND run.id=demand.run_id
+-        AND job.queue_kind='workflow' AND job.status='pending'
++         AND job.status='pending'
+         AND job.run_at<=clock_timestamp() AND job.retry_count<job.max_retries
+         AND execution.completed_at IS NULL AND run.state IN ('queued','running')
+         AND run.deadline>clock_timestamp()
+diff --git a/src/adapters/persistence/workflow/guard_failure.rs b/src/adapters/persistence/workflow/guard_failure.rs
+index 78339cb..b222fae 100644
+--- a/src/adapters/persistence/workflow/guard_failure.rs
++++ b/src/adapters/persistence/workflow/guard_failure.rs
+@@ -68,7 +68,7 @@ async fn fail_on(db: &mut PgConnection, failure: &GuardFailure) -> AppResult<Gua
+         .bind(company).bind(run).fetch_all(&mut *db).await?;
+     sqlx::query("SELECT id FROM workflow_executions WHERE company_id=$1 AND run_id=$2 ORDER BY id FOR UPDATE")
+         .bind(company).bind(run).execute(&mut *db).await?;
+-    sqlx::query("SELECT job.id FROM background_tasks AS job JOIN workflow_executions AS execution ON execution.company_id=job.company_id AND execution.id=job.workflow_execution_id WHERE execution.company_id=$1 AND execution.run_id=$2 AND job.queue_kind='workflow' ORDER BY job.id FOR UPDATE OF job")
++    sqlx::query("SELECT job.id FROM background_tasks AS job JOIN workflow_executions AS execution ON execution.company_id=job.company_id AND execution.id=job.workflow_execution_id WHERE execution.company_id=$1 AND execution.run_id=$2  ORDER BY job.id FOR UPDATE OF job")
+         .bind(company).bind(run).execute(&mut *db).await?;
+     maintenance::retire_jobs(
+         db,
+@@ -117,7 +117,7 @@ async fn deferral_free(
+     if !current || (owner.expired && failure.site != GuardSite::RunExpiry) {
+         return Ok(false);
+     }
+-    let job = sqlx::query_as::<_, JobRow>("SELECT status, worker_id, execution_generation, attempt_ordinal, lock_expires_at > clock_timestamp() AS live FROM background_tasks WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 AND queue_kind='workflow'")
++    let job = sqlx::query_as::<_, JobRow>("SELECT status, worker_id, execution_generation, attempt_ordinal, lock_expires_at > clock_timestamp() AS live FROM background_tasks WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 ")
+         .bind(scope.company.as_uuid()).bind(scope.job.0).bind(scope.execution.as_uuid()).fetch_optional(&mut *db).await?;
+     let Some(job) = job else {
+         return Ok(false);
+diff --git a/src/adapters/persistence/workflow/lease.rs b/src/adapters/persistence/workflow/lease.rs
+index d10b353..c659f74 100644
+--- a/src/adapters/persistence/workflow/lease.rs
++++ b/src/adapters/persistence/workflow/lease.rs
+@@ -2,7 +2,6 @@ use super::persistence_bound::{Attempt, End, Evidence, WriteBound, set_server_ti
+ use super::*;
+ use crate::application::workflow::{activation::*, lease::*};
+ use chrono::{DateTime, Utc};
+-use serde_json::Value;
+ use sqlx::PgPool;
+ use tokio::time::Instant;
+ 
+@@ -20,7 +19,6 @@ pub(super) struct LeaseJob {
+     pub worker_id: Option<Uuid>,
+     pub execution_generation: Option<Uuid>,
+     pub lock_expires_at: Option<DateTime<Utc>>,
+-    pub payload: Value,
+     pub step_id: String,
+ }
+ 
+@@ -292,14 +290,11 @@ pub(super) async fn lock_scope(
+     let Some(step_id) = step else {
+         return Ok(None);
+     };
+-    let job = sqlx::query_as::<_, LeaseJob>("SELECT status,retry_count,attempt_ordinal,max_retries,worker_id,execution_generation,lock_expires_at,payload,$4::text AS step_id FROM background_tasks WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 AND queue_kind='workflow' FOR UPDATE")
++    let job = sqlx::query_as::<_, LeaseJob>("SELECT status,retry_count,attempt_ordinal,max_retries,worker_id,execution_generation,lock_expires_at,$4::text AS step_id FROM background_tasks WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3  FOR UPDATE")
+         .bind(scope.company.as_uuid()).bind(scope.job.0).bind(scope.execution.as_uuid()).bind(step_id).fetch_optional(&mut *db).await?;
+     let Some(job) = job else {
+         return Ok(None);
+     };
+-    if decode_job_payload(job.payload.clone())? != scope.execution {
+-        return Ok(None);
+-    }
+     super::persistence_bound::locks_held();
+     let active: bool = sqlx::query_scalar("SELECT state IN ('queued','running') AND deadline > clock_timestamp() FROM workflow_runs WHERE company_id=$1 AND id=$2")
+         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).fetch_one(&mut *db).await?;
+@@ -330,7 +325,7 @@ pub(super) async fn live_window(
+     fence: WorkflowFence,
+     started: Instant,
+ ) -> AppResult<Option<LeaseWindow>> {
+-    let row = sqlx::query_as::<_, Remaining>("SELECT extract(epoch FROM (job.lock_expires_at-clock_timestamp()))::float8 AS lease_seconds, extract(epoch FROM (run.deadline-clock_timestamp()))::float8 AS run_seconds FROM background_tasks AS job JOIN workflow_executions AS execution ON execution.company_id=job.company_id AND execution.id=job.workflow_execution_id JOIN workflow_runs AS run ON run.company_id=execution.company_id AND run.id=execution.run_id JOIN task_attempts AS attempt ON attempt.task_id=job.id AND attempt.attempt_number=$7 AND attempt.execution_generation=$6 AND attempt.worker_id=$5 AND attempt.status='processing' WHERE job.company_id=$1 AND run.id=$2 AND execution.id=$3 AND job.id=$4 AND job.queue_kind='workflow' AND job.status='processing' AND job.worker_id=$5 AND job.execution_generation=$6 AND job.attempt_ordinal=$7 AND job.lock_expires_at > clock_timestamp() AND execution.completed_at IS NULL AND run.state IN ('queued','running') AND run.deadline > clock_timestamp()")
++    let row = sqlx::query_as::<_, Remaining>("SELECT extract(epoch FROM (job.lock_expires_at-clock_timestamp()))::float8 AS lease_seconds, extract(epoch FROM (run.deadline-clock_timestamp()))::float8 AS run_seconds FROM background_tasks AS job JOIN workflow_executions AS execution ON execution.company_id=job.company_id AND execution.id=job.workflow_execution_id JOIN workflow_runs AS run ON run.company_id=execution.company_id AND run.id=execution.run_id JOIN task_attempts AS attempt ON attempt.task_id=job.id AND attempt.attempt_number=$7 AND attempt.execution_generation=$6 AND attempt.worker_id=$5 AND attempt.status='processing' WHERE job.company_id=$1 AND run.id=$2 AND execution.id=$3 AND job.id=$4  AND job.status='processing' AND job.worker_id=$5 AND job.execution_generation=$6 AND job.attempt_ordinal=$7 AND job.lock_expires_at > clock_timestamp() AND execution.completed_at IS NULL AND run.state IN ('queued','running') AND run.deadline > clock_timestamp()")
+         .bind(fence.scope.company.as_uuid()).bind(fence.scope.run.as_uuid()).bind(fence.scope.execution.as_uuid()).bind(fence.scope.job.0).bind(fence.worker.0).bind(fence.generation.0).bind(fence.attempt.0).fetch_optional(db).await?;
+     Ok(row
+         .filter(|row| row.lease_seconds > 0.0 && row.run_seconds > 0.0)
+@@ -468,7 +463,7 @@ pub(super) async fn renew_owned(
+     fence: WorkflowFence,
+     policy: LeasePolicy,
+ ) -> AppResult<bool> {
+-    let changed = sqlx::query("UPDATE background_tasks SET lock_expires_at = LEAST(clock_timestamp() + make_interval(secs => $2), (SELECT deadline FROM workflow_runs WHERE company_id=$3 AND id=$4)) WHERE id=$1 AND company_id=$3 AND workflow_execution_id=$5 AND queue_kind='workflow' AND status='processing' AND execution_generation=$6 AND worker_id=$7 AND attempt_ordinal=$8 AND lock_expires_at > clock_timestamp() AND EXISTS (SELECT 1 FROM workflow_runs AS run WHERE run.company_id=$3 AND run.id=$4 AND run.deadline > clock_timestamp())")
++    let changed = sqlx::query("UPDATE background_tasks SET lock_expires_at = LEAST(clock_timestamp() + make_interval(secs => $2), (SELECT deadline FROM workflow_runs WHERE company_id=$3 AND id=$4)) WHERE id=$1 AND company_id=$3 AND workflow_execution_id=$5  AND status='processing' AND execution_generation=$6 AND worker_id=$7 AND attempt_ordinal=$8 AND lock_expires_at > clock_timestamp() AND EXISTS (SELECT 1 FROM workflow_runs AS run WHERE run.company_id=$3 AND run.id=$4 AND run.deadline > clock_timestamp())")
+         .bind(fence.scope.job.0).bind(policy.duration().as_secs_f64())
+         .bind(fence.scope.company.as_uuid()).bind(fence.scope.run.as_uuid())
+         .bind(fence.scope.execution.as_uuid()).bind(fence.generation.0).bind(fence.worker.0)
+diff --git a/src/adapters/persistence/workflow/lease_claim.rs b/src/adapters/persistence/workflow/lease_claim.rs
+index c1dad8e..106bd09 100644
+--- a/src/adapters/persistence/workflow/lease_claim.rs
++++ b/src/adapters/persistence/workflow/lease_claim.rs
+@@ -165,12 +165,12 @@ async fn install(
+     policy: LeasePolicy,
+ ) -> AppResult<()> {
+     let scope = fence.scope;
+-    let changed = sqlx::query("UPDATE background_tasks SET status='processing', worker_id=$4, execution_generation=$5, locked_at=clock_timestamp(), lock_expires_at=LEAST(clock_timestamp()+make_interval(secs => $6), (SELECT deadline FROM workflow_runs WHERE company_id=$1 AND id=$7)) WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 AND queue_kind='workflow' AND status='pending' AND retry_count < max_retries AND run_at <= clock_timestamp() AND EXISTS (SELECT 1 FROM workflow_runs AS run WHERE run.company_id=$1 AND run.id=$7 AND run.state IN ('queued','running') AND run.deadline > clock_timestamp())")
++    let changed = sqlx::query("UPDATE background_tasks SET status='processing', worker_id=$4, execution_generation=$5, locked_at=clock_timestamp(), lock_expires_at=LEAST(clock_timestamp()+make_interval(secs => $6), (SELECT deadline FROM workflow_runs WHERE company_id=$1 AND id=$7)) WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3  AND status='pending' AND retry_count < max_retries AND run_at <= clock_timestamp() AND EXISTS (SELECT 1 FROM workflow_runs AS run WHERE run.company_id=$1 AND run.id=$7 AND run.state IN ('queued','running') AND run.deadline > clock_timestamp())")
+         .bind(scope.company.as_uuid()).bind(scope.job.0).bind(scope.execution.as_uuid()).bind(fence.worker.0).bind(fence.generation.0).bind(policy.duration().as_secs_f64()).bind(scope.run.as_uuid()).execute(&mut *db).await?;
+     if changed.rows_affected() != 1 {
+         return Err(refused("lease claim"));
+     }
+-    sqlx::query("INSERT INTO task_attempts (id,task_id,attempt_number,execution_generation,status,worker_id,machine_id,started_at) VALUES (gen_random_uuid(),$1,$2,$3,'processing',$4,'workflow',clock_timestamp())")
++    sqlx::query("INSERT INTO task_attempts (id,task_id,attempt_number,execution_generation,status,worker_id,started_at) VALUES (gen_random_uuid(),$1,$2,$3,'processing',$4,clock_timestamp())")
+         .bind(scope.job.0).bind(fence.attempt.0).bind(fence.generation.0).bind(fence.worker.0).execute(&mut *db).await?;
+     sqlx::query(
+         "UPDATE workflow_runs SET state='running' WHERE company_id=$1 AND id=$2 AND state='queued'",
+diff --git a/src/adapters/persistence/workflow/maintenance.rs b/src/adapters/persistence/workflow/maintenance.rs
+index ba8d3dc..425cc95 100644
+--- a/src/adapters/persistence/workflow/maintenance.rs
++++ b/src/adapters/persistence/workflow/maintenance.rs
+@@ -20,7 +20,7 @@ pub(super) async fn expire_on(db: &mut PgConnection, scope: ActivationRequest) -
+     if !eligible {
+         return Ok(false);
+     }
+-    let associated: bool = sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM workflow_executions AS execution JOIN background_tasks AS job ON job.company_id=execution.company_id AND job.workflow_execution_id=execution.id WHERE execution.company_id=$1 AND execution.run_id=$2 AND execution.id=$3 AND job.id=$4 AND job.queue_kind='workflow' AND execution.completed_at IS NULL)")
++    let associated: bool = sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM workflow_executions AS execution JOIN background_tasks AS job ON job.company_id=execution.company_id AND job.workflow_execution_id=execution.id WHERE execution.company_id=$1 AND execution.run_id=$2 AND execution.id=$3 AND job.id=$4  AND execution.completed_at IS NULL)")
+         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(scope.job.0).fetch_one(&mut *db).await?;
+     if !associated {
+         return Ok(false);
+@@ -28,7 +28,7 @@ pub(super) async fn expire_on(db: &mut PgConnection, scope: ActivationRequest) -
+     // Runs have a frozen activation bound. These statements do not load the history into memory.
+     sqlx::query("SELECT id FROM workflow_executions WHERE company_id=$1 AND run_id=$2 ORDER BY id FOR UPDATE")
+         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).execute(&mut *db).await?;
+-    sqlx::query("SELECT job.id FROM background_tasks AS job JOIN workflow_executions AS execution ON execution.company_id=job.company_id AND execution.id=job.workflow_execution_id WHERE execution.company_id=$1 AND execution.run_id=$2 AND job.queue_kind='workflow' ORDER BY job.id FOR UPDATE OF job")
++    sqlx::query("SELECT job.id FROM background_tasks AS job JOIN workflow_executions AS execution ON execution.company_id=job.company_id AND execution.id=job.workflow_execution_id WHERE execution.company_id=$1 AND execution.run_id=$2  ORDER BY job.id FOR UPDATE OF job")
+         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).execute(&mut *db).await?;
+     retire_jobs(db, scope.company, scope.run, RetirementCause::Deadline).await?;
+     sqlx::query("UPDATE workflow_waits SET state='expired',settled_at=clock_timestamp() WHERE company_id=$1 AND run_id=$2 AND state='waiting'")
+@@ -69,14 +69,14 @@ pub(super) async fn retire_jobs(
+         RetirementCause::Guard => (guard_failure::GUARD_FAILURE_CODE, "guard", None),
+     };
+     // Unknown is conservative: maintenance must not infer effect safety from a lost worker.
+-    let attempts = sqlx::query("UPDATE task_attempts AS attempt SET status='failed',finished_at=clock_timestamp(),workflow_failure_class='terminal',workflow_failure_code=$3,workflow_retry_safety='unknown',workflow_retirement=$4,stop_reason=$5 FROM background_tasks AS job JOIN workflow_executions AS execution ON execution.company_id=job.company_id AND execution.id=job.workflow_execution_id WHERE execution.company_id=$1 AND execution.run_id=$2 AND job.queue_kind='workflow' AND job.status='processing' AND attempt.task_id=job.id AND attempt.attempt_number=job.attempt_ordinal AND attempt.execution_generation=job.execution_generation AND attempt.worker_id=job.worker_id AND attempt.status='processing'")
++    let attempts = sqlx::query("UPDATE task_attempts AS attempt SET status='failed',finished_at=clock_timestamp(),workflow_failure_class='terminal',workflow_failure_code=$3,workflow_retry_safety='unknown',workflow_retirement=$4,stop_reason=$5 FROM background_tasks AS job JOIN workflow_executions AS execution ON execution.company_id=job.company_id AND execution.id=job.workflow_execution_id WHERE execution.company_id=$1 AND execution.run_id=$2  AND job.status='processing' AND attempt.task_id=job.id AND attempt.attempt_number=job.attempt_ordinal AND attempt.execution_generation=job.execution_generation AND attempt.worker_id=job.worker_id AND attempt.status='processing'")
+         .bind(company.as_uuid()).bind(run.as_uuid()).bind(code).bind(retirement).bind(stop).execute(&mut *db).await?;
+-    let jobs = sqlx::query("UPDATE background_tasks AS job SET status='failed',retry_count=retry_count+1,worker_id=NULL,execution_generation=NULL,locked_at=NULL,lock_expires_at=NULL,updated_at=clock_timestamp() FROM workflow_executions AS execution WHERE execution.company_id=$1 AND execution.run_id=$2 AND job.company_id=execution.company_id AND job.workflow_execution_id=execution.id AND job.queue_kind='workflow' AND job.status='processing'")
++    let jobs = sqlx::query("UPDATE background_tasks AS job SET status='failed',retry_count=retry_count+1,worker_id=NULL,execution_generation=NULL,locked_at=NULL,lock_expires_at=NULL,updated_at=clock_timestamp() FROM workflow_executions AS execution WHERE execution.company_id=$1 AND execution.run_id=$2 AND job.company_id=execution.company_id AND job.workflow_execution_id=execution.id  AND job.status='processing'")
+         .bind(company.as_uuid()).bind(run.as_uuid()).execute(&mut *db).await?;
+     if attempts.rows_affected() != jobs.rows_affected() {
+         return Err(invalid());
+     }
+-    sqlx::query("UPDATE background_tasks AS job SET status='failed',updated_at=clock_timestamp() FROM workflow_executions AS execution WHERE execution.company_id=$1 AND execution.run_id=$2 AND job.company_id=execution.company_id AND job.workflow_execution_id=execution.id AND job.queue_kind='workflow' AND job.status='pending'")
++    sqlx::query("UPDATE background_tasks AS job SET status='failed',updated_at=clock_timestamp() FROM workflow_executions AS execution WHERE execution.company_id=$1 AND execution.run_id=$2 AND job.company_id=execution.company_id AND job.workflow_execution_id=execution.id  AND job.status='pending'")
+         .bind(company.as_uuid()).bind(run.as_uuid()).execute(db).await?;
+     Ok(())
+ }
+diff --git a/src/adapters/persistence/workflow/message_publish.rs b/src/adapters/persistence/workflow/message_publish.rs
+index 3d31585..12b6bb4 100644
+--- a/src/adapters/persistence/workflow/message_publish.rs
++++ b/src/adapters/persistence/workflow/message_publish.rs
+@@ -155,7 +155,7 @@ async fn continuations_exhausted_on(
+     let scope = request.fence.scope;
+     let used: i16 = sqlx::query_scalar(
+         "SELECT continuation_count FROM background_tasks \
+-         WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 AND queue_kind='workflow'",
++         WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 ",
+     )
+     .bind(scope.company.as_uuid())
+     .bind(scope.job.0)
+@@ -329,7 +329,7 @@ async fn park_on(
+     let closed = sqlx::query("UPDATE task_attempts SET status='completed',stop_reason='effect_parked',finished_at=clock_timestamp() WHERE task_id=$1 AND attempt_number=$2 AND worker_id=$3 AND execution_generation=$4 AND status='processing'")
+         .bind(scope.job.0).bind(fence.attempt.0).bind(fence.worker.0).bind(fence.generation.0)
+         .execute(&mut **tx).await?;
+-    let job = sqlx::query("UPDATE background_tasks SET status='completed',updated_at=clock_timestamp(),worker_id=NULL,execution_generation=NULL,locked_at=NULL,lock_expires_at=NULL WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 AND queue_kind='workflow' AND status='processing' AND worker_id=$4 AND execution_generation=$5 AND attempt_ordinal=$6 AND lock_expires_at>clock_timestamp()")
++    let job = sqlx::query("UPDATE background_tasks SET status='completed',updated_at=clock_timestamp(),worker_id=NULL,execution_generation=NULL,locked_at=NULL,lock_expires_at=NULL WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3  AND status='processing' AND worker_id=$4 AND execution_generation=$5 AND attempt_ordinal=$6 AND lock_expires_at>clock_timestamp()")
+         .bind(scope.company.as_uuid()).bind(scope.job.0).bind(scope.execution.as_uuid())
+         .bind(fence.worker.0).bind(fence.generation.0).bind(fence.attempt.0)
+         .execute(&mut **tx).await?;
+diff --git a/src/adapters/persistence/workflow/message_receipts.rs b/src/adapters/persistence/workflow/message_receipts.rs
+index 6014ec6..22a848f 100644
+--- a/src/adapters/persistence/workflow/message_receipts.rs
++++ b/src/adapters/persistence/workflow/message_receipts.rs
+@@ -308,7 +308,7 @@ pub(in crate::adapters::persistence::workflow) async fn conflicted_effect_park_o
+ ) -> AppResult<()> {
+     sqlx::query("UPDATE workflow_waits SET state='failed',failure_code='evidence_conflict',settled_at=clock_timestamp() WHERE company_id=$1 AND run_id=$2 AND execution_id=$3 AND reason='effect' AND state='waiting'")
+         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).execute(&mut *db).await?;
+-    let closed = sqlx::query("UPDATE background_tasks SET status='failed',updated_at=clock_timestamp() WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 AND queue_kind='workflow' AND status='completed'")
++    let closed = sqlx::query("UPDATE background_tasks SET status='failed',updated_at=clock_timestamp() WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3  AND status='completed'")
+         .bind(scope.company.as_uuid()).bind(scope.job.0).bind(scope.execution.as_uuid()).execute(&mut *db).await?;
+     if closed.rows_affected() != 1 {
+         return Err(invalid());
+diff --git a/src/adapters/persistence/workflow/metrics.sql b/src/adapters/persistence/workflow/metrics.sql
+index 4bcc1ea..d63dbc1 100644
+--- a/src/adapters/persistence/workflow/metrics.sql
++++ b/src/adapters/persistence/workflow/metrics.sql
+@@ -13,7 +13,7 @@ WITH bounds AS (
+                FILTER (WHERE status = 'pending' AND run_at <= bounds.now), 0) AS age,
+            count(*) FILTER (WHERE status = 'processing' AND lock_expires_at <= bounds.now) AS expired
+     FROM background_tasks CROSS JOIN bounds
+-    WHERE queue_kind = 'workflow' AND status IN ('pending','processing')
++    WHERE status IN ('pending','processing')
+ ), steps AS (
+     SELECT count(*) AS completed,
+            COALESCE(percentile_cont(0.95) WITHIN GROUP
+@@ -23,7 +23,7 @@ WITH bounds AS (
+     SELECT count(*) AS count FROM task_attempts AS attempt
+     JOIN background_tasks AS job ON job.id = attempt.task_id
+     CROSS JOIN bounds
+-    WHERE job.queue_kind = 'workflow' AND attempt.attempt_number > 1 AND attempt.started_at >= bounds.since
++    WHERE attempt.attempt_number > 1 AND attempt.started_at >= bounds.since
+ ), decisions AS (
+     SELECT count(*) AS open,
+            COALESCE(max(EXTRACT(EPOCH FROM bounds.now - decision.created_at)), 0) AS age
+diff --git a/src/adapters/persistence/workflow/pending_recovery.rs b/src/adapters/persistence/workflow/pending_recovery.rs
+index 5bfbffc..6621939 100644
+--- a/src/adapters/persistence/workflow/pending_recovery.rs
++++ b/src/adapters/persistence/workflow/pending_recovery.rs
+@@ -103,7 +103,7 @@ pub(super) async fn settle(
+         sqlx::query("UPDATE workflow_runs SET state=$4,waiting_reason=$5,terminal_execution_id=CASE WHEN $4='failed' THEN $3 ELSE NULL END WHERE company_id=$1 AND id=$2 AND state IN ('queued','running')")
+             .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(if reconcile {"waiting"} else {"failed"}).bind(if reconcile {Some("reconciliation")} else {None}).execute(&mut *db).await?;
+     }
+-    let changed = sqlx::query("UPDATE background_tasks SET status='failed',updated_at=clock_timestamp() WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 AND queue_kind='workflow' AND status='pending' AND worker_id IS NULL AND execution_generation IS NULL AND lock_expires_at IS NULL")
++    let changed = sqlx::query("UPDATE background_tasks SET status='failed',updated_at=clock_timestamp() WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3  AND status='pending' AND worker_id IS NULL AND execution_generation IS NULL AND lock_expires_at IS NULL")
+         .bind(scope.company.as_uuid()).bind(scope.job.0).bind(scope.execution.as_uuid()).execute(&mut *db).await?;
+     if changed.rows_affected() != 1 {
+         return Err(invalid());
+diff --git a/src/adapters/persistence/workflow/polling.rs b/src/adapters/persistence/workflow/polling.rs
+index 1acf021..a862801 100644
+--- a/src/adapters/persistence/workflow/polling.rs
++++ b/src/adapters/persistence/workflow/polling.rs
+@@ -47,7 +47,7 @@ impl WorkflowPolling for PostgresPersistence {
+                 "SELECT run.binding_id, execution.step_id FROM workflow_runs AS run \
+                  JOIN workflow_executions AS execution ON execution.company_id=run.company_id AND execution.run_id=run.id \
+                  JOIN background_tasks AS job ON job.company_id=run.company_id AND job.workflow_execution_id=execution.id \
+-                 WHERE run.company_id=$1 AND run.id=$2 AND execution.id=$3 AND job.id=$4 AND job.queue_kind='workflow'")
++                 WHERE run.company_id=$1 AND run.id=$2 AND execution.id=$3 AND job.id=$4 ")
+                 .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(scope.job.0)
+                 .fetch_optional(&mut *tx).await?;
+             let (binding, step) = row.ok_or_else(missing)?;
+@@ -114,7 +114,7 @@ pub(super) const CANDIDATES_SQL: &str = concat!(
+                 LEFT JOIN workflow_waits AS wait
+                   ON wait.company_id = execution.company_id AND wait.execution_id = execution.id
+                  AND wait.run_id = run.id AND wait.state = 'waiting'
+-                WHERE job.queue_kind = 'workflow' AND ((execution.completed_at IS NULL
++                WHERE ((execution.completed_at IS NULL
+                   AND (
+                     (run.state IN ('queued','running','waiting') AND run.deadline <= clock_timestamp())
+                     OR (wait.id IS NULL AND run.state IN ('queued','running')
+diff --git a/src/adapters/persistence/workflow/recovery.rs b/src/adapters/persistence/workflow/recovery.rs
+index b4fd1c5..c9abc79 100644
+--- a/src/adapters/persistence/workflow/recovery.rs
++++ b/src/adapters/persistence/workflow/recovery.rs
+@@ -26,7 +26,7 @@ pub(super) async fn retire_on(
+     let scope = fence.scope;
+     let run = sqlx::query_as::<_, Snapshot>("SELECT binding_id,max_steps,deadline,clock_timestamp() AS now FROM workflow_runs WHERE company_id=$1 AND id=$2")
+         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).fetch_one(&mut *db).await?;
+-    let job = sqlx::query_as::<_, LeaseJob>("SELECT status,retry_count,attempt_ordinal,max_retries,worker_id,execution_generation,lock_expires_at,payload,execution.step_id FROM background_tasks AS job JOIN workflow_executions AS execution ON execution.company_id=job.company_id AND execution.id=job.workflow_execution_id WHERE job.company_id=$1 AND job.id=$2")
++    let job = sqlx::query_as::<_, LeaseJob>("SELECT status,retry_count,attempt_ordinal,max_retries,worker_id,execution_generation,lock_expires_at,execution.step_id FROM background_tasks AS job JOIN workflow_executions AS execution ON execution.company_id=job.company_id AND execution.id=job.workflow_execution_id WHERE job.company_id=$1 AND job.id=$2")
+         .bind(scope.company.as_uuid()).bind(scope.job.0).fetch_one(&mut *db).await?;
+     let binding = admission_binding::read_saved_binding(
+         db,
+@@ -210,7 +210,7 @@ async fn finish_job(
+         RecoveryDecision::RetryAt(at) => Some(at),
+         _ => None,
+     };
+-    let changed = sqlx::query("UPDATE background_tasks SET status=$8,retry_count=retry_count+1,run_at=COALESCE($9,run_at),worker_id=NULL,execution_generation=NULL,locked_at=NULL,lock_expires_at=NULL,updated_at=clock_timestamp() WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 AND queue_kind='workflow' AND status='processing' AND execution_generation=$4 AND worker_id=$5 AND attempt_ordinal=$6 AND ($7 OR lock_expires_at>clock_timestamp())")
++    let changed = sqlx::query("UPDATE background_tasks SET status=$8,retry_count=retry_count+1,run_at=COALESCE($9,run_at),worker_id=NULL,execution_generation=NULL,locked_at=NULL,lock_expires_at=NULL,updated_at=clock_timestamp() WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3  AND status='processing' AND execution_generation=$4 AND worker_id=$5 AND attempt_ordinal=$6 AND ($7 OR lock_expires_at>clock_timestamp())")
+         .bind(fence.scope.company.as_uuid()).bind(fence.scope.job.0).bind(fence.scope.execution.as_uuid()).bind(fence.generation.0).bind(fence.worker.0).bind(fence.attempt.0)
+         .bind(matches!(reason,Retirement::Expired)).bind(if retry_at.is_some(){"pending"}else{"failed"}).bind(retry_at).execute(db).await?;
+     if changed.rows_affected() != 1 {
+@@ -355,7 +355,7 @@ pub(super) async fn route_parked_failure(
+         sqlx::query("UPDATE workflow_runs SET state='failed',waiting_reason=NULL,terminal_execution_id=$3 WHERE company_id=$1 AND id=$2")
+             .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).execute(&mut *db).await?;
+     }
+-    let closed = sqlx::query("UPDATE background_tasks SET status='failed',updated_at=clock_timestamp() WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 AND queue_kind='workflow' AND status='completed'")
++    let closed = sqlx::query("UPDATE background_tasks SET status='failed',updated_at=clock_timestamp() WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3  AND status='completed'")
+         .bind(scope.company.as_uuid()).bind(scope.job.0).bind(scope.execution.as_uuid()).execute(&mut *db).await?;
+     if closed.rows_affected() != 1 {
+         return Err(invalid());
+diff --git a/src/adapters/persistence/workflow/storage_retention.rs b/src/adapters/persistence/workflow/storage_retention.rs
+index 4f0f34d..23cca0a 100644
+--- a/src/adapters/persistence/workflow/storage_retention.rs
++++ b/src/adapters/persistence/workflow/storage_retention.rs
+@@ -59,7 +59,7 @@ pub(super) async fn retire_on(
+     let removed_jobs = sqlx::query(
+         "DELETE FROM background_tasks AS job USING pg_temp.workflow_retention_jobs AS saved
+         WHERE job.company_id=saved.company_id AND job.id=saved.job_id
+-        AND job.workflow_execution_id=saved.execution_id AND job.queue_kind='workflow'",
++        AND job.workflow_execution_id=saved.execution_id ",
+     )
+     .execute(db)
+     .await?
+diff --git a/src/adapters/persistence/workflow/token_budget.rs b/src/adapters/persistence/workflow/token_budget.rs
+index ada64cd..fd7647d 100644
+--- a/src/adapters/persistence/workflow/token_budget.rs
++++ b/src/adapters/persistence/workflow/token_budget.rs
+@@ -193,14 +193,14 @@ pub(super) async fn pending_gate(
+         JOIN workflow_decisions AS decision ON decision.company_id=checkpoint.company_id AND decision.id=checkpoint.model_blocked_decision
+         JOIN workflow_waits AS wait ON wait.company_id=decision.company_id AND wait.id=decision.wait_id
+         WHERE checkpoint.company_id=$1 AND checkpoint.workflow_run_id=$2 AND checkpoint.workflow_execution_id=$3 AND checkpoint.task_id=$4
+-        AND checkpoint.owner_kind='workflow' AND checkpoint.state='active' AND checkpoint.model_request_id IS NULL
++         AND checkpoint.state='active' AND checkpoint.model_request_id IS NULL
+         AND decision.token_stage='reservation' AND decision.choice='approve' AND wait.state='completed')")
+         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(scope.job.0).fetch_one(&mut *db).await?;
+     if native {
+         return Ok(Progression::Open);
+     }
+     let changed=sqlx::query("UPDATE background_tasks AS job SET run_at=LEAST(clock_timestamp()+interval '5 seconds',run.deadline),updated_at=clock_timestamp()
+-        FROM workflow_runs AS run WHERE job.company_id=$1 AND job.id=$2 AND job.workflow_execution_id=$3 AND job.queue_kind='workflow'
++        FROM workflow_runs AS run WHERE job.company_id=$1 AND job.id=$2 AND job.workflow_execution_id=$3
+         AND job.status='pending' AND job.worker_id IS NULL AND job.execution_generation IS NULL
+         AND run.company_id=job.company_id AND run.id=$4 AND run.deadline>clock_timestamp()")
+         .bind(scope.company.as_uuid()).bind(scope.job.0).bind(scope.execution.as_uuid()).bind(scope.run.as_uuid()).execute(db).await?.rows_affected();
+diff --git a/src/adapters/persistence/workflow/wait_commit.rs b/src/adapters/persistence/workflow/wait_commit.rs
+index 011ef2d..10de21b 100644
+--- a/src/adapters/persistence/workflow/wait_commit.rs
++++ b/src/adapters/persistence/workflow/wait_commit.rs
+@@ -344,8 +344,13 @@ pub(super) async fn saved(
+         TransitionTarget::Step(StepId::parse(saved.route_target).map_err(|_| invalid())?)
+     };
+     let successor = if let Some(id) = saved.successor_execution_id {
+-        let job=sqlx::query_scalar("SELECT id FROM background_tasks WHERE company_id=$1 AND workflow_execution_id=$2 AND queue_kind='workflow'")
+-            .bind(scope.company.as_uuid()).bind(id).fetch_one(db).await?;
++        let job = sqlx::query_scalar(
++            "SELECT id FROM background_tasks WHERE company_id=$1 AND workflow_execution_id=$2 ",
++        )
++        .bind(scope.company.as_uuid())
++        .bind(id)
++        .fetch_one(db)
++        .await?;
+         Some(ActivationRequest {
+             execution: ExecutionId::new(id),
+             job: WorkflowJobId(job),
+diff --git a/src/adapters/persistence/workflow/waits.rs b/src/adapters/persistence/workflow/waits.rs
+index 33d6593..a6447ee 100644
+--- a/src/adapters/persistence/workflow/waits.rs
++++ b/src/adapters/persistence/workflow/waits.rs
+@@ -119,18 +119,9 @@ pub(super) async fn lock(
+     if execution.is_none() {
+         return Ok(None);
+     }
+-    let payload:Option<Value>=sqlx::query_scalar("SELECT payload FROM background_tasks WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 AND queue_kind='workflow' AND status IN ('pending','completed','failed') AND worker_id IS NULL AND execution_generation IS NULL AND lock_expires_at IS NULL FOR UPDATE")
++    let execution:Option<Uuid>=sqlx::query_scalar("SELECT workflow_execution_id FROM background_tasks WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3  AND status IN ('pending','completed','failed') AND worker_id IS NULL AND execution_generation IS NULL AND lock_expires_at IS NULL FOR UPDATE")
+         .bind(scope.company.as_uuid()).bind(scope.job.0).bind(scope.execution.as_uuid()).fetch_optional(&mut *db).await?;
+-    match payload {
+-        Some(payload) => {
+-            if decode_job_payload(payload)? == scope.execution {
+-                Ok(run)
+-            } else {
+-                Ok(None)
+-            }
+-        }
+-        _ => Ok(None),
+-    }
++    Ok(execution.and(run))
+ }
+ pub(super) enum WaitSelection {
+     Execution,
+@@ -338,7 +329,7 @@ struct SavedEvent {
+ async fn select_due(pool: &sqlx::PgPool, limit: u16) -> AppResult<Vec<SweepCandidate>> {
+     let mut tx = pool.begin().await?;
+     sqlx::query("SELECT set_config('lock_timeout','1000ms',true),set_config('statement_timeout','1000ms',true)").execute(&mut *tx).await?;
+-    let rows=sqlx::query_as("SELECT wait.company_id,wait.run_id,wait.execution_id,job.id AS job_id FROM workflow_waits AS wait JOIN workflow_runs AS run ON run.company_id=wait.company_id AND run.id=wait.run_id JOIN background_tasks AS job ON job.company_id=wait.company_id AND job.workflow_execution_id=wait.execution_id WHERE wait.state='waiting' AND (wait.deadline<=clock_timestamp() OR run.deadline<=clock_timestamp() OR run.state IN ('cancelled','failed','succeeded')) AND job.queue_kind='workflow' ORDER BY wait.deadline,wait.id LIMIT $1")
++    let rows=sqlx::query_as("SELECT wait.company_id,wait.run_id,wait.execution_id,job.id AS job_id FROM workflow_waits AS wait JOIN workflow_runs AS run ON run.company_id=wait.company_id AND run.id=wait.run_id JOIN background_tasks AS job ON job.company_id=wait.company_id AND job.workflow_execution_id=wait.execution_id WHERE wait.state='waiting' AND (wait.deadline<=clock_timestamp() OR run.deadline<=clock_timestamp() OR run.state IN ('cancelled','failed','succeeded'))  ORDER BY wait.deadline,wait.id LIMIT $1")
+             .bind(i64::from(limit)).fetch_all(&mut *tx).await?;
+     tx.commit().await?;
+     Ok(rows)
+diff --git a/src/adapters/persistence/workflow/workflow_tool_calls.rs b/src/adapters/persistence/workflow/workflow_tool_calls.rs
+index 2e5ba90..8cecb2d 100644
+--- a/src/adapters/persistence/workflow/workflow_tool_calls.rs
++++ b/src/adapters/persistence/workflow/workflow_tool_calls.rs
+@@ -156,7 +156,7 @@ async fn park_on(db: &mut PgConnection, fence: WorkflowFence, wait: Uuid) -> App
+         .execute(&mut *db).await?;
+     sqlx::query("UPDATE workflow_runs SET state='waiting',waiting_reason='child_run' WHERE company_id=$1 AND id=$2 AND state IN ('queued','running')")
+         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).execute(&mut *db).await?;
+-    let job = sqlx::query("UPDATE background_tasks SET status='completed',updated_at=clock_timestamp(),worker_id=NULL,execution_generation=NULL,locked_at=NULL,lock_expires_at=NULL WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 AND queue_kind='workflow' AND status='processing' AND worker_id=$4 AND execution_generation=$5 AND attempt_ordinal=$6 AND lock_expires_at>clock_timestamp()")
++    let job = sqlx::query("UPDATE background_tasks SET status='completed',updated_at=clock_timestamp(),worker_id=NULL,execution_generation=NULL,locked_at=NULL,lock_expires_at=NULL WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3  AND status='processing' AND worker_id=$4 AND execution_generation=$5 AND attempt_ordinal=$6 AND lock_expires_at>clock_timestamp()")
+         .bind(scope.company.as_uuid()).bind(scope.job.0).bind(scope.execution.as_uuid())
+         .bind(fence.worker.0).bind(fence.generation.0).bind(fence.attempt.0)
+         .execute(&mut *db).await?;

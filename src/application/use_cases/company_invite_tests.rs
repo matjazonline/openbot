@@ -409,7 +409,7 @@ async fn company_invites_crud_and_accept_flow() {
         username: "newuser".to_string(),
         email: "newuser@example.com".to_string(),
         email_verified_at: Some(Utc::now()),
-        password_hash: "hash".to_string(),
+        password_hash: Some("hash".to_string()),
         avatar_url: None,
         created_at: Utc::now(),
     };

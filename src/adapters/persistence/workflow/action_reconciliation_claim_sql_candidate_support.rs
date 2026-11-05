@@ -84,8 +84,8 @@ fn remove_fresh_topology(before: &Value, normalized: &mut Value, scope: Activati
             assert_eq!(added["status"], "pending");
             assert_eq!(added["retry_count"], 0);
             assert_eq!(
-                added["payload"],
-                crate::application::workflow::activation::job_payload(scope.execution)
+                added["workflow_execution_id"],
+                json!(scope.execution.as_uuid())
             );
             for field in ["worker_id", "execution_generation", "lock_expires_at"] {
                 assert!(added[field].is_null());

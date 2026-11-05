@@ -358,13 +358,8 @@ fn outstanding_row(task: &OutstandingTask, show_company: bool, openable: bool) -
         channel.to_owned()
     };
 
-    // The error is why the row is here at all, so it earns a line — truncated, because a stack of
-    // provider errors would push every other row off the panel.
-    let detail = match task
-        .last_error
-        .as_deref()
-        .filter(|_| task.needs_attention())
-    {
+    // Show the latest attempt's failure code while a failed attempt waits to retry, too.
+    let detail = match task.workflow_failure_code.as_deref() {
         Some(error) => format!(
             r##"<div class="truncate text-xs opacity-60">{error}</div>"##,
             error = escape_html_text(&truncate(error, 120)),
@@ -1333,11 +1328,10 @@ mod tests {
             channel_id: Some(Uuid::nil()),
             thread_id: Some(Uuid::nil()),
             run_id: Some(Uuid::nil()),
-            task_type: "email_agent_dispatch".into(),
             status,
             stalled,
             retry_count: 0,
-            last_error: None,
+            workflow_failure_code: None,
             since: Utc::now(),
         }
     }
@@ -1456,6 +1450,15 @@ mod tests {
         let chart = retry_rate_panel(&snapshot, DashboardWindow::last_hour());
         assert!(chart.contains("Retry rate"), "{chart}");
         assert!(chart.contains("25%"), "{chart}");
+    }
+
+    #[test]
+    fn dashboard_outstanding_renders_the_latest_attempt_failure_code() {
+        let mut task = outstanding(TaskStatus::Pending, false);
+        task.retry_count = 1;
+        task.workflow_failure_code = Some("agent.provider_timeout".into());
+        let html = outstanding_row(&task, false, true);
+        assert!(html.contains("agent.provider_timeout"));
     }
 
     #[test]

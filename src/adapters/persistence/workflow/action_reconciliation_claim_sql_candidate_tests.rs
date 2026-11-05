@@ -17,9 +17,8 @@ async fn prepare_second(f: &AdmissionFixture, first: &ActionDispatchRequest) -> 
     sqlx::query("INSERT INTO workflow_executions(company_id,run_id,id,step_id,activation) SELECT company_id,run_id,$2,step_id,2 FROM workflow_executions WHERE id=$1")
         .bind(first.scope().execution.as_uuid()).bind(scope.execution.as_uuid())
         .execute(&mut *tx).await.expect("P1 fresh execution must be legal");
-    sqlx::query("INSERT INTO background_tasks(id,company_id,channel_id,thread_id,correlation_id,task_type,payload,queue_kind,workflow_execution_id) SELECT $2,company_id,channel_id,thread_id,correlation_id,'workflow_execution',$3,'workflow',$4 FROM background_tasks WHERE id=$1")
+    sqlx::query("INSERT INTO background_tasks(id, company_id, channel_id, thread_id, correlation_id, workflow_execution_id) SELECT $2, company_id, channel_id, thread_id, correlation_id, $3 FROM background_tasks WHERE id=$1")
         .bind(first.fence.scope.job.0).bind(scope.job.0)
-        .bind(crate::application::workflow::activation::job_payload(scope.execution))
         .bind(scope.execution.as_uuid()).execute(&mut *tx).await.expect("P1 associated job must be legal");
     sqlx::query("UPDATE workflow_runs SET state='running',waiting_reason=NULL WHERE company_id=$1 AND id=$2")
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).execute(&mut *tx).await.unwrap();

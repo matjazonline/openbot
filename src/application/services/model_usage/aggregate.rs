@@ -4,7 +4,7 @@ use crate::services::harness::runs::TokenUsageSource;
 pub struct UsageSample {
     pub provider: ModelProvider,
     pub model: ModelName,
-    pub workflow: Option<Uuid>,
+    pub workflow: Uuid,
     pub agent: Option<Uuid>,
     pub input: u64,
     pub output: u64,
@@ -27,7 +27,7 @@ struct Total {
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
 enum GroupKey {
     Model(ModelProvider, ModelName),
-    Workflow(Option<Uuid>),
+    Workflow(Uuid),
 }
 pub fn aggregate(
     calls: Vec<UsageSample>,
@@ -42,7 +42,7 @@ pub fn aggregate(
     let mut truncated = false;
     for call in calls {
         if query.agent.is_some_and(|id| Some(id) != call.agent)
-            || query.workflow.is_some_and(|id| Some(id) != call.workflow)
+            || query.workflow.is_some_and(|id| id != call.workflow)
         {
             continue;
         }
@@ -126,7 +126,7 @@ fn group(key: GroupKey, total: Total) -> UsageGroup {
             group.provider = Some(provider);
             group.model = Some(model);
         }
-        GroupKey::Workflow(workflow) => group.workflow = workflow,
+        GroupKey::Workflow(workflow) => group.workflow = Some(workflow),
     }
     group
 }
@@ -152,7 +152,7 @@ mod tests {
         UsageSample {
             provider: "openai".into(),
             model: "model".into(),
-            workflow: None,
+            workflow: Uuid::nil(),
             agent: Some(Uuid::nil()),
             input: 1,
             output: 1,
@@ -220,7 +220,7 @@ mod tests {
         let samples = (0..201)
             .map(|index| {
                 let mut row = sample(None);
-                row.workflow = Some(Uuid::from_u128(index + 1));
+                row.workflow = Uuid::from_u128(index + 1);
                 row
             })
             .collect();

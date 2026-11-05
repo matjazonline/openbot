@@ -173,9 +173,9 @@ async fn mail_from(
     sqlx::query(
         r#"INSERT INTO messages
                (id, company_id, author_principal_id, authored_identity_id, subject,
-                clean_text_body, direction, role, correlation_id, content_hash)
+                clean_text_body, direction, role, correlation_id, content_hash, audience)
            VALUES ($1, $2, $3, $4, 'Hello', 'Hello', 'inbound', 'human', $5,
-                   decode(repeat('ab', 32), 'hex'))"#,
+                   decode(repeat('ab', 32), 'hex'), 'external_conversation')"#,
     )
     .bind(message_id)
     .bind(company_id)

@@ -144,13 +144,7 @@ fn preserved_history(before: &Value, after: &Value) {
     let old_job = &before["background_tasks"][0];
     let new_job = &after["background_tasks"][0];
     assert_eq!(after["background_tasks"].as_array().unwrap().len(), 1);
-    for key in [
-        "id",
-        "workflow_execution_id",
-        "retry_count",
-        "max_retries",
-        "payload",
-    ] {
+    for key in ["id", "workflow_execution_id", "retry_count", "max_retries"] {
         assert_eq!(old_job[key], new_job[key], "existing job preserves {key}");
     }
     for key in [

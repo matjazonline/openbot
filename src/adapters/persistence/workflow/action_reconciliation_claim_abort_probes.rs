@@ -58,7 +58,7 @@ const CANDIDATE: &str = r#"
     IF NOT EXISTS(SELECT 1 FROM background_tasks AS job
         JOIN workflow_runs AS owner ON owner.company_id=job.company_id AND owner.id=TG_ARGV[1]::uuid
         WHERE job.company_id=TG_ARGV[0]::uuid AND job.id=TG_ARGV[3]::uuid
-            AND job.workflow_execution_id=TG_ARGV[2]::uuid AND job.queue_kind='workflow'
+            AND job.workflow_execution_id=TG_ARGV[2]::uuid
             AND job.status='processing' AND job.retry_count=TG_ARGV[5]::integer
             AND job.worker_id=NEW.worker_id AND job.execution_generation=NEW.execution_generation
             AND job.lock_expires_at>clock_timestamp() AND owner.deadline>clock_timestamp()
@@ -84,7 +84,7 @@ const REFUSAL: &str = r#"
         AND later.attempt_number>NEW.retired_attempt)
     THEN RAISE EXCEPTION 'probe prerequisite: no greater attempt'; END IF;
     IF NOT EXISTS(SELECT 1 FROM background_tasks AS job WHERE job.company_id=NEW.company_id
-        AND job.id=NEW.job_id AND job.workflow_execution_id=NEW.execution_id AND job.queue_kind='workflow'
+        AND job.id=NEW.job_id AND job.workflow_execution_id=NEW.execution_id
         AND job.status='failed' AND job.retry_count=NEW.retired_attempt AND job.worker_id IS NULL
         AND job.execution_generation IS NULL AND job.lock_expires_at IS NULL)
     THEN RAISE EXCEPTION 'probe prerequisite: genuine lease-free failed job'; END IF;

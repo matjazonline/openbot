@@ -1,0 +1,35 @@
+{
+  "expected_init_sha384": "3fda615559ab9483d390a6abf6036a527a35c2aca5d8123d85e649d3691aaf8bb401cc952881866d3332ebde4c3b585f",
+  "databases": [
+    [
+      "open_bots",
+      "mac02",
+      "55408",
+      "/Users/mac02/dev/openbot-recovery/.worktrees/pg-p08",
+      "3fda615559ab9483d390a6abf6036a527a35c2aca5d8123d85e649d3691aaf8bb401cc952881866d3332ebde4c3b585f",
+      "t"
+    ],
+    [
+      "open_bots_test",
+      "mac02",
+      "55408",
+      "/Users/mac02/dev/openbot-recovery/.worktrees/pg-p08",
+      "3fda615559ab9483d390a6abf6036a527a35c2aca5d8123d85e649d3691aaf8bb401cc952881866d3332ebde4c3b585f",
+      "t"
+    ]
+  ],
+  "nullability": [
+    "model_usage_calls|execution_id|NO",
+    "model_usage_calls|root_run_id|NO",
+    "model_usage_calls|run_id|NO",
+    "model_usage_calls|version_id|NO",
+    "model_usage_calls|workflow_id|NO",
+    "task_harness_runs|workflow_attempt|NO",
+    "task_harness_runs|workflow_execution_id|NO",
+    "task_harness_runs|workflow_generation|NO",
+    "task_harness_runs|workflow_prepared|NO",
+    "task_harness_runs|workflow_run_id|NO",
+    "task_harness_runs|workflow_worker_id|NO",
+    "users|password_hash|YES"
+  ]
+}

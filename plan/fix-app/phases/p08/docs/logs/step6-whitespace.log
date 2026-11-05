@@ -1,0 +1,36 @@
+migrations/20260817000000_init_schema.sql:1499: trailing whitespace.
++        WHERE job.company_id=NEW.company_id AND job.id=NEW.task_id 
+migrations/20260817000000_init_schema.sql:2625: trailing whitespace.
++        WHERE owner.company_id=company AND owner.id=run AND task.id=job 
+migrations/20260817000000_init_schema.sql:2641: trailing whitespace.
++                WHERE sibling.company_id=company AND sibling.run_id=run 
+migrations/20260817000000_init_schema.sql:2825: trailing whitespace.
++        WHERE owner.company_id=company AND owner.id=run AND task.id=job 
+migrations/20260817000000_init_schema.sql:2845: trailing whitespace.
++                WHERE sibling.company_id=company AND sibling.run_id=run 
+migrations/20260817000000_init_schema.sql:9019: trailing whitespace.
++                  AND execution.id=OLD.terminal_execution_id 
+src/adapters/persistence/dashboard.rs:232: trailing whitespace.
++          JOIN background_tasks AS task ON task.id = attempt.task_id 
+src/adapters/persistence/dashboard.rs:303: trailing whitespace.
++      JOIN background_tasks AS task ON task.id = attempt.task_id 
+src/adapters/persistence/dashboard.rs:325: trailing whitespace.
++          JOIN background_tasks AS task ON task.id = attempt.task_id 
+src/adapters/persistence/workflow/action_reconciliation_child_policy_tests.rs:45: trailing whitespace.
++            WHERE owner.company_id=$1 AND owner.id=$2 AND task.id=$3 
+src/adapters/persistence/workflow/action_reconciliation_child_policy_tests.rs:60: trailing whitespace.
++                    WHERE sibling.company_id=$1 AND sibling.run_id=$2 
+src/adapters/persistence/workflow/action_reconciliation_claim_abort_probes.rs:61: trailing whitespace.
++            AND job.workflow_execution_id=TG_ARGV[2]::uuid 
+src/adapters/persistence/workflow/action_reconciliation_claim_abort_probes.rs:87: trailing whitespace.
++        AND job.id=NEW.job_id AND job.workflow_execution_id=NEW.execution_id 
+src/adapters/persistence/workflow/action_reconciliation_claim_sql_historical_tests.rs:87: trailing whitespace.
++            AND job.workflow_execution_id=episode.execution_id 
+src/adapters/persistence/workflow/action_reconciliation_eligibility_poison_tests.rs:66: trailing whitespace.
++         WHERE owner.company_id=$1 AND owner.id=$2 AND task.id=$3 
+src/adapters/persistence/workflow/action_reconciliation_eligibility_poison_tests.rs:82: trailing whitespace.
++             WHERE sibling.company_id=$1 AND sibling.run_id=$2 
+src/adapters/persistence/workflow/action_reconciliation_eligibility_remaining_tests.rs:220: trailing whitespace.
++        WHERE owner.company_id=$1 AND owner.id=$2 AND task.id=$3 
+src/adapters/persistence/workflow/token_budget.rs:203: trailing whitespace.
++        FROM workflow_runs AS run WHERE job.company_id=$1 AND job.id=$2 AND job.workflow_execution_id=$3 

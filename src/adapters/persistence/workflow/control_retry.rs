@@ -21,7 +21,7 @@ pub(super) async fn retry_on(
     let Some(execution) = execution else {
         return Ok(false);
     };
-    let job: Option<Uuid> = sqlx::query_scalar("SELECT id FROM background_tasks WHERE company_id=$1 AND workflow_execution_id=$2 AND queue_kind='workflow' AND status='failed' FOR UPDATE")
+    let job: Option<Uuid> = sqlx::query_scalar("SELECT id FROM background_tasks WHERE company_id=$1 AND workflow_execution_id=$2  AND status='failed' FOR UPDATE")
         .bind(command.company_id.as_uuid()).bind(execution).fetch_optional(&mut *db).await?;
     let Some(job) = job else {
         return Ok(false);

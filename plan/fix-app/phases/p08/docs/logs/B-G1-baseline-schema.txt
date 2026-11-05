@@ -1,0 +1,18 @@
+{"port": 55408, "user": "mac02", "version": "18.6 (Homebrew)", "database": "open_bots", "data_directory": "/Users/mac02/dev/openbot-recovery/.worktrees/pg-p08", "listen_addresses": "127.0.0.1"}
+background_tasks|background_tasks_workflow_shape_check|CHECK (((workflow_execution_id IS NOT NULL) AND (task_type = 'workflow_execution'::text) AND (payload = jsonb_build_object('version', 1, 'execution_id', (workflow_execution_id)::text))))
+task_harness_runs|task_harness_runs_owner_shape|CHECK (((owner_kind = 'workflow'::text) AND (num_nonnulls(workflow_run_id, workflow_execution_id, workflow_generation, workflow_worker_id, workflow_attempt, workflow_prepared) = 6) AND (workflow_attempt > 0) AND (final_output_consumed_at IS NULL) AND (jsonb_typeof(workflow_prepared) = 'object'::text) AND (octet_length((workflow_prepared)::text) <= 2097152)))
+company_mcp_connections|company_mcp_connections_company_id_slug_key|UNIQUE (company_id, slug)
+company_id|NO
+request_id|NO
+agent_id|YES
+workflow_id|NO
+version_id|NO
+provider|NO
+model|NO
+requested_at|NO
+reserved_input|NO
+reserved_output|NO
+input_tokens|YES
+output_tokens|YES
+usage_source|YES
+settled_at|YES

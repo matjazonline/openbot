@@ -1,0 +1,26 @@
+{
+  "filters": {
+    "schema_constraint_": 10,
+    "notification": 26,
+    "adapters::persistence::delivery::": 38,
+    "adapters::persistence::agent::": 7,
+    "mcp_shared_configuration_is_tenant_scoped_revisioned_and_preserved": 1,
+    "mcp_connection_capacity_is_atomic_for_competing_creators": 1,
+    "mcp_key_rotation_retains_shared_token_and_rejects_row_substitution": 1,
+    "workflow_maintenance_": 12,
+    "workflow_io_real_competing_claims": 1,
+    "workflow_activation_": 11,
+    "workflow_job_projection_": 2,
+    "workflow_action_reconciliation_claim_sql_deferred_greater_attempt_refusal": 1,
+    "dashboard": 51,
+    "adapters::http::pages::tests::deliveries_page_lists_queued_work_and_escapes_its_subject": 1,
+    "adapters::persistence::account_identity::": 8,
+    "jev_assets_tests::": 6,
+    "run_schema_tests::": 13,
+    "admission_history_tests::": 6,
+    "authored_identity_cannot_belong_to_a_different_author_principal": 1,
+    "workflow_decision_notices_are_atomic_private_and_never_settle": 1,
+    "workflow_message_sql_delivery_provenance_rejects_unproven_exits": 1
+  },
+  "selected_unique": 183
+}

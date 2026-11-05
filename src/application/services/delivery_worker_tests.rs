@@ -35,7 +35,7 @@ fn record(company_id: uuid::Uuid) -> DeliveryRecord {
         external_destination: None,
         correlation_id: CorrelationId::new(),
         transport: TransportKind::Email,
-        purpose: crate::entities::transport::DeliveryPurpose::Reply,
+        purpose: crate::entities::transport::DeliveryPurpose::WorkflowReply,
         idempotency_key: DeliveryKey::parse("reply:test").expect("a short key"),
         attempt_count: 0,
         max_attempts: MAX_DELIVERY_ATTEMPTS,

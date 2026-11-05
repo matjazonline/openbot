@@ -15,7 +15,7 @@ pub(super) async fn scoped_job(
     association: RunAssociation,
 ) -> Result<Uuid, sqlx::Error> {
     let id = Uuid::new_v4();
-    sqlx::query("INSERT INTO background_tasks (id, company_id, channel_id, thread_id, correlation_id, task_type, queue_kind, workflow_execution_id, payload) VALUES ($1, $2, $3, $4, $1, 'workflow_execution', 'workflow', $5, jsonb_build_object('version', 1, 'execution_id', $5::uuid::text))")
+    sqlx::query("INSERT INTO background_tasks (id, company_id, channel_id, thread_id, correlation_id, workflow_execution_id) VALUES ($1, $2, $3, $4, $1, $5)")
         .bind(id).bind(company).bind(association.channel).bind(association.thread).bind(execution).execute(db).await?;
     Ok(id)
 }
@@ -76,7 +76,7 @@ async fn workflow_job_association_nullable_scope_matrix_and_shared_attempts() {
                 .await
                 .unwrap();
         assert_eq!(saved, (scope.channel, scope.thread));
-        sqlx::query("INSERT INTO task_attempts (id, task_id, attempt_number, status, execution_generation, worker_id, machine_id) VALUES (gen_random_uuid(), $1, 1, 'processing', gen_random_uuid(), gen_random_uuid(), 'association-test')")
+        sqlx::query("INSERT INTO task_attempts (id, task_id, attempt_number, status, execution_generation, worker_id) VALUES (gen_random_uuid(), $1, 1, 'processing', gen_random_uuid(), gen_random_uuid())")
             .bind(job).execute(&mut *db).await.unwrap();
         for (other_index, other) in scopes.iter().copied().enumerate() {
             if index == other_index {
@@ -108,9 +108,9 @@ async fn workflow_job_association_nullable_scope_matrix_and_shared_attempts() {
         .acquire()
         .await
         .unwrap();
-    let error = sqlx::query("INSERT INTO background_tasks (id, company_id, correlation_id, task_type) VALUES (gen_random_uuid(), $1, gen_random_uuid(), 'inbound_email')")
+    let error = sqlx::query("INSERT INTO background_tasks (id, company_id, correlation_id, workflow_execution_id) VALUES (gen_random_uuid(), $1, gen_random_uuid(), gen_random_uuid())")
         .bind(company).execute(&mut *db).await.unwrap_err();
-    // Every job is a workflow job now (p08 D4.8), so one naming no execution is refused as one.
+    // A job must name an execution owned by this company.
     constraint(error, "background_tasks_workflow_execution_fk");
 }
 
@@ -120,7 +120,7 @@ async fn workflow_job_association_parents_and_scope_reject_mutation() {
     assert_nullable_gate(&f).await;
     let pool = f.binding.fixture.persistence.pool();
     let mut db = pool.acquire().await.unwrap();
-    f.insert(&mut db, f.payload()).await.unwrap();
+    f.insert(&mut db).await.unwrap();
     for field in ["company_id", "id", "channel_id", "thread_id"] {
         let error = sqlx::query(&format!(
             "UPDATE workflow_runs SET {field} = $2 WHERE id = $1"
@@ -231,7 +231,7 @@ async fn workflow_job_association_insert_serializes_parent_update() {
     } in parent_mutations(&f)
     {
         let mut writer = pool.begin().await.unwrap();
-        let job = f.insert(&mut writer, f.payload()).await.unwrap();
+        let job = f.insert(&mut writer).await.unwrap();
         let mut editor = pool.begin().await.unwrap();
         let pid: i32 = sqlx::query_scalar("SELECT pg_backend_pid()")
             .fetch_one(&mut *editor)

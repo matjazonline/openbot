@@ -1,0 +1,47 @@
+{
+  "source": {
+    "base": "77edd70862a88e2189587fda50fb2b0b913082b6",
+    "head": "77edd70862a88e2189587fda50fb2b0b913082b6",
+    "exclusions": [
+      "plan/fix-app/phases/p08/docs/"
+    ],
+    "diff_sha256": "01bd280bcb8e427cd5eb7aa724667ea6a2c20c6d200c1cb7b7d4ab73ab3e9e65",
+    "tree_sha256": "ed1a3d1796a732d9a849d174618c3abae6b4df43bd9fc1f134a48303e382a0bd",
+    "files_count": 2258
+  },
+  "installed_snapshot": [
+    "base:   77edd70862a88e2189587fda50fb2b0b913082b6",
+    "digest: 4ede6ac86c2ca8d362c5cec4f878c366a8deca0d80c3df21d23b5342d7fcb065"
+  ],
+  "authority_revision": 29,
+  "decision_revision": 1,
+  "coverage": "Whole workflow1090 included in1448 selected;1441PASS/4FAIL/3ignored corrected byR3PASS21. FinalR4PASS46. Earlier D3/D4/D5 evidence retained; no fullsuite/check.sh/stack-budget perI004.",
+  "corrected_failures": [
+    "adapters::persistence::workflow::tests::admission_tests::batch_tests::workflow_batch_records_map_rule_end_and_null_output",
+    "adapters::persistence::workflow::tests::admission_tests::history_reader_tests::workflow_context_history_returns_the_admission_snapshot_with_boundaries",
+    "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::workflow_agent_capture_refuses_unrunnable_agents",
+    "adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::builder_stops_a_listing_loop_once_its_result_repeats"
+  ],
+  "ignored_tests": [
+    "test adapters::http::pages::tests::dump_application_javascript ... ignored, developer aid: dumps /assets/app.js so it can be syntax-checked with node",
+    "test adapters::http::pages::tests::dump_html_injection_browser_fixtures ... ignored, browser protocol fixture: write the server-rendered forms, alerts, and shipped JavaScript",
+    "test adapters::persistence::workflow::reads::tests::dump_run_list_query_shapes ... ignored, writes the query-plan script's input; run on demand"
+  ],
+  "logs": {
+    "step3-r2-native-focused.log": "e640b7cfc14b2e41b535e75b2fcdd0d10e7e1338dce62585f6dc36ac4ace80a1",
+    "step4-native-focused.log": "255e3030336c26d8536100134a37feab08b302317cd95674192e04dacfb1f8a9",
+    "step4-r2-native-focused.log": "c553c0bc00123d16b8809e9d130d132f6bfff4607675ef8cf273ea258399f6bb",
+    "step5-r2-native-focused.log": "9db7196579c2dee8f1f128dc987f157b3982ad46dd42642d67d283666bcd0e82",
+    "step6-r2-native-focused.log": "7a5c1d06909067d16adae44635351a06f065a1311009ba72f97e074a9ded743a",
+    "step6-r3-native-focused.log": "75c66e85101841923ac76e21d7ccdde614e837b686c8390eaeb9c6cd526d2801",
+    "step6-r4-native-focused.log": "5f1aaee66e2ed1502059cf3afd6fbb4009f72bb3bbe81a3a096ec327f1c5f7fd",
+    "final-author-main.log": "ac2225eb27eb141aa9ca9cc5b5892c18575efb3227cd8c6a518a5f80d02678cc",
+    "final-r2-sqlx.log": "7be77496309692a8c54ab8d44c7b7185bcdab6d4ae3d5097bd782344323126da",
+    "final-r2-clippy.log": "7b6e0fd454b57c3f1171c0cef22fc629a92942b0a91fbbad4f2d8ed1e24c9b9c",
+    "final-r2-read-checks.json": "181a5345f18d7ce2d2b3f773b4ce314488002d0b384311c82108a47277175764",
+    "step6-resource-migration-identity.json": "f0955b19021a11c2ed798d01612f4fba693fed0648643d7566fada64cdf5767f",
+    "final-reset.log": "c558b4c5bb0064f36fcb07fc63f46cb3342806942f59d1536342bf7e63f00717",
+    "final-test-migrate.log": "8371cd7ccbd1a240cfb391e511b27e69e74afd26798c586b9e79d62a8a110f8c",
+    "final-whitespace-corrections.json": "9b2441a9c7d176dcefd7baf5c5d8789c1c8ec37b36cc2413109136774ab827e0"
+  }
+}

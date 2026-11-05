@@ -1,0 +1,7 @@
+Database 'open_bots' recreated.
+Database 'open_bots_test' recreated.
+Applying development database migrations...
+Applied 20260817000000/migrate init schema (272.546667ms)
+
+Reset complete. The development database is ready for cargo run.
+The test schema will be rebuilt by the first cargo test run that reaches it.

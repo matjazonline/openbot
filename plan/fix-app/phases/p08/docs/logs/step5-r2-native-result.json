@@ -1,0 +1,27 @@
+{
+  "build_command": [
+    "cargo",
+    "test",
+    "--locked",
+    "--offline",
+    "--lib",
+    "--no-run",
+    "--message-format=json"
+  ],
+  "command": [
+    "/Users/mac02/dev/openbot-recovery/.worktrees/fix-app-p08/target/debug/deps/open_bots-7b3508cbfb62bd10",
+    "jsonb_row_context_",
+    "adapters::persistence::thread::",
+    "adapters::persistence::mcp",
+    "workflow_harness_",
+    "adapters::persistence::delivery::tests::",
+    "response_schema::"
+  ],
+  "exit_code": 0,
+  "environment": {
+    "CARGO_INCREMENTAL": "0",
+    "SQLX_OFFLINE": "true",
+    "DATABASE_URL": "postgres://mac02@127.0.0.1:55408/open_bots",
+    "TEST_DATABASE_URL": "postgres://mac02@127.0.0.1:55408/open_bots_test"
+  }
+}

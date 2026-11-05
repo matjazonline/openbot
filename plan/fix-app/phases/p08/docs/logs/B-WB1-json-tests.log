@@ -1,0 +1,11 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.52s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-7b3508cbfb62bd10)
+
+running 4 tests
+test adapters::persistence::mcp_tests::jsonb_row_context_mcp_quarantines_discovery_and_effective_grants ... ok
+test adapters::persistence::delivery::tests::jsonb_row_context_delivery_reports_id_before_creating_queue_rows ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::store_tests::jsonb_row_context_checkpoint_reports_persisted_id_and_preserves_neighbor ... ok
+test adapters::persistence::thread::tests::jsonb_row_context_tests::jsonb_row_context_thread_contract_is_optional_per_message ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 2709 filtered out; finished in 1.65s
+

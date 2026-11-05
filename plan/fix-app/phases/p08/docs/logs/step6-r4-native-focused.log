@@ -1,0 +1,55 @@
+
+running 46 tests
+test adapters::persistence::dashboard::tests::no_statement_tests_a_parameter_for_null ... ok
+test adapters::persistence::dashboard::tests::the_company_is_the_last_parameter_and_only_the_company_form_binds_it ... ok
+test adapters::persistence::dashboard::tests::the_global_snapshot_runs ... ok
+test adapters::persistence::dashboard::tests::a_company_scoped_snapshot_runs_and_stays_inside_its_company ... ok
+test adapters::persistence::agent::constraint_tests::schema_constraint_agent_provider_and_model_are_one_pair ... ok
+test adapters::persistence::mcp_tests::schema_constraint_deleted_mcp_slug_is_reusable_and_live_creators_compete ... ok
+test adapters::persistence::thread::tests::schema_constraint_messages_require_declared_audience ... ok
+test adapters::persistence::dashboard::tests::every_global_form_reads_both_companies ... ok
+test adapters::persistence::dashboard::tests::every_company_form_reads_only_its_own_company ... ok
+test adapters::persistence::dashboard::tests::the_snapshot_cache_never_serves_one_view_to_another ... ok
+test adapters::persistence::mcp_tests::jsonb_row_context_mcp_quarantines_discovery_and_effective_grants ... ok
+test adapters::persistence::delivery::tests::schema_constraint_delivery_failure_requires_class_and_bounded_detail ... ok
+test adapters::persistence::delivery::tests::jsonb_row_context_delivery_reports_id_before_creating_queue_rows ... ok
+test adapters::persistence::auth_key_rotation_tests::schema_constraint_oauth_account_stores_null_and_rejects_passwords ... ok
+test adapters::persistence::delivery::tests::schema_constraint_retired_delivery_purposes_and_identity_status_are_refused ... ok
+test adapters::persistence::notification::tests::schema_constraint_notification_failure_requires_class_and_bounded_detail ... ok
+test adapters::persistence::thread::tests::jsonb_row_context_tests::jsonb_row_context_thread_contract_is_optional_per_message ... ok
+test adapters::persistence::auth_key_rotation_tests::schema_constraint_password_login_requires_hash_and_registered_method ... ok
+SETTLE repoll op=competing at=src/adapters/persistence/workflow/lease_tests.rs:266:14 attempt=1 not_applied=pair, no winner
+SETTLE loser op=competing at=src/adapters/persistence/workflow/lease_tests.rs:266:14 not_applied=Workflow lease.claim not applied: persistence bound elapsed before commit
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::settle_tests::workflow_io_settle_competing_pair_repolls_only_when_nothing_was_written ... ok
+SETTLE repoll op=scripted at=src/adapters/persistence/workflow/lease_tests.rs:253:30 attempt=1 not_applied=Workflow lease.claim not applied: persistence bound elapsed before commit
+SETTLE repoll op=scripted at=src/adapters/persistence/workflow/lease_tests.rs:253:30 attempt=2 not_applied=Workflow lease.claim not applied: persistence bound elapsed before commit
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::settle_tests::workflow_io_settle_repolls_only_a_definite_not_applied ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::settle_tests::workflow_io_settle_unknown_setup_still_fails - should panic ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::adversarial_tests::workflow_io_contended_renewal_never_resurrects_expired_lease ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::adversarial_tests::workflow_io_pure_boundary_claim_freeze_supervised_result_integration ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::schema_constraint_tests::schema_constraint_attempt_finish_stamp_matches_status ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::adversarial_tests::workflow_io_real_renew_reclaim_cancel_contenders_serialize_run_first ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::store_tests::jsonb_row_context_checkpoint_reports_persisted_id_and_preserves_neighbor ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::schema_constraint_tests::schema_constraint_attempt_stop_reason_matrix ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::schema_constraint_tests::schema_constraint_competing_claimants_leave_one_processing_attempt ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::schema_constraint_tests::schema_constraint_workflow_retry_count_cannot_exceed_budget ... ok
+test application::workflow::supervise::tests::workflow_io_supervision_drops_actual_future_on_every_stop ... ok
+test application::workflow::supervise::tests::workflow_io_supervision_heartbeats_and_returns_only_fenced_bounded_result ... ok
+test application::workflow::supervise::tests::workflow_io_supervision_ready_result_loses_to_cancel_expiry_and_run_deadline ... ok
+test application::workflow::supervise::tests::workflow_io_supervision_renewal_settling_inside_its_deadline_continues ... ok
+test application::workflow::supervise::tests::workflow_io_supervision_renews_at_once_after_a_full_deadline_claim ... ok
+test application::workflow::supervise::tests::workflow_io_supervision_stops_renewing_a_deadline_capped_window ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::workflow_io_exact_scope_fence_and_run_state_refuse_without_writes ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::workflow_io_external_handler_has_no_transaction_and_returns_fence ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::workflow_io_real_competing_claims_lost_ack_crash_backoff_and_frozen_retry ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::adversarial_tests::workflow_io_contended_claim_cannot_cross_deadline_or_wait_forever ... ok
+test adapters::persistence::workflow::tests::admission_tests::model_usage_tests::schema_constraint_live_usage_requires_run_and_history_has_no_runtime_owners ... ok
+test adapters::persistence::workflow::tests::run_schema_tests::job_schema_tests::workflow_job_schema_enforces_exact_ids_and_scoped_execution ... ok
+test adapters::persistence::workflow::tests::run_schema_tests::job_schema_tests::workflow_job_schema_keeps_the_channel_nullable_for_company_associations ... ok
+test adapters::persistence::workflow::tests::run_schema_tests::job_schema_tests::workflow_job_schema_rejects_foreign_execution_and_missing_owner ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::workflow_io_claim_rolls_back_at_each_write_boundary ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::adversarial_tests::workflow_io_existing_mismatched_scope_and_run_states_reject_all_fenced_operations ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::adversarial_tests::workflow_io_claim_rejects_pure_wait_due_terminal_and_deadline ... ok
+
+test result: ok. 46 passed; 0 failed; 0 ignored; 0 measured; 2667 filtered out; finished in 10.48s
+

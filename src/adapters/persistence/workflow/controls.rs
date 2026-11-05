@@ -211,7 +211,7 @@ pub(super) async fn cancel_children_on(
 async fn cancel_run_on(db: &mut PgConnection, company: CompanyId, run: RunId) -> AppResult<()> {
     sqlx::query("SELECT id FROM workflow_executions WHERE company_id=$1 AND run_id=$2 ORDER BY id FOR UPDATE")
         .bind(company.as_uuid()).bind(run.as_uuid()).execute(&mut *db).await?;
-    sqlx::query("SELECT job.id FROM background_tasks AS job JOIN workflow_executions AS execution ON execution.company_id=job.company_id AND execution.id=job.workflow_execution_id WHERE execution.company_id=$1 AND execution.run_id=$2 AND job.queue_kind='workflow' ORDER BY job.id FOR UPDATE OF job")
+    sqlx::query("SELECT job.id FROM background_tasks AS job JOIN workflow_executions AS execution ON execution.company_id=job.company_id AND execution.id=job.workflow_execution_id WHERE execution.company_id=$1 AND execution.run_id=$2  ORDER BY job.id FOR UPDATE OF job")
         .bind(company.as_uuid()).bind(run.as_uuid()).execute(&mut *db).await?;
     maintenance::retire_jobs(db, company, run, maintenance::RetirementCause::Cancel).await?;
     sqlx::query("UPDATE workflow_waits SET state='cancelled',settled_at=clock_timestamp() WHERE company_id=$1 AND run_id=$2 AND state='waiting'")

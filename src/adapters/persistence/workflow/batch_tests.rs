@@ -84,7 +84,15 @@ async fn workflow_batch_records_map_rule_end_and_null_output() {
     assert_eq!(state["events"].as_array().unwrap().len(), 4);
     for job in state["jobs"].as_array().unwrap() {
         assert_eq!(job["status"], "completed");
-        assert_eq!(job["payload"].as_object().unwrap().len(), 2);
+        assert!(job["workflow_execution_id"].is_string());
+        assert!(
+            state["executions"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|execution| execution["id"] == job["workflow_execution_id"])
+        );
+        assert!(!job.as_object().unwrap().contains_key("payload"));
     }
     let replay = f
         .persistence()
@@ -393,7 +401,7 @@ async fn workflow_batch_sql_rejects_mutated_choice_route_successor_and_duplicate
         "UPDATE workflow_executions SET committed_route = 'choice:no' WHERE step_id = 'rule'",
         "UPDATE workflow_executions SET route_target = '$end',successor_execution_id = NULL WHERE step_id = 'start'",
         "UPDATE workflow_executions SET successor_execution_id = gen_random_uuid() WHERE step_id = 'start'",
-        "INSERT INTO background_tasks (company_id,channel_id,thread_id,correlation_id,task_type,payload,queue_kind,workflow_execution_id) SELECT company_id,channel_id,thread_id,correlation_id,task_type,payload,queue_kind,workflow_execution_id FROM background_tasks LIMIT 1",
+        "INSERT INTO background_tasks (company_id, channel_id, thread_id, correlation_id, workflow_execution_id) SELECT company_id, channel_id, thread_id, correlation_id, workflow_execution_id FROM background_tasks LIMIT 1",
         "INSERT INTO workflow_executions (company_id,run_id,id,step_id,activation) SELECT company_id,run_id,gen_random_uuid(),step_id,activation FROM workflow_executions LIMIT 1",
     ] {
         assert!(

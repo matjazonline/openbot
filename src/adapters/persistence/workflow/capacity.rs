@@ -57,7 +57,7 @@ pub(super) const LIVE_COMPANIES_SQL: &str = r#"
       ON execution.company_id=job.company_id AND execution.id=job.workflow_execution_id
     JOIN workflow_runs AS run
       ON run.company_id=execution.company_id AND run.id=execution.run_id
-    WHERE job.queue_kind='workflow' AND job.status='processing'
+    WHERE job.status='processing'
       AND job.lock_expires_at > clock_timestamp() AND execution.completed_at IS NULL
       AND run.state IN ('queued','running') AND run.deadline > clock_timestamp()
     LIMIT $1

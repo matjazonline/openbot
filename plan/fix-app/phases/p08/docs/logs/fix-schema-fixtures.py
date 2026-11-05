@@ -1,0 +1,25 @@
+from pathlib import Path
+
+def edit(name, old, new, count=1):
+ p=Path(name);s=p.read_text();assert s.count(old)==count,(name,old,s.count(old));p.write_text(s.replace(old,new))
+for file in ('agent_retire_tests.rs','account_identity_tests.rs'):
+ edit('src/adapters/persistence/'+file,'correlation_id, content_hash)','correlation_id, content_hash, audience)')
+edit('src/adapters/persistence/agent_retire_tests.rs',"decode(repeat('cd', 32), 'hex'))", "decode(repeat('cd', 32), 'hex'), 'external_conversation')")
+edit('src/adapters/persistence/account_identity_tests.rs',"decode(repeat('ab', 32), 'hex'))", "decode(repeat('ab', 32), 'hex'), 'external_conversation')")
+edit('src/adapters/persistence/workflow/jev_assets_tests.rs','correlation_id,content_hash,attachments) SELECT','correlation_id,content_hash,attachments,audience) SELECT')
+edit('src/adapters/persistence/workflow/jev_assets_tests.rs',"'inbound','human',$3,$4,$5 FROM principals", "'inbound','human',$3,$4,$5,'external_conversation' FROM principals")
+edit('src/adapters/persistence/workflow/run_schema_tests.rs','role, correlation_id, content_hash) SELECT','role, correlation_id, content_hash, audience) SELECT')
+edit('src/adapters/persistence/workflow/run_schema_tests.rs',"'inbound', 'human', $3, $4 FROM principals", "'inbound', 'human', $3, $4, 'external_conversation' FROM principals")
+edit('src/adapters/persistence/workflow/admission_history_tests.rs','role, correlation_id, content_hash) SELECT','role, correlation_id, content_hash, audience) SELECT')
+edit('src/adapters/persistence/workflow/admission_history_tests.rs',"'inbound','human',$3,$4 FROM principals", "'inbound','human',$3,$4,'external_conversation' FROM principals")
+edit('src/adapters/persistence/workflow/admission_history_tests.rs','role,correlation_id,content_hash) SELECT','role,correlation_id,content_hash,audience) SELECT')
+edit('src/adapters/persistence/workflow/admission_history_tests.rs',"'inbound','human',gen_random_uuid(),$5 FROM principals", "'inbound','human',gen_random_uuid(),$5,'external_conversation' FROM principals")
+edit('src/adapters/persistence/thread/inbound_tests.rs','clean_text_body, direction, role, correlation_id, content_hash\n','clean_text_body, direction, role, correlation_id, content_hash, audience\n')
+edit('src/adapters/persistence/thread/inbound_tests.rs',"'', '', 'inbound', 'human', $5, $6)", "'', '', 'inbound', 'human', $5, $6, 'external_conversation')")
+edit('src/adapters/persistence/delivery/tests.rs',"SET status = 'dead_letter', attempt_count = max_attempts\n", "SET status = 'dead_letter', attempt_count = max_attempts, last_error_class = 'invalid_payload'\n")
+edit('src/adapters/persistence/delivery/tests.rs',"delivered_at = CASE WHEN $2 = 'delivered' THEN CURRENT_TIMESTAMP END\n                  WHERE", "delivered_at = CASE WHEN $2 = 'delivered' THEN CURRENT_TIMESTAMP END,\n                        last_error_class = CASE WHEN $2 IN ('retryable','dead_letter') THEN 'invalid_payload' END\n                  WHERE")
+edit('src/adapters/persistence/workflow/decision_lifecycle_tests.rs',"SET status='dead_letter' WHERE", "SET status='dead_letter',last_error_class='invalid_payload' WHERE")
+edit('src/adapters/persistence/workflow/message_sql_tests.rs',"SET status='retryable' WHERE", "SET status='retryable',last_error_class='invalid_payload' WHERE")
+edit('src/adapters/persistence/workflow/message_sql_tests.rs',"SET status='dead_letter' WHERE", "SET status='dead_letter',last_error_class='invalid_payload' WHERE")
+edit('src/adapters/persistence/workflow/message_sql_tests.rs',"SET status='retryable', delivered_at=NULL WHERE", "SET status='retryable', delivered_at=NULL,last_error_class='invalid_payload' WHERE")
+print('Explicit audience and failure-class fixture audit applied')

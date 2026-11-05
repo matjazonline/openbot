@@ -291,51 +291,56 @@ async fn private_messages_cannot_enter_the_external_delivery_queue() {
 }
 
 #[tokio::test]
-async fn legacy_unclassified_messages_remain_readable_but_not_deliverable() {
-    let Some(fixture) = Fixture::new("legacy_visibility").await else {
-        return;
-    };
+async fn schema_constraint_messages_require_declared_audience() {
+    let fixture = Fixture::new("declared_audience")
+        .await
+        .expect("native fixture");
     let stored = fixture
         .persistence
         .create_message(&inbound_email(
             fixture.thread.id,
-            email_metadata(&format!("<legacy-{}@partner.test>", fixture.suffix)),
-            "Old but still readable",
+            email_metadata(&format!("<audience-{}@partner.test>", fixture.suffix)),
+            "Explicit audience",
         ))
         .await
         .unwrap();
-    sqlx::query("UPDATE messages SET audience = 'legacy_unclassified' WHERE id = $1")
+    struct AudienceCase {
+        expression: &'static str,
+        code: &'static str,
+    }
+    for case in [
+        AudienceCase {
+            expression: "'legacy_unclassified'",
+            code: "23514",
+        },
+        AudienceCase {
+            expression: "DEFAULT",
+            code: "23502",
+        },
+    ] {
+        let error = sqlx::query(&format!(
+            "UPDATE messages SET audience = {} WHERE id = $1",
+            case.expression
+        ))
         .bind(stored.canonical_id.as_uuid())
         .execute(&fixture.pool)
         .await
-        .unwrap();
+        .unwrap_err();
+        assert_eq!(
+            error
+                .as_database_error()
+                .and_then(|error| error.code())
+                .as_deref(),
+            Some(case.code)
+        );
+    }
     let read = fixture
         .persistence
         .get_thread_message(fixture.thread.id, stored.canonical_id)
         .await
         .unwrap()
         .unwrap();
-    assert_eq!(read.audience, MessageAudience::LegacyUnclassified);
-
-    let mut delivery = crate::adapters::persistence::test_support::delivery_fixture(
-        &fixture.persistence,
-        crate::adapters::persistence::test_support::DeliveryFixtureRequest::new(
-            fixture.company_id,
-            fixture.channel_id,
-            fixture.thread.id,
-            &format!("legacy-guard-{}", fixture.suffix),
-        ),
-    )
-    .await
-    .delivery;
-    delivery.message_id = stored.canonical_id;
-    let mut tx = fixture.pool.begin().await.unwrap();
-    assert!(
-        crate::adapters::persistence::delivery::enqueue::insert_delivery_on(&mut tx, &delivery)
-            .await
-            .is_err()
-    );
-    tx.rollback().await.unwrap();
+    assert_eq!(read.audience, MessageAudience::ExternalConversation);
     fixture.cleanup().await;
 }
 
@@ -1383,3 +1388,6 @@ async fn channel_path_fk_external_threads_and_notes_leave_with_channel_and_compa
         }
     }
 }
+
+#[path = "jsonb_row_context_tests.rs"]
+mod jsonb_row_context_tests;

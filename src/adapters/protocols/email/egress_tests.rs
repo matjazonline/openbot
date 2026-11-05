@@ -44,7 +44,7 @@ fn envelope(context: EmailDeliveryContext) -> DeliveryEnvelope {
             message_id,
             source_binding_id: binding,
             destination: destination.clone(),
-            purpose: DeliveryPurpose::Reply,
+            purpose: DeliveryPurpose::WorkflowReply,
             key: DeliveryKey::parse("reply:task:abc:email:customer@example.com")
                 .expect("a short key"),
         },
@@ -382,7 +382,7 @@ fn a_renderer_refuses_a_context_for_another_transport() {
             message_id: CanonicalMessageId::random(),
             source_binding_id: ChannelBindingId::random(),
             destination: DeliveryDestination::Binding(ChannelBindingId::random()),
-            purpose: DeliveryPurpose::Mirror,
+            purpose: DeliveryPurpose::WorkflowReply,
             key: DeliveryKey::parse("mirror:key").unwrap(),
         },
         TransportKind::Slack,
@@ -546,7 +546,7 @@ fn record() -> DeliveryRecord {
         external_destination: None,
         correlation_id: CorrelationId::new(),
         transport: TransportKind::Email,
-        purpose: DeliveryPurpose::Reply,
+        purpose: DeliveryPurpose::WorkflowReply,
         idempotency_key: DeliveryKey::parse("reply:task:abc:email:customer@example.com").unwrap(),
         attempt_count: 0,
         max_attempts: MAX_DELIVERY_ATTEMPTS,
@@ -589,16 +589,25 @@ fn a_delivery_key_separates_purpose_source_and_destination() {
             .to_string()
     };
 
-    let base = key(DeliveryPurpose::Reply, "task:1", "a@example.com");
-    assert_eq!(base, "reply:task:1:email:a@example.com");
+    let base = key(DeliveryPurpose::WorkflowReply, "task:1", "a@example.com");
+    assert_eq!(base, "workflow_reply:task:1:email:a@example.com");
     assert_ne!(
         base,
-        key(DeliveryPurpose::Outreach, "task:1", "a@example.com")
+        key(DeliveryPurpose::WorkflowSend, "task:1", "a@example.com")
     );
-    assert_ne!(base, key(DeliveryPurpose::Reply, "task:2", "a@example.com"));
-    assert_ne!(base, key(DeliveryPurpose::Reply, "task:1", "b@example.com"));
+    assert_ne!(
+        base,
+        key(DeliveryPurpose::WorkflowReply, "task:2", "a@example.com")
+    );
+    assert_ne!(
+        base,
+        key(DeliveryPurpose::WorkflowReply, "task:1", "b@example.com")
+    );
     // Case-folded, so one recipient written two ways is one delivery rather than two.
-    assert_eq!(base, key(DeliveryPurpose::Reply, "task:1", "A@Example.com"));
+    assert_eq!(
+        base,
+        key(DeliveryPurpose::WorkflowReply, "task:1", "A@Example.com")
+    );
 
     // The composer type is the only thing that builds these in production; naming it here keeps
     // the import honest about that.

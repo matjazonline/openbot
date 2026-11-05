@@ -16,7 +16,7 @@ pub(super) async fn update_on(
         return Ok(End::Rollback(WriteOutcome::OwnershipLost));
     }
     let saved = load_on(tx, write.fence).await?.ok_or_else(missing)?;
-    let current = decode(saved.checkpoint.clone())?;
+    let current = decode(saved.id, saved.checkpoint.clone())?;
     live(tx, write.fence, bound).await?;
     if current.run_id != write.checkpoint {
         return Ok(End::Rollback(WriteOutcome::OwnershipLost));

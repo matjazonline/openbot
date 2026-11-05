@@ -49,14 +49,12 @@ pub enum MessageRole {
 /// The widest boundary at which a canonical message's content may appear.
 ///
 /// This belongs to the payload rather than to a delivery or a thread: associating the same
-/// message with another thread must never make private content public. `LegacyUnclassified` is a
-/// fail-closed migration state and is deliberately not externally deliverable.
+/// message with another thread must never make private content public.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum MessageAudience {
     ExternalConversation,
     InternalOnly,
-    LegacyUnclassified,
 }
 
 impl MessageAudience {
@@ -64,7 +62,6 @@ impl MessageAudience {
         match self {
             Self::ExternalConversation => "external_conversation",
             Self::InternalOnly => "internal_only",
-            Self::LegacyUnclassified => "legacy_unclassified",
         }
     }
 
@@ -80,7 +77,6 @@ impl FromStr for MessageAudience {
         match value {
             "external_conversation" => Ok(Self::ExternalConversation),
             "internal_only" => Ok(Self::InternalOnly),
-            "legacy_unclassified" => Ok(Self::LegacyUnclassified),
             _ => Err(format!("Unknown message audience: {value}")),
         }
     }

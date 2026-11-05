@@ -1,0 +1,1432 @@
+[
+  {
+    "rendered": "error[E0308]: mismatched types\n    --> src/adapters/http/pages/tests.rs:4129:24\n     |\n4129 |         password_hash: \"irrelevant\".to_string(),\n     |                        ^^^^^^^^^^^^^^^^^^^^^^^^ expected `Option<String>`, found `String`\n     |\n     = note: expected enum `std::option::Option<std::string::String>`\n              found struct `std::string::String`\nhelp: try wrapping the expression in `Some`\n     |\n4129 |         password_hash: Some(\"irrelevant\".to_string()),\n     |                        +++++                        +\n\n",
+    "$message_type": "diagnostic",
+    "children": [
+      {
+        "children": [],
+        "code": null,
+        "level": "note",
+        "message": "expected enum `std::option::Option<std::string::String>`\n found struct `std::string::String`",
+        "rendered": null,
+        "spans": []
+      },
+      {
+        "children": [],
+        "code": null,
+        "level": "help",
+        "message": "try wrapping the expression in `Some`",
+        "rendered": null,
+        "spans": [
+          {
+            "byte_end": 154610,
+            "byte_start": 154610,
+            "column_end": 24,
+            "column_start": 24,
+            "expansion": null,
+            "file_name": "src/adapters/http/pages/tests.rs",
+            "is_primary": true,
+            "label": null,
+            "line_end": 4129,
+            "line_start": 4129,
+            "suggested_replacement": "Some(",
+            "suggestion_applicability": "MaybeIncorrect",
+            "text": [
+              {
+                "highlight_end": 24,
+                "highlight_start": 24,
+                "text": "        password_hash: \"irrelevant\".to_string(),"
+              }
+            ]
+          },
+          {
+            "byte_end": 154634,
+            "byte_start": 154634,
+            "column_end": 48,
+            "column_start": 48,
+            "expansion": null,
+            "file_name": "src/adapters/http/pages/tests.rs",
+            "is_primary": true,
+            "label": null,
+            "line_end": 4129,
+            "line_start": 4129,
+            "suggested_replacement": ")",
+            "suggestion_applicability": "MaybeIncorrect",
+            "text": [
+              {
+                "highlight_end": 48,
+                "highlight_start": 48,
+                "text": "        password_hash: \"irrelevant\".to_string(),"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "level": "error",
+    "message": "mismatched types",
+    "spans": [
+      {
+        "byte_end": 154634,
+        "byte_start": 154610,
+        "column_end": 48,
+        "column_start": 24,
+        "expansion": null,
+        "file_name": "src/adapters/http/pages/tests.rs",
+        "is_primary": true,
+        "label": "expected `Option<String>`, found `String`",
+        "line_end": 4129,
+        "line_start": 4129,
+        "suggested_replacement": null,
+        "suggestion_applicability": null,
+        "text": [
+          {
+            "highlight_end": 48,
+            "highlight_start": 24,
+            "text": "        password_hash: \"irrelevant\".to_string(),"
+          }
+        ]
+      }
+    ],
+    "code": {
+      "code": "E0308",
+      "explanation": "Expected type did not match the received type.\n\nErroneous code examples:\n\n```compile_fail,E0308\nfn plus_one(x: i32) -> i32 {\n    x + 1\n}\n\nplus_one(\"Not a number\");\n//       ^^^^^^^^^^^^^^ expected `i32`, found `&str`\n\nif \"Not a bool\" {\n// ^^^^^^^^^^^^ expected `bool`, found `&str`\n}\n\nlet x: f32 = \"Not a float\";\n//     ---   ^^^^^^^^^^^^^ expected `f32`, found `&str`\n//     |\n//     expected due to this\n```\n\nThis error occurs when an expression was used in a place where the compiler\nexpected an expression of a different type. It can occur in several cases, the\nmost common being when calling a function and passing an argument which has a\ndifferent type than the matching type in the function declaration.\n"
+    }
+  },
+  {
+    "rendered": "error[E0308]: mismatched types\n  --> src/adapters/http/routes/monitoring.rs:41:28\n   |\n41 |             password_hash: String::new(),\n   |                            ^^^^^^^^^^^^^ expected `Option<String>`, found `String`\n   |\n   = note: expected enum `std::option::Option<std::string::String>`\n            found struct `std::string::String`\nhelp: try wrapping the expression in `Some`\n   |\n41 |             password_hash: Some(String::new()),\n   |                            +++++             +\n\n",
+    "$message_type": "diagnostic",
+    "children": [
+      {
+        "children": [],
+        "code": null,
+        "level": "note",
+        "message": "expected enum `std::option::Option<std::string::String>`\n found struct `std::string::String`",
+        "rendered": null,
+        "spans": []
+      },
+      {
+        "children": [],
+        "code": null,
+        "level": "help",
+        "message": "try wrapping the expression in `Some`",
+        "rendered": null,
+        "spans": [
+          {
+            "byte_end": 1430,
+            "byte_start": 1430,
+            "column_end": 28,
+            "column_start": 28,
+            "expansion": null,
+            "file_name": "src/adapters/http/routes/monitoring.rs",
+            "is_primary": true,
+            "label": null,
+            "line_end": 41,
+            "line_start": 41,
+            "suggested_replacement": "Some(",
+            "suggestion_applicability": "MaybeIncorrect",
+            "text": [
+              {
+                "highlight_end": 28,
+                "highlight_start": 28,
+                "text": "            password_hash: String::new(),"
+              }
+            ]
+          },
+          {
+            "byte_end": 1443,
+            "byte_start": 1443,
+            "column_end": 41,
+            "column_start": 41,
+            "expansion": null,
+            "file_name": "src/adapters/http/routes/monitoring.rs",
+            "is_primary": true,
+            "label": null,
+            "line_end": 41,
+            "line_start": 41,
+            "suggested_replacement": ")",
+            "suggestion_applicability": "MaybeIncorrect",
+            "text": [
+              {
+                "highlight_end": 41,
+                "highlight_start": 41,
+                "text": "            password_hash: String::new(),"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "level": "error",
+    "message": "mismatched types",
+    "spans": [
+      {
+        "byte_end": 1443,
+        "byte_start": 1430,
+        "column_end": 41,
+        "column_start": 28,
+        "expansion": null,
+        "file_name": "src/adapters/http/routes/monitoring.rs",
+        "is_primary": true,
+        "label": "expected `Option<String>`, found `String`",
+        "line_end": 41,
+        "line_start": 41,
+        "suggested_replacement": null,
+        "suggestion_applicability": null,
+        "text": [
+          {
+            "highlight_end": 41,
+            "highlight_start": 28,
+            "text": "            password_hash: String::new(),"
+          }
+        ]
+      }
+    ],
+    "code": {
+      "code": "E0308",
+      "explanation": "Expected type did not match the received type.\n\nErroneous code examples:\n\n```compile_fail,E0308\nfn plus_one(x: i32) -> i32 {\n    x + 1\n}\n\nplus_one(\"Not a number\");\n//       ^^^^^^^^^^^^^^ expected `i32`, found `&str`\n\nif \"Not a bool\" {\n// ^^^^^^^^^^^^ expected `bool`, found `&str`\n}\n\nlet x: f32 = \"Not a float\";\n//     ---   ^^^^^^^^^^^^^ expected `f32`, found `&str`\n//     |\n//     expected due to this\n```\n\nThis error occurs when an expression was used in a place where the compiler\nexpected an expression of a different type. It can occur in several cases, the\nmost common being when calling a function and passing an argument which has a\ndifferent type than the matching type in the function declaration.\n"
+    }
+  },
+  {
+    "rendered": "error[E0308]: mismatched types\n   --> src/adapters/http/routes/user_tests.rs:263:28\n    |\n263 |             password_hash: password_hash.to_string(),\n    |                            ^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Option<String>`, found `String`\n    |\n    = note: expected enum `std::option::Option<std::string::String>`\n             found struct `std::string::String`\nhelp: try wrapping the expression in `Some`\n    |\n263 |             password_hash: Some(password_hash.to_string()),\n    |                            +++++                         +\n\n",
+    "$message_type": "diagnostic",
+    "children": [
+      {
+        "children": [],
+        "code": null,
+        "level": "note",
+        "message": "expected enum `std::option::Option<std::string::String>`\n found struct `std::string::String`",
+        "rendered": null,
+        "spans": []
+      },
+      {
+        "children": [],
+        "code": null,
+        "level": "help",
+        "message": "try wrapping the expression in `Some`",
+        "rendered": null,
+        "spans": [
+          {
+            "byte_end": 9111,
+            "byte_start": 9111,
+            "column_end": 28,
+            "column_start": 28,
+            "expansion": null,
+            "file_name": "src/adapters/http/routes/user_tests.rs",
+            "is_primary": true,
+            "label": null,
+            "line_end": 263,
+            "line_start": 263,
+            "suggested_replacement": "Some(",
+            "suggestion_applicability": "MaybeIncorrect",
+            "text": [
+              {
+                "highlight_end": 28,
+                "highlight_start": 28,
+                "text": "            password_hash: password_hash.to_string(),"
+              }
+            ]
+          },
+          {
+            "byte_end": 9136,
+            "byte_start": 9136,
+            "column_end": 53,
+            "column_start": 53,
+            "expansion": null,
+            "file_name": "src/adapters/http/routes/user_tests.rs",
+            "is_primary": true,
+            "label": null,
+            "line_end": 263,
+            "line_start": 263,
+            "suggested_replacement": ")",
+            "suggestion_applicability": "MaybeIncorrect",
+            "text": [
+              {
+                "highlight_end": 53,
+                "highlight_start": 53,
+                "text": "            password_hash: password_hash.to_string(),"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "level": "error",
+    "message": "mismatched types",
+    "spans": [
+      {
+        "byte_end": 9136,
+        "byte_start": 9111,
+        "column_end": 53,
+        "column_start": 28,
+        "expansion": null,
+        "file_name": "src/adapters/http/routes/user_tests.rs",
+        "is_primary": true,
+        "label": "expected `Option<String>`, found `String`",
+        "line_end": 263,
+        "line_start": 263,
+        "suggested_replacement": null,
+        "suggestion_applicability": null,
+        "text": [
+          {
+            "highlight_end": 53,
+            "highlight_start": 28,
+            "text": "            password_hash: password_hash.to_string(),"
+          }
+        ]
+      }
+    ],
+    "code": {
+      "code": "E0308",
+      "explanation": "Expected type did not match the received type.\n\nErroneous code examples:\n\n```compile_fail,E0308\nfn plus_one(x: i32) -> i32 {\n    x + 1\n}\n\nplus_one(\"Not a number\");\n//       ^^^^^^^^^^^^^^ expected `i32`, found `&str`\n\nif \"Not a bool\" {\n// ^^^^^^^^^^^^ expected `bool`, found `&str`\n}\n\nlet x: f32 = \"Not a float\";\n//     ---   ^^^^^^^^^^^^^ expected `f32`, found `&str`\n//     |\n//     expected due to this\n```\n\nThis error occurs when an expression was used in a place where the compiler\nexpected an expression of a different type. It can occur in several cases, the\nmost common being when calling a function and passing an argument which has a\ndifferent type than the matching type in the function declaration.\n"
+    }
+  },
+  {
+    "rendered": "error[E0277]: the trait bound `std::option::Option<std::string::String>: std::convert::From<&str>` is not satisfied\n  --> src/adapters/http/session_test_support.rs:84:36\n   |\n84 |         password_hash: \"unit-hash\".into(),\n   |                                    ^^^^ the trait `std::convert::From<&str>` is not implemented for `std::option::Option<std::string::String>`\n   |\n   = help: the following other types implement trait `std::convert::From<T>`:\n             `std::option::Option<&T>` implements `std::convert::From<&std::option::Option<T>>`\n             `std::option::Option<&mut T>` implements `std::convert::From<&mut std::option::Option<T>>`\n             `std::option::Option<&tracing::Id>` implements `std::convert::From<&EnteredSpan>`\n             `std::option::Option<&tracing::Id>` implements `std::convert::From<&tracing::Span>`\n             `std::option::Option<&tracing::Id>` implements `std::convert::From<&tracing_core::span::Current>`\n             `std::option::Option<&tracing::Metadata<'_>>` implements `std::convert::From<&tracing_core::span::Current>`\n             `std::option::Option<Mailbox>` implements `std::convert::From<Mailboxes>`\n             `std::option::Option<T>` implements `std::convert::From<Checked<T>>`\n           and 22 others\n   = note: required for `&str` to implement `Into<std::option::Option<std::string::String>>`\n\n",
+    "$message_type": "diagnostic",
+    "children": [
+      {
+        "children": [],
+        "code": null,
+        "level": "help",
+        "message": "the following other types implement trait `std::convert::From<T>`:\n  `std::option::Option<&T>` implements `std::convert::From<&std::option::Option<T>>`\n  `std::option::Option<&mut T>` implements `std::convert::From<&mut std::option::Option<T>>`\n  `std::option::Option<&tracing::Id>` implements `std::convert::From<&EnteredSpan>`\n  `std::option::Option<&tracing::Id>` implements `std::convert::From<&tracing::Span>`\n  `std::option::Option<&tracing::Id>` implements `std::convert::From<&tracing_core::span::Current>`\n  `std::option::Option<&tracing::Metadata<'_>>` implements `std::convert::From<&tracing_core::span::Current>`\n  `std::option::Option<Mailbox>` implements `std::convert::From<Mailboxes>`\n  `std::option::Option<T>` implements `std::convert::From<Checked<T>>`\nand 22 others",
+        "rendered": null,
+        "spans": []
+      },
+      {
+        "children": [],
+        "code": null,
+        "level": "note",
+        "message": "required for `&str` to implement `Into<std::option::Option<std::string::String>>`",
+        "rendered": null,
+        "spans": []
+      }
+    ],
+    "level": "error",
+    "message": "the trait bound `std::option::Option<std::string::String>: std::convert::From<&str>` is not satisfied",
+    "spans": [
+      {
+        "byte_end": 2679,
+        "byte_start": 2675,
+        "column_end": 40,
+        "column_start": 36,
+        "expansion": null,
+        "file_name": "src/adapters/http/session_test_support.rs",
+        "is_primary": true,
+        "label": "the trait `std::convert::From<&str>` is not implemented for `std::option::Option<std::string::String>`",
+        "line_end": 84,
+        "line_start": 84,
+        "suggested_replacement": null,
+        "suggestion_applicability": null,
+        "text": [
+          {
+            "highlight_end": 40,
+            "highlight_start": 36,
+            "text": "        password_hash: \"unit-hash\".into(),"
+          }
+        ]
+      }
+    ],
+    "code": {
+      "code": "E0277",
+      "explanation": "You tried to use a type which doesn't implement some trait in a place which\nexpected that trait.\n\nErroneous code example:\n\n```compile_fail,E0277\n// here we declare the Foo trait with a bar method\ntrait Foo {\n    fn bar(&self);\n}\n\n// we now declare a function which takes an object implementing the Foo trait\nfn some_func<T: Foo>(foo: T) {\n    foo.bar();\n}\n\nfn main() {\n    // we now call the method with the i32 type, which doesn't implement\n    // the Foo trait\n    some_func(5i32); // error: the trait bound `i32 : Foo` is not satisfied\n}\n```\n\nIn order to fix this error, verify that the type you're using does implement\nthe trait. Example:\n\n```\ntrait Foo {\n    fn bar(&self);\n}\n\n// we implement the trait on the i32 type\nimpl Foo for i32 {\n    fn bar(&self) {}\n}\n\nfn some_func<T: Foo>(foo: T) {\n    foo.bar(); // we can now use this method since i32 implements the\n               // Foo trait\n}\n\nfn main() {\n    some_func(5i32); // ok!\n}\n```\n\nOr in a generic context, an erroneous code example would look like:\n\n```compile_fail,E0277\nfn some_func<T>(foo: T) {\n    println!(\"{:?}\", foo); // error: the trait `core::fmt::Debug` is not\n                           //        implemented for the type `T`\n}\n\nfn main() {\n    // We now call the method with the i32 type,\n    // which *does* implement the Debug trait.\n    some_func(5i32);\n}\n```\n\nNote that the error here is in the definition of the generic function. Although\nwe only call it with a parameter that does implement `Debug`, the compiler\nstill rejects the function. It must work with all possible input types. In\norder to make this example compile, we need to restrict the generic type we're\naccepting:\n\n```\nuse std::fmt;\n\n// Restrict the input type to types that implement Debug.\nfn some_func<T: fmt::Debug>(foo: T) {\n    println!(\"{:?}\", foo);\n}\n\nfn main() {\n    // Calling the method is still fine, as i32 implements Debug.\n    some_func(5i32);\n\n    // This would fail to compile now:\n    // struct WithoutDebug;\n    // some_func(WithoutDebug);\n}\n```\n\nRust only looks at the signature of the called function, as such it must\nalready specify all requirements that will be used for every type parameter.\n"
+    }
+  },
+  {
+    "rendered": "error[E0308]: mismatched types\n   --> src/adapters/persistence/auth_attempts.rs:329:13\n    |\n329 |             \"old-hash\"\n    |             ^^^^^^^^^^ expected `Option<String>`, found `&str`\n    |\n    = note:   expected enum `std::option::Option<std::string::String>`\n            found reference `&str`\n\n",
+    "$message_type": "diagnostic",
+    "children": [
+      {
+        "children": [],
+        "code": null,
+        "level": "note",
+        "message": "  expected enum `std::option::Option<std::string::String>`\nfound reference `&str`",
+        "rendered": null,
+        "spans": []
+      }
+    ],
+    "level": "error",
+    "message": "mismatched types",
+    "spans": [
+      {
+        "byte_end": 12353,
+        "byte_start": 12343,
+        "column_end": 23,
+        "column_start": 13,
+        "expansion": null,
+        "file_name": "src/adapters/persistence/auth_attempts.rs",
+        "is_primary": true,
+        "label": "expected `Option<String>`, found `&str`",
+        "line_end": 329,
+        "line_start": 329,
+        "suggested_replacement": null,
+        "suggestion_applicability": null,
+        "text": [
+          {
+            "highlight_end": 23,
+            "highlight_start": 13,
+            "text": "            \"old-hash\""
+          }
+        ]
+      }
+    ],
+    "code": {
+      "code": "E0308",
+      "explanation": "Expected type did not match the received type.\n\nErroneous code examples:\n\n```compile_fail,E0308\nfn plus_one(x: i32) -> i32 {\n    x + 1\n}\n\nplus_one(\"Not a number\");\n//       ^^^^^^^^^^^^^^ expected `i32`, found `&str`\n\nif \"Not a bool\" {\n// ^^^^^^^^^^^^ expected `bool`, found `&str`\n}\n\nlet x: f32 = \"Not a float\";\n//     ---   ^^^^^^^^^^^^^ expected `f32`, found `&str`\n//     |\n//     expected due to this\n```\n\nThis error occurs when an expression was used in a place where the compiler\nexpected an expression of a different type. It can occur in several cases, the\nmost common being when calling a function and passing an argument which has a\ndifferent type than the matching type in the function declaration.\n"
+    }
+  },
+  {
+    "rendered": "error[E0308]: mismatched types\n   --> src/adapters/persistence/auth_attempts.rs:370:13\n    |\n370 |             \"new-hash\"\n    |             ^^^^^^^^^^ expected `Option<String>`, found `&str`\n    |\n    = note:   expected enum `std::option::Option<std::string::String>`\n            found reference `&str`\n\n",
+    "$message_type": "diagnostic",
+    "children": [
+      {
+        "children": [],
+        "code": null,
+        "level": "note",
+        "message": "  expected enum `std::option::Option<std::string::String>`\nfound reference `&str`",
+        "rendered": null,
+        "spans": []
+      }
+    ],
+    "level": "error",
+    "message": "mismatched types",
+    "spans": [
+      {
+        "byte_end": 13633,
+        "byte_start": 13623,
+        "column_end": 23,
+        "column_start": 13,
+        "expansion": null,
+        "file_name": "src/adapters/persistence/auth_attempts.rs",
+        "is_primary": true,
+        "label": "expected `Option<String>`, found `&str`",
+        "line_end": 370,
+        "line_start": 370,
+        "suggested_replacement": null,
+        "suggestion_applicability": null,
+        "text": [
+          {
+            "highlight_end": 23,
+            "highlight_start": 13,
+            "text": "            \"new-hash\""
+          }
+        ]
+      }
+    ],
+    "code": {
+      "code": "E0308",
+      "explanation": "Expected type did not match the received type.\n\nErroneous code examples:\n\n```compile_fail,E0308\nfn plus_one(x: i32) -> i32 {\n    x + 1\n}\n\nplus_one(\"Not a number\");\n//       ^^^^^^^^^^^^^^ expected `i32`, found `&str`\n\nif \"Not a bool\" {\n// ^^^^^^^^^^^^ expected `bool`, found `&str`\n}\n\nlet x: f32 = \"Not a float\";\n//     ---   ^^^^^^^^^^^^^ expected `f32`, found `&str`\n//     |\n//     expected due to this\n```\n\nThis error occurs when an expression was used in a place where the compiler\nexpected an expression of a different type. It can occur in several cases, the\nmost common being when calling a function and passing an argument which has a\ndifferent type than the matching type in the function declaration.\n"
+    }
+  },
+  {
+    "rendered": "error[E0308]: mismatched types\n    --> src/adapters/persistence/user.rs:1438:13\n     |\n1438 |             \"hash\",\n     |             ^^^^^^ expected `Option<String>`, found `&str`\n     |\n     = note:   expected enum `std::option::Option<std::string::String>`\n             found reference `&str`\n\n",
+    "$message_type": "diagnostic",
+    "children": [
+      {
+        "children": [],
+        "code": null,
+        "level": "note",
+        "message": "  expected enum `std::option::Option<std::string::String>`\nfound reference `&str`",
+        "rendered": null,
+        "spans": []
+      }
+    ],
+    "level": "error",
+    "message": "mismatched types",
+    "spans": [
+      {
+        "byte_end": 53211,
+        "byte_start": 53205,
+        "column_end": 19,
+        "column_start": 13,
+        "expansion": null,
+        "file_name": "src/adapters/persistence/user.rs",
+        "is_primary": true,
+        "label": "expected `Option<String>`, found `&str`",
+        "line_end": 1438,
+        "line_start": 1438,
+        "suggested_replacement": null,
+        "suggestion_applicability": null,
+        "text": [
+          {
+            "highlight_end": 19,
+            "highlight_start": 13,
+            "text": "            \"hash\","
+          }
+        ]
+      }
+    ],
+    "code": {
+      "code": "E0308",
+      "explanation": "Expected type did not match the received type.\n\nErroneous code examples:\n\n```compile_fail,E0308\nfn plus_one(x: i32) -> i32 {\n    x + 1\n}\n\nplus_one(\"Not a number\");\n//       ^^^^^^^^^^^^^^ expected `i32`, found `&str`\n\nif \"Not a bool\" {\n// ^^^^^^^^^^^^ expected `bool`, found `&str`\n}\n\nlet x: f32 = \"Not a float\";\n//     ---   ^^^^^^^^^^^^^ expected `f32`, found `&str`\n//     |\n//     expected due to this\n```\n\nThis error occurs when an expression was used in a place where the compiler\nexpected an expression of a different type. It can occur in several cases, the\nmost common being when calling a function and passing an argument which has a\ndifferent type than the matching type in the function declaration.\n"
+    }
+  },
+  {
+    "rendered": "error[E0308]: mismatched types\n   --> src/application/use_cases/company_invite_tests.rs:412:24\n    |\n412 |         password_hash: \"hash\".to_string(),\n    |                        ^^^^^^^^^^^^^^^^^^ expected `Option<String>`, found `String`\n    |\n    = note: expected enum `std::option::Option<std::string::String>`\n             found struct `std::string::String`\nhelp: try wrapping the expression in `Some`\n    |\n412 |         password_hash: Some(\"hash\".to_string()),\n    |                        +++++                  +\n\n",
+    "$message_type": "diagnostic",
+    "children": [
+      {
+        "children": [],
+        "code": null,
+        "level": "note",
+        "message": "expected enum `std::option::Option<std::string::String>`\n found struct `std::string::String`",
+        "rendered": null,
+        "spans": []
+      },
+      {
+        "children": [],
+        "code": null,
+        "level": "help",
+        "message": "try wrapping the expression in `Some`",
+        "rendered": null,
+        "spans": [
+          {
+            "byte_end": 12473,
+            "byte_start": 12473,
+            "column_end": 24,
+            "column_start": 24,
+            "expansion": null,
+            "file_name": "src/application/use_cases/company_invite_tests.rs",
+            "is_primary": true,
+            "label": null,
+            "line_end": 412,
+            "line_start": 412,
+            "suggested_replacement": "Some(",
+            "suggestion_applicability": "MaybeIncorrect",
+            "text": [
+              {
+                "highlight_end": 24,
+                "highlight_start": 24,
+                "text": "        password_hash: \"hash\".to_string(),"
+              }
+            ]
+          },
+          {
+            "byte_end": 12491,
+            "byte_start": 12491,
+            "column_end": 42,
+            "column_start": 42,
+            "expansion": null,
+            "file_name": "src/application/use_cases/company_invite_tests.rs",
+            "is_primary": true,
+            "label": null,
+            "line_end": 412,
+            "line_start": 412,
+            "suggested_replacement": ")",
+            "suggestion_applicability": "MaybeIncorrect",
+            "text": [
+              {
+                "highlight_end": 42,
+                "highlight_start": 42,
+                "text": "        password_hash: \"hash\".to_string(),"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "level": "error",
+    "message": "mismatched types",
+    "spans": [
+      {
+        "byte_end": 12491,
+        "byte_start": 12473,
+        "column_end": 42,
+        "column_start": 24,
+        "expansion": null,
+        "file_name": "src/application/use_cases/company_invite_tests.rs",
+        "is_primary": true,
+        "label": "expected `Option<String>`, found `String`",
+        "line_end": 412,
+        "line_start": 412,
+        "suggested_replacement": null,
+        "suggestion_applicability": null,
+        "text": [
+          {
+            "highlight_end": 42,
+            "highlight_start": 24,
+            "text": "        password_hash: \"hash\".to_string(),"
+          }
+        ]
+      }
+    ],
+    "code": {
+      "code": "E0308",
+      "explanation": "Expected type did not match the received type.\n\nErroneous code examples:\n\n```compile_fail,E0308\nfn plus_one(x: i32) -> i32 {\n    x + 1\n}\n\nplus_one(\"Not a number\");\n//       ^^^^^^^^^^^^^^ expected `i32`, found `&str`\n\nif \"Not a bool\" {\n// ^^^^^^^^^^^^ expected `bool`, found `&str`\n}\n\nlet x: f32 = \"Not a float\";\n//     ---   ^^^^^^^^^^^^^ expected `f32`, found `&str`\n//     |\n//     expected due to this\n```\n\nThis error occurs when an expression was used in a place where the compiler\nexpected an expression of a different type. It can occur in several cases, the\nmost common being when calling a function and passing an argument which has a\ndifferent type than the matching type in the function declaration.\n"
+    }
+  },
+  {
+    "rendered": "error[E0308]: mismatched types\n   --> src/application/use_cases/user/tests.rs:287:32\n    |\n287 |                 password_hash: \"secret_hash\".to_string(),\n    |                                ^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Option<String>`, found `String`\n    |\n    = note: expected enum `std::option::Option<std::string::String>`\n             found struct `std::string::String`\nhelp: try wrapping the expression in `Some`\n    |\n287 |                 password_hash: Some(\"secret_hash\".to_string()),\n    |                                +++++                         +\n\n",
+    "$message_type": "diagnostic",
+    "children": [
+      {
+        "children": [],
+        "code": null,
+        "level": "note",
+        "message": "expected enum `std::option::Option<std::string::String>`\n found struct `std::string::String`",
+        "rendered": null,
+        "spans": []
+      },
+      {
+        "children": [],
+        "code": null,
+        "level": "help",
+        "message": "try wrapping the expression in `Some`",
+        "rendered": null,
+        "spans": [
+          {
+            "byte_end": 9178,
+            "byte_start": 9178,
+            "column_end": 32,
+            "column_start": 32,
+            "expansion": null,
+            "file_name": "src/application/use_cases/user/tests.rs",
+            "is_primary": true,
+            "label": null,
+            "line_end": 287,
+            "line_start": 287,
+            "suggested_replacement": "Some(",
+            "suggestion_applicability": "MaybeIncorrect",
+            "text": [
+              {
+                "highlight_end": 32,
+                "highlight_start": 32,
+                "text": "                password_hash: \"secret_hash\".to_string(),"
+              }
+            ]
+          },
+          {
+            "byte_end": 9203,
+            "byte_start": 9203,
+            "column_end": 57,
+            "column_start": 57,
+            "expansion": null,
+            "file_name": "src/application/use_cases/user/tests.rs",
+            "is_primary": true,
+            "label": null,
+            "line_end": 287,
+            "line_start": 287,
+            "suggested_replacement": ")",
+            "suggestion_applicability": "MaybeIncorrect",
+            "text": [
+              {
+                "highlight_end": 57,
+                "highlight_start": 57,
+                "text": "                password_hash: \"secret_hash\".to_string(),"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "level": "error",
+    "message": "mismatched types",
+    "spans": [
+      {
+        "byte_end": 9203,
+        "byte_start": 9178,
+        "column_end": 57,
+        "column_start": 32,
+        "expansion": null,
+        "file_name": "src/application/use_cases/user/tests.rs",
+        "is_primary": true,
+        "label": "expected `Option<String>`, found `String`",
+        "line_end": 287,
+        "line_start": 287,
+        "suggested_replacement": null,
+        "suggestion_applicability": null,
+        "text": [
+          {
+            "highlight_end": 57,
+            "highlight_start": 32,
+            "text": "                password_hash: \"secret_hash\".to_string(),"
+          }
+        ]
+      }
+    ],
+    "code": {
+      "code": "E0308",
+      "explanation": "Expected type did not match the received type.\n\nErroneous code examples:\n\n```compile_fail,E0308\nfn plus_one(x: i32) -> i32 {\n    x + 1\n}\n\nplus_one(\"Not a number\");\n//       ^^^^^^^^^^^^^^ expected `i32`, found `&str`\n\nif \"Not a bool\" {\n// ^^^^^^^^^^^^ expected `bool`, found `&str`\n}\n\nlet x: f32 = \"Not a float\";\n//     ---   ^^^^^^^^^^^^^ expected `f32`, found `&str`\n//     |\n//     expected due to this\n```\n\nThis error occurs when an expression was used in a place where the compiler\nexpected an expression of a different type. It can occur in several cases, the\nmost common being when calling a function and passing an argument which has a\ndifferent type than the matching type in the function declaration.\n"
+    }
+  },
+  {
+    "rendered": "error[E0308]: mismatched types\n   --> src/application/use_cases/user/tests.rs:332:28\n    |\n332 |             password_hash: password_hash.to_string(),\n    |                            ^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Option<String>`, found `String`\n    |\n    = note: expected enum `std::option::Option<std::string::String>`\n             found struct `std::string::String`\nhelp: try wrapping the expression in `Some`\n    |\n332 |             password_hash: Some(password_hash.to_string()),\n    |                            +++++                         +\n\n",
+    "$message_type": "diagnostic",
+    "children": [
+      {
+        "children": [],
+        "code": null,
+        "level": "note",
+        "message": "expected enum `std::option::Option<std::string::String>`\n found struct `std::string::String`",
+        "rendered": null,
+        "spans": []
+      },
+      {
+        "children": [],
+        "code": null,
+        "level": "help",
+        "message": "try wrapping the expression in `Some`",
+        "rendered": null,
+        "spans": [
+          {
+            "byte_end": 10530,
+            "byte_start": 10530,
+            "column_end": 28,
+            "column_start": 28,
+            "expansion": null,
+            "file_name": "src/application/use_cases/user/tests.rs",
+            "is_primary": true,
+            "label": null,
+            "line_end": 332,
+            "line_start": 332,
+            "suggested_replacement": "Some(",
+            "suggestion_applicability": "MaybeIncorrect",
+            "text": [
+              {
+                "highlight_end": 28,
+                "highlight_start": 28,
+                "text": "            password_hash: password_hash.to_string(),"
+              }
+            ]
+          },
+          {
+            "byte_end": 10555,
+            "byte_start": 10555,
+            "column_end": 53,
+            "column_start": 53,
+            "expansion": null,
+            "file_name": "src/application/use_cases/user/tests.rs",
+            "is_primary": true,
+            "label": null,
+            "line_end": 332,
+            "line_start": 332,
+            "suggested_replacement": ")",
+            "suggestion_applicability": "MaybeIncorrect",
+            "text": [
+              {
+                "highlight_end": 53,
+                "highlight_start": 53,
+                "text": "            password_hash: password_hash.to_string(),"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "level": "error",
+    "message": "mismatched types",
+    "spans": [
+      {
+        "byte_end": 10555,
+        "byte_start": 10530,
+        "column_end": 53,
+        "column_start": 28,
+        "expansion": null,
+        "file_name": "src/application/use_cases/user/tests.rs",
+        "is_primary": true,
+        "label": "expected `Option<String>`, found `String`",
+        "line_end": 332,
+        "line_start": 332,
+        "suggested_replacement": null,
+        "suggestion_applicability": null,
+        "text": [
+          {
+            "highlight_end": 53,
+            "highlight_start": 28,
+            "text": "            password_hash: password_hash.to_string(),"
+          }
+        ]
+      }
+    ],
+    "code": {
+      "code": "E0308",
+      "explanation": "Expected type did not match the received type.\n\nErroneous code examples:\n\n```compile_fail,E0308\nfn plus_one(x: i32) -> i32 {\n    x + 1\n}\n\nplus_one(\"Not a number\");\n//       ^^^^^^^^^^^^^^ expected `i32`, found `&str`\n\nif \"Not a bool\" {\n// ^^^^^^^^^^^^ expected `bool`, found `&str`\n}\n\nlet x: f32 = \"Not a float\";\n//     ---   ^^^^^^^^^^^^^ expected `f32`, found `&str`\n//     |\n//     expected due to this\n```\n\nThis error occurs when an expression was used in a place where the compiler\nexpected an expression of a different type. It can occur in several cases, the\nmost common being when calling a function and passing an argument which has a\ndifferent type than the matching type in the function declaration.\n"
+    }
+  },
+  {
+    "rendered": "error[E0308]: mismatched types\n   --> src/application/use_cases/user/tests.rs:346:32\n    |\n346 |                 password_hash: \"secret_hash\".to_string(),\n    |                                ^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Option<String>`, found `String`\n    |\n    = note: expected enum `std::option::Option<std::string::String>`\n             found struct `std::string::String`\nhelp: try wrapping the expression in `Some`\n    |\n346 |                 password_hash: Some(\"secret_hash\".to_string()),\n    |                                +++++                         +\n\n",
+    "$message_type": "diagnostic",
+    "children": [
+      {
+        "children": [],
+        "code": null,
+        "level": "note",
+        "message": "expected enum `std::option::Option<std::string::String>`\n found struct `std::string::String`",
+        "rendered": null,
+        "spans": []
+      },
+      {
+        "children": [],
+        "code": null,
+        "level": "help",
+        "message": "try wrapping the expression in `Some`",
+        "rendered": null,
+        "spans": [
+          {
+            "byte_end": 11043,
+            "byte_start": 11043,
+            "column_end": 32,
+            "column_start": 32,
+            "expansion": null,
+            "file_name": "src/application/use_cases/user/tests.rs",
+            "is_primary": true,
+            "label": null,
+            "line_end": 346,
+            "line_start": 346,
+            "suggested_replacement": "Some(",
+            "suggestion_applicability": "MaybeIncorrect",
+            "text": [
+              {
+                "highlight_end": 32,
+                "highlight_start": 32,
+                "text": "                password_hash: \"secret_hash\".to_string(),"
+              }
+            ]
+          },
+          {
+            "byte_end": 11068,
+            "byte_start": 11068,
+            "column_end": 57,
+            "column_start": 57,
+            "expansion": null,
+            "file_name": "src/application/use_cases/user/tests.rs",
+            "is_primary": true,
+            "label": null,
+            "line_end": 346,
+            "line_start": 346,
+            "suggested_replacement": ")",
+            "suggestion_applicability": "MaybeIncorrect",
+            "text": [
+              {
+                "highlight_end": 57,
+                "highlight_start": 57,
+                "text": "                password_hash: \"secret_hash\".to_string(),"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "level": "error",
+    "message": "mismatched types",
+    "spans": [
+      {
+        "byte_end": 11068,
+        "byte_start": 11043,
+        "column_end": 57,
+        "column_start": 32,
+        "expansion": null,
+        "file_name": "src/application/use_cases/user/tests.rs",
+        "is_primary": true,
+        "label": "expected `Option<String>`, found `String`",
+        "line_end": 346,
+        "line_start": 346,
+        "suggested_replacement": null,
+        "suggestion_applicability": null,
+        "text": [
+          {
+            "highlight_end": 57,
+            "highlight_start": 32,
+            "text": "                password_hash: \"secret_hash\".to_string(),"
+          }
+        ]
+      }
+    ],
+    "code": {
+      "code": "E0308",
+      "explanation": "Expected type did not match the received type.\n\nErroneous code examples:\n\n```compile_fail,E0308\nfn plus_one(x: i32) -> i32 {\n    x + 1\n}\n\nplus_one(\"Not a number\");\n//       ^^^^^^^^^^^^^^ expected `i32`, found `&str`\n\nif \"Not a bool\" {\n// ^^^^^^^^^^^^ expected `bool`, found `&str`\n}\n\nlet x: f32 = \"Not a float\";\n//     ---   ^^^^^^^^^^^^^ expected `f32`, found `&str`\n//     |\n//     expected due to this\n```\n\nThis error occurs when an expression was used in a place where the compiler\nexpected an expression of a different type. It can occur in several cases, the\nmost common being when calling a function and passing an argument which has a\ndifferent type than the matching type in the function declaration.\n"
+    }
+  },
+  {
+    "rendered": "error[E0308]: mismatched types\n   --> src/application/use_cases/user/tests.rs:363:32\n    |\n363 |                 password_hash: \"secret_hash\".to_string(),\n    |                                ^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Option<String>`, found `String`\n    |\n    = note: expected enum `std::option::Option<std::string::String>`\n             found struct `std::string::String`\nhelp: try wrapping the expression in `Some`\n    |\n363 |                 password_hash: Some(\"secret_hash\".to_string()),\n    |                                +++++                         +\n\n",
+    "$message_type": "diagnostic",
+    "children": [
+      {
+        "children": [],
+        "code": null,
+        "level": "note",
+        "message": "expected enum `std::option::Option<std::string::String>`\n found struct `std::string::String`",
+        "rendered": null,
+        "spans": []
+      },
+      {
+        "children": [],
+        "code": null,
+        "level": "help",
+        "message": "try wrapping the expression in `Some`",
+        "rendered": null,
+        "spans": [
+          {
+            "byte_end": 11616,
+            "byte_start": 11616,
+            "column_end": 32,
+            "column_start": 32,
+            "expansion": null,
+            "file_name": "src/application/use_cases/user/tests.rs",
+            "is_primary": true,
+            "label": null,
+            "line_end": 363,
+            "line_start": 363,
+            "suggested_replacement": "Some(",
+            "suggestion_applicability": "MaybeIncorrect",
+            "text": [
+              {
+                "highlight_end": 32,
+                "highlight_start": 32,
+                "text": "                password_hash: \"secret_hash\".to_string(),"
+              }
+            ]
+          },
+          {
+            "byte_end": 11641,
+            "byte_start": 11641,
+            "column_end": 57,
+            "column_start": 57,
+            "expansion": null,
+            "file_name": "src/application/use_cases/user/tests.rs",
+            "is_primary": true,
+            "label": null,
+            "line_end": 363,
+            "line_start": 363,
+            "suggested_replacement": ")",
+            "suggestion_applicability": "MaybeIncorrect",
+            "text": [
+              {
+                "highlight_end": 57,
+                "highlight_start": 57,
+                "text": "                password_hash: \"secret_hash\".to_string(),"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "level": "error",
+    "message": "mismatched types",
+    "spans": [
+      {
+        "byte_end": 11641,
+        "byte_start": 11616,
+        "column_end": 57,
+        "column_start": 32,
+        "expansion": null,
+        "file_name": "src/application/use_cases/user/tests.rs",
+        "is_primary": true,
+        "label": "expected `Option<String>`, found `String`",
+        "line_end": 363,
+        "line_start": 363,
+        "suggested_replacement": null,
+        "suggestion_applicability": null,
+        "text": [
+          {
+            "highlight_end": 57,
+            "highlight_start": 32,
+            "text": "                password_hash: \"secret_hash\".to_string(),"
+          }
+        ]
+      }
+    ],
+    "code": {
+      "code": "E0308",
+      "explanation": "Expected type did not match the received type.\n\nErroneous code examples:\n\n```compile_fail,E0308\nfn plus_one(x: i32) -> i32 {\n    x + 1\n}\n\nplus_one(\"Not a number\");\n//       ^^^^^^^^^^^^^^ expected `i32`, found `&str`\n\nif \"Not a bool\" {\n// ^^^^^^^^^^^^ expected `bool`, found `&str`\n}\n\nlet x: f32 = \"Not a float\";\n//     ---   ^^^^^^^^^^^^^ expected `f32`, found `&str`\n//     |\n//     expected due to this\n```\n\nThis error occurs when an expression was used in a place where the compiler\nexpected an expression of a different type. It can occur in several cases, the\nmost common being when calling a function and passing an argument which has a\ndifferent type than the matching type in the function declaration.\n"
+    }
+  },
+  {
+    "rendered": "error[E0308]: mismatched types\n   --> src/application/use_cases/user/tests.rs:437:32\n    |\n437 |         stored.password_hash = password_hash.to_string();\n    |         --------------------   ^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Option<String>`, found `String`\n    |         |\n    |         expected due to the type of this binding\n    |\n    = note: expected enum `std::option::Option<std::string::String>`\n             found struct `std::string::String`\nhelp: try wrapping the expression in `Some`\n    |\n437 |         stored.password_hash = Some(password_hash.to_string());\n    |                                +++++                         +\n\n",
+    "$message_type": "diagnostic",
+    "children": [
+      {
+        "children": [],
+        "code": null,
+        "level": "note",
+        "message": "expected enum `std::option::Option<std::string::String>`\n found struct `std::string::String`",
+        "rendered": null,
+        "spans": []
+      },
+      {
+        "children": [],
+        "code": null,
+        "level": "help",
+        "message": "try wrapping the expression in `Some`",
+        "rendered": null,
+        "spans": [
+          {
+            "byte_end": 13900,
+            "byte_start": 13900,
+            "column_end": 32,
+            "column_start": 32,
+            "expansion": null,
+            "file_name": "src/application/use_cases/user/tests.rs",
+            "is_primary": true,
+            "label": null,
+            "line_end": 437,
+            "line_start": 437,
+            "suggested_replacement": "Some(",
+            "suggestion_applicability": "MaybeIncorrect",
+            "text": [
+              {
+                "highlight_end": 32,
+                "highlight_start": 32,
+                "text": "        stored.password_hash = password_hash.to_string();"
+              }
+            ]
+          },
+          {
+            "byte_end": 13925,
+            "byte_start": 13925,
+            "column_end": 57,
+            "column_start": 57,
+            "expansion": null,
+            "file_name": "src/application/use_cases/user/tests.rs",
+            "is_primary": true,
+            "label": null,
+            "line_end": 437,
+            "line_start": 437,
+            "suggested_replacement": ")",
+            "suggestion_applicability": "MaybeIncorrect",
+            "text": [
+              {
+                "highlight_end": 57,
+                "highlight_start": 57,
+                "text": "        stored.password_hash = password_hash.to_string();"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "level": "error",
+    "message": "mismatched types",
+    "spans": [
+      {
+        "byte_end": 13925,
+        "byte_start": 13900,
+        "column_end": 57,
+        "column_start": 32,
+        "expansion": null,
+        "file_name": "src/application/use_cases/user/tests.rs",
+        "is_primary": true,
+        "label": "expected `Option<String>`, found `String`",
+        "line_end": 437,
+        "line_start": 437,
+        "suggested_replacement": null,
+        "suggestion_applicability": null,
+        "text": [
+          {
+            "highlight_end": 57,
+            "highlight_start": 32,
+            "text": "        stored.password_hash = password_hash.to_string();"
+          }
+        ]
+      },
+      {
+        "byte_end": 13897,
+        "byte_start": 13877,
+        "column_end": 29,
+        "column_start": 9,
+        "expansion": null,
+        "file_name": "src/application/use_cases/user/tests.rs",
+        "is_primary": false,
+        "label": "expected due to the type of this binding",
+        "line_end": 437,
+        "line_start": 437,
+        "suggested_replacement": null,
+        "suggestion_applicability": null,
+        "text": [
+          {
+            "highlight_end": 29,
+            "highlight_start": 9,
+            "text": "        stored.password_hash = password_hash.to_string();"
+          }
+        ]
+      }
+    ],
+    "code": {
+      "code": "E0308",
+      "explanation": "Expected type did not match the received type.\n\nErroneous code examples:\n\n```compile_fail,E0308\nfn plus_one(x: i32) -> i32 {\n    x + 1\n}\n\nplus_one(\"Not a number\");\n//       ^^^^^^^^^^^^^^ expected `i32`, found `&str`\n\nif \"Not a bool\" {\n// ^^^^^^^^^^^^ expected `bool`, found `&str`\n}\n\nlet x: f32 = \"Not a float\";\n//     ---   ^^^^^^^^^^^^^ expected `f32`, found `&str`\n//     |\n//     expected due to this\n```\n\nThis error occurs when an expression was used in a place where the compiler\nexpected an expression of a different type. It can occur in several cases, the\nmost common being when calling a function and passing an argument which has a\ndifferent type than the matching type in the function declaration.\n"
+    }
+  },
+  {
+    "rendered": "error[E0308]: mismatched types\n   --> src/application/use_cases/user/tests.rs:584:45\n    |\n584 |                 AccountChangeKind::Email => \"secret_hash\".to_string(),\n    |                                             ^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Option<String>`, found `String`\n    |\n    = note: expected enum `std::option::Option<std::string::String>`\n             found struct `std::string::String`\nnote: return type inferred to be `std::option::Option<std::string::String>` here\n   --> src/application/use_cases/user/tests.rs:534:1\n    |\n534 | #[async_trait]\n    | ^^^^^^^^^^^^^^\n    = note: this error originates in the attribute macro `async_trait` (in Nightly builds, run with -Z macro-backtrace for more info)\nhelp: try wrapping the expression in `Some`\n    |\n584 |                 AccountChangeKind::Email => Some(\"secret_hash\".to_string()),\n    |                                             +++++                         +\n\n",
+    "$message_type": "diagnostic",
+    "children": [
+      {
+        "children": [],
+        "code": null,
+        "level": "note",
+        "message": "expected enum `std::option::Option<std::string::String>`\n found struct `std::string::String`",
+        "rendered": null,
+        "spans": []
+      },
+      {
+        "children": [],
+        "code": null,
+        "level": "note",
+        "message": "return type inferred to be `std::option::Option<std::string::String>` here",
+        "rendered": null,
+        "spans": [
+          {
+            "byte_end": 16818,
+            "byte_start": 16804,
+            "column_end": 15,
+            "column_start": 1,
+            "expansion": {
+              "def_site_span": {
+                "byte_end": 7545,
+                "byte_start": 7473,
+                "column_end": 73,
+                "column_start": 1,
+                "expansion": null,
+                "file_name": "/Users/mac02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/async-trait-0.1.89/src/lib.rs",
+                "is_primary": false,
+                "label": null,
+                "line_end": 252,
+                "line_start": 252,
+                "suggested_replacement": null,
+                "suggestion_applicability": null,
+                "text": [
+                  {
+                    "highlight_end": 73,
+                    "highlight_start": 1,
+                    "text": "pub fn async_trait(args: TokenStream, input: TokenStream) -> TokenStream {"
+                  }
+                ]
+              },
+              "macro_decl_name": "#[async_trait]",
+              "span": {
+                "byte_end": 16818,
+                "byte_start": 16804,
+                "column_end": 15,
+                "column_start": 1,
+                "expansion": null,
+                "file_name": "src/application/use_cases/user/tests.rs",
+                "is_primary": false,
+                "label": null,
+                "line_end": 534,
+                "line_start": 534,
+                "suggested_replacement": null,
+                "suggestion_applicability": null,
+                "text": [
+                  {
+                    "highlight_end": 15,
+                    "highlight_start": 1,
+                    "text": "#[async_trait]"
+                  }
+                ]
+              }
+            },
+            "file_name": "src/application/use_cases/user/tests.rs",
+            "is_primary": true,
+            "label": null,
+            "line_end": 534,
+            "line_start": 534,
+            "suggested_replacement": null,
+            "suggestion_applicability": null,
+            "text": [
+              {
+                "highlight_end": 15,
+                "highlight_start": 1,
+                "text": "#[async_trait]"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "children": [],
+        "code": null,
+        "level": "help",
+        "message": "try wrapping the expression in `Some`",
+        "rendered": null,
+        "spans": [
+          {
+            "byte_end": 18779,
+            "byte_start": 18779,
+            "column_end": 45,
+            "column_start": 45,
+            "expansion": null,
+            "file_name": "src/application/use_cases/user/tests.rs",
+            "is_primary": true,
+            "label": null,
+            "line_end": 584,
+            "line_start": 584,
+            "suggested_replacement": "Some(",
+            "suggestion_applicability": "MaybeIncorrect",
+            "text": [
+              {
+                "highlight_end": 45,
+                "highlight_start": 45,
+                "text": "                AccountChangeKind::Email => \"secret_hash\".to_string(),"
+              }
+            ]
+          },
+          {
+            "byte_end": 18804,
+            "byte_start": 18804,
+            "column_end": 70,
+            "column_start": 70,
+            "expansion": null,
+            "file_name": "src/application/use_cases/user/tests.rs",
+            "is_primary": true,
+            "label": null,
+            "line_end": 584,
+            "line_start": 584,
+            "suggested_replacement": ")",
+            "suggestion_applicability": "MaybeIncorrect",
+            "text": [
+              {
+                "highlight_end": 70,
+                "highlight_start": 70,
+                "text": "                AccountChangeKind::Email => \"secret_hash\".to_string(),"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "level": "error",
+    "message": "mismatched types",
+    "spans": [
+      {
+        "byte_end": 18804,
+        "byte_start": 18779,
+        "column_end": 70,
+        "column_start": 45,
+        "expansion": null,
+        "file_name": "src/application/use_cases/user/tests.rs",
+        "is_primary": true,
+        "label": "expected `Option<String>`, found `String`",
+        "line_end": 584,
+        "line_start": 584,
+        "suggested_replacement": null,
+        "suggestion_applicability": null,
+        "text": [
+          {
+            "highlight_end": 70,
+            "highlight_start": 45,
+            "text": "                AccountChangeKind::Email => \"secret_hash\".to_string(),"
+          }
+        ]
+      }
+    ],
+    "code": {
+      "code": "E0308",
+      "explanation": "Expected type did not match the received type.\n\nErroneous code examples:\n\n```compile_fail,E0308\nfn plus_one(x: i32) -> i32 {\n    x + 1\n}\n\nplus_one(\"Not a number\");\n//       ^^^^^^^^^^^^^^ expected `i32`, found `&str`\n\nif \"Not a bool\" {\n// ^^^^^^^^^^^^ expected `bool`, found `&str`\n}\n\nlet x: f32 = \"Not a float\";\n//     ---   ^^^^^^^^^^^^^ expected `f32`, found `&str`\n//     |\n//     expected due to this\n```\n\nThis error occurs when an expression was used in a place where the compiler\nexpected an expression of a different type. It can occur in several cases, the\nmost common being when calling a function and passing an argument which has a\ndifferent type than the matching type in the function declaration.\n"
+    }
+  },
+  {
+    "rendered": "error[E0308]: mismatched types\n   --> src/application/use_cases/user/tests.rs:770:9\n    |\n770 |         \"secret_hash\",\n    |         ^^^^^^^^^^^^^ expected `Option<String>`, found `&str`\n    |\n    = note:   expected enum `std::option::Option<std::string::String>`\n            found reference `&str`\n\n",
+    "$message_type": "diagnostic",
+    "children": [
+      {
+        "children": [],
+        "code": null,
+        "level": "note",
+        "message": "  expected enum `std::option::Option<std::string::String>`\nfound reference `&str`",
+        "rendered": null,
+        "spans": []
+      }
+    ],
+    "level": "error",
+    "message": "mismatched types",
+    "spans": [
+      {
+        "byte_end": 24537,
+        "byte_start": 24524,
+        "column_end": 22,
+        "column_start": 9,
+        "expansion": null,
+        "file_name": "src/application/use_cases/user/tests.rs",
+        "is_primary": true,
+        "label": "expected `Option<String>`, found `&str`",
+        "line_end": 770,
+        "line_start": 770,
+        "suggested_replacement": null,
+        "suggestion_applicability": null,
+        "text": [
+          {
+            "highlight_end": 22,
+            "highlight_start": 9,
+            "text": "        \"secret_hash\","
+          }
+        ]
+      }
+    ],
+    "code": {
+      "code": "E0308",
+      "explanation": "Expected type did not match the received type.\n\nErroneous code examples:\n\n```compile_fail,E0308\nfn plus_one(x: i32) -> i32 {\n    x + 1\n}\n\nplus_one(\"Not a number\");\n//       ^^^^^^^^^^^^^^ expected `i32`, found `&str`\n\nif \"Not a bool\" {\n// ^^^^^^^^^^^^ expected `bool`, found `&str`\n}\n\nlet x: f32 = \"Not a float\";\n//     ---   ^^^^^^^^^^^^^ expected `f32`, found `&str`\n//     |\n//     expected due to this\n```\n\nThis error occurs when an expression was used in a place where the compiler\nexpected an expression of a different type. It can occur in several cases, the\nmost common being when calling a function and passing an argument which has a\ndifferent type than the matching type in the function declaration.\n"
+    }
+  },
+  {
+    "rendered": "error[E0308]: mismatched types\n   --> src/application/use_cases/user/tests.rs:784:41\n    |\n784 |     assert_eq!(confirmed.password_hash, \"a-longer-secret_hash\");\n    |                                         ^^^^^^^^^^^^^^^^^^^^^^ expected `Option<String>`, found `&str`\n    |\n    = note:   expected enum `std::option::Option<std::string::String>`\n            found reference `&str`\n\n",
+    "$message_type": "diagnostic",
+    "children": [
+      {
+        "children": [],
+        "code": null,
+        "level": "note",
+        "message": "  expected enum `std::option::Option<std::string::String>`\nfound reference `&str`",
+        "rendered": null,
+        "spans": []
+      }
+    ],
+    "level": "error",
+    "message": "mismatched types",
+    "spans": [
+      {
+        "byte_end": 25091,
+        "byte_start": 25069,
+        "column_end": 63,
+        "column_start": 41,
+        "expansion": null,
+        "file_name": "src/application/use_cases/user/tests.rs",
+        "is_primary": true,
+        "label": "expected `Option<String>`, found `&str`",
+        "line_end": 784,
+        "line_start": 784,
+        "suggested_replacement": null,
+        "suggestion_applicability": null,
+        "text": [
+          {
+            "highlight_end": 63,
+            "highlight_start": 41,
+            "text": "    assert_eq!(confirmed.password_hash, \"a-longer-secret_hash\");"
+          }
+        ]
+      }
+    ],
+    "code": {
+      "code": "E0308",
+      "explanation": "Expected type did not match the received type.\n\nErroneous code examples:\n\n```compile_fail,E0308\nfn plus_one(x: i32) -> i32 {\n    x + 1\n}\n\nplus_one(\"Not a number\");\n//       ^^^^^^^^^^^^^^ expected `i32`, found `&str`\n\nif \"Not a bool\" {\n// ^^^^^^^^^^^^ expected `bool`, found `&str`\n}\n\nlet x: f32 = \"Not a float\";\n//     ---   ^^^^^^^^^^^^^ expected `f32`, found `&str`\n//     |\n//     expected due to this\n```\n\nThis error occurs when an expression was used in a place where the compiler\nexpected an expression of a different type. It can occur in several cases, the\nmost common being when calling a function and passing an argument which has a\ndifferent type than the matching type in the function declaration.\n"
+    }
+  },
+  {
+    "rendered": "error[E0308]: mismatched types\n   --> src/application/use_cases/user/tests.rs:968:9\n    |\n968 |         \"a-longer-secret_hash\"\n    |         ^^^^^^^^^^^^^^^^^^^^^^ expected `Option<String>`, found `&str`\n    |\n    = note:   expected enum `std::option::Option<std::string::String>`\n            found reference `&str`\n\n",
+    "$message_type": "diagnostic",
+    "children": [
+      {
+        "children": [],
+        "code": null,
+        "level": "note",
+        "message": "  expected enum `std::option::Option<std::string::String>`\nfound reference `&str`",
+        "rendered": null,
+        "spans": []
+      }
+    ],
+    "level": "error",
+    "message": "mismatched types",
+    "spans": [
+      {
+        "byte_end": 30387,
+        "byte_start": 30365,
+        "column_end": 31,
+        "column_start": 9,
+        "expansion": null,
+        "file_name": "src/application/use_cases/user/tests.rs",
+        "is_primary": true,
+        "label": "expected `Option<String>`, found `&str`",
+        "line_end": 968,
+        "line_start": 968,
+        "suggested_replacement": null,
+        "suggestion_applicability": null,
+        "text": [
+          {
+            "highlight_end": 31,
+            "highlight_start": 9,
+            "text": "        \"a-longer-secret_hash\""
+          }
+        ]
+      }
+    ],
+    "code": {
+      "code": "E0308",
+      "explanation": "Expected type did not match the received type.\n\nErroneous code examples:\n\n```compile_fail,E0308\nfn plus_one(x: i32) -> i32 {\n    x + 1\n}\n\nplus_one(\"Not a number\");\n//       ^^^^^^^^^^^^^^ expected `i32`, found `&str`\n\nif \"Not a bool\" {\n// ^^^^^^^^^^^^ expected `bool`, found `&str`\n}\n\nlet x: f32 = \"Not a float\";\n//     ---   ^^^^^^^^^^^^^ expected `f32`, found `&str`\n//     |\n//     expected due to this\n```\n\nThis error occurs when an expression was used in a place where the compiler\nexpected an expression of a different type. It can occur in several cases, the\nmost common being when calling a function and passing an argument which has a\ndifferent type than the matching type in the function declaration.\n"
+    }
+  },
+  {
+    "rendered": "error[E0308]: mismatched types\n   --> src/application/use_cases/user/tests.rs:999:9\n    |\n999 |         \"secret_hash\",\n    |         ^^^^^^^^^^^^^ expected `Option<String>`, found `&str`\n    |\n    = note:   expected enum `std::option::Option<std::string::String>`\n            found reference `&str`\n\n",
+    "$message_type": "diagnostic",
+    "children": [
+      {
+        "children": [],
+        "code": null,
+        "level": "note",
+        "message": "  expected enum `std::option::Option<std::string::String>`\nfound reference `&str`",
+        "rendered": null,
+        "spans": []
+      }
+    ],
+    "level": "error",
+    "message": "mismatched types",
+    "spans": [
+      {
+        "byte_end": 31316,
+        "byte_start": 31303,
+        "column_end": 22,
+        "column_start": 9,
+        "expansion": null,
+        "file_name": "src/application/use_cases/user/tests.rs",
+        "is_primary": true,
+        "label": "expected `Option<String>`, found `&str`",
+        "line_end": 999,
+        "line_start": 999,
+        "suggested_replacement": null,
+        "suggestion_applicability": null,
+        "text": [
+          {
+            "highlight_end": 22,
+            "highlight_start": 9,
+            "text": "        \"secret_hash\","
+          }
+        ]
+      }
+    ],
+    "code": {
+      "code": "E0308",
+      "explanation": "Expected type did not match the received type.\n\nErroneous code examples:\n\n```compile_fail,E0308\nfn plus_one(x: i32) -> i32 {\n    x + 1\n}\n\nplus_one(\"Not a number\");\n//       ^^^^^^^^^^^^^^ expected `i32`, found `&str`\n\nif \"Not a bool\" {\n// ^^^^^^^^^^^^ expected `bool`, found `&str`\n}\n\nlet x: f32 = \"Not a float\";\n//     ---   ^^^^^^^^^^^^^ expected `f32`, found `&str`\n//     |\n//     expected due to this\n```\n\nThis error occurs when an expression was used in a place where the compiler\nexpected an expression of a different type. It can occur in several cases, the\nmost common being when calling a function and passing an argument which has a\ndifferent type than the matching type in the function declaration.\n"
+    }
+  },
+  {
+    "rendered": "error[E0308]: mismatched types\n    --> src/application/use_cases/user/tests.rs:1199:9\n     |\n1199 |         \"a-new-password_hash\"\n     |         ^^^^^^^^^^^^^^^^^^^^^ expected `Option<String>`, found `&str`\n     |\n     = note:   expected enum `std::option::Option<std::string::String>`\n             found reference `&str`\n\n",
+    "$message_type": "diagnostic",
+    "children": [
+      {
+        "children": [],
+        "code": null,
+        "level": "note",
+        "message": "  expected enum `std::option::Option<std::string::String>`\nfound reference `&str`",
+        "rendered": null,
+        "spans": []
+      }
+    ],
+    "level": "error",
+    "message": "mismatched types",
+    "spans": [
+      {
+        "byte_end": 37711,
+        "byte_start": 37690,
+        "column_end": 30,
+        "column_start": 9,
+        "expansion": null,
+        "file_name": "src/application/use_cases/user/tests.rs",
+        "is_primary": true,
+        "label": "expected `Option<String>`, found `&str`",
+        "line_end": 1199,
+        "line_start": 1199,
+        "suggested_replacement": null,
+        "suggestion_applicability": null,
+        "text": [
+          {
+            "highlight_end": 30,
+            "highlight_start": 9,
+            "text": "        \"a-new-password_hash\""
+          }
+        ]
+      }
+    ],
+    "code": {
+      "code": "E0308",
+      "explanation": "Expected type did not match the received type.\n\nErroneous code examples:\n\n```compile_fail,E0308\nfn plus_one(x: i32) -> i32 {\n    x + 1\n}\n\nplus_one(\"Not a number\");\n//       ^^^^^^^^^^^^^^ expected `i32`, found `&str`\n\nif \"Not a bool\" {\n// ^^^^^^^^^^^^ expected `bool`, found `&str`\n}\n\nlet x: f32 = \"Not a float\";\n//     ---   ^^^^^^^^^^^^^ expected `f32`, found `&str`\n//     |\n//     expected due to this\n```\n\nThis error occurs when an expression was used in a place where the compiler\nexpected an expression of a different type. It can occur in several cases, the\nmost common being when calling a function and passing an argument which has a\ndifferent type than the matching type in the function declaration.\n"
+    }
+  }
+]

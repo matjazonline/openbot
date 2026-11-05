@@ -1,0 +1,41 @@
+57:        IF NEW.queue_kind<>'workflow' THEN RETURN NULL; END IF;
+126:    IF OLD.queue_kind='workflow' AND OLD.status='failed' AND NEW.status='pending' THEN
+167:    IF OLD.queue_kind = 'workflow' AND OLD.status = 'processing' AND NEW.status = 'completed' THEN
+210:    IF OLD.queue_kind='workflow' AND OLD.status='completed' AND NEW.status='pending' THEN
+283:    IF OLD.queue_kind='workflow' AND OLD.status='processing' AND NEW.status IN ('pending','failed') THEN
+1095:    IF (NEW.queue_kind, NEW.workflow_execution_id) IS DISTINCT FROM
+1096:       (OLD.queue_kind, OLD.workflow_execution_id) THEN
+1472:        ROW(NEW.id,NEW.company_id,NEW.task_id,NEW.agent_id,NEW.owner_kind,NEW.workflow_run_id,
+1475:        ROW(OLD.id,OLD.company_id,OLD.task_id,OLD.agent_id,OLD.owner_kind,OLD.workflow_run_id,
+1479:    IF NEW.owner_kind <> 'workflow' THEN
+1504:        WHERE job.company_id=NEW.company_id AND job.id=NEW.task_id AND job.queue_kind='workflow'
+1520:    IF NEW.owner_kind<>'workflow' THEN RETURN NEW; END IF;
+1979:    IF OLD.queue_kind='workflow' AND OLD.status='failed' AND NEW.status='pending' THEN
+2035:                AND job.status='failed' AND job.queue_kind='workflow' AND job.workflow_execution_id=NEW.execution_id AND job.attempt_ordinal-1=NEW.retired_attempt
+2176:    IF OLD.queue_kind='workflow' AND OLD.status='pending' AND NEW.status='failed'
+2205:            AND queue_kind='workflow' AND status='pending';
+2270:                      AND job.queue_kind='workflow' AND job.status<>'processing'
+2292:          AND job.id=NEW.job_id AND job.queue_kind='workflow' AND job.status='processing'
+2498:            AND task.queue_kind='workflow' AND task.status='pending' AND task.attempt_ordinal-1=episode.retired_attempt
+2631:        WHERE owner.company_id=company AND owner.id=run AND task.id=job AND task.queue_kind='workflow'
+2647:                WHERE sibling.company_id=company AND sibling.run_id=run AND other.queue_kind='workflow'
+2672:            AND job.id=NEW.job_id AND job.queue_kind='workflow' AND job.status='processing'
+2831:        WHERE owner.company_id=company AND owner.id=run AND task.id=job AND task.queue_kind='workflow'
+2851:                WHERE sibling.company_id=company AND sibling.run_id=run AND other.queue_kind='workflow'
+3379:    task_type text NOT NULL,
+3393:    queue_kind text DEFAULT 'workflow'::text NOT NULL,
+3398:    CONSTRAINT background_tasks_queue_kind_check CHECK ((queue_kind = 'workflow'::text)),
+3402:    CONSTRAINT background_tasks_workflow_shape_check CHECK (((workflow_execution_id IS NOT NULL) AND (task_type = 'workflow_execution'::text) AND (payload = jsonb_build_object('version', 1, 'execution_id', (workflow_execution_id)::text))))
+4231:    owner_kind text NOT NULL DEFAULT 'workflow',
+4249:    CONSTRAINT task_harness_runs_token_owner CHECK (model_blocked_decision IS NULL OR owner_kind='workflow'),
+4252:        OR (owner_kind='workflow'
+4256:        owner_kind = 'workflow'
+8178:CREATE UNIQUE INDEX workflow_one_execution_job ON public.background_tasks USING btree (company_id, workflow_execution_id) WHERE (queue_kind = 'workflow'::text);
+8222:CREATE TRIGGER background_tasks_preserve_queue_identity BEFORE UPDATE OF queue_kind, workflow_execution_id ON public.background_tasks FOR EACH ROW EXECUTE FUNCTION public.preserve_background_task_queue_identity();
+8229:CREATE TRIGGER background_tasks_validate_workflow_association BEFORE INSERT OR UPDATE OF company_id, channel_id, thread_id, workflow_execution_id, queue_kind ON public.background_tasks FOR EACH ROW WHEN ((new.queue_kind = 'workflow'::text)) EXECUTE FUNCTION public.validate_workflow_job_association();
+9035:                  AND execution.id=OLD.terminal_execution_id AND job.queue_kind='workflow'
+11170:        OLD.queue_kind='workflow' AND NEW.queue_kind='workflow'
+11227:    ON public.task_harness_runs(company_id,workflow_execution_id) WHERE owner_kind='workflow';
+11365:    IF NEW.owner_kind<>'workflow' THEN RETURN NEW; END IF;
+11459:    FOR EACH ROW WHEN (NEW.owner_kind='workflow' AND OLD.model_request_id IS NULL AND NEW.model_request_id IS NOT NULL)
+11485:    FOR EACH ROW WHEN (NEW.owner_kind='workflow')

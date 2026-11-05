@@ -54,12 +54,6 @@ async fn workflow_fairness_full_wait_preserves_age_then_protects_quiet_retry() {
     denied(p, q, w).await;
     let original = ticket(p, q.company).await;
     assert!(original.1.is_none());
-    sqlx::query(
-        "UPDATE workflow_dispatch_demand SET registered_at=clock_timestamp()-interval '2 minutes'",
-    )
-    .execute(p.pool())
-    .await
-    .unwrap();
     for index in 0..8 {
         denied(p, admit(&noise, &format!("noise-{index}")).await, worker()).await;
         assert_eq!(ticket(p, q.company).await, original);

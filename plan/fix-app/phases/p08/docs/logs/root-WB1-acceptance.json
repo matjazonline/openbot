@@ -1,0 +1,25 @@
+{
+  "status": "accepted in phase; not integrated",
+  "review": "FIXAPP-P08-WB1-R1-MAC02",
+  "source": {
+    "base": "77edd70862a88e2189587fda50fb2b0b913082b6",
+    "head": "77edd70862a88e2189587fda50fb2b0b913082b6",
+    "exclusions": [
+      "plan/fix-app/phases/p08/docs/"
+    ],
+    "diff_sha256": "01bd280bcb8e427cd5eb7aa724667ea6a2c20c6d200c1cb7b7d4ab73ab3e9e65",
+    "tree_sha256": "ed1a3d1796a732d9a849d174618c3abae6b4df43bd9fc1f134a48303e382a0bd",
+    "files_count": 2258
+  },
+  "installed_snapshot": [
+    "base:   77edd70862a88e2189587fda50fb2b0b913082b6",
+    "digest: 4ede6ac86c2ca8d362c5cec4f878c366a8deca0d80c3df21d23b5342d7fcb065"
+  ],
+  "coordination_revision": 29,
+  "checks": "All required affected checks pass; no unresolved findings; I004 fullsuite exclusions retained",
+  "review_records": {
+    "REVIEW.md": "f38636c2d9f76dec238e4b47a8ae47ddaefe612fa9ca0c285a00998b81af9375",
+    "agent-review-notes.md": "ec74f8984eb8b589cb81138c3b67ed18b6313b134d882264d669e181ad6b817e",
+    "agent-review-findings.md": "d825a6689789a6e2e40ea048e6340182897ffb3a32403e47dbabc9695eab6994"
+  }
+}

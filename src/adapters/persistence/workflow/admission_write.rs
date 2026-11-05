@@ -169,11 +169,9 @@ pub(super) async fn insert_first_job(db: &mut PgConnection, job: &FirstJob<'_>) 
         .bind(job.entry.as_str()).execute(&mut *db).await?;
     let (channel, thread) = binding_rows::association_columns(job.association);
     sqlx::query(
-        "INSERT INTO background_tasks (id, company_id, channel_id, thread_id, correlation_id, task_type, \
-         payload, queue_kind, workflow_execution_id) VALUES ($1,$2,$3,$4,$5,'workflow_execution',$6,'workflow',$7)",
+        "INSERT INTO background_tasks (id, company_id, channel_id, thread_id, correlation_id, workflow_execution_id) VALUES ($1,$2,$3,$4,$5,$6)",
     ).bind(Uuid::new_v4()).bind(job.company.as_uuid()).bind(channel).bind(thread)
         .bind(job.correlation)
-        .bind(crate::application::workflow::activation::job_payload(job.execution))
         .bind(job.execution.as_uuid()).execute(db).await?;
     Ok(())
 }

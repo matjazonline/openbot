@@ -42,7 +42,7 @@ async fn non_lineage_gates(f: &AdmissionFixture, request: &ActionDispatchRequest
             JOIN workflow_executions AS execution ON execution.company_id=owner.company_id AND execution.run_id=owner.id
             JOIN background_tasks AS task ON task.company_id=execution.company_id AND task.workflow_execution_id=execution.id
             JOIN task_attempts AS attempt ON attempt.task_id=task.id AND attempt.attempt_number=task.retry_count
-            WHERE owner.company_id=$1 AND owner.id=$2 AND task.id=$3 AND task.queue_kind='workflow'
+            WHERE owner.company_id=$1 AND owner.id=$2 AND task.id=$3
                 AND owner.deadline>clock_timestamp() AND execution.activation<=owner.max_steps
                 AND execution.activated_at IS NOT NULL AND execution.completed_at IS NULL
                 AND execution.committed_output IS NULL AND execution.committed_route IS NULL AND execution.successor_execution_id IS NULL
@@ -57,7 +57,7 @@ async fn non_lineage_gates(f: &AdmissionFixture, request: &ActionDispatchRequest
                     WHERE refusal.company_id=$1 AND refusal.run_id=$2 AND refusal.execution_id=execution.id AND refusal.job_id=$3)
                 AND NOT EXISTS(SELECT 1 FROM workflow_executions AS sibling
                     JOIN background_tasks AS other ON other.company_id=sibling.company_id AND other.workflow_execution_id=sibling.id
-                    WHERE sibling.company_id=$1 AND sibling.run_id=$2 AND other.queue_kind='workflow'
+                    WHERE sibling.company_id=$1 AND sibling.run_id=$2
                         AND other.id<>$3 AND other.status IN ('pending','processing')))
         "#).bind(request.scope().company.as_uuid()).bind(request.scope().run.as_uuid())
         .bind(request.fence.scope.job.0).fetch_one(f.persistence().pool()).await.unwrap();

@@ -319,16 +319,6 @@ impl PrincipalAccessPersistence for InMemoryParticipantDirectory {
             .identities
             .get(&(company_id, identity.clone()))
             .cloned();
-        if known
-            .as_ref()
-            .is_some_and(|known| known.status == IdentityStatus::Disabled)
-        {
-            return Ok(PrincipalAccessContext {
-                principal_id: None,
-                membership: CompanyMembership::None,
-                grant_authority: PrincipalGrantAuthority::Available,
-            });
-        }
         // Test fixtures state ACL principals and team membership without running the database
         // bootstrap that would have inserted their identity rows. Derive the same stable principal
         // for a read, but do not put it in `state`: a policy lookup must remain observable as

@@ -194,13 +194,7 @@ pub(super) fn retry_delta(
     }
     let old_job = scoped(before, "background_tasks", "id", request.fence.scope.job.0);
     let new_job = scoped(after, "background_tasks", "id", request.fence.scope.job.0);
-    for field in [
-        "id",
-        "workflow_execution_id",
-        "retry_count",
-        "max_retries",
-        "payload",
-    ] {
+    for field in ["id", "workflow_execution_id", "retry_count", "max_retries"] {
         assert_eq!(
             old_job[field], new_job[field],
             "operator retry preserves job {field}"

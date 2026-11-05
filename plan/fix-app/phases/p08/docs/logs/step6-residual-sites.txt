@@ -1,0 +1,10 @@
+src/adapters/persistence/dashboard.rs:104:     WHERE queue_kind = 'workflow'
+src/adapters/persistence/dashboard.rs:123:     WHERE queue_kind = 'workflow'
+src/adapters/persistence/workflow/batch_commit.rs:84:        "INSERT INTO background_tasks (id,company_id,channel_id,thread_id,correlation_id,task_type,payload,queue_kind,workflow_execution_id) \
+src/adapters/persistence/workflow/admission_write.rs:172:        "INSERT INTO background_tasks (id, company_id, channel_id, thread_id, correlation_id, task_type, \
+src/adapters/persistence/workflow/admission_write.rs:173:         payload, queue_kind, workflow_execution_id) VALUES ($1,$2,$3,$4,$5,'workflow_execution',$6,'workflow',$7)",
+src/adapters/persistence/workflow/metrics.sql:16:    WHERE queue_kind = 'workflow' AND status IN ('pending','processing')
+src/adapters/persistence/workflow/metrics.sql:26:    WHERE job.queue_kind = 'workflow' AND attempt.attempt_number > 1 AND attempt.started_at >= bounds.since
+src/adapters/persistence/workflow/action_reconciliation_state_witness_validate.sql:128:        'workflow_queue',task.queue_kind='workflow','future_deadline',owner.deadline>clock_timestamp(),'activation_bound',execution.activation<=owner.max_steps,
+src/adapters/persistence/workflow/action_reconciliation_state_witness_validate.sql:142:        'no_runnable_sibling',NOT EXISTS(SELECT 1 FROM workflow_executions AS sibling JOIN background_tasks AS other ON other.company_id=sibling.company_id AND other.workflow_execution_id=sibling.id WHERE sibling.company_id=config.company_id AND sibling.run_id=config.run_id AND other.queue_kind='workflow' AND other.id<>config.job_id AND other.status IN ('pending','processing')),
+src/adapters/persistence/workflow/job_schema_tests.rs:179:    let retired: i64 = sqlx::query_scalar("SELECT count(*) FROM pg_attribute WHERE NOT attisdropped AND ((attrelid='background_tasks'::regclass AND attname IN ('task_type','payload','queue_kind')) OR (attrelid='task_harness_runs'::regclass AND attname='owner_kind'))")

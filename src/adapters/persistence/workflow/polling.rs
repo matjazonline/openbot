@@ -47,7 +47,7 @@ impl WorkflowPolling for PostgresPersistence {
                 "SELECT run.binding_id, execution.step_id FROM workflow_runs AS run \
                  JOIN workflow_executions AS execution ON execution.company_id=run.company_id AND execution.run_id=run.id \
                  JOIN background_tasks AS job ON job.company_id=run.company_id AND job.workflow_execution_id=execution.id \
-                 WHERE run.company_id=$1 AND run.id=$2 AND execution.id=$3 AND job.id=$4 AND job.queue_kind='workflow'")
+                 WHERE run.company_id=$1 AND run.id=$2 AND execution.id=$3 AND job.id=$4 ")
                 .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(scope.job.0)
                 .fetch_optional(&mut *tx).await?;
             let (binding, step) = row.ok_or_else(missing)?;
@@ -114,7 +114,7 @@ pub(super) const CANDIDATES_SQL: &str = concat!(
                 LEFT JOIN workflow_waits AS wait
                   ON wait.company_id = execution.company_id AND wait.execution_id = execution.id
                  AND wait.run_id = run.id AND wait.state = 'waiting'
-                WHERE job.queue_kind = 'workflow' AND ((execution.completed_at IS NULL
+                WHERE ((execution.completed_at IS NULL
                   AND (
                     (run.state IN ('queued','running','waiting') AND run.deadline <= clock_timestamp())
                     OR (wait.id IS NULL AND run.state IN ('queued','running')

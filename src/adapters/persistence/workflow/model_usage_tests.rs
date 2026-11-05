@@ -172,3 +172,69 @@ async fn agent_retire_with_usage_rows_reports_run_history() {
             .unwrap();
     assert_eq!(kind, "agent", "the refused retirement rolled back whole");
 }
+
+#[tokio::test]
+async fn schema_constraint_live_usage_requires_run_and_history_has_no_runtime_owners() {
+    let f = AdmissionFixture::new().await;
+    let command = f.prepare(f.request("usage-nullability", f.manual())).await;
+    f.persistence().admit(&command).await.unwrap();
+    let agent = AgentPersistence::create(
+        f.persistence(),
+        command.company_id().as_uuid(),
+        AgentWrite {
+            name: "Required owners".into(),
+            slug: "required-owners".into(),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+    let mut row = usage_row(
+        &f,
+        command.proposed_run_id().as_uuid(),
+        command.first_execution_id().as_uuid(),
+        agent.id,
+    )
+    .await;
+    row["run_id"] = Value::Null;
+    let error = sqlx::query("INSERT INTO model_usage_calls SELECT (jsonb_populate_record(NULL::model_usage_calls,$1)).*")
+        .bind(row).execute(f.persistence().pool()).await.unwrap_err();
+    let database = error.as_database_error().unwrap();
+    assert_eq!(database.code().as_deref(), Some("23502"));
+    assert_eq!(
+        database
+            .downcast_ref::<sqlx::postgres::PgDatabaseError>()
+            .column(),
+        Some("run_id")
+    );
+    for (table, fields) in [
+        (
+            "model_usage_calls",
+            vec![
+                "workflow_id",
+                "version_id",
+                "run_id",
+                "execution_id",
+                "root_run_id",
+            ],
+        ),
+        (
+            "task_harness_runs",
+            vec![
+                "workflow_run_id",
+                "workflow_execution_id",
+                "workflow_generation",
+                "workflow_worker_id",
+                "workflow_attempt",
+                "workflow_prepared",
+            ],
+        ),
+    ] {
+        let required: i64 = sqlx::query_scalar("SELECT count(*) FROM information_schema.columns             WHERE table_schema='public' AND table_name=$1 AND column_name=ANY($2) AND is_nullable='NO'")
+            .bind(table).bind(&fields).fetch_one(f.persistence().pool()).await.unwrap();
+        assert_eq!(required, fields.len() as i64, "{table}");
+    }
+    let retained_owner_refs: i64 = sqlx::query_scalar("SELECT count(*) FROM information_schema.columns         WHERE table_schema='public' AND table_name='model_usage_history'         AND column_name IN ('run_id','execution_id','root_run_id','job_id','task_id')")
+        .fetch_one(f.persistence().pool()).await.unwrap();
+    assert_eq!(retained_owner_refs, 0);
+}

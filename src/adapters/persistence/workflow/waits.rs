@@ -119,18 +119,9 @@ pub(super) async fn lock(
     if execution.is_none() {
         return Ok(None);
     }
-    let payload:Option<Value>=sqlx::query_scalar("SELECT payload FROM background_tasks WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 AND queue_kind='workflow' AND status IN ('pending','completed','failed') AND worker_id IS NULL AND execution_generation IS NULL AND lock_expires_at IS NULL FOR UPDATE")
+    let execution:Option<Uuid>=sqlx::query_scalar("SELECT workflow_execution_id FROM background_tasks WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3  AND status IN ('pending','completed','failed') AND worker_id IS NULL AND execution_generation IS NULL AND lock_expires_at IS NULL FOR UPDATE")
         .bind(scope.company.as_uuid()).bind(scope.job.0).bind(scope.execution.as_uuid()).fetch_optional(&mut *db).await?;
-    match payload {
-        Some(payload) => {
-            if decode_job_payload(payload)? == scope.execution {
-                Ok(run)
-            } else {
-                Ok(None)
-            }
-        }
-        _ => Ok(None),
-    }
+    Ok(execution.and(run))
 }
 pub(super) enum WaitSelection {
     Execution,
@@ -338,7 +329,7 @@ struct SavedEvent {
 async fn select_due(pool: &sqlx::PgPool, limit: u16) -> AppResult<Vec<SweepCandidate>> {
     let mut tx = pool.begin().await?;
     sqlx::query("SELECT set_config('lock_timeout','1000ms',true),set_config('statement_timeout','1000ms',true)").execute(&mut *tx).await?;
-    let rows=sqlx::query_as("SELECT wait.company_id,wait.run_id,wait.execution_id,job.id AS job_id FROM workflow_waits AS wait JOIN workflow_runs AS run ON run.company_id=wait.company_id AND run.id=wait.run_id JOIN background_tasks AS job ON job.company_id=wait.company_id AND job.workflow_execution_id=wait.execution_id WHERE wait.state='waiting' AND (wait.deadline<=clock_timestamp() OR run.deadline<=clock_timestamp() OR run.state IN ('cancelled','failed','succeeded')) AND job.queue_kind='workflow' ORDER BY wait.deadline,wait.id LIMIT $1")
+    let rows=sqlx::query_as("SELECT wait.company_id,wait.run_id,wait.execution_id,job.id AS job_id FROM workflow_waits AS wait JOIN workflow_runs AS run ON run.company_id=wait.company_id AND run.id=wait.run_id JOIN background_tasks AS job ON job.company_id=wait.company_id AND job.workflow_execution_id=wait.execution_id WHERE wait.state='waiting' AND (wait.deadline<=clock_timestamp() OR run.deadline<=clock_timestamp() OR run.state IN ('cancelled','failed','succeeded'))  ORDER BY wait.deadline,wait.id LIMIT $1")
             .bind(i64::from(limit)).fetch_all(&mut *tx).await?;
     tx.commit().await?;
     Ok(rows)

@@ -111,9 +111,9 @@ pub(super) async fn activate_on(
 }
 
 async fn validate_job(db: &mut PgConnection, request: ActivationRequest) -> AppResult<()> {
-    let payload: Value = sqlx::query_scalar(
-        "SELECT payload FROM background_tasks WHERE company_id = $1 AND id = $2 \
-         AND workflow_execution_id = $3 AND queue_kind = 'workflow' FOR SHARE",
+    let _: Uuid = sqlx::query_scalar(
+        "SELECT workflow_execution_id FROM background_tasks WHERE company_id = $1 AND id = $2 \
+         AND workflow_execution_id = $3  FOR SHARE",
     )
     .bind(request.company.as_uuid())
     .bind(request.job.0)
@@ -121,9 +121,6 @@ async fn validate_job(db: &mut PgConnection, request: ActivationRequest) -> AppR
     .fetch_optional(db)
     .await?
     .ok_or_else(missing)?;
-    if decode_job_payload(payload)? != request.execution {
-        return Err(invalid());
-    }
     Ok(())
 }
 

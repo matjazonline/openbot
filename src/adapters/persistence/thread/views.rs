@@ -17,7 +17,7 @@ use std::collections::HashMap;
 use std::str::FromStr;
 use uuid::Uuid;
 
-use super::message::decode_attachments;
+use super::message::{decode_attachments, decode_response_contract};
 use crate::{
     app_error::{AppError, AppResult},
     entities::{
@@ -91,8 +91,7 @@ fn transport_kind(value: &str) -> AppResult<TransportKind> {
 
 #[derive(sqlx::FromRow, Debug)]
 struct ThreadMessageDb {
-    response_contract:
-        Option<sqlx::types::Json<crate::entities::response_contract::ResponseContract>>,
+    response_contract: Option<Value>,
     id: Uuid,
     canonical_id: Uuid,
     company_id: Uuid,
@@ -140,7 +139,10 @@ impl ThreadMessageDb {
             }
         };
         Ok(ThreadMessageView {
-            response_contract: self.response_contract.map(|value| value.0),
+            response_contract: decode_response_contract(
+                CanonicalMessageId::new(self.canonical_id),
+                self.response_contract,
+            ),
             id: self.id,
             canonical_id: CanonicalMessageId::new(self.canonical_id),
             thread_id: self.thread_id,

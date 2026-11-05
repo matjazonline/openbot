@@ -204,7 +204,7 @@ mod tests {
             message_id: CanonicalMessageId::random(),
             correlation_id: CorrelationId::new(),
             transport: TransportKind::Email,
-            purpose: DeliveryPurpose::Reply,
+            purpose: DeliveryPurpose::WorkflowReply,
             status: DeliveryStatus::Pending,
             idempotency_key: "reply:key".to_string(),
             destination_label: "support@acme".to_string(),
@@ -275,7 +275,7 @@ mod tests {
             channel_id: Some(channel_id),
             status: Some(DeliveryStatus::DeadLetter),
             transport: Some(TransportKind::Email),
-            purpose: Some(DeliveryPurpose::Outreach),
+            purpose: Some(DeliveryPurpose::WorkflowSend),
             sort_asc: true,
             page: None,
             limit: None,
@@ -285,7 +285,7 @@ mod tests {
         assert_eq!(Some(channel_id), next.channel_id);
         assert_eq!(Some(DeliveryStatus::DeadLetter), next.status);
         assert_eq!(Some(TransportKind::Email), next.transport);
-        assert_eq!(Some(DeliveryPurpose::Outreach), next.purpose);
+        assert_eq!(Some(DeliveryPurpose::WorkflowSend), next.purpose);
         assert!(next.sort_asc);
         assert_eq!(4, next.page());
     }

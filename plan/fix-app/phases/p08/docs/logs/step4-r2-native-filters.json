@@ -1,0 +1,10 @@
+{
+  "filters": {
+    "schema_constraint_": 13,
+    "passwordless_login_refuses_even_if_dummy_verification_returns_true": 1,
+    "model_usage": 12,
+    "admission_source_tests::": 5,
+    "adapters::persistence::auth_key_rotation_tests::": 3
+  },
+  "selected_unique": 31
+}

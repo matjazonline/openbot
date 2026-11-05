@@ -1,6 +1,5 @@
 use super::*;
 use crate::application::workflow::{activation::*, batch::*};
-use serde_json::Value;
 use std::time::Instant;
 
 #[derive(sqlx::FromRow)]
@@ -20,7 +19,6 @@ struct BatchExecution {
 }
 #[derive(sqlx::FromRow)]
 struct BatchJob {
-    payload: Value,
     status: String,
     eligible: bool,
 }
@@ -190,15 +188,12 @@ async fn lock_execution(
     .await?
     .ok_or_else(missing)?;
     let job = sqlx::query_as::<_, BatchJob>(
-        "SELECT payload, status, (status = 'pending' AND retry_count < max_retries AND run_at <= clock_timestamp() \
+        "SELECT status, (status = 'pending' AND retry_count < max_retries AND run_at <= clock_timestamp() \
          AND worker_id IS NULL AND execution_generation IS NULL AND locked_at IS NULL AND lock_expires_at IS NULL) AS eligible \
          FROM background_tasks WHERE company_id = $1 AND id = $2 AND workflow_execution_id = $3 \
-         AND queue_kind = 'workflow' FOR UPDATE",
+          FOR UPDATE",
     ).bind(request.company.as_uuid()).bind(request.job.0).bind(request.execution.as_uuid())
         .fetch_optional(db).await?.ok_or_else(missing)?;
-    if decode_job_payload(job.payload)? != request.execution {
-        return Err(invalid());
-    }
     if row.completed_at.is_some() {
         if job.status != "completed"
             && !(job.status == "failed" && row.committed_route.as_deref() == Some("final_error"))
@@ -220,8 +215,13 @@ async fn replay(
         return Err(invalid());
     }
     let continuation = if let Some(execution) = row.successor_execution_id {
-        let job = sqlx::query_scalar("SELECT id FROM background_tasks WHERE company_id = $1 AND workflow_execution_id = $2 AND queue_kind = 'workflow'")
-            .bind(request.company.as_uuid()).bind(execution).fetch_one(db).await?;
+        let job = sqlx::query_scalar(
+            "SELECT id FROM background_tasks WHERE company_id = $1 AND workflow_execution_id = $2 ",
+        )
+        .bind(request.company.as_uuid())
+        .bind(execution)
+        .fetch_one(db)
+        .await?;
         Some(ActivationRequest {
             execution: ExecutionId::new(execution),
             job: WorkflowJobId(job),

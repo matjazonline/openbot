@@ -1,5 +1,5 @@
 //! The read side of `/ui/dashboard`: aggregates over the tables the queues already write. The job
-//! figures are the workflow queue's (`queue_kind = 'workflow'`) and the tokens are the model usage
+//! figures are the workflow queue's and the tokens are the model usage
 //! ledger's (p08 D4.5).
 //!
 //! Kept out of the workflow queue's own persistence deliberately: this module is reporting, never
@@ -101,7 +101,6 @@ const TASK_QUEUE_SQL: &str = r#"
     SELECT status,
            COUNT(*)::bigint AS count
       FROM background_tasks
-     WHERE queue_kind = 'workflow'
      {scope}
      GROUP BY status
      ORDER BY status"#;
@@ -120,7 +119,6 @@ const TASK_PRESSURE_SQL: &str = r#"
                WHERE status = 'pending' AND run_at <= CURRENT_TIMESTAMP
            )::bigint AS due_now
       FROM background_tasks
-     WHERE queue_kind = 'workflow'
      {scope}"#;
 
 const DELIVERY_QUEUE_SQL: &str = r#"
@@ -196,8 +194,7 @@ const THROUGHPUT_BODY: &str = r#",
                COUNT(*) FILTER (WHERE status = 'completed')::bigint AS completed,
                COUNT(*) FILTER (WHERE status = 'failed')::bigint AS failed
           FROM background_tasks
-         WHERE queue_kind = 'workflow'
-           AND status IN ('completed', 'failed')
+         WHERE status IN ('completed', 'failed')
            AND updated_at >= CURRENT_TIMESTAMP - make_interval(mins => $2)
            {scope}
          GROUP BY bucket
@@ -232,7 +229,7 @@ const LATENCY_BODY: &str = r#",
                              * 1000)::double precision
                ) AS p95_ms
           FROM task_attempts AS attempt
-          JOIN background_tasks AS task ON task.id = attempt.task_id AND task.queue_kind = 'workflow'
+          JOIN background_tasks AS task ON task.id = attempt.task_id
          WHERE attempt.started_at >= CURRENT_TIMESTAMP - make_interval(mins => $2)
            {scope}
          GROUP BY bucket
@@ -264,8 +261,7 @@ const QUEUE_DEPTH_BODY: &str = r#",
     open_tasks AS (
         SELECT created_at, updated_at, status
           FROM background_tasks
-         WHERE queue_kind = 'workflow'
-           AND (status IN ('pending', 'processing')
+         WHERE (status IN ('pending', 'processing')
                 OR updated_at >= CURRENT_TIMESTAMP - make_interval(mins => $2))
            {scope}
     )
@@ -304,7 +300,7 @@ const ATTEMPT_STATS_SQL: &str = r#"
                          * 1000)::double precision
            ) AS p95_ms
       FROM task_attempts AS attempt
-      JOIN background_tasks AS task ON task.id = attempt.task_id AND task.queue_kind = 'workflow'
+      JOIN background_tasks AS task ON task.id = attempt.task_id
      WHERE attempt.started_at >= CURRENT_TIMESTAMP - make_interval(mins => $1)
        {scope}"#;
 
@@ -326,7 +322,7 @@ const RETRY_RATE_BODY: &str = r#",
                COUNT(*)::bigint AS attempts,
                COUNT(*) FILTER (WHERE attempt.attempt_number > 1)::bigint AS retries
           FROM task_attempts AS attempt
-          JOIN background_tasks AS task ON task.id = attempt.task_id AND task.queue_kind = 'workflow'
+          JOIN background_tasks AS task ON task.id = attempt.task_id
          WHERE attempt.started_at >= CURRENT_TIMESTAMP - make_interval(mins => $2)
            {scope}
          GROUP BY bucket
@@ -356,10 +352,13 @@ const OUTSTANDING_SQL: &str = r#"
            channel.name AS channel_name,
            task.thread_id,
            execution.run_id,
-           task.task_type,
            task.status,
            task.retry_count,
-           task.last_error,
+           (SELECT attempt.workflow_failure_code
+              FROM task_attempts AS attempt
+             WHERE attempt.task_id = task.id
+             ORDER BY attempt.attempt_number DESC, attempt.started_at DESC, attempt.id DESC
+             LIMIT 1) AS workflow_failure_code,
            task.updated_at,
            (task.status = 'processing'
              AND (task.lock_expires_at IS NULL
@@ -369,7 +368,7 @@ const OUTSTANDING_SQL: &str = r#"
       LEFT JOIN channels AS channel ON channel.id = task.channel_id
       LEFT JOIN workflow_executions AS execution
              ON execution.company_id = task.company_id AND execution.id = task.workflow_execution_id
-     WHERE task.queue_kind = 'workflow' AND (
+     WHERE (
              task.status = 'processing'
              OR (task.status = 'pending' AND task.run_at <= CURRENT_TIMESTAMP)
            )
@@ -390,9 +389,9 @@ const OUTSTANDING_SQL: &str = r#"
 /// Assembled at first use rather than on every read. A reading is taken at most once per tick per
 /// view, and there is still no reason to rebuild twenty strings each time.
 static TASK_QUEUE: LazyLock<ScopedSql> =
-    LazyLock::new(|| ScopedSql::new(TASK_QUEUE_SQL, "AND company_id = $1"));
+    LazyLock::new(|| ScopedSql::new(TASK_QUEUE_SQL, "WHERE company_id = $1"));
 static TASK_PRESSURE: LazyLock<ScopedSql> =
-    LazyLock::new(|| ScopedSql::new(TASK_PRESSURE_SQL, "AND company_id = $1"));
+    LazyLock::new(|| ScopedSql::new(TASK_PRESSURE_SQL, "WHERE company_id = $1"));
 static DELIVERY_QUEUE: LazyLock<ScopedSql> =
     LazyLock::new(|| ScopedSql::new(DELIVERY_QUEUE_SQL, "WHERE company_id = $1"));
 static DELIVERY_PRESSURE: LazyLock<ScopedSql> =
@@ -644,12 +643,13 @@ impl PostgresPersistence {
                     channel_name: row.try_get("channel_name").map_err(AppError::from)?,
                     thread_id: row.try_get("thread_id").map_err(AppError::from)?,
                     run_id: row.try_get("run_id").map_err(AppError::from)?,
-                    task_type: row.try_get("task_type").map_err(AppError::from)?,
                     status: TaskStatus::from_str(&raw)
                         .map_err(|err| AppError::Internal(err.to_string()))?,
                     stalled: row.try_get("stalled").map_err(AppError::from)?,
                     retry_count: row.try_get("retry_count").map_err(AppError::from)?,
-                    last_error: row.try_get("last_error").map_err(AppError::from)?,
+                    workflow_failure_code: row
+                        .try_get("workflow_failure_code")
+                        .map_err(AppError::from)?,
                     since: row.try_get("updated_at").map_err(AppError::from)?,
                 })
             })

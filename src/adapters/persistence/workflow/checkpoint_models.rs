@@ -24,7 +24,7 @@ pub(super) async fn reserve_on(
         return Ok(End::Rollback(Admission::OwnershipLost));
     }
     let saved = load_on(tx, write.fence).await?.ok_or_else(missing)?;
-    let current = decode(saved.checkpoint.clone())?;
+    let current = decode(saved.id, saved.checkpoint.clone())?;
     live(tx, write.fence, bound).await?;
     if let Some(result) = admission_replay(&saved, &current, write, &request.reservation)? {
         return Ok(End::Rollback(result));
@@ -155,7 +155,7 @@ pub(super) async fn settle_on(
         )));
     }
     let saved = load_on(tx, write.fence).await?.ok_or_else(missing)?;
-    let current = decode(saved.checkpoint.clone())?;
+    let current = decode(saved.id, saved.checkpoint.clone())?;
     live(tx, write.fence, bound).await?;
     if let Some(result) = settlement_replay(&saved, &current, write, turn)? {
         let result = replay_policy(tx, write.fence, result).await?;

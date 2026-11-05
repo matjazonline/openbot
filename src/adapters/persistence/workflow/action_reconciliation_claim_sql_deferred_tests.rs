@@ -19,7 +19,7 @@ const REFUSAL_PREREQUISITES: &str = r#"SELECT
             AND workflow_action_retry_safe(witness.company_id,witness.execution_id) IS DISTINCT FROM false)
             OR (owner.state='waiting' AND owner.waiting_reason='reconciliation' AND owner.terminal_execution_id IS NULL
                 AND workflow_action_retry_safe(witness.company_id,witness.execution_id) IS FALSE))
-        AND job.status='failed' AND job.queue_kind='workflow' AND job.workflow_execution_id=witness.execution_id
+        AND job.status='failed'  AND job.workflow_execution_id=witness.execution_id
         AND job.retry_count=witness.retired_attempt AND job.worker_id IS NULL AND job.execution_generation IS NULL
         AND job.lock_expires_at IS NULL AND execution.activated_at IS NOT NULL AND execution.completed_at IS NULL
         AND audit.execution_id=witness.execution_id AND audit.event_kind='workflow.root_budget_exhausted' AS other_predicates,
@@ -84,11 +84,11 @@ async fn insert_invalid_attempt(
     let generation = Uuid::new_v4();
     let worker_id = Uuid::new_v4();
     let greater_attempt = retired_attempt.checked_add(1).unwrap();
-    let inserted = sqlx::query("INSERT INTO task_attempts(id,task_id,attempt_number,status,execution_generation,worker_id,machine_id) VALUES($1,$2,$3,'processing',$4,$5,'deferred-refusal-attack')")
+    let inserted = sqlx::query("INSERT INTO task_attempts(id,task_id,attempt_number,status,execution_generation,worker_id) VALUES($1,$2,$3,'processing',$4,$5)")
         .bind(attempt_id).bind(job.0).bind(greater_attempt)
         .bind(generation).bind(worker_id).execute(&mut **tx).await.unwrap();
     assert_eq!(inserted.rows_affected(), 1);
-    let exact_attempt: i64 = sqlx::query_scalar("SELECT count(*) FROM task_attempts AS attempt WHERE attempt.id=$1 AND attempt.task_id=$2 AND attempt.attempt_number=$3 AND attempt.status='processing' AND attempt.execution_generation=$4 AND attempt.worker_id=$5 AND attempt.machine_id='deferred-refusal-attack' AND attempt.finished_at IS NULL AND attempt.workflow_failure_class IS NULL AND attempt.workflow_failure_code IS NULL AND attempt.workflow_retry_safety IS NULL AND attempt.workflow_retirement IS NULL")
+    let exact_attempt: i64 = sqlx::query_scalar("SELECT count(*) FROM task_attempts AS attempt WHERE attempt.id=$1 AND attempt.task_id=$2 AND attempt.attempt_number=$3 AND attempt.status='processing' AND attempt.execution_generation=$4 AND attempt.worker_id=$5 AND attempt.finished_at IS NULL AND attempt.workflow_failure_class IS NULL AND attempt.workflow_failure_code IS NULL AND attempt.workflow_retry_safety IS NULL AND attempt.workflow_retirement IS NULL")
         .bind(attempt_id).bind(job.0).bind(greater_attempt)
         .bind(generation).bind(worker_id).fetch_one(&mut **tx).await.unwrap();
     assert_eq!(

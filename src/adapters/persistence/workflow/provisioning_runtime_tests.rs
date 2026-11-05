@@ -408,10 +408,11 @@ async fn builder_stops_a_listing_loop_once_its_result_repeats() {
     })
     .await;
 
-    let failure: (String, String) = sqlx::query_as(
+    let failure: ListingLoopFailure = sqlx::query_as(
         "SELECT run.state, attempt.workflow_failure_code FROM workflow_runs AS run \
          JOIN workflow_executions AS execution \
            ON execution.company_id = run.company_id AND execution.run_id = run.id \
+           AND execution.id = run.terminal_execution_id \
          JOIN background_tasks AS job \
            ON job.company_id = execution.company_id AND job.workflow_execution_id = execution.id \
          JOIN task_attempts AS attempt ON attempt.task_id = job.id \
@@ -421,13 +422,11 @@ async fn builder_stops_a_listing_loop_once_its_result_repeats() {
     .fetch_one(d.p().pool())
     .await
     .unwrap();
-    assert_eq!(
-        failure,
-        ("failed".into(), "agent.repeated_tool_call".into())
-    );
-    let (turns, invocations): (i32, i32) = sqlx::query_as(
-        "SELECT jsonb_array_length(harness.checkpoint->'turns'), \
-           jsonb_array_length(harness.checkpoint->'invocations') \
+    assert_eq!(failure.state, "failed");
+    assert_eq!(failure.workflow_failure_code, "agent.repeated_tool_call");
+    let work: ListingLoopWork = sqlx::query_as(
+        "SELECT jsonb_array_length(harness.checkpoint->'turns') AS turns, \
+           jsonb_array_length(harness.checkpoint->'invocations') AS invocations \
          FROM task_harness_runs AS harness JOIN workflow_runs AS run \
            ON run.company_id = harness.company_id AND run.id = harness.workflow_run_id \
          WHERE run.binding_id = $1",
@@ -436,7 +435,8 @@ async fn builder_stops_a_listing_loop_once_its_result_repeats() {
     .fetch_one(d.p().pool())
     .await
     .unwrap();
-    assert_eq!((turns, invocations), (3, 2), "the third listing never ran");
+    assert_eq!(work.turns, 3);
+    assert_eq!(work.invocations, 2, "the third listing never ran");
     let first = d.llm.observed().remove(0).to_string();
     assert!(
         first.contains(r#"\"untrusted_subject\":\"Assistant\""#),
@@ -579,4 +579,15 @@ async fn reviewed_assistants_park_their_answer_until_the_run_deadline() {
     assert!(expires_with_run);
     assert_eq!(reviewer, json!(admin.to_string()));
     assert_eq!(d.llm.finish().await.unwrap(), 3);
+}
+
+#[derive(sqlx::FromRow)]
+struct ListingLoopFailure {
+    state: String,
+    workflow_failure_code: String,
+}
+#[derive(sqlx::FromRow)]
+struct ListingLoopWork {
+    turns: i32,
+    invocations: i32,
 }

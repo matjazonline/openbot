@@ -68,7 +68,7 @@ async fn fail_on(db: &mut PgConnection, failure: &GuardFailure) -> AppResult<Gua
         .bind(company).bind(run).fetch_all(&mut *db).await?;
     sqlx::query("SELECT id FROM workflow_executions WHERE company_id=$1 AND run_id=$2 ORDER BY id FOR UPDATE")
         .bind(company).bind(run).execute(&mut *db).await?;
-    sqlx::query("SELECT job.id FROM background_tasks AS job JOIN workflow_executions AS execution ON execution.company_id=job.company_id AND execution.id=job.workflow_execution_id WHERE execution.company_id=$1 AND execution.run_id=$2 AND job.queue_kind='workflow' ORDER BY job.id FOR UPDATE OF job")
+    sqlx::query("SELECT job.id FROM background_tasks AS job JOIN workflow_executions AS execution ON execution.company_id=job.company_id AND execution.id=job.workflow_execution_id WHERE execution.company_id=$1 AND execution.run_id=$2  ORDER BY job.id FOR UPDATE OF job")
         .bind(company).bind(run).execute(&mut *db).await?;
     maintenance::retire_jobs(
         db,
@@ -117,7 +117,7 @@ async fn deferral_free(
     if !current || (owner.expired && failure.site != GuardSite::RunExpiry) {
         return Ok(false);
     }
-    let job = sqlx::query_as::<_, JobRow>("SELECT status, worker_id, execution_generation, attempt_ordinal, lock_expires_at > clock_timestamp() AS live FROM background_tasks WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 AND queue_kind='workflow'")
+    let job = sqlx::query_as::<_, JobRow>("SELECT status, worker_id, execution_generation, attempt_ordinal, lock_expires_at > clock_timestamp() AS live FROM background_tasks WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3 ")
         .bind(scope.company.as_uuid()).bind(scope.job.0).bind(scope.execution.as_uuid()).fetch_optional(&mut *db).await?;
     let Some(job) = job else {
         return Ok(false);

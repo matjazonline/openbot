@@ -260,7 +260,7 @@ impl crate::use_cases::user::UserPersistence for StubUserPersistence {
             username: username.to_string(),
             email: email.to_string(),
             email_verified_at: None,
-            password_hash: password_hash.to_string(),
+            password_hash: Some(password_hash.to_string()),
             avatar_url: None,
             created_at: chrono::Utc::now(),
         })

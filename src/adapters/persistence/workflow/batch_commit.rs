@@ -81,10 +81,10 @@ async fn successor(
         .bind(request.company.as_uuid()).bind(request.run.as_uuid()).bind(next.execution.as_uuid()).bind(step.as_str())
         .bind(i64::try_from(ordinal).map_err(|_| invalid())?).execute(&mut *db).await?;
     sqlx::query(
-        "INSERT INTO background_tasks (id,company_id,channel_id,thread_id,correlation_id,task_type,payload,queue_kind,workflow_execution_id) \
-         SELECT $3,run.company_id,run.channel_id,run.thread_id,run.correlation_id,'workflow_execution',$4,'workflow',$5 \
+        "INSERT INTO background_tasks (id,company_id,channel_id,thread_id,correlation_id,workflow_execution_id) \
+         SELECT $3,run.company_id,run.channel_id,run.thread_id,run.correlation_id,$4 \
          FROM workflow_runs AS run WHERE run.company_id = $1 AND run.id = $2",
-    ).bind(request.company.as_uuid()).bind(request.run.as_uuid()).bind(next.job.0).bind(job_payload(next.execution))
+    ).bind(request.company.as_uuid()).bind(request.run.as_uuid()).bind(next.job.0)
         .bind(next.execution.as_uuid()).execute(db).await?;
     Ok(next)
 }

@@ -284,7 +284,7 @@ impl MockUserPersistence {
                 username: "testuser".to_string(),
                 email: "testuser@gmail.com".to_string(),
                 email_verified_at: None,
-                password_hash: "secret_hash".to_string(),
+                password_hash: Some("secret_hash".to_string()),
                 avatar_url: None,
                 created_at: chrono::Utc::now(),
             }),
@@ -329,44 +329,20 @@ impl UserPersistence for MockUserPersistence {
             username: username.to_string(),
             email: email.to_string(),
             email_verified_at: None,
-            password_hash: password_hash.to_string(),
+            password_hash: Some(password_hash.to_string()),
             avatar_url: None,
             created_at: chrono::Utc::now(),
         })
     }
 
     async fn get_by_email(&self, email: &str) -> AppResult<Option<User>> {
-        if email == "testuser@gmail.com" {
-            Ok(Some(User {
-                auth_revision: 0,
-                id: Uuid::new_v4(),
-                username: "testuser".to_string(),
-                email: "testuser@gmail.com".to_string(),
-                email_verified_at: None,
-                password_hash: "secret_hash".to_string(),
-                avatar_url: None,
-                created_at: chrono::Utc::now(),
-            }))
-        } else {
-            Ok(None)
-        }
+        let stored = self.stored.lock().unwrap();
+        Ok((email == stored.email).then(|| stored.clone()))
     }
 
     async fn get_by_username(&self, username: &str) -> AppResult<Option<User>> {
-        if username == "testuser" {
-            Ok(Some(User {
-                auth_revision: 0,
-                id: Uuid::new_v4(),
-                username: "testuser".to_string(),
-                email: "testuser@gmail.com".to_string(),
-                email_verified_at: None,
-                password_hash: "secret_hash".to_string(),
-                avatar_url: None,
-                created_at: chrono::Utc::now(),
-            }))
-        } else {
-            Ok(None)
-        }
+        let stored = self.stored.lock().unwrap();
+        Ok((username == stored.username).then(|| stored.clone()))
     }
 
     async fn get_by_id(&self, _id: Uuid) -> AppResult<Option<User>> {
@@ -434,7 +410,7 @@ impl UserPersistence for MockUserPersistence {
         password_hash: &str,
     ) -> AppResult<Option<User>> {
         let mut stored = self.stored.lock().unwrap();
-        stored.password_hash = password_hash.to_string();
+        stored.password_hash = Some(password_hash.to_string());
         Ok(Some(stored.clone()))
     }
 
@@ -580,10 +556,10 @@ impl AccountChangePersistence for MockAccountChanges {
                 AccountChangeKind::Password => "testuser@gmail.com".to_string(),
             },
             email_verified_at: (kind == AccountChangeKind::Email).then(chrono::Utc::now),
-            password_hash: match kind {
+            password_hash: Some(match kind {
                 AccountChangeKind::Email => "secret_hash".to_string(),
                 AccountChangeKind::Password => payload,
-            },
+            }),
             avatar_url: None,
             created_at: chrono::Utc::now(),
         }))
@@ -767,7 +743,7 @@ async fn a_new_password_is_mailed_a_code_and_the_old_one_stands_until_it_comes_b
     assert!(matches!(outcome, PasswordOutcome::ConfirmationSent(_)));
     assert_eq!(
         persistence.stored.lock().unwrap().password_hash,
-        "secret_hash",
+        Some("secret_hash".to_owned()),
         "the stored password must still be the old one"
     );
 
@@ -781,7 +757,10 @@ async fn a_new_password_is_mailed_a_code_and_the_old_one_stands_until_it_comes_b
         .confirm_account_change(id, AccountChangeKind::Password, &code)
         .await
         .unwrap();
-    assert_eq!(confirmed.password_hash, "a-longer-secret_hash");
+    assert_eq!(
+        confirmed.password_hash,
+        Some("a-longer-secret_hash".to_owned())
+    );
 }
 
 #[tokio::test]
@@ -965,7 +944,7 @@ async fn changing_a_password_rehashes_it_only_for_whoever_knows_the_current_one(
 
     assert_eq!(
         persistence.stored.lock().unwrap().password_hash,
-        "a-longer-secret_hash"
+        Some("a-longer-secret_hash".to_owned())
     );
 }
 
@@ -996,7 +975,7 @@ async fn a_new_password_must_be_long_enough_and_confirmed() {
 
     assert_eq!(
         persistence.stored.lock().unwrap().password_hash,
-        "secret_hash",
+        Some("secret_hash".to_owned()),
         "a refused change must leave the stored password alone"
     );
 }
@@ -1172,6 +1151,7 @@ async fn an_oauth_only_account_can_add_password_login() {
     persistence
         .password_enabled
         .store(false, std::sync::atomic::Ordering::SeqCst);
+    persistence.stored.lock().unwrap().password_hash = None;
     let id = persistence.id();
     let user_use_cases = use_cases(persistence.clone());
 
@@ -1196,6 +1176,32 @@ async fn an_oauth_only_account_can_add_password_login() {
     );
     assert_eq!(
         persistence.stored.lock().unwrap().password_hash,
-        "a-new-password_hash"
+        Some("a-new-password_hash".to_owned())
     );
+}
+
+#[tokio::test]
+async fn passwordless_login_refuses_even_if_dummy_verification_returns_true() {
+    struct AcceptingHasher(std::sync::atomic::AtomicUsize);
+    impl UserCredentialsHasher for AcceptingHasher {
+        fn hash_password(&self, _: &str) -> AppResult<String> {
+            unreachable!()
+        }
+        fn verify_password(&self, _: &str, hash: &str) -> AppResult<bool> {
+            assert_eq!(hash, DUMMY_PASSWORD_HASH);
+            self.0.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            Ok(true)
+        }
+    }
+    let persistence = Arc::new(MockUserPersistence::new());
+    persistence.stored.lock().unwrap().password_hash = None;
+    let hasher = Arc::new(AcceptingHasher(std::sync::atomic::AtomicUsize::new(0)));
+    let users = UserUseCases::new(hasher.clone(), persistence, ("test-attempt-secret").into());
+    assert!(matches!(
+        users
+            .login("testuser", &"candidate".into(), None, None)
+            .await,
+        Err(AppError::InvalidCredentials)
+    ));
+    assert_eq!(hasher.0.load(std::sync::atomic::Ordering::SeqCst), 1);
 }
