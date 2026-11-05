@@ -1,0 +1,209 @@
+{
+  "query": "configured",
+  "matches": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/mcp_test_support.rs#configured",
+        "name": "configured",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/mcp_test_support.rs",
+        "span": "L345-L375"
+      },
+      "hits": [
+        {
+          "id": "src/adapters/persistence/workflow/mcp_test_support.rs#mcp_setup",
+          "relation": "calls",
+          "depth": 1,
+          "name": "mcp_setup",
+          "kind": "function",
+          "path": "src/adapters/persistence/workflow/mcp_test_support.rs",
+          "span": "L323-L343"
+        },
+        {
+          "id": "src/adapters/persistence/workflow/knowledge_mcp_tests.rs#knowledge_run_level_mcp_level_change_preserves_operation_and_credentials",
+          "relation": "calls",
+          "depth": 2,
+          "name": "knowledge_run_level_mcp_level_change_preserves_operation_and_credentials",
+          "kind": "function",
+          "path": "src/adapters/persistence/workflow/knowledge_mcp_tests.rs",
+          "span": "L42-L74"
+        },
+        {
+          "id": "src/adapters/persistence/workflow/knowledge_mcp_tests.rs#knowledge_run_level_mcp_step_and_tool_refuse_without_provider_entry",
+          "relation": "calls",
+          "depth": 2,
+          "name": "knowledge_run_level_mcp_step_and_tool_refuse_without_provider_entry",
+          "kind": "function",
+          "path": "src/adapters/persistence/workflow/knowledge_mcp_tests.rs",
+          "span": "L5-L39"
+        },
+        {
+          "id": "src/adapters/persistence/workflow/mcp_catalog_tests.rs#workflow_mcp_binding_rejects_foreign_and_wrong_kind_resources",
+          "relation": "calls",
+          "depth": 2,
+          "name": "workflow_mcp_binding_rejects_foreign_and_wrong_kind_resources",
+          "kind": "function",
+          "path": "src/adapters/persistence/workflow/mcp_catalog_tests.rs",
+          "span": "L195-L235"
+        },
+        {
+          "id": "src/adapters/persistence/workflow/mcp_catalog_tests.rs#workflow_mcp_operation_cas_cascades_and_tenant_constraints",
+          "relation": "calls",
+          "depth": 2,
+          "name": "workflow_mcp_operation_cas_cascades_and_tenant_constraints",
+          "kind": "function",
+          "path": "src/adapters/persistence/workflow/mcp_catalog_tests.rs",
+          "span": "L60-L192"
+        },
+        {
+          "id": "src/adapters/persistence/workflow/mcp_catalog_tests.rs#workflow_mcp_registration_competes_with_grant_removal_refresh_and_delete",
+          "relation": "calls",
+          "depth": 2,
+          "name": "workflow_mcp_registration_competes_with_grant_removal_refresh_and_delete",
+          "kind": "function",
+          "path": "src/adapters/persistence/workflow/mcp_catalog_tests.rs",
+          "span": "L4-L57"
+        },
+        {
+          "id": "src/adapters/persistence/workflow/mcp_reconciliation_tests.rs#workflow_mcp_unknown_note_through_the_production_composition",
+          "relation": "calls",
+          "depth": 2,
+          "name": "workflow_mcp_unknown_note_through_the_production_composition",
+          "kind": "function",
+          "path": "src/adapters/persistence/workflow/mcp_reconciliation_tests.rs",
+          "span": "L172-L221"
+        },
+        {
+          "id": "src/adapters/persistence/workflow/mcp_reconciliation_tests.rs#workflow_mcp_verified_not_applied_retries_lazily_and_checks_live_drift",
+          "relation": "calls",
+          "depth": 2,
+          "name": "workflow_mcp_verified_not_applied_retries_lazily_and_checks_live_drift",
+          "kind": "function",
+          "path": "src/adapters/persistence/workflow/mcp_reconciliation_tests.rs",
+          "span": "L123-L167"
+        },
+        {
+          "id": "src/adapters/persistence/workflow/mcp_recovery_tests.rs#workflow_mcp_cancellation_and_dropped_worker_cancel_and_close_without_second_call",
+          "relation": "calls",
+          "depth": 2,
+          "name": "workflow_mcp_cancellation_and_dropped_worker_cancel_and_close_without_second_call",
+          "kind": "function",
+          "path": "src/adapters/persistence/workflow/mcp_recovery_tests.rs",
+          "span": "L90-L153"
+        },
+        {
+          "id": "src/adapters/persistence/workflow/mcp_recovery_tests.rs#workflow_mcp_permit_timeout_retires_safely_then_retries_once",
+          "relation": "calls",
+          "depth": 2,
+          "name": "workflow_mcp_permit_timeout_retires_safely_then_retries_once",
+          "kind": "function",
+          "path": "src/adapters/persistence/workflow/mcp_recovery_tests.rs",
+          "span": "L4-L48"
+        },
+        {
+          "id": "src/adapters/persistence/workflow/mcp_recovery_tests.rs#workflow_mcp_post_entry_failures_and_session_expiry_park_without_reinitialize",
+          "relation": "calls",
+          "depth": 2,
+          "name": "workflow_mcp_post_entry_failures_and_session_expiry_park_without_reinitialize",
+          "kind": "function",
+          "path": "src/adapters/persistence/workflow/mcp_recovery_tests.rs",
+          "span": "L51-L87"
+        },
+        {
+          "id": "src/adapters/persistence/workflow/mcp_recovery_tests.rs#workflow_mcp_revocation_and_rotation_racing_dispatch_never_call",
+          "relation": "calls",
+          "depth": 2,
+          "name": "workflow_mcp_revocation_and_rotation_racing_dispatch_never_call",
+          "kind": "function",
+          "path": "src/adapters/persistence/workflow/mcp_recovery_tests.rs",
+          "span": "L197-L275"
+        },
+        {
+          "id": "src/adapters/persistence/workflow/mcp_recovery_tests.rs#workflow_mcp_stale_worker_during_eager_open_retries_then_calls_once",
+          "relation": "calls",
+          "depth": 2,
+          "name": "workflow_mcp_stale_worker_during_eager_open_retries_then_calls_once",
+          "kind": "function",
+          "path": "src/adapters/persistence/workflow/mcp_recovery_tests.rs",
+          "span": "L156-L194"
+        },
+        {
+          "id": "src/adapters/persistence/workflow/mcp_tests.rs#workflow_mcp_competitors_restart_and_direct_tool_share_one_call",
+          "relation": "calls",
+          "depth": 2,
+          "name": "workflow_mcp_competitors_restart_and_direct_tool_share_one_call",
+          "kind": "function",
+          "path": "src/adapters/persistence/workflow/mcp_tests.rs",
+          "span": "L133-L204"
+        },
+        {
+          "id": "src/adapters/persistence/workflow/mcp_tests.rs#workflow_mcp_drift_and_missing_tool_fail_before_any_marker",
+          "relation": "calls",
+          "depth": 2,
+          "name": "workflow_mcp_drift_and_missing_tool_fail_before_any_marker",
+          "kind": "function",
+          "path": "src/adapters/persistence/workflow/mcp_tests.rs",
+          "span": "L322-L352"
+        },
+        {
+          "id": "src/adapters/persistence/workflow/mcp_tests.rs#workflow_mcp_json_and_sse_run_end_to_end_with_typed_refs",
+          "relation": "calls",
+          "depth": 2,
+          "name": "workflow_mcp_json_and_sse_run_end_to_end_with_typed_refs",
+          "kind": "function",
+          "path": "src/adapters/persistence/workflow/mcp_tests.rs",
+          "span": "L44-L130"
+        },
+        {
+          "id": "src/adapters/persistence/workflow/mcp_tests.rs#workflow_mcp_output_violation_and_oversize_stay_unknown_without_second_call",
+          "relation": "calls",
+          "depth": 2,
+          "name": "workflow_mcp_output_violation_and_oversize_stay_unknown_without_second_call",
+          "kind": "function",
+          "path": "src/adapters/persistence/workflow/mcp_tests.rs",
+          "span": "L281-L319"
+        },
+        {
+          "id": "src/adapters/persistence/workflow/mcp_tests.rs#workflow_mcp_refusals_and_protection_are_terminal_without_network",
+          "relation": "calls",
+          "depth": 2,
+          "name": "workflow_mcp_refusals_and_protection_are_terminal_without_network",
+          "kind": "function",
+          "path": "src/adapters/persistence/workflow/mcp_tests.rs",
+          "span": "L388-L490"
+        },
+        {
+          "id": "src/adapters/persistence/workflow/mcp_tests.rs#workflow_mcp_resource_links_stay_inert_and_echoed_secrets_are_redacted",
+          "relation": "calls",
+          "depth": 2,
+          "name": "workflow_mcp_resource_links_stay_inert_and_echoed_secrets_are_redacted",
+          "kind": "function",
+          "path": "src/adapters/persistence/workflow/mcp_tests.rs",
+          "span": "L245-L278"
+        },
+        {
+          "id": "src/adapters/persistence/workflow/mcp_tests.rs#workflow_mcp_tool_error_commits_receipt_and_takes_final_error",
+          "relation": "calls",
+          "depth": 2,
+          "name": "workflow_mcp_tool_error_commits_receipt_and_takes_final_error",
+          "kind": "function",
+          "path": "src/adapters/persistence/workflow/mcp_tests.rs",
+          "span": "L207-L242"
+        },
+        {
+          "id": "src/adapters/persistence/workflow/mcp_tests.rs#workflow_mcp_unavailable_before_marker_retries_and_dispatches_once",
+          "relation": "calls",
+          "depth": 2,
+          "name": "workflow_mcp_unavailable_before_marker_retries_and_dispatches_once",
+          "kind": "function",
+          "path": "src/adapters/persistence/workflow/mcp_tests.rs",
+          "span": "L355-L385"
+        }
+      ]
+    }
+  ],
+  "saved": {
+    "files": 6,
+    "baselineChars": 65570
+  }
+}

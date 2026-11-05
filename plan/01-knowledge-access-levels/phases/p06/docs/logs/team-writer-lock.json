@@ -1,0 +1,32 @@
+{
+  "pattern": "fn lock_team",
+  "filesSearched": 505,
+  "totalHits": 1,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/company_level_authority.rs#lock_team",
+        "name": "lock_team",
+        "kind": "function",
+        "path": "src/adapters/persistence/company_level_authority.rs",
+        "span": "L88-L118"
+      },
+      "path": "src/adapters/persistence/company_level_authority.rs",
+      "inDegree": 5,
+      "hits": [
+        {
+          "line": 88,
+          "text": "pub(in crate::adapters::persistence) async fn lock_team("
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 7194
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "step": "query-statistics-record",
+  "command": [
+    "psql",
+    "postgres://mac02@127.0.0.1:55506/open_bots_test",
+    "-X",
+    "-v",
+    "ON_ERROR_STOP=1",
+    "-Atc",
+    "SELECT queryid FROM pg_stat_statements WHERE dbid=(SELECT oid FROM pg_database WHERE datname=current_database()) AND query LIKE '%ci_pg_stat_statements_probe%' LIMIT 1"
+  ],
+  "exit": 0,
+  "seconds": 0.02,
+  "rust_test_summaries": []
+}

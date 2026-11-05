@@ -1,0 +1,26 @@
+
+> openbots@1.0.0 test:run-counts
+> node --test scripts/tests/run-counts.mjs
+
+TAP version 13
+# Subtest: channel: snapshot before pane, OOB list, competing reads, reconnect and navigation
+ok 1 - channel: snapshot before pane, OOB list, competing reads, reconnect and navigation
+  ---
+  duration_ms: 1663.099333
+  type: 'test'
+  ...
+# Subtest: channel: pane before first snapshot stays uninitialized and then hydrates
+ok 2 - channel: pane before first snapshot stays uninitialized and then hydrates
+  ---
+  duration_ms: 416.543625
+  type: 'test'
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 2
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2546.004792

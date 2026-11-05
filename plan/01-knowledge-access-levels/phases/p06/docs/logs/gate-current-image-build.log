@@ -1,0 +1,87 @@
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 1.77kB done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/debian:bookworm-slim@sha256:99c0b25c46d0214d5a2091092e7908907dcaecd6a962cde0ac700acee222b6f3
+#2 DONE 0.8s
+
+#3 [internal] load metadata for docker.io/library/rust:1.95.0-bookworm@sha256:6258907abe69656e41cd992e0b705cdcfabcbbe3db374f92ed2d47121282d4a1
+#3 DONE 0.8s
+
+#4 [internal] load .dockerignore
+#4 transferring context: 218B done
+#4 DONE 0.0s
+
+#5 [model 1/6] FROM docker.io/library/debian:bookworm-slim@sha256:99c0b25c46d0214d5a2091092e7908907dcaecd6a962cde0ac700acee222b6f3
+#5 resolve docker.io/library/debian:bookworm-slim@sha256:99c0b25c46d0214d5a2091092e7908907dcaecd6a962cde0ac700acee222b6f3 done
+#5 DONE 0.0s
+
+#6 [builder 1/8] FROM docker.io/library/rust:1.95.0-bookworm@sha256:6258907abe69656e41cd992e0b705cdcfabcbbe3db374f92ed2d47121282d4a1
+#6 resolve docker.io/library/rust:1.95.0-bookworm@sha256:6258907abe69656e41cd992e0b705cdcfabcbbe3db374f92ed2d47121282d4a1 0.0s done
+#6 DONE 0.0s
+
+#7 [internal] load build context
+#7 transferring context: 14.52MB 0.1s done
+#7 DONE 0.2s
+
+#8 [builder 2/8] WORKDIR /app
+#8 CACHED
+
+#9 [builder 3/8] COPY Cargo.toml Cargo.lock ./
+#9 CACHED
+
+#10 [builder 4/8] COPY .sqlx ./.sqlx
+#10 CACHED
+
+#11 [builder 5/8] COPY migrations ./migrations
+#11 CACHED
+
+#12 [builder 6/8] COPY assets ./assets
+#12 CACHED
+
+#13 [builder 7/8] COPY src ./src
+#13 DONE 0.1s
+
+#14 [builder 8/8] RUN --mount=type=cache,target=/usr/local/cargo/registry     --mount=type=cache,target=/app/target     cargo build --release --locked     && cp target/release/open_bots /app/open_bots
+#14 0.816    Compiling open_bots v0.1.0 (/app)
+#14 165.2     Finished `release` profile [optimized] target(s) in 2m 45s
+#14 DONE 165.4s
+
+#15 [stage-2 4/5] COPY --from=builder --chmod=0555 /app/open_bots /app/open_bots
+#15 CACHED
+
+#16 [model 4/6] COPY scripts/prepare-knowledge-model.py ./scripts/prepare-knowledge-model.py
+#16 CACHED
+
+#17 [stage-2 3/5] WORKDIR /app
+#17 CACHED
+
+#18 [model 6/6] RUN python3 scripts/prepare-knowledge-model.py --destination /knowledge-model
+#18 CACHED
+
+#19 [stage-2 2/5] RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates libstdc++6 libgomp1     && rm -rf /var/lib/apt/lists/*     && groupadd --system mailagents     && useradd --system --gid mailagents --home-dir /app --shell /usr/sbin/nologin mailagents
+#19 CACHED
+
+#20 [model 2/6] RUN apt-get update && apt-get install -y --no-install-recommends python3 ca-certificates     && rm -rf /var/lib/apt/lists/*
+#20 CACHED
+
+#21 [model 3/6] WORKDIR /prepare
+#21 CACHED
+
+#22 [model 5/6] COPY assets/knowledge ./assets/knowledge
+#22 CACHED
+
+#23 [stage-2 5/5] COPY --from=model /knowledge-model /app/models/multilingual-e5-small
+#23 CACHED
+
+#24 exporting to image
+#24 exporting layers done
+#24 exporting manifest sha256:3624b0f6d8542eac88cefdedd9b29d0fa32f038ad09bb581456b0d2952b4d007 done
+#24 exporting config sha256:00b672acebfe115d7fc3944843264ebe042be90f2dd7139ad9e752c7056e6646 done
+#24 exporting attestation manifest sha256:0d9a4208d039579ea34be391d9d69ea59135ea64f48f5534857dcfa7e0a910ac done
+#24 exporting manifest list sha256:383c31ec7480a9fa84faf51d207c9352b86201b09448cc6d04a793124eaa2cec done
+#24 naming to docker.io/library/openbot-knowledge-p06:wb1 done
+#24 unpacking to docker.io/library/openbot-knowledge-p06:wb1 done
+#24 DONE 0.0s

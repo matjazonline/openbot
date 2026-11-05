@@ -1,0 +1,16 @@
+{
+  "filters": {
+    "knowledge_e2e_": 9
+  },
+  "names": [
+    "adapters::persistence::knowledge::tests::search::knowledge_e2e_quality_fixture_exact_hit_oracle_matches_real_postgres_search",
+    "adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::knowledge_e2e_customer_cc_lowers_member_run_to_public_before_search",
+    "adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::knowledge_e2e_level_five_team_reply_is_stamped_and_level_zero_viewer_gets_placeholder",
+    "adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::knowledge_e2e_member_upload_ceiling_prefix_new_layer_and_replacement_are_enforced",
+    "adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::knowledge_e2e_outside_contact_cannot_observe_private_sales_and_gets_missing_information_reply",
+    "adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::knowledge_e2e_public_followup_in_the_same_thread_excludes_prior_private_reply_from_history",
+    "adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::mcp::knowledge_e2e_private_search_refuses_public_mcp_to_model_and_allows_level_nine_crm",
+    "adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::races::knowledge_e2e_cc_and_member_demotion_mid_reply_refuse_delivery_and_show_typed_attention",
+    "adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::uploads::knowledge_e2e_competing_application_replicas_replace_one_name_and_level_without_duplicates"
+  ]
+}

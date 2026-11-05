@@ -1,0 +1,22 @@
+{
+  "step": "dump-session",
+  "command": [
+    "cargo",
+    "test",
+    "--locked",
+    "--offline",
+    "--lib",
+    "dump_session_revocation_browser_fixtures",
+    "--",
+    "--ignored"
+  ],
+  "exit": 0,
+  "seconds": 0.83,
+  "rust_test_summaries": [
+    {
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0
+    }
+  ]
+}

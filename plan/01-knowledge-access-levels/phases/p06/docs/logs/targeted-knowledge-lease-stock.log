@@ -1,0 +1,22 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+lease budget: work phase must stay under 50% of the attempt bound
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.33s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-c19a0b960dacdcef)
+
+running 2 tests
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::knowledge_search_driver_persists_observation_and_classification_before_continuing ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::knowledge_search_replay_uses_the_canonical_result_without_embedding_again ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 2885 filtered out; finished in 1.53s
+
+op                               n  max work ms  bound ms  max lock  max body  max acquire  max commit  outcomes
+checkpoint.blocked               2            2      3000         1         3            0           0  {'completed': 2}
+checkpoint.execution             2            4      2000         2         7            0           0  {'completed': 2}
+checkpoint.model.reserve         3            4      2000         7        12            0           0  {'completed': 3}
+checkpoint.model.settle          3            3      2000         1         5            0           0  {'completed': 3}
+checkpoint.open                  2            3      2000         1         4            0           0  {'completed': 2}
+checkpoint.update                6            5      2000         2         7            0           0  {'completed': 6}
+knowledge.context                3            7      2000         2         9            0           0  {'completed': 3}
+knowledge.observe                2            3      2000         9        13            0           1  {'completed': 2}
+lease.claim                      2           22      2000         2        24            0           0  {'completed': 2}
+injected (excluded) events: 0

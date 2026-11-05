@@ -1,0 +1,83 @@
+{
+  "pattern": "struct ChannelWrite|enum ChannelAccessMode|struct RenderedPart|enum ProviderSendOutcome",
+  "filesSearched": 1160,
+  "totalHits": 4,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/application/ports/channel.rs#ChannelWrite",
+        "name": "ChannelWrite",
+        "kind": "struct",
+        "path": "src/application/ports/channel.rs",
+        "span": "L17-L30"
+      },
+      "path": "src/application/ports/channel.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 17,
+          "text": "pub struct ChannelWrite {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/transport/delivery.rs#RenderedPart",
+        "name": "RenderedPart",
+        "kind": "struct",
+        "path": "src/application/transport/delivery.rs",
+        "span": "L370-L378"
+      },
+      "path": "src/application/transport/delivery.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 370,
+          "text": "pub struct RenderedPart {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/transport/delivery.rs#ProviderSendOutcome",
+        "name": "ProviderSendOutcome",
+        "kind": "enum",
+        "path": "src/application/transport/delivery.rs",
+        "span": "L629-L656"
+      },
+      "path": "src/application/transport/delivery.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 629,
+          "text": "pub enum ProviderSendOutcome {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/channel.rs#ChannelAccessMode",
+        "name": "ChannelAccessMode",
+        "kind": "enum",
+        "path": "src/domain/entities/channel.rs",
+        "span": "L85-L89"
+      },
+      "path": "src/domain/entities/channel.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 85,
+          "text": "pub enum ChannelAccessMode {"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 3,
+    "baselineChars": 54353
+  }
+}

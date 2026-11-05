@@ -1,0 +1,105 @@
+{
+  "pattern": "create_person_principal_on",
+  "filesSearched": 500,
+  "totalHits": 6,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/company.rs#create",
+        "name": "create",
+        "kind": "function",
+        "path": "src/adapters/persistence/company.rs",
+        "span": "L139-L178"
+      },
+      "path": "src/adapters/persistence/company.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 174,
+          "text": "create_person_principal_on(&mut transaction, uuid, user_id, &username, &email).await?;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/participant.rs#create_person_principal_on",
+        "name": "create_person_principal_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/participant.rs",
+        "span": "L330-L411"
+      },
+      "path": "src/adapters/persistence/participant.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 330,
+          "text": "pub(crate) async fn create_person_principal_on("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_ingress_tests.rs#verified_member",
+        "name": "verified_member",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_ingress_tests.rs",
+        "span": "L414-L448"
+      },
+      "path": "src/adapters/persistence/workflow/message_ingress_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 438,
+          "text": "crate::adapters::persistence::participant::create_person_principal_on("
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/company_invite.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 8,
+          "text": "adapters::persistence::{PostgresPersistence, participant::create_person_principal_on},"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/company_invite.rs#accept_pending_invite",
+        "name": "accept_pending_invite",
+        "kind": "function",
+        "path": "src/adapters/persistence/company_invite.rs",
+        "span": "L353-L432"
+      },
+      "path": "src/adapters/persistence/company_invite.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 404,
+          "text": "create_person_principal_on("
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/company.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 7,
+          "text": "adapters::persistence::{PostgresPersistence, participant::create_person_principal_on},"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 4,
+    "baselineChars": 120157
+  }
+}

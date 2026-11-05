@@ -1,0 +1,8 @@
+
+running 3 tests
+test application::transport::dependency_tests::workflow_and_transport_depend_on_shared_ports_without_reverse_usecase_imports ... ok
+test adapters::persistence::knowledge::tests::search::knowledge_e2e_quality_fixture_exact_hit_oracle_matches_real_postgres_search ... ok
+test adapters::persistence::thread::tests::jsonb_row_context_tests::jsonb_row_context_thread_contract_is_optional_per_message ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 2876 filtered out; finished in 0.83s
+

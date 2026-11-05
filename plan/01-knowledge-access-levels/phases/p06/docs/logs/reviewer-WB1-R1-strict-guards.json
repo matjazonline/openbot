@@ -1,0 +1,26 @@
+{
+  "src/application/transport/dependency_tests.rs": {
+    "unchanged_from_review_base": true,
+    "sha256": "d0ff5d5a7be83a455403343ba17d512c5c7035709593e30da427ff1e2f4d46d1"
+  },
+  "scripts/transport-boundary-check.sh": {
+    "unchanged_from_review_base": true,
+    "sha256": "f5123c80b02fee3f864b528846297134b42b05fdc5f9de8e2518821ff16aa2e8"
+  },
+  "scripts/tests/transport-boundary.sh": {
+    "unchanged_from_review_base": true,
+    "sha256": "6edae3a4bb8f23c93d9aaf3080d985e57c282152e05868f1b65f3cf40e1c4d8a"
+  },
+  ".github/workflows/ci.yml": {
+    "unchanged_from_review_base": true,
+    "sha256": "dd8cdf737e3127c17a7023184563e2e0ad42ca3dd8fb16873da0181a409a8a40"
+  },
+  "scripts/stack-budget.sh": {
+    "unchanged_from_review_base": true,
+    "sha256": "95102fb06a99c5da63fd8acbe029bec0de90004be093e87e232bd6de7aef11eb"
+  },
+  "command_relocation": {
+    "old_module_absent": true,
+    "new_definition_byte_identical": true
+  }
+}

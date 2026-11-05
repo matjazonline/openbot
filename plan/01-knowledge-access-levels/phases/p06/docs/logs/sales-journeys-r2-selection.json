@@ -1,0 +1,12 @@
+{
+  "filters": {
+    "knowledge_e2e_": 5
+  },
+  "names": [
+    "adapters::persistence::knowledge::tests::search::knowledge_e2e_quality_fixture_exact_hit_oracle_matches_real_postgres_search",
+    "adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::knowledge_e2e_customer_cc_lowers_member_run_to_public_before_search",
+    "adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::knowledge_e2e_level_five_team_reply_is_stamped_and_level_zero_viewer_gets_placeholder",
+    "adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::knowledge_e2e_member_upload_ceiling_prefix_new_layer_and_replacement_are_enforced",
+    "adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::knowledge_e2e_outside_contact_cannot_observe_private_sales_and_gets_missing_information_reply"
+  ]
+}

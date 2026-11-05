@@ -1,0 +1,100 @@
+{
+  "pattern": "knowledge_run_level_history_",
+  "filesSearched": 406,
+  "totalHits": 5,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/knowledge_history_lease_tests.rs#knowledge_run_level_history_real_replacement_claim_fences_old_reader_and_replays_once",
+        "name": "knowledge_run_level_history_real_replacement_claim_fences_old_reader_and_replays_once",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/knowledge_history_lease_tests.rs",
+        "span": "L92-L147"
+      },
+      "path": "src/adapters/persistence/workflow/knowledge_history_lease_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 92,
+          "text": "async fn knowledge_run_level_history_real_replacement_claim_fences_old_reader_and_replays_once() {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/knowledge_history_lease_tests.rs#knowledge_run_level_history_expired_database_lease_or_deadline_returns_no_output_or_rise",
+        "name": "knowledge_run_level_history_expired_database_lease_or_deadline_returns_no_output_or_rise",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/knowledge_history_lease_tests.rs",
+        "span": "L150-L166"
+      },
+      "path": "src/adapters/persistence/workflow/knowledge_history_lease_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 150,
+          "text": "async fn knowledge_run_level_history_expired_database_lease_or_deadline_returns_no_output_or_rise()"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/knowledge_history_lease_tests.rs#knowledge_run_level_history_expiry_during_statement_and_commit_rolls_back_taint_and_proof",
+        "name": "knowledge_run_level_history_expiry_during_statement_and_commit_rolls_back_taint_and_proof",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/knowledge_history_lease_tests.rs",
+        "span": "L184-L219"
+      },
+      "path": "src/adapters/persistence/workflow/knowledge_history_lease_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 184,
+          "text": "async fn knowledge_run_level_history_expiry_during_statement_and_commit_rolls_back_taint_and_proof()"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/knowledge_history_lease_tests.rs#knowledge_run_level_history_consumption_rejects_foreign_scope_and_rewritten_proof",
+        "name": "knowledge_run_level_history_consumption_rejects_foreign_scope_and_rewritten_proof",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/knowledge_history_lease_tests.rs",
+        "span": "L222-L254"
+      },
+      "path": "src/adapters/persistence/workflow/knowledge_history_lease_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 222,
+          "text": "async fn knowledge_run_level_history_consumption_rejects_foreign_scope_and_rewritten_proof() {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/knowledge_history_tests.rs#knowledge_run_level_history_filters_before_count_and_raises_returned_content",
+        "name": "knowledge_run_level_history_filters_before_count_and_raises_returned_content",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/knowledge_history_tests.rs",
+        "span": "L5-L51"
+      },
+      "path": "src/adapters/persistence/workflow/knowledge_history_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 5,
+          "text": "async fn knowledge_run_level_history_filters_before_count_and_raises_returned_content() {"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 2,
+    "baselineChars": 12669
+  }
+}

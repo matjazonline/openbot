@@ -1,0 +1,10 @@
+{
+  "step": "rust-version",
+  "command": [
+    "rustc",
+    "--version"
+  ],
+  "exit": 0,
+  "seconds": 0.02,
+  "rust_test_summaries": []
+}

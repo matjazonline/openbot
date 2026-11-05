@@ -1,0 +1,11 @@
+{
+  "binary": "/Users/mac02/dev/openbot-recovery/.worktrees/knowledge-p06/target/debug/deps/open_bots-c19a0b960dacdcef",
+  "exit": 101,
+  "selected": 9,
+  "filters": {
+    "knowledge_e2e_": 9
+  },
+  "source_unchanged": true,
+  "tree_sha256": "eed81e18cede1b9a81f496d4df9c8f62d25400b2ee6bdba51cd123ec74eee146",
+  "stack": "stock2MiB"
+}

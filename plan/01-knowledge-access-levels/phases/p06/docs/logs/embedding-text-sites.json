@@ -1,0 +1,66 @@
+{
+  "pattern": "embedding_text",
+  "filesSearched": 17,
+  "totalHits": 3,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/application/knowledge/chunking.rs#embedding_text",
+        "name": "embedding_text",
+        "kind": "function",
+        "path": "src/application/knowledge/chunking.rs",
+        "span": "L18-L20"
+      },
+      "path": "src/application/knowledge/chunking.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 18,
+          "text": "pub fn embedding_text(&self) -> String {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/knowledge/service.rs#embed_document",
+        "name": "embed_document",
+        "kind": "function",
+        "path": "src/application/knowledge/service.rs",
+        "span": "L174-L208"
+      },
+      "path": "src/application/knowledge/service.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 187,
+          "text": "let passages: Vec<_> = batch.iter().map(KnowledgeChunk::embedding_text).collect();"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/knowledge/chunking_tests.rs#knowledge_chunk_long_unbroken_unicode_has_no_overlap_or_loss_and_a_hard_limit",
+        "name": "knowledge_chunk_long_unbroken_unicode_has_no_overlap_or_loss_and_a_hard_limit",
+        "kind": "function",
+        "path": "src/application/knowledge/chunking_tests.rs",
+        "span": "L17-L33"
+      },
+      "path": "src/application/knowledge/chunking_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 31,
+          "text": ".all(|chunk| chunk.embedding_text().chars().count() <= MAX_EMBEDDING_TOKENS)"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 3,
+    "baselineChars": 18247
+  }
+}

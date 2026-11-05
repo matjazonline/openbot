@@ -1,0 +1,13 @@
+{
+  "port": 55506,
+  "data": "/Users/mac02/dev/openbot-recovery/.worktrees/pg-knowledge-p06",
+  "socket": "/Users/mac02/dev/openbot-recovery/.worktrees/pg-knowledge-p06-socket",
+  "databases": [
+    "open_bots",
+    "open_bots_test"
+  ],
+  "env_mode": "0o600",
+  "env_ignored": true,
+  "both_fresh_migrations": "PASS",
+  "target": "own APFS COW clone of accepted04, no hardlinks/shared mutable target"
+}

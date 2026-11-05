@@ -1,0 +1,49 @@
+{
+  "pattern": "impl WorkflowHistory|WriteBound::.*history|WriteBound::.*knowledge",
+  "filesSearched": 406,
+  "totalHits": 2,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/knowledge_checkpoint.rs#knowledge_context",
+        "name": "knowledge_context",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/knowledge_checkpoint.rs",
+        "span": "L39-L60"
+      },
+      "path": "src/adapters/persistence/workflow/knowledge_checkpoint.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 44,
+          "text": "let bound = WriteBound::start(\"knowledge.context\", read_policy()?);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/knowledge_checkpoint.rs#observe_knowledge",
+        "name": "observe_knowledge",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/knowledge_checkpoint.rs",
+        "span": "L62-L85"
+      },
+      "path": "src/adapters/persistence/workflow/knowledge_checkpoint.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 68,
+          "text": "let bound = WriteBound::start(\"knowledge.observe\", read_policy()?);"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 10580
+  }
+}

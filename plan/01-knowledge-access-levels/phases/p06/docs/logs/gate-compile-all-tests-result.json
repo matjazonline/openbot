@@ -1,0 +1,14 @@
+{
+  "step": "compile-all-tests",
+  "command": [
+    "cargo",
+    "test",
+    "--locked",
+    "--offline",
+    "--all-targets",
+    "--no-run"
+  ],
+  "exit": 0,
+  "seconds": 107.7,
+  "rust_test_summaries": []
+}

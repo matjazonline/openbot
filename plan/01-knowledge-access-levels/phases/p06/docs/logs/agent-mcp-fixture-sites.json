@@ -1,0 +1,66 @@
+{
+  "pattern": "workflow_agent.*mcp|mod agent_tests",
+  "filesSearched": 403,
+  "totalHits": 3,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/mcp_agent_tests.rs#workflow_agent_mcp_tool_dispatches_once_through_the_bound_slot",
+        "name": "workflow_agent_mcp_tool_dispatches_once_through_the_bound_slot",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/mcp_agent_tests.rs",
+        "span": "L27-L169"
+      },
+      "path": "src/adapters/persistence/workflow/mcp_agent_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 27,
+          "text": "async fn workflow_agent_mcp_tool_dispatches_once_through_the_bound_slot() {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/mcp_tests.rs#agent_tests",
+        "name": "agent_tests",
+        "kind": "module",
+        "path": "src/adapters/persistence/workflow/mcp_tests.rs",
+        "span": "L37-L37"
+      },
+      "path": "src/adapters/persistence/workflow/mcp_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 37,
+          "text": "mod agent_tests;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_tests.rs#agent_tests",
+        "name": "agent_tests",
+        "kind": "module",
+        "path": "src/adapters/persistence/workflow/message_tests.rs",
+        "span": "L15-L15"
+      },
+      "path": "src/adapters/persistence/workflow/message_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 15,
+          "text": "mod agent_tests;"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 3,
+    "baselineChars": 47264
+  }
+}

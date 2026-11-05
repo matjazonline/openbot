@@ -1,0 +1,9 @@
+{
+  "command": [
+    "npm",
+    "run",
+    "check:css"
+  ],
+  "exit": 0,
+  "seconds": 1.02
+}

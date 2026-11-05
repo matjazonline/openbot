@@ -1,0 +1,27 @@
+import subprocess,os,json,sys,time
+from pathlib import Path
+logs=Path("plan/01-knowledge-access-levels/phases/p06/docs/logs")
+env=os.environ.copy();env.update(CARGO_INCREMENTAL="0",SQLX_OFFLINE="true",DATABASE_URL="postgres://mac02@127.0.0.1:55506/open_bots",TEST_DATABASE_URL="postgres://mac02@127.0.0.1:55506/open_bots_test")
+env["PATH"]="/Users/mac02/dev/openbot-recovery/.worktrees/knowledge-tooling/node22-bin:/opt/homebrew/opt/node@22/bin:/opt/homebrew/opt/postgresql@18/bin:"+env["PATH"]
+env["PLAYWRIGHT_BROWSERS_PATH"]="/Users/mac02/dev/openbot-recovery/.worktrees/knowledge-tooling/playwright"
+steps=[
+("fmt",["cargo","fmt","--all","--","--check"]),
+("whitespace",["git","diff","--check"]),
+("transport-boundary-tests",["bash","scripts/tests/transport-boundary.sh"]),
+("transport-boundary-check",["bash","scripts/transport-boundary-check.sh"]),
+("sample-boundary-tests",["python3","scripts/tests/workflow-sample-boundary.py"]),
+("sample-boundary-check",["python3","scripts/workflow-sample-boundary.py"]),
+("deploy-tests",["bash","scripts/tests/deploy.sh"]),
+("key-rotation-tests",["bash","scripts/tests/credential-key-rotation.sh"]),
+("model-artifact-tests",["python3","scripts/tests/knowledge-model-prepare.py"]),
+("frontend-install",["npm","ci","--offline"]),
+("css",["npm","run","check:css"]),
+("offline-alltargets",["cargo","check","--locked","--offline","--all-targets"]),
+("clippy-alltargets",["cargo","clippy","--locked","--offline","--all-targets","--","-D","warnings"]),
+]
+for name,command in steps:
+ print({"step":name,"status":"started"},flush=True);start=time.monotonic()
+ with(logs/("final-"+name+".log")).open("w")as out:r=subprocess.run(command,env=env,stdout=out,stderr=subprocess.STDOUT)
+ proof={"command":command,"exit":r.returncode,"seconds":round(time.monotonic()-start,2)}
+ (logs/("final-"+name+"-result.json")).write_text(json.dumps(proof,indent=2)+"\n");print({"step":name,**proof},flush=True)
+ if r.returncode:raise SystemExit(r.returncode)

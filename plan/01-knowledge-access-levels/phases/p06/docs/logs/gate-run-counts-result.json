@@ -1,0 +1,11 @@
+{
+  "step": "run-counts",
+  "command": [
+    "npm",
+    "run",
+    "test:run-counts"
+  ],
+  "exit": 0,
+  "seconds": 2.79,
+  "rust_test_summaries": []
+}

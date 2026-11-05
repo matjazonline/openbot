@@ -1,0 +1,409 @@
+[
+  {
+    "step": "source-start",
+    "command": [
+      "python3",
+      "/Users/mac02/dev/openbot-recovery/.worktrees/knowledge-tooling/p06-source-manifest.py",
+      "/Users/mac02/dev/openbot-recovery/.worktrees/knowledge-p06/plan/01-knowledge-access-levels/phases/p06/docs/logs/full-gate-source-start.json"
+    ],
+    "exit": 0,
+    "seconds": 0.63,
+    "rust_test_summaries": []
+  },
+  {
+    "step": "rust-version",
+    "command": [
+      "rustc",
+      "--version"
+    ],
+    "exit": 0,
+    "seconds": 0.02,
+    "rust_test_summaries": []
+  },
+  {
+    "step": "sqlx-version",
+    "command": [
+      "cargo",
+      "sqlx",
+      "--version"
+    ],
+    "exit": 0,
+    "seconds": 0.02,
+    "rust_test_summaries": []
+  },
+  {
+    "step": "postgres-version",
+    "command": [
+      "postgres",
+      "--version"
+    ],
+    "exit": 0,
+    "seconds": 0.01,
+    "rust_test_summaries": []
+  },
+  {
+    "step": "node-version",
+    "command": [
+      "node",
+      "--version"
+    ],
+    "exit": 0,
+    "seconds": 0.05,
+    "rust_test_summaries": []
+  },
+  {
+    "step": "fetch-locked",
+    "command": [
+      "cargo",
+      "fetch",
+      "--locked"
+    ],
+    "exit": 0,
+    "seconds": 0.27,
+    "rust_test_summaries": []
+  },
+  {
+    "step": "fresh-owned-reset",
+    "command": [
+      "bash",
+      "scripts/reset-db.sh",
+      "--all",
+      "--yes"
+    ],
+    "exit": 0,
+    "seconds": 0.64,
+    "rust_test_summaries": []
+  },
+  {
+    "step": "fresh-test-migrations",
+    "command": [
+      "cargo",
+      "sqlx",
+      "migrate",
+      "run",
+      "--database-url",
+      "postgres://mac02@127.0.0.1:55506/open_bots_test"
+    ],
+    "exit": 0,
+    "seconds": 0.28,
+    "rust_test_summaries": []
+  },
+  {
+    "step": "query-statistics-settings",
+    "command": [
+      "psql",
+      "postgres://mac02@127.0.0.1:55506/open_bots_test",
+      "-X",
+      "-v",
+      "ON_ERROR_STOP=1",
+      "-Atc",
+      "SELECT name,setting FROM pg_settings WHERE name IN ('pg_stat_statements.track','pg_stat_statements.track_utility','log_parameter_max_length','log_parameter_max_length_on_error') ORDER BY name"
+    ],
+    "exit": 0,
+    "seconds": 0.02,
+    "rust_test_summaries": []
+  },
+  {
+    "step": "query-statistics-probe",
+    "command": [
+      "psql",
+      "postgres://mac02@127.0.0.1:55506/open_bots_test",
+      "-X",
+      "-v",
+      "ON_ERROR_STOP=1",
+      "-Atc",
+      "SELECT 1 AS ci_pg_stat_statements_probe"
+    ],
+    "exit": 0,
+    "seconds": 0.01,
+    "rust_test_summaries": []
+  },
+  {
+    "step": "query-statistics-record",
+    "command": [
+      "psql",
+      "postgres://mac02@127.0.0.1:55506/open_bots_test",
+      "-X",
+      "-v",
+      "ON_ERROR_STOP=1",
+      "-Atc",
+      "SELECT queryid FROM pg_stat_statements WHERE dbid=(SELECT oid FROM pg_database WHERE datname=current_database()) AND query LIKE '%ci_pg_stat_statements_probe%' LIMIT 1"
+    ],
+    "exit": 0,
+    "seconds": 0.02,
+    "rust_test_summaries": []
+  },
+  {
+    "step": "live-sqlx-prepare",
+    "command": [
+      "cargo",
+      "sqlx",
+      "prepare",
+      "--",
+      "--locked",
+      "--offline",
+      "--all-targets"
+    ],
+    "exit": 0,
+    "seconds": 59.4,
+    "rust_test_summaries": []
+  },
+  {
+    "step": "sqlx-cache-check",
+    "command": [
+      "cargo",
+      "sqlx",
+      "prepare",
+      "--check",
+      "--",
+      "--locked",
+      "--offline",
+      "--all-targets"
+    ],
+    "exit": 0,
+    "seconds": 59.46,
+    "rust_test_summaries": []
+  },
+  {
+    "step": "current-image-build",
+    "command": [
+      "docker",
+      "build",
+      "--progress=plain",
+      "--tag",
+      "openbot-knowledge-p06:wb1",
+      "."
+    ],
+    "exit": 0,
+    "seconds": 167.13,
+    "rust_test_summaries": []
+  },
+  {
+    "step": "current-image-check",
+    "command": [
+      "python3",
+      "scripts/check-knowledge-image.py",
+      "--image",
+      "openbot-knowledge-p06:wb1"
+    ],
+    "exit": 0,
+    "seconds": 8.1,
+    "rust_test_summaries": []
+  },
+  {
+    "step": "run-counts",
+    "command": [
+      "npm",
+      "run",
+      "test:run-counts"
+    ],
+    "exit": 0,
+    "seconds": 2.79,
+    "rust_test_summaries": []
+  },
+  {
+    "step": "sse-navigation",
+    "command": [
+      "node",
+      "--test",
+      "scripts/tests/sse-navigation.mjs",
+      "scripts/tests/agent-runtime.mjs",
+      "scripts/tests/workflow-runs.mjs",
+      "scripts/tests/workflow-conversations.mjs",
+      "scripts/tests/workflow-samples.mjs"
+    ],
+    "exit": 0,
+    "seconds": 47.44,
+    "rust_test_summaries": []
+  },
+  {
+    "step": "compile-all-tests",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--all-targets",
+      "--no-run"
+    ],
+    "exit": 0,
+    "seconds": 107.7,
+    "rust_test_summaries": []
+  },
+  {
+    "step": "dump-html",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "dump_html_injection_browser_fixtures",
+      "--",
+      "--ignored"
+    ],
+    "exit": 0,
+    "seconds": 2.0,
+    "rust_test_summaries": [
+      {
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0
+      }
+    ]
+  },
+  {
+    "step": "html-team-browser",
+    "command": [
+      "node",
+      "--test",
+      "scripts/tests/team-autocomplete-browser.mjs",
+      "scripts/tests/html-injection-browser.mjs"
+    ],
+    "exit": 0,
+    "seconds": 1.13,
+    "rust_test_summaries": []
+  },
+  {
+    "step": "dump-knowledge",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "dump_knowledge_browser_fixtures",
+      "--",
+      "--ignored"
+    ],
+    "exit": 0,
+    "seconds": 0.26,
+    "rust_test_summaries": [
+      {
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0
+      }
+    ]
+  },
+  {
+    "step": "knowledge-browser",
+    "command": [
+      "node",
+      "--test",
+      "scripts/tests/knowledge-browser.mjs"
+    ],
+    "exit": 0,
+    "seconds": 0.87,
+    "rust_test_summaries": []
+  },
+  {
+    "step": "dump-session",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "dump_session_revocation_browser_fixtures",
+      "--",
+      "--ignored"
+    ],
+    "exit": 0,
+    "seconds": 0.83,
+    "rust_test_summaries": [
+      {
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0
+      }
+    ]
+  },
+  {
+    "step": "session-browser",
+    "command": [
+      "node",
+      "--test",
+      "scripts/tests/session-revocation-browser.mjs"
+    ],
+    "exit": 0,
+    "seconds": 0.79,
+    "rust_test_summaries": []
+  },
+  {
+    "step": "all-targets-network-isolated",
+    "command": [
+      "scripts/test-network-isolation.sh",
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--all-targets"
+    ],
+    "exit": 0,
+    "seconds": 612.83,
+    "rust_test_summaries": [
+      {
+        "passed": 2880,
+        "failed": 0,
+        "ignored": 7
+      },
+      {
+        "passed": 5,
+        "failed": 0,
+        "ignored": 0
+      }
+    ]
+  },
+  {
+    "step": "decision-markup",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "decision_browser_markup_and_closed_draft_recovery"
+    ],
+    "exit": 0,
+    "seconds": 0.34,
+    "rust_test_summaries": [
+      {
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0
+      }
+    ]
+  },
+  {
+    "step": "decision-exact-source",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "source_message_outside_window_is_exact_and_authorized"
+    ],
+    "exit": 0,
+    "seconds": 0.45,
+    "rust_test_summaries": [
+      {
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0
+      }
+    ]
+  },
+  {
+    "step": "decision-browser",
+    "command": [
+      "node",
+      "--test",
+      "scripts/tests/workflow-decisions.mjs"
+    ],
+    "exit": 0,
+    "seconds": 1.92,
+    "rust_test_summaries": []
+  }
+]

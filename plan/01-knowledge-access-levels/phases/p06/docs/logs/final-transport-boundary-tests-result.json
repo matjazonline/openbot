@@ -1,0 +1,8 @@
+{
+  "command": [
+    "bash",
+    "scripts/tests/transport-boundary.sh"
+  ],
+  "exit": 0,
+  "seconds": 1.27
+}

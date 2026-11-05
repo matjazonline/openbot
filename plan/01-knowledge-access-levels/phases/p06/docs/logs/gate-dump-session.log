@@ -1,0 +1,8 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.21s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-c19a0b960dacdcef)
+
+running 1 test
+test adapters::http::routes::ui_profile::session_tests::dump_session_revocation_browser_fixtures ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2886 filtered out; finished in 0.58s
+

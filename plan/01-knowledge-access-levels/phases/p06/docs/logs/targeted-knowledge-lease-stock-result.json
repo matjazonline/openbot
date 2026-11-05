@@ -1,0 +1,12 @@
+{
+  "exit": 0,
+  "selected_tests": 2,
+  "rust_min_stack": 2097152,
+  "required_ops": [
+    "knowledge.context",
+    "knowledge.observe"
+  ],
+  "scope": "targeted per latest user I004/r2; broad runs stopped",
+  "source_unchanged": true,
+  "tree_sha256": "bf18a25b1a286ed8a58518f483dc38a6a63ba85fa6ba301cdf9082409abf7b54"
+}

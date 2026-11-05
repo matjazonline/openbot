@@ -1,0 +1,42 @@
+{
+  "round": "KNOW-P06-WB1-R1",
+  "note": "KNOW-P06-WB1-R1-N1",
+  "root_accepted": true,
+  "installed_digest": "cfd37b5ff6f6d1ab276156a5cdc1f92052c7a8662a0c8d8e503be4bd833c287a",
+  "source_tree": "bf18a25b1a286ed8a58518f483dc38a6a63ba85fa6ba301cdf9082409abf7b54",
+  "files_count": 5569,
+  "source_base": "7388f92519c6b801a86431991b67ab27e57f7517",
+  "authority_revision": 22,
+  "authority_sha256": "d07dece95ec65378f1bbd8db2d3c86ab0196bc60349aadc4cc1280479ef25e77",
+  "source_exactly_unchanged": true,
+  "reviewer_identity": {
+    "round": "KNOW-P06-WB1-R1",
+    "phase_start": "7388f92519c6b801a86431991b67ab27e57f7517",
+    "review_base": "7388f92519c6b801a86431991b67ab27e57f7517",
+    "head": "7388f92519c6b801a86431991b67ab27e57f7517",
+    "installed_digest": "cfd37b5ff6f6d1ab276156a5cdc1f92052c7a8662a0c8d8e503be4bd833c287a",
+    "tree_sha256": "bf18a25b1a286ed8a58518f483dc38a6a63ba85fa6ba301cdf9082409abf7b54",
+    "files_count": 5569,
+    "exclusions": [
+      "plan/01-knowledge-access-levels/phases/p06/docs"
+    ],
+    "authority_revision": 22,
+    "authority_sha256": "d07dece95ec65378f1bbd8db2d3c86ab0196bc60349aadc4cc1280479ef25e77",
+    "source_unchanged": true,
+    "strict_guards_unchanged": true
+  },
+  "reviewer_records": {
+    "REVIEW.md": "225d476a618c8819036944feacab0d1c78050106f5abe7e05b9c356ea6708838",
+    "agent-review-notes.md": "564efc6ff4c96f1765e187ad225954b9cab732b36a0fee2cd1a0e843eeb7e0db",
+    "agent-review-findings.md": "624adda5e56388d5ddf52a331aca1d9ec97c9fdbe67a3b4c3c5240267ef8e5c4"
+  },
+  "scope": "whole knowledge integration, current targeted-only user policy",
+  "debts_closed": [
+    "Q001/r1",
+    "Q002/r1"
+  ],
+  "source_committed": false,
+  "integrated": false,
+  "pushed": false,
+  "no_full_stock_or_interrupted_gate_completion_claim": true
+}

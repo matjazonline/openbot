@@ -1,0 +1,21 @@
+from pathlib import Path
+import subprocess,os,json,sys
+stage=sys.argv[1];filters=sys.argv[2:];assert stage.replace("-","").isalnum() and filters
+logs=Path("plan/01-knowledge-access-levels/phases/p06/docs/logs");helper="/Users/mac02/dev/openbot-recovery/.worktrees/knowledge-tooling/p06-source-manifest.py"
+subprocess.run(["python3",helper,str(logs/(stage+"-source-start.json"))],check=True)
+env=os.environ.copy();env.update(CARGO_INCREMENTAL="0",SQLX_OFFLINE="true",DATABASE_URL="postgres://mac02@127.0.0.1:55506/open_bots",TEST_DATABASE_URL="postgres://mac02@127.0.0.1:55506/open_bots_test")
+with(logs/(stage+"-build.jsonl")).open("w")as out,(logs/(stage+"-build.log")).open("w")as err:r=subprocess.run(["cargo","test","--locked","--offline","--lib","--no-run","--message-format=json"],env=env,stdout=out,stderr=err)
+rows=[json.loads(l)for l in(logs/(stage+"-build.jsonl")).read_text().splitlines()if l.startswith("{")]
+if r.returncode:
+ for row in rows:
+  if row.get("reason")=="compiler-message" and row["message"].get("level")=="error":print(row["message"].get("rendered",""))
+ raise SystemExit(r.returncode)
+binaries=[r["executable"]for r in rows if r.get("reason")=="compiler-artifact" and r.get("target",{}).get("name")=="open_bots" and r.get("profile",{}).get("test") and r.get("executable")];assert len(binaries)==1
+binary=binaries[0];env.pop("RUST_MIN_STACK",None)
+r=subprocess.run([binary,"--list"],env=env,text=True,capture_output=True,check=True);names=[l[:-6]for l in r.stdout.splitlines()if l.endswith(": test")]
+counts={f:len([n for n in names if f in n])for f in filters};assert all(counts.values()),counts
+selected=sorted(n for n in names if any(f in n for f in filters));(logs/(stage+"-selection.json")).write_text(json.dumps({"filters":counts,"names":selected},indent=2)+"\n")
+with(logs/(stage+"-tests.log")).open("w")as out:r=subprocess.run([binary,"--exact",*selected,"--nocapture"],env=env,stdout=out,stderr=subprocess.STDOUT,timeout=150)
+subprocess.run(["python3",helper,str(logs/(stage+"-source-finish.json"))],check=True)
+a=json.loads((logs/(stage+"-source-start.json")).read_text());b=json.loads((logs/(stage+"-source-finish.json")).read_text());assert a==b
+proof={"binary":binary,"exit":r.returncode,"selected":len(selected),"filters":counts,"source_unchanged":True,"tree_sha256":a["tree_sha256"],"stack":"stock2MiB"};(logs/(stage+"-result.json")).write_text(json.dumps(proof,indent=2)+"\n");print(proof);raise SystemExit(r.returncode)

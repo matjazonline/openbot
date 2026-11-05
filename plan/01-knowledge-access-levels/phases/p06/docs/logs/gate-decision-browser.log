@@ -1,0 +1,16 @@
+TAP version 13
+# Subtest: comment preserves the unfinished exact decision; queued submission settles without stale replacement
+ok 1 - comment preserves the unfinished exact decision; queued submission settles without stale replacement
+  ---
+  duration_ms: 1561.15325
+  type: 'test'
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 1
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1804.641333

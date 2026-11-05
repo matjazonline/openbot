@@ -1,0 +1,11 @@
+{
+  "step": "fetch-locked",
+  "command": [
+    "cargo",
+    "fetch",
+    "--locked"
+  ],
+  "exit": 0,
+  "seconds": 0.27,
+  "rust_test_summaries": []
+}

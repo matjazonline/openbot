@@ -1,0 +1,32 @@
+{
+  "pattern": "pub struct ConfigureBinding|pub enum ResourceBinding|pub enum ResourceValue",
+  "filesSearched": 178,
+  "totalHits": 1,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/application/workflow/lifecycle/contracts.rs#ConfigureBinding",
+        "name": "ConfigureBinding",
+        "kind": "struct",
+        "path": "src/application/workflow/lifecycle/contracts.rs",
+        "span": "L137-L148"
+      },
+      "path": "src/application/workflow/lifecycle/contracts.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 137,
+          "text": "pub struct ConfigureBinding {"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 5170
+  }
+}

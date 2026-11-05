@@ -1,0 +1,10 @@
+{
+  "step": "postgres-version",
+  "command": [
+    "postgres",
+    "--version"
+  ],
+  "exit": 0,
+  "seconds": 0.01,
+  "rust_test_summaries": []
+}

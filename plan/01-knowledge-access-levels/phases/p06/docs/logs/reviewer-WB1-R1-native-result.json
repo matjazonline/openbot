@@ -1,0 +1,33 @@
+{
+  "command": [
+    "scripts/test-network-isolation.sh",
+    "/Users/mac02/dev/openbot-recovery/.worktrees/knowledge-p06/target/debug/deps/open_bots-c19a0b960dacdcef",
+    "knowledge_e2e_",
+    "message_ingress_end_to_end_each_message",
+    "message_ingress_member_email",
+    "workflow_and_transport_depend_on_shared_ports_without_reverse_usecase_imports",
+    "jsonb_row_context_thread_contract_is_optional_per_message",
+    "knowledge_run_level_race_connection_revision_writers",
+    "knowledge_run_level_http_current_connection_level",
+    "knowledge_run_level_mcp_level_change",
+    "knowledge_run_level_race_history_read_and_email_freeze_record_consistent_consumption",
+    "workflow_agent_mcp_tool_dispatches_once_through_the_bound_slot",
+    "--nocapture"
+  ],
+  "exit": 0,
+  "selected": 18,
+  "filters": {
+    "knowledge_e2e_": 9,
+    "message_ingress_end_to_end_each_message": 1,
+    "message_ingress_member_email": 1,
+    "workflow_and_transport_depend_on_shared_ports_without_reverse_usecase_imports": 1,
+    "jsonb_row_context_thread_contract_is_optional_per_message": 1,
+    "knowledge_run_level_race_connection_revision_writers": 1,
+    "knowledge_run_level_http_current_connection_level": 1,
+    "knowledge_run_level_mcp_level_change": 1,
+    "knowledge_run_level_race_history_read_and_email_freeze_record_consistent_consumption": 1,
+    "workflow_agent_mcp_tool_dispatches_once_through_the_bound_slot": 1
+  },
+  "stack_bytes": 2097152,
+  "elapsed_seconds": 19.08
+}

@@ -1,0 +1,11 @@
+{
+  "step": "decision-browser",
+  "command": [
+    "node",
+    "--test",
+    "scripts/tests/workflow-decisions.mjs"
+  ],
+  "exit": 0,
+  "seconds": 1.92,
+  "rust_test_summaries": []
+}

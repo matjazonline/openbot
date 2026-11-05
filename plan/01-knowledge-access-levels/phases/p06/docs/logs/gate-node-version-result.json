@@ -1,0 +1,10 @@
+{
+  "step": "node-version",
+  "command": [
+    "node",
+    "--version"
+  ],
+  "exit": 0,
+  "seconds": 0.05,
+  "rust_test_summaries": []
+}

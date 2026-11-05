@@ -1,0 +1,10 @@
+{
+  "pattern": "parallel|fork",
+  "filesSearched": 21,
+  "totalHits": 0,
+  "groups": [],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  }
+}

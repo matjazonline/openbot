@@ -1,0 +1,66 @@
+{
+  "pattern": "knowledge_run_level_race_",
+  "filesSearched": 401,
+  "totalHits": 3,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/knowledge_history_race_tests.rs#knowledge_run_level_race_history_read_and_email_freeze_record_consistent_consumption",
+        "name": "knowledge_run_level_race_history_read_and_email_freeze_record_consistent_consumption",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/knowledge_history_race_tests.rs",
+        "span": "L77-L159"
+      },
+      "path": "src/adapters/persistence/workflow/knowledge_history_race_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 77,
+          "text": "async fn knowledge_run_level_race_history_read_and_email_freeze_record_consistent_consumption() {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/knowledge_message_tests.rs#knowledge_run_level_race_verified_address_change_cannot_authorize_a_frozen_retired_recipient",
+        "name": "knowledge_run_level_race_verified_address_change_cannot_authorize_a_frozen_retired_recipient",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/knowledge_message_tests.rs",
+        "span": "L214-L269"
+      },
+      "path": "src/adapters/persistence/workflow/knowledge_message_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 214,
+          "text": "async fn knowledge_run_level_race_verified_address_change_cannot_authorize_a_frozen_retired_recipient()"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/knowledge_reply_tests.rs#knowledge_run_level_race_cc_commit_after_destination_snapshot_is_ordered_after_that_freeze",
+        "name": "knowledge_run_level_race_cc_commit_after_destination_snapshot_is_ordered_after_that_freeze",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/knowledge_reply_tests.rs",
+        "span": "L82-L138"
+      },
+      "path": "src/adapters/persistence/workflow/knowledge_reply_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 82,
+          "text": "async fn knowledge_run_level_race_cc_commit_after_destination_snapshot_is_ordered_after_that_freeze()"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 3,
+    "baselineChars": 29141
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "pattern": "lock_actor|scope_on|fn scope|pub.*authority",
+  "filesSearched": 10,
+  "totalHits": 0,
+  "groups": [],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  }
+}

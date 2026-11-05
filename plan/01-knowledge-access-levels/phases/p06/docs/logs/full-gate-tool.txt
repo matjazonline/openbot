@@ -1,0 +1,88 @@
+import subprocess,os,json,time,sys,hashlib,re
+from pathlib import Path
+from urllib.parse import urlsplit
+root=Path.cwd();logs=root/"plan/01-knowledge-access-levels/phases/p06/docs/logs"
+env=os.environ.copy();env.update(CARGO_INCREMENTAL="0",SQLX_OFFLINE="true",CARGO_NET_OFFLINE="true",DATABASE_URL="postgres://mac02@127.0.0.1:55506/open_bots",TEST_DATABASE_URL="postgres://mac02@127.0.0.1:55506/open_bots_test")
+env.pop("RUST_MIN_STACK",None)
+env["PATH"]="/Users/mac02/dev/openbot-recovery/.worktrees/knowledge-tooling/node22-bin:/opt/homebrew/opt/node@22/bin:/opt/homebrew/opt/postgresql@18/bin:"+env["PATH"]
+env["PLAYWRIGHT_BROWSERS_PATH"]="/Users/mac02/dev/openbot-recovery/.worktrees/knowledge-tooling/playwright"
+env["DOCKER_HOST"]="unix:///Users/mac02/.colima/openbot-knowledge/docker.sock";env["DOCKER_CONFIG"]="/Users/mac02/dev/openbot-recovery/.worktrees/docker-knowledge"
+fixtures=root/"target/knowledge-final-fixtures"
+for key,folder in [("HTML_INJECTION_BROWSER_FIXTURES","html"),("KNOWLEDGE_BROWSER_FIXTURES","knowledge"),("SESSION_REVOCATION_BROWSER_FIXTURES","session"),("WORKFLOW_DECISION_BROWSER_FIXTURES","decisions")]:
+ env[key]=str(fixtures/folder)
+env["APP_JS_OUT"]=str(fixtures/"html/app.js")
+env["LEASE_BUDGET_RECORD"]=str(logs/"final-lease-events.jsonl")
+resume = sys.argv[1] if len(sys.argv)>1 else None
+active = resume is None
+results = json.loads((logs/"full-gate-progress.json").read_text()) if resume else []
+def run(name,command,extra=None,nonzero=False):
+ global active
+ if not active:
+  if name!=resume:return
+  active=True
+ e=env.copy();e.update(extra or {});start=time.monotonic();print({"step":name,"status":"started"},flush=True)
+ logfile=logs/("gate-"+name+".log")
+ if logfile.exists():
+  import shutil
+  attempt=1
+  while (logs/("gate-"+name+"-attempt"+str(attempt)+".log")).exists():attempt+=1
+  shutil.copy2(logfile,logs/("gate-"+name+"-attempt"+str(attempt)+".log"))
+  previous=logs/("gate-"+name+"-result.json")
+  if previous.exists():shutil.copy2(previous,logs/("gate-"+name+"-attempt"+str(attempt)+"-result.json"))
+ with logfile.open("w") as out:r=subprocess.run(command,env=e,stdout=out,stderr=subprocess.STDOUT)
+ content=logfile.read_text(errors="replace")
+ counts=[{"passed":int(a),"failed":int(b),"ignored":int(c)}for a,b,c in re.findall(r"test result: \w+\. (\d+) passed; (\d+) failed; (\d+) ignored",content)]
+ proof={"step":name,"command":command,"exit":r.returncode,"seconds":round(time.monotonic()-start,2),"rust_test_summaries":counts}
+ if nonzero and not sum(c["passed"] for c in counts):proof["nonzero_count_missing"]=True
+ results.append(proof);(logs/("gate-"+name+"-result.json")).write_text(json.dumps(proof,indent=2)+"\n");(logs/"full-gate-progress.json").write_text(json.dumps(results,indent=2)+"\n");print(proof,flush=True)
+ if r.returncode or proof.get("nonzero_count_missing"):raise SystemExit(r.returncode or 1)
+helper="/Users/mac02/dev/openbot-recovery/.worktrees/knowledge-tooling/p06-source-manifest.py"
+run("source-start",["python3",helper,str(logs/"full-gate-source-start.json")])
+run("rust-version",["rustc","--version"])
+run("sqlx-version",["cargo","sqlx","--version"])
+assert "0.8.6" in (logs/"gate-sqlx-version.log").read_text()
+run("postgres-version",["postgres","--version"])
+run("node-version",["node","--version"])
+assert (logs/"gate-node-version.log").read_text().startswith("v22.")
+run("fetch-locked",["cargo","fetch","--locked"],{"CARGO_NET_OFFLINE":"false"})
+# Every reset target is verified against this phase's exact local URLs before destructive work.
+values=dict(line.split("=",1)for line in(root/".env").read_text().splitlines()if line)
+assert values=={key:env[key]for key in ["DATABASE_URL","TEST_DATABASE_URL"]}
+for key,name in [("DATABASE_URL","open_bots"),("TEST_DATABASE_URL","open_bots_test")]:
+ url=urlsplit(values[key]);assert (url.hostname,url.port,url.username,url.path)==("127.0.0.1",55506,"mac02","/"+name)
+run("fresh-owned-reset",["bash","scripts/reset-db.sh","--all","--yes"],{"SQLX_OFFLINE":"false"})
+run("fresh-test-migrations",["cargo","sqlx","migrate","run","--database-url",env["TEST_DATABASE_URL"]],{"SQLX_OFFLINE":"false"})
+settings="SELECT name,setting FROM pg_settings WHERE name IN ('pg_stat_statements.track','pg_stat_statements.track_utility','log_parameter_max_length','log_parameter_max_length_on_error') ORDER BY name"
+run("query-statistics-settings",["psql",env["TEST_DATABASE_URL"],"-X","-v","ON_ERROR_STOP=1","-Atc",settings])
+text=(logs/"gate-query-statistics-settings.log").read_text();assert all(x in text for x in ["pg_stat_statements.track|top","pg_stat_statements.track_utility|off","log_parameter_max_length|0","log_parameter_max_length_on_error|0"])
+run("query-statistics-probe",["psql",env["TEST_DATABASE_URL"],"-X","-v","ON_ERROR_STOP=1","-Atc","SELECT 1 AS ci_pg_stat_statements_probe"])
+query="SELECT queryid FROM pg_stat_statements WHERE dbid=(SELECT oid FROM pg_database WHERE datname=current_database()) AND query LIKE '%ci_pg_stat_statements_probe%' LIMIT 1"
+run("query-statistics-record",["psql",env["TEST_DATABASE_URL"],"-X","-v","ON_ERROR_STOP=1","-Atc",query])
+assert re.fullmatch(r"-?[0-9]+",(logs/"gate-query-statistics-record.log").read_text().strip()), "query statistics probe was not recorded"
+run("live-sqlx-prepare",["cargo","sqlx","prepare","--","--locked","--offline","--all-targets"],{"SQLX_OFFLINE":"false"})
+run("sqlx-cache-check",["cargo","sqlx","prepare","--check","--","--locked","--offline","--all-targets"],{"SQLX_OFFLINE":"false"})
+run("current-image-build",["docker","build","--progress=plain","--tag","openbot-knowledge-p06:wb1","."])
+run("current-image-check",["python3","scripts/check-knowledge-image.py","--image","openbot-knowledge-p06:wb1"])
+image=json.loads((logs/"gate-current-image-check.log").read_text());(logs/"gate-current-image-check.json").write_text(json.dumps(image,indent=2)+"\n")
+run("run-counts",["npm","run","test:run-counts"])
+run("sse-navigation",["node","--test","scripts/tests/sse-navigation.mjs","scripts/tests/agent-runtime.mjs","scripts/tests/workflow-runs.mjs","scripts/tests/workflow-conversations.mjs","scripts/tests/workflow-samples.mjs"])
+run("compile-all-tests",["cargo","test","--locked","--offline","--all-targets","--no-run"])
+run("dump-html",["cargo","test","--locked","--offline","--lib","dump_html_injection_browser_fixtures","--","--ignored"],nonzero=True)
+run("html-team-browser",["node","--test","scripts/tests/team-autocomplete-browser.mjs","scripts/tests/html-injection-browser.mjs"])
+run("dump-knowledge",["cargo","test","--locked","--offline","--lib","dump_knowledge_browser_fixtures","--","--ignored"],nonzero=True)
+run("knowledge-browser",["node","--test","scripts/tests/knowledge-browser.mjs"])
+run("dump-session",["cargo","test","--locked","--offline","--lib","dump_session_revocation_browser_fixtures","--","--ignored"],nonzero=True)
+run("session-browser",["node","--test","scripts/tests/session-revocation-browser.mjs"])
+run("all-targets-network-isolated",["scripts/test-network-isolation.sh","cargo","test","--locked","--offline","--all-targets"],nonzero=True)
+run("decision-markup",["cargo","test","--locked","--offline","--lib","decision_browser_markup_and_closed_draft_recovery"],nonzero=True)
+run("decision-exact-source",["cargo","test","--locked","--offline","--lib","source_message_outside_window_is_exact_and_authorized"],nonzero=True)
+run("decision-browser",["node","--test","scripts/tests/workflow-decisions.mjs"])
+run("stock-stack-network-isolated",["scripts/test-network-isolation.sh","scripts/stack-budget.sh","--offline"],nonzero=True)
+run("lease-budget-network-isolated",["scripts/test-network-isolation.sh","scripts/lease-budget.sh","--offline"],nonzero=True)
+run("final-format",["cargo","fmt","--all","--","--check"])
+run("final-whitespace",["git","diff","--check"])
+run("source-finish",["python3",helper,str(logs/"full-gate-source-finish.json")])
+a=json.loads((logs/"full-gate-source-start.json").read_text());b=json.loads((logs/"full-gate-source-finish.json").read_text());assert a==b,"Source changed during full gate"
+latest={r["step"]:r for r in results};assert all(r["exit"]==0 and not r.get("nonzero_count_missing")for r in latest.values())
+(logs/"full-gate-result.json").write_text(json.dumps({"exit":0,"source_unchanged":True,"tree_sha256":a["tree_sha256"],"steps":results,"platform":"macOS arm64 native/PG18.6; Linux arm64 Docker image, two CPUs","scope":"current CI inventory plus source/migration/image checks; prior final preflight results also required"},indent=2)+"\n")
+print({"full_gate":"PASS","steps":len(results),"tree_sha256":a["tree_sha256"]},flush=True)

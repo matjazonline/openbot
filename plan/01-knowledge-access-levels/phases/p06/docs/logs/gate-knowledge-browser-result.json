@@ -1,0 +1,11 @@
+{
+  "step": "knowledge-browser",
+  "command": [
+    "node",
+    "--test",
+    "scripts/tests/knowledge-browser.mjs"
+  ],
+  "exit": 0,
+  "seconds": 0.87,
+  "rust_test_summaries": []
+}

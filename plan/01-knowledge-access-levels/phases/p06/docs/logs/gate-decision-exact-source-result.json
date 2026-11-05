@@ -1,0 +1,20 @@
+{
+  "step": "decision-exact-source",
+  "command": [
+    "cargo",
+    "test",
+    "--locked",
+    "--offline",
+    "--lib",
+    "source_message_outside_window_is_exact_and_authorized"
+  ],
+  "exit": 0,
+  "seconds": 0.45,
+  "rust_test_summaries": [
+    {
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "command": [
+    "python3",
+    "scripts/tests/knowledge-model-prepare.py"
+  ],
+  "exit": 0,
+  "seconds": 0.08
+}

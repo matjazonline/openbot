@@ -1,0 +1,14 @@
+{
+  "step": "current-image-build",
+  "command": [
+    "docker",
+    "build",
+    "--progress=plain",
+    "--tag",
+    "openbot-knowledge-p06:wb1",
+    "."
+  ],
+  "exit": 0,
+  "seconds": 167.13,
+  "rust_test_summaries": []
+}

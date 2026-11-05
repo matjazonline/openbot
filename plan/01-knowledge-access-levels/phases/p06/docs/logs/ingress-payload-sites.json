@@ -1,0 +1,49 @@
+{
+  "pattern": "struct RawInboundPayload|struct TransportPayload",
+  "filesSearched": 1160,
+  "totalHits": 2,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/protocols/email/parser.rs#RawInboundPayload",
+        "name": "RawInboundPayload",
+        "kind": "struct",
+        "path": "src/adapters/protocols/email/parser.rs",
+        "span": "L87-L100"
+      },
+      "path": "src/adapters/protocols/email/parser.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 87,
+          "text": "pub struct RawInboundPayload {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/transport/delivery.rs#TransportPayload",
+        "name": "TransportPayload",
+        "kind": "struct",
+        "path": "src/application/transport/delivery.rs",
+        "span": "L243-L247"
+      },
+      "path": "src/application/transport/delivery.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 243,
+          "text": "pub struct TransportPayload {"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 2,
+    "baselineChars": 51560
+  }
+}

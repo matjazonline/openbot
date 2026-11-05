@@ -1,0 +1,12 @@
+{
+  "step": "html-team-browser",
+  "command": [
+    "node",
+    "--test",
+    "scripts/tests/team-autocomplete-browser.mjs",
+    "scripts/tests/html-injection-browser.mjs"
+  ],
+  "exit": 0,
+  "seconds": 1.13,
+  "rust_test_summaries": []
+}

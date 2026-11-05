@@ -1,0 +1,15 @@
+{
+  "step": "query-statistics-probe",
+  "command": [
+    "psql",
+    "postgres://mac02@127.0.0.1:55506/open_bots_test",
+    "-X",
+    "-v",
+    "ON_ERROR_STOP=1",
+    "-Atc",
+    "SELECT 1 AS ci_pg_stat_statements_probe"
+  ],
+  "exit": 0,
+  "seconds": 0.01,
+  "rust_test_summaries": []
+}

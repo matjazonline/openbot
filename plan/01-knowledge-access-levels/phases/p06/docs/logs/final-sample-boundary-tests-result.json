@@ -1,0 +1,8 @@
+{
+  "command": [
+    "python3",
+    "scripts/tests/workflow-sample-boundary.py"
+  ],
+  "exit": 0,
+  "seconds": 0.07
+}

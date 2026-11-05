@@ -1,0 +1,8 @@
+{
+  "command": [
+    "bash",
+    "scripts/tests/deploy.sh"
+  ],
+  "exit": 0,
+  "seconds": 0.51
+}

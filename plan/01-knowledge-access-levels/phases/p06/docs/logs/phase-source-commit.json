@@ -1,0 +1,8 @@
+{
+  "source_commit": "0d5197191c4cafc584dffc378bde90a88acda7b3",
+  "review_base": "7388f92519c6b801a86431991b67ab27e57f7517",
+  "accepted_snapshot": "cfd37b5ff6f6d1ab276156a5cdc1f92052c7a8662a0c8d8e503be4bd833c287a",
+  "source_tree": "bf18a25b1a286ed8a58518f483dc38a6a63ba85fa6ba301cdf9082409abf7b54",
+  "source_bytes_identical_to_reviewed": true,
+  "verification_policy": "latest user targeted only I004/r2"
+}

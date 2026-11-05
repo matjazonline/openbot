@@ -1,0 +1,11 @@
+{
+  "step": "source-start",
+  "command": [
+    "python3",
+    "/Users/mac02/dev/openbot-recovery/.worktrees/knowledge-tooling/p06-source-manifest.py",
+    "/Users/mac02/dev/openbot-recovery/.worktrees/knowledge-p06/plan/01-knowledge-access-levels/phases/p06/docs/logs/full-gate-source-start.json"
+  ],
+  "exit": 0,
+  "seconds": 0.63,
+  "rust_test_summaries": []
+}

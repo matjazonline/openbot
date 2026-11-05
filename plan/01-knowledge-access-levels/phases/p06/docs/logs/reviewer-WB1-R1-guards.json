@@ -1,0 +1,42 @@
+[
+  {
+    "command": [
+      "scripts/transport-boundary-check.sh"
+    ],
+    "exit": 0,
+    "log": "plan/01-knowledge-access-levels/phases/p06/docs/logs/reviewer-WB1-R1-guard-0.log"
+  },
+  {
+    "command": [
+      "scripts/tests/transport-boundary.sh"
+    ],
+    "exit": 0,
+    "log": "plan/01-knowledge-access-levels/phases/p06/docs/logs/reviewer-WB1-R1-guard-1.log"
+  },
+  {
+    "command": [
+      "scripts/tests/deploy.sh"
+    ],
+    "exit": 0,
+    "log": "plan/01-knowledge-access-levels/phases/p06/docs/logs/reviewer-WB1-R1-guard-2.log"
+  },
+  {
+    "command": [
+      "git",
+      "diff",
+      "--check"
+    ],
+    "exit": 0,
+    "log": "plan/01-knowledge-access-levels/phases/p06/docs/logs/reviewer-WB1-R1-guard-3.log"
+  },
+  {
+    "command": [
+      "git",
+      "diff",
+      "--cached",
+      "--check"
+    ],
+    "exit": 0,
+    "log": "plan/01-knowledge-access-levels/phases/p06/docs/logs/reviewer-WB1-R1-guard-4.log"
+  }
+]

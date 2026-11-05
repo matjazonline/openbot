@@ -1,0 +1,215 @@
+{
+  "pattern": "ConnectionLevelCommand",
+  "filesSearched": 1259,
+  "totalHits": 14,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/connection_levels.rs#command",
+        "name": "command",
+        "kind": "function",
+        "path": "src/adapters/http/routes/connection_levels.rs",
+        "span": "L81-L90"
+      },
+      "path": "src/adapters/http/routes/connection_levels.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 81,
+          "text": "fn command(&self, user: Uuid, company: Uuid, id: Uuid) -> AppResult<ConnectionLevelCommand> {"
+        },
+        {
+          "line": 82,
+          "text": "Ok(ConnectionLevelCommand {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/mcp.rs#set_level",
+        "name": "set_level",
+        "kind": "function",
+        "path": "src/application/use_cases/mcp.rs",
+        "span": "L193-L204"
+      },
+      "path": "src/application/use_cases/mcp.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 195,
+          "text": "command: super::connection_level::ConnectionLevelCommand,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/mcp.rs#set_mcp_level",
+        "name": "set_mcp_level",
+        "kind": "function",
+        "path": "src/application/use_cases/mcp.rs",
+        "span": "L100-L103"
+      },
+      "path": "src/application/use_cases/mcp.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 102,
+          "text": "command: super::connection_level::ConnectionLevelCommand,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/connection_level_tests.rs#knowledge_run_level_race_connection_revision_writers_have_one_winner",
+        "name": "knowledge_run_level_race_connection_revision_writers_have_one_winner",
+        "kind": "function",
+        "path": "src/adapters/http/routes/connection_level_tests.rs",
+        "span": "L379-L399"
+      },
+      "path": "src/adapters/http/routes/connection_level_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 384,
+          "text": "f.p.set_http_level(ConnectionLevelCommand {"
+        },
+        {
+          "line": 393,
+          "text": "f.p.set_mcp_level(ConnectionLevelCommand {"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/http/routes/connection_levels.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 8,
+          "text": "use_cases::connection_level::ConnectionLevelCommand,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/mcp.rs#set_mcp_level",
+        "name": "set_mcp_level",
+        "kind": "function",
+        "path": "src/adapters/persistence/mcp.rs",
+        "span": "L147-L171"
+      },
+      "path": "src/adapters/persistence/mcp.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 149,
+          "text": "command: crate::use_cases::connection_level::ConnectionLevelCommand,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/http.rs#set_http_level",
+        "name": "set_http_level",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/http.rs",
+        "span": "L150-L177"
+      },
+      "path": "src/adapters/persistence/workflow/http.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 152,
+          "text": "command: crate::use_cases::connection_level::ConnectionLevelCommand,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/knowledge_http_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 4,
+          "text": "use crate::use_cases::connection_level::ConnectionLevelCommand;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/knowledge_http_tests.rs#knowledge_run_level_http_current_connection_level_allows_classified_dispatch",
+        "name": "knowledge_run_level_http_current_connection_level_allows_classified_dispatch",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/knowledge_http_tests.rs",
+        "span": "L45-L81"
+      },
+      "path": "src/adapters/persistence/workflow/knowledge_http_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 51,
+          "text": "p.set_http_level(ConnectionLevelCommand {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/knowledge_mcp_tests.rs#knowledge_run_level_mcp_level_change_preserves_operation_and_credentials",
+        "name": "knowledge_run_level_mcp_level_change_preserves_operation_and_credentials",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/knowledge_mcp_tests.rs",
+        "span": "L42-L72"
+      },
+      "path": "src/adapters/persistence/workflow/knowledge_mcp_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 48,
+          "text": "p.set_mcp_level(crate::use_cases::connection_level::ConnectionLevelCommand {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/connection_level.rs#ConnectionLevelCommand",
+        "name": "ConnectionLevelCommand",
+        "kind": "struct",
+        "path": "src/application/use_cases/connection_level.rs",
+        "span": "L7-L13"
+      },
+      "path": "src/application/use_cases/connection_level.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 7,
+          "text": "pub struct ConnectionLevelCommand {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/http.rs#set_http_level",
+        "name": "set_http_level",
+        "kind": "function",
+        "path": "src/application/workflow/http.rs",
+        "span": "L121-L124"
+      },
+      "path": "src/application/workflow/http.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 123,
+          "text": "command: crate::use_cases::connection_level::ConnectionLevelCommand,"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 9,
+    "baselineChars": 84449
+  }
+}

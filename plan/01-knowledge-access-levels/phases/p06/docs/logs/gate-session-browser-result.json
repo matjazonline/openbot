@@ -1,0 +1,11 @@
+{
+  "step": "session-browser",
+  "command": [
+    "node",
+    "--test",
+    "scripts/tests/session-revocation-browser.mjs"
+  ],
+  "exit": 0,
+  "seconds": 0.79,
+  "rust_test_summaries": []
+}

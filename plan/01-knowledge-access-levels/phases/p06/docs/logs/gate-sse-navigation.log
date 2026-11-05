@@ -1,0 +1,154 @@
+TAP version 13
+# Subtest: library payload carries the agent's own fields and no retired runtime fields
+ok 1 - library payload carries the agent's own fields and no retired runtime fields
+  ---
+  duration_ms: 1.742125
+  type: 'test'
+  ...
+# Subtest: accepted library writes show progress, prevent duplicate submits, and restore on failure
+ok 2 - accepted library writes show progress, prevent duplicate submits, and restore on failure
+  ---
+  duration_ms: 0.453375
+  type: 'test'
+  ...
+# Subtest: ordinary page links release every stream before navigation
+ok 3 - ordinary page links release every stream before navigation
+  ---
+  duration_ms: 1.617833
+  type: 'test'
+  ...
+# Subtest: HTMX/prevented clicks, modified clicks, downloads and new tabs keep streams
+ok 4 - HTMX/prevented clicks, modified clicks, downloads and new tabs keep streams
+  ---
+  duration_ms: 1.7545
+  type: 'test'
+  ...
+# Subtest: anchors and non-document protocols keep streams
+ok 5 - anchors and non-document protocols keep streams
+  ---
+  duration_ms: 0.824542
+  type: 'test'
+  ...
+# Subtest: native filter submissions release all streams on every navigation
+ok 6 - native filter submissions release all streams on every navigation
+  ---
+  duration_ms: 3.818209
+  type: 'test'
+  ...
+# Subtest: cancelled, HTMX, dialog and other-window submissions retain streams
+ok 7 - cancelled, HTMX, dialog and other-window submissions retain streams
+  ---
+  duration_ms: 1.705375
+  type: 'test'
+  ...
+# Subtest: late attribution and reconnect keep both replies, composer and stream owner
+ok 8 - late attribution and reconnect keep both replies, composer and stream owner
+  ---
+  duration_ms: 613.824
+  type: 'test'
+  ...
+# Subtest: a reconnect backlog keeps an explicit 200-message live window and the composer
+ok 9 - a reconnect backlog keeps an explicit 200-message live window and the composer
+  ---
+  duration_ms: 627.117
+  type: 'test'
+  ...
+# Subtest: a late body read cannot remove preserved steps after a cancel or navigation
+ok 10 - a late body read cannot remove preserved steps after a cancel or navigation
+  ---
+  duration_ms: 1048.595083
+  type: 'test'
+  ...
+# Subtest: an actual SSE disconnect reconciles and preserves an unfinished note and disclosure
+ok 11 - an actual SSE disconnect reconciles and preserves an unfinished note and disclosure
+  ---
+  duration_ms: 994.426458
+  type: 'test'
+  ...
+# Subtest: a waiting parent refreshes a child badge on the child wakeup without reconnecting
+ok 12 - a waiting parent refreshes a child badge on the child wakeup without reconnecting
+  ---
+  duration_ms: 690.374917
+  type: 'test'
+  ...
+# Subtest: board: two window reads completing out of order show the later choice
+ok 13 - board: two window reads completing out of order show the later choice
+  ---
+  duration_ms: 601.06725
+  type: 'test'
+  ...
+# Subtest: board: opening a run while a filter read is in flight keeps the chosen filters
+ok 14 - board: opening a run while a filter read is in flight keeps the chosen filters
+  ---
+  duration_ms: 1421.025
+  type: 'test'
+  ...
+# Subtest: list: a wake-up during a filter read reads the new filter instead of undoing it
+ok 15 - list: a wake-up during a filter read reads the new filter instead of undoing it
+  ---
+  duration_ms: 952.16475
+  type: 'test'
+  ...
+# Subtest: board: a filter change while a wake-up read is in flight wins
+ok 16 - board: a filter change while a wake-up read is in flight wins
+  ---
+  duration_ms: 646.933375
+  type: 'test'
+  ...
+# Subtest: board: a burst of run events reads at most once per two seconds and shows the final state
+ok 17 - board: a burst of run events reads at most once per two seconds and shows the final state
+  ---
+  duration_ms: 7252.401209
+  type: 'test'
+  ...
+# Subtest: board: constant change still reads every two seconds and never starves
+ok 18 - board: constant change still reads every two seconds and never starves
+  ---
+  duration_ms: 10983.213875
+  type: 'test'
+  ...
+# Subtest: phone: a stream-driven or polled pane reload leaves the reader on the list; opening a run still moves them
+ok 19 - phone: a stream-driven or polled pane reload leaves the reader on the list; opening a run still moves them
+  ---
+  duration_ms: 1273.145792
+  type: 'test'
+  ...
+# Subtest: board: reads slower than the interval never overlap and keep landing under constant change
+ok 20 - board: reads slower than the interval never overlap and keep landing under constant change
+  ---
+  duration_ms: 12543.047792
+  type: 'test'
+  ...
+# Subtest: board: a run change during a filter read is read again after it, on the new leaf
+ok 21 - board: a run change during a filter read is read again after it, on the new leaf
+  ---
+  duration_ms: 5811.595375
+  type: 'test'
+  ...
+# Subtest: board: two quick filter changes do not leave the coalescer waiting for ever
+ok 22 - board: two quick filter changes do not leave the coalescer waiting for ever
+  ---
+  duration_ms: 2896.704667
+  type: 'test'
+  ...
+# Subtest: sample progress, failed request recovery and late navigation response use the requesting form
+ok 23 - sample progress, failed request recovery and late navigation response use the requesting form
+  ---
+  duration_ms: 694.53125
+  type: 'test'
+  ...
+# Subtest: actual sample textarea template preserves leading newlines for every raw JSON field
+ok 24 - actual sample textarea template preserves leading newlines for every raw JSON field
+  ---
+  duration_ms: 154.309917
+  type: 'test'
+  ...
+1..24
+# tests 24
+# suites 0
+# pass 24
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 47365.271709

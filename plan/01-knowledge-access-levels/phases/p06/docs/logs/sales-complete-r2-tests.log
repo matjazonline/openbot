@@ -1,0 +1,34 @@
+
+running 9 tests
+2026-11-05T17:54:54.217246Z  WARN open_bots::adapters::persistence::workflow::knowledge_release: Workflow release refused company_id=d03ad1a5-b412-4600-8e0a-d8e6d24312d2 run_id=e634e139-1c4c-4a37-b5e0-2d5fe9c2ad3c execution_id=101dd5c5-7205-43bf-9e3d-60317cf4eacc step_id=answer content_level=5 destination_level=0 code="knowledge.audience_below_content"
+test adapters::persistence::knowledge::tests::search::knowledge_e2e_quality_fixture_exact_hit_oracle_matches_real_postgres_search ... ok
+observed gated transaction pids=[72685] blocker=72688 elapsed_ms=219
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::knowledge_e2e_member_upload_ceiling_prefix_new_layer_and_replacement_are_enforced ... ok
+
+thread 'adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::uploads::knowledge_e2e_competing_application_replicas_replace_one_name_and_level_without_duplicates' (31284059) panicked at src/adapters/persistence/workflow/knowledge_e2e_upload_tests.rs:22:13:
+both actual writers must reach the held company lock
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::uploads::knowledge_e2e_competing_application_replicas_replace_one_name_and_level_without_duplicates ... FAILED
+2026-11-05T17:54:57.066810Z  WARN open_bots::adapters::persistence::workflow::knowledge_release: Workflow release refused company_id=bec674e0-64cb-4584-b36b-82964ed97fd6 run_id=8a9fc012-e2a9-44f1-8288-00b317b7fb4b execution_id=1621e879-9204-46e7-bded-e1394d6750ba step_id=reply content_level=5 destination_level=0 code="knowledge.audience_below_content"
+observed gated transaction pids=[72716] blocker=72720 elapsed_ms=208
+2026-11-05T17:55:00.194679Z  WARN open_bots::adapters::persistence::workflow::knowledge_release: Workflow release refused company_id=2598712f-8186-487d-80ff-925a17576fce run_id=ae8f6103-3a81-439b-9cc7-0b2faf320863 execution_id=36de9a5d-117b-4dc4-bfcb-58e4911a1f05 step_id=reply content_level=5 destination_level=0 code="knowledge.audience_below_content"
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::races::knowledge_e2e_cc_and_member_demotion_mid_reply_refuse_delivery_and_show_typed_attention ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::knowledge_e2e_outside_contact_cannot_observe_private_sales_and_gets_missing_information_reply ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::knowledge_e2e_customer_cc_lowers_member_run_to_public_before_search ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::knowledge_e2e_level_five_team_reply_is_stamped_and_level_zero_viewer_gets_placeholder ... ok
+
+thread 'adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::knowledge_e2e_public_followup_in_the_same_thread_excludes_prior_private_reply_from_history' (31284056) panicked at src/adapters/persistence/workflow/knowledge_e2e_tests.rs:188:5:
+assertion `left == right` failed
+  left: 2
+ right: 4
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::knowledge_e2e_public_followup_in_the_same_thread_excludes_prior_private_reply_from_history ... FAILED
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::mcp::knowledge_e2e_private_search_refuses_public_mcp_to_model_and_allows_level_nine_crm ... ok
+
+failures:
+
+failures:
+    adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::knowledge_e2e_public_followup_in_the_same_thread_excludes_prior_private_reply_from_history
+    adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::uploads::knowledge_e2e_competing_application_replicas_replace_one_name_and_level_without_duplicates
+
+test result: FAILED. 7 passed; 2 failed; 0 ignored; 0 measured; 2878 filtered out; finished in 15.77s
+

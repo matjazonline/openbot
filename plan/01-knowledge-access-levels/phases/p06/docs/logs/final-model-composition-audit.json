@@ -1,0 +1,282 @@
+{
+  "pattern": "LocalTextEmbedder::load|KnowledgeLibrary::new",
+  "filesSearched": 1165,
+  "totalHits": 18,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/infra/workflow.rs#for_tests",
+        "name": "for_tests",
+        "kind": "function",
+        "path": "src/infra/workflow.rs",
+        "span": "L465-L499"
+      },
+      "path": "src/infra/workflow.rs",
+      "inDegree": 16,
+      "hits": [
+        {
+          "line": 481,
+          "text": "let knowledge = Arc::new(crate::application::knowledge::KnowledgeLibrary::new("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/knowledge/tests.rs#new",
+        "name": "new",
+        "kind": "function",
+        "path": "src/adapters/http/routes/knowledge/tests.rs",
+        "span": "L40-L52"
+      },
+      "path": "src/adapters/http/routes/knowledge/tests.rs",
+      "inDegree": 6,
+      "hits": [
+        {
+          "line": 46,
+          "text": "library: Arc::new(KnowledgeLibrary::new(f.persistence.clone(), model.clone())),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/knowledge_search_support.rs#new",
+        "name": "new",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/knowledge_search_support.rs",
+        "span": "L25-L77"
+      },
+      "path": "src/adapters/persistence/workflow/knowledge_search_support.rs",
+      "inDegree": 6,
+      "hits": [
+        {
+          "line": 66,
+          "text": "let library = Arc::new(KnowledgeLibrary::new("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/knowledge/query_embedding_tests.rs#fixture",
+        "name": "fixture",
+        "kind": "function",
+        "path": "src/application/knowledge/query_embedding_tests.rs",
+        "span": "L19-L33"
+      },
+      "path": "src/application/knowledge/query_embedding_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 27,
+          "text": "library: Arc::new(KnowledgeLibrary::new(documents.clone(), model.clone())),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/embedding/probe.rs#model_check",
+        "name": "model_check",
+        "kind": "function",
+        "path": "src/adapters/embedding/probe.rs",
+        "span": "L24-L67"
+      },
+      "path": "src/adapters/embedding/probe.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 26,
+          "text": "let model = LocalTextEmbedder::load(directory)?;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/knowledge_e2e_upload_tests.rs#knowledge_e2e_competing_application_replicas_replace_one_name_and_level_without_duplicates",
+        "name": "knowledge_e2e_competing_application_replicas_replace_one_name_and_level_without_duplicates",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/knowledge_e2e_upload_tests.rs",
+        "span": "L6-L55"
+      },
+      "path": "src/adapters/persistence/workflow/knowledge_e2e_upload_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 11,
+          "text": "let replica = Arc::new(KnowledgeLibrary::new("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_ingress_composition.rs#engine",
+        "name": "engine",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_ingress_composition.rs",
+        "span": "L10-L36"
+      },
+      "path": "src/adapters/persistence/workflow/message_ingress_composition.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 16,
+          "text": "let knowledge = Arc::new(KnowledgeLibrary::new("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/knowledge/query_embedding_tests.rs#knowledge_search_result_holds_the_slot_through_consumption_and_releases_on_drop",
+        "name": "knowledge_search_result_holds_the_slot_through_consumption_and_releases_on_drop",
+        "kind": "function",
+        "path": "src/application/knowledge/query_embedding_tests.rs",
+        "span": "L82-L96"
+      },
+      "path": "src/application/knowledge/query_embedding_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 85,
+          "text": "let library = KnowledgeLibrary::new(docs.clone(), model);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/knowledge/query_embedding_tests.rs#knowledge_search_registration_competes_with_shutdown_without_late_consumption",
+        "name": "knowledge_search_registration_competes_with_shutdown_without_late_consumption",
+        "kind": "function",
+        "path": "src/application/knowledge/query_embedding_tests.rs",
+        "span": "L99-L127"
+      },
+      "path": "src/application/knowledge/query_embedding_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 101,
+          "text": "let library = Arc::new(KnowledgeLibrary::new("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/knowledge/query_embedding_tests.rs#knowledge_search_query_boundary_rejects_oversized_input_and_invalid_model_outputs",
+        "name": "knowledge_search_query_boundary_rejects_oversized_input_and_invalid_model_outputs",
+        "kind": "function",
+        "path": "src/application/knowledge/query_embedding_tests.rs",
+        "span": "L130-L144"
+      },
+      "path": "src/application/knowledge/query_embedding_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 132,
+          "text": "let library = KnowledgeLibrary::new(Arc::new(Documents::default()), model.clone());"
+        },
+        {
+          "line": 140,
+          "text": "KnowledgeLibrary::new(Arc::new(Documents::default()), Arc::new(Model::new(output)));"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/knowledge/service_tests.rs#knowledge_upload_cancellation_retains_actual_native_permit_and_bounded_shutdown_never_writes",
+        "name": "knowledge_upload_cancellation_retains_actual_native_permit_and_bounded_shutdown_never_writes",
+        "kind": "function",
+        "path": "src/application/knowledge/service_tests.rs",
+        "span": "L142-L169"
+      },
+      "path": "src/application/knowledge/service_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 150,
+          "text": "let service = Arc::new(KnowledgeLibrary::new(docs.clone(), model));"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/knowledge/service_tests.rs#knowledge_upload_validates_all_chunks_before_embedding_and_rejects_bad_model_outputs",
+        "name": "knowledge_upload_validates_all_chunks_before_embedding_and_rejects_bad_model_outputs",
+        "kind": "function",
+        "path": "src/application/knowledge/service_tests.rs",
+        "span": "L171-L197"
+      },
+      "path": "src/application/knowledge/service_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 174,
+          "text": "let library = KnowledgeLibrary::new(docs.clone(), model.clone());"
+        },
+        {
+          "line": 187,
+          "text": "let library = KnowledgeLibrary::new(docs.clone(), Arc::new(Model::new(output)));"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/knowledge/service_tests.rs#knowledge_upload_shutdown_competes_with_preflight_and_refuses_later_model_registration",
+        "name": "knowledge_upload_shutdown_competes_with_preflight_and_refuses_later_model_registration",
+        "kind": "function",
+        "path": "src/application/knowledge/service_tests.rs",
+        "span": "L221-L241"
+      },
+      "path": "src/application/knowledge/service_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 228,
+          "text": "let library = Arc::new(KnowledgeLibrary::new(documents.clone(), model.clone()));"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/knowledge/service_tests.rs#knowledge_upload_deadline_cancels_the_result_and_retains_permit_until_the_native_batch_stops",
+        "name": "knowledge_upload_deadline_cancels_the_result_and_retains_permit_until_the_native_batch_stops",
+        "kind": "function",
+        "path": "src/application/knowledge/service_tests.rs",
+        "span": "L243-L265"
+      },
+      "path": "src/application/knowledge/service_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 251,
+          "text": "let library = Arc::new(KnowledgeLibrary::new(documents.clone(), model));"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/infra/setup/foundation.rs#build",
+        "name": "build",
+        "kind": "function",
+        "path": "src/infra/setup/foundation.rs",
+        "span": "L13-L60"
+      },
+      "path": "src/infra/setup/foundation.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 17,
+          "text": "crate::adapters::embedding::LocalTextEmbedder::load(&model_path)"
+        },
+        {
+          "line": 42,
+          "text": "let knowledge = Arc::new(crate::application::knowledge::KnowledgeLibrary::new("
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 9,
+    "baselineChars": 79231
+  }
+}

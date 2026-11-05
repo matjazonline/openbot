@@ -1,0 +1,15 @@
+{
+  "step": "sse-navigation",
+  "command": [
+    "node",
+    "--test",
+    "scripts/tests/sse-navigation.mjs",
+    "scripts/tests/agent-runtime.mjs",
+    "scripts/tests/workflow-runs.mjs",
+    "scripts/tests/workflow-conversations.mjs",
+    "scripts/tests/workflow-samples.mjs"
+  ],
+  "exit": 0,
+  "seconds": 47.44,
+  "rust_test_summaries": []
+}

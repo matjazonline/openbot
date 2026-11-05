@@ -1,0 +1,12 @@
+{
+  "step": "fresh-owned-reset",
+  "command": [
+    "bash",
+    "scripts/reset-db.sh",
+    "--all",
+    "--yes"
+  ],
+  "exit": 0,
+  "seconds": 0.64,
+  "rust_test_summaries": []
+}

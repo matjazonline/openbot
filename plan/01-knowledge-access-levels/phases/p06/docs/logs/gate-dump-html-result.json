@@ -1,0 +1,22 @@
+{
+  "step": "dump-html",
+  "command": [
+    "cargo",
+    "test",
+    "--locked",
+    "--offline",
+    "--lib",
+    "dump_html_injection_browser_fixtures",
+    "--",
+    "--ignored"
+  ],
+  "exit": 0,
+  "seconds": 2.0,
+  "rust_test_summaries": [
+    {
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "step": "all-targets-network-isolated",
+  "command": [
+    "scripts/test-network-isolation.sh",
+    "cargo",
+    "test",
+    "--locked",
+    "--offline",
+    "--all-targets"
+  ],
+  "exit": 0,
+  "seconds": 612.83,
+  "rust_test_summaries": [
+    {
+      "passed": 2880,
+      "failed": 0,
+      "ignored": 7
+    },
+    {
+      "passed": 5,
+      "failed": 0,
+      "ignored": 0
+    }
+  ]
+}

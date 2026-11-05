@@ -1,0 +1,115 @@
+{
+  "pattern": "knowledge_view_",
+  "filesSearched": 500,
+  "totalHits": 7,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/knowledge_view_delivery_tests.rs#knowledge_view_delivery_subjects_use_current_level_and_foreign_id_is_concealed",
+        "name": "knowledge_view_delivery_subjects_use_current_level_and_foreign_id_is_concealed",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/knowledge_view_delivery_tests.rs",
+        "span": "L84-L148"
+      },
+      "path": "src/adapters/persistence/workflow/knowledge_view_delivery_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 84,
+          "text": "async fn knowledge_view_delivery_subjects_use_current_level_and_foreign_id_is_concealed() {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/knowledge_view_delivery_tests.rs#knowledge_view_notification_email_and_in_app_projection_never_quote_classified_message",
+        "name": "knowledge_view_notification_email_and_in_app_projection_never_quote_classified_message",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/knowledge_view_delivery_tests.rs",
+        "span": "L151-L208"
+      },
+      "path": "src/adapters/persistence/workflow/knowledge_view_delivery_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 151,
+          "text": "async fn knowledge_view_notification_email_and_in_app_projection_never_quote_classified_message() {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/knowledge_view_tests.rs#knowledge_view_current_run_and_step_stamp_controls_payloads",
+        "name": "knowledge_view_current_run_and_step_stamp_controls_payloads",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/knowledge_view_tests.rs",
+        "span": "L30-L77"
+      },
+      "path": "src/adapters/persistence/workflow/knowledge_view_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 30,
+          "text": "async fn knowledge_view_current_run_and_step_stamp_controls_payloads() {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/knowledge_view_tests.rs#knowledge_view_competing_readers_demotion_and_content_raise_use_final_facts",
+        "name": "knowledge_view_competing_readers_demotion_and_content_raise_use_final_facts",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/knowledge_view_tests.rs",
+        "span": "L100-L166"
+      },
+      "path": "src/adapters/persistence/workflow/knowledge_view_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 100,
+          "text": "async fn knowledge_view_competing_readers_demotion_and_content_raise_use_final_facts() {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/knowledge_view_tests.rs#knowledge_view_refusal_attention_and_native_constraints_keep_only_historical_levels",
+        "name": "knowledge_view_refusal_attention_and_native_constraints_keep_only_historical_levels",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/knowledge_view_tests.rs",
+        "span": "L169-L232"
+      },
+      "path": "src/adapters/persistence/workflow/knowledge_view_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 169,
+          "text": "async fn knowledge_view_refusal_attention_and_native_constraints_keep_only_historical_levels() {"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/message_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 596,
+          "text": "#[path = \"knowledge_view_tests.rs\"]"
+        },
+        {
+          "line": 599,
+          "text": "#[path = \"knowledge_view_delivery_tests.rs\"]"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 3,
+    "baselineChars": 41911
+  }
+}

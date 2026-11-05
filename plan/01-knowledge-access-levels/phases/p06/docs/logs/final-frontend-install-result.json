@@ -1,0 +1,9 @@
+{
+  "command": [
+    "npm",
+    "ci",
+    "--offline"
+  ],
+  "exit": 0,
+  "seconds": 0.83
+}

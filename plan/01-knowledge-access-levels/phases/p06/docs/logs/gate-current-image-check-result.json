@@ -1,0 +1,12 @@
+{
+  "step": "current-image-check",
+  "command": [
+    "python3",
+    "scripts/check-knowledge-image.py",
+    "--image",
+    "openbot-knowledge-p06:wb1"
+  ],
+  "exit": 0,
+  "seconds": 8.1,
+  "rust_test_summaries": []
+}

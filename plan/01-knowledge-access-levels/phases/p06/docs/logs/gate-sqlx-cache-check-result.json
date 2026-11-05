@@ -1,0 +1,16 @@
+{
+  "step": "sqlx-cache-check",
+  "command": [
+    "cargo",
+    "sqlx",
+    "prepare",
+    "--check",
+    "--",
+    "--locked",
+    "--offline",
+    "--all-targets"
+  ],
+  "exit": 0,
+  "seconds": 59.46,
+  "rust_test_summaries": []
+}

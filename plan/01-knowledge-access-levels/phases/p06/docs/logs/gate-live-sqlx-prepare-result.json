@@ -1,0 +1,15 @@
+{
+  "step": "live-sqlx-prepare",
+  "command": [
+    "cargo",
+    "sqlx",
+    "prepare",
+    "--",
+    "--locked",
+    "--offline",
+    "--all-targets"
+  ],
+  "exit": 0,
+  "seconds": 59.4,
+  "rust_test_summaries": []
+}

@@ -1,0 +1,13 @@
+{
+  "binary": "/Users/mac02/dev/openbot-recovery/.worktrees/knowledge-p06/target/debug/deps/open_bots-c19a0b960dacdcef",
+  "exit": 0,
+  "selected": 11,
+  "filters": {
+    "knowledge_e2e_": 9,
+    "knowledge_run_level_race_history_read_and_email_freeze_record_consistent_consumption": 1,
+    "workflow_agent_mcp_tool_dispatches_once_through_the_bound_slot": 1
+  },
+  "source_unchanged": true,
+  "tree_sha256": "03352b77a92cbc6ef1e0ffc4f307bfab060201030aaa1439e19ddd8c08241413",
+  "stack": "stock2MiB"
+}

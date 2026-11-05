@@ -1,0 +1,49 @@
+{
+  "pattern": "pub struct Viewer|enum AuthVerdict",
+  "filesSearched": 1160,
+  "totalHits": 2,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/domain/entities/auth.rs#AuthVerdict",
+        "name": "AuthVerdict",
+        "kind": "enum",
+        "path": "src/domain/entities/auth.rs",
+        "span": "L5-L15"
+      },
+      "path": "src/domain/entities/auth.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 5,
+          "text": "pub enum AuthVerdict {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/user.rs#Viewer",
+        "name": "Viewer",
+        "kind": "struct",
+        "path": "src/domain/entities/user.rs",
+        "span": "L28-L32"
+      },
+      "path": "src/domain/entities/user.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 28,
+          "text": "pub struct Viewer {"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 2,
+    "baselineChars": 5283
+  }
+}

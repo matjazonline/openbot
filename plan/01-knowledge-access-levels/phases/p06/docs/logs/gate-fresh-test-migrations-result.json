@@ -1,0 +1,14 @@
+{
+  "step": "fresh-test-migrations",
+  "command": [
+    "cargo",
+    "sqlx",
+    "migrate",
+    "run",
+    "--database-url",
+    "postgres://mac02@127.0.0.1:55506/open_bots_test"
+  ],
+  "exit": 0,
+  "seconds": 0.28,
+  "rust_test_summaries": []
+}
