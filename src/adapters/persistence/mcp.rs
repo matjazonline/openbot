@@ -127,6 +127,28 @@ pub(super) async fn connection_on(
         .bind(company).bind(id).fetch_optional(db).await?.map(TryInto::try_into).transpose()
 }
 
+/// Publication cannot quarantine invalid stored discovery into an apparently empty catalogue.
+/// Keep the ordinary settings-page projection separate; capture locks and validates the source.
+pub(super) async fn publication_connection_on(
+    db: &mut PgConnection,
+    company: Uuid,
+    id: Uuid,
+) -> AppResult<Option<CompanyMcpConnection>> {
+    let row = sqlx::query_as::<_, ConnectionRow>(&format!(
+        "{CONNECTION_SELECT} WHERE connection.company_id=$1 AND connection.id=$2 \
+         AND connection.deleted_at IS NULL FOR SHARE OF connection"
+    ))
+    .bind(company)
+    .bind(id)
+    .fetch_optional(db)
+    .await?;
+    row.map(|row| {
+        read_catalog(row.discovery_json.clone(), row.tool_grants.clone()).map_err(invalid)?;
+        row.try_into()
+    })
+    .transpose()
+}
+
 async fn replace_grants(
     tx: &mut Transaction<'_, Postgres>,
     company: Uuid,

@@ -1,0 +1,57 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p02)
+warning: method `skill` is never used
+  --> src/adapters/persistence/agent_publication/tests/support.rs:90:18
+   |
+12 | impl Fixture {
+   | ------------ method in this implementation
+...
+90 |     pub async fn skill(&self, required: Vec<TypeName>) -> crate::entities::skill::Skill {
+   |                  ^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 50s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-c19a0b960dacdcef)
+adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_competing_identical_keys_return_one_result: test
+adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_competing_publishers_choose_one_without_partial_state: test
+adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_preview_and_publish_without_a_workflow: test
+adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_removal_revokes_identity_and_new_identity_cannot_revive_it: test
+adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_replay_returns_original_after_newer_activation: test
+adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_requires_current_authority_and_scopes_history: test
+adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_revoke_deactivate_and_delete_preserve_frozen_result: test
+adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_validation_failure_preserves_active_and_history: test
+adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::draft_tests::autonomous_agent_storage_competing_writers_cannot_retarget_a_binding_identity: test
+adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::draft_tests::autonomous_agent_storage_draft_round_trip_order_and_live_grants_are_independent: test
+adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::draft_tests::autonomous_agent_storage_native_scope_kind_and_reserved_alias_constraints: test
+adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::grant_race_tests::autonomous_agent_storage_native_activation_locks_before_competing_revocation: test
+adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::grant_race_tests::autonomous_agent_storage_native_retained_reactivation_serializes_revocation: test
+adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::grant_race_tests::autonomous_agent_storage_native_revocation_locks_before_competing_activation: test
+adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::grant_tests::autonomous_agent_storage_public_mcp_grant_edits_retain_identity_and_require_fresh_review: test
+adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::manifest_tests::autonomous_agent_storage_manifest_retention_races_preserve_surviving_revisions: test
+adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::manifest_tests::autonomous_agent_storage_manifest_seals_selection_and_accepts_only_its_tree: test
+adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::revision_tests::autonomous_agent_storage_revision_round_trip_seals_members_and_active_owner: test
+adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::revision_tests::autonomous_agent_storage_skill_incarnations_and_sealed_revision_assignments: test
+adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::skill_lifetime_tests::autonomous_agent_storage_skill_authority_reader_serializes_before_source_delete: test
+adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::skill_lifetime_tests::autonomous_agent_storage_skill_delete_preserves_history_and_cannot_revive_assignment: test
+adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::skill_lifetime_tests::autonomous_agent_storage_skill_delete_serializes_before_authority_reader: test
+adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::targets_tests::autonomous_agent_storage_external_targets_round_trip_and_revoke_without_aba: test
+adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::targets_tests::autonomous_agent_storage_workflow_pin_survives_repin_and_revocation_is_permanent: test
+application::agent::contract_tests::autonomous_agent_contract_alias_and_identity_uniqueness_is_agent_local: test
+application::agent::contract_tests::autonomous_agent_contract_binding_count_and_parameter_bytes_fail_before_execution: test
+application::agent::contract_tests::autonomous_agent_contract_canonical_content_keeps_order_and_all_effect_facts: test
+application::agent::contract_tests::autonomous_agent_contract_definition_decoding_is_bounded_and_rejects_extra_secrets: test
+application::agent::contract_tests::autonomous_agent_contract_manifest_is_canonical_unique_bounded_identity_content: test
+application::agent::contract_tests::autonomous_agent_contract_reserved_names_cannot_manufacture_builtin_authority: test
+application::agent::contract_tests::autonomous_agent_contract_skills_require_local_aliases_without_granting_tools: test
+application::agent::contract_tests::autonomous_agent_contract_target_variants_and_remote_aliases_round_trip: test
+application::agent::resolution_tests::autonomous_agent_resolution_alias_collision_and_reserved_spoofing_are_refused: test
+application::agent::resolution_tests::autonomous_agent_resolution_needs_no_workflow_slot_channel_or_run: test
+application::agent::resolution_tests::autonomous_agent_resolution_requires_exact_binding_identity_source_and_order: test
+application::agent::resolution_tests::autonomous_agent_resolution_same_alias_on_different_agents_is_independent: test
+application::agent::resolution_tests::autonomous_agent_resolution_validates_schema_and_explicit_available_model: test
+application::agent::resolution_tests::autonomous_agent_skills_preserve_order_and_reject_substituted_assignments: test
+application::agent::resolution_tests::autonomous_agent_skills_refuse_foreign_tenant_facts_and_missing_requirements: test
+application::agent::resolution_tests::autonomous_agent_skills_require_explicit_aliases_without_adding_tools: test
+
+40 tests, 0 benchmarks

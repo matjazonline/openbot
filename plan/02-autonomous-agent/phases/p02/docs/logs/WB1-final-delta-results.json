@@ -1,0 +1,70 @@
+[
+  {
+    "name": "WB1-final-delta-run",
+    "argv": [
+      "scripts/test-network-isolation.sh",
+      "target/debug/deps/open_bots-c19a0b960dacdcef",
+      "--exact",
+      "adapters::persistence::agent_publication::tests::http::autonomous_agent_resolution_http_alias_captures_exact_connection_and_approval",
+      "adapters::persistence::agent_publication::tests::mcp::autonomous_agent_resolution_malformed_stored_catalog_is_an_error_not_an_empty_capture",
+      "adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_removal_revokes_identity_and_new_identity_cannot_revive_it",
+      "application::agent::resolution_tests::autonomous_agent_resolution_same_alias_on_different_agents_is_independent"
+    ],
+    "selected": [
+      "adapters::persistence::agent_publication::tests::http::autonomous_agent_resolution_http_alias_captures_exact_connection_and_approval",
+      "adapters::persistence::agent_publication::tests::mcp::autonomous_agent_resolution_malformed_stored_catalog_is_an_error_not_an_empty_capture",
+      "adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_removal_revokes_identity_and_new_identity_cannot_revive_it",
+      "application::agent::resolution_tests::autonomous_agent_resolution_same_alias_on_different_agents_is_independent"
+    ],
+    "selected_count": 4,
+    "exit_code": 0,
+    "note": "After test compile, only retained-revision deletion Conflict wording was clarified; state logic/category unchanged, inspected directly. Current source receives alltarget static checks."
+  },
+  {
+    "name": "WB1-clippy-r2",
+    "argv": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "--offline",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "WB1-sqlx-r2",
+    "argv": [
+      "cargo",
+      "sqlx",
+      "prepare",
+      "--",
+      "--all-targets"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "WB1-offline-check-r2",
+    "argv": [
+      "cargo",
+      "check",
+      "--locked",
+      "--offline",
+      "--all-targets"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "WB1-fmt-r2",
+    "argv": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--",
+      "--check"
+    ],
+    "exit_code": 1
+  }
+]

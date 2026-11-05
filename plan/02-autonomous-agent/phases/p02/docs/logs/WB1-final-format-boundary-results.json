@@ -1,0 +1,41 @@
+[
+  {
+    "name": "WB1-final-fmt",
+    "argv": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--",
+      "--check"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "WB1-final-diff",
+    "argv": [
+      "git",
+      "diff",
+      "--check"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "WB1-transport-boundary",
+    "argv": [
+      "scripts/transport-boundary-check.sh",
+      "--strict"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "WB1-final-graft-build",
+    "argv": [
+      "graft",
+      "build",
+      ".",
+      "--no-gitignore",
+      "--no-ignore"
+    ],
+    "exit_code": 0
+  }
+]

@@ -1,0 +1,323 @@
+{
+  "pattern": "AgentDraftRevision",
+  "filesSearched": 1285,
+  "totalHits": 23,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/tests.rs#settings_agent",
+        "name": "settings_agent",
+        "kind": "function",
+        "path": "src/adapters/http/pages/tests.rs",
+        "span": "L1379-L1394"
+      },
+      "path": "src/adapters/http/pages/tests.rs",
+      "inDegree": 9,
+      "hits": [
+        {
+          "line": 1381,
+          "text": "draft_revision: crate::entities::agent_capability::AgentDraftRevision::new(1).unwrap(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/agent.rs#try_from",
+        "name": "try_from",
+        "kind": "function",
+        "path": "src/adapters/persistence/agent.rs",
+        "span": "L50-L72"
+      },
+      "path": "src/adapters/persistence/agent.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 56,
+          "text": "crate::entities::agent_capability::AgentDraftRevision::new(value).ok()"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/agent_tests.rs#create",
+        "name": "create",
+        "kind": "function",
+        "path": "src/application/use_cases/agent_tests.rs",
+        "span": "L36-L53"
+      },
+      "path": "src/application/use_cases/agent_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 38,
+          "text": "draft_revision: crate::entities::agent_capability::AgentDraftRevision::new(1).unwrap(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/onboarding.rs#library_agent",
+        "name": "library_agent",
+        "kind": "function",
+        "path": "src/adapters/http/routes/onboarding.rs",
+        "span": "L403-L418"
+      },
+      "path": "src/adapters/http/routes/onboarding.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 405,
+          "text": "draft_revision: crate::entities::agent_capability::AgentDraftRevision::new(1).unwrap(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/tests.rs#the_easy_tab_creates_the_picked_library_agents",
+        "name": "the_easy_tab_creates_the_picked_library_agents",
+        "kind": "function",
+        "path": "src/adapters/http/pages/tests.rs",
+        "span": "L1220-L1272"
+      },
+      "path": "src/adapters/http/pages/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1223,
+          "text": "draft_revision: crate::entities::agent_capability::AgentDraftRevision::new(1).unwrap(),"
+        },
+        {
+          "line": 1229,
+          "text": "draft_revision: crate::entities::agent_capability::AgentDraftRevision::new(1).unwrap(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/agent.rs#agent_pages_and_fragments_render_correctly",
+        "name": "agent_pages_and_fragments_render_correctly",
+        "kind": "function",
+        "path": "src/adapters/http/routes/agent.rs",
+        "span": "L761-L804"
+      },
+      "path": "src/adapters/http/routes/agent.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 773,
+          "text": "draft_revision: crate::entities::agent_capability::AgentDraftRevision::new(1).unwrap(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/agent/contract_tests.rs#autonomous_agent_contract_manifest_is_canonical_unique_bounded_identity_content",
+        "name": "autonomous_agent_contract_manifest_is_canonical_unique_bounded_identity_content",
+        "kind": "function",
+        "path": "src/application/agent/contract_tests.rs",
+        "span": "L192-L227"
+      },
+      "path": "src/application/agent/contract_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 219,
+          "text": "assert!(AgentDraftRevision::new(0).is_err());"
+        },
+        {
+          "line": 220,
+          "text": "assert!(AgentDraftRevision::new(i64::MAX as u64 + 1).is_err());"
+        },
+        {
+          "line": 222,
+          "text": "serde_json::from_str::<AgentDraftRevision>(\"1\")"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/agent/definition.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 4,
+          "text": "AgentDraftRevision, AgentId, AgentSkillAssignmentId, AgentToolBinding, validate_agent_bindings,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/agent/definition.rs#AgentDraft",
+        "name": "AgentDraft",
+        "kind": "struct",
+        "path": "src/application/agent/definition.rs",
+        "span": "L17-L26"
+      },
+      "path": "src/application/agent/definition.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 20,
+          "text": "pub revision: AgentDraftRevision,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/agent/publication.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 7,
+          "text": "AgentBindingId, AgentDraftRevision, AgentId, AgentRevisionId, AgentSkillAssignmentId,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/agent/publication.rs#PublishAgent",
+        "name": "PublishAgent",
+        "kind": "struct",
+        "path": "src/application/agent/publication.rs",
+        "span": "L43-L48"
+      },
+      "path": "src/application/agent/publication.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 45,
+          "text": "pub expected_draft_revision: AgentDraftRevision,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/agent/publication.rs#AgentPreview",
+        "name": "AgentPreview",
+        "kind": "struct",
+        "path": "src/application/agent/publication.rs",
+        "span": "L51-L55"
+      },
+      "path": "src/application/agent/publication.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 52,
+          "text": "pub draft_revision: AgentDraftRevision,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/agent/publication.rs#PublishedAgentRevision",
+        "name": "PublishedAgentRevision",
+        "kind": "struct",
+        "path": "src/application/agent/publication.rs",
+        "span": "L58-L63"
+      },
+      "path": "src/application/agent/publication.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 60,
+          "text": "pub draft_revision: AgentDraftRevision,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/agent_tests.rs#a_library_pick_is_copied_into_the_company_with_a_model_it_can_run",
+        "name": "a_library_pick_is_copied_into_the_company_with_a_model_it_can_run",
+        "kind": "function",
+        "path": "src/application/use_cases/agent_tests.rs",
+        "span": "L559-L695"
+      },
+      "path": "src/application/use_cases/agent_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 577,
+          "text": "draft_revision: crate::entities::agent_capability::AgentDraftRevision::new(1).unwrap(),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/agent_capability.rs#AgentDraftRevision",
+        "name": "AgentDraftRevision",
+        "kind": "struct",
+        "path": "src/domain/entities/agent_capability.rs",
+        "span": "L34-L34"
+      },
+      "path": "src/domain/entities/agent_capability.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 34,
+          "text": "pub struct AgentDraftRevision(u64);"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/domain/entities/agent_capability.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 35,
+          "text": "impl AgentDraftRevision {"
+        },
+        {
+          "line": 46,
+          "text": "impl TryFrom<u64> for AgentDraftRevision {"
+        },
+        {
+          "line": 52,
+          "text": "impl From<AgentDraftRevision> for u64 {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/agent_capability.rs#from",
+        "name": "from",
+        "kind": "function",
+        "path": "src/domain/entities/agent_capability.rs",
+        "span": "L53-L55"
+      },
+      "path": "src/domain/entities/agent_capability.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 53,
+          "text": "fn from(value: AgentDraftRevision) -> Self {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/agent.rs#Agent",
+        "name": "Agent",
+        "kind": "struct",
+        "path": "src/domain/entities/agent.rs",
+        "span": "L9-L27"
+      },
+      "path": "src/domain/entities/agent.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 11,
+          "text": "pub draft_revision: super::agent_capability::AgentDraftRevision,"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 10,
+    "baselineChars": 310483
+  }
+}

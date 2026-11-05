@@ -124,7 +124,7 @@ async fn pinned_bundle(
 /// The publication snapshot of the company's workflow tool `name`, if one is registered: the
 /// pinned child's own input and output schemas, its static parameters, and a policy that never
 /// asks for approval. A pinned version that is no longer selectable cannot be captured.
-pub(super) async fn workflow_tool_snapshot(
+pub(in crate::adapters::persistence) async fn workflow_tool_snapshot(
     db: &mut PgConnection,
     company: CompanyId,
     name: &TypeName,

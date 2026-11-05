@@ -1,0 +1,83 @@
+[
+  {
+    "name": "WB1-reset-open_bots",
+    "argv": [
+      "/opt/homebrew/opt/postgresql@18/bin/dropdb",
+      "-h",
+      "127.0.0.1",
+      "-p",
+      "55602",
+      "--force",
+      "open_bots"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "WB1-create-open_bots",
+    "argv": [
+      "/opt/homebrew/opt/postgresql@18/bin/createdb",
+      "-h",
+      "127.0.0.1",
+      "-p",
+      "55602",
+      "open_bots"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "WB1-migrate-open_bots",
+    "argv": [
+      "cargo",
+      "sqlx",
+      "migrate",
+      "run"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "WB1-reset-open_bots_test",
+    "argv": [
+      "/opt/homebrew/opt/postgresql@18/bin/dropdb",
+      "-h",
+      "127.0.0.1",
+      "-p",
+      "55602",
+      "--force",
+      "open_bots_test"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "WB1-create-open_bots_test",
+    "argv": [
+      "/opt/homebrew/opt/postgresql@18/bin/createdb",
+      "-h",
+      "127.0.0.1",
+      "-p",
+      "55602",
+      "open_bots_test"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "WB1-migrate-open_bots_test",
+    "argv": [
+      "cargo",
+      "sqlx",
+      "migrate",
+      "run"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "WB1-initial-check",
+    "argv": [
+      "cargo",
+      "check",
+      "--locked",
+      "--offline",
+      "--all-targets"
+    ],
+    "exit_code": 101
+  }
+]

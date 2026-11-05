@@ -1,0 +1,222 @@
+{
+  "pattern": "AgentBuilder",
+  "filesSearched": 1283,
+  "totalHits": 14,
+  "groups": [
+    {
+      "symbol": null,
+      "path": "src/adapters/harness/rig/batch_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 6,
+          "text": "use rig_agent::{agent::AgentBuilder, completion::Prompt};"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/harness/rig/batch_tests.rs#parallel_calls_preserve_explicit_ids_and_exactly_one_result_per_call",
+        "name": "parallel_calls_preserve_explicit_ids_and_exactly_one_result_per_call",
+        "kind": "function",
+        "path": "src/adapters/harness/rig/batch_tests.rs",
+        "span": "L14-L74"
+      },
+      "path": "src/adapters/harness/rig/batch_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 67,
+          "text": "let agent = AgentBuilder::from_model_handle(model(&registry, \"openai\", \"key\", &llm.base_url))"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/harness/rig/provider_failure_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 6,
+          "text": "use rig_agent::{agent::AgentBuilder, completion::Prompt};"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/harness/rig/provider_failure_tests.rs#every_provider_rejects_malformed_rate_limited_and_disconnected_exchanges_without_retry",
+        "name": "every_provider_rejects_malformed_rate_limited_and_disconnected_exchanges_without_retry",
+        "kind": "function",
+        "path": "src/adapters/harness/rig/provider_failure_tests.rs",
+        "span": "L12-L47"
+      },
+      "path": "src/adapters/harness/rig/provider_failure_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 30,
+          "text": "let agent = AgentBuilder::from_model_handle(model("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/harness/rig/provider_failure_tests.rs#every_provider_cancels_a_held_response_without_later_requests",
+        "name": "every_provider_cancels_a_held_response_without_later_requests",
+        "kind": "function",
+        "path": "src/adapters/harness/rig/provider_failure_tests.rs",
+        "span": "L50-L81"
+      },
+      "path": "src/adapters/harness/rig/provider_failure_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 63,
+          "text": "let agent = AgentBuilder::from_model_handle(model("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/harness/rig/provider_failure_tests.rs#unregistered_model_destinations_fail_before_any_provider_connection",
+        "name": "unregistered_model_destinations_fail_before_any_provider_connection",
+        "kind": "function",
+        "path": "src/adapters/harness/rig/provider_failure_tests.rs",
+        "span": "L84-L106"
+      },
+      "path": "src/adapters/harness/rig/provider_failure_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 95,
+          "text": "let result = AgentBuilder::from_model_handle(handle)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/harness/rig/provider_failure_tests.rs#every_provider_decodes_missing_and_partial_usage_without_inventing_tokens",
+        "name": "every_provider_decodes_missing_and_partial_usage_without_inventing_tokens",
+        "kind": "function",
+        "path": "src/adapters/harness/rig/provider_failure_tests.rs",
+        "span": "L109-L154"
+      },
+      "path": "src/adapters/harness/rig/provider_failure_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 134,
+          "text": "let agent = AgentBuilder::from_model_handle(model("
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/harness/rig/provider_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 7,
+          "text": "AgentBuilder,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/harness/rig/provider_tests.rs#every_factory_executes_a_request_checked_native_tool_loop",
+        "name": "every_factory_executes_a_request_checked_native_tool_loop",
+        "kind": "function",
+        "path": "src/adapters/harness/rig/provider_tests.rs",
+        "span": "L20-L73"
+      },
+      "path": "src/adapters/harness/rig/provider_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 44,
+          "text": "let agent = AgentBuilder::from_model_handle(model("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/harness/rig/provider_tests.rs#lifecycle_hook_stops_before_tool_execution_and_second_provider_call",
+        "name": "lifecycle_hook_stops_before_tool_execution_and_second_provider_call",
+        "kind": "function",
+        "path": "src/adapters/harness/rig/provider_tests.rs",
+        "span": "L123-L144"
+      },
+      "path": "src/adapters/harness/rig/provider_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 131,
+          "text": "let agent = AgentBuilder::from_model_handle(model(&registry, \"openai\", \"key\", &llm.base_url))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/harness/rig/provider_tests.rs#concurrent_tenants_and_rotation_use_only_supplied_credentials",
+        "name": "concurrent_tenants_and_rotation_use_only_supplied_credentials",
+        "kind": "function",
+        "path": "src/adapters/harness/rig/provider_tests.rs",
+        "span": "L147-L184"
+      },
+      "path": "src/adapters/harness/rig/provider_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 157,
+          "text": "AgentBuilder::from_model_handle(model(registry, \"openai\", key, &llm.base_url)).build();"
+        },
+        {
+          "line": 177,
+          "text": "AgentBuilder::from_model_handle(model(registry, \"openai\", key, &llm.base_url)).build();"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/harness/rig/provider_tests.rs#dropping_the_run_cancels_an_inflight_completion_before_tools_execute",
+        "name": "dropping_the_run_cancels_an_inflight_completion_before_tools_execute",
+        "kind": "function",
+        "path": "src/adapters/harness/rig/provider_tests.rs",
+        "span": "L187-L217"
+      },
+      "path": "src/adapters/harness/rig/provider_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 200,
+          "text": "let agent = AgentBuilder::from_model_handle(model(&registry, \"openai\", \"key\", &llm.base_url))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/harness/rig/provider_tests.rs#provider_error_bodies_and_credentials_do_not_escape_the_transport",
+        "name": "provider_error_bodies_and_credentials_do_not_escape_the_transport",
+        "kind": "function",
+        "path": "src/adapters/harness/rig/provider_tests.rs",
+        "span": "L220-L257"
+      },
+      "path": "src/adapters/harness/rig/provider_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 231,
+          "text": "let agent = AgentBuilder::from_model_handle(model("
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 3,
+    "baselineChars": 20531
+  }
+}

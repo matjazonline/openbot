@@ -15,6 +15,8 @@ use support::*;
 mod agent_tests;
 #[path = "message_authority_tests.rs"]
 mod authority_tests;
+#[path = "autonomous_agent_publication_workflow_tests.rs"]
+mod autonomous_agent_publication_workflow_tests;
 #[path = "message_delivery_tests.rs"]
 mod delivery_tests;
 #[path = "message_ingress_tests.rs"]

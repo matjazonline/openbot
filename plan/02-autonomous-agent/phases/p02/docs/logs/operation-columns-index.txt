@@ -1,0 +1,41 @@
+2680:        OR (marker.current_policy->'approval_required'='true'::jsonb
+2721:        OR marker.current_policy->'approval_required' IS DISTINCT FROM 'false'::jsonb
+3332:CREATE TABLE public.agent_skills (
+3552:    credential_revision bigint DEFAULT 1 NOT NULL,
+3557:    CONSTRAINT company_mcp_connections_credential_revision_check CHECK ((credential_revision > 0)),
+3567:-- Name: company_mcp_credentials; Type: TABLE; Schema: public; Owner: -
+3570:CREATE TABLE public.company_mcp_credentials (
+3574:    CONSTRAINT company_mcp_credentials_envelope_check CHECK (((envelope ~~ 'enc:v2:%'::text) AND (octet_length(envelope) <= 24000)))
+3729:-- Name: integration_credentials; Type: TABLE; Schema: public; Owner: -
+3732:CREATE TABLE public.integration_credentials (
+3735:    credential_kind text NOT NULL,
+3739:    CONSTRAINT integration_credentials_envelope_check CHECK (((envelope ~ '^enc:v2:[1-9][0-9]{0,8}(:[A-Za-z0-9+/]+={0,2}){4}$'::text) AND (octet_length(envelope) <= 8192))),
+3740:    CONSTRAINT integration_credentials_kind_check CHECK ((credential_kind = ANY (ARRAY['bot_access_token'::text, 'bot_refresh_token'::text, 'user_access_token'::text])))
+4544:    CONSTRAINT workflow_action_intents_policy_decision_check CHECK ((policy_decision = ANY (ARRAY['unevaluated'::text, 'approval_required'::text]))),
+5213:-- Name: workflow_http_credentials; Type: TABLE; Schema: public; Owner: -
+5216:CREATE TABLE public.workflow_http_credentials (
+5220:    CONSTRAINT workflow_http_credentials_envelope_check CHECK (((octet_length(envelope) BETWEEN 1 AND 16384) AND (envelope ~~ 'enc:v2:%'::text)))
+5248:CREATE TABLE public.workflow_http_operations (
+5253:    approval_required boolean NOT NULL,
+5267:CREATE TABLE public.workflow_mcp_operations (
+5272:    approval_required boolean NOT NULL,
+5987:-- Name: company_mcp_credentials company_mcp_credentials_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+5990:ALTER TABLE ONLY public.company_mcp_credentials
+5991:    ADD CONSTRAINT company_mcp_credentials_pkey PRIMARY KEY (company_id, connection_id);
+6123:-- Name: integration_credentials integration_credentials_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+6126:ALTER TABLE ONLY public.integration_credentials
+6127:    ADD CONSTRAINT integration_credentials_pkey PRIMARY KEY (company_id, installation_id, credential_kind);
+7196:-- Name: workflow_http_credentials workflow_http_credentials_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+7199:ALTER TABLE ONLY public.workflow_http_credentials
+7200:    ADD CONSTRAINT workflow_http_credentials_pkey PRIMARY KEY (company_id, connection_id);
+9383:-- Name: company_mcp_credentials company_mcp_credentials_company_id_connection_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+9386:ALTER TABLE ONLY public.company_mcp_credentials
+9387:    ADD CONSTRAINT company_mcp_credentials_company_id_connection_id_fkey FOREIGN KEY (company_id, connection_id) REFERENCES public.company_mcp_connections(company_id, id) ON DELETE CASCADE;
+9487:-- Name: integration_credentials integration_credentials_installation_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+9490:ALTER TABLE ONLY public.integration_credentials
+9491:    ADD CONSTRAINT integration_credentials_installation_fk FOREIGN KEY (company_id, installation_id) REFERENCES public.integration_installations(company_id, id) ON DELETE CASCADE;
+10592:-- Name: workflow_http_credentials workflow_http_credentials_company_id_connection_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+10595:ALTER TABLE ONLY public.workflow_http_credentials
+10596:    ADD CONSTRAINT workflow_http_credentials_company_id_connection_id_fkey FOREIGN KEY (company_id, connection_id) REFERENCES public.workflow_http_connections(company_id, id) ON DELETE CASCADE;
+11613:    CHECK (failure_code IS NULL OR failure_code IN ('jev.invalid_request','jev.provider_protocol','jev.transport','jev.timeout','jev.rate_limited','jev.credentials','jev.http')),
+11648:-- All credential writers, including code-confirmed changes, share the account-row fence.

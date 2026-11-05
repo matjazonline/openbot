@@ -78,7 +78,7 @@ mod wait_commit;
 mod waits;
 mod wakeups;
 mod workflow_tool_calls;
-mod workflow_tools;
+pub(in crate::adapters::persistence) mod workflow_tools;
 
 use super::PostgresPersistence;
 use crate::app_error::{AppError, AppResult};

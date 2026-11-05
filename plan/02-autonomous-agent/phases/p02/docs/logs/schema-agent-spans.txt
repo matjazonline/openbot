@@ -1,0 +1,31 @@
+527:CREATE FUNCTION public.enforce_agent_skill_scope() RETURNS trigger
+8223:CREATE TRIGGER agent_skills_scope_check BEFORE INSERT OR UPDATE ON public.agent_skills FOR EACH ROW EXECUTE FUNCTION public.enforce_agent_skill_scope();
+12213:CREATE FUNCTION public.agent_binding_source(binding public.agent_capability_bindings) RETURNS jsonb
+12224:CREATE FUNCTION public.guard_agent_owned_identity() RETURNS trigger LANGUAGE plpgsql AS $$
+12235:CREATE TRIGGER agent_binding_immutable BEFORE UPDATE OR DELETE ON public.agent_capability_bindings
+12237:CREATE TRIGGER agent_assignment_immutable BEFORE UPDATE OR DELETE ON public.agent_skill_assignments
+12239:CREATE TRIGGER agent_revision_immutable BEFORE UPDATE OR DELETE ON public.agent_revisions
+12242:CREATE FUNCTION public.guard_agent_library_scope() RETURNS trigger LANGUAGE plpgsql AS $$
+12261:CREATE TRIGGER agent_binding_scope BEFORE INSERT ON public.agent_capability_bindings
+12263:CREATE TRIGGER agent_assignment_scope BEFORE INSERT ON public.agent_skill_assignments
+12265:CREATE TRIGGER agent_draft_binding_scope BEFORE INSERT OR UPDATE ON public.agent_draft_bindings
+12268:CREATE FUNCTION public.capture_agent_skill_assignment() RETURNS trigger LANGUAGE plpgsql AS $$
+12277:CREATE TRIGGER agent_skill_assignment_identity BEFORE INSERT OR UPDATE ON public.agent_skills
+12280:CREATE FUNCTION public.guard_agent_live_grant() RETURNS trigger LANGUAGE plpgsql AS $$
+12287:CREATE TRIGGER agent_binding_grant_revoke BEFORE UPDATE OR DELETE ON public.agent_binding_grants
+12289:CREATE TRIGGER agent_skill_grant_revoke BEFORE UPDATE OR DELETE ON public.agent_skill_grants
+12292:CREATE FUNCTION public.retire_agent_skill_authority() RETURNS trigger LANGUAGE plpgsql AS $$
+12300:CREATE TRIGGER agent_skill_source_retired AFTER UPDATE ON public.agent_skill_assignments
+12303:CREATE FUNCTION public.revoke_registered_agent_bindings() RETURNS trigger LANGUAGE plpgsql AS $$
+12322:CREATE TRIGGER agent_http_operation_revoke AFTER UPDATE ON public.workflow_http_operations
+12324:CREATE TRIGGER agent_mcp_operation_revoke AFTER UPDATE ON public.workflow_mcp_operations
+12326:CREATE TRIGGER agent_workflow_registration_revoke AFTER UPDATE ON public.workflow_tool_registrations
+12329:CREATE FUNCTION public.guard_agent_revision_member() RETURNS trigger LANGUAGE plpgsql AS $$
+12335:CREATE TRIGGER agent_revision_binding_immutable BEFORE UPDATE OR DELETE ON public.agent_revision_bindings
+12337:CREATE TRIGGER agent_revision_skill_immutable BEFORE UPDATE OR DELETE ON public.agent_revision_skills
+12340:CREATE FUNCTION public.check_agent_revision_members() RETURNS trigger LANGUAGE plpgsql AS $$
+12378:CREATE FUNCTION public.guard_agent_manifest() RETURNS trigger LANGUAGE plpgsql AS $$
+12394:CREATE TRIGGER agent_manifest_immutable BEFORE UPDATE OR DELETE ON public.agent_dependency_manifests
+12396:CREATE TRIGGER agent_manifest_revision_immutable BEFORE UPDATE OR DELETE ON public.agent_manifest_revisions
+12398:CREATE TRIGGER agent_manifest_workflow_immutable BEFORE UPDATE OR DELETE ON public.agent_manifest_workflows
+12403:CREATE FUNCTION public.check_agent_manifest_members() RETURNS trigger LANGUAGE plpgsql AS $$

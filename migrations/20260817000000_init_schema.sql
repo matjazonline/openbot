@@ -12433,3 +12433,28 @@ CREATE CONSTRAINT TRIGGER agent_manifest_workflows_complete AFTER INSERT ON publ
     DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.check_agent_manifest_members();
 CREATE CONSTRAINT TRIGGER agent_manifest_association_complete AFTER INSERT ON public.run_dependency_manifests
     DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.check_agent_manifest_members();
+
+-- Agent publication requests retain their original result across later activations.
+CREATE TABLE public.agent_publication_requests (
+    company_id uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
+    agent_id uuid NOT NULL,
+    key text NOT NULL CHECK(octet_length(key) BETWEEN 1 AND 128 AND key ~ '^[!-~]+$'),
+    expected_draft_revision bigint NOT NULL CHECK(expected_draft_revision>0),
+    expected_active_revision uuid,
+    result_revision uuid NOT NULL,
+    PRIMARY KEY(company_id,agent_id,key),
+    FOREIGN KEY(company_id,agent_id) REFERENCES public.agents(company_id,id) DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY(company_id,agent_id,expected_active_revision)
+        REFERENCES public.agent_revisions(company_id,agent_id,id) DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY(company_id,agent_id,result_revision)
+        REFERENCES public.agent_revisions(company_id,agent_id,id) DEFERRABLE INITIALLY DEFERRED
+);
+CREATE FUNCTION public.guard_agent_publication_request() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP='DELETE' AND NOT EXISTS(SELECT 1 FROM public.companies WHERE id=OLD.company_id) THEN
+        RETURN OLD;
+    END IF;
+    RAISE EXCEPTION 'agent publication result is immutable' USING ERRCODE='23514';
+END $$;
+CREATE TRIGGER agent_publication_request_immutable BEFORE UPDATE OR DELETE ON public.agent_publication_requests
+    FOR EACH ROW EXECUTE FUNCTION public.guard_agent_publication_request();

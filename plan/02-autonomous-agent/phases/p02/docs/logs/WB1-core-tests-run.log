@@ -1,0 +1,37 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 31 tests
+test adapters::persistence::agent_publication::tests::mcp::autonomous_agent_resolution_mcp_retired_operation_and_removed_grant_are_not_discovery ... ok
+test adapters::persistence::agent_publication::tests::mcp::autonomous_agent_resolution_mcp_without_workflow_freezes_remote_name_policy_and_alias ... ok
+test adapters::persistence::agent_publication::tests::mcp::autonomous_agent_resolution_mcp_schema_drift_refuses_without_replacing_active_revision ... ok
+test adapters::persistence::agent_publication::tests::mcp::autonomous_agent_resolution_mcp_reapproval_requires_fresh_concrete_binding ... ok
+test adapters::persistence::agent_publication::tests::native::autonomous_agent_publication_native_result_cannot_reference_another_agent_or_company ... ok
+test adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_competing_identical_keys_return_one_result ... ok
+test adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_competing_publishers_choose_one_without_partial_state ... ok
+test adapters::persistence::agent_publication::tests::native::autonomous_agent_publication_native_request_result_is_immutable_and_company_owned ... ok
+test adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_requires_current_authority_and_scopes_history ... ok
+test adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_preview_and_publish_without_a_workflow ... ok
+test adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_revoke_deactivate_and_delete_preserve_frozen_result ... ok
+test adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_replay_returns_original_after_newer_activation ... ok
+test application::agent::resolution_tests::autonomous_agent_resolution_alias_collision_and_reserved_spoofing_are_refused ... ok
+test adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_validation_failure_preserves_active_and_history ... ok
+test application::agent::resolution_tests::autonomous_agent_resolution_requires_exact_binding_identity_source_and_order ... ok
+test application::agent::resolution_tests::autonomous_agent_resolution_same_alias_on_different_agents_is_independent ... ok
+test application::agent::resolution_tests::autonomous_agent_resolution_validates_schema_and_explicit_available_model ... ok
+test application::agent::resolution_tests::autonomous_agent_resolution_needs_no_workflow_slot_channel_or_run ... ok
+test application::agent::resolution_tests::autonomous_agent_skills_preserve_order_and_reject_substituted_assignments ... ok
+test application::agent::resolution_tests::autonomous_agent_skills_refuse_foreign_tenant_facts_and_missing_requirements ... ok
+test application::agent::resolution_tests::autonomous_agent_skills_require_explicit_aliases_without_adding_tools ... ok
+test adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_removal_revokes_identity_and_new_identity_cannot_revive_it ... ok
+test adapters::persistence::agent_publication::tests::skills::autonomous_agent_skills_missing_requirement_preserves_active_without_adding_grants ... ok
+test adapters::persistence::agent_publication::tests::skills::autonomous_agent_skills_shared_edit_does_not_change_frozen_text_or_live_assignment ... ok
+test adapters::persistence::agent_publication::tests::skills::autonomous_agent_skills_removal_reassignment_and_explicit_revoke_preserve_incarnations ... ok
+test adapters::persistence::agent_publication::tests::races::autonomous_agent_publication_capture_serializes_before_actual_skill_deletion ... ok
+test adapters::persistence::agent_publication::tests::races::autonomous_agent_publication_capture_holds_draft_and_shared_text_until_commit ... ok
+test adapters::persistence::agent_publication::tests::mcp::autonomous_agent_publication_capture_locks_mcp_catalog_operation_and_grant ... ok
+test adapters::persistence::agent_publication::tests::mcp::autonomous_agent_publication_catalog_edit_first_cannot_commit_a_mixed_review ... ok
+test adapters::persistence::agent_publication::tests::races::autonomous_agent_publication_actual_skill_deletion_serializes_before_capture ... ok
+test adapters::persistence::agent_publication::tests::races::autonomous_agent_publication_draft_edit_first_refuses_stale_expected_state ... ok
+
+test result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 2911 filtered out; finished in 1.33s
+

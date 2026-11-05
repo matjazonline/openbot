@@ -431,6 +431,10 @@ fn agent_delete_error(error: sqlx::Error) -> AppError {
         .and_then(|database| database.constraint())
         .map(str::to_owned);
     match constraint.as_deref() {
+        Some("agent_revisions_company_id_agent_id_fkey") => AppError::Conflict(
+            "This agent has published revisions and cannot be deleted. Deactivate it instead."
+                .into(),
+        ),
         Some(
             "task_harness_runs_company_id_agent_id_fkey"
             | "model_usage_calls_company_id_agent_id_fkey"

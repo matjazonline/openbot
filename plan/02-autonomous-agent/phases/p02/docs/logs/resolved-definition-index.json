@@ -1,0 +1,202 @@
+{
+  "pattern": "ResolvedAgentDefinition",
+  "filesSearched": 1283,
+  "totalHits": 14,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/autonomous_agent_storage_support.rs#save_revision",
+        "name": "save_revision",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/autonomous_agent_storage_support.rs",
+        "span": "L105-L111"
+      },
+      "path": "src/adapters/persistence/workflow/autonomous_agent_storage_support.rs",
+      "inDegree": 6,
+      "hits": [
+        {
+          "line": 105,
+          "text": "pub(super) async fn save_revision(f: &AdmissionFixture, value: &ResolvedAgentDefinition) -> Uuid {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/autonomous_agent_storage_skill_lifetime_tests.rs#assert_retired",
+        "name": "assert_retired",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/autonomous_agent_storage_skill_lifetime_tests.rs",
+        "span": "L68-L101"
+      },
+      "path": "src/adapters/persistence/workflow/autonomous_agent_storage_skill_lifetime_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 88,
+          "text": "let restored = ResolvedAgentDefinition::decode(saved.as_bytes()).unwrap();"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/agent/contract_tests.rs#definition",
+        "name": "definition",
+        "kind": "function",
+        "path": "src/application/agent/contract_tests.rs",
+        "span": "L7-L32"
+      },
+      "path": "src/application/agent/contract_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 7,
+          "text": "fn definition() -> ResolvedAgentDefinition {"
+        },
+        {
+          "line": 8,
+          "text": "ResolvedAgentDefinition {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/autonomous_agent_storage_support.rs#insert_revision",
+        "name": "insert_revision",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/autonomous_agent_storage_support.rs",
+        "span": "L82-L103"
+      },
+      "path": "src/adapters/persistence/workflow/autonomous_agent_storage_support.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 84,
+          "text": "value: &ResolvedAgentDefinition,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/autonomous_agent_storage_revision_tests.rs#autonomous_agent_storage_revision_round_trip_seals_members_and_active_owner",
+        "name": "autonomous_agent_storage_revision_round_trip_seals_members_and_active_owner",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/autonomous_agent_storage_revision_tests.rs",
+        "span": "L4-L69"
+      },
+      "path": "src/adapters/persistence/workflow/autonomous_agent_storage_revision_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 21,
+          "text": "ResolvedAgentDefinition::decode(content.as_bytes())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/autonomous_agent_storage_support.rs#definition",
+        "name": "definition",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/autonomous_agent_storage_support.rs",
+        "span": "L34-L80"
+      },
+      "path": "src/adapters/persistence/workflow/autonomous_agent_storage_support.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 38,
+          "text": ") -> ResolvedAgentDefinition {"
+        },
+        {
+          "line": 40,
+          "text": "ResolvedAgentDefinition {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/agent/contract_tests.rs#autonomous_agent_contract_definition_decoding_is_bounded_and_rejects_extra_secrets",
+        "name": "autonomous_agent_contract_definition_decoding_is_bounded_and_rejects_extra_secrets",
+        "kind": "function",
+        "path": "src/application/agent/contract_tests.rs",
+        "span": "L137-L149"
+      },
+      "path": "src/application/agent/contract_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 138,
+          "text": "assert!(ResolvedAgentDefinition::decode(&vec![b' '; MAX_AGENT_DEFINITION_BYTES + 1]).is_err());"
+        },
+        {
+          "line": 142,
+          "text": "assert!(ResolvedAgentDefinition::decode(&serde_json::to_vec(&json).unwrap()).is_err());"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/agent/contract_tests.rs#autonomous_agent_contract_canonical_content_keeps_order_and_all_effect_facts",
+        "name": "autonomous_agent_contract_canonical_content_keeps_order_and_all_effect_facts",
+        "kind": "function",
+        "path": "src/application/agent/contract_tests.rs",
+        "span": "L171-L189"
+      },
+      "path": "src/application/agent/contract_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 174,
+          "text": "let restored = ResolvedAgentDefinition::decode(&original).unwrap();"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/agent/definition.rs#ResolvedAgentDefinition",
+        "name": "ResolvedAgentDefinition",
+        "kind": "struct",
+        "path": "src/application/agent/definition.rs",
+        "span": "L38-L46"
+      },
+      "path": "src/application/agent/definition.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 38,
+          "text": "pub struct ResolvedAgentDefinition {"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/agent/definition.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 69,
+          "text": "impl ResolvedAgentDefinition {"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/agent/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 36,
+          "text": "/// credentials. `(ResolvedAgentDefinition.company_id, provider)` is the existing company model"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 6,
+    "baselineChars": 44579
+  }
+}

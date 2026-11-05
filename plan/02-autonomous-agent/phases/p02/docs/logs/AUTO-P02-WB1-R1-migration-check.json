@@ -1,0 +1,34 @@
+{
+  "utc": "2026-11-05T22:51:45.501510+00:00",
+  "expected_sha384": "4d35278af3d30a7b3c979496e56ea3e118886889121d1d5a259b25cc3d32cfae7d7de352380cd1015bacbaeaad7c774d",
+  "checks": [
+    {
+      "database": "open_bots",
+      "argv": [
+        "/opt/homebrew/opt/postgresql@18/bin/psql",
+        "postgres://mac02@127.0.0.1:55602/open_bots",
+        "-X",
+        "-At",
+        "-c",
+        "SELECT version,success,encode(checksum,'hex') FROM _sqlx_migrations ORDER BY version"
+      ],
+      "exit_code": 0,
+      "result": "20260817000000|t|4d35278af3d30a7b3c979496e56ea3e118886889121d1d5a259b25cc3d32cfae7d7de352380cd1015bacbaeaad7c774d",
+      "matches_current_migration_sha384": true
+    },
+    {
+      "database": "open_bots_test",
+      "argv": [
+        "/opt/homebrew/opt/postgresql@18/bin/psql",
+        "postgres://mac02@127.0.0.1:55602/open_bots_test",
+        "-X",
+        "-At",
+        "-c",
+        "SELECT version,success,encode(checksum,'hex') FROM _sqlx_migrations ORDER BY version"
+      ],
+      "exit_code": 0,
+      "result": "20260817000000|t|4d35278af3d30a7b3c979496e56ea3e118886889121d1d5a259b25cc3d32cfae7d7de352380cd1015bacbaeaad7c774d",
+      "matches_current_migration_sha384": true
+    }
+  ]
+}

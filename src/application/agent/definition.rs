@@ -123,6 +123,7 @@ impl ResolvedAgentDefinition {
             {
                 return Err(invalid("Invalid or oversized agent tool contract"));
             }
+            validate_tool_schema(tool)?;
         }
         if serde_json::to_vec(self)
             .map_err(|_| invalid("Invalid agent definition"))?
@@ -144,4 +145,23 @@ impl ResolvedAgentDefinition {
     pub fn content_hash(&self) -> AppResult<[u8; 32]> {
         Ok(Sha256::digest(self.canonical_content()?).into())
     }
+}
+
+fn validate_tool_schema(tool: &ResolvedAgentTool) -> AppResult<()> {
+    use crate::application::workflow::compiler::{Schema, SourceSpan};
+    let span = SourceSpan {
+        start: 0,
+        end: 0,
+        line: 1,
+        column: 1,
+    };
+    for schema in [&tool.input_schema, &tool.output_schema] {
+        Schema::compile(schema.clone(), "/agent-tool", span).map_err(|_| {
+            invalid(&format!(
+                "Agent tool {} has an invalid schema",
+                tool.binding.alias.as_str()
+            ))
+        })?;
+    }
+    Ok(())
 }

@@ -1,0 +1,849 @@
+{
+  "pattern": "ModelProvider",
+  "filesSearched": 1283,
+  "totalHits": 62,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/application/use_cases/agent.rs#resolve_explicit",
+        "name": "resolve_explicit",
+        "kind": "function",
+        "path": "src/application/use_cases/agent.rs",
+        "span": "L676-L694"
+      },
+      "path": "src/application/use_cases/agent.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 677,
+          "text": "provider: &ModelProvider,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/company.rs#model_connections_on",
+        "name": "model_connections_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/company.rs",
+        "span": "L988-L1014"
+      },
+      "path": "src/adapters/persistence/company.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 1007,
+          "text": "provider: ModelProvider::from(provider),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/company.rs#model_api_key_on",
+        "name": "model_api_key_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/company.rs",
+        "span": "L1016-L1034"
+      },
+      "path": "src/adapters/persistence/company.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 1020,
+          "text": "provider: &ModelProvider,"
+        },
+        {
+          "line": 1022,
+          "text": "// Folded by `ModelProvider::canonical` before it gets here, so the column is compared as"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/agent.rs#model_allowed",
+        "name": "model_allowed",
+        "kind": "function",
+        "path": "src/application/use_cases/agent.rs",
+        "span": "L154-L164"
+      },
+      "path": "src/application/use_cases/agent.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 159,
+          "text": "let provider = ModelProvider::canonical(provider);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/agent.rs#resolve_global",
+        "name": "resolve_global",
+        "kind": "function",
+        "path": "src/application/use_cases/agent.rs",
+        "span": "L646-L674"
+      },
+      "path": "src/application/use_cases/agent.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 670,
+          "text": "provider: ModelProvider::canonical(&provider),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/agent/model_preparation.rs#prompt_model",
+        "name": "prompt_model",
+        "kind": "function",
+        "path": "src/application/use_cases/agent/model_preparation.rs",
+        "span": "L59-L91"
+      },
+      "path": "src/application/use_cases/agent/model_preparation.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 63,
+          "text": ") -> AppResult<(ModelProvider, ModelName)> {"
+        },
+        {
+          "line": 71,
+          "text": "ModelProvider::canonical(non_empty(provider_override).unwrap_or(default.provider.as_str()));"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/harness/rig/providers.rs#register",
+        "name": "register",
+        "kind": "function",
+        "path": "src/adapters/harness/rig/providers.rs",
+        "span": "L89-L99"
+      },
+      "path": "src/adapters/harness/rig/providers.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 91,
+          "text": "key: ModelProvider,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/model_usage.rs#save_price",
+        "name": "save_price",
+        "kind": "function",
+        "path": "src/adapters/http/routes/model_usage.rs",
+        "span": "L102-L142"
+      },
+      "path": "src/adapters/http/routes/model_usage.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 123,
+          "text": "provider: ModelProvider::canonical(form.provider),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/reviewed_delivery_tests.rs#check_current_price_estimate",
+        "name": "check_current_price_estimate",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/reviewed_delivery_tests.rs",
+        "span": "L227-L255"
+      },
+      "path": "src/adapters/persistence/workflow/reviewed_delivery_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 231,
+          "text": "use crate::entities::value_objects::{ModelName, ModelProvider};"
+        },
+        {
+          "line": 238,
+          "text": "provider: ModelProvider::canonical(SCRIPTED_PROVIDER),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/agent/model_preparation.rs#validate_model_selection",
+        "name": "validate_model_selection",
+        "kind": "function",
+        "path": "src/application/use_cases/agent/model_preparation.rs",
+        "span": "L5-L24"
+      },
+      "path": "src/application/use_cases/agent/model_preparation.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 20,
+          "text": "ModelProvider::canonical(provider),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/onboarding.rs#model_api_key",
+        "name": "model_api_key",
+        "kind": "function",
+        "path": "src/application/use_cases/onboarding.rs",
+        "span": "L58-L58"
+      },
+      "path": "src/application/use_cases/onboarding.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 58,
+          "text": "async fn model_api_key(&mut self, provider: &ModelProvider) -> AppResult<Option<String>>;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/harness/rig/classifier.rs#tests",
+        "name": "tests",
+        "kind": "module",
+        "path": "src/adapters/harness/rig/classifier.rs",
+        "span": "L82-L137"
+      },
+      "path": "src/adapters/harness/rig/classifier.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 84,
+          "text": "use crate::entities::value_objects::{ModelName, ModelProvider};"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/harness/rig/classifier.rs#rig_classifier_sends_one_tool_free_request_and_returns_the_reply_verbatim",
+        "name": "rig_classifier_sends_one_tool_free_request_and_returns_the_reply_verbatim",
+        "kind": "function",
+        "path": "src/adapters/harness/rig/classifier.rs",
+        "span": "L88-L120"
+      },
+      "path": "src/adapters/harness/rig/classifier.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 96,
+          "text": "provider: &ModelProvider::from(\"openai\"),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/harness/rig/classifier.rs#rig_classifier_refuses_an_unsupported_provider_before_any_request",
+        "name": "rig_classifier_refuses_an_unsupported_provider_before_any_request",
+        "kind": "function",
+        "path": "src/adapters/harness/rig/classifier.rs",
+        "span": "L123-L136"
+      },
+      "path": "src/adapters/harness/rig/classifier.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 129,
+          "text": "provider: &ModelProvider::from(\"unknown\"),"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/harness/rig/providers.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 9,
+          "text": "use crate::entities::value_objects::{ModelName, ModelProvider};"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/harness/rig/providers.rs#ResolvedModelRequest",
+        "name": "ResolvedModelRequest",
+        "kind": "struct",
+        "path": "src/adapters/harness/rig/providers.rs",
+        "span": "L12-L18"
+      },
+      "path": "src/adapters/harness/rig/providers.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 13,
+          "text": "pub provider: &'a ModelProvider,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/harness/rig/providers.rs#ProviderRegistry",
+        "name": "ProviderRegistry",
+        "kind": "struct",
+        "path": "src/adapters/harness/rig/providers.rs",
+        "span": "L43-L46"
+      },
+      "path": "src/adapters/harness/rig/providers.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 44,
+          "text": "factories: HashMap<ModelProvider, ProviderFactory>,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/http/routes/model_usage.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 5,
+          "text": "entities::value_objects::{ModelName, ModelProvider},"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/company.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 12,
+          "text": "value_objects::{AvatarUrl, CompanySlug, ModelName, ModelProvider},"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/company.rs#model_api_key",
+        "name": "model_api_key",
+        "kind": "function",
+        "path": "src/adapters/persistence/company.rs",
+        "span": "L323-L330"
+      },
+      "path": "src/adapters/persistence/company.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 326,
+          "text": "provider: &ModelProvider,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/company.rs#a_company_can_replace_multiple_encrypted_model_connections_without_resending_keys",
+        "name": "a_company_can_replace_multiple_encrypted_model_connections_without_resending_keys",
+        "kind": "function",
+        "path": "src/adapters/persistence/company.rs",
+        "span": "L628-L783"
+      },
+      "path": "src/adapters/persistence/company.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 699,
+          "text": ".model_api_key(company.id, &ModelProvider::canonical(\"anthropic\"))"
+        },
+        {
+          "line": 737,
+          "text": ".model_api_key(company.id, &ModelProvider::canonical(\"openai\"))"
+        },
+        {
+          "line": 768,
+          "text": ".model_api_key(company.id, &ModelProvider::canonical(\"anthropic\"))"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/onboarding.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 21,
+          "text": "entities::{agent::Agent, company::CompanyModelConnection, value_objects::ModelProvider},"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/onboarding.rs#model_api_key",
+        "name": "model_api_key",
+        "kind": "function",
+        "path": "src/adapters/persistence/onboarding.rs",
+        "span": "L104-L106"
+      },
+      "path": "src/adapters/persistence/onboarding.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 104,
+          "text": "async fn model_api_key(&mut self, provider: &ModelProvider) -> AppResult<Option<String>> {"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/agent_preparation.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 14,
+          "text": "use crate::entities::value_objects::ModelProvider;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/agent_preparation.rs#prepare_agent",
+        "name": "prepare_agent",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/agent_preparation.rs",
+        "span": "L180-L243"
+      },
+      "path": "src/adapters/persistence/workflow/agent_preparation.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 231,
+          "text": "let provider = ModelProvider::from(prepared.selection().agent().model.provider.as_str());"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/services/harness/classifier.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 14,
+          "text": "use crate::entities::value_objects::{ModelName, ModelProvider};"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/services/harness/classifier.rs#ClassificationRequest",
+        "name": "ClassificationRequest",
+        "kind": "struct",
+        "path": "src/application/services/harness/classifier.rs",
+        "span": "L22-L30"
+      },
+      "path": "src/application/services/harness/classifier.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 27,
+          "text": "pub provider: &'a ModelProvider,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/services/harness/runs/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 10,
+          "text": "value_objects::{ModelName, ModelProvider, ToolId},"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/services/harness/runs/mod.rs#RunIdentity",
+        "name": "RunIdentity",
+        "kind": "struct",
+        "path": "src/application/services/harness/runs/mod.rs",
+        "span": "L25-L36"
+      },
+      "path": "src/application/services/harness/runs/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 30,
+          "text": "pub provider: ModelProvider,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/services/harness/runs/mod.rs#ContinuationBlock",
+        "name": "ContinuationBlock",
+        "kind": "struct",
+        "path": "src/application/services/harness/runs/mod.rs",
+        "span": "L67-L72"
+      },
+      "path": "src/application/services/harness/runs/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 69,
+          "text": "pub provider: ModelProvider,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/services/model_usage/aggregate.rs#UsageSample",
+        "name": "UsageSample",
+        "kind": "struct",
+        "path": "src/application/services/model_usage/aggregate.rs",
+        "span": "L4-L13"
+      },
+      "path": "src/application/services/model_usage/aggregate.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 5,
+          "text": "pub provider: ModelProvider,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/services/model_usage/aggregate.rs#GroupKey",
+        "name": "GroupKey",
+        "kind": "enum",
+        "path": "src/application/services/model_usage/aggregate.rs",
+        "span": "L28-L31"
+      },
+      "path": "src/application/services/model_usage/aggregate.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 29,
+          "text": "Model(ModelProvider, ModelName),"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/services/model_usage/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 4,
+          "text": "entities::value_objects::{ModelName, ModelProvider},"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/services/model_usage/mod.rs#ModelPrice",
+        "name": "ModelPrice",
+        "kind": "struct",
+        "path": "src/application/services/model_usage/mod.rs",
+        "span": "L98-L104"
+      },
+      "path": "src/application/services/model_usage/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 99,
+          "text": "pub provider: ModelProvider,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/services/model_usage/mod.rs#PriceWrite",
+        "name": "PriceWrite",
+        "kind": "struct",
+        "path": "src/application/services/model_usage/mod.rs",
+        "span": "L111-L118"
+      },
+      "path": "src/application/services/model_usage/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 113,
+          "text": "pub provider: ModelProvider,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/services/model_usage/mod.rs#validate~2",
+        "name": "validate~2",
+        "kind": "function",
+        "path": "src/application/services/model_usage/mod.rs",
+        "span": "L120-L135"
+      },
+      "path": "src/application/services/model_usage/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 123,
+          "text": "|| self.provider != ModelProvider::canonical(&self.provider)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/services/model_usage/mod.rs#UsageGroup",
+        "name": "UsageGroup",
+        "kind": "struct",
+        "path": "src/application/services/model_usage/mod.rs",
+        "span": "L138-L153"
+      },
+      "path": "src/application/services/model_usage/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 139,
+          "text": "pub provider: Option<ModelProvider>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/agent_tests.rs#prompt_generation_requires_explicitly_owned_credentials",
+        "name": "prompt_generation_requires_explicitly_owned_credentials",
+        "kind": "function",
+        "path": "src/application/use_cases/agent_tests.rs",
+        "span": "L377-L400"
+      },
+      "path": "src/application/use_cases/agent_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 379,
+          "text": "&ModelProvider::canonical(\"google\"),"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/use_cases/agent.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 14,
+          "text": "value_objects::{AvatarUrl, ModelName, ModelProvider},"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/agent.rs#PromptGeneratorLlm",
+        "name": "PromptGeneratorLlm",
+        "kind": "struct",
+        "path": "src/application/use_cases/agent.rs",
+        "span": "L639-L643"
+      },
+      "path": "src/application/use_cases/agent.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 640,
+          "text": "provider: ModelProvider,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/use_cases/company_test_support.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 20,
+          "text": "value_objects::ModelProvider,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/company_test_support.rs#model_api_key",
+        "name": "model_api_key",
+        "kind": "function",
+        "path": "src/application/use_cases/company_test_support.rs",
+        "span": "L283-L291"
+      },
+      "path": "src/application/use_cases/company_test_support.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 286,
+          "text": "_provider: &ModelProvider,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/use_cases/company.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 12,
+          "text": "value_objects::{AvatarUrl, ModelName, ModelProvider},"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/company.rs#CompanyModelConnectionWrite",
+        "name": "CompanyModelConnectionWrite",
+        "kind": "struct",
+        "path": "src/application/use_cases/company.rs",
+        "span": "L26-L32"
+      },
+      "path": "src/application/use_cases/company.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 27,
+          "text": "pub provider: ModelProvider,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/company.rs#model_api_key",
+        "name": "model_api_key",
+        "kind": "function",
+        "path": "src/application/use_cases/company.rs",
+        "span": "L171-L175"
+      },
+      "path": "src/application/use_cases/company.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 174,
+          "text": "provider: &ModelProvider,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/use_cases/onboarding.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 23,
+          "text": "value_objects::{ModelName, ModelProvider},"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/onboarding.rs#PromptRequest",
+        "name": "PromptRequest",
+        "kind": "struct",
+        "path": "src/application/use_cases/onboarding.rs",
+        "span": "L35-L40"
+      },
+      "path": "src/application/use_cases/onboarding.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 36,
+          "text": "pub provider: ModelProvider,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/domain/entities/company.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 6,
+          "text": "value_objects::{AvatarUrl, CompanySlug, ModelName, ModelProvider},"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/company.rs#CompanyModelConnection",
+        "name": "CompanyModelConnection",
+        "kind": "struct",
+        "path": "src/domain/entities/company.rs",
+        "span": "L26-L31"
+      },
+      "path": "src/domain/entities/company.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 27,
+          "text": "pub provider: ModelProvider,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/domain/entities/knowledge_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 4,
+          "text": "value_objects::{KnowledgeDocumentKey, ModelName, ModelProvider},"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/knowledge_tests.rs#knowledge_upload_existing_newtypes_keep_raw_comparison_and_canonical_helpers",
+        "name": "knowledge_upload_existing_newtypes_keep_raw_comparison_and_canonical_helpers",
+        "kind": "function",
+        "path": "src/domain/entities/knowledge_tests.rs",
+        "span": "L116-L122"
+      },
+      "path": "src/domain/entities/knowledge_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 117,
+          "text": "let raw = ModelProvider::from(\" OpenAI \");"
+        },
+        {
+          "line": 118,
+          "text": "assert_ne!(raw, ModelProvider::from(\"openai\"));"
+        },
+        {
+          "line": 119,
+          "text": "assert_eq!(ModelProvider::canonical(raw), \"openai\");"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/domain/entities/value_objects.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 163,
+          "text": "string_newtype!(ModelProvider);"
+        },
+        {
+          "line": 165,
+          "text": "impl ModelProvider {"
+        },
+        {
+          "line": 174,
+          "text": "// One provider-specific model identifier. Kept distinct from `ModelProvider` because the two are"
+        },
+        {
+          "line": 180,
+          "text": "/// case-sensitive (`gpt-4o` is not `GPT-4o`). The asymmetry with [`ModelProvider::canonical`]"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 20,
+    "baselineChars": 246196
+  }
+}

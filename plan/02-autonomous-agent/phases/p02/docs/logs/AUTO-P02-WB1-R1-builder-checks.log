@@ -1,0 +1,8 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 2 tests
+test adapters::http::routes::agent::api_tests::library_builder_copy_keeps_its_grants_on_an_explicit_model ... ok
+test adapters::http::routes::workflows::tests::tool_tests::workflow_tool_routes_register_revoke_and_grant ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 2944 filtered out; finished in 0.81s
+

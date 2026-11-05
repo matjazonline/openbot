@@ -1,0 +1,83 @@
+{
+  "pattern": "AgentToolTarget::Mcp",
+  "filesSearched": 1301,
+  "totalHits": 4,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/agent_preparation.rs#targets",
+        "name": "targets",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/agent_preparation.rs",
+        "span": "L120-L172"
+      },
+      "path": "src/adapters/persistence/workflow/agent_preparation.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 148,
+          "text": "AgentToolTarget::Mcp { slot: slot.clone() }"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/workflow_agent/mod.rs#invocation",
+        "name": "invocation",
+        "kind": "function",
+        "path": "src/adapters/workflow_agent/mod.rs",
+        "span": "L76-L123"
+      },
+      "path": "src/adapters/workflow_agent/mod.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 88,
+          "text": "AgentToolTarget::Mcp { slot } => ToolInvocation::Mcp(Box::new(McpToolCall {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/agent.rs#prepared_tool",
+        "name": "prepared_tool",
+        "kind": "function",
+        "path": "src/application/workflow/agent.rs",
+        "span": "L262-L285"
+      },
+      "path": "src/application/workflow/agent.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 270,
+          "text": "(AgentToolTarget::Mcp { slot }, ToolKind::Slot(frozen)) => frozen == slot,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/agent_tests.rs#workflow_agent_preparation_refuses_unsupported_or_colliding_bindings",
+        "name": "workflow_agent_preparation_refuses_unsupported_or_colliding_bindings",
+        "kind": "function",
+        "path": "src/application/workflow/agent_tests.rs",
+        "span": "L101-L154"
+      },
+      "path": "src/application/workflow/agent_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 102,
+          "text": "let mcp = AgentToolTarget::Mcp {"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 4,
+    "baselineChars": 37875
+  }
+}

@@ -1,0 +1,117 @@
+{
+  "pattern": "mod authority",
+  "filesSearched": 1285,
+  "totalHits": 6,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/company_invite.rs#authority",
+        "name": "authority",
+        "kind": "module",
+        "path": "src/adapters/persistence/company_invite.rs",
+        "span": "L22-L22"
+      },
+      "path": "src/adapters/persistence/company_invite.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 22,
+          "text": "pub(super) mod authority;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_provider_tests.rs#authority_tests",
+        "name": "authority_tests",
+        "kind": "module",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_provider_tests.rs",
+        "span": "L524-L524"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_provider_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 524,
+          "text": "mod authority_tests;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/decision_tests.rs#authority_tests",
+        "name": "authority_tests",
+        "kind": "module",
+        "path": "src/adapters/persistence/workflow/decision_tests.rs",
+        "span": "L485-L485"
+      },
+      "path": "src/adapters/persistence/workflow/decision_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 485,
+          "text": "mod authority_tests;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/http_tests.rs#authority_tests",
+        "name": "authority_tests",
+        "kind": "module",
+        "path": "src/adapters/persistence/workflow/http_tests.rs",
+        "span": "L19-L19"
+      },
+      "path": "src/adapters/persistence/workflow/http_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 19,
+          "text": "mod authority_tests;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_tests.rs#authority_tests",
+        "name": "authority_tests",
+        "kind": "module",
+        "path": "src/adapters/persistence/workflow/message_tests.rs",
+        "span": "L17-L17"
+      },
+      "path": "src/adapters/persistence/workflow/message_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 17,
+          "text": "mod authority_tests;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/mod.rs#authority",
+        "name": "authority",
+        "kind": "module",
+        "path": "src/adapters/persistence/workflow/mod.rs",
+        "span": "L29-L29"
+      },
+      "path": "src/adapters/persistence/workflow/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 29,
+          "text": "pub(crate) mod authority;"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 6,
+    "baselineChars": 112364
+  }
+}

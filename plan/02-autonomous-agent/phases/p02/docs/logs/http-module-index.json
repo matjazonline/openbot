@@ -1,0 +1,134 @@
+{
+  "pattern": "mod http",
+  "filesSearched": 1283,
+  "totalHits": 7,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/harness/rig/mod.rs#http",
+        "name": "http",
+        "kind": "module",
+        "path": "src/adapters/harness/rig/mod.rs",
+        "span": "L3-L3"
+      },
+      "path": "src/adapters/harness/rig/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 3,
+          "text": "mod http;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/mcp/mod.rs#http",
+        "name": "http",
+        "kind": "module",
+        "path": "src/adapters/mcp/mod.rs",
+        "span": "L2-L2"
+      },
+      "path": "src/adapters/mcp/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 2,
+          "text": "mod http;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/mod.rs#http",
+        "name": "http",
+        "kind": "module",
+        "path": "src/adapters/mod.rs",
+        "span": "L4-L4"
+      },
+      "path": "src/adapters/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 4,
+          "text": "pub mod http;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/credential_rotation_tests.rs#http_tests",
+        "name": "http_tests",
+        "kind": "module",
+        "path": "src/adapters/persistence/credential_rotation_tests.rs",
+        "span": "L615-L615"
+      },
+      "path": "src/adapters/persistence/credential_rotation_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 615,
+          "text": "mod http_tests;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/mod.rs#http",
+        "name": "http",
+        "kind": "module",
+        "path": "src/adapters/persistence/workflow/mod.rs",
+        "span": "L50-L50"
+      },
+      "path": "src/adapters/persistence/workflow/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 50,
+          "text": "pub mod http;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/tests.rs#http_tests",
+        "name": "http_tests",
+        "kind": "module",
+        "path": "src/adapters/persistence/workflow/tests.rs",
+        "span": "L19-L19"
+      },
+      "path": "src/adapters/persistence/workflow/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 19,
+          "text": "mod http_tests;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/mod.rs#http",
+        "name": "http",
+        "kind": "module",
+        "path": "src/application/workflow/mod.rs",
+        "span": "L27-L27"
+      },
+      "path": "src/application/workflow/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 27,
+          "text": "pub mod http;"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 7,
+    "baselineChars": 64651
+  }
+}

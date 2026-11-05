@@ -77,7 +77,7 @@ impl ConnectionRow {
         })
     }
 }
-pub(super) async fn connection_on(
+pub(in crate::adapters::persistence) async fn connection_on(
     tx: &mut Transaction<'_, Postgres>,
     company: CompanyId,
     id: Uuid,

@@ -1,0 +1,53 @@
+{
+  "pattern": "account",
+  "filesSearched": 10,
+  "totalHits": 3,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/knowledge/tests.rs#new",
+        "name": "new",
+        "kind": "function",
+        "path": "src/adapters/persistence/knowledge/tests.rs",
+        "span": "L24-L52"
+      },
+      "path": "src/adapters/persistence/knowledge/tests.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 26,
+          "text": "let owner = account(&store).await;"
+        },
+        {
+          "line": 27,
+          "text": "let member = account(&store).await;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/knowledge/tests.rs#account",
+        "name": "account",
+        "kind": "function",
+        "path": "src/adapters/persistence/knowledge/tests.rs",
+        "span": "L73-L83"
+      },
+      "path": "src/adapters/persistence/knowledge/tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 73,
+          "text": "async fn account(store: &PostgresPersistence) -> User {"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 1,
+    "baselineChars": 8318
+  }
+}

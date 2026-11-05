@@ -1,0 +1,5 @@
+adapters::persistence::workflow::tests::message_tests::workflow_tool_revocation_tests::workflow_tool_repin_and_archive_leave_published_workflows_on_their_frozen_version: test
+application::workflow::mcp::tests::workflow_mcp_discovery_must_offer_exactly_the_frozen_schemas: test
+application::workflow::mcp::tests::workflow_mcp_operation_requires_grant_review_and_reconcile_recovery: test
+
+3 tests, 0 benchmarks

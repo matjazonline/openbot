@@ -1,0 +1,236 @@
+{
+  "pattern": "FROM users WHERE id",
+  "filesSearched": 1283,
+  "totalHits": 13,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/inbound_event/tests.rs#cleanup",
+        "name": "cleanup",
+        "kind": "function",
+        "path": "src/adapters/persistence/inbound_event/tests.rs",
+        "span": "L78-L89"
+      },
+      "path": "src/adapters/persistence/inbound_event/tests.rs",
+      "inDegree": 7,
+      "hits": [
+        {
+          "line": 84,
+          "text": "sqlx::query(\"DELETE FROM users WHERE id = $1\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/user.rs#get_by_id",
+        "name": "get_by_id",
+        "kind": "function",
+        "path": "src/adapters/persistence/user.rs",
+        "span": "L278-L289"
+      },
+      "path": "src/adapters/persistence/user.rs",
+      "inDegree": 5,
+      "hits": [
+        {
+          "line": 281,
+          "text": "r#\"SELECT id, username, email, password_hash, avatar_url, email_verified_at, auth_revision, created_at as \"created_at!\" FROM users WHERE id = $1\"#,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/company.rs#create",
+        "name": "create",
+        "kind": "function",
+        "path": "src/adapters/persistence/company.rs",
+        "span": "L139-L178"
+      },
+      "path": "src/adapters/persistence/company.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 143,
+          "text": "\"SELECT username::text, email::text FROM users WHERE id = $1 FOR UPDATE\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/account_identity.rs#rekey_account_identity_on",
+        "name": "rekey_account_identity_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/account_identity.rs",
+        "span": "L52-L100"
+      },
+      "path": "src/adapters/persistence/account_identity.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 78,
+          "text": "let username: String = sqlx::query_scalar(\"SELECT username::text FROM users WHERE id = $1\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/company_invite.rs#lock_verified_account_email",
+        "name": "lock_verified_account_email",
+        "kind": "function",
+        "path": "src/adapters/persistence/company_invite.rs",
+        "span": "L61-L75"
+      },
+      "path": "src/adapters/persistence/company_invite.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 67,
+          "text": "\"SELECT email::text, email_verified_at IS NOT NULL FROM users WHERE id = $1 FOR UPDATE\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/user.rs#locked_account_email",
+        "name": "locked_account_email",
+        "kind": "function",
+        "path": "src/adapters/persistence/user.rs",
+        "span": "L825-L836"
+      },
+      "path": "src/adapters/persistence/user.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 830,
+          "text": "r#\"SELECT email::text AS \"email!\" FROM users WHERE id = $1 FOR UPDATE\"#,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/session_security_change_tests.rs#security_session_issued_first_is_revoked_by_waiting_password_change",
+        "name": "security_session_issued_first_is_revoked_by_waiting_password_change",
+        "kind": "function",
+        "path": "src/adapters/http/session_security_change_tests.rs",
+        "span": "L192-L237"
+      },
+      "path": "src/adapters/http/session_security_change_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 210,
+          "text": "sqlx::query(\"SELECT auth_revision FROM users WHERE id = $1 FOR UPDATE\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/company_invite_tests.rs#security_email_identity_concurrent_address_change_defeats_stale_invite_acceptance",
+        "name": "security_email_identity_concurrent_address_change_defeats_stale_invite_acceptance",
+        "kind": "function",
+        "path": "src/adapters/persistence/company_invite_tests.rs",
+        "span": "L231-L282"
+      },
+      "path": "src/adapters/persistence/company_invite_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 242,
+          "text": "sqlx::query(\"SELECT id FROM users WHERE id = $1 FOR UPDATE\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/company_invite.rs#accept_pending_invite",
+        "name": "accept_pending_invite",
+        "kind": "function",
+        "path": "src/adapters/persistence/company_invite.rs",
+        "span": "L353-L432"
+      },
+      "path": "src/adapters/persistence/company_invite.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 399,
+          "text": "sqlx::query_scalar(\"SELECT username::text FROM users WHERE id = $1\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/company_level_authority.rs#start",
+        "name": "start",
+        "kind": "function",
+        "path": "src/adapters/persistence/company_level_authority.rs",
+        "span": "L71-L87"
+      },
+      "path": "src/adapters/persistence/company_level_authority.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 78,
+          "text": "let actor: Option<Uuid> = sqlx::query_scalar(\"SELECT id FROM users WHERE id=$1 FOR SHARE\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/company_level_authority.rs#refuse_owner_address",
+        "name": "refuse_owner_address",
+        "kind": "function",
+        "path": "src/adapters/persistence/company_level_authority.rs",
+        "span": "L168-L185"
+      },
+      "path": "src/adapters/persistence/company_level_authority.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 173,
+          "text": "let own: bool = sqlx::query_scalar(\"SELECT email=$2::citext FROM users WHERE id=$1\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/participant.rs#a_profile_email_claim_neither_merges_a_principal_nor_grants_access",
+        "name": "a_profile_email_claim_neither_merges_a_principal_nor_grants_access",
+        "kind": "function",
+        "path": "src/adapters/persistence/participant.rs",
+        "span": "L816-L890"
+      },
+      "path": "src/adapters/persistence/participant.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 829,
+          "text": "let owner_email: String = sqlx::query_scalar(\"SELECT email::text FROM users WHERE id = $1\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/session.rs#create_session",
+        "name": "create_session",
+        "kind": "function",
+        "path": "src/adapters/persistence/session.rs",
+        "span": "L11-L36"
+      },
+      "path": "src/adapters/persistence/session.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 17,
+          "text": "sqlx::query_scalar(\"SELECT auth_revision FROM users WHERE id = $1 FOR UPDATE\")"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 10,
+    "baselineChars": 228636
+  }
+}

@@ -1,0 +1,10 @@
+Diff in /Users/mac02/dev/openbot-recovery/.worktrees/autonomous-p02/src/adapters/persistence/agent.rs:432:
+         .map(str::to_owned);
+     match constraint.as_deref() {
+         Some("agent_revisions_company_id_agent_id_fkey") => AppError::Conflict(
+-            "This agent has published revisions and cannot be deleted. Deactivate it instead.".into(),
++            "This agent has published revisions and cannot be deleted. Deactivate it instead."
++                .into(),
+         ),
+         Some(
+             "task_harness_runs_company_id_agent_id_fkey"

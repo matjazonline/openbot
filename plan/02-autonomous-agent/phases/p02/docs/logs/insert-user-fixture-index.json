@@ -1,0 +1,219 @@
+{
+  "pattern": "INSERT INTO users",
+  "filesSearched": 1291,
+  "totalHits": 12,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/test_support.rs#revoke_membership",
+        "name": "revoke_membership",
+        "kind": "function",
+        "path": "src/adapters/persistence/test_support.rs",
+        "span": "L577-L618"
+      },
+      "path": "src/adapters/persistence/test_support.rs",
+      "inDegree": 8,
+      "hits": [
+        {
+          "line": 595,
+          "text": "\"INSERT INTO users (id, username, email, password_hash) VALUES ($1, $2, $3, 'hash')\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/delivery/tenant_tests.rs#member",
+        "name": "member",
+        "kind": "function",
+        "path": "src/adapters/persistence/delivery/tenant_tests.rs",
+        "span": "L22-L51"
+      },
+      "path": "src/adapters/persistence/delivery/tenant_tests.rs",
+      "inDegree": 5,
+      "hits": [
+        {
+          "line": 25,
+          "text": "sqlx::query(\"INSERT INTO users(id,username,email,password_hash) VALUES($1,$2,$3,'test')\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/schedule_tests.rs#member",
+        "name": "member",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/schedule_tests.rs",
+        "span": "L280-L302"
+      },
+      "path": "src/adapters/persistence/workflow/schedule_tests.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 284,
+          "text": "sqlx::query(\"INSERT INTO users(id,username,email,password_hash) VALUES($1,$2,$3,'test')\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_ingress_tests.rs#verified_member",
+        "name": "verified_member",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_ingress_tests.rs",
+        "span": "L411-L445"
+      },
+      "path": "src/adapters/persistence/workflow/message_ingress_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 417,
+          "text": "\"INSERT INTO users (id, username, email, password_hash) VALUES ($1, $2, $3, 'test')\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/user.rs#create_user",
+        "name": "create_user",
+        "kind": "function",
+        "path": "src/adapters/persistence/user.rs",
+        "span": "L161-L191"
+      },
+      "path": "src/adapters/persistence/user.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 171,
+          "text": "r#\"INSERT INTO users (id, username, email, password_hash)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/user.rs#create_external_user",
+        "name": "create_external_user",
+        "kind": "function",
+        "path": "src/adapters/persistence/user.rs",
+        "span": "L417-L449"
+      },
+      "path": "src/adapters/persistence/user.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 428,
+          "text": "r#\"INSERT INTO users (id, username, email, password_hash, email_verified_at)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/user.rs#confirm_pending_registration",
+        "name": "confirm_pending_registration",
+        "kind": "function",
+        "path": "src/adapters/persistence/user.rs",
+        "span": "L68-L125"
+      },
+      "path": "src/adapters/persistence/user.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 105,
+          "text": "r#\"INSERT INTO users (id, username, email, password_hash, email_verified_at)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_test_support.rs#member",
+        "name": "member",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_test_support.rs",
+        "span": "L77-L102"
+      },
+      "path": "src/adapters/persistence/workflow/message_test_support.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 84,
+          "text": "sqlx::query(\"INSERT INTO users(id,username,email,password_hash) VALUES($1,$2,$3,'test')\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs#person",
+        "name": "person",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs",
+        "span": "L204-L225"
+      },
+      "path": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 207,
+          "text": "sqlx::query(\"INSERT INTO users(id,username,email,password_hash) VALUES($1,$2,$3,'test')\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/mod.rs#a_row_defaulted_from_a_non_utc_session_reads_back_as_the_same_instant",
+        "name": "a_row_defaulted_from_a_non_utc_session_reads_back_as_the_same_instant",
+        "kind": "function",
+        "path": "src/adapters/persistence/mod.rs",
+        "span": "L343-L381"
+      },
+      "path": "src/adapters/persistence/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 360,
+          "text": "r#\"INSERT INTO users (id, username, email, password_hash)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/action_reconciliation_authority_support.rs#principal",
+        "name": "principal",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/action_reconciliation_authority_support.rs",
+        "span": "L85-L111"
+      },
+      "path": "src/adapters/persistence/workflow/action_reconciliation_authority_support.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 88,
+          "text": "sqlx::query(\"INSERT INTO users(id,username,email,password_hash) VALUES($1,$2,$3,'test')\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_sql_tests.rs#workflow_message_sql_destination_links_reject_foreign_rows",
+        "name": "workflow_message_sql_destination_links_reject_foreign_rows",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_sql_tests.rs",
+        "span": "L367-L401"
+      },
+      "path": "src/adapters/persistence/workflow/message_sql_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 375,
+          "text": "sqlx::query(\"INSERT INTO users(id,username,email,password_hash) VALUES($1,$2,$3,'test')\")"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 10,
+    "baselineChars": 310977
+  }
+}

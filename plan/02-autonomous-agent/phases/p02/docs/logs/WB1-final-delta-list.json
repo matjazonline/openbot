@@ -1,0 +1,13 @@
+{
+  "argv": [
+    "cargo",
+    "test",
+    "--locked",
+    "--offline",
+    "--lib",
+    "autonomous_agent_",
+    "--",
+    "--list"
+  ],
+  "exit_code": 0
+}

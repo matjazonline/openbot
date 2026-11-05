@@ -1,0 +1,9 @@
+UTC: 2026-11-05T21:59:37.329374+00:00
+Authority revision9 unchanged and byte-identical to coordination-r9.md
+Authority sha256: b14525f5e9e7bd37a2fd94477ec840d5fe6af0b095d0f3cd3ddb12580c966eb5
+Decision r1 sha256: 22dad5d974bc301d55faf21406864338cdbd450e672b9f8ebb8f80f56b5eb67c
+base:   e31ae98defcc6e6dea4c2778f5561ef15e4e716d
+digest: 6a2f7c205d7e30ff49405f0d812422bbe9ee4813180fc9427e23a56b8bbf536c
+files:
+?? plan/02-autonomous-agent/phases/p02/
+autonomous/p02

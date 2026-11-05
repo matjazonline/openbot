@@ -4,8 +4,12 @@ use serde::{Deserialize, Serialize};
 
 mod definition;
 mod manifest;
+mod publication;
+mod resolution;
 pub use definition::*;
 pub use manifest::*;
+pub use publication::*;
+pub use resolution::*;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 #[serde(transparent)]
@@ -82,3 +86,6 @@ pub struct ApprovedActionPolicy {
 
 #[cfg(test)]
 mod contract_tests;
+
+#[cfg(test)]
+mod resolution_tests;

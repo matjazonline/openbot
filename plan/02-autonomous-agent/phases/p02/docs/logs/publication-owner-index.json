@@ -1,0 +1,75 @@
+{
+  "pattern": "publication_owner",
+  "filesSearched": 1283,
+  "totalHits": 5,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/http.rs#publication_owner",
+        "name": "publication_owner",
+        "kind": "module",
+        "path": "src/adapters/persistence/workflow/http.rs",
+        "span": "L26-L26"
+      },
+      "path": "src/adapters/persistence/workflow/http.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 26,
+          "text": "mod publication_owner;"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/http.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 27,
+          "text": "pub use publication_owner::HttpPublicationDirectory;"
+        },
+        {
+          "line": 28,
+          "text": "pub use publication_owner::HttpPublicationSelection;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/mcp.rs#publication_owner",
+        "name": "publication_owner",
+        "kind": "module",
+        "path": "src/adapters/persistence/workflow/mcp.rs",
+        "span": "L19-L19"
+      },
+      "path": "src/adapters/persistence/workflow/mcp.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 19,
+          "text": "mod publication_owner;"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/mcp.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 20,
+          "text": "pub use publication_owner::{McpPublicationDirectory, McpPublicationSelection};"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 2,
+    "baselineChars": 34194
+  }
+}

@@ -1,0 +1,42 @@
+[
+  {
+    "name": "WB1-source-branches-run",
+    "argv": [
+      "scripts/test-network-isolation.sh",
+      "target/debug/deps/open_bots-c19a0b960dacdcef",
+      "--exact",
+      "adapters::persistence::agent_publication::tests::http::autonomous_agent_resolution_http_alias_captures_exact_connection_and_approval",
+      "adapters::persistence::agent_publication::tests::http::autonomous_agent_resolution_http_requires_current_secret_and_enabled_connection",
+      "adapters::persistence::agent_publication::tests::mcp::autonomous_agent_resolution_malformed_stored_catalog_is_an_error_not_an_empty_capture",
+      "adapters::persistence::workflow::tests::message_tests::autonomous_agent_publication_workflow_tests::autonomous_agent_publication_workflow_pin_is_exact_at_publish_and_retained_after_repin",
+      "adapters::persistence::workflow::tests::message_tests::workflow_tool_revocation_tests::workflow_tool_repin_and_archive_leave_published_workflows_on_their_frozen_version",
+      "application::workflow::mcp::tests::workflow_mcp_discovery_must_offer_exactly_the_frozen_schemas",
+      "application::workflow::mcp::tests::workflow_mcp_operation_requires_grant_review_and_reconcile_recovery"
+    ],
+    "selected": [
+      "adapters::persistence::agent_publication::tests::http::autonomous_agent_resolution_http_alias_captures_exact_connection_and_approval",
+      "adapters::persistence::agent_publication::tests::http::autonomous_agent_resolution_http_requires_current_secret_and_enabled_connection",
+      "adapters::persistence::agent_publication::tests::mcp::autonomous_agent_resolution_malformed_stored_catalog_is_an_error_not_an_empty_capture",
+      "adapters::persistence::workflow::tests::message_tests::autonomous_agent_publication_workflow_tests::autonomous_agent_publication_workflow_pin_is_exact_at_publish_and_retained_after_repin",
+      "adapters::persistence::workflow::tests::message_tests::workflow_tool_revocation_tests::workflow_tool_repin_and_archive_leave_published_workflows_on_their_frozen_version",
+      "application::workflow::mcp::tests::workflow_mcp_discovery_must_offer_exactly_the_frozen_schemas",
+      "application::workflow::mcp::tests::workflow_mcp_operation_requires_grant_review_and_reconcile_recovery"
+    ],
+    "selected_count": 7,
+    "exit_code": 0
+  },
+  {
+    "name": "WB1-clippy-r1",
+    "argv": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "--offline",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 101
+  }
+]

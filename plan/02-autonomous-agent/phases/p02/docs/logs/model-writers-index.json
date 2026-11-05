@@ -1,0 +1,354 @@
+{
+  "pattern": "replace_model_connections_for_user",
+  "filesSearched": 1283,
+  "totalHits": 23,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/workflow_tool_support.rs#new",
+        "name": "new",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/workflow_tool_support.rs",
+        "span": "L173-L242"
+      },
+      "path": "src/adapters/persistence/workflow/workflow_tool_support.rs",
+      "inDegree": 8,
+      "hits": [
+        {
+          "line": 219,
+          "text": "CompanyPersistence::replace_model_connections_for_user("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/agent_runtime_tests.rs#agent_setup_source",
+        "name": "agent_setup_source",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/agent_runtime_tests.rs",
+        "span": "L85-L188"
+      },
+      "path": "src/adapters/persistence/workflow/agent_runtime_tests.rs",
+      "inDegree": 7,
+      "hits": [
+        {
+          "line": 127,
+          "text": "CompanyPersistence::replace_model_connections_for_user("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_ingress_tests.rs#new",
+        "name": "new",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_ingress_tests.rs",
+        "span": "L59-L134"
+      },
+      "path": "src/adapters/persistence/workflow/message_ingress_tests.rs",
+      "inDegree": 5,
+      "hits": [
+        {
+          "line": 97,
+          "text": "CompanyPersistence::replace_model_connections_for_user("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/company.rs#replace_model_connections",
+        "name": "replace_model_connections",
+        "kind": "function",
+        "path": "src/application/use_cases/company.rs",
+        "span": "L400-L411"
+      },
+      "path": "src/application/use_cases/company.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 409,
+          "text": ".replace_model_connections_for_user(user_id, company_id, connections)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/assistant_channels_tests.rs#new",
+        "name": "new",
+        "kind": "function",
+        "path": "src/adapters/http/routes/assistant_channels_tests.rs",
+        "span": "L23-L82"
+      },
+      "path": "src/adapters/http/routes/assistant_channels_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 43,
+          "text": "CompanyPersistence::replace_model_connections_for_user("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/company.rs#replace_model_connections_for_user",
+        "name": "replace_model_connections_for_user",
+        "kind": "function",
+        "path": "src/adapters/persistence/company.rs",
+        "span": "L332-L453"
+      },
+      "path": "src/adapters/persistence/company.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 332,
+          "text": "async fn replace_model_connections_for_user("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs#enable_model",
+        "name": "enable_model",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs",
+        "span": "L46-L60"
+      },
+      "path": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 47,
+          "text": "CompanyPersistence::replace_model_connections_for_user("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/knowledge_search_support.rs#configure_agent",
+        "name": "configure_agent",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/knowledge_search_support.rs",
+        "span": "L186-L220"
+      },
+      "path": "src/adapters/persistence/workflow/knowledge_search_support.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 206,
+          "text": "CompanyPersistence::replace_model_connections_for_user("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/company.rs#replace_model_connections_for_user",
+        "name": "replace_model_connections_for_user",
+        "kind": "function",
+        "path": "src/application/use_cases/company.rs",
+        "span": "L177-L182"
+      },
+      "path": "src/application/use_cases/company.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 177,
+          "text": "async fn replace_model_connections_for_user("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/agent_api_tests.rs#library_builder_copy_keeps_its_grants_on_an_explicit_model",
+        "name": "library_builder_copy_keeps_its_grants_on_an_explicit_model",
+        "kind": "function",
+        "path": "src/adapters/http/routes/agent_api_tests.rs",
+        "span": "L135-L250"
+      },
+      "path": "src/adapters/http/routes/agent_api_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 147,
+          "text": "CompanyPersistence::replace_model_connections_for_user("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/onboarding.rs#the_channel_step_gives_each_modelled_agent_one_assistant_channel",
+        "name": "the_channel_step_gives_each_modelled_agent_one_assistant_channel",
+        "kind": "function",
+        "path": "src/adapters/http/routes/onboarding.rs",
+        "span": "L569-L761"
+      },
+      "path": "src/adapters/http/routes/onboarding.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 614,
+          "text": "CompanyPersistence::replace_model_connections_for_user("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/company.rs#a_company_can_replace_multiple_encrypted_model_connections_without_resending_keys",
+        "name": "a_company_can_replace_multiple_encrypted_model_connections_without_resending_keys",
+        "kind": "function",
+        "path": "src/adapters/persistence/company.rs",
+        "span": "L628-L783"
+      },
+      "path": "src/adapters/persistence/company.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 651,
+          "text": ".replace_model_connections_for_user("
+        },
+        {
+          "line": 668,
+          "text": ".replace_model_connections_for_user("
+        },
+        {
+          "line": 718,
+          "text": ".replace_model_connections_for_user("
+        },
+        {
+          "line": 756,
+          "text": ".replace_model_connections_for_user("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/company.rs#a_replace_that_would_strand_a_pinned_agent_is_refused_whole",
+        "name": "a_replace_that_would_strand_a_pinned_agent_is_refused_whole",
+        "kind": "function",
+        "path": "src/adapters/persistence/company.rs",
+        "span": "L786-L864"
+      },
+      "path": "src/adapters/persistence/company.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 808,
+          "text": ".replace_model_connections_for_user("
+        },
+        {
+          "line": 841,
+          "text": ".replace_model_connections_for_user("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/onboarding/tests.rs#new~2",
+        "name": "new~2",
+        "kind": "function",
+        "path": "src/adapters/persistence/onboarding/tests.rs",
+        "span": "L83-L128"
+      },
+      "path": "src/adapters/persistence/onboarding/tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 106,
+          "text": ".replace_model_connections_for_user("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/agent_recovery_tests.rs#workflow_agent_run_dynamic_selection_runs_the_bound_agent",
+        "name": "workflow_agent_run_dynamic_selection_runs_the_bound_agent",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/agent_recovery_tests.rs",
+        "span": "L461-L604"
+      },
+      "path": "src/adapters/persistence/workflow/agent_recovery_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 490,
+          "text": "CompanyPersistence::replace_model_connections_for_user("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/child_publication_tests.rs#workflow_child_publication_publishes_the_shipped_revision_template_end_to_end",
+        "name": "workflow_child_publication_publishes_the_shipped_revision_template_end_to_end",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/child_publication_tests.rs",
+        "span": "L168-L248"
+      },
+      "path": "src/adapters/persistence/workflow/child_publication_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 189,
+          "text": "CompanyPersistence::replace_model_connections_for_user("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/mcp_agent_tests.rs#workflow_agent_mcp_tool_dispatches_once_through_the_bound_slot",
+        "name": "workflow_agent_mcp_tool_dispatches_once_through_the_bound_slot",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/mcp_agent_tests.rs",
+        "span": "L27-L178"
+      },
+      "path": "src/adapters/persistence/workflow/mcp_agent_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 61,
+          "text": "CompanyPersistence::replace_model_connections_for_user("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/message_agent_tests.rs#workflow_agent_message_tool_parks_on_delivery_and_continues_with_its_receipt",
+        "name": "workflow_agent_message_tool_parks_on_delivery_and_continues_with_its_receipt",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/message_agent_tests.rs",
+        "span": "L33-L182"
+      },
+      "path": "src/adapters/persistence/workflow/message_agent_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 58,
+          "text": "CompanyPersistence::replace_model_connections_for_user("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/company_test_support.rs#replace_model_connections_for_user",
+        "name": "replace_model_connections_for_user",
+        "kind": "function",
+        "path": "src/application/use_cases/company_test_support.rs",
+        "span": "L293-L315"
+      },
+      "path": "src/application/use_cases/company_test_support.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 293,
+          "text": "async fn replace_model_connections_for_user("
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 16,
+    "baselineChars": 311083
+  }
+}

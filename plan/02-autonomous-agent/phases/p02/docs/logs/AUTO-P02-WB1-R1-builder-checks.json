@@ -1,0 +1,25 @@
+{
+  "argv": [
+    "scripts/test-network-isolation.sh",
+    "target/debug/deps/open_bots-c19a0b960dacdcef",
+    "--exact",
+    "adapters::http::routes::agent::api_tests::library_builder_copy_keeps_its_grants_on_an_explicit_model",
+    "adapters::http::routes::workflows::tests::tool_tests::workflow_tool_routes_register_revoke_and_grant"
+  ],
+  "selected_count": 2,
+  "selected": [
+    "adapters::http::routes::agent::api_tests::library_builder_copy_keeps_its_grants_on_an_explicit_model",
+    "adapters::http::routes::workflows::tests::tool_tests::workflow_tool_routes_register_revoke_and_grant"
+  ],
+  "exit_code": 0,
+  "binary_sha256": "2f997c74ded3f955bd71a92d5dbd3e8bd246ad7b9e81bd9822f7eb7d7808c488",
+  "purpose": "Verify unchanged public grant restriction and existing authorized Builder producer at new publication boundary",
+  "environment": {
+    "DATABASE_URL": "postgres://mac02@127.0.0.1:55602/open_bots",
+    "TEST_DATABASE_URL": "postgres://mac02@127.0.0.1:55602/open_bots_test",
+    "SQLX_OFFLINE": "true",
+    "CARGO_INCREMENTAL": "0",
+    "RUST_MIN_STACK": "2097152"
+  },
+  "ALLOW_MISSING_DATABASE_URL": "unset"
+}

@@ -1,0 +1,10 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 4 tests
+test application::agent::resolution_tests::autonomous_agent_resolution_same_alias_on_different_agents_is_independent ... ok
+test adapters::persistence::agent_publication::tests::mcp::autonomous_agent_resolution_malformed_stored_catalog_is_an_error_not_an_empty_capture ... ok
+test adapters::persistence::agent_publication::tests::http::autonomous_agent_resolution_http_alias_captures_exact_connection_and_approval ... ok
+test adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_removal_revokes_identity_and_new_identity_cannot_revive_it ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 2942 filtered out; finished in 0.22s
+
