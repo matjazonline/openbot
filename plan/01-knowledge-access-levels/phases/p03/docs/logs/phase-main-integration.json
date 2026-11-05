@@ -1,0 +1,15 @@
+{
+  "source_commit": "aac35b772d3dc5ae555e00a0077b2f9a60e4925c",
+  "primary_main_head": "aac35b772d3dc5ae555e00a0077b2f9a60e4925c",
+  "integration": "exact fast-forward; no source merge/resolution",
+  "preserved_primary_status": [
+    " M plan/fix-app/COORDINATION.md",
+    "?? plan/01-knowledge-access-levels/COORDINATION.md"
+  ],
+  "accepted_source_tree": "5814560962264ec3c568ea3d5c7ab31e449b641856d2d9b9597ce4ceec10fad2",
+  "outbound_notice": "KNOW-C002/r1 ACTIVE",
+  "authority_revision": 8,
+  "authority_sha256": "a9e058ae84380cec057d6a618644f3392df6d4eb15aeb92a488b308205714968",
+  "remote_publication": false,
+  "whole_plan_final06": "PENDING"
+}
